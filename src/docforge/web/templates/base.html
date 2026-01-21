@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}DocForge{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="/">DocForge</a>
+        </div>
+        <ul class="nav-links">
+            <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>
+            <li><a href="/templates" class="{% if '/templates' in request.url.path %}active{% endif %}">Templates</a></li>
+            <li><a href="/documents" class="{% if '/documents' in request.url.path %}active{% endif %}">Documents</a></li>
+            <li><a href="/extract" class="{% if '/extract' in request.url.path %}active{% endif %}">Extract</a></li>
+            <li class="nav-admin-links" id="nav-admin-links" style="display: none;">
+                <a href="/users" class="{% if '/users' in request.url.path %}active{% endif %}">Users</a>
+            </li>
+            <li class="nav-admin-links" id="nav-audit-link" style="display: none;">
+                <a href="/audit-logs" class="{% if '/audit-logs' in request.url.path %}active{% endif %}">Audit Logs</a>
+            </li>
+        </ul>
+        <div class="user-menu" id="user-menu">
+            <button class="user-menu-btn" onclick="toggleUserDropdown()">
+                <span class="user-avatar" id="user-avatar">?</span>
+                <span class="user-name" id="user-name">Loading...</span>
+                <span class="dropdown-arrow">&#9662;</span>
+            </button>
+            <div class="user-dropdown" id="user-dropdown">
+                <div class="user-dropdown-header" id="user-dropdown-header">
+                    <!-- Populated by JS -->
+                </div>
+                <div class="user-dropdown-menu">
+                    <a href="/profile">My Profile</a>
+                    <a href="#" onclick="logout(); return false;">Sign Out</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <p>DocForge - Documentation Template Management System</p>
+    </footer>
+
+    <div id="toast-container"></div>
+
+    <!-- Markdown parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

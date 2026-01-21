@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "docforge"
+version = "0.1.0"
+description = "Documentation Template Management System"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "DocForge Team"}
+]
+dependencies = [
+    "typer[all]>=0.9.0",
+    "sqlalchemy>=2.0",
+    "jinja2>=3.1",
+    "python-docx>=1.1",
+    "markdown>=3.5",
+    "beautifulsoup4>=4.12",
+    "rich>=13.0",
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+    "python-multipart>=0.0.6",
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt>=4.0.0,<4.1",
+    "python-jose[cryptography]>=3.3.0",
+    "httpx>=0.25.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+]
+
+[project.scripts]
+docforge = "docforge.cli.main:app"
+docforge-web = "docforge.web.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

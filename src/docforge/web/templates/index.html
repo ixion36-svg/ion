@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - DocForge{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <h1>Dashboard</h1>
+
+    <div class="stats-grid" id="stats-container">
+        <div class="stat-card">
+            <div class="stat-value" id="templates-count">-</div>
+            <div class="stat-label">Templates</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="documents-count">-</div>
+            <div class="stat-label">Documents</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="tags-count">-</div>
+            <div class="stat-label">Tags</div>
+        </div>
+    </div>
+
+    <div class="dashboard-sections">
+        <section class="section">
+            <div class="section-header">
+                <h2>Recent Templates</h2>
+                <a href="/templates/new" class="btn btn-primary">New Template</a>
+            </div>
+            <div id="recent-templates" class="card-list">
+                <p class="loading">Loading...</p>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-header">
+                <h2>Quick Actions</h2>
+            </div>
+            <div class="action-grid">
+                <a href="/templates/new" class="action-card">
+                    <div class="action-icon">+</div>
+                    <div class="action-label">Create Template</div>
+                </a>
+                <a href="/extract" class="action-card">
+                    <div class="action-icon">&#x21e7;</div>
+                    <div class="action-label">Extract Template</div>
+                </a>
+                <a href="/templates" class="action-card">
+                    <div class="action-icon">&#x2630;</div>
+                    <div class="action-label">Browse Templates</div>
+                </a>
+                <a href="/documents" class="action-card">
+                    <div class="action-icon">&#x2637;</div>
+                    <div class="action-label">View Documents</div>
+                </a>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-header">
+                <h2>Sample Templates</h2>
+            </div>
+            <p class="muted" style="margin-bottom: 1rem;">Get started quickly with pre-built cyber security templates.</p>
+            <button id="create-samples-btn" class="btn btn-primary">Load Sample Templates</button>
+            <span id="samples-status" style="margin-left: 1rem;"></span>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% raw %}
+document.addEventListener('DOMContentLoaded', async () => {
+    // Load stats
+    try {
+        const stats = await api.get('/api/stats');
+        document.getElementById('templates-count').textContent = stats.templates_count;
+        document.getElementById('documents-count').textContent = stats.documents_count;
+        document.getElementById('tags-count').textContent = stats.tags_count;
+    } catch (e) {
+        console.error('Failed to load stats:', e);
+    }
+
+    // Load recent templates
+    try {
+        const templates = await api.get('/api/templates');
+        const container = document.getElementById('recent-templates');
+
+        if (templates.length === 0) {
+            container.innerHTML = '<p class="empty-state">No templates yet. <a href="/templates/new">Create one!</a></p>';
+        } else {
+            let html = '';
+            templates.slice(0, 5).forEach(function(t) {
+                html += '<div class="list-item">';
+                html += '<div class="list-item-content">';
+                html += '<a href="/templates/' + t.id + '" class="list-item-title">' + escapeHtml(t.name) + '</a>';
+                html += '<div class="list-item-meta">';
+                html += '<span class="badge">' + t.format + '</span>';
+                html += '<span>v' + t.current_version + '</span>';
+                t.tags.forEach(function(tag) {
+                    html += '<span class="tag">' + escapeHtml(tag) + '</span>';
+                });
+                html += '</div>';
+                html += '</div>';
+                html += '<div class="list-item-actions">';
+                html += '<a href="/templates/' + t.id + '/render" class="btn btn-sm">Render</a>';
+                html += '<a href="/templates/' + t.id + '/edit" class="btn btn-sm btn-secondary">Edit</a>';
+                html += '</div>';
+                html += '</div>';
+            });
+            container.innerHTML = html;
+        }
+    } catch (e) {
+        document.getElementById('recent-templates').innerHTML = '<p class="error">Failed to load templates</p>';
+    }
+
+    // Sample templates button
+    document.getElementById('create-samples-btn').addEventListener('click', async function() {
+        const btn = this;
+        const status = document.getElementById('samples-status');
+        btn.disabled = true;
+        btn.textContent = 'Loading...';
+
+        try {
+            const result = await api.post('/api/samples/create', {});
+            if (result.created && result.created.length > 0) {
+                status.innerHTML = '<span style="color: var(--success);">Created ' + result.created.length + ' templates!</span>';
+                showToast(result.message, 'success');
+                // Reload templates list
+                setTimeout(function() { window.location.reload(); }, 1000);
+            } else {
+                status.innerHTML = '<span style="color: var(--text-muted);">Sample templates already exist.</span>';
+            }
+        } catch (e) {
+            status.innerHTML = '<span style="color: var(--danger);">Failed to create samples</span>';
+            showToast('Failed to create sample templates', 'error');
+        }
+
+        btn.disabled = false;
+        btn.textContent = 'Load Sample Templates';
+    });
+});
+{% endraw %}
+</script>
+{% endblock %}
