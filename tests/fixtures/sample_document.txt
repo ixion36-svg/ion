@@ -1,0 +1,34 @@
+INVOICE
+
+Invoice Number: INV-2024-001
+Date: 2024-01-15
+
+Bill To:
+Mr. John Smith
+Acme Corporation
+123 Main Street
+New York, NY 10001
+Email: john.smith@acme.com
+Phone: (555) 123-4567
+
+Description                     Qty     Price       Total
+------------------------------------------------------------
+Consulting Services             10      $150.00     $1,500.00
+Software License                1       $499.99     $499.99
+Support Package                 1       $200.00     $200.00
+------------------------------------------------------------
+                                        Subtotal:   $2,199.99
+                                        Tax (8%):   $176.00
+                                        Total:      $2,375.99
+
+Payment Terms: Net 30
+Due Date: 2024-02-14
+
+Please remit payment to:
+Bank: First National Bank
+Account: 1234567890
+Routing: 021000021
+
+Thank you for your business!
+
+Contact us at billing@vendor.com or visit https://vendor.com/support

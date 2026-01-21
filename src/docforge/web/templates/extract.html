@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Extract Template - DocForge{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Extract Template from Document</h1>
+</div>
+
+<div class="extract-layout">
+    <div class="extract-input">
+        <div class="form-group">
+            <label for="file-input">Upload Document</label>
+            <input type="file" id="file-input" accept=".txt,.md,.html,.docx">
+        </div>
+
+        <div class="form-group">
+            <label for="confidence">Minimum Confidence: <span id="confidence-value">70%</span></label>
+            <input type="range" id="confidence" min="0" max="100" value="70" step="5">
+        </div>
+
+        <div class="form-actions">
+            <button id="analyze-btn" class="btn">Analyze</button>
+            <button id="generate-btn" class="btn btn-primary">Generate Template</button>
+        </div>
+
+        <div id="patterns-section" style="display: none;">
+            <h3>Detected Patterns</h3>
+            <div id="patterns-list" class="patterns-container"></div>
+        </div>
+
+        <div id="variables-section" style="display: none;">
+            <h3>Inferred Variables</h3>
+            <table id="variables-table" class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Occurrences</th>
+                        <th>Confidence</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="extract-output">
+        <h3>Generated Template</h3>
+        <pre id="generated-template" class="code-block">Upload a document and click "Generate Template" to extract a template.</pre>
+
+        <div id="save-section" style="display: none;">
+            <div class="form-group">
+                <label for="template-name">Template Name</label>
+                <input type="text" id="template-name" placeholder="my_template">
+            </div>
+            <button id="save-btn" class="btn btn-primary">Save as Template</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% raw %}
+let generatedContent = '';
+
+document.getElementById('confidence').addEventListener('input', (e) => {
+    document.getElementById('confidence-value').textContent = e.target.value + '%';
+});
+
+document.getElementById('analyze-btn').addEventListener('click', async () => {
+    const fileInput = document.getElementById('file-input');
+    if (!fileInput.files.length) {
+        showToast('Please select a file', 'error');
+        return;
+    }
+
+    const confidence = document.getElementById('confidence').value / 100;
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    try {
+        const response = await fetch('/api/extract/analyze?confidence=' + confidence, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) throw new Error('Analysis failed');
+        const result = await response.json();
+
+        // Show patterns
+        document.getElementById('patterns-section').style.display = 'block';
+        const patternsList = document.getElementById('patterns-list');
+        if (result.patterns.length === 0) {
+            patternsList.innerHTML = '<p class="muted">No patterns detected</p>';
+        } else {
+            let html = '';
+            result.patterns.forEach(function(p) {
+                html += '<div class="pattern-item">';
+                html += '<span class="pattern-type">' + p.pattern_type + '</span>';
+                html += '<span class="pattern-value">' + escapeHtml(p.value.substring(0, 50)) + '</span>';
+                html += '<span class="pattern-confidence">' + Math.round(p.confidence * 100) + '%</span>';
+                html += '</div>';
+            });
+            patternsList.innerHTML = html;
+        }
+
+        // Show variables
+        document.getElementById('variables-section').style.display = 'block';
+        const tbody = document.querySelector('#variables-table tbody');
+        if (result.variables.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="muted">No variables inferred</td></tr>';
+        } else {
+            let html = '';
+            result.variables.forEach(function(v) {
+                html += '<tr>';
+                html += '<td><code>' + escapeHtml(v.name) + '</code></td>';
+                html += '<td>' + v.var_type + '</td>';
+                html += '<td>' + v.occurrences + '</td>';
+                html += '<td>' + Math.round(v.confidence * 100) + '%</td>';
+                html += '</tr>';
+            });
+            tbody.innerHTML = html;
+        }
+
+        showToast('Analysis complete', 'success');
+    } catch (e) {
+        showToast('Analysis failed', 'error');
+    }
+});
+
+document.getElementById('generate-btn').addEventListener('click', async () => {
+    const fileInput = document.getElementById('file-input');
+    if (!fileInput.files.length) {
+        showToast('Please select a file', 'error');
+        return;
+    }
+
+    const confidence = document.getElementById('confidence').value / 100;
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    try {
+        const response = await fetch('/api/extract/generate?confidence=' + confidence, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) throw new Error('Generation failed');
+        const result = await response.json();
+
+        generatedContent = result.template_content;
+        document.getElementById('generated-template').textContent = result.template_content;
+        document.getElementById('save-section').style.display = 'block';
+
+        // Set default name from filename
+        const filename = fileInput.files[0].name.replace(/\.[^/.]+$/, '');
+        document.getElementById('template-name').value = filename + '_template';
+
+        showToast('Template generated with ' + result.replacements_made + ' replacements', 'success');
+    } catch (e) {
+        showToast('Generation failed', 'error');
+    }
+});
+
+document.getElementById('save-btn').addEventListener('click', async () => {
+    const name = document.getElementById('template-name').value;
+    if (!name) {
+        showToast('Please enter a template name', 'error');
+        return;
+    }
+
+    try {
+        const result = await api.post('/api/templates', {
+            name: name,
+            content: generatedContent,
+            format: 'markdown',
+            description: 'Generated from document extraction',
+        });
+
+        showToast('Template saved', 'success');
+        window.location.href = '/templates/' + result.id;
+    } catch (e) {
+        showToast(e.message || 'Failed to save template', 'error');
+    }
+});
+{% endraw %}
+</script>
+{% endblock %}

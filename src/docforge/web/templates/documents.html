@@ -1,0 +1,571 @@
+{% extends "base.html" %}
+
+{% block title %}Documents - DocForge{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Documents</h1>
+</div>
+
+<div class="toolbar">
+    <input type="text" id="search-input" placeholder="Search documents..." class="search-input">
+</div>
+
+<div id="documents-list" class="card-list">
+    <p class="loading">Loading...</p>
+</div>
+
+<!-- Document View Modal -->
+<div id="document-modal" class="modal" style="display: none;">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2 id="modal-doc-name">Document</h2>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="modal-doc-meta" class="meta-bar"></div>
+
+            <div class="content-tabs">
+                <button type="button" class="content-tab-btn active" data-view="rendered">Rendered</button>
+                <button type="button" class="content-tab-btn" data-view="raw">Raw</button>
+                <button type="button" class="content-tab-btn" data-view="edit">Edit</button>
+                <button type="button" class="content-tab-btn" data-view="versions">Version History</button>
+            </div>
+
+            <div id="rendered-view" class="document-content rendered-content"></div>
+            <div id="raw-view" class="document-content" style="display: none;">
+                <pre id="modal-doc-content" class="code-block"></pre>
+            </div>
+
+            <div id="edit-view" class="document-content" style="display: none;">
+                <textarea id="edit-content" class="edit-textarea" rows="20"></textarea>
+            </div>
+
+            <div id="versions-view" class="document-content" style="display: none;">
+                <div id="versions-list" class="versions-list"></div>
+            </div>
+
+            <div id="modal-doc-data-section" style="display: none;">
+                <h4>Input Data</h4>
+                <pre id="modal-doc-data" class="code-block"></pre>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="save-amendment-btn" class="btn btn-success" style="display: none;">Save Amendment</button>
+            <button id="download-btn" class="btn btn-primary">Download</button>
+            <button id="delete-doc-btn" class="btn btn-danger">Delete</button>
+            <button class="btn" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Amendment Confirmation Modal -->
+<div id="amendment-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Confirm Amendment</h2>
+            <button class="modal-close" onclick="closeAmendmentModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>You are about to create a new version of this document.</p>
+            <div class="form-group">
+                <label for="amendment-reason">Amendment Reason (optional):</label>
+                <input type="text" id="amendment-reason" class="form-control" placeholder="e.g., Updated findings, Fixed typo...">
+            </div>
+            <div class="form-group">
+                <label for="amended-by">Amended By (optional):</label>
+                <input type="text" id="amended-by" class="form-control" placeholder="Your name">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="confirm-amendment-btn" class="btn btn-success">Confirm Amendment</button>
+            <button class="btn" onclick="closeAmendmentModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Version Preview Modal -->
+<div id="version-modal" class="modal" style="display: none;">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2 id="version-modal-title">Version Preview</h2>
+            <button class="modal-close" onclick="closeVersionModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="version-meta" class="meta-bar"></div>
+            <div id="version-content" class="document-content rendered-content"></div>
+        </div>
+        <div class="modal-footer">
+            <button id="revert-version-btn" class="btn btn-warning">Revert to This Version</button>
+            <button class="btn" onclick="closeVersionModal()">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% raw %}
+let currentDocId = null;
+let currentDocContent = '';
+let currentDocName = '';
+let currentDocFormat = '';
+let currentDocVersion = 1;
+let currentDocInputData = null;
+let allDocuments = [];
+let pendingAmendmentContent = '';
+let previewVersionNumber = null;
+
+async function loadDocuments() {
+    try {
+        allDocuments = await api.get('/api/documents');
+        renderDocuments(allDocuments);
+    } catch (e) {
+        document.getElementById('documents-list').innerHTML = '<p class="error">Failed to load documents</p>';
+    }
+}
+
+function renderDocuments(documents) {
+    const container = document.getElementById('documents-list');
+
+    if (documents.length === 0) {
+        container.innerHTML = '<p class="empty-state">No documents found. Render a template to create one!</p>';
+        return;
+    }
+
+    let html = '';
+    documents.forEach(function(d) {
+        const isArchived = d.status === 'archived';
+        html += '<div class="list-item' + (isArchived ? ' archived' : '') + '">';
+        html += '<div class="list-item-content">';
+        html += '<span class="list-item-title">' + escapeHtml(d.name) + '</span>';
+        html += '<div class="list-item-meta">';
+        html += '<span class="badge">' + d.output_format + '</span>';
+        html += '<span class="badge badge-version">v' + (d.current_version || 1) + '</span>';
+        if (isArchived) {
+            html += '<span class="badge badge-archived">Archived</span>';
+        }
+        if (d.source_template_id) {
+            html += '<span>From template #' + d.source_template_id + ' v' + d.source_template_version + '</span>';
+        }
+        html += '<span>' + formatDate(d.created_at) + '</span>';
+        html += '</div>';
+        html += '</div>';
+        html += '<div class="list-item-actions">';
+        html += '<button class="btn btn-sm" onclick="viewDocument(' + d.id + ')">View</button>';
+        if (isArchived) {
+            html += '<button class="btn btn-sm btn-success" onclick="restoreDocument(' + d.id + ')">Restore</button>';
+        } else {
+            html += '<button class="btn btn-sm btn-warning" onclick="archiveDocument(' + d.id + ')">Archive</button>';
+        }
+        html += '<button class="btn btn-sm btn-danger" onclick="deleteDocument(' + d.id + ', \'' + escapeHtml(d.name).replace(/'/g, "\\'") + '\')">Delete</button>';
+        html += '</div>';
+        html += '</div>';
+    });
+    container.innerHTML = html;
+}
+
+function filterDocuments() {
+    const search = document.getElementById('search-input').value.toLowerCase();
+
+    if (!search) {
+        renderDocuments(allDocuments);
+        return;
+    }
+
+    const filtered = allDocuments.filter(function(d) {
+        return d.name.toLowerCase().indexOf(search) !== -1;
+    });
+
+    renderDocuments(filtered);
+}
+
+function renderContent(content, format) {
+    switch (format) {
+        case 'markdown':
+            return renderMarkdown(content);
+        case 'html':
+            return content; // Already HTML
+        case 'csv':
+            return renderCSV(content);
+        default:
+            return '<pre class="plain-text">' + escapeHtml(content) + '</pre>';
+    }
+}
+
+function renderMarkdown(content) {
+    if (typeof marked !== 'undefined') {
+        // Configure marked for safety
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+        return marked.parse(content);
+    }
+    // Fallback: basic markdown rendering
+    return '<pre>' + escapeHtml(content) + '</pre>';
+}
+
+function renderCSV(content) {
+    const lines = content.trim().split('\n');
+    if (lines.length === 0) return '<p>Empty CSV</p>';
+
+    let html = '<table class="table csv-table">';
+
+    lines.forEach(function(line, index) {
+        // Simple CSV parsing (handles basic cases)
+        const cells = parseCSVLine(line);
+        const tag = index === 0 ? 'th' : 'td';
+        const rowTag = index === 0 ? 'thead' : (index === 1 ? 'tbody' : '');
+
+        if (rowTag === 'thead') html += '<thead>';
+        if (rowTag === 'tbody') html += '</thead><tbody>';
+
+        html += '<tr>';
+        cells.forEach(function(cell) {
+            html += '<' + tag + '>' + escapeHtml(cell.trim()) + '</' + tag + '>';
+        });
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    return html;
+}
+
+function parseCSVLine(line) {
+    const cells = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+            inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+            cells.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    cells.push(current);
+    return cells;
+}
+
+async function viewDocument(id) {
+    try {
+        const doc = await api.get('/api/documents/' + id);
+        currentDocId = id;
+        currentDocContent = doc.rendered_content;
+        currentDocName = doc.name;
+        currentDocFormat = doc.output_format;
+        currentDocVersion = doc.current_version || 1;
+        currentDocInputData = doc.input_data;
+
+        document.getElementById('modal-doc-name').textContent = doc.name;
+        let metaHtml = '<span class="badge">' + doc.output_format + '</span>';
+        metaHtml += '<span class="badge badge-version">v' + currentDocVersion + '</span>';
+        if (doc.status === 'archived') {
+            metaHtml += '<span class="badge badge-archived">Archived</span>';
+        }
+        if (doc.source_template_id) {
+            metaHtml += '<span>From template #' + doc.source_template_id + ' v' + doc.source_template_version + '</span>';
+        }
+        metaHtml += '<span>Created: ' + formatDate(doc.created_at) + '</span>';
+        if (doc.updated_at && doc.updated_at !== doc.created_at) {
+            metaHtml += '<span>Updated: ' + formatDate(doc.updated_at) + '</span>';
+        }
+        document.getElementById('modal-doc-meta').innerHTML = metaHtml;
+
+        // Render content based on format
+        document.getElementById('rendered-view').innerHTML = renderContent(doc.rendered_content, doc.output_format);
+        document.getElementById('modal-doc-content').textContent = doc.rendered_content;
+        document.getElementById('edit-content').value = doc.rendered_content;
+
+        // Reset to rendered view
+        switchTab('rendered');
+
+        if (doc.input_data) {
+            document.getElementById('modal-doc-data').textContent = JSON.stringify(doc.input_data, null, 2);
+            document.getElementById('modal-doc-data-section').style.display = 'block';
+        } else {
+            document.getElementById('modal-doc-data-section').style.display = 'none';
+        }
+
+        document.getElementById('document-modal').style.display = 'flex';
+    } catch (e) {
+        showToast('Failed to load document', 'error');
+    }
+}
+
+async function deleteDocument(id, name) {
+    if (!confirm('Delete document "' + name + '"?')) return;
+
+    try {
+        await api.delete('/api/documents/' + id);
+        showToast('Document deleted', 'success');
+        loadDocuments();
+    } catch (e) {
+        showToast('Failed to delete document', 'error');
+    }
+}
+
+function closeModal() {
+    document.getElementById('document-modal').style.display = 'none';
+}
+
+function switchTab(view) {
+    document.querySelectorAll('.content-tab-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+    });
+    document.querySelector('.content-tab-btn[data-view="' + view + '"]').classList.add('active');
+
+    document.getElementById('rendered-view').style.display = view === 'rendered' ? 'block' : 'none';
+    document.getElementById('raw-view').style.display = view === 'raw' ? 'block' : 'none';
+    document.getElementById('edit-view').style.display = view === 'edit' ? 'block' : 'none';
+    document.getElementById('versions-view').style.display = view === 'versions' ? 'block' : 'none';
+
+    // Show/hide save amendment button based on edit view
+    document.getElementById('save-amendment-btn').style.display = view === 'edit' ? 'inline-block' : 'none';
+
+    // Load versions when switching to versions tab
+    if (view === 'versions') {
+        loadVersions();
+    }
+}
+
+async function loadVersions() {
+    const container = document.getElementById('versions-list');
+    container.innerHTML = '<p class="loading">Loading versions...</p>';
+
+    try {
+        const versions = await api.get('/api/documents/' + currentDocId + '/versions');
+
+        if (versions.length === 0) {
+            container.innerHTML = '<p class="empty-state">No version history available</p>';
+            return;
+        }
+
+        let html = '<table class="table versions-table">';
+        html += '<thead><tr><th>Version</th><th>Reason</th><th>By</th><th>Date</th><th>Actions</th></tr></thead>';
+        html += '<tbody>';
+        versions.forEach(function(v) {
+            const isCurrent = v.version_number === currentDocVersion;
+            html += '<tr' + (isCurrent ? ' class="current-version"' : '') + '>';
+            html += '<td>v' + v.version_number + (isCurrent ? ' <span class="badge badge-current">Current</span>' : '') + '</td>';
+            html += '<td>' + escapeHtml(v.amendment_reason || '-') + '</td>';
+            html += '<td>' + escapeHtml(v.amended_by || '-') + '</td>';
+            html += '<td>' + formatDate(v.created_at) + '</td>';
+            html += '<td>';
+            html += '<button class="btn btn-sm" onclick="previewVersion(' + v.version_number + ')">View</button>';
+            if (!isCurrent) {
+                html += ' <button class="btn btn-sm btn-warning" onclick="confirmRevert(' + v.version_number + ')">Revert</button>';
+            }
+            html += '</td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<p class="error">Failed to load versions</p>';
+    }
+}
+
+async function previewVersion(versionNumber) {
+    try {
+        const version = await api.get('/api/documents/' + currentDocId + '/versions/' + versionNumber);
+        previewVersionNumber = versionNumber;
+
+        document.getElementById('version-modal-title').textContent = 'Version ' + versionNumber + ' Preview';
+
+        let metaHtml = '';
+        if (version.amendment_reason) {
+            metaHtml += '<span><strong>Reason:</strong> ' + escapeHtml(version.amendment_reason) + '</span>';
+        }
+        if (version.amended_by) {
+            metaHtml += '<span><strong>By:</strong> ' + escapeHtml(version.amended_by) + '</span>';
+        }
+        metaHtml += '<span><strong>Date:</strong> ' + formatDate(version.created_at) + '</span>';
+        document.getElementById('version-meta').innerHTML = metaHtml;
+
+        document.getElementById('version-content').innerHTML = renderContent(version.rendered_content, currentDocFormat);
+
+        // Show/hide revert button
+        document.getElementById('revert-version-btn').style.display =
+            versionNumber === currentDocVersion ? 'none' : 'inline-block';
+
+        document.getElementById('version-modal').style.display = 'flex';
+    } catch (e) {
+        showToast('Failed to load version', 'error');
+    }
+}
+
+function closeVersionModal() {
+    document.getElementById('version-modal').style.display = 'none';
+}
+
+function confirmRevert(versionNumber) {
+    if (!confirm('Revert to version ' + versionNumber + '? This will create a new version with the old content.')) {
+        return;
+    }
+    revertToVersion(versionNumber);
+}
+
+async function revertToVersion(versionNumber) {
+    try {
+        const prefs = JSON.parse(localStorage.getItem('docforge_prefs') || '{}');
+        const amendedBy = prefs.author || null;
+
+        await api.post('/api/documents/' + currentDocId + '/revert/' + versionNumber + (amendedBy ? '?amended_by=' + encodeURIComponent(amendedBy) : ''));
+        showToast('Document reverted to version ' + versionNumber, 'success');
+        closeVersionModal();
+        viewDocument(currentDocId);
+        loadDocuments();
+    } catch (e) {
+        showToast('Failed to revert document', 'error');
+    }
+}
+
+async function archiveDocument(id) {
+    if (!confirm('Archive this document? It will be hidden from the main list but can be restored later.')) {
+        return;
+    }
+
+    try {
+        await api.post('/api/documents/' + id + '/archive');
+        showToast('Document archived', 'success');
+        loadDocuments();
+    } catch (e) {
+        showToast('Failed to archive document', 'error');
+    }
+}
+
+async function restoreDocument(id) {
+    try {
+        await api.post('/api/documents/' + id + '/restore');
+        showToast('Document restored', 'success');
+        loadDocuments();
+    } catch (e) {
+        showToast('Failed to restore document', 'error');
+    }
+}
+
+function showAmendmentModal() {
+    pendingAmendmentContent = document.getElementById('edit-content').value;
+
+    // Check if content actually changed
+    if (pendingAmendmentContent === currentDocContent) {
+        showToast('No changes to save', 'warning');
+        return;
+    }
+
+    // Pre-fill amended by from preferences
+    const prefs = JSON.parse(localStorage.getItem('docforge_prefs') || '{}');
+    if (prefs.author) {
+        document.getElementById('amended-by').value = prefs.author;
+    }
+
+    document.getElementById('amendment-reason').value = '';
+    document.getElementById('amendment-modal').style.display = 'flex';
+}
+
+function closeAmendmentModal() {
+    document.getElementById('amendment-modal').style.display = 'none';
+}
+
+async function confirmAmendment() {
+    const reason = document.getElementById('amendment-reason').value.trim();
+    const amendedBy = document.getElementById('amended-by').value.trim();
+
+    try {
+        await api.put('/api/documents/' + currentDocId + '/amend', {
+            rendered_content: pendingAmendmentContent,
+            input_data: currentDocInputData,
+            amendment_reason: reason || null,
+            amended_by: amendedBy || null
+        });
+
+        showToast('Document amended successfully', 'success');
+        closeAmendmentModal();
+        viewDocument(currentDocId);
+        loadDocuments();
+    } catch (e) {
+        showToast('Failed to amend document', 'error');
+    }
+}
+
+// Content view tabs
+document.querySelectorAll('.content-tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const view = this.getAttribute('data-view');
+        switchTab(view);
+    });
+});
+
+document.getElementById('download-btn').addEventListener('click', function() {
+    let ext = '.txt';
+    let mimeType = 'text/plain';
+
+    if (currentDocFormat === 'markdown') {
+        ext = '.md';
+        mimeType = 'text/markdown';
+    } else if (currentDocFormat === 'html') {
+        ext = '.html';
+        mimeType = 'text/html';
+    } else if (currentDocFormat === 'csv') {
+        ext = '.csv';
+        mimeType = 'text/csv';
+    }
+
+    const blob = new Blob([currentDocContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = currentDocName + ext;
+    a.click();
+    URL.revokeObjectURL(url);
+});
+
+document.getElementById('delete-doc-btn').addEventListener('click', async function() {
+    if (!currentDocId) return;
+    if (!confirm('Delete this document?')) return;
+
+    try {
+        await api.delete('/api/documents/' + currentDocId);
+        showToast('Document deleted', 'success');
+        closeModal();
+        loadDocuments();
+    } catch (e) {
+        showToast('Failed to delete document', 'error');
+    }
+});
+
+document.getElementById('document-modal').addEventListener('click', function(e) {
+    if (e.target.id === 'document-modal') closeModal();
+});
+
+document.getElementById('save-amendment-btn').addEventListener('click', showAmendmentModal);
+
+document.getElementById('confirm-amendment-btn').addEventListener('click', confirmAmendment);
+
+document.getElementById('amendment-modal').addEventListener('click', function(e) {
+    if (e.target.id === 'amendment-modal') closeAmendmentModal();
+});
+
+document.getElementById('version-modal').addEventListener('click', function(e) {
+    if (e.target.id === 'version-modal') closeVersionModal();
+});
+
+document.getElementById('revert-version-btn').addEventListener('click', function() {
+    if (previewVersionNumber !== null) {
+        confirmRevert(previewVersionNumber);
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadDocuments();
+    document.getElementById('search-input').addEventListener('input', filterDocuments);
+});
+{% endraw %}
+</script>
+{% endblock %}

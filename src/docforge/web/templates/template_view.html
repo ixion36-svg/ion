@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Template - DocForge{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 id="template-name">Loading...</h1>
+    <div class="header-actions">
+        <a href="/templates/{{ template_id }}/render" class="btn btn-primary">Render</a>
+        <a href="/templates/{{ template_id }}/edit" class="btn">Edit</a>
+        <a href="/templates/{{ template_id }}/versions" class="btn">Version History</a>
+    </div>
+</div>
+
+<div class="template-details">
+    <div class="meta-bar">
+        <span class="badge" id="template-format">-</span>
+        <span id="template-version">Version: -</span>
+        <span id="template-updated">Updated: -</span>
+    </div>
+
+    <div id="template-tags" class="tags-container"></div>
+
+    <div class="section">
+        <h3>Description</h3>
+        <p id="template-description" class="description">-</p>
+    </div>
+
+    <div class="section">
+        <h3>Variables</h3>
+        <div id="template-variables" class="variables-list">
+            <p class="loading">Loading...</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Content</h3>
+        <pre id="template-content" class="code-block">Loading...</pre>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% raw %}
+const templateId = {% endraw %}{{ template_id }}{% raw %};
+
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const template = await api.get('/api/templates/' + templateId);
+
+        document.getElementById('template-name').textContent = template.name;
+        document.getElementById('template-format').textContent = template.format;
+        document.getElementById('template-version').textContent = 'Version: ' + template.current_version;
+        document.getElementById('template-updated').textContent = 'Updated: ' + formatDate(template.updated_at);
+        document.getElementById('template-description').textContent = template.description || 'No description';
+        document.getElementById('template-content').textContent = template.content || '(empty)';
+
+        // Tags
+        const tagsContainer = document.getElementById('template-tags');
+        if (template.tags.length > 0) {
+            tagsContainer.innerHTML = template.tags.map(t => '<span class="tag">' + escapeHtml(t) + '</span>').join('');
+        } else {
+            tagsContainer.innerHTML = '<span class="muted">No tags</span>';
+        }
+
+        // Variables
+        const varsData = await api.get('/api/templates/' + templateId + '/variables');
+        const varsContainer = document.getElementById('template-variables');
+
+        if (varsData.extracted.length === 0) {
+            varsContainer.innerHTML = '<p class="muted">No variables detected</p>';
+        } else {
+            let tableHtml = '<table class="table"><thead><tr><th>Variable</th><th>Status</th></tr></thead><tbody>';
+            varsData.extracted.forEach(v => {
+                const defined = varsData.defined.find(d => d.name === v);
+                tableHtml += '<tr><td><code>{{ ' + v + ' }}</code></td>';
+                if (defined) {
+                    tableHtml += '<td><span class="badge badge-success">' + defined.var_type + '</span></td>';
+                } else {
+                    tableHtml += '<td><span class="muted">Not defined</span></td>';
+                }
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</tbody></table>';
+            varsContainer.innerHTML = tableHtml;
+        }
+
+    } catch (e) {
+        showToast('Failed to load template', 'error');
+    }
+});
+{% endraw %}
+</script>
+{% endblock %}

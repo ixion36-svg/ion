@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Templates - DocForge{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Templates</h1>
+    <a href="/templates/new" class="btn btn-primary">New Template</a>
+</div>
+
+<div class="toolbar">
+    <input type="text" id="search-input" placeholder="Search templates..." class="search-input">
+    <select id="format-filter" class="filter-select">
+        <option value="">All Formats</option>
+        <option value="markdown">Markdown</option>
+        <option value="html">HTML</option>
+        <option value="text">Plain Text</option>
+    </select>
+</div>
+
+<div id="templates-list" class="card-list">
+    <p class="loading">Loading...</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% raw %}
+let allTemplates = [];
+
+async function loadTemplates() {
+    try {
+        allTemplates = await api.get('/api/templates');
+        renderTemplates(allTemplates);
+    } catch (e) {
+        document.getElementById('templates-list').innerHTML = '<p class="error">Failed to load templates</p>';
+    }
+}
+
+function renderTemplates(templates) {
+    const container = document.getElementById('templates-list');
+
+    if (templates.length === 0) {
+        container.innerHTML = '<p class="empty-state">No templates found. <a href="/templates/new">Create one!</a></p>';
+        return;
+    }
+
+    let html = '';
+    templates.forEach(function(t) {
+        html += '<div class="card">';
+        html += '<div class="card-header">';
+        html += '<a href="/templates/' + t.id + '" class="card-title">' + escapeHtml(t.name) + '</a>';
+        html += '<span class="badge">' + t.format + '</span>';
+        html += '</div>';
+        html += '<div class="card-body">';
+        html += '<p class="card-description">' + escapeHtml(t.description || 'No description') + '</p>';
+        html += '<div class="card-meta">';
+        html += '<span>Version: ' + t.current_version + '</span>';
+        html += '<span>Updated: ' + formatDate(t.updated_at) + '</span>';
+        html += '</div>';
+        html += '<div class="card-tags">';
+        t.tags.forEach(function(tag) {
+            html += '<span class="tag">' + escapeHtml(tag) + '</span>';
+        });
+        html += '</div>';
+        html += '</div>';
+        html += '<div class="card-footer">';
+        html += '<a href="/templates/' + t.id + '/render" class="btn btn-sm btn-primary">Render</a>';
+        html += '<a href="/templates/' + t.id + '/edit" class="btn btn-sm">Edit</a>';
+        html += '<a href="/templates/' + t.id + '/versions" class="btn btn-sm">History</a>';
+        html += '<button class="btn btn-sm btn-danger" onclick="deleteTemplate(' + t.id + ', \'' + escapeHtml(t.name).replace(/'/g, "\\'") + '\')">Delete</button>';
+        html += '</div>';
+        html += '</div>';
+    });
+    container.innerHTML = html;
+}
+
+function filterTemplates() {
+    const search = document.getElementById('search-input').value.toLowerCase();
+    const format = document.getElementById('format-filter').value;
+
+    const filtered = allTemplates.filter(t => {
+        const matchesSearch = !search ||
+            t.name.toLowerCase().includes(search) ||
+            (t.description && t.description.toLowerCase().includes(search));
+        const matchesFormat = !format || t.format === format;
+        return matchesSearch && matchesFormat;
+    });
+
+    renderTemplates(filtered);
+}
+
+async function deleteTemplate(id, name) {
+    if (!confirm('Delete template "' + name + '"? This cannot be undone.')) return;
+
+    try {
+        await api.delete('/api/templates/' + id);
+        showToast('Template deleted', 'success');
+        loadTemplates();
+    } catch (e) {
+        showToast('Failed to delete template', 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadTemplates();
+    document.getElementById('search-input').addEventListener('input', filterTemplates);
+    document.getElementById('format-filter').addEventListener('change', filterTemplates);
+});
+{% endraw %}
+</script>
+{% endblock %}
