@@ -1876,6 +1876,43 @@ async def get_dashboard(
         except Exception as e:
             gitlab_data["error"] = str(e)
 
+    # Elasticsearch alerts
+    elasticsearch_data = {
+        "enabled": False,
+        "connected": False,
+        "alerts": [],
+        "total_alerts": 0,
+        "critical_count": 0,
+        "high_count": 0,
+    }
+
+    es_config = get_elasticsearch_config()
+    if es_config.get("enabled") and es_config.get("url"):
+        elasticsearch_data["enabled"] = True
+        try:
+            from docforge.services.elasticsearch_service import ElasticsearchService
+            es_service = ElasticsearchService()
+
+            if es_service.is_configured:
+                # Test connection
+                connection = await es_service.test_connection()
+                if connection.get("connected"):
+                    elasticsearch_data["connected"] = True
+                    elasticsearch_data["cluster_name"] = connection.get("cluster_name")
+
+                    # Get recent alerts (last 24 hours, limit 10 for dashboard)
+                    alerts = await es_service.get_alerts(hours=24, limit=10)
+                    elasticsearch_data["alerts"] = [a.to_dict() for a in alerts]
+                    elasticsearch_data["total_alerts"] = len(alerts)
+
+                    # Count by severity
+                    elasticsearch_data["critical_count"] = sum(1 for a in alerts if a.severity == "critical")
+                    elasticsearch_data["high_count"] = sum(1 for a in alerts if a.severity == "high")
+                else:
+                    elasticsearch_data["error"] = connection.get("error", "Connection failed")
+        except Exception as e:
+            elasticsearch_data["error"] = str(e)
+
     return {
         "user": {
             "id": current_user.id,
@@ -1910,6 +1947,7 @@ async def get_dashboard(
             for d in recent_docs
         ],
         "gitlab": gitlab_data,
+        "elasticsearch": elasticsearch_data,
     }
 
 
@@ -2623,3 +2661,139 @@ async def list_gitlab_members(
         raise HTTPException(status_code=e.status_code or 500, detail=str(e))
     finally:
         await service.close()
+
+
+# ============================================================================
+# Elasticsearch Alerts Endpoints
+# ============================================================================
+
+from docforge.services.elasticsearch_service import ElasticsearchService, ElasticsearchError
+from docforge.core.config import get_elasticsearch_config
+
+
+def get_elasticsearch_service() -> ElasticsearchService:
+    """Get configured Elasticsearch service instance."""
+    return ElasticsearchService()
+
+
+@router.get("/elasticsearch/config")
+async def get_es_config_status(
+    current_user: User = Depends(get_current_user),
+):
+    """Get Elasticsearch configuration status (not sensitive data)."""
+    config = get_elasticsearch_config()
+    return {
+        "enabled": config.get("enabled", False),
+        "url": config.get("url", "")[:50] + "..." if len(config.get("url", "")) > 50 else config.get("url", ""),
+        "has_credentials": bool(config.get("api_key") or (config.get("username") and config.get("password"))),
+        "alert_index": config.get("alert_index", ""),
+    }
+
+
+@router.post("/elasticsearch/config", dependencies=[Depends(require_admin)])
+async def update_es_config(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """Update Elasticsearch configuration (admin only)."""
+    data = await request.json()
+
+    config = get_config()
+    config_path = Path.cwd() / ".docforge" / "config.json"
+
+    # Update config fields
+    if "enabled" in data:
+        config.elasticsearch_enabled = data["enabled"]
+    if "url" in data:
+        config.elasticsearch_url = data["url"]
+    if "api_key" in data:
+        config.elasticsearch_api_key = data["api_key"]
+    if "username" in data:
+        config.elasticsearch_username = data["username"]
+    if "password" in data:
+        config.elasticsearch_password = data["password"]
+    if "alert_index" in data:
+        config.elasticsearch_alert_index = data["alert_index"]
+    if "verify_ssl" in data:
+        config.elasticsearch_verify_ssl = data["verify_ssl"]
+
+    config.to_file(config_path)
+
+    return {"message": "Elasticsearch configuration updated"}
+
+
+@router.get("/elasticsearch/test")
+async def test_es_connection(
+    current_user: User = Depends(get_current_user),
+):
+    """Test Elasticsearch connection."""
+    service = get_elasticsearch_service()
+    result = await service.test_connection()
+    return result
+
+
+@router.get("/elasticsearch/alerts")
+async def get_es_alerts(
+    hours: int = 24,
+    severity: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+):
+    """Fetch alerts from Elasticsearch.
+
+    Args:
+        hours: Number of hours to look back (default 24)
+        severity: Filter by severity (critical, high, medium, low, info)
+        status: Filter by status (open, acknowledged, resolved)
+        limit: Maximum number of alerts (default 50)
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        return {"alerts": [], "enabled": False, "message": "Elasticsearch integration is not enabled"}
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        return {"alerts": [], "enabled": True, "configured": False, "message": "Elasticsearch is not configured"}
+
+    try:
+        alerts = await service.get_alerts(
+            hours=hours,
+            severity=severity,
+            status=status,
+            limit=limit,
+        )
+        return {
+            "alerts": [a.to_dict() for a in alerts],
+            "total": len(alerts),
+            "hours": hours,
+            "enabled": True,
+            "configured": True,
+        }
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/elasticsearch/alerts/stats")
+async def get_es_alert_stats(
+    hours: int = 24,
+    current_user: User = Depends(get_current_user),
+):
+    """Get alert statistics from Elasticsearch."""
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        return {"enabled": False}
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        return {"enabled": True, "configured": False}
+
+    try:
+        stats = await service.get_alert_stats(hours=hours)
+        return {
+            "enabled": True,
+            "configured": True,
+            **stats,
+        }
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
