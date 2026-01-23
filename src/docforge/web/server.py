@@ -5,11 +5,22 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
-from docforge.web.api import router as api_router
+from docforge.web.api import router as api_router, limiter
+from docforge.web.security_api import router as security_router
 from docforge.core.config import get_config
+from docforge.core.logging import setup_logging, get_logger
 from docforge.storage.database import init_db
+from docforge.web.logging_middleware import RequestLoggingMiddleware
+from docforge.web.security_middleware import SecurityMonitoringMiddleware, RateLimitSecurityMiddleware
+
+# Initialize logging
+setup_logging()
+logger = get_logger(__name__)
 
 # Get the directory containing this file
 BASE_DIR = Path(__file__).parent
@@ -20,6 +31,58 @@ app = FastAPI(
     version="0.1.0",
 )
 
+
+# =============================================================================
+# Security Headers Middleware
+# =============================================================================
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security headers to all responses."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        # Prevent MIME type sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+
+        # Prevent clickjacking
+        response.headers["X-Frame-Options"] = "DENY"
+
+        # XSS protection (legacy, but still useful)
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+
+        # Referrer policy
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+        # Content Security Policy (adjust as needed for your app)
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "frame-ancestors 'none'"
+        )
+
+        return response
+
+
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Add security monitoring middleware (attack detection)
+app.add_middleware(SecurityMonitoringMiddleware)
+
+# Add rate limit security tracking
+app.add_middleware(RateLimitSecurityMiddleware)
+
+# Add request logging middleware (ECS-compliant)
+app.add_middleware(RequestLoggingMiddleware)
+
+# Configure rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Mount static files
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
@@ -28,6 +91,7 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 # Include API routes
 app.include_router(api_router, prefix="/api")
+app.include_router(security_router, prefix="/api/security")
 
 
 @app.on_event("startup")
@@ -93,6 +157,12 @@ async def extract_page(request: Request):
     return templates.TemplateResponse("extract.html", {"request": request})
 
 
+@app.get("/gitlab", response_class=HTMLResponse)
+async def gitlab_page(request: Request):
+    """Render the GitLab integration page."""
+    return templates.TemplateResponse("gitlab.html", {"request": request})
+
+
 # Auth page routes
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
@@ -116,6 +186,12 @@ async def users_page(request: Request):
 async def audit_logs_page(request: Request):
     """Render the audit logs page (admin only)."""
     return templates.TemplateResponse("audit_logs.html", {"request": request})
+
+
+@app.get("/security", response_class=HTMLResponse)
+async def security_dashboard_page(request: Request):
+    """Render the security dashboard page (admin only)."""
+    return templates.TemplateResponse("security_dashboard.html", {"request": request})
 
 
 def main():

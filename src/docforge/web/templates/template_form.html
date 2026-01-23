@@ -44,9 +44,15 @@
     </div>
 
     {% if template_id %}
-    <div class="form-group">
-        <label for="message">Version Message</label>
-        <input type="text" id="message" name="message" placeholder="Describe your changes">
+    <div class="form-row">
+        <div class="form-group">
+            <label for="message">Version Message</label>
+            <input type="text" id="message" name="message" placeholder="Describe your changes">
+        </div>
+        <div class="form-group">
+            <label for="author">Author</label>
+            <input type="text" id="author" name="author" placeholder="Your name">
+        </div>
     </div>
     {% endif %}
 
@@ -103,6 +109,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('description').value = template.description || '';
             document.getElementById('content').value = template.content;
             document.getElementById('tags').value = template.tags.join(', ');
+
+            // Pre-fill author from preferences
+            const prefs = JSON.parse(localStorage.getItem('docforge_prefs') || '{}');
+            if (prefs.author) {
+                document.getElementById('author').value = prefs.author;
+            }
         } catch (e) {
             showToast('Failed to load template', 'error');
         }
@@ -126,6 +138,7 @@ document.getElementById('template-form').addEventListener('submit', async (e) =>
 
     if (templateId) {
         data.message = document.getElementById('message').value || null;
+        data.author = document.getElementById('author').value || null;
     }
 
     try {

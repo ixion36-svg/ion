@@ -1,0 +1,62 @@
+# DocForge Docker Compose Configuration
+# For air-gapped/secure environment deployment
+
+version: '3.8'
+
+services:
+  docforge:
+    image: docforge:latest
+    container_name: docforge
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      # Persist database and configuration
+      - docforge-data:/data
+
+      # Optional: Mount custom config file
+      # - ./config.json:/data/.docforge/config.json:ro
+
+    environment:
+      # Server configuration
+      - DOCFORGE_HOST=0.0.0.0
+      - DOCFORGE_PORT=8000
+
+      # Security: Set to true when using HTTPS/reverse proxy
+      - DOCFORGE_COOKIE_SECURE=false
+
+      # Optional: OIDC/Keycloak configuration
+      # - DOCFORGE_OIDC_ENABLED=false
+      # - DOCFORGE_OIDC_KEYCLOAK_URL=https://keycloak.example.com
+      # - DOCFORGE_OIDC_REALM=docforge
+      # - DOCFORGE_OIDC_CLIENT_ID=docforge-app
+      # - DOCFORGE_OIDC_CLIENT_SECRET=your-secret
+
+      # Optional: GitLab integration
+      # - DOCFORGE_GITLAB_ENABLED=false
+      # - DOCFORGE_GITLAB_URL=https://gitlab.example.com
+      # - DOCFORGE_GITLAB_TOKEN=glpat-xxxxxxxxxxxx
+      # - DOCFORGE_GITLAB_PROJECT_ID=group/project
+
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+
+    # Resource limits (increased for NLP processing)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  docforge-data:
+    driver: local

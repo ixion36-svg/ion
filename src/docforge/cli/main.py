@@ -8,6 +8,7 @@ from docforge.cli.version_commands import version_app
 from docforge.cli.render_commands import render_app
 from docforge.cli.extract_commands import extract_app
 from docforge.cli.document_commands import document_app
+from docforge.cli.collection_commands import collection_app
 
 app = typer.Typer(
     name="docforge",
@@ -19,6 +20,7 @@ console = Console()
 
 # Add sub-commands
 app.add_typer(template_app, name="template", help="Template management commands")
+app.add_typer(collection_app, name="collection", help="Collection management commands")
 app.add_typer(version_app, name="version", help="Version control commands")
 app.add_typer(render_app, name="render", help="Template rendering commands")
 app.add_typer(extract_app, name="extract", help="Template extraction commands")
@@ -302,6 +304,33 @@ def upgrade() -> None:
             conn.execute(text("CREATE INDEX ix_audit_logs_timestamp ON audit_logs(timestamp)"))
             conn.execute(text("CREATE INDEX ix_audit_logs_user_action ON audit_logs(user_id, action)"))
             migrations_applied.append("audit_logs table")
+
+        # =================================================================
+        # Collections table migration
+        # =================================================================
+
+        # Create collections table if missing
+        if 'collections' not in inspector.get_table_names():
+            console.print("  Creating 'collections' table...")
+            conn.execute(text("""
+                CREATE TABLE collections (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name VARCHAR(255) NOT NULL UNIQUE,
+                    description TEXT,
+                    icon VARCHAR(50),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+                )
+            """))
+            migrations_applied.append("collections table")
+
+        # Add collection_id column to templates if missing
+        if 'templates' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('templates')]
+            if 'collection_id' not in columns:
+                console.print("  Adding 'collection_id' column to templates...")
+                conn.execute(text("ALTER TABLE templates ADD COLUMN collection_id INTEGER REFERENCES collections(id)"))
+                migrations_applied.append("templates.collection_id")
 
         conn.commit()
 

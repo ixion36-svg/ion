@@ -5,14 +5,98 @@
 {% block content %}
 <div class="page-header">
     <h1>Documents</h1>
+    <div class="header-actions">
+        <button class="btn" onclick="showFoldersModal()">Manage Folders</button>
+    </div>
 </div>
 
-<div class="toolbar">
-    <input type="text" id="search-input" placeholder="Search documents..." class="search-input">
+<div class="documents-layout">
+    <!-- Folder Sidebar -->
+    <div class="folder-sidebar">
+        <div class="folder-header">
+            <h3>Folders</h3>
+        </div>
+        <div id="folder-tree" class="folder-tree">
+            <div class="folder-item active" data-id="" onclick="selectFolder(null)">
+                <span class="folder-icon">📁</span>
+                <span class="folder-name">All Documents</span>
+            </div>
+            <div class="folder-item" data-id="uncategorized" onclick="selectFolder('uncategorized')">
+                <span class="folder-icon">📄</span>
+                <span class="folder-name">Uncategorized</span>
+            </div>
+            <div id="folder-list"></div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="documents-main">
+        <div class="toolbar">
+            <input type="text" id="search-input" placeholder="Search documents..." class="search-input">
+            <select id="format-filter" class="filter-select">
+                <option value="">All Formats</option>
+                <option value="markdown">Markdown</option>
+                <option value="html">HTML</option>
+                <option value="csv">CSV</option>
+                <option value="text">Plain Text</option>
+            </select>
+            <select id="status-filter" class="filter-select">
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="archived">Archived</option>
+            </select>
+        </div>
+
+        <div id="current-folder-path" class="folder-path"></div>
+
+        <div id="documents-list" class="card-list">
+            <p class="loading">Loading...</p>
+        </div>
+    </div>
 </div>
 
-<div id="documents-list" class="card-list">
-    <p class="loading">Loading...</p>
+<!-- Manage Folders Modal -->
+<div id="folders-modal" class="modal" style="display: none;">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2>Manage Folders</h2>
+            <button class="modal-close" onclick="closeFoldersModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Create New Folder</label>
+                <div class="folder-create-form">
+                    <select id="new-folder-parent" class="form-control">
+                        <option value="">Root Level</option>
+                    </select>
+                    <input type="text" id="new-folder-name" placeholder="Folder name (e.g., SOI, SOP, KB, WI)" class="form-control">
+                    <input type="text" id="new-folder-desc" placeholder="Description" class="form-control">
+                    <button class="btn btn-primary" onclick="createFolder()">Create</button>
+                </div>
+            </div>
+            <h3>Existing Folders</h3>
+            <div id="folders-tree-manage" class="folders-manage-tree"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Move Document Modal -->
+<div id="move-modal" class="modal" style="display: none;">
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h2>Move to Folder</h2>
+            <button class="modal-close" onclick="closeMoveModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <select id="move-folder-select" class="form-control">
+                <option value="">No Folder (Root)</option>
+            </select>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeMoveModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="moveDocument()">Move</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Document View Modal -->
@@ -29,6 +113,7 @@
                 <button type="button" class="content-tab-btn active" data-view="rendered">Rendered</button>
                 <button type="button" class="content-tab-btn" data-view="raw">Raw</button>
                 <button type="button" class="content-tab-btn" data-view="edit">Edit</button>
+                <button type="button" class="content-tab-btn" data-view="rewrite">Rewrite</button>
                 <button type="button" class="content-tab-btn" data-view="versions">Version History</button>
             </div>
 
@@ -39,6 +124,31 @@
 
             <div id="edit-view" class="document-content" style="display: none;">
                 <textarea id="edit-content" class="edit-textarea" rows="20"></textarea>
+            </div>
+
+            <div id="rewrite-view" class="document-content" style="display: none;">
+                <div class="rewrite-controls">
+                    <select id="doc-rewrite-style" class="form-control">
+                        <option value="professional">Professional</option>
+                        <option value="concise">Concise</option>
+                        <option value="formal">Formal</option>
+                        <option value="technical">Technical</option>
+                    </select>
+                    <button id="doc-get-suggestions" class="btn">Get Suggestions</button>
+                    <button id="doc-apply-rewrite" class="btn btn-primary" style="display: none;">Apply All Changes</button>
+                </div>
+                <div id="doc-rewrite-suggestions" class="rewrite-results">
+                    <p class="muted">Select a style and click "Get Suggestions" to improve this document.</p>
+                </div>
+                <div id="doc-rewritten-section" style="display: none;">
+                    <h4>Rewritten Text</h4>
+                    <div id="doc-rewrite-stats" class="rewrite-stats"></div>
+                    <pre id="doc-rewritten-text" class="code-block"></pre>
+                    <div class="rewrite-actions">
+                        <button id="doc-copy-rewritten" class="btn">Copy to Clipboard</button>
+                        <button id="doc-apply-to-edit" class="btn btn-primary">Apply to Edit Tab</button>
+                    </div>
+                </div>
             </div>
 
             <div id="versions-view" class="document-content" style="display: none;">
@@ -104,6 +214,218 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+.documents-layout {
+    display: flex;
+    gap: 1.5rem;
+}
+.folder-sidebar {
+    width: 250px;
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 1rem;
+}
+.folder-header h3 {
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.folder-tree {
+    font-size: 0.9rem;
+}
+.folder-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 2px;
+}
+.folder-item:hover {
+    background: var(--bg-hover);
+}
+.folder-item.active {
+    background: var(--primary-color);
+    color: white;
+}
+.folder-icon {
+    margin-right: 0.5rem;
+}
+.folder-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.folder-children {
+    margin-left: 1.25rem;
+    border-left: 1px solid var(--border-color);
+    padding-left: 0.5rem;
+}
+.documents-main {
+    flex: 1;
+    min-width: 0;
+}
+.folder-path {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+.folder-path span {
+    cursor: pointer;
+}
+.folder-path span:hover {
+    color: var(--primary-color);
+}
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+.collection-badge {
+    background: var(--primary-color);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+}
+.modal-large {
+    max-width: 700px;
+}
+.modal-small {
+    max-width: 400px;
+}
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+.folder-create-form {
+    display: grid;
+    grid-template-columns: 150px 1fr 1fr auto;
+    gap: 0.5rem;
+    align-items: center;
+}
+.folders-manage-tree {
+    margin-top: 1rem;
+}
+.folder-manage-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+.folder-manage-item:hover {
+    background: var(--bg-secondary);
+}
+.folder-manage-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.folder-manage-counts {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.folder-manage-children {
+    margin-left: 1.5rem;
+}
+.move-btn {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+}
+.toolbar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.filter-select {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+/* Rewrite functionality styles */
+.rewrite-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    align-items: center;
+}
+.rewrite-controls .form-control {
+    width: auto;
+}
+.rewrite-results {
+    max-height: 300px;
+    overflow-y: auto;
+}
+.rewrite-item {
+    background: var(--bg-secondary);
+    border-left: 3px solid var(--primary-color);
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.rewrite-item .original {
+    color: #e74c3c;
+    text-decoration: line-through;
+}
+.rewrite-item .suggestion {
+    color: #2ecc71;
+    font-weight: bold;
+}
+.rewrite-item .reason {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+.rewrite-item .style-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--primary-color);
+    color: white;
+    margin-left: 0.5rem;
+}
+.rewrite-stats {
+    background: var(--bg-secondary);
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+.changes-list {
+    margin-top: 0.5rem;
+    padding-left: 1.5rem;
+    font-size: 0.875rem;
+}
+.changes-list li {
+    margin-bottom: 0.25rem;
+}
+.changes-list del {
+    color: #e74c3c;
+    text-decoration: line-through;
+}
+.changes-list ins {
+    color: #2ecc71;
+    text-decoration: none;
+    font-weight: bold;
+}
+.rewrite-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+}
+#doc-rewritten-text {
+    max-height: 300px;
+    overflow-y: auto;
+}
+</style>
 <script>
 {% raw %}
 let currentDocId = null;
@@ -113,16 +435,141 @@ let currentDocFormat = '';
 let currentDocVersion = 1;
 let currentDocInputData = null;
 let allDocuments = [];
+let allCollections = [];
+let selectedFolderId = null;
+let moveDocumentId = null;
 let pendingAmendmentContent = '';
 let previewVersionNumber = null;
 
 async function loadDocuments() {
     try {
         allDocuments = await api.get('/api/documents');
-        renderDocuments(allDocuments);
+        renderDocuments(filterDocuments());
     } catch (e) {
         document.getElementById('documents-list').innerHTML = '<p class="error">Failed to load documents</p>';
     }
+}
+
+async function loadCollections() {
+    try {
+        allCollections = await api.get('/api/collections?flat=true');
+        renderFolderTree();
+        updateFolderSelects();
+    } catch (e) {
+        console.error('Failed to load collections:', e);
+    }
+}
+
+function buildFolderTree(collections, parentId = null) {
+    return collections
+        .filter(c => c.parent_id === parentId)
+        .map(c => ({
+            ...c,
+            children: buildFolderTree(collections, c.id)
+        }));
+}
+
+function renderFolderTree() {
+    const container = document.getElementById('folder-list');
+    const tree = buildFolderTree(allCollections);
+    container.innerHTML = renderFolderItems(tree, 0);
+}
+
+function renderFolderItems(folders, depth) {
+    if (!folders.length) return '';
+
+    let html = '';
+    folders.forEach(f => {
+        const isActive = selectedFolderId === f.id;
+        const indent = depth > 0 ? 'folder-children' : '';
+
+        html += '<div class="' + indent + '">';
+        html += '<div class="folder-item' + (isActive ? ' active' : '') + '" data-id="' + f.id + '" onclick="selectFolder(' + f.id + ')">';
+        html += '<span class="folder-icon">' + (f.children.length > 0 ? '📂' : '📁') + '</span>';
+        html += '<span class="folder-name">' + escapeHtml(f.name) + '</span>';
+        html += '<span class="folder-manage-counts">(' + (f.document_count || 0) + ')</span>';
+        html += '</div>';
+
+        if (f.children.length > 0) {
+            html += renderFolderItems(f.children, depth + 1);
+        }
+        html += '</div>';
+    });
+    return html;
+}
+
+function selectFolder(folderId) {
+    selectedFolderId = folderId;
+
+    // Update active state
+    document.querySelectorAll('.folder-item').forEach(el => {
+        el.classList.remove('active');
+        if (el.dataset.id === String(folderId || '')) {
+            el.classList.add('active');
+        }
+    });
+
+    // Update path display
+    updateFolderPath();
+
+    // Re-render documents
+    renderDocuments(filterDocuments());
+}
+
+function updateFolderPath() {
+    const pathEl = document.getElementById('current-folder-path');
+
+    if (selectedFolderId === null) {
+        pathEl.innerHTML = '';
+        return;
+    }
+
+    if (selectedFolderId === 'uncategorized') {
+        pathEl.innerHTML = '<span onclick="selectFolder(null)">All</span> / <span>Uncategorized</span>';
+        return;
+    }
+
+    const folder = allCollections.find(c => c.id === selectedFolderId);
+    if (folder) {
+        pathEl.innerHTML = '<span onclick="selectFolder(null)">All</span> / <span>' + escapeHtml(folder.full_path) + '</span>';
+    }
+}
+
+function isInFolderOrSubfolder(docCollectionId, targetFolderId) {
+    if (docCollectionId === targetFolderId) return true;
+    if (!docCollectionId) return false;
+
+    const folder = allCollections.find(c => c.id === docCollectionId);
+    if (!folder) return false;
+
+    let current = folder;
+    while (current.parent_id) {
+        if (current.parent_id === targetFolderId) return true;
+        current = allCollections.find(c => c.id === current.parent_id);
+        if (!current) break;
+    }
+    return false;
+}
+
+function filterDocuments() {
+    const search = document.getElementById('search-input').value.toLowerCase();
+    const format = document.getElementById('format-filter').value;
+    const status = document.getElementById('status-filter').value;
+
+    return allDocuments.filter(d => {
+        const matchesSearch = !search || d.name.toLowerCase().includes(search);
+        const matchesFormat = !format || d.output_format === format;
+        const matchesStatus = !status || d.status === status;
+
+        let matchesFolder = true;
+        if (selectedFolderId === 'uncategorized') {
+            matchesFolder = !d.collection_id;
+        } else if (selectedFolderId !== null) {
+            matchesFolder = isInFolderOrSubfolder(d.collection_id, selectedFolderId);
+        }
+
+        return matchesSearch && matchesFormat && matchesStatus && matchesFolder;
+    });
 }
 
 function renderDocuments(documents) {
@@ -136,9 +583,14 @@ function renderDocuments(documents) {
     let html = '';
     documents.forEach(function(d) {
         const isArchived = d.status === 'archived';
+        const folder = allCollections.find(c => c.id === d.collection_id);
+        const folderBadge = folder
+            ? '<span class="collection-badge">' + escapeHtml(folder.name) + '</span>'
+            : '';
+
         html += '<div class="list-item' + (isArchived ? ' archived' : '') + '">';
         html += '<div class="list-item-content">';
-        html += '<span class="list-item-title">' + escapeHtml(d.name) + '</span>';
+        html += '<span class="list-item-title">' + escapeHtml(d.name) + folderBadge + '</span>';
         html += '<div class="list-item-meta">';
         html += '<span class="badge">' + d.output_format + '</span>';
         html += '<span class="badge badge-version">v' + (d.current_version || 1) + '</span>';
@@ -153,6 +605,7 @@ function renderDocuments(documents) {
         html += '</div>';
         html += '<div class="list-item-actions">';
         html += '<button class="btn btn-sm" onclick="viewDocument(' + d.id + ')">View</button>';
+        html += '<button class="btn btn-sm move-btn" onclick="showMoveModal(' + d.id + ', ' + (d.collection_id || 'null') + ')">Move</button>';
         if (isArchived) {
             html += '<button class="btn btn-sm btn-success" onclick="restoreDocument(' + d.id + ')">Restore</button>';
         } else {
@@ -165,19 +618,8 @@ function renderDocuments(documents) {
     container.innerHTML = html;
 }
 
-function filterDocuments() {
-    const search = document.getElementById('search-input').value.toLowerCase();
-
-    if (!search) {
-        renderDocuments(allDocuments);
-        return;
-    }
-
-    const filtered = allDocuments.filter(function(d) {
-        return d.name.toLowerCase().indexOf(search) !== -1;
-    });
-
-    renderDocuments(filtered);
+function applyFilters() {
+    renderDocuments(filterDocuments());
 }
 
 function renderContent(content, format) {
@@ -323,6 +765,7 @@ function switchTab(view) {
     document.getElementById('rendered-view').style.display = view === 'rendered' ? 'block' : 'none';
     document.getElementById('raw-view').style.display = view === 'raw' ? 'block' : 'none';
     document.getElementById('edit-view').style.display = view === 'edit' ? 'block' : 'none';
+    document.getElementById('rewrite-view').style.display = view === 'rewrite' ? 'block' : 'none';
     document.getElementById('versions-view').style.display = view === 'versions' ? 'block' : 'none';
 
     // Show/hide save amendment button based on edit view
@@ -423,6 +866,173 @@ async function revertToVersion(versionNumber) {
         loadDocuments();
     } catch (e) {
         showToast('Failed to revert document', 'error');
+    }
+}
+
+// Folder Management Functions
+function showFoldersModal() {
+    document.getElementById('folders-modal').style.display = 'flex';
+    renderFoldersManageTree();
+    updateParentSelect();
+}
+
+function closeFoldersModal() {
+    document.getElementById('folders-modal').style.display = 'none';
+}
+
+function updateParentSelect() {
+    const select = document.getElementById('new-folder-parent');
+    select.innerHTML = '<option value="">Root Level</option>';
+
+    function addOptions(folders, prefix = '') {
+        folders.forEach(f => {
+            const option = document.createElement('option');
+            option.value = f.id;
+            option.textContent = prefix + f.name;
+            select.appendChild(option);
+            if (f.children.length > 0) {
+                addOptions(f.children, prefix + '  ');
+            }
+        });
+    }
+
+    const tree = buildFolderTree(allCollections);
+    addOptions(tree);
+}
+
+function updateFolderSelects() {
+    const moveSelect = document.getElementById('move-folder-select');
+    moveSelect.innerHTML = '<option value="">No Folder (Root)</option>';
+
+    function addOptions(folders, prefix = '') {
+        folders.forEach(f => {
+            const option = document.createElement('option');
+            option.value = f.id;
+            option.textContent = prefix + f.name;
+            moveSelect.appendChild(option);
+            if (f.children.length > 0) {
+                addOptions(f.children, prefix + '  ');
+            }
+        });
+    }
+
+    const tree = buildFolderTree(allCollections);
+    addOptions(tree);
+}
+
+function renderFoldersManageTree() {
+    const container = document.getElementById('folders-tree-manage');
+    const tree = buildFolderTree(allCollections);
+
+    if (tree.length === 0) {
+        container.innerHTML = '<p class="empty-state">No folders yet. Create one above!</p>';
+        return;
+    }
+
+    container.innerHTML = renderFolderManageItems(tree);
+}
+
+function renderFolderManageItems(folders, depth = 0) {
+    let html = '';
+    folders.forEach(f => {
+        const indent = depth > 0 ? 'folder-manage-children' : '';
+
+        html += '<div class="' + indent + '">';
+        html += '<div class="folder-manage-item">';
+        html += '<div class="folder-manage-info">';
+        html += '<span>' + (f.children.length > 0 ? '📂' : '📁') + '</span>';
+        html += '<span>' + escapeHtml(f.name) + '</span>';
+        html += '<span class="folder-manage-counts">' + (f.template_count || 0) + ' templates, ' + (f.document_count || 0) + ' docs</span>';
+        html += '</div>';
+        html += '<div>';
+        html += '<button class="btn btn-sm btn-danger" onclick="deleteFolder(' + f.id + ', \'' + escapeHtml(f.name).replace(/'/g, "\\'") + '\')">Delete</button>';
+        html += '</div>';
+        html += '</div>';
+
+        if (f.children.length > 0) {
+            html += renderFolderManageItems(f.children, depth + 1);
+        }
+        html += '</div>';
+    });
+    return html;
+}
+
+async function createFolder() {
+    const parentId = document.getElementById('new-folder-parent').value || null;
+    const name = document.getElementById('new-folder-name').value.trim();
+    const description = document.getElementById('new-folder-desc').value.trim();
+
+    if (!name) {
+        showToast('Please enter a folder name', 'error');
+        return;
+    }
+
+    try {
+        await api.post('/api/collections', {
+            name,
+            description: description || null,
+            parent_id: parentId ? parseInt(parentId) : null
+        });
+        showToast('Folder created', 'success');
+        document.getElementById('new-folder-name').value = '';
+        document.getElementById('new-folder-desc').value = '';
+        await loadCollections();
+        renderFoldersManageTree();
+        updateParentSelect();
+    } catch (e) {
+        showToast(e.message || 'Failed to create folder', 'error');
+    }
+}
+
+async function deleteFolder(id, name) {
+    const folder = allCollections.find(c => c.id === id);
+    const totalItems = (folder?.template_count || 0) + (folder?.document_count || 0);
+    const msg = totalItems > 0
+        ? 'Delete folder "' + name + '"? ' + totalItems + ' items will be moved to parent folder.'
+        : 'Delete folder "' + name + '"?';
+
+    if (!confirm(msg)) return;
+
+    try {
+        await api.delete('/api/collections/' + id);
+        showToast('Folder deleted', 'success');
+        await loadCollections();
+        await loadDocuments();
+        renderFoldersManageTree();
+        updateParentSelect();
+    } catch (e) {
+        showToast('Failed to delete folder', 'error');
+    }
+}
+
+// Move Document Modal
+function showMoveModal(docId, currentCollectionId) {
+    moveDocumentId = docId;
+    document.getElementById('move-folder-select').value = currentCollectionId || '';
+    document.getElementById('move-modal').style.display = 'flex';
+}
+
+function closeMoveModal() {
+    document.getElementById('move-modal').style.display = 'none';
+    moveDocumentId = null;
+}
+
+async function moveDocument() {
+    const collectionId = document.getElementById('move-folder-select').value;
+
+    try {
+        if (collectionId) {
+            await api.post('/api/collections/' + collectionId + '/documents/' + moveDocumentId);
+        } else {
+            // Remove from collection
+            await api.delete('/api/documents/' + moveDocumentId + '/collection');
+        }
+        showToast('Document moved', 'success');
+        closeMoveModal();
+        await loadCollections();
+        await loadDocuments();
+    } catch (e) {
+        showToast(e.message || 'Failed to move document', 'error');
     }
 }
 
@@ -562,9 +1172,115 @@ document.getElementById('revert-version-btn').addEventListener('click', function
     }
 });
 
-document.addEventListener('DOMContentLoaded', function() {
-    loadDocuments();
-    document.getElementById('search-input').addEventListener('input', filterDocuments);
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadCollections();
+    await loadDocuments();
+    document.getElementById('search-input').addEventListener('input', applyFilters);
+    document.getElementById('format-filter').addEventListener('change', applyFilters);
+    document.getElementById('status-filter').addEventListener('change', applyFilters);
+});
+
+// Close modal on outside click
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal')) {
+        e.target.style.display = 'none';
+    }
+});
+
+// Document Rewrite functionality
+document.getElementById('doc-get-suggestions').addEventListener('click', async function() {
+    if (!currentDocContent) {
+        showToast('No document content available', 'error');
+        return;
+    }
+
+    const style = document.getElementById('doc-rewrite-style').value;
+
+    try {
+        const response = await api.post('/api/extract/rewrite-suggestions', {
+            text: currentDocContent,
+            style: style
+        });
+
+        const resultsDiv = document.getElementById('doc-rewrite-suggestions');
+        const applyBtn = document.getElementById('doc-apply-rewrite');
+
+        if (response.suggestion_count === 0) {
+            resultsDiv.innerHTML = '<p class="success">No suggestions for this style. Your document looks good!</p>';
+            applyBtn.style.display = 'none';
+        } else {
+            let html = '<p><strong>' + response.suggestion_count + ' suggestions for ' + style + ' style:</strong></p>';
+            response.suggestions.forEach(function(s) {
+                html += '<div class="rewrite-item">';
+                html += '<span class="original">' + escapeHtml(s.original) + '</span>';
+                html += ' → <span class="suggestion">' + escapeHtml(s.suggestion) + '</span>';
+                html += '<span class="style-badge">' + s.style + '</span>';
+                html += '<div class="reason">' + escapeHtml(s.reason) + '</div>';
+                html += '</div>';
+            });
+            resultsDiv.innerHTML = html;
+            applyBtn.style.display = 'inline-block';
+        }
+
+        // Hide previous rewritten text
+        document.getElementById('doc-rewritten-section').style.display = 'none';
+    } catch (e) {
+        showToast('Failed to get suggestions: ' + (e.message || 'Unknown error'), 'error');
+    }
+});
+
+document.getElementById('doc-apply-rewrite').addEventListener('click', async function() {
+    if (!currentDocContent) {
+        showToast('No document content available', 'error');
+        return;
+    }
+
+    const style = document.getElementById('doc-rewrite-style').value;
+
+    try {
+        const response = await api.post('/api/extract/apply-rewrites', {
+            text: currentDocContent,
+            style: style,
+            apply_all: true
+        });
+
+        const rewrittenSection = document.getElementById('doc-rewritten-section');
+        const rewrittenText = document.getElementById('doc-rewritten-text');
+        const statsDiv = document.getElementById('doc-rewrite-stats');
+
+        rewrittenText.textContent = response.rewritten;
+        statsDiv.innerHTML = '<strong>' + response.changes_applied + ' changes applied</strong>';
+
+        if (response.changes && response.changes.length > 0) {
+            let changesHtml = '<ul class="changes-list">';
+            response.changes.forEach(function(c) {
+                changesHtml += '<li><del>' + escapeHtml(c.original) + '</del> → <ins>' + escapeHtml(c.replacement) + '</ins></li>';
+            });
+            changesHtml += '</ul>';
+            statsDiv.innerHTML += changesHtml;
+        }
+
+        rewrittenSection.style.display = 'block';
+        showToast(response.changes_applied + ' changes applied', 'success');
+    } catch (e) {
+        showToast('Failed to apply rewrites: ' + (e.message || 'Unknown error'), 'error');
+    }
+});
+
+document.getElementById('doc-copy-rewritten').addEventListener('click', function() {
+    const text = document.getElementById('doc-rewritten-text').textContent;
+    navigator.clipboard.writeText(text).then(function() {
+        showToast('Copied to clipboard', 'success');
+    }).catch(function() {
+        showToast('Failed to copy', 'error');
+    });
+});
+
+document.getElementById('doc-apply-to-edit').addEventListener('click', function() {
+    const rewrittenText = document.getElementById('doc-rewritten-text').textContent;
+    document.getElementById('edit-content').value = rewrittenText;
+    switchTab('edit');
+    showToast('Rewritten text applied to Edit tab', 'success');
 });
 {% endraw %}
 </script>

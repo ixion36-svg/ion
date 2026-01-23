@@ -1,0 +1,40 @@
+# GitLab CE for local testing
+# Run with: docker-compose up -d
+# Access at: http://localhost:8929
+# Initial root password will be auto-generated
+
+version: '3.8'
+
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    container_name: gitlab-test
+    hostname: gitlab.local
+    restart: unless-stopped
+
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://localhost:8929'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2224
+        # Reduce memory usage for testing
+        puma['worker_processes'] = 2
+        sidekiq['concurrency'] = 5
+        prometheus_monitoring['enable'] = false
+        # Disable container registry for testing
+        registry['enable'] = false
+
+    ports:
+      - "8929:8929"    # HTTP
+      - "2224:22"      # SSH
+
+    volumes:
+      - gitlab-config:/etc/gitlab
+      - gitlab-logs:/var/log/gitlab
+      - gitlab-data:/var/opt/gitlab
+
+    shm_size: '256m'
+
+volumes:
+  gitlab-config:
+  gitlab-logs:
+  gitlab-data:

@@ -7,6 +7,15 @@
     <h1>Extract Template from Document</h1>
 </div>
 
+<!-- NLP Status Banner -->
+<div id="nlp-status-banner" class="nlp-status-banner" style="display: none;">
+    <div class="nlp-status-content">
+        <span class="nlp-status-icon"></span>
+        <span class="nlp-status-text"></span>
+    </div>
+    <button class="nlp-status-close" onclick="this.parentElement.style.display='none'">&times;</button>
+</div>
+
 <div class="extract-layout">
     <div class="extract-input">
         <div class="form-group">
@@ -19,9 +28,29 @@
             <input type="range" id="confidence" min="0" max="100" value="70" step="5">
         </div>
 
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="use-nlp" checked>
+                <span>Use NLP Detection</span>
+                <small id="nlp-hint">(Enhanced entity recognition)</small>
+            </label>
+        </div>
+
         <div class="form-actions">
             <button id="analyze-btn" class="btn">Analyze</button>
             <button id="generate-btn" class="btn btn-primary">Generate Template</button>
+        </div>
+
+        <!-- SOC Entities Section -->
+        <div id="soc-section" style="display: none;">
+            <h3>SOC Entities Detected</h3>
+            <div id="soc-entities" class="soc-grid"></div>
+        </div>
+
+        <!-- Tables Section -->
+        <div id="tables-section" style="display: none;">
+            <h3>Tables Detected</h3>
+            <div id="tables-list" class="tables-container"></div>
         </div>
 
         <div id="patterns-section" style="display: none;">
@@ -46,24 +75,406 @@
     </div>
 
     <div class="extract-output">
-        <h3>Generated Template</h3>
-        <pre id="generated-template" class="code-block">Upload a document and click "Generate Template" to extract a template.</pre>
+        <div class="output-tabs">
+            <button class="output-tab active" data-tab="template">Generated Template</button>
+            <button class="output-tab" data-tab="spellcheck">Spell Check</button>
+            <button class="output-tab" data-tab="rewrite">Rewrite Suggestions</button>
+        </div>
 
-        <div id="save-section" style="display: none;">
-            <div class="form-group">
-                <label for="template-name">Template Name</label>
-                <input type="text" id="template-name" placeholder="my_template">
+        <!-- Template Tab -->
+        <div id="template-tab" class="tab-content">
+            <pre id="generated-template" class="code-block">Upload a document and click "Generate Template" to extract a template.</pre>
+
+            <div id="save-section" style="display: none;">
+                <div class="form-group">
+                    <label for="template-name">Template Name</label>
+                    <input type="text" id="template-name" placeholder="my_template">
+                </div>
+                <button id="save-btn" class="btn btn-primary">Save as Template</button>
             </div>
-            <button id="save-btn" class="btn btn-primary">Save as Template</button>
+        </div>
+
+        <!-- Spell Check Tab -->
+        <div id="spellcheck-tab" class="tab-content" style="display: none;">
+            <div class="spell-controls">
+                <button id="run-spellcheck" class="btn">Run Spell Check</button>
+                <span id="spellcheck-status" class="status-text"></span>
+            </div>
+            <div id="spell-results" class="spell-results">
+                <p class="muted">Click "Run Spell Check" to check the document for spelling errors.</p>
+            </div>
+            <div id="corrected-text-section" style="display: none;">
+                <h4>Corrected Text</h4>
+                <pre id="corrected-text" class="code-block"></pre>
+            </div>
+        </div>
+
+        <!-- Rewrite Tab -->
+        <div id="rewrite-tab" class="tab-content" style="display: none;">
+            <div class="rewrite-controls">
+                <select id="rewrite-style" class="form-control">
+                    <option value="professional">Professional</option>
+                    <option value="concise">Concise</option>
+                    <option value="formal">Formal</option>
+                    <option value="technical">Technical</option>
+                </select>
+                <button id="run-rewrite" class="btn">Get Suggestions</button>
+                <button id="apply-rewrite" class="btn btn-primary" style="display: none;">Apply All Changes</button>
+            </div>
+            <div id="rewrite-results" class="rewrite-results">
+                <p class="muted">Select a style and click "Get Suggestions" to improve your document.</p>
+            </div>
+            <div id="rewritten-text-section" style="display: none;">
+                <h4>Rewritten Text</h4>
+                <div class="rewrite-stats" id="rewrite-stats"></div>
+                <pre id="rewritten-text" class="code-block"></pre>
+                <div class="rewrite-actions">
+                    <button id="copy-rewritten" class="btn">Copy to Clipboard</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<style>
+.nlp-status-banner {
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.nlp-status-banner.available {
+    background: #1a3a1a;
+    border: 1px solid #2d5a2d;
+}
+.nlp-status-banner.unavailable {
+    background: #3a2a1a;
+    border: 1px solid #5a4a2d;
+}
+.nlp-status-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.nlp-status-icon {
+    font-size: 1.2rem;
+}
+.nlp-status-close {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 1.2rem;
+    opacity: 0.7;
+}
+.nlp-status-close:hover {
+    opacity: 1;
+}
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+.checkbox-label small {
+    color: var(--text-muted);
+    font-weight: normal;
+}
+.detection-stats {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+.detection-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+}
+.stat-item .label {
+    color: var(--text-muted);
+}
+.pattern-source {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 0.5rem;
+}
+.pattern-source.nlp {
+    background: #2d4a5a;
+    color: #7cb3c9;
+}
+.pattern-source.regex {
+    background: #4a3a2d;
+    color: #c9a77c;
+}
+.pattern-source.soc {
+    background: #4a2d4a;
+    color: #c97cc9;
+}
+/* SOC Entities Grid */
+.soc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+.soc-entity-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.75rem;
+}
+.soc-entity-card h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.875rem;
+    color: var(--primary-color);
+}
+.soc-entity-card .entity-count {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+.soc-entity-card .entity-list {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    max-height: 80px;
+    overflow-y: auto;
+}
+.soc-entity-card .entity-item {
+    padding: 2px 0;
+    word-break: break-all;
+}
+/* Tables */
+.tables-container {
+    margin-top: 0.5rem;
+}
+.table-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.table-card h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.875rem;
+}
+.table-preview {
+    overflow-x: auto;
+    font-size: 0.75rem;
+}
+.table-preview table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.table-preview th, .table-preview td {
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    text-align: left;
+}
+.table-preview th {
+    background: var(--bg-primary);
+}
+/* Output Tabs */
+.output-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+.output-tab {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: 4px;
+}
+.output-tab:hover {
+    background: var(--bg-hover);
+}
+.output-tab.active {
+    background: var(--primary-color);
+    color: white;
+}
+.tab-content {
+    padding: 0.5rem 0;
+}
+/* Spell Check */
+.spell-controls, .rewrite-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    align-items: center;
+}
+.status-text {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+.spell-results {
+    max-height: 300px;
+    overflow-y: auto;
+}
+.spell-error {
+    background: var(--bg-secondary);
+    border-left: 3px solid #e74c3c;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.spell-error .word {
+    font-weight: bold;
+    color: #e74c3c;
+}
+.spell-error .correction {
+    color: #2ecc71;
+}
+.spell-error .suggestions {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+/* Rewrite */
+.rewrite-results {
+    max-height: 400px;
+    overflow-y: auto;
+}
+.rewrite-item {
+    background: var(--bg-secondary);
+    border-left: 3px solid var(--primary-color);
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.rewrite-item .original {
+    color: #e74c3c;
+    text-decoration: line-through;
+}
+.rewrite-item .suggestion {
+    color: #2ecc71;
+    font-weight: bold;
+}
+.rewrite-item .reason {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+.rewrite-item .style-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--primary-color);
+    color: white;
+    margin-left: 0.5rem;
+}
+.rewrite-stats {
+    background: var(--bg-secondary);
+    padding: 0.75rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+.changes-list {
+    margin-top: 0.5rem;
+    padding-left: 1.5rem;
+    font-size: 0.875rem;
+}
+.changes-list li {
+    margin-bottom: 0.25rem;
+}
+.changes-list del {
+    color: #e74c3c;
+    text-decoration: line-through;
+}
+.changes-list ins {
+    color: #2ecc71;
+    text-decoration: none;
+    font-weight: bold;
+}
+.rewrite-actions {
+    margin-top: 1rem;
+}
+#rewritten-text {
+    max-height: 400px;
+    overflow-y: auto;
+}
+</style>
 <script>
 {% raw %}
 let generatedContent = '';
+let currentDocText = '';
+let nlpAvailable = false;
+let spellcheckAvailable = false;
+
+// Check NLP status on page load
+async function checkNlpStatus() {
+    try {
+        const response = await fetch('/api/extract/nlp-status');
+        const status = await response.json();
+
+        nlpAvailable = status.nlp_available;
+        spellcheckAvailable = status.spellcheck_available;
+
+        const banner = document.getElementById('nlp-status-banner');
+        const checkbox = document.getElementById('use-nlp');
+        const hint = document.getElementById('nlp-hint');
+
+        banner.style.display = 'flex';
+
+        if (status.nlp_available) {
+            banner.className = 'nlp-status-banner available';
+            banner.querySelector('.nlp-status-icon').textContent = '✓';
+
+            let statusText = 'NLP enabled: ' + status.model_name;
+            if (status.soc_pattern_count) {
+                statusText += ' + ' + status.soc_pattern_count + ' SOC patterns';
+            }
+            if (status.spellcheck_available) {
+                statusText += ' + Spell Check';
+            }
+            banner.querySelector('.nlp-status-text').textContent = statusText;
+            hint.textContent = '(Detects names, IPs, CVEs, hashes, domains, and more)';
+        } else {
+            banner.className = 'nlp-status-banner unavailable';
+            banner.querySelector('.nlp-status-icon').textContent = '⚠';
+            banner.querySelector('.nlp-status-text').textContent =
+                'NLP limited: SOC patterns only (' + status.soc_pattern_count + ' patterns)';
+            hint.textContent = '(SOC entities still detected via regex)';
+        }
+
+        // Update spell check status
+        if (!spellcheckAvailable) {
+            document.getElementById('run-spellcheck').disabled = true;
+            document.getElementById('spellcheck-status').textContent = 'Install pyspellchecker to enable';
+        }
+    } catch (e) {
+        console.error('Failed to check NLP status:', e);
+    }
+}
+
+checkNlpStatus();
+
+// Tab switching
+document.querySelectorAll('.output-tab').forEach(tab => {
+    tab.addEventListener('click', function() {
+        document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+
+        const tabName = this.getAttribute('data-tab');
+        document.getElementById('template-tab').style.display = tabName === 'template' ? 'block' : 'none';
+        document.getElementById('spellcheck-tab').style.display = tabName === 'spellcheck' ? 'block' : 'none';
+        document.getElementById('rewrite-tab').style.display = tabName === 'rewrite' ? 'block' : 'none';
+    });
+});
 
 document.getElementById('confidence').addEventListener('input', (e) => {
     document.getElementById('confidence-value').textContent = e.target.value + '%';
@@ -77,17 +488,29 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
     }
 
     const confidence = document.getElementById('confidence').value / 100;
+    const useNlp = document.getElementById('use-nlp').checked;
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
 
     try {
-        const response = await fetch('/api/extract/analyze?confidence=' + confidence, {
+        const response = await fetch('/api/extract/analyze?confidence=' + confidence + '&use_nlp=' + useNlp, {
             method: 'POST',
             body: formData,
         });
 
         if (!response.ok) throw new Error('Analysis failed');
         const result = await response.json();
+
+        // Store document text for spell check / rewrite
+        if (result.original_text) {
+            currentDocText = result.original_text;
+        }
+
+        // Show SOC entities if any
+        displaySocEntities(result.patterns);
+
+        // Show tables if any
+        displayTables(result.tables);
 
         // Show patterns
         document.getElementById('patterns-section').style.display = 'block';
@@ -98,7 +521,7 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
             let html = '';
             result.patterns.forEach(function(p) {
                 html += '<div class="pattern-item">';
-                html += '<span class="pattern-type">' + p.pattern_type + '</span>';
+                html += '<span class="pattern-type">' + formatPatternType(p.pattern_type) + '</span>';
                 html += '<span class="pattern-value">' + escapeHtml(p.value.substring(0, 50)) + '</span>';
                 html += '<span class="pattern-confidence">' + Math.round(p.confidence * 100) + '%</span>';
                 html += '</div>';
@@ -124,11 +547,115 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
             tbody.innerHTML = html;
         }
 
-        showToast('Analysis complete', 'success');
+        // Show stats if available
+        if (result.stats) {
+            showDetectionStats(result.stats);
+        }
+
+        showToast('Analysis complete: ' + result.patterns.length + ' patterns found', 'success');
     } catch (e) {
         showToast('Analysis failed', 'error');
     }
 });
+
+function displaySocEntities(patterns) {
+    const socSection = document.getElementById('soc-section');
+    const socContainer = document.getElementById('soc-entities');
+
+    // SOC pattern types
+    const socTypes = ['ipv4', 'ipv6', 'cve', 'mitre_attack', 'md5_hash', 'sha1_hash', 'sha256_hash',
+                      'domain', 'url', 'email', 'mac_address', 'registry_key', 'severity',
+                      'timestamp_iso', 'timestamp_common', 'windows_path', 'unix_path', 'process_name'];
+
+    const socEntities = {};
+    patterns.forEach(p => {
+        if (socTypes.includes(p.pattern_type)) {
+            if (!socEntities[p.pattern_type]) {
+                socEntities[p.pattern_type] = [];
+            }
+            if (!socEntities[p.pattern_type].includes(p.value)) {
+                socEntities[p.pattern_type].push(p.value);
+            }
+        }
+    });
+
+    if (Object.keys(socEntities).length === 0) {
+        socSection.style.display = 'none';
+        return;
+    }
+
+    socSection.style.display = 'block';
+
+    const typeLabels = {
+        'ipv4': 'IPv4 Addresses',
+        'ipv6': 'IPv6 Addresses',
+        'cve': 'CVE IDs',
+        'mitre_attack': 'MITRE ATT&CK',
+        'md5_hash': 'MD5 Hashes',
+        'sha1_hash': 'SHA1 Hashes',
+        'sha256_hash': 'SHA256 Hashes',
+        'domain': 'Domains',
+        'url': 'URLs',
+        'email': 'Email Addresses',
+        'mac_address': 'MAC Addresses',
+        'registry_key': 'Registry Keys',
+        'severity': 'Severity Levels',
+        'timestamp_iso': 'ISO Timestamps',
+        'timestamp_common': 'Timestamps',
+        'windows_path': 'Windows Paths',
+        'unix_path': 'Unix Paths',
+        'process_name': 'Processes',
+    };
+
+    let html = '';
+    Object.entries(socEntities).forEach(([type, values]) => {
+        html += '<div class="soc-entity-card">';
+        html += '<h4>' + (typeLabels[type] || type) + '</h4>';
+        html += '<div class="entity-count">' + values.length + '</div>';
+        html += '<div class="entity-list">';
+        values.slice(0, 5).forEach(v => {
+            html += '<div class="entity-item">' + escapeHtml(v.substring(0, 40)) + '</div>';
+        });
+        if (values.length > 5) {
+            html += '<div class="entity-item">... and ' + (values.length - 5) + ' more</div>';
+        }
+        html += '</div></div>';
+    });
+    socContainer.innerHTML = html;
+}
+
+function displayTables(tables) {
+    const tablesSection = document.getElementById('tables-section');
+    const tablesList = document.getElementById('tables-list');
+
+    if (!tables || tables.length === 0) {
+        tablesSection.style.display = 'none';
+        return;
+    }
+
+    tablesSection.style.display = 'block';
+
+    let html = '';
+    tables.forEach((t, i) => {
+        html += '<div class="table-card">';
+        html += '<h4>Table ' + (i + 1) + ' (' + t.row_count + ' rows x ' + t.col_count + ' cols)</h4>';
+        html += '<div class="table-preview"><table>';
+        if (t.headers && t.headers.length) {
+            html += '<tr>';
+            t.headers.forEach(h => html += '<th>' + escapeHtml(h) + '</th>');
+            html += '</tr>';
+        }
+        if (t.preview) {
+            t.preview.forEach(row => {
+                html += '<tr>';
+                row.forEach(cell => html += '<td>' + escapeHtml(cell) + '</td>');
+                html += '</tr>';
+            });
+        }
+        html += '</table></div></div>';
+    });
+    tablesList.innerHTML = html;
+}
 
 document.getElementById('generate-btn').addEventListener('click', async () => {
     const fileInput = document.getElementById('file-input');
@@ -138,11 +665,12 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
     }
 
     const confidence = document.getElementById('confidence').value / 100;
+    const useNlp = document.getElementById('use-nlp').checked;
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
 
     try {
-        const response = await fetch('/api/extract/generate?confidence=' + confidence, {
+        const response = await fetch('/api/extract/generate?confidence=' + confidence + '&use_nlp=' + useNlp, {
             method: 'POST',
             body: formData,
         });
@@ -151,6 +679,8 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
         const result = await response.json();
 
         generatedContent = result.template_content;
+        currentDocText = result.original_text || '';
+
         document.getElementById('generated-template').textContent = result.template_content;
         document.getElementById('save-section').style.display = 'block';
 
@@ -158,10 +688,227 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
         const filename = fileInput.files[0].name.replace(/\.[^/.]+$/, '');
         document.getElementById('template-name').value = filename + '_template';
 
-        showToast('Template generated with ' + result.replacements_made + ' replacements', 'success');
+        // Show stats
+        if (result.detection_stats) {
+            showDetectionStats(result.detection_stats);
+        }
+
+        let msg = 'Template generated with ' + result.replacements_made + ' replacements';
+        if (result.nlp_used) {
+            msg += ' (NLP enabled)';
+        }
+        showToast(msg, 'success');
     } catch (e) {
         showToast('Generation failed', 'error');
     }
+});
+
+function showDetectionStats(stats) {
+    const existingStats = document.querySelector('.detection-stats');
+    if (existingStats) existingStats.remove();
+
+    let socCount = 0;
+    if (stats.by_type) {
+        const socTypes = ['ipv4', 'ipv6', 'cve', 'mitre_attack', 'md5_hash', 'sha1_hash', 'sha256_hash',
+                          'domain', 'url', 'email', 'mac_address', 'registry_key', 'severity'];
+        Object.entries(stats.by_type).forEach(([type, count]) => {
+            if (socTypes.includes(type)) socCount += count;
+        });
+    }
+
+    const statsHtml = `
+        <div class="detection-stats">
+            <strong>Detection Statistics</strong>
+            <div class="detection-stats-grid">
+                <div class="stat-item">
+                    <span class="label">Total:</span>
+                    <span>${stats.total_matches || 0}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="label">Regex:</span>
+                    <span>${stats.by_source?.regex || 0}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="label">NLP:</span>
+                    <span>${stats.by_source?.nlp || 0}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="label">SOC:</span>
+                    <span>${socCount}</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('patterns-section').insertAdjacentHTML('beforeend', statsHtml);
+}
+
+function formatPatternType(type) {
+    const nlpTypes = ['person_name', 'organization', 'location', 'date_nlp', 'time',
+                      'currency_nlp', 'percentage_nlp', 'number', 'ordinal', 'quantity',
+                      'facility', 'product', 'event', 'work_of_art', 'law', 'language', 'group'];
+    const socTypes = ['ipv4', 'ipv6', 'cve', 'mitre_attack', 'md5_hash', 'sha1_hash', 'sha256_hash',
+                      'domain', 'url', 'email', 'mac_address', 'registry_key', 'severity',
+                      'timestamp_iso', 'timestamp_common', 'windows_path', 'unix_path', 'process_name'];
+
+    const displayName = type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+    let sourceTag;
+    if (socTypes.includes(type)) {
+        sourceTag = '<span class="pattern-source soc">SOC</span>';
+    } else if (nlpTypes.includes(type)) {
+        sourceTag = '<span class="pattern-source nlp">NLP</span>';
+    } else {
+        sourceTag = '<span class="pattern-source regex">Regex</span>';
+    }
+
+    return displayName + sourceTag;
+}
+
+// Spell Check
+document.getElementById('run-spellcheck').addEventListener('click', async () => {
+    const fileInput = document.getElementById('file-input');
+    let text = currentDocText;
+
+    if (!text && fileInput.files.length) {
+        const file = fileInput.files[0];
+        text = await file.text();
+    }
+
+    if (!text) {
+        showToast('Please upload a document first', 'error');
+        return;
+    }
+
+    try {
+        const response = await api.post('/api/extract/spell-check', { text });
+
+        const resultsDiv = document.getElementById('spell-results');
+        const correctedSection = document.getElementById('corrected-text-section');
+
+        if (response.suggestion_count === 0) {
+            resultsDiv.innerHTML = '<p class="success">No spelling errors found!</p>';
+            correctedSection.style.display = 'none';
+        } else {
+            let html = '<p><strong>' + response.suggestion_count + ' potential spelling issues found:</strong></p>';
+            response.misspelled.forEach(err => {
+                html += '<div class="spell-error">';
+                html += '<span class="word">' + escapeHtml(err.word) + '</span>';
+                html += ' &rarr; <span class="correction">' + escapeHtml(err.correction) + '</span>';
+                if (err.suggestions && err.suggestions.length > 1) {
+                    html += '<div class="suggestions">Other suggestions: ' + err.suggestions.slice(1, 4).join(', ') + '</div>';
+                }
+                html += '</div>';
+            });
+            resultsDiv.innerHTML = html;
+
+            document.getElementById('corrected-text').textContent = response.corrected;
+            correctedSection.style.display = 'block';
+        }
+
+        document.getElementById('spellcheck-status').textContent = 'Checked ' + text.split(/\s+/).length + ' words';
+    } catch (e) {
+        showToast('Spell check failed: ' + (e.message || 'Unknown error'), 'error');
+    }
+});
+
+// Rewrite Suggestions
+let currentRewriteText = '';
+
+document.getElementById('run-rewrite').addEventListener('click', async () => {
+    const fileInput = document.getElementById('file-input');
+    let text = currentDocText;
+
+    if (!text && fileInput.files.length) {
+        const file = fileInput.files[0];
+        text = await file.text();
+    }
+
+    if (!text) {
+        showToast('Please upload a document first', 'error');
+        return;
+    }
+
+    currentRewriteText = text;
+    const style = document.getElementById('rewrite-style').value;
+
+    try {
+        const response = await api.post('/api/extract/rewrite-suggestions', { text, style });
+
+        const resultsDiv = document.getElementById('rewrite-results');
+        const applyBtn = document.getElementById('apply-rewrite');
+
+        if (response.suggestion_count === 0) {
+            resultsDiv.innerHTML = '<p class="success">No suggestions for this style. Your text looks good!</p>';
+            applyBtn.style.display = 'none';
+        } else {
+            let html = '<p><strong>' + response.suggestion_count + ' suggestions for ' + style + ' style:</strong></p>';
+            response.suggestions.forEach((s, i) => {
+                html += '<div class="rewrite-item">';
+                html += '<span class="original">' + escapeHtml(s.original) + '</span>';
+                html += ' &rarr; <span class="suggestion">' + escapeHtml(s.suggestion) + '</span>';
+                html += '<span class="style-badge">' + s.style + '</span>';
+                html += '<div class="reason">' + escapeHtml(s.reason) + '</div>';
+                html += '</div>';
+            });
+            resultsDiv.innerHTML = html;
+            applyBtn.style.display = 'inline-block';
+        }
+
+        // Hide previous rewritten text
+        document.getElementById('rewritten-text-section').style.display = 'none';
+    } catch (e) {
+        showToast('Failed to get suggestions: ' + (e.message || 'Unknown error'), 'error');
+    }
+});
+
+// Apply Rewrite
+document.getElementById('apply-rewrite').addEventListener('click', async () => {
+    if (!currentRewriteText) {
+        showToast('Please get suggestions first', 'error');
+        return;
+    }
+
+    const style = document.getElementById('rewrite-style').value;
+
+    try {
+        const response = await api.post('/api/extract/apply-rewrites', {
+            text: currentRewriteText,
+            style: style,
+            apply_all: true
+        });
+
+        const rewrittenSection = document.getElementById('rewritten-text-section');
+        const rewrittenText = document.getElementById('rewritten-text');
+        const statsDiv = document.getElementById('rewrite-stats');
+
+        rewrittenText.textContent = response.rewritten;
+        statsDiv.innerHTML = '<strong>' + response.changes_applied + ' changes applied</strong>';
+
+        if (response.changes && response.changes.length > 0) {
+            let changesHtml = '<ul class="changes-list">';
+            response.changes.forEach(c => {
+                changesHtml += '<li><del>' + escapeHtml(c.original) + '</del> &rarr; <ins>' + escapeHtml(c.replacement) + '</ins></li>';
+            });
+            changesHtml += '</ul>';
+            statsDiv.innerHTML += changesHtml;
+        }
+
+        rewrittenSection.style.display = 'block';
+        showToast(response.changes_applied + ' changes applied', 'success');
+    } catch (e) {
+        showToast('Failed to apply rewrites: ' + (e.message || 'Unknown error'), 'error');
+    }
+});
+
+// Copy rewritten text
+document.getElementById('copy-rewritten').addEventListener('click', () => {
+    const text = document.getElementById('rewritten-text').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Copied to clipboard', 'success');
+    }).catch(() => {
+        showToast('Failed to copy', 'error');
+    });
 });
 
 document.getElementById('save-btn').addEventListener('click', async () => {

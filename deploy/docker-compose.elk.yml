@@ -1,0 +1,118 @@
+# =============================================================================
+# DocForge - Docker Compose with Elasticsearch Logging
+# =============================================================================
+# Includes Filebeat sidecar for shipping logs to Elasticsearch.
+#
+# Usage:
+#   docker-compose -f docker-compose.elk.yml up -d
+#
+# Prerequisites:
+#   - Elasticsearch cluster accessible at ELASTICSEARCH_HOSTS
+#   - Run setup-elasticsearch.sh first to create indices/policies
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # DocForge Application
+  # ===========================================================================
+  docforge:
+    image: docforge:latest
+    container_name: docforge
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Application settings
+      - DOCFORGE_DB_PATH=/data/.docforge/docforge.db
+      - DOCFORGE_COOKIE_SECURE=false
+      - DOCFORGE_ADMIN_PASSWORD=${DOCFORGE_ADMIN_PASSWORD:-changeme}
+
+      # Logging settings
+      - DOCFORGE_LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DOCFORGE_LOG_JSON=true
+      - DOCFORGE_LOG_FILE=/var/log/docforge/app.log
+
+      # Environment identifier for logs
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    volumes:
+      # Persistent data
+      - docforge-data:/data
+      # Shared log volume with Filebeat
+      - docforge-logs:/var/log/docforge
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - docforge-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Filebeat - Log Shipper
+  # ===========================================================================
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: docforge-filebeat
+    restart: unless-stopped
+    user: root
+    environment:
+      # Elasticsearch connection
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS:-["http://elasticsearch:9200"]}
+      - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME:-}
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD:-}
+      - ELASTICSEARCH_SSL_ENABLED=${ELASTICSEARCH_SSL_ENABLED:-false}
+
+      # Kibana for dashboards (optional)
+      - KIBANA_HOST=${KIBANA_HOST:-http://kibana:5601}
+
+      # Environment
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+
+      # Monitoring
+      - MONITORING_ENABLED=${MONITORING_ENABLED:-false}
+    volumes:
+      # Filebeat configuration
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      # DocForge logs
+      - docforge-logs:/var/log/docforge:ro
+      # Filebeat data (registry, etc.)
+      - filebeat-data:/usr/share/filebeat/data
+      # Docker socket for container metadata
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: ["--strict.perms=false"]
+    depends_on:
+      docforge:
+        condition: service_healthy
+    networks:
+      - docforge-net
+    healthcheck:
+      test: ["CMD", "filebeat", "test", "config"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  docforge-net:
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  docforge-data:
+    name: docforge-data
+  docforge-logs:
+    name: docforge-logs
+  filebeat-data:
+    name: docforge-filebeat-data

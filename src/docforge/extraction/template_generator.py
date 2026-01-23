@@ -1,10 +1,11 @@
 """Generate templates from documents with detected patterns."""
 
-from dataclasses import dataclass
-from typing import List
+from dataclasses import dataclass, field
+from typing import List, Optional, Dict
 from pathlib import Path
 
 from docforge.extraction.pattern_detector import PatternDetector, PatternMatch
+from docforge.extraction.enhanced_detector import EnhancedPatternDetector, EnhancedMatch, convert_to_pattern_match
 from docforge.extraction.variable_inferrer import VariableInferrer, InferredVariable
 from docforge.plugins import PluginRegistry
 
@@ -17,28 +18,89 @@ class GeneratedTemplate:
     variables: List[InferredVariable]
     original_text: str
     replacements_made: int
+    nlp_used: bool = False
+    detection_stats: Dict = field(default_factory=dict)
 
 
 class TemplateGenerator:
-    """Generate templates from documents."""
+    """Generate templates from documents.
 
-    def __init__(self):
-        self.detector = PatternDetector()
+    Supports both regex-based and NLP-based entity detection.
+    """
+
+    def __init__(self, use_nlp: bool = True):
+        """Initialize the template generator.
+
+        Args:
+            use_nlp: Whether to use NLP-based detection (spaCy NER).
+                    Falls back to regex-only if spaCy is not available.
+        """
+        self.use_nlp = use_nlp
+        self.enhanced_detector = EnhancedPatternDetector(use_nlp=use_nlp)
+        self.regex_detector = PatternDetector()  # Keep for backwards compatibility
         self.inferrer = VariableInferrer()
         self.plugin_registry = PluginRegistry()
 
+    @property
+    def nlp_available(self) -> bool:
+        """Check if NLP detection is available."""
+        return self.enhanced_detector.nlp_available
+
     def analyze(
-        self, text: str, min_confidence: float = 0.5
-    ) -> tuple[List[PatternMatch], List[InferredVariable]]:
-        """Analyze text and return detected patterns and inferred variables."""
-        matches = self.detector.detect(text, min_confidence)
+        self,
+        text: str,
+        min_confidence: float = 0.5,
+        use_nlp: Optional[bool] = None,
+    ) -> tuple[List[PatternMatch], List[InferredVariable], Dict]:
+        """Analyze text and return detected patterns and inferred variables.
+
+        Args:
+            text: The text to analyze.
+            min_confidence: Minimum confidence threshold (0-1).
+            use_nlp: Override NLP setting for this call. None uses instance default.
+
+        Returns:
+            Tuple of (matches, variables, stats) where stats contains detection info.
+        """
+        should_use_nlp = use_nlp if use_nlp is not None else self.use_nlp
+
+        # Get detection summary with both sources
+        summary = self.enhanced_detector.get_detection_summary(
+            text, min_confidence
+        )
+
+        # Convert enhanced matches back to PatternMatch for compatibility
+        matches = [convert_to_pattern_match(m) for m in summary["matches"]]
+
+        # Infer variables
         variables = self.inferrer.infer(matches)
-        return matches, variables
+
+        stats = {
+            "total_matches": summary["total_count"],
+            "by_type": summary["by_type"],
+            "by_source": summary["by_source"],
+            "nlp_available": summary["nlp_available"],
+            "nlp_used": should_use_nlp and summary["nlp_available"],
+        }
+
+        return matches, variables, stats
 
     def analyze_file(
-        self, path: Path, min_confidence: float = 0.5
-    ) -> tuple[List[PatternMatch], List[InferredVariable], str]:
-        """Analyze a file and return patterns, variables, and content."""
+        self,
+        path: Path,
+        min_confidence: float = 0.5,
+        use_nlp: Optional[bool] = None,
+    ) -> tuple[List[PatternMatch], List[InferredVariable], str, Dict]:
+        """Analyze a file and return patterns, variables, content, and stats.
+
+        Args:
+            path: Path to the file to analyze.
+            min_confidence: Minimum confidence threshold (0-1).
+            use_nlp: Override NLP setting for this call.
+
+        Returns:
+            Tuple of (matches, variables, content, stats).
+        """
         # Read file content using appropriate plugin
         plugin = self.plugin_registry.get_plugin_for_file(path)
         if plugin:
@@ -46,18 +108,28 @@ class TemplateGenerator:
         else:
             text = path.read_text(encoding="utf-8")
 
-        matches, variables = self.analyze(text, min_confidence)
-        return matches, variables, text
+        matches, variables, stats = self.analyze(text, min_confidence, use_nlp)
+        return matches, variables, text, stats
 
     def generate(
         self,
         text: str,
         min_confidence: float = 0.7,
         use_filters: bool = True,
+        use_nlp: Optional[bool] = None,
     ) -> GeneratedTemplate:
-        """Generate a template from text."""
-        matches = self.detector.detect(text, min_confidence)
-        variables = self.inferrer.infer(matches)
+        """Generate a template from text.
+
+        Args:
+            text: The text to generate a template from.
+            min_confidence: Minimum confidence threshold (0-1).
+            use_filters: Whether to add Jinja2 filters based on pattern type.
+            use_nlp: Override NLP setting for this call.
+
+        Returns:
+            GeneratedTemplate with the template content and variables.
+        """
+        matches, variables, stats = self.analyze(text, min_confidence, use_nlp)
 
         # Create template by replacing matches with Jinja2 variables
         template_content = self._replace_with_variables(text, matches, use_filters)
@@ -67,6 +139,8 @@ class TemplateGenerator:
             variables=variables,
             original_text=text,
             replacements_made=len(matches),
+            nlp_used=stats.get("nlp_used", False),
+            detection_stats=stats,
         )
 
     def generate_from_file(
@@ -74,8 +148,19 @@ class TemplateGenerator:
         path: Path,
         min_confidence: float = 0.7,
         use_filters: bool = True,
+        use_nlp: Optional[bool] = None,
     ) -> GeneratedTemplate:
-        """Generate a template from a file."""
+        """Generate a template from a file.
+
+        Args:
+            path: Path to the file.
+            min_confidence: Minimum confidence threshold (0-1).
+            use_filters: Whether to add Jinja2 filters.
+            use_nlp: Override NLP setting for this call.
+
+        Returns:
+            GeneratedTemplate with the template content and variables.
+        """
         # Read file content
         plugin = self.plugin_registry.get_plugin_for_file(path)
         if plugin:
@@ -83,7 +168,7 @@ class TemplateGenerator:
         else:
             text = path.read_text(encoding="utf-8")
 
-        return self.generate(text, min_confidence, use_filters)
+        return self.generate(text, min_confidence, use_filters, use_nlp)
 
     def _replace_with_variables(
         self,
@@ -128,6 +213,7 @@ class TemplateGenerator:
     def _get_filter_for_type(self, pattern_type: str) -> str:
         """Get Jinja2 filter suggestion based on pattern type."""
         filter_map = {
+            # Regex-detected types
             "date_iso": "",
             "date_us": "",
             "date_eu": "",
@@ -136,6 +222,24 @@ class TemplateGenerator:
             "percentage": "",
             "email": " | lower",
             "name_pattern": " | title",
+            # NLP-detected types
+            "person_name": " | title",
+            "organization": "",
+            "location": " | title",
+            "date_nlp": "",
+            "time": "",
+            "currency_nlp": "",
+            "percentage_nlp": "",
+            "number": "",
+            "ordinal": "",
+            "quantity": "",
+            "facility": "",
+            "product": "",
+            "event": "",
+            "work_of_art": "",
+            "law": "",
+            "language": "",
+            "group": "",
         }
         return filter_map.get(pattern_type, "")
 

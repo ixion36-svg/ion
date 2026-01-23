@@ -135,8 +135,10 @@ function updateUserMenu() {
     if (currentUserData.roles.includes('admin')) {
         const adminLinks = document.getElementById('nav-admin-links');
         const auditLink = document.getElementById('nav-audit-link');
+        const securityLink = document.getElementById('nav-security-link');
         if (adminLinks) adminLinks.style.display = 'block';
         if (auditLink) auditLink.style.display = 'block';
+        if (securityLink) securityLink.style.display = 'block';
     }
 }
 

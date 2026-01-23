@@ -1,0 +1,149 @@
+# =============================================================================
+# DocForge Docker Compose - HTTPS Production Deployment
+# =============================================================================
+# This configuration includes:
+# - Nginx reverse proxy with TLS termination
+# - DocForge application
+# - Persistent data volumes
+# - Security hardening
+#
+# Prerequisites:
+# - Place your TLS certificate at: ./ssl/server.crt
+# - Place your TLS private key at: ./ssl/server.key
+#
+# Usage:
+#   docker-compose -f docker-compose.https.yml up -d
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # Nginx Reverse Proxy
+  # ===========================================================================
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: docforge-nginx
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      # Nginx configuration
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+      # TLS certificates
+      - ./ssl:/etc/nginx/ssl:ro
+
+      # Logs (optional - for debugging)
+      # - ./logs/nginx:/var/log/nginx
+
+    depends_on:
+      - docforge
+
+    networks:
+      - docforge-network
+
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+
+  # ===========================================================================
+  # DocForge Application
+  # ===========================================================================
+  docforge:
+    image: docforge:latest
+    container_name: docforge-app
+    restart: unless-stopped
+
+    # No port exposure - accessed only through nginx
+    expose:
+      - "8000"
+
+    volumes:
+      # Persistent data
+      - docforge-data:/data
+
+    environment:
+      # Server configuration
+      - DOCFORGE_HOST=0.0.0.0
+      - DOCFORGE_PORT=8000
+
+      # IMPORTANT: Set to true when using HTTPS
+      - DOCFORGE_COOKIE_SECURE=true
+
+      # Initial admin password (change after first login!)
+      # - DOCFORGE_ADMIN_PASSWORD=ChangeMe123!
+
+      # OIDC/Keycloak configuration (optional)
+      # - DOCFORGE_OIDC_ENABLED=true
+      # - DOCFORGE_OIDC_KEYCLOAK_URL=https://keycloak.example.com
+      # - DOCFORGE_OIDC_REALM=docforge
+      # - DOCFORGE_OIDC_CLIENT_ID=docforge-app
+      # - DOCFORGE_OIDC_CLIENT_SECRET=your-client-secret
+
+    networks:
+      - docforge-network
+
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/stats')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 128M
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  docforge-network:
+    driver: bridge
+    internal: false
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  docforge-data:
+    driver: local

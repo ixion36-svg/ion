@@ -18,6 +18,10 @@ class AuthService:
     # Default session lifetime: 24 hours
     DEFAULT_SESSION_LIFETIME_HOURS = 24
 
+    # Dummy hash for timing attack prevention - bcrypt hash of random string
+    # Used to ensure constant-time comparison even when user doesn't exist
+    _DUMMY_HASH = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.NTtYB.1NQq1vRi"
+
     def __init__(
         self,
         session: Session,
@@ -61,11 +65,17 @@ class AuthService:
         if user is None:
             user = self.user_repo.get_by_email(username)
 
+        # Timing attack prevention: always verify a password hash
+        # even when user doesn't exist, to ensure constant-time response
         if user is None:
+            # Verify against dummy hash to consume same time as real verification
+            password_hasher.verify(password, self._DUMMY_HASH)
             self._log_failed_login(username, ip_address, "User not found")
             return None, None, "Invalid username or password"
 
         if not user.is_active:
+            # Still verify password to prevent timing leak for disabled accounts
+            password_hasher.verify(password, user.password_hash)
             self._log_failed_login(username, ip_address, "Account disabled")
             return None, None, "Account is disabled"
 
