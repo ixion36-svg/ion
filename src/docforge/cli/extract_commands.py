@@ -36,16 +36,33 @@ def analyze(
     show_content: bool = typer.Option(
         False, "--content", help="Show file content with highlighted patterns"
     ),
+    no_nlp: bool = typer.Option(
+        False, "--no-nlp", help="Disable NLP-based detection (use regex only)"
+    ),
 ) -> None:
-    """Analyze a document for patterns that could become template variables."""
+    """Analyze a document for patterns that could become template variables.
+
+    By default, uses both regex patterns and NLP-based entity recognition.
+    Use --no-nlp to disable NLP and use regex patterns only.
+    """
     if not file.exists():
         console.print(f"[red]File not found: {file}[/red]")
         raise typer.Exit(1)
 
-    generator = TemplateGenerator()
+    use_nlp = not no_nlp
+    generator = TemplateGenerator(use_nlp=use_nlp)
+
+    # Show NLP status
+    if use_nlp:
+        if generator.nlp_available:
+            console.print("[green]NLP detection enabled[/green]")
+        else:
+            console.print("[yellow]NLP not available (install spaCy). Using regex only.[/yellow]")
+    else:
+        console.print("[dim]NLP detection disabled (--no-nlp)[/dim]")
 
     try:
-        matches, variables, content = generator.analyze_file(file, confidence)
+        matches, variables, content, stats = generator.analyze_file(file, confidence)
 
         console.print(Panel(f"[bold]Analysis of {file.name}[/bold]"))
 
@@ -128,13 +145,30 @@ def generate(
     format: Optional[str] = typer.Option(
         None, "--format", help="Template format"
     ),
+    no_nlp: bool = typer.Option(
+        False, "--no-nlp", help="Disable NLP-based detection (use regex only)"
+    ),
 ) -> None:
-    """Generate a template from a document."""
+    """Generate a template from a document.
+
+    By default, uses both regex patterns and NLP-based entity recognition.
+    Use --no-nlp to disable NLP and use regex patterns only.
+    """
     if not file.exists():
         console.print(f"[red]File not found: {file}[/red]")
         raise typer.Exit(1)
 
-    generator = TemplateGenerator()
+    use_nlp = not no_nlp
+    generator = TemplateGenerator(use_nlp=use_nlp)
+
+    # Show NLP status
+    if use_nlp:
+        if generator.nlp_available:
+            console.print("[green]NLP detection enabled[/green]")
+        else:
+            console.print("[yellow]NLP not available (install spaCy). Using regex only.[/yellow]")
+    else:
+        console.print("[dim]NLP detection disabled (--no-nlp)[/dim]")
 
     try:
         result = generator.generate_from_file(file, confidence)
@@ -213,16 +247,33 @@ def generate_schema(
     output: Optional[Path] = typer.Option(
         None, "--output", "-o", help="Output file for JSON schema"
     ),
+    no_nlp: bool = typer.Option(
+        False, "--no-nlp", help="Disable NLP-based detection (use regex only)"
+    ),
 ) -> None:
-    """Generate a JSON schema for inferred variables."""
+    """Generate a JSON schema for inferred variables.
+
+    By default, uses both regex patterns and NLP-based entity recognition.
+    Use --no-nlp to disable NLP and use regex patterns only.
+    """
     if not file.exists():
         console.print(f"[red]File not found: {file}[/red]")
         raise typer.Exit(1)
 
-    generator = TemplateGenerator()
+    use_nlp = not no_nlp
+    generator = TemplateGenerator(use_nlp=use_nlp)
+
+    # Show NLP status
+    if use_nlp:
+        if generator.nlp_available:
+            console.print("[green]NLP detection enabled[/green]")
+        else:
+            console.print("[yellow]NLP not available (install spaCy). Using regex only.[/yellow]")
+    else:
+        console.print("[dim]NLP detection disabled (--no-nlp)[/dim]")
 
     try:
-        matches, variables, _ = generator.analyze_file(file, confidence)
+        matches, variables, _, stats = generator.analyze_file(file, confidence)
 
         from docforge.extraction.variable_inferrer import VariableInferrer
         inferrer = VariableInferrer()

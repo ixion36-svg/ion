@@ -4,8 +4,18 @@
 
 {% block content %}
 <div class="dashboard">
-    <h1>Dashboard</h1>
+    <!-- User Welcome Section -->
+    <div class="welcome-section" id="welcome-section">
+        <div class="welcome-content">
+            <h1>Welcome, <span id="user-display-name">User</span></h1>
+            <p class="welcome-meta">
+                <span id="user-role" class="badge badge-primary"></span>
+                <span id="current-date" class="text-muted"></span>
+            </p>
+        </div>
+    </div>
 
+    <!-- Stats Grid -->
     <div class="stats-grid" id="stats-container">
         <div class="stat-card">
             <div class="stat-value" id="templates-count">-</div>
@@ -19,100 +29,381 @@
             <div class="stat-value" id="tags-count">-</div>
             <div class="stat-label">Tags</div>
         </div>
+        <div class="stat-card" id="gitlab-stat-card" style="display: none;">
+            <div class="stat-value" id="gitlab-issues-count">-</div>
+            <div class="stat-label">Open Issues</div>
+        </div>
     </div>
 
-    <div class="dashboard-sections">
-        <section class="section">
-            <div class="section-header">
-                <h2>Recent Templates</h2>
-                <a href="/templates/new" class="btn btn-primary">New Template</a>
-            </div>
-            <div id="recent-templates" class="card-list">
-                <p class="loading">Loading...</p>
-            </div>
-        </section>
+    <div class="dashboard-grid">
+        <!-- Left Column -->
+        <div class="dashboard-column">
+            <!-- GitLab Tasks Section -->
+            <section class="section gitlab-section" id="gitlab-section" style="display: none;">
+                <div class="section-header">
+                    <h2>GitLab Tasks</h2>
+                    <a href="/gitlab" class="btn btn-sm">View All</a>
+                </div>
+                <div class="gitlab-status" id="gitlab-status">
+                    <span class="status-indicator connected"></span>
+                    <span id="gitlab-project-name">Project</span>
+                </div>
+                <div id="gitlab-tasks" class="task-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
 
-        <section class="section">
-            <div class="section-header">
-                <h2>Quick Actions</h2>
-            </div>
-            <div class="action-grid">
-                <a href="/templates/new" class="action-card">
-                    <div class="action-icon">+</div>
-                    <div class="action-label">Create Template</div>
-                </a>
-                <a href="/extract" class="action-card">
-                    <div class="action-icon">&#x21e7;</div>
-                    <div class="action-label">Extract Template</div>
-                </a>
-                <a href="/templates" class="action-card">
-                    <div class="action-icon">&#x2630;</div>
-                    <div class="action-label">Browse Templates</div>
-                </a>
-                <a href="/documents" class="action-card">
-                    <div class="action-icon">&#x2637;</div>
-                    <div class="action-label">View Documents</div>
-                </a>
-            </div>
-        </section>
+            <!-- Recent Documents -->
+            <section class="section">
+                <div class="section-header">
+                    <h2>Recent Documents</h2>
+                    <a href="/documents" class="btn btn-sm">View All</a>
+                </div>
+                <div id="recent-documents" class="card-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+        </div>
 
-        <section class="section">
-            <div class="section-header">
-                <h2>Sample Templates</h2>
-            </div>
-            <p class="muted" style="margin-bottom: 1rem;">Get started quickly with pre-built cyber security templates.</p>
-            <button id="create-samples-btn" class="btn btn-primary">Load Sample Templates</button>
-            <span id="samples-status" style="margin-left: 1rem;"></span>
-        </section>
+        <!-- Right Column -->
+        <div class="dashboard-column">
+            <!-- Quick Actions -->
+            <section class="section">
+                <div class="section-header">
+                    <h2>Quick Actions</h2>
+                </div>
+                <div class="action-grid">
+                    <a href="/templates/new" class="action-card">
+                        <div class="action-icon">+</div>
+                        <div class="action-label">Create Template</div>
+                    </a>
+                    <a href="/extract" class="action-card">
+                        <div class="action-icon">&#x21e7;</div>
+                        <div class="action-label">Extract Template</div>
+                    </a>
+                    <a href="/templates" class="action-card">
+                        <div class="action-icon">&#x2630;</div>
+                        <div class="action-label">Browse Templates</div>
+                    </a>
+                    <a href="/documents" class="action-card">
+                        <div class="action-icon">&#x2637;</div>
+                        <div class="action-label">View Documents</div>
+                    </a>
+                </div>
+            </section>
+
+            <!-- Recent Templates -->
+            <section class="section">
+                <div class="section-header">
+                    <h2>Recent Templates</h2>
+                    <a href="/templates" class="btn btn-sm">View All</a>
+                </div>
+                <div id="recent-templates" class="card-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+
+            <!-- Sample Templates -->
+            <section class="section">
+                <div class="section-header">
+                    <h2>Sample Templates</h2>
+                </div>
+                <p class="muted" style="margin-bottom: 1rem;">Get started quickly with pre-built cyber security templates.</p>
+                <button id="create-samples-btn" class="btn btn-primary">Load Sample Templates</button>
+                <span id="samples-status" style="margin-left: 1rem;"></span>
+            </section>
+        </div>
     </div>
 </div>
+
+<style>
+.welcome-section {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark, #1a5a8a) 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.welcome-section h1 {
+    margin: 0;
+    font-size: 1.75rem;
+}
+
+.welcome-meta {
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.welcome-meta .badge {
+    background: rgba(255,255,255,0.2);
+    color: white;
+}
+
+.welcome-meta .text-muted {
+    opacity: 0.8;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.dashboard-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.gitlab-section {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid #fc6d26;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.gitlab-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--danger);
+}
+
+.status-indicator.connected {
+    background: var(--success);
+}
+
+.task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.task-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--background);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.task-item:hover {
+    background: var(--hover-bg, #f5f5f5);
+}
+
+.task-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+    flex-shrink: 0;
+    margin-top: 4px;
+}
+
+.task-indicator.closed {
+    background: var(--success);
+    border-color: var(--success);
+}
+
+.task-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.task-title {
+    font-weight: 500;
+    color: var(--text);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.task-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.task-labels {
+    display: flex;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.task-label {
+    font-size: 0.625rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    color: white;
+    background: var(--primary);
+}
+
+.document-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.document-item:hover {
+    border-color: var(--primary);
+}
+
+.document-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.document-name {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.document-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.empty-message {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 1rem;
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
 {% raw %}
 document.addEventListener('DOMContentLoaded', async () => {
-    // Load stats
-    try {
-        const stats = await api.get('/api/stats');
-        document.getElementById('templates-count').textContent = stats.templates_count;
-        document.getElementById('documents-count').textContent = stats.documents_count;
-        document.getElementById('tags-count').textContent = stats.tags_count;
-    } catch (e) {
-        console.error('Failed to load stats:', e);
-    }
+    // Set current date
+    const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    document.getElementById('current-date').textContent = new Date().toLocaleDateString(undefined, dateOptions);
 
-    // Load recent templates
+    // Load dashboard data
     try {
-        const templates = await api.get('/api/templates');
-        const container = document.getElementById('recent-templates');
+        const data = await api.get('/api/dashboard');
 
-        if (templates.length === 0) {
-            container.innerHTML = '<p class="empty-state">No templates yet. <a href="/templates/new">Create one!</a></p>';
-        } else {
-            let html = '';
-            templates.slice(0, 5).forEach(function(t) {
-                html += '<div class="list-item">';
-                html += '<div class="list-item-content">';
-                html += '<a href="/templates/' + t.id + '" class="list-item-title">' + escapeHtml(t.name) + '</a>';
-                html += '<div class="list-item-meta">';
-                html += '<span class="badge">' + t.format + '</span>';
-                html += '<span>v' + t.current_version + '</span>';
-                t.tags.forEach(function(tag) {
-                    html += '<span class="tag">' + escapeHtml(tag) + '</span>';
-                });
-                html += '</div>';
-                html += '</div>';
-                html += '<div class="list-item-actions">';
-                html += '<a href="/templates/' + t.id + '/render" class="btn btn-sm">Render</a>';
-                html += '<a href="/templates/' + t.id + '/edit" class="btn btn-sm btn-secondary">Edit</a>';
-                html += '</div>';
-                html += '</div>';
-            });
-            container.innerHTML = html;
+        // User info
+        document.getElementById('user-display-name').textContent = data.user.display_name || data.user.username;
+        document.getElementById('user-role').textContent = data.user.roles.length > 0 ? data.user.roles[0] : 'User';
+
+        // Stats
+        document.getElementById('templates-count').textContent = data.stats.templates_count;
+        document.getElementById('documents-count').textContent = data.stats.documents_count;
+        document.getElementById('tags-count').textContent = data.stats.tags_count;
+
+        // GitLab section
+        if (data.gitlab.enabled && data.gitlab.connected) {
+            document.getElementById('gitlab-section').style.display = 'block';
+            document.getElementById('gitlab-stat-card').style.display = 'block';
+            document.getElementById('gitlab-issues-count').textContent = data.gitlab.total_open;
+            document.getElementById('gitlab-project-name').textContent = data.gitlab.project_name || 'Project';
+
+            const tasksContainer = document.getElementById('gitlab-tasks');
+            if (data.gitlab.open_issues && data.gitlab.open_issues.length > 0) {
+                tasksContainer.innerHTML = data.gitlab.open_issues.slice(0, 5).map(issue => `
+                    <div class="task-item" onclick="window.location.href='/gitlab'">
+                        <div class="task-indicator ${issue.state === 'closed' ? 'closed' : ''}"></div>
+                        <div class="task-content">
+                            <p class="task-title">#${issue.iid} ${escapeHtml(issue.title)}</p>
+                            <div class="task-meta">
+                                ${issue.due_date ? `Due: ${issue.due_date}` : `Created: ${formatDate(issue.created_at)}`}
+                                ${issue.assignees.length > 0 ? ` &bull; ${issue.assignees.join(', ')}` : ''}
+                            </div>
+                            ${issue.labels.length > 0 ? `
+                                <div class="task-labels">
+                                    ${issue.labels.map(l => `<span class="task-label">${escapeHtml(l)}</span>`).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                tasksContainer.innerHTML = '<p class="empty-message">No open issues</p>';
+            }
         }
+
+        // Recent documents
+        const docsContainer = document.getElementById('recent-documents');
+        if (data.recent_documents && data.recent_documents.length > 0) {
+            docsContainer.innerHTML = data.recent_documents.map(doc => `
+                <div class="document-item" onclick="window.location.href='/documents'">
+                    <div class="document-info">
+                        <div class="document-name">${escapeHtml(doc.name)}</div>
+                        <div class="document-meta">
+                            From: ${escapeHtml(doc.template_name)} &bull; ${formatDate(doc.updated_at)}
+                        </div>
+                    </div>
+                    <span class="badge ${doc.status === 'active' ? 'badge-success' : ''}">${doc.status}</span>
+                </div>
+            `).join('');
+        } else {
+            docsContainer.innerHTML = '<p class="empty-message">No documents yet. <a href="/templates">Create one from a template!</a></p>';
+        }
+
+        // Recent templates
+        const templatesContainer = document.getElementById('recent-templates');
+        if (data.recent_templates && data.recent_templates.length > 0) {
+            templatesContainer.innerHTML = data.recent_templates.map(t => `
+                <div class="list-item">
+                    <div class="list-item-content">
+                        <a href="/templates/${t.id}" class="list-item-title">${escapeHtml(t.name)}</a>
+                        <div class="list-item-meta">
+                            <span class="badge">${t.format}</span>
+                            ${t.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+                        </div>
+                    </div>
+                    <div class="list-item-actions">
+                        <a href="/templates/${t.id}/render" class="btn btn-sm">Render</a>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            templatesContainer.innerHTML = '<p class="empty-message">No templates yet. <a href="/templates/new">Create one!</a></p>';
+        }
+
     } catch (e) {
-        document.getElementById('recent-templates').innerHTML = '<p class="error">Failed to load templates</p>';
+        console.error('Failed to load dashboard:', e);
+        // Fallback to basic stats
+        try {
+            const stats = await api.get('/api/stats');
+            document.getElementById('templates-count').textContent = stats.templates_count;
+            document.getElementById('documents-count').textContent = stats.documents_count;
+            document.getElementById('tags-count').textContent = stats.tags_count;
+        } catch (e2) {
+            console.error('Failed to load stats:', e2);
+        }
     }
 
     // Sample templates button
@@ -127,7 +418,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (result.created && result.created.length > 0) {
                 status.innerHTML = '<span style="color: var(--success);">Created ' + result.created.length + ' templates!</span>';
                 showToast(result.message, 'success');
-                // Reload templates list
                 setTimeout(function() { window.location.reload(); }, 1000);
             } else {
                 status.innerHTML = '<span style="color: var(--text-muted);">Sample templates already exist.</span>';
@@ -141,6 +431,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         btn.textContent = 'Load Sample Templates';
     });
 });
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+
+    return date.toLocaleDateString();
+}
 {% endraw %}
 </script>
 {% endblock %}

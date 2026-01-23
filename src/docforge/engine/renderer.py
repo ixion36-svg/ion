@@ -2,25 +2,24 @@
 
 import re
 from typing import Any, Set
-from jinja2 import Environment, BaseLoader, TemplateSyntaxError, UndefinedError, Undefined
+from jinja2 import TemplateSyntaxError, UndefinedError, Undefined
+from jinja2.sandbox import SandboxedEnvironment, SecurityError
 
 from docforge.core.exceptions import RenderError
 
 
-class StringLoader(BaseLoader):
-    """Loader that loads templates from strings."""
-
-    def get_source(self, environment: Environment, template: str) -> tuple[str, str | None, Any]:
-        return template, None, lambda: True
-
-
 class TemplateRenderer:
-    """Jinja2-based template renderer."""
+    """Jinja2-based template renderer using sandboxed environment.
+
+    Uses SandboxedEnvironment to prevent Server-Side Template Injection (SSTI)
+    attacks by restricting access to dangerous attributes and methods.
+    """
 
     def __init__(self):
-        self.env = Environment(
-            loader=StringLoader(),
-            autoescape=False,
+        # Use SandboxedEnvironment to prevent SSTI attacks
+        # This blocks access to dangerous attributes like __class__, __mro__, etc.
+        self.env = SandboxedEnvironment(
+            autoescape=False,  # Templates are for document generation, not HTML
             trim_blocks=True,
             lstrip_blocks=True,
         )
@@ -43,10 +42,16 @@ class TemplateRenderer:
         self.env.filters["default"] = default_filter
 
     def render(self, template_content: str, data: dict[str, Any]) -> str:
-        """Render a template with the given data."""
+        """Render a template with the given data.
+
+        The template is rendered in a sandboxed environment that prevents
+        access to dangerous Python internals.
+        """
         try:
             template = self.env.from_string(template_content)
             return template.render(**data)
+        except SecurityError as e:
+            raise RenderError(f"Security violation: {e}")
         except TemplateSyntaxError as e:
             raise RenderError(f"Template syntax error: {e.message} at line {e.lineno}")
         except UndefinedError as e:

@@ -262,10 +262,9 @@
                 return;
             }
 
-            // Generate a random state for CSRF protection
-            const state = Math.random().toString(36).substring(2, 15) +
-                          Math.random().toString(36).substring(2, 15);
-            sessionStorage.setItem('oidc_state', state);
+            // Use server-provided state for CSRF protection
+            // The state is also stored in an httponly cookie server-side
+            const state = oidcConfig.state;
 
             // Build authorization URL with required parameters
             const params = new URLSearchParams({

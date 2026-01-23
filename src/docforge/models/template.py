@@ -1,4 +1,4 @@
-"""Template, Tag, and Variable models."""
+"""Template, Tag, Variable, and Collection models."""
 
 from datetime import datetime
 from typing import Optional, List
@@ -27,6 +27,49 @@ template_tags = Table(
 )
 
 
+class Collection(Base, TimestampMixin):
+    """Collection/Folder model for grouping templates and documents.
+
+    Supports hierarchical folder structure with parent/child relationships.
+    """
+
+    __tablename__ = "collections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # emoji or icon name
+    parent_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("collections.id"), nullable=True
+    )
+
+    # Self-referential relationships for folder hierarchy
+    parent: Mapped[Optional["Collection"]] = relationship(
+        "Collection", remote_side=[id], back_populates="children"
+    )
+    children: Mapped[List["Collection"]] = relationship(
+        "Collection", back_populates="parent", cascade="all, delete-orphan"
+    )
+
+    # Relationships to templates and documents
+    templates: Mapped[List["Template"]] = relationship(
+        "Template", back_populates="collection"
+    )
+    documents: Mapped[List["Document"]] = relationship(
+        "Document", back_populates="collection"
+    )
+
+    @property
+    def full_path(self) -> str:
+        """Get the full path including parent folders."""
+        if self.parent:
+            return f"{self.parent.full_path}/{self.name}"
+        return self.name
+
+    def __repr__(self) -> str:
+        return f"<Collection(id={self.id}, name='{self.name}', parent_id={self.parent_id})>"
+
+
 class Template(Base, TimestampMixin):
     """Template model for storing document templates."""
 
@@ -40,8 +83,14 @@ class Template(Base, TimestampMixin):
     folder_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     current_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    collection_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("collections.id"), nullable=True
+    )
 
     # Relationships
+    collection: Mapped[Optional["Collection"]] = relationship(
+        "Collection", back_populates="templates"
+    )
     tags: Mapped[List["Tag"]] = relationship(
         "Tag", secondary=template_tags, back_populates="templates"
     )

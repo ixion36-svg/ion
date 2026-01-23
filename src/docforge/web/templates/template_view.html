@@ -8,76 +8,215 @@
     <div class="header-actions">
         <a href="/templates/{{ template_id }}/render" class="btn btn-primary">Render</a>
         <a href="/templates/{{ template_id }}/edit" class="btn">Edit</a>
-        <a href="/templates/{{ template_id }}/versions" class="btn">Version History</a>
     </div>
 </div>
 
 <div class="template-details">
     <div class="meta-bar">
         <span class="badge" id="template-format">-</span>
-        <span id="template-version">Version: -</span>
+        <span class="badge badge-version" id="template-version">v1</span>
         <span id="template-updated">Updated: -</span>
     </div>
 
     <div id="template-tags" class="tags-container"></div>
 
-    <div class="section">
-        <h3>Description</h3>
-        <p id="template-description" class="description">-</p>
+    <div class="content-tabs">
+        <button type="button" class="content-tab-btn active" data-view="content">Content</button>
+        <button type="button" class="content-tab-btn" data-view="variables">Variables</button>
+        <button type="button" class="content-tab-btn" data-view="versions">Version History</button>
     </div>
 
-    <div class="section">
-        <h3>Variables</h3>
+    <!-- Content View -->
+    <div id="content-view" class="tab-content">
+        <div class="section">
+            <h3>Description</h3>
+            <p id="template-description" class="description">-</p>
+        </div>
+        <div class="section">
+            <h3>Template Content</h3>
+            <pre id="template-content" class="code-block">Loading...</pre>
+        </div>
+    </div>
+
+    <!-- Variables View -->
+    <div id="variables-view" class="tab-content" style="display: none;">
         <div id="template-variables" class="variables-list">
             <p class="loading">Loading...</p>
         </div>
     </div>
 
-    <div class="section">
-        <h3>Content</h3>
-        <pre id="template-content" class="code-block">Loading...</pre>
+    <!-- Versions View -->
+    <div id="versions-view" class="tab-content" style="display: none;">
+        <div id="versions-list" class="versions-list">
+            <p class="loading">Loading versions...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Version Preview Modal -->
+<div id="version-modal" class="modal" style="display: none;">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2 id="version-modal-title">Version Preview</h2>
+            <button class="modal-close" onclick="closeVersionModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="version-meta" class="meta-bar"></div>
+            <div class="version-tabs">
+                <button type="button" class="version-tab-btn active" data-vtab="content">Content</button>
+                <button type="button" class="version-tab-btn" data-vtab="diff">Diff</button>
+            </div>
+            <div id="version-content-tab" class="version-tab-content">
+                <pre id="version-content" class="code-block"></pre>
+            </div>
+            <div id="version-diff-tab" class="version-tab-content" style="display: none;">
+                <pre id="version-diff" class="code-block diff-view"></pre>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="rollback-btn" class="btn btn-warning">Rollback to This Version</button>
+            <button class="btn" onclick="closeVersionModal()">Close</button>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<style>
+.content-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+.content-tab-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: 4px;
+}
+.content-tab-btn:hover {
+    background: var(--bg-hover);
+}
+.content-tab-btn.active {
+    background: var(--primary-color);
+    color: white;
+}
+.tab-content {
+    padding: 1rem 0;
+}
+.versions-table {
+    width: 100%;
+}
+.versions-table th, .versions-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+.versions-table tr:hover {
+    background: var(--bg-hover);
+}
+.current-version {
+    background: var(--bg-secondary);
+}
+.badge-current {
+    background: var(--success-color);
+    color: white;
+}
+.badge-checkpoint {
+    background: var(--warning-color);
+    color: black;
+}
+.version-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.version-tab-btn {
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    cursor: pointer;
+    border-radius: 4px;
+}
+.version-tab-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+.diff-view {
+    font-family: monospace;
+    white-space: pre-wrap;
+}
+.diff-view .diff-add {
+    background: #d4edda;
+    color: #155724;
+}
+.diff-view .diff-del {
+    background: #f8d7da;
+    color: #721c24;
+}
+</style>
 <script>
 {% raw %}
 const templateId = {% endraw %}{{ template_id }}{% raw %};
+let currentTemplate = null;
+let currentVersion = 1;
+let previewVersionNumber = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        const template = await api.get('/api/templates/' + templateId);
+    await loadTemplate();
+    setupTabs();
+});
 
-        document.getElementById('template-name').textContent = template.name;
-        document.getElementById('template-format').textContent = template.format;
-        document.getElementById('template-version').textContent = 'Version: ' + template.current_version;
-        document.getElementById('template-updated').textContent = 'Updated: ' + formatDate(template.updated_at);
-        document.getElementById('template-description').textContent = template.description || 'No description';
-        document.getElementById('template-content').textContent = template.content || '(empty)';
+async function loadTemplate() {
+    try {
+        currentTemplate = await api.get('/api/templates/' + templateId);
+
+        document.getElementById('template-name').textContent = currentTemplate.name;
+        document.getElementById('template-format').textContent = currentTemplate.format;
+        document.getElementById('template-version').textContent = 'v' + currentTemplate.current_version;
+        currentVersion = currentTemplate.current_version;
+        document.getElementById('template-updated').textContent = 'Updated: ' + formatDate(currentTemplate.updated_at);
+        document.getElementById('template-description').textContent = currentTemplate.description || 'No description';
+        document.getElementById('template-content').textContent = currentTemplate.content || '(empty)';
 
         // Tags
         const tagsContainer = document.getElementById('template-tags');
-        if (template.tags.length > 0) {
-            tagsContainer.innerHTML = template.tags.map(t => '<span class="tag">' + escapeHtml(t) + '</span>').join('');
+        if (currentTemplate.tags.length > 0) {
+            tagsContainer.innerHTML = currentTemplate.tags.map(t => '<span class="tag">' + escapeHtml(t) + '</span>').join('');
         } else {
             tagsContainer.innerHTML = '<span class="muted">No tags</span>';
         }
 
-        // Variables
+        // Load variables
+        await loadVariables();
+
+    } catch (e) {
+        showToast('Failed to load template', 'error');
+    }
+}
+
+async function loadVariables() {
+    const varsContainer = document.getElementById('template-variables');
+    try {
         const varsData = await api.get('/api/templates/' + templateId + '/variables');
-        const varsContainer = document.getElementById('template-variables');
 
         if (varsData.extracted.length === 0) {
             varsContainer.innerHTML = '<p class="muted">No variables detected</p>';
         } else {
-            let tableHtml = '<table class="table"><thead><tr><th>Variable</th><th>Status</th></tr></thead><tbody>';
+            let tableHtml = '<table class="table"><thead><tr><th>Variable</th><th>Type</th><th>Status</th></tr></thead><tbody>';
             varsData.extracted.forEach(v => {
                 const defined = varsData.defined.find(d => d.name === v);
                 tableHtml += '<tr><td><code>{{ ' + v + ' }}</code></td>';
                 if (defined) {
-                    tableHtml += '<td><span class="badge badge-success">' + defined.var_type + '</span></td>';
+                    tableHtml += '<td>' + defined.var_type + '</td>';
+                    tableHtml += '<td><span class="badge badge-success">Defined</span></td>';
                 } else {
+                    tableHtml += '<td>-</td>';
                     tableHtml += '<td><span class="muted">Not defined</span></td>';
                 }
                 tableHtml += '</tr>';
@@ -85,10 +224,177 @@ document.addEventListener('DOMContentLoaded', async () => {
             tableHtml += '</tbody></table>';
             varsContainer.innerHTML = tableHtml;
         }
-
     } catch (e) {
-        showToast('Failed to load template', 'error');
+        varsContainer.innerHTML = '<p class="error">Failed to load variables</p>';
     }
+}
+
+async function loadVersions() {
+    const container = document.getElementById('versions-list');
+    container.innerHTML = '<p class="loading">Loading versions...</p>';
+
+    try {
+        const versions = await api.get('/api/templates/' + templateId + '/versions');
+
+        if (versions.length === 0) {
+            container.innerHTML = '<p class="empty-state">No version history available</p>';
+            return;
+        }
+
+        let html = '<table class="table versions-table">';
+        html += '<thead><tr><th>Version</th><th>Message</th><th>Author</th><th>Date</th><th>Actions</th></tr></thead>';
+        html += '<tbody>';
+        versions.forEach(function(v) {
+            const isCurrent = v.version_number === currentVersion;
+            html += '<tr' + (isCurrent ? ' class="current-version"' : '') + '>';
+            html += '<td>v' + v.version_number;
+            if (isCurrent) html += ' <span class="badge badge-current">Current</span>';
+            if (v.is_checkpoint) html += ' <span class="badge badge-checkpoint">' + escapeHtml(v.checkpoint_name) + '</span>';
+            html += '</td>';
+            html += '<td>' + escapeHtml(v.message || '-') + '</td>';
+            html += '<td>' + escapeHtml(v.author || '-') + '</td>';
+            html += '<td>' + formatDate(v.created_at) + '</td>';
+            html += '<td>';
+            html += '<button class="btn btn-sm" onclick="previewVersion(' + v.version_number + ')">View</button>';
+            if (!isCurrent) {
+                html += ' <button class="btn btn-sm btn-warning" onclick="confirmRollback(' + v.version_number + ')">Rollback</button>';
+            }
+            html += '</td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<p class="error">Failed to load versions</p>';
+    }
+}
+
+function setupTabs() {
+    document.querySelectorAll('.content-tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const view = this.getAttribute('data-view');
+            switchTab(view);
+        });
+    });
+}
+
+function switchTab(view) {
+    document.querySelectorAll('.content-tab-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+    });
+    document.querySelector('.content-tab-btn[data-view="' + view + '"]').classList.add('active');
+
+    document.getElementById('content-view').style.display = view === 'content' ? 'block' : 'none';
+    document.getElementById('variables-view').style.display = view === 'variables' ? 'block' : 'none';
+    document.getElementById('versions-view').style.display = view === 'versions' ? 'block' : 'none';
+
+    if (view === 'versions') {
+        loadVersions();
+    }
+}
+
+async function previewVersion(versionNumber) {
+    try {
+        const version = await api.get('/api/templates/' + templateId + '/versions/' + versionNumber);
+        previewVersionNumber = versionNumber;
+
+        document.getElementById('version-modal-title').textContent = 'Version ' + versionNumber + ' Preview';
+
+        let metaHtml = '';
+        if (version.message) {
+            metaHtml += '<span><strong>Message:</strong> ' + escapeHtml(version.message) + '</span>';
+        }
+        if (version.author) {
+            metaHtml += '<span><strong>Author:</strong> ' + escapeHtml(version.author) + '</span>';
+        }
+        if (version.is_checkpoint) {
+            metaHtml += '<span class="badge badge-checkpoint">' + escapeHtml(version.checkpoint_name) + '</span>';
+        }
+        metaHtml += '<span><strong>Date:</strong> ' + formatDate(version.created_at) + '</span>';
+        document.getElementById('version-meta').innerHTML = metaHtml;
+
+        document.getElementById('version-content').textContent = version.content;
+
+        // Format diff if available
+        if (version.diff) {
+            document.getElementById('version-diff').innerHTML = formatDiff(version.diff);
+        } else {
+            document.getElementById('version-diff').textContent = '(No diff available for this version)';
+        }
+
+        // Show/hide rollback button
+        document.getElementById('rollback-btn').style.display =
+            versionNumber === currentVersion ? 'none' : 'inline-block';
+
+        // Reset to content tab
+        switchVersionTab('content');
+
+        document.getElementById('version-modal').style.display = 'flex';
+    } catch (e) {
+        showToast('Failed to load version', 'error');
+    }
+}
+
+function formatDiff(diff) {
+    if (!diff) return '';
+    return escapeHtml(diff)
+        .split('\n')
+        .map(line => {
+            if (line.startsWith('+') && !line.startsWith('+++')) {
+                return '<span class="diff-add">' + line + '</span>';
+            } else if (line.startsWith('-') && !line.startsWith('---')) {
+                return '<span class="diff-del">' + line + '</span>';
+            }
+            return line;
+        })
+        .join('\n');
+}
+
+function switchVersionTab(tab) {
+    document.querySelectorAll('.version-tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector('.version-tab-btn[data-vtab="' + tab + '"]').classList.add('active');
+
+    document.getElementById('version-content-tab').style.display = tab === 'content' ? 'block' : 'none';
+    document.getElementById('version-diff-tab').style.display = tab === 'diff' ? 'block' : 'none';
+}
+
+document.querySelectorAll('.version-tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        switchVersionTab(this.getAttribute('data-vtab'));
+    });
+});
+
+function closeVersionModal() {
+    document.getElementById('version-modal').style.display = 'none';
+}
+
+function confirmRollback(versionNumber) {
+    if (!confirm('Rollback to version ' + versionNumber + '? This will create a new version with the old content.')) {
+        return;
+    }
+    rollbackToVersion(versionNumber);
+}
+
+async function rollbackToVersion(versionNumber) {
+    try {
+        await api.post('/api/templates/' + templateId + '/rollback/' + versionNumber);
+        showToast('Template rolled back to version ' + versionNumber, 'success');
+        closeVersionModal();
+        await loadTemplate();
+        loadVersions();
+    } catch (e) {
+        showToast('Failed to rollback template', 'error');
+    }
+}
+
+document.getElementById('rollback-btn').addEventListener('click', function() {
+    if (previewVersionNumber !== null) {
+        confirmRollback(previewVersionNumber);
+    }
+});
+
+document.getElementById('version-modal').addEventListener('click', function(e) {
+    if (e.target.id === 'version-modal') closeVersionModal();
 });
 {% endraw %}
 </script>

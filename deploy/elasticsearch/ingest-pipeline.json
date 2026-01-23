@@ -1,0 +1,74 @@
+{
+  "description": "DocForge log processing pipeline",
+  "processors": [
+    {
+      "date": {
+        "field": "@timestamp",
+        "target_field": "@timestamp",
+        "formats": ["ISO8601", "yyyy-MM-dd'T'HH:mm:ss.SSSZ"],
+        "ignore_failure": true
+      }
+    },
+    {
+      "geoip": {
+        "field": "client.ip",
+        "target_field": "client.geo",
+        "ignore_missing": true,
+        "ignore_failure": true
+      }
+    },
+    {
+      "user_agent": {
+        "field": "user_agent.original",
+        "target_field": "user_agent",
+        "ignore_missing": true,
+        "ignore_failure": true
+      }
+    },
+    {
+      "lowercase": {
+        "field": "log.level",
+        "ignore_missing": true,
+        "ignore_failure": true
+      }
+    },
+    {
+      "set": {
+        "field": "event.created",
+        "value": "{{_ingest.timestamp}}",
+        "override": false
+      }
+    },
+    {
+      "set": {
+        "field": "ecs.version",
+        "value": "8.11.0",
+        "override": false
+      }
+    },
+    {
+      "remove": {
+        "field": ["host.name"],
+        "ignore_missing": true,
+        "ignore_failure": true,
+        "if": "ctx.host?.hostname != null"
+      }
+    },
+    {
+      "rename": {
+        "field": "host.hostname",
+        "target_field": "host.name",
+        "ignore_missing": true,
+        "ignore_failure": true
+      }
+    }
+  ],
+  "on_failure": [
+    {
+      "set": {
+        "field": "error.message",
+        "value": "Pipeline processing failed: {{ _ingest.on_failure_message }}"
+      }
+    }
+  ]
+}

@@ -16,11 +16,15 @@
             <li><a href="/templates" class="{% if '/templates' in request.url.path %}active{% endif %}">Templates</a></li>
             <li><a href="/documents" class="{% if '/documents' in request.url.path %}active{% endif %}">Documents</a></li>
             <li><a href="/extract" class="{% if '/extract' in request.url.path %}active{% endif %}">Extract</a></li>
+            <li><a href="/gitlab" class="{% if '/gitlab' in request.url.path %}active{% endif %}">GitLab</a></li>
             <li class="nav-admin-links" id="nav-admin-links" style="display: none;">
                 <a href="/users" class="{% if '/users' in request.url.path %}active{% endif %}">Users</a>
             </li>
             <li class="nav-admin-links" id="nav-audit-link" style="display: none;">
                 <a href="/audit-logs" class="{% if '/audit-logs' in request.url.path %}active{% endif %}">Audit Logs</a>
+            </li>
+            <li class="nav-admin-links" id="nav-security-link" style="display: none;">
+                <a href="/security" class="{% if '/security' in request.url.path %}active{% endif %}">Security</a>
             </li>
         </ul>
         <div class="user-menu" id="user-menu">

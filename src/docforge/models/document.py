@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from docforge.models.base import Base
 
 if TYPE_CHECKING:
-    from docforge.models.template import Template
+    from docforge.models.template import Template, Collection
 
 
 class Document(Base):
@@ -22,6 +22,9 @@ class Document(Base):
         Integer, ForeignKey("templates.id"), nullable=True
     )
     source_template_version: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    collection_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("collections.id"), nullable=True
+    )
     rendered_content: Mapped[str] = mapped_column(Text, nullable=False)
     input_data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON string
     output_format: Mapped[str] = mapped_column(String(50), nullable=False, default="markdown")
@@ -38,6 +41,9 @@ class Document(Base):
     # Relationships
     source_template: Mapped[Optional["Template"]] = relationship(
         "Template", back_populates="documents"
+    )
+    collection: Mapped[Optional["Collection"]] = relationship(
+        "Collection", back_populates="documents"
     )
     versions: Mapped[List["DocumentVersion"]] = relationship(
         "DocumentVersion", back_populates="document", cascade="all, delete-orphan",

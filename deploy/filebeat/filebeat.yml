@@ -1,0 +1,202 @@
+# =============================================================================
+# Filebeat Configuration for DocForge
+# =============================================================================
+# Ships ECS-compliant JSON logs to Elasticsearch
+#
+# Usage:
+#   - Mount this file to /usr/share/filebeat/filebeat.yml
+#   - Mount DocForge log directory to /var/log/docforge
+#   - Set ELASTICSEARCH_HOSTS environment variable
+# =============================================================================
+
+# =============================================================================
+# Filebeat Input Configuration
+# =============================================================================
+filebeat.inputs:
+
+  # DocForge application logs (JSON/ECS format)
+  - type: log
+    id: docforge-app
+    enabled: true
+    paths:
+      - /var/log/docforge/*.log
+      - /var/log/docforge/**/*.log
+
+    # Parse as JSON (ECS-compliant)
+    json.keys_under_root: true
+    json.overwrite_keys: true
+    json.add_error_key: true
+    json.expand_keys: true
+
+    # Add metadata fields
+    fields:
+      log.type: docforge
+      environment: ${ENVIRONMENT:production}
+    fields_under_root: true
+
+    # Multiline handling for stack traces
+    multiline.type: pattern
+    multiline.pattern: '^\{'
+    multiline.negate: true
+    multiline.match: after
+
+    # Handle file rotation
+    close_inactive: 5m
+    clean_inactive: 24h
+    ignore_older: 12h
+
+    # Harvester settings
+    harvester_buffer_size: 16384
+    max_bytes: 10485760
+
+  # Docker container logs (alternative input)
+  - type: container
+    id: docforge-container
+    enabled: ${FILEBEAT_CONTAINER_LOGS_ENABLED:false}
+    paths:
+      - /var/lib/docker/containers/*/*.log
+
+    # Parse as JSON
+    json.keys_under_root: true
+    json.overwrite_keys: true
+    json.add_error_key: true
+
+    # Filter to DocForge containers only
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+      - drop_event:
+          when:
+            not:
+              contains:
+                container.name: "docforge"
+
+# =============================================================================
+# Processors - Transform and enrich events
+# =============================================================================
+processors:
+  # Add host metadata
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+
+  # Add cloud metadata (if running in cloud)
+  - add_cloud_metadata: ~
+
+  # Add Docker metadata (if available)
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+      match_short_id: true
+
+  # Ensure ECS compliance
+  - rename:
+      fields:
+        - from: "level"
+          to: "log.level"
+      ignore_missing: true
+      fail_on_error: false
+
+  # Drop debug logs in production (optional)
+  - drop_event:
+      when:
+        and:
+          - equals:
+              log.level: "DEBUG"
+          - equals:
+              environment: "production"
+
+# =============================================================================
+# Output Configuration
+# =============================================================================
+
+# Elasticsearch output
+output.elasticsearch:
+  enabled: ${ELASTICSEARCH_ENABLED:true}
+  hosts: ${ELASTICSEARCH_HOSTS:["http://elasticsearch:9200"]}
+
+  # Authentication (if required)
+  username: ${ELASTICSEARCH_USERNAME:""}
+  password: ${ELASTICSEARCH_PASSWORD:""}
+
+  # API key authentication (alternative)
+  # api_key: ${ELASTICSEARCH_API_KEY:""}
+
+  # TLS/SSL settings
+  ssl.enabled: ${ELASTICSEARCH_SSL_ENABLED:false}
+  ssl.certificate_authorities: ${ELASTICSEARCH_CA_PATH:[]}
+  ssl.verification_mode: ${ELASTICSEARCH_SSL_VERIFY:full}
+
+  # Index settings
+  index: "docforge-%{[environment]}-%{+yyyy.MM.dd}"
+
+  # ILM (Index Lifecycle Management)
+  ilm.enabled: true
+  ilm.rollover_alias: "docforge"
+  ilm.pattern: "{now/d}-000001"
+  ilm.policy_name: "docforge-policy"
+
+  # Pipeline for additional processing
+  pipeline: "docforge-pipeline"
+
+  # Bulk settings
+  bulk_max_size: 1000
+  worker: 1
+
+  # Retry settings
+  max_retries: 3
+  timeout: 90
+
+# Logstash output (alternative)
+# output.logstash:
+#   enabled: ${LOGSTASH_ENABLED:false}
+#   hosts: ${LOGSTASH_HOSTS:["logstash:5044"]}
+#   ssl.enabled: false
+
+# Console output (for debugging)
+# output.console:
+#   enabled: false
+#   pretty: true
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0640
+
+# JSON logging for Filebeat itself
+logging.json: true
+
+# =============================================================================
+# Monitoring (optional)
+# =============================================================================
+monitoring.enabled: ${MONITORING_ENABLED:false}
+monitoring.elasticsearch:
+  hosts: ${ELASTICSEARCH_HOSTS:["http://elasticsearch:9200"]}
+
+# =============================================================================
+# Setup Configuration
+# =============================================================================
+setup.template.enabled: true
+setup.template.name: "docforge"
+setup.template.pattern: "docforge-*"
+setup.template.settings:
+  index.number_of_shards: 1
+  index.number_of_replicas: 0
+  index.codec: best_compression
+
+# ILM policy setup
+setup.ilm.enabled: true
+setup.ilm.rollover_alias: "docforge"
+setup.ilm.pattern: "{now/d}-000001"
+setup.ilm.policy_name: "docforge-policy"
+setup.ilm.overwrite: false
+
+# Kibana setup (for dashboards)
+setup.kibana:
+  host: ${KIBANA_HOST:"http://kibana:5601"}
+  username: ${KIBANA_USERNAME:""}
+  password: ${KIBANA_PASSWORD:""}
