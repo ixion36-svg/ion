@@ -35,6 +35,15 @@ class Config:
     gitlab_token: str = ""  # Personal access token with api scope
     gitlab_project_id: str = ""  # Project ID or path (e.g., "group/project" or "123")
 
+    # Elasticsearch integration
+    elasticsearch_enabled: bool = False
+    elasticsearch_url: str = ""  # e.g., https://localhost:9200
+    elasticsearch_api_key: str = ""  # API key (preferred over username/password)
+    elasticsearch_username: str = ""  # Basic auth username
+    elasticsearch_password: str = ""  # Basic auth password
+    elasticsearch_alert_index: str = ".alerts-*,.watcher-history-*,alerts-*"  # Alert index pattern
+    elasticsearch_verify_ssl: bool = True
+
     @classmethod
     def from_file(cls, path: Path) -> "Config":
         """Load configuration from a JSON file."""
@@ -69,6 +78,14 @@ class Config:
             gitlab_url=data.get("gitlab_url", ""),
             gitlab_token=data.get("gitlab_token", ""),
             gitlab_project_id=data.get("gitlab_project_id", ""),
+            # Elasticsearch integration
+            elasticsearch_enabled=data.get("elasticsearch_enabled", False),
+            elasticsearch_url=data.get("elasticsearch_url", ""),
+            elasticsearch_api_key=data.get("elasticsearch_api_key", ""),
+            elasticsearch_username=data.get("elasticsearch_username", ""),
+            elasticsearch_password=data.get("elasticsearch_password", ""),
+            elasticsearch_alert_index=data.get("elasticsearch_alert_index", ".alerts-*,.watcher-history-*,alerts-*"),
+            elasticsearch_verify_ssl=data.get("elasticsearch_verify_ssl", True),
         )
 
     def to_file(self, path: Path) -> None:
@@ -97,6 +114,14 @@ class Config:
                     "gitlab_url": self.gitlab_url,
                     "gitlab_token": self.gitlab_token,
                     "gitlab_project_id": self.gitlab_project_id,
+                    # Elasticsearch integration
+                    "elasticsearch_enabled": self.elasticsearch_enabled,
+                    "elasticsearch_url": self.elasticsearch_url,
+                    "elasticsearch_api_key": self.elasticsearch_api_key,
+                    "elasticsearch_username": self.elasticsearch_username,
+                    "elasticsearch_password": self.elasticsearch_password,
+                    "elasticsearch_alert_index": self.elasticsearch_alert_index,
+                    "elasticsearch_verify_ssl": self.elasticsearch_verify_ssl,
                 },
                 f,
                 indent=2,
@@ -163,6 +188,22 @@ def get_config() -> Config:
         if os.environ.get("DOCFORGE_GITLAB_PROJECT_ID"):
             _config.gitlab_project_id = os.environ.get("DOCFORGE_GITLAB_PROJECT_ID", "")
 
+        # Elasticsearch environment variable overrides
+        if os.environ.get("DOCFORGE_ELASTICSEARCH_ENABLED"):
+            _config.elasticsearch_enabled = _get_env_bool("DOCFORGE_ELASTICSEARCH_ENABLED")
+        if os.environ.get("DOCFORGE_ELASTICSEARCH_URL"):
+            _config.elasticsearch_url = os.environ.get("DOCFORGE_ELASTICSEARCH_URL", "")
+        if os.environ.get("DOCFORGE_ELASTICSEARCH_API_KEY"):
+            _config.elasticsearch_api_key = os.environ.get("DOCFORGE_ELASTICSEARCH_API_KEY", "")
+        if os.environ.get("DOCFORGE_ELASTICSEARCH_USERNAME"):
+            _config.elasticsearch_username = os.environ.get("DOCFORGE_ELASTICSEARCH_USERNAME", "")
+        if os.environ.get("DOCFORGE_ELASTICSEARCH_PASSWORD"):
+            _config.elasticsearch_password = os.environ.get("DOCFORGE_ELASTICSEARCH_PASSWORD", "")
+        if os.environ.get("DOCFORGE_ELASTICSEARCH_ALERT_INDEX"):
+            _config.elasticsearch_alert_index = os.environ.get("DOCFORGE_ELASTICSEARCH_ALERT_INDEX", "")
+        if os.environ.get("DOCFORGE_ELASTICSEARCH_VERIFY_SSL"):
+            _config.elasticsearch_verify_ssl = _get_env_bool("DOCFORGE_ELASTICSEARCH_VERIFY_SSL", True)
+
     return _config
 
 
@@ -203,4 +244,21 @@ def get_gitlab_config() -> dict:
         "url": config.gitlab_url,
         "token": config.gitlab_token,
         "project_id": config.gitlab_project_id,
+    }
+
+
+def get_elasticsearch_config() -> dict:
+    """Get Elasticsearch configuration from the global config.
+
+    Returns a dictionary with Elasticsearch configuration.
+    """
+    config = get_config()
+    return {
+        "enabled": config.elasticsearch_enabled,
+        "url": config.elasticsearch_url,
+        "api_key": config.elasticsearch_api_key,
+        "username": config.elasticsearch_username,
+        "password": config.elasticsearch_password,
+        "alert_index": config.elasticsearch_alert_index,
+        "verify_ssl": config.elasticsearch_verify_ssl,
     }

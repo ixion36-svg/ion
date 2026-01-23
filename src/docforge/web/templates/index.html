@@ -33,11 +33,34 @@
             <div class="stat-value" id="gitlab-issues-count">-</div>
             <div class="stat-label">Open Issues</div>
         </div>
+        <div class="stat-card stat-card-danger" id="alerts-critical-card" style="display: none;">
+            <div class="stat-value" id="alerts-critical-count">-</div>
+            <div class="stat-label">Critical Alerts</div>
+        </div>
+        <div class="stat-card stat-card-warning" id="alerts-high-card" style="display: none;">
+            <div class="stat-value" id="alerts-high-count">-</div>
+            <div class="stat-label">High Alerts</div>
+        </div>
     </div>
 
     <div class="dashboard-grid">
         <!-- Left Column -->
         <div class="dashboard-column">
+            <!-- Elasticsearch Alerts Section -->
+            <section class="section alerts-section" id="alerts-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Security Alerts</h2>
+                    <span class="alerts-badge" id="alerts-total-badge">0</span>
+                </div>
+                <div class="alerts-status" id="alerts-status">
+                    <span class="status-indicator connected"></span>
+                    <span id="elasticsearch-cluster">Elasticsearch</span>
+                </div>
+                <div id="alerts-list" class="alerts-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+
             <!-- GitLab Tasks Section -->
             <section class="section gitlab-section" id="gitlab-section" style="display: none;">
                 <div class="section-header">
@@ -170,6 +193,137 @@
     border-left: 4px solid #fc6d26;
     border-radius: 8px;
     padding: 1rem;
+}
+
+.alerts-section {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--danger, #dc3545);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.alerts-section .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.alerts-badge {
+    background: var(--danger, #dc3545);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.alerts-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.alert-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--background);
+    border-radius: 6px;
+    border-left: 3px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.alert-item:hover {
+    background: var(--hover-bg, #f5f5f5);
+}
+
+.alert-item.severity-critical {
+    border-left-color: #dc3545;
+    background: rgba(220, 53, 69, 0.05);
+}
+
+.alert-item.severity-high {
+    border-left-color: #fd7e14;
+    background: rgba(253, 126, 20, 0.05);
+}
+
+.alert-item.severity-medium {
+    border-left-color: #ffc107;
+}
+
+.alert-item.severity-low {
+    border-left-color: #17a2b8;
+}
+
+.alert-item.severity-info {
+    border-left-color: #6c757d;
+}
+
+.alert-severity {
+    font-size: 0.625rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: white;
+    flex-shrink: 0;
+}
+
+.alert-severity.critical { background: #dc3545; }
+.alert-severity.high { background: #fd7e14; }
+.alert-severity.medium { background: #ffc107; color: #333; }
+.alert-severity.low { background: #17a2b8; }
+.alert-severity.info { background: #6c757d; }
+
+.alert-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.alert-title {
+    font-weight: 500;
+    color: var(--text);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.875rem;
+}
+
+.alert-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.stat-card-danger {
+    border-left: 4px solid #dc3545;
+}
+
+.stat-card-danger .stat-value {
+    color: #dc3545;
+}
+
+.stat-card-warning {
+    border-left: 4px solid #fd7e14;
+}
+
+.stat-card-warning .stat-value {
+    color: #fd7e14;
 }
 
 .gitlab-status {
@@ -322,6 +476,42 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('templates-count').textContent = data.stats.templates_count;
         document.getElementById('documents-count').textContent = data.stats.documents_count;
         document.getElementById('tags-count').textContent = data.stats.tags_count;
+
+        // Elasticsearch Alerts section
+        if (data.elasticsearch && data.elasticsearch.enabled && data.elasticsearch.connected) {
+            document.getElementById('alerts-section').style.display = 'block';
+            document.getElementById('elasticsearch-cluster').textContent = data.elasticsearch.cluster_name || 'Elasticsearch';
+            document.getElementById('alerts-total-badge').textContent = data.elasticsearch.total_alerts;
+
+            // Show alert stat cards if there are critical/high alerts
+            if (data.elasticsearch.critical_count > 0) {
+                document.getElementById('alerts-critical-card').style.display = 'block';
+                document.getElementById('alerts-critical-count').textContent = data.elasticsearch.critical_count;
+            }
+            if (data.elasticsearch.high_count > 0) {
+                document.getElementById('alerts-high-card').style.display = 'block';
+                document.getElementById('alerts-high-count').textContent = data.elasticsearch.high_count;
+            }
+
+            const alertsContainer = document.getElementById('alerts-list');
+            if (data.elasticsearch.alerts && data.elasticsearch.alerts.length > 0) {
+                alertsContainer.innerHTML = data.elasticsearch.alerts.map(alert => `
+                    <div class="alert-item severity-${alert.severity}">
+                        <span class="alert-severity ${alert.severity}">${alert.severity}</span>
+                        <div class="alert-content">
+                            <p class="alert-title">${escapeHtml(alert.title)}</p>
+                            <div class="alert-meta">
+                                ${formatDate(alert.timestamp)}
+                                ${alert.host ? ` &bull; ${escapeHtml(alert.host)}` : ''}
+                                ${alert.rule_name ? ` &bull; ${escapeHtml(alert.rule_name)}` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                alertsContainer.innerHTML = '<p class="empty-message">No alerts in the last 24 hours</p>';
+            }
+        }
 
         // GitLab section
         if (data.gitlab.enabled && data.gitlab.connected) {
