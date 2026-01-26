@@ -100,7 +100,8 @@ async def startup_event():
     config = get_config()
     if not config.db_path.exists():
         config.db_path.parent.mkdir(parents=True, exist_ok=True)
-        init_db(config.db_path)
+    # Always run create_all to ensure new tables are created
+    init_db(config.db_path)
 
 
 @app.get("/", response_class=HTMLResponse)
