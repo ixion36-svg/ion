@@ -1,5 +1,6 @@
 """API routes for DocForge web interface."""
 
+import asyncio
 import json
 import secrets
 from pathlib import Path
@@ -1843,75 +1844,85 @@ async def get_dashboard(
     # Recent templates (last 5)
     recent_templates = sorted(templates, key=lambda t: t.updated_at, reverse=True)[:5]
 
-    # GitLab tasks
-    gitlab_data = {
-        "enabled": False,
-        "connected": False,
-        "open_issues": [],
-        "assigned_to_me": [],
-        "total_open": 0,
-    }
-
-    gitlab_config = get_gitlab_config()
-    if gitlab_config.get("enabled") and gitlab_config.get("url") and gitlab_config.get("token"):
-        gitlab_data["enabled"] = True
-        try:
-            from docforge.services.gitlab_service import GitLabService
-            gitlab = GitLabService()
-
-            # Test connection
-            connection = await gitlab.test_connection()
-            if connection.get("connected"):
-                gitlab_data["connected"] = True
-                gitlab_data["project_name"] = connection.get("project_name")
-                gitlab_data["project_url"] = connection.get("web_url")
-
-                # Get open issues
-                issues = await gitlab.list_issues(state="opened", per_page=10)
-                gitlab_data["open_issues"] = [i.to_dict() for i in issues]
-                gitlab_data["total_open"] = len(issues)
-
-                # Note: GitLab API doesn't easily filter by current user without knowing their GitLab username
-                # For now, show all open issues - could be enhanced to filter by assignee later
-        except Exception as e:
-            gitlab_data["error"] = str(e)
-
-    # Elasticsearch alerts
-    elasticsearch_data = {
-        "enabled": False,
-        "connected": False,
-        "alerts": [],
-        "total_alerts": 0,
-        "critical_count": 0,
-        "high_count": 0,
-    }
-
-    es_config = get_elasticsearch_config()
-    if es_config.get("enabled") and es_config.get("url"):
-        elasticsearch_data["enabled"] = True
-        try:
-            from docforge.services.elasticsearch_service import ElasticsearchService
-            es_service = ElasticsearchService()
-
-            if es_service.is_configured:
-                # Test connection
-                connection = await es_service.test_connection()
+    # Fetch GitLab and Elasticsearch data in parallel with short timeouts
+    async def fetch_gitlab_data():
+        data = {
+            "enabled": False,
+            "connected": False,
+            "open_issues": [],
+            "assigned_to_me": [],
+            "total_open": 0,
+        }
+        gitlab_config = get_gitlab_config()
+        if gitlab_config.get("enabled") and gitlab_config.get("url") and gitlab_config.get("token"):
+            data["enabled"] = True
+            try:
+                from docforge.services.gitlab_service import GitLabService
+                gitlab = GitLabService()
+                connection = await gitlab.test_connection()
                 if connection.get("connected"):
-                    elasticsearch_data["connected"] = True
-                    elasticsearch_data["cluster_name"] = connection.get("cluster_name")
+                    data["connected"] = True
+                    data["project_name"] = connection.get("project_name")
+                    data["project_url"] = connection.get("web_url")
+                    issues = await gitlab.list_issues(state="opened", per_page=10)
+                    data["open_issues"] = [i.to_dict() for i in issues]
+                    data["total_open"] = len(issues)
+            except Exception as e:
+                data["error"] = str(e)
+        return data
 
-                    # Get recent alerts (last 24 hours, limit 10 for dashboard)
-                    alerts = await es_service.get_alerts(hours=24, limit=10)
-                    elasticsearch_data["alerts"] = [a.to_dict() for a in alerts]
-                    elasticsearch_data["total_alerts"] = len(alerts)
+    async def fetch_elasticsearch_data():
+        data = {
+            "enabled": False,
+            "connected": False,
+            "alerts": [],
+            "total_alerts": 0,
+            "critical_count": 0,
+            "high_count": 0,
+        }
+        es_config = get_elasticsearch_config()
+        if es_config.get("enabled") and es_config.get("url"):
+            data["enabled"] = True
+            try:
+                from docforge.services.elasticsearch_service import ElasticsearchService
+                es_service = ElasticsearchService()
+                if es_service.is_configured:
+                    connection = await es_service.test_connection()
+                    if connection.get("connected"):
+                        data["connected"] = True
+                        data["cluster_name"] = connection.get("cluster_name")
+                        alerts = await es_service.get_alerts(hours=24, limit=10)
+                        data["alerts"] = [a.to_dict() for a in alerts]
+                        data["total_alerts"] = len(alerts)
+                        data["critical_count"] = sum(1 for a in alerts if a.severity == "critical")
+                        data["high_count"] = sum(1 for a in alerts if a.severity == "high")
+                    else:
+                        data["error"] = connection.get("error", "Connection failed")
+            except Exception as e:
+                data["error"] = str(e)
+        return data
 
-                    # Count by severity
-                    elasticsearch_data["critical_count"] = sum(1 for a in alerts if a.severity == "critical")
-                    elasticsearch_data["high_count"] = sum(1 for a in alerts if a.severity == "high")
-                else:
-                    elasticsearch_data["error"] = connection.get("error", "Connection failed")
-        except Exception as e:
-            elasticsearch_data["error"] = str(e)
+    # Run both with 8 second timeouts so dashboard loads quickly
+    async def safe_fetch(coro):
+        try:
+            return await asyncio.wait_for(coro, timeout=8.0)
+        except asyncio.TimeoutError:
+            return None
+
+    gitlab_result, es_result = await asyncio.gather(
+        safe_fetch(fetch_gitlab_data()),
+        safe_fetch(fetch_elasticsearch_data()),
+    )
+
+    gitlab_data = gitlab_result or {
+        "enabled": True, "connected": False, "open_issues": [],
+        "assigned_to_me": [], "total_open": 0, "error": "Connection timed out",
+    }
+    elasticsearch_data = es_result or {
+        "enabled": True, "connected": False, "alerts": [],
+        "total_alerts": 0, "critical_count": 0, "high_count": 0,
+        "error": "Connection timed out",
+    }
 
     return {
         "user": {
@@ -2769,6 +2780,336 @@ async def get_es_alerts(
             "hours": hours,
             "enabled": True,
             "configured": True,
+        }
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Alert Triage, Comments & Case Management Endpoints
+# ============================================================================
+
+from docforge.models.alert_triage import (
+    AlertTriage,
+    AlertTriageStatus,
+    AlertComment,
+    AlertCase,
+    AlertCaseStatus,
+)
+
+
+class TriageUpdate(BaseModel):
+    status: Optional[str] = None
+    assigned_to_id: Optional[int] = None
+    priority: Optional[str] = None
+    case_id: Optional[int] = None
+
+
+class CommentCreate(BaseModel):
+    content: str
+
+
+class CaseCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    severity: Optional[str] = None
+    assigned_to_id: Optional[int] = None
+    alert_ids: Optional[List[str]] = None
+
+
+class CaseUpdate(BaseModel):
+    title: Optional[str] = None
+    status: Optional[str] = None
+    assigned_to_id: Optional[int] = None
+    description: Optional[str] = None
+    severity: Optional[str] = None
+
+
+@router.get("/elasticsearch/alerts/cases")
+async def list_cases(
+    status: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """List all investigation cases."""
+    query = session.query(AlertCase)
+    if status:
+        query = query.filter(AlertCase.status == status)
+    cases = query.order_by(AlertCase.created_at.desc()).all()
+    return {
+        "cases": [
+            {
+                "id": c.id,
+                "case_number": c.case_number,
+                "title": c.title,
+                "description": c.description,
+                "status": c.status.value if hasattr(c.status, "value") else c.status,
+                "severity": c.severity,
+                "created_by": c.created_by.username if c.created_by else None,
+                "assigned_to": c.assigned_to.username if c.assigned_to else None,
+                "assigned_to_id": c.assigned_to_id,
+                "alert_count": len(c.triage_entries),
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+            }
+            for c in cases
+        ]
+    }
+
+
+@router.post("/elasticsearch/alerts/cases")
+async def create_case(
+    data: CaseCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Create a new investigation case, optionally linking alert IDs."""
+    # Generate next case number
+    last_case = (
+        session.query(AlertCase)
+        .order_by(AlertCase.id.desc())
+        .first()
+    )
+    next_num = 1 if not last_case else last_case.id + 1
+    case_number = f"CASE-{next_num:04d}"
+
+    new_case = AlertCase(
+        case_number=case_number,
+        title=data.title,
+        description=data.description,
+        status=AlertCaseStatus.OPEN,
+        severity=data.severity,
+        created_by_id=current_user.id,
+        assigned_to_id=data.assigned_to_id,
+    )
+    session.add(new_case)
+    session.flush()
+
+    # Link alert IDs if provided
+    linked = 0
+    if data.alert_ids:
+        for alert_id in data.alert_ids:
+            triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+            if not triage:
+                triage = AlertTriage(
+                    es_alert_id=alert_id,
+                    status=AlertTriageStatus.INVESTIGATING,
+                )
+                session.add(triage)
+                session.flush()
+            triage.case_id = new_case.id
+            linked += 1
+
+    session.commit()
+    return {
+        "id": new_case.id,
+        "case_number": new_case.case_number,
+        "title": new_case.title,
+        "status": new_case.status.value if hasattr(new_case.status, "value") else new_case.status,
+        "linked_alerts": linked,
+    }
+
+
+@router.get("/elasticsearch/alerts/cases/{case_id}")
+async def get_case_detail(
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Get case detail with linked alerts."""
+    case = session.query(AlertCase).filter_by(id=case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    return {
+        "id": case.id,
+        "case_number": case.case_number,
+        "title": case.title,
+        "description": case.description,
+        "status": case.status.value if hasattr(case.status, "value") else case.status,
+        "severity": case.severity,
+        "created_by": case.created_by.username if case.created_by else None,
+        "assigned_to": case.assigned_to.username if case.assigned_to else None,
+        "assigned_to_id": case.assigned_to_id,
+        "created_at": case.created_at.isoformat() if case.created_at else None,
+        "updated_at": case.updated_at.isoformat() if case.updated_at else None,
+        "alerts": [
+            {
+                "es_alert_id": t.es_alert_id,
+                "status": t.status.value if hasattr(t.status, "value") else t.status,
+                "priority": t.priority,
+            }
+            for t in case.triage_entries
+        ],
+    }
+
+
+@router.patch("/elasticsearch/alerts/cases/{case_id}")
+async def update_case(
+    case_id: int,
+    data: CaseUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Update case status, assignee, title, etc."""
+    case = session.query(AlertCase).filter_by(id=case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if data.title is not None:
+        case.title = data.title
+    if data.description is not None:
+        case.description = data.description
+    if data.severity is not None:
+        case.severity = data.severity
+    if data.status is not None:
+        case.status = data.status
+    if data.assigned_to_id is not None:
+        case.assigned_to_id = data.assigned_to_id
+
+    session.commit()
+    return {
+        "id": case.id,
+        "case_number": case.case_number,
+        "title": case.title,
+        "status": case.status.value if hasattr(case.status, "value") else case.status,
+        "message": "Case updated",
+    }
+
+
+@router.get("/elasticsearch/alerts/{alert_id}/triage")
+async def get_alert_triage(
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Get triage state and comments for an alert."""
+    triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+    comments = (
+        session.query(AlertComment)
+        .filter_by(es_alert_id=alert_id)
+        .order_by(AlertComment.created_at.asc())
+        .all()
+    )
+
+    triage_data = None
+    if triage:
+        triage_data = {
+            "id": triage.id,
+            "es_alert_id": triage.es_alert_id,
+            "status": triage.status.value if hasattr(triage.status, "value") else triage.status,
+            "assigned_to_id": triage.assigned_to_id,
+            "assigned_to": triage.assigned_to.username if triage.assigned_to else None,
+            "case_id": triage.case_id,
+            "case_number": triage.case.case_number if triage.case else None,
+            "priority": triage.priority,
+        }
+
+    return {
+        "triage": triage_data,
+        "comments": [
+            {
+                "id": c.id,
+                "user": c.user.username if c.user else "Unknown",
+                "content": c.content,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            }
+            for c in comments
+        ],
+    }
+
+
+@router.put("/elasticsearch/alerts/{alert_id}/triage")
+async def update_alert_triage(
+    alert_id: str,
+    data: TriageUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Update triage status, assignee, priority for an alert."""
+    triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+    if not triage:
+        triage = AlertTriage(es_alert_id=alert_id)
+        session.add(triage)
+        session.flush()
+
+    if data.status is not None:
+        triage.status = data.status
+    if data.assigned_to_id is not None:
+        triage.assigned_to_id = data.assigned_to_id
+    if data.priority is not None:
+        triage.priority = data.priority
+    if data.case_id is not None:
+        triage.case_id = data.case_id
+
+    session.commit()
+    return {
+        "id": triage.id,
+        "es_alert_id": triage.es_alert_id,
+        "status": triage.status.value if hasattr(triage.status, "value") else triage.status,
+        "priority": triage.priority,
+        "assigned_to_id": triage.assigned_to_id,
+        "case_id": triage.case_id,
+        "message": "Triage updated",
+    }
+
+
+@router.post("/elasticsearch/alerts/{alert_id}/comments")
+async def add_alert_comment(
+    alert_id: str,
+    data: CommentCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Add a comment to an alert."""
+    comment = AlertComment(
+        es_alert_id=alert_id,
+        user_id=current_user.id,
+        content=data.content,
+    )
+    session.add(comment)
+    session.commit()
+    return {
+        "id": comment.id,
+        "es_alert_id": comment.es_alert_id,
+        "user": current_user.username,
+        "content": comment.content,
+        "created_at": comment.created_at.isoformat() if comment.created_at else None,
+    }
+
+
+@router.get("/elasticsearch/alerts/{alert_id}/related")
+async def get_es_related_alerts(
+    alert_id: str,
+    host: Optional[str] = None,
+    user: Optional[str] = None,
+    rule_name: Optional[str] = None,
+    hours: int = 72,
+    current_user: User = Depends(get_current_user),
+):
+    """Get alerts related to a specific alert by host, user, or rule."""
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch not configured")
+
+    try:
+        related = await service.get_related_alerts(
+            alert_id=alert_id,
+            host=host,
+            user=user,
+            rule_name=rule_name,
+            hours=hours,
+        )
+        return {
+            "alert_id": alert_id,
+            "related": {
+                key: [a.to_dict() for a in alerts]
+                for key, alerts in related.items()
+            },
         }
     except ElasticsearchError as e:
         raise HTTPException(status_code=500, detail=str(e))

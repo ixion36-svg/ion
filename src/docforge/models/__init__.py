@@ -21,6 +21,13 @@ from docforge.models.security import (
     SecurityAlertRule,
     BlockedIP,
 )
+from docforge.models.alert_triage import (
+    AlertTriage,
+    AlertTriageStatus,
+    AlertComment,
+    AlertCase,
+    AlertCaseStatus,
+)
 
 __all__ = [
     "Base",
@@ -45,4 +52,9 @@ __all__ = [
     "SecurityEventStatus",
     "SecurityAlertRule",
     "BlockedIP",
+    "AlertTriage",
+    "AlertTriageStatus",
+    "AlertComment",
+    "AlertCase",
+    "AlertCaseStatus",
 ]

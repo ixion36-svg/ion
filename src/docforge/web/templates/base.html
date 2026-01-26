@@ -26,6 +26,9 @@
             <li class="nav-admin-links" id="nav-security-link" style="display: none;">
                 <a href="/security" class="{% if '/security' in request.url.path %}active{% endif %}">Security</a>
             </li>
+            <li class="nav-admin-links" id="nav-alerts-link" style="display: none;">
+                <a href="/alerts" class="{% if '/alerts' in request.url.path %}active{% endif %}">Alerts</a>
+            </li>
         </ul>
         <div class="user-menu" id="user-menu">
             <button class="user-menu-btn" onclick="toggleUserDropdown()">

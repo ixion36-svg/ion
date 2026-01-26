@@ -48,6 +48,7 @@ class ElasticsearchAlert:
             "host": self.host,
             "user": self.user,
             "tags": self.tags,
+            "raw_data": self.raw_data,
         }
 
 
@@ -391,6 +392,90 @@ class ElasticsearchService:
             tags=tags,
             raw_data=source,
         )
+
+    async def get_related_alerts(
+        self,
+        alert_id: str,
+        host: Optional[str] = None,
+        user: Optional[str] = None,
+        rule_name: Optional[str] = None,
+        hours: int = 72,
+        limit: int = 20,
+    ) -> Dict[str, List[ElasticsearchAlert]]:
+        """Find alerts related to a given alert by shared host, user, or rule.
+
+        Returns a dict with keys 'by_host', 'by_user', 'by_rule' each containing
+        a list of related alerts (excluding the original alert).
+        """
+        related = {}
+
+        async def search_by_field(field_queries: List[Dict], label: str):
+            query = {
+                "size": limit,
+                "sort": [{"@timestamp": {"order": "desc"}}],
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "range": {
+                                    "@timestamp": {
+                                        "gte": f"now-{hours}h",
+                                        "lte": "now"
+                                    }
+                                }
+                            },
+                            {
+                                "bool": {
+                                    "should": field_queries,
+                                    "minimum_should_match": 1
+                                }
+                            }
+                        ],
+                        "must_not": [
+                            {"ids": {"values": [alert_id]}}
+                        ]
+                    }
+                }
+            }
+            try:
+                result = await self._request(
+                    "POST",
+                    f"/{self.alert_index}/_search",
+                    json=query,
+                )
+                alerts = []
+                for hit in result.get("hits", {}).get("hits", []):
+                    source = hit.get("_source", {})
+                    alert = self._parse_alert(hit["_id"], source)
+                    if alert:
+                        alerts.append(alert)
+                return alerts
+            except ElasticsearchError:
+                return []
+
+        if host:
+            related["by_host"] = await search_by_field([
+                {"term": {"host.name": host}},
+                {"term": {"host.hostname": host}},
+                {"term": {"agent.hostname": host}},
+                {"term": {"hostname": host}},
+            ], "host")
+
+        if user:
+            related["by_user"] = await search_by_field([
+                {"term": {"user.name": user}},
+                {"term": {"user_name": user}},
+            ], "user")
+
+        if rule_name:
+            related["by_rule"] = await search_by_field([
+                {"term": {"kibana.alert.rule.name.keyword": rule_name}},
+                {"term": {"rule.name.keyword": rule_name}},
+                {"match_phrase": {"kibana.alert.rule.name": rule_name}},
+                {"match_phrase": {"rule.name": rule_name}},
+            ], "rule")
+
+        return related
 
     async def get_alert_stats(self, hours: int = 24) -> Dict[str, Any]:
         """Get alert statistics."""
