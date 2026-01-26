@@ -27,6 +27,7 @@ from docforge.models.alert_triage import (
     AlertComment,
     AlertCase,
     AlertCaseStatus,
+    CaseNote,
 )
 
 __all__ = [
@@ -57,4 +58,5 @@ __all__ = [
     "AlertComment",
     "AlertCase",
     "AlertCaseStatus",
+    "CaseNote",
 ]

@@ -1,12 +1,15 @@
 """Database connection and initialization."""
 
+import logging
 from pathlib import Path
 from typing import Generator, Optional
-from sqlalchemy import create_engine, Engine
+from sqlalchemy import create_engine, Engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from docforge.models.base import Base
 from docforge.core.config import get_config
+
+logger = logging.getLogger(__name__)
 
 _engine: Optional[Engine] = None
 _session_factory: Optional[sessionmaker[Session]] = None
@@ -47,6 +50,45 @@ def get_session(engine: Optional[Engine] = None) -> Generator[Session, None, Non
         session.close()
 
 
+def _run_migrations(engine: Engine) -> None:
+    """Add missing columns to existing tables. Idempotent."""
+    insp = inspect(engine)
+
+    # Migrations for alert_cases table
+    if insp.has_table("alert_cases"):
+        existing = {col["name"] for col in insp.get_columns("alert_cases")}
+        new_columns = {
+            "affected_hosts": "JSON",
+            "affected_users": "JSON",
+            "triggered_rules": "JSON",
+            "evidence_summary": "TEXT",
+            "source_alert_ids": "JSON",
+        }
+        with engine.begin() as conn:
+            for col_name, col_type in new_columns.items():
+                if col_name not in existing:
+                    conn.execute(
+                        text(f"ALTER TABLE alert_cases ADD COLUMN {col_name} {col_type}")
+                    )
+                    logger.info("Migrated: alert_cases.%s", col_name)
+
+    # Migrations for alert_triage table
+    if insp.has_table("alert_triage"):
+        existing = {col["name"] for col in insp.get_columns("alert_triage")}
+        if "analyst_notes" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE alert_triage ADD COLUMN analyst_notes TEXT")
+                )
+                logger.info("Migrated: alert_triage.analyst_notes")
+        if "observables" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE alert_triage ADD COLUMN observables JSON")
+                )
+                logger.info("Migrated: alert_triage.observables")
+
+
 def init_db(db_path: Optional[Path] = None) -> Engine:
     """Initialize the database, creating all tables."""
     global _engine, _session_factory
@@ -55,6 +97,7 @@ def init_db(db_path: Optional[Path] = None) -> Engine:
 
     engine = get_engine(db_path)
     Base.metadata.create_all(engine)
+    _run_migrations(engine)
     return engine
 
 

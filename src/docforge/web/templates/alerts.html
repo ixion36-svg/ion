@@ -661,6 +661,108 @@
 }
 
 /* ============================================= */
+/* Observables                                   */
+/* ============================================= */
+.observables-section {
+    margin-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.5rem;
+}
+
+.observables-section label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.375rem;
+}
+
+.observable-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    min-width: 70px;
+    text-align: center;
+}
+
+.observable-badge.hostname     { background: #1e3a5f; color: #7db8f0; }
+.observable-badge.source_ip    { background: #5f1e1e; color: #f07d7d; }
+.observable-badge.destination_ip { background: #5f3a1e; color: #f0a87d; }
+.observable-badge.url          { background: #1e5f2e; color: #7df098; }
+.observable-badge.domain       { background: #3a1e5f; color: #a87df0; }
+.observable-badge.user_account { background: #1e5f5f; color: #7df0f0; }
+
+.observable-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8125rem;
+}
+
+.observable-row:last-child {
+    border-bottom: none;
+}
+
+.observable-value {
+    flex: 1;
+    word-break: break-all;
+    color: var(--text-primary);
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.125rem 0.35rem;
+    border-radius: 3px;
+    font-size: 0.875rem;
+    line-height: 1;
+}
+
+.btn-icon:hover {
+    background: rgba(255, 80, 80, 0.15);
+    color: #f07d7d;
+}
+
+.observable-add-row {
+    display: flex;
+    gap: 0.375rem;
+    margin-top: 0.375rem;
+    align-items: center;
+}
+
+.observable-add-row select,
+.observable-add-row input {
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.375rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.observable-add-row select {
+    min-width: 120px;
+}
+
+.observable-add-row input {
+    flex: 1;
+}
+
+.observable-empty {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    font-style: italic;
+    padding: 0.25rem 0;
+}
+
+/* ============================================= */
 /* Comments tab                                  */
 /* ============================================= */
 .comments-list {
@@ -813,6 +915,66 @@
     justify-content: flex-end;
     margin-top: 1rem;
 }
+.case-context-group {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+    font-size: 0.8125rem;
+}
+.case-context-label {
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.context-tag {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+.tag-host {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+.tag-user {
+    background: rgba(168, 85, 247, 0.15);
+    color: #a855f7;
+}
+.tag-rule {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+.case-evidence-block {
+    margin: 0.75rem 0;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    border-left: 3px solid var(--accent);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+}
+.case-evidence-block strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+.case-evidence-block p {
+    margin: 0;
+}
+.case-notes-section {
+    margin-top: 1rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.75rem;
+}
+.case-notes-section h5 {
+    margin: 0 0 0.5rem;
+    font-size: 0.8125rem;
+}
 </style>
 
 {% raw %}
@@ -833,6 +995,7 @@ let casesData = []; // cached list of cases
 const SEVERITY_ORDER = { critical: 1, high: 2, medium: 3, low: 4, info: 5 };
 const TRIAGE_STATUSES = ['open', 'investigating', 'escalated', 'resolved', 'closed', 'false_positive'];
 const PRIORITIES = ['critical', 'high', 'medium', 'low'];
+const OBSERVABLE_TYPES = ['hostname', 'source_ip', 'destination_ip', 'url', 'domain', 'user_account'];
 
 const debouncedSearch = debounce(() => applyFilters(), 300);
 
@@ -933,26 +1096,57 @@ function showCreateCaseForm(alertId) {
     overlay.id = 'case-create-overlay';
     overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
 
+    // Auto-populate from alert data
+    const alert = allAlerts.find(a => a.id === alertId);
+    let prefillTitle = '';
+    let prefillDesc = '';
+    let prefillSeverity = '';
+    let prefillEvidence = '';
+
+    if (alert) {
+        prefillTitle = alert.title || '';
+        prefillSeverity = (alert.severity || '').toLowerCase();
+
+        const lines = [];
+        if (alert.rule_name) lines.push(`Rule: ${alert.rule_name}`);
+        if (alert.host) lines.push(`Host: ${alert.host}`);
+        if (alert.user) lines.push(`User: ${alert.user}`);
+        if (alert.message) lines.push(`Message: ${alert.message}`);
+        if (alert.timestamp) lines.push(`Timestamp: ${new Date(alert.timestamp).toLocaleString()}`);
+        prefillDesc = lines.join('\n');
+
+        const evidenceLines = [];
+        evidenceLines.push(`Alert "${alert.title || 'N/A'}" triggered at ${alert.timestamp ? new Date(alert.timestamp).toLocaleString() : 'unknown time'}.`);
+        if (alert.rule_name) evidenceLines.push(`Detection rule: ${alert.rule_name}.`);
+        if (alert.host) evidenceLines.push(`Affected host: ${alert.host}.`);
+        if (alert.user) evidenceLines.push(`Affected user: ${alert.user}.`);
+        if (alert.message) evidenceLines.push(`Detail: ${alert.message}`);
+        if (alert.severity) evidenceLines.push(`Severity: ${alert.severity}.`);
+        prefillEvidence = evidenceLines.join(' ');
+    }
+
+    const severityOptions = ['', 'critical', 'high', 'medium', 'low'].map(s =>
+        `<option value="${s}" ${s === prefillSeverity ? 'selected' : ''}>${s || 'Select severity'}</option>`
+    ).join('');
+
     overlay.innerHTML = `
         <div class="case-create-form">
             <h3>Create Investigation Case</h3>
             <div class="form-group">
                 <label>Title</label>
-                <input type="text" id="case-title" placeholder="Case title...">
+                <input type="text" id="case-title" placeholder="Case title..." value="${escapeHtml(prefillTitle)}">
             </div>
             <div class="form-group">
                 <label>Description</label>
-                <textarea id="case-description" placeholder="Describe the investigation..."></textarea>
+                <textarea id="case-description" placeholder="Describe the investigation...">${escapeHtml(prefillDesc)}</textarea>
             </div>
             <div class="form-group">
                 <label>Severity</label>
-                <select id="case-severity">
-                    <option value="">Select severity</option>
-                    <option value="critical">Critical</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                </select>
+                <select id="case-severity">${severityOptions}</select>
+            </div>
+            <div class="form-group">
+                <label>Evidence Summary</label>
+                <textarea id="case-evidence-summary" placeholder="Auto-generated evidence narrative (editable)..." rows="4">${escapeHtml(prefillEvidence)}</textarea>
             </div>
             <div class="form-actions">
                 <button class="btn btn-secondary" onclick="document.getElementById('case-create-overlay').remove()">Cancel</button>
@@ -969,11 +1163,18 @@ async function submitCreateCase(alertId) {
     const title = document.getElementById('case-title').value.trim();
     const description = document.getElementById('case-description').value.trim();
     const severity = document.getElementById('case-severity').value;
+    const evidenceSummary = document.getElementById('case-evidence-summary').value.trim();
 
     if (!title) {
         alert('Please enter a case title');
         return;
     }
+
+    // Build structured context from alert data
+    const alertData = allAlerts.find(a => a.id === alertId);
+    const affectedHosts = alertData && alertData.host ? [alertData.host] : [];
+    const affectedUsers = alertData && alertData.user ? [alertData.user] : [];
+    const triggeredRules = alertData && alertData.rule_name ? [alertData.rule_name] : [];
 
     try {
         const response = await fetch('/api/elasticsearch/alerts/cases', {
@@ -984,6 +1185,10 @@ async function submitCreateCase(alertId) {
                 description: description || null,
                 severity: severity || null,
                 alert_ids: alertId ? [alertId] : [],
+                affected_hosts: affectedHosts.length ? affectedHosts : null,
+                affected_users: affectedUsers.length ? affectedUsers : null,
+                triggered_rules: triggeredRules.length ? triggeredRules : null,
+                evidence_summary: evidenceSummary || null,
             }),
         });
 
@@ -1053,6 +1258,15 @@ async function loadTriage(alertId) {
             } else {
                 document.getElementById('detail-tab-case').innerHTML = '<div class="empty-state">Not linked to any case. Use "Create Case" or "Link to Case" in the triage bar above.</div>';
             }
+
+            // Auto-populate observables if empty
+            const hasObservables = data.triage && data.triage.observables && data.triage.observables.length > 0;
+            if (!hasObservables) {
+                const alert = allAlerts.find(a => a.id === alertId);
+                if (alert) {
+                    autoPopulateObservables(alertId, alert);
+                }
+            }
         }
     } catch (e) {
         console.error('Error loading triage:', e);
@@ -1067,6 +1281,8 @@ function renderTriageBar(alertId, triage) {
     const priority = triage ? (triage.priority || '') : '';
     const caseNumber = triage ? triage.case_number : null;
     const caseId = triage ? triage.case_id : null;
+    const analystNotes = triage ? (triage.analyst_notes || '') : '';
+    const observables = triage ? (triage.observables || []) : [];
 
     const statusOptions = TRIAGE_STATUSES.map(s =>
         `<option value="${s}" ${s === status ? 'selected' : ''}>${s.replace('_', ' ')}</option>`
@@ -1086,19 +1302,141 @@ function renderTriageBar(alertId, triage) {
         `;
     }
 
+    // Build observables HTML
+    let observablesListHtml = '';
+    if (observables.length > 0) {
+        observablesListHtml = observables.map((obs, idx) =>
+            `<div class="observable-row">
+                <span class="observable-badge ${escapeHtml(obs.type)}">${escapeHtml(obs.type.replace('_', ' '))}</span>
+                <span class="observable-value">${escapeHtml(obs.value)}</span>
+                <button class="btn-icon" onclick="removeObservable('${escapeHtml(alertId)}', ${idx})" title="Remove">&times;</button>
+            </div>`
+        ).join('');
+    } else {
+        observablesListHtml = '<div class="observable-empty">No observables yet</div>';
+    }
+
+    const typeOptions = OBSERVABLE_TYPES.map(t =>
+        `<option value="${t}">${t.replace('_', ' ')}</option>`
+    ).join('');
+
     bar.innerHTML = `
-        <div class="triage-group">
-            <label>Status</label>
-            <select onchange="updateTriage('${escapeHtml(alertId)}', 'status', this.value)">${statusOptions}</select>
+        <div class="triage-row" style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+            <div class="triage-group">
+                <label>Status</label>
+                <select onchange="updateTriage('${escapeHtml(alertId)}', 'status', this.value)">${statusOptions}</select>
+            </div>
+            <div class="triage-group">
+                <label>Priority</label>
+                <select onchange="updateTriage('${escapeHtml(alertId)}', 'priority', this.value)">${priorityOptions}</select>
+            </div>
+            <div class="triage-group" style="margin-left:auto;">
+                ${caseHtml}
+            </div>
         </div>
-        <div class="triage-group">
-            <label>Priority</label>
-            <select onchange="updateTriage('${escapeHtml(alertId)}', 'priority', this.value)">${priorityOptions}</select>
+        <div class="triage-notes-row" style="margin-top:0.5rem;">
+            <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.25rem;">Analyst Notes</label>
+            <div style="display:flex;gap:0.5rem;">
+                <textarea id="analyst-notes-input" placeholder="Add analyst assessment..." style="flex:1;min-height:2.5rem;resize:vertical;font-size:0.8125rem;padding:0.375rem;border:1px solid var(--border);border-radius:4px;background:var(--bg-secondary);color:var(--text-primary);">${escapeHtml(analystNotes)}</textarea>
+                <button class="btn btn-sm btn-primary" onclick="saveAnalystNotes('${escapeHtml(alertId)}')" style="align-self:flex-end;">Save</button>
+            </div>
         </div>
-        <div class="triage-group" style="margin-left:auto;">
-            ${caseHtml}
+        <div class="observables-section">
+            <label>Observables</label>
+            <div id="observables-list">${observablesListHtml}</div>
+            <div class="observable-add-row">
+                <select id="observable-type-select">${typeOptions}</select>
+                <input type="text" id="observable-value-input" placeholder="Value..." onkeydown="if(event.key==='Enter'){addObservable('${escapeHtml(alertId)}');}">
+                <button class="btn btn-sm btn-primary" onclick="addObservable('${escapeHtml(alertId)}')">Add</button>
+            </div>
         </div>
     `;
+}
+
+async function saveAnalystNotes(alertId) {
+    const input = document.getElementById('analyst-notes-input');
+    if (!input) return;
+    const value = input.value.trim();
+    await updateTriage(alertId, 'analyst_notes', value);
+}
+
+function addObservable(alertId) {
+    const typeSelect = document.getElementById('observable-type-select');
+    const valueInput = document.getElementById('observable-value-input');
+    if (!typeSelect || !valueInput) return;
+
+    const obsType = typeSelect.value;
+    const obsValue = valueInput.value.trim();
+    if (!obsValue) return;
+
+    const cached = triageCache[alertId];
+    const current = (cached && cached.observables) ? [...cached.observables] : [];
+    current.push({ type: obsType, value: obsValue });
+    valueInput.value = '';
+    saveObservables(alertId, current);
+}
+
+function removeObservable(alertId, index) {
+    const cached = triageCache[alertId];
+    const current = (cached && cached.observables) ? [...cached.observables] : [];
+    if (index >= 0 && index < current.length) {
+        current.splice(index, 1);
+        saveObservables(alertId, current);
+    }
+}
+
+async function saveObservables(alertId, observables) {
+    try {
+        const response = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ observables }),
+        });
+        if (!response.ok) throw new Error('Failed to save observables');
+        const result = await response.json();
+
+        // Update cache
+        triageCache[alertId] = {
+            ...triageCache[alertId],
+            observables: result.observables,
+        };
+
+        // Re-render triage bar
+        if (currentDetailAlert && currentDetailAlert.id === alertId) {
+            renderTriageBar(alertId, triageCache[alertId]);
+        }
+    } catch (e) {
+        console.error('Error saving observables:', e);
+    }
+}
+
+async function autoPopulateObservables(alertId, alert) {
+    try {
+        const body = {
+            host: alert.host || null,
+            user: alert.user || null,
+            raw_data: alert.raw_data || null,
+        };
+        const response = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage/auto-populate-observables`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) return;
+        const result = await response.json();
+
+        if (result.observables && result.observables.length > 0) {
+            triageCache[alertId] = {
+                ...triageCache[alertId],
+                observables: result.observables,
+            };
+            if (currentDetailAlert && currentDetailAlert.id === alertId) {
+                renderTriageBar(alertId, triageCache[alertId]);
+            }
+        }
+    } catch (e) {
+        console.error('Error auto-populating observables:', e);
+    }
 }
 
 async function updateTriage(alertId, field, value) {
@@ -1120,6 +1458,7 @@ async function updateTriage(alertId, field, value) {
             priority: result.priority,
             case_id: result.case_id,
             assigned_to_id: result.assigned_to_id,
+            observables: result.observables !== undefined ? result.observables : (triageCache[alertId] && triageCache[alertId].observables),
         };
 
         // Re-render table row indicator
@@ -1199,6 +1538,48 @@ async function renderCaseTab(caseId) {
         if (!response.ok) throw new Error('Failed');
         const c = await response.json();
 
+        // Build tag badges for context fields
+        function renderTags(items, label, colorClass) {
+            if (!items || items.length === 0) return '';
+            const badges = items.map(i => `<span class="context-tag ${colorClass}">${escapeHtml(i)}</span>`).join('');
+            return `<div class="case-context-group"><span class="case-context-label">${label}:</span> ${badges}</div>`;
+        }
+
+        const contextHtml = [
+            renderTags(c.affected_hosts, 'Hosts', 'tag-host'),
+            renderTags(c.affected_users, 'Users', 'tag-user'),
+            renderTags(c.triggered_rules, 'Rules', 'tag-rule'),
+        ].filter(Boolean).join('');
+
+        const evidenceHtml = c.evidence_summary
+            ? `<div class="case-evidence-block"><strong>Evidence Summary</strong><p>${escapeHtml(c.evidence_summary)}</p></div>`
+            : '';
+
+        // Notes journal
+        const notes = c.notes || [];
+        let notesHtml = '<div class="case-notes-section"><h5>Investigation Notes</h5>';
+        if (notes.length === 0) {
+            notesHtml += '<div class="empty-state">No notes yet</div>';
+        } else {
+            notes.forEach(n => {
+                notesHtml += `
+                    <div class="comment-item">
+                        <div class="comment-header">
+                            <span class="comment-user">${escapeHtml(n.user)}</span>
+                            <span class="comment-time">${n.created_at ? new Date(n.created_at).toLocaleString() : ''}</span>
+                        </div>
+                        <div class="comment-body">${escapeHtml(n.content)}</div>
+                    </div>
+                `;
+            });
+        }
+        notesHtml += `
+            <div class="comment-form" style="margin-top:0.75rem;">
+                <textarea id="case-note-input" placeholder="Add investigation note..."></textarea>
+                <button class="btn btn-primary" onclick="addCaseNote(${c.id})">Add Note</button>
+            </div>
+        </div>`;
+
         container.innerHTML = `
             <div class="case-detail-box">
                 <h4>${escapeHtml(c.case_number)}: ${escapeHtml(c.title)}</h4>
@@ -1220,6 +1601,8 @@ async function renderCaseTab(caseId) {
                         <div>${escapeHtml(c.assigned_to || 'Unassigned')}</div>
                     </div>
                 </div>
+                ${contextHtml ? `<div class="case-context-tags" style="margin:0.75rem 0;display:flex;flex-direction:column;gap:0.375rem;">${contextHtml}</div>` : ''}
+                ${evidenceHtml}
                 ${c.description ? `<p style="font-size:0.875rem;line-height:1.5;">${escapeHtml(c.description)}</p>` : ''}
                 <div class="case-alerts-list">
                     <h5>Linked Alerts (${c.alerts.length})</h5>
@@ -1231,10 +1614,32 @@ async function renderCaseTab(caseId) {
                         </div>
                     `).join('') : '<div class="empty-state">No other alerts linked</div>'}
                 </div>
+                ${notesHtml}
             </div>
         `;
     } catch (e) {
         container.innerHTML = '<div class="empty-state">Failed to load case details</div>';
+    }
+}
+
+async function addCaseNote(caseId) {
+    const input = document.getElementById('case-note-input');
+    if (!input) return;
+    const content = input.value.trim();
+    if (!content) return;
+
+    try {
+        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}/notes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content }),
+        });
+        if (!response.ok) throw new Error('Failed to add note');
+        input.value = '';
+        // Re-render case tab
+        await renderCaseTab(caseId);
+    } catch (e) {
+        console.error('Error adding case note:', e);
     }
 }
 
