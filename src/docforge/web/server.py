@@ -194,6 +194,12 @@ async def security_dashboard_page(request: Request):
     return templates.TemplateResponse("security_dashboard.html", {"request": request})
 
 
+@app.get("/alerts", response_class=HTMLResponse)
+async def alerts_page(request: Request):
+    """Render the alerts investigation page (admin only)."""
+    return templates.TemplateResponse("alerts.html", {"request": request})
+
+
 def main():
     """Run the web server."""
     import argparse

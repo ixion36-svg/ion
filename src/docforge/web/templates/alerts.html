@@ -1,0 +1,1720 @@
+{% extends "base.html" %}
+
+{% block title %}Alert Investigation - DocForge{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Alert Investigation</h1>
+    <div class="header-actions">
+        <label class="auto-refresh-toggle" id="auto-refresh-toggle">
+            <input type="checkbox" id="auto-refresh-cb" checked onchange="toggleAutoRefresh()">
+            <span class="auto-refresh-label">Auto-refresh</span>
+            <span class="auto-refresh-indicator" id="auto-refresh-indicator"></span>
+        </label>
+        <button class="btn btn-secondary" onclick="loadAlerts()">Refresh</button>
+    </div>
+</div>
+
+<!-- Threat Banner -->
+<div class="security-banner" id="alerts-threat-banner">
+    <div class="threat-level" id="alerts-threat-level">
+        <span class="threat-icon">&#9888;</span>
+        <span class="threat-text">Loading threat assessment...</span>
+    </div>
+    <div class="threat-stats" id="alerts-threat-stats"></div>
+</div>
+
+<!-- Active Filter Banner -->
+<div class="active-filter-banner" id="active-filter-banner" style="display: none;">
+    <span id="active-filter-text"></span>
+    <button class="btn btn-sm" onclick="clearEntityFilter()">&#10005; Clear Filter</button>
+</div>
+
+<!-- Filters -->
+<div class="alerts-filters">
+    <select id="alert-time-range" onchange="loadAlerts()">
+        <option value="1">Last Hour</option>
+        <option value="24" selected>Last 24 Hours</option>
+        <option value="72">Last 3 Days</option>
+        <option value="168">Last 7 Days</option>
+        <option value="720">Last 30 Days</option>
+    </select>
+    <select id="alert-severity-filter" onchange="applyFilters()">
+        <option value="">All Severities</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+        <option value="info">Info</option>
+    </select>
+    <select id="alert-status-filter" onchange="applyFilters()">
+        <option value="">All Statuses</option>
+        <option value="open">Open</option>
+        <option value="acknowledged">Acknowledged</option>
+        <option value="resolved">Resolved</option>
+    </select>
+    <input type="text" id="alert-search" class="search-input" placeholder="Search alerts..." oninput="debouncedSearch()">
+    <button class="btn btn-secondary" onclick="clearAllFilters()">Clear</button>
+</div>
+
+<!-- Main Grid -->
+<div class="alerts-grid">
+    <!-- Alert Table -->
+    <div class="card card-wide">
+        <div class="card-body">
+            <table class="data-table" id="alerts-table">
+                <thead>
+                    <tr>
+                        <th style="width:32px;"></th>
+                        <th class="sortable" onclick="sortBy('severity')">
+                            Severity <span class="sort-arrow" id="sort-severity"></span>
+                        </th>
+                        <th class="sortable" onclick="sortBy('title')">
+                            Title <span class="sort-arrow" id="sort-title"></span>
+                        </th>
+                        <th class="sortable" onclick="sortBy('host')">
+                            Host <span class="sort-arrow" id="sort-host"></span>
+                        </th>
+                        <th class="sortable" onclick="sortBy('user')">
+                            User <span class="sort-arrow" id="sort-user"></span>
+                        </th>
+                        <th>Rule</th>
+                        <th>Status</th>
+                        <th class="sortable" onclick="sortBy('timestamp')">
+                            Time <span class="sort-arrow" id="sort-timestamp"></span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="alerts-tbody">
+                    <tr><td colspan="8" class="loading">Loading alerts...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Side Panel -->
+    <div class="side-panel">
+        <div class="card">
+            <div class="card-header">
+                <h3>Cases</h3>
+                <span class="badge" id="cases-count">0</span>
+            </div>
+            <div class="card-body">
+                <div id="cases-summary" class="list-group">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3>Top Hosts</h3>
+                <span class="badge" id="hosts-count">0</span>
+            </div>
+            <div class="card-body">
+                <div id="top-hosts-list" class="list-group">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3>Top Rules</h3>
+                <span class="badge" id="rules-count">0</span>
+            </div>
+            <div class="card-body">
+                <div id="top-rules-list" class="list-group">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3>Top Users</h3>
+                <span class="badge" id="users-count">0</span>
+            </div>
+            <div class="card-body">
+                <div id="top-users-list" class="list-group">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Detail Modal -->
+<div class="modal" id="alert-detail-modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2 id="alert-detail-title">Alert Details</h2>
+            <button class="modal-close" onclick="closeAlertModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="alert-detail-body">
+            <!-- Populated by JS -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeAlertModal()">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* Alerts Investigation Page Styles */
+.alerts-filters {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.alerts-filters select,
+.alerts-filters .search-input {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    background: var(--bg-card);
+}
+
+.alerts-filters .search-input {
+    flex: 1;
+    min-width: 200px;
+}
+
+.alerts-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1.5rem;
+}
+
+@media (max-width: 1200px) {
+    .alerts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Threat Banner (reuse from security_dashboard) */
+.security-banner {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white;
+}
+
+.threat-level {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.threat-icon { font-size: 2rem; }
+.threat-text { font-size: 1.25rem; font-weight: 600; }
+
+.threat-level.critical { color: #ff4444; }
+.threat-level.high { color: #ff8800; }
+.threat-level.medium { color: #ffbb33; }
+.threat-level.low { color: #00C851; }
+.threat-level.normal { color: #33b5e5; }
+
+.threat-stats {
+    display: flex;
+    gap: 2rem;
+}
+
+.threat-stat { text-align: center; }
+.threat-stat-value { font-size: 1.5rem; font-weight: bold; }
+.threat-stat-label { font-size: 0.875rem; opacity: 0.8; }
+
+/* Active Filter Banner */
+.active-filter-banner {
+    background: rgba(37, 99, 235, 0.08);
+    border: 1px solid rgba(37, 99, 235, 0.2);
+    border-radius: var(--radius);
+    padding: 0.625rem 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.875rem;
+    color: var(--primary);
+}
+
+/* Sortable columns */
+.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.sortable:hover {
+    color: var(--primary);
+}
+
+.sort-arrow {
+    font-size: 0.65rem;
+    margin-left: 0.25rem;
+}
+
+.sort-arrow.asc::after { content: '\25B2'; }
+.sort-arrow.desc::after { content: '\25BC'; }
+
+/* Alert table styling */
+#alerts-table {
+    min-width: 700px;
+}
+
+.card-wide .card-body {
+    overflow-x: auto;
+}
+
+#alerts-table tr.alert-row {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+#alerts-table tr.alert-row:hover {
+    background: rgba(37, 99, 235, 0.04);
+}
+
+/* Severity badges (reuse from security_dashboard) */
+.severity-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.severity-critical { background: #ff4444; color: white; }
+.severity-high { background: #ff8800; color: white; }
+.severity-medium { background: #ffbb33; color: #333; }
+.severity-low { background: #00C851; color: white; }
+.severity-info { background: #33b5e5; color: white; }
+
+/* Status badges */
+.alert-status-open { background: #e3f2fd; color: #1976d2; }
+.alert-status-acknowledged { background: #fff3e0; color: #f57c00; }
+.alert-status-resolved { background: #e0e0e0; color: #616161; }
+
+/* Side panel clickable items */
+.side-panel .list-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.side-panel .list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 0;
+}
+
+.side-panel .list-item:hover {
+    border-color: var(--primary);
+    background: rgba(37, 99, 235, 0.04);
+}
+
+.side-panel .list-item-count {
+    background: var(--primary);
+    color: white;
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Auto-refresh toggle */
+.auto-refresh-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+.auto-refresh-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+}
+
+.auto-refresh-indicator.paused {
+    background: var(--text-muted);
+}
+
+/* Modal detail styles */
+.alert-meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.alert-meta-item {
+    padding: 0.625rem;
+    background: var(--bg);
+    border-radius: 4px;
+}
+
+.alert-meta-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+}
+
+.alert-meta-value {
+    font-weight: 500;
+    word-break: break-all;
+    font-size: 0.875rem;
+}
+
+.alert-message-box {
+    background: var(--bg);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+.alert-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-bottom: 1.25rem;
+}
+
+.alert-tag {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--primary);
+}
+
+/* Detail tabs */
+.detail-tabs {
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+}
+
+.detail-tab-btn {
+    padding: 0.5rem 1rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: -1px;
+    transition: all 0.2s;
+}
+
+.detail-tab-btn:hover { color: var(--primary); }
+
+.detail-tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.detail-tab-content {
+    display: none;
+}
+
+.detail-tab-content.active {
+    display: block;
+}
+
+/* Related alerts section */
+.related-section {
+    margin-bottom: 1rem;
+}
+
+.related-section h4 {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+.related-alert-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8125rem;
+}
+
+.related-alert-item:last-child {
+    border-bottom: none;
+}
+
+.related-alert-time {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    min-width: 130px;
+}
+
+.related-alert-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Timeline */
+.timeline {
+    position: relative;
+    padding-left: 1.5rem;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+}
+
+.timeline-item {
+    position: relative;
+    padding: 0.5rem 0 0.5rem 1rem;
+    font-size: 0.8125rem;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -1.5rem;
+    top: 0.75rem;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--secondary);
+    border: 2px solid var(--bg-card);
+}
+
+.timeline-item.current::before {
+    background: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.timeline-item.severity-critical::before { background: #ff4444; }
+.timeline-item.severity-high::before { background: #ff8800; }
+.timeline-item.severity-medium::before { background: #ffbb33; }
+.timeline-item.severity-low::before { background: #00C851; }
+
+.timeline-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.timeline-title {
+    font-weight: 500;
+}
+
+.timeline-host {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Raw data JSON view */
+.raw-data-container {
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 1rem;
+    border-radius: var(--radius);
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    max-height: 500px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.json-key { color: #7dd3fc; }
+.json-string { color: #86efac; }
+.json-number { color: #fbbf24; }
+.json-boolean { color: #c084fc; }
+.json-null { color: #94a3b8; }
+
+/* Modal large for alert detail */
+.modal-large {
+    max-width: 900px;
+}
+
+/* Empty state */
+.side-panel .empty-state {
+    padding: 1rem;
+    font-size: 0.8125rem;
+}
+
+/* Truncated text in table */
+#alerts-table td {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#alerts-table td:first-child {
+    max-width: none;
+    white-space: nowrap;
+}
+
+/* ============================================= */
+/* Triage indicator dot on table rows            */
+/* ============================================= */
+.triage-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.triage-dot.triage-open { background: #90caf9; }
+.triage-dot.triage-investigating { background: #ffb74d; }
+.triage-dot.triage-escalated { background: #ef5350; }
+.triage-dot.triage-resolved { background: #66bb6a; }
+.triage-dot.triage-closed { background: #9e9e9e; }
+.triage-dot.triage-false_positive { background: #b0bec5; }
+.triage-dot.triage-none { background: transparent; border: 1px dashed var(--border); }
+
+/* ============================================= */
+/* Triage bar in alert detail modal              */
+/* ============================================= */
+.triage-bar {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1.25rem;
+}
+
+.triage-bar label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-right: 0.25rem;
+}
+
+.triage-bar select {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    background: var(--bg-card);
+}
+
+.triage-bar .triage-group {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.triage-bar .btn-sm {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8125rem;
+}
+
+.triage-case-link {
+    font-size: 0.8125rem;
+    color: var(--primary);
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.triage-case-link:hover {
+    text-decoration: underline;
+}
+
+/* ============================================= */
+/* Comments tab                                  */
+/* ============================================= */
+.comments-list {
+    max-height: 350px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+}
+
+.comment-item {
+    padding: 0.625rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.comment-item:last-child {
+    border-bottom: none;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.25rem;
+}
+
+.comment-user {
+    font-weight: 600;
+    font-size: 0.8125rem;
+}
+
+.comment-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.comment-body {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.comment-form {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.comment-form textarea {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.8125rem;
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+}
+
+/* ============================================= */
+/* Case tab in modal                             */
+/* ============================================= */
+.case-detail-box {
+    background: var(--bg);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+
+.case-detail-box h4 {
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
+.case-meta {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.8125rem;
+}
+
+.case-meta-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.case-alerts-list {
+    margin-top: 0.75rem;
+}
+
+.case-alerts-list h5 {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+/* Case create modal overlay */
+.case-create-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.case-create-form {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+
+.case-create-form h3 {
+    margin-bottom: 1rem;
+}
+
+.case-create-form .form-group {
+    margin-bottom: 0.75rem;
+}
+
+.case-create-form label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.case-create-form input,
+.case-create-form select,
+.case-create-form textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.case-create-form textarea {
+    min-height: 60px;
+    resize: vertical;
+}
+
+.case-create-form .form-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+</style>
+
+{% raw %}
+<script>
+// =========================================================================
+// State
+// =========================================================================
+let allAlerts = [];
+let filteredAlerts = [];
+let currentSort = { field: 'timestamp', dir: 'desc' };
+let entityFilter = null; // { type: 'host'|'user'|'rule', value: '...' }
+let autoRefreshEnabled = true;
+let autoRefreshTimer = null;
+let currentDetailAlert = null;
+let triageCache = {}; // { es_alert_id: { status, priority, case_id, ... } }
+let casesData = []; // cached list of cases
+
+const SEVERITY_ORDER = { critical: 1, high: 2, medium: 3, low: 4, info: 5 };
+const TRIAGE_STATUSES = ['open', 'investigating', 'escalated', 'resolved', 'closed', 'false_positive'];
+const PRIORITIES = ['critical', 'high', 'medium', 'low'];
+
+const debouncedSearch = debounce(() => applyFilters(), 300);
+
+// =========================================================================
+// Initialization
+// =========================================================================
+document.addEventListener('DOMContentLoaded', function() {
+    loadAlerts();
+    loadCases();
+    startAutoRefresh();
+});
+
+// =========================================================================
+// Data Loading
+// =========================================================================
+async function loadAlerts() {
+    const hours = document.getElementById('alert-time-range').value;
+    const tbody = document.getElementById('alerts-tbody');
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">Loading alerts...</td></tr>';
+
+    try {
+        const params = new URLSearchParams({ hours, limit: 200 });
+        const response = await fetch(`/api/elasticsearch/alerts?${params}`);
+        if (!response.ok) {
+            if (response.status === 401) {
+                window.location.href = '/login?redirect=/alerts';
+                return;
+            }
+            throw new Error('Failed to load alerts');
+        }
+
+        const data = await response.json();
+        allAlerts = data.alerts || [];
+        applyFilters();
+        renderThreatBanner();
+    } catch (error) {
+        console.error('Error loading alerts:', error);
+        tbody.innerHTML = '<tr><td colspan="8" class="error">Error loading alerts. Check Elasticsearch connection.</td></tr>';
+        document.getElementById('top-hosts-list').innerHTML = '<div class="empty-state">-</div>';
+        document.getElementById('top-rules-list').innerHTML = '<div class="empty-state">-</div>';
+        document.getElementById('top-users-list').innerHTML = '<div class="empty-state">-</div>';
+    }
+}
+
+// =========================================================================
+// Cases
+// =========================================================================
+async function loadCases() {
+    try {
+        const response = await fetch('/api/elasticsearch/alerts/cases');
+        if (!response.ok) return;
+        const data = await response.json();
+        casesData = data.cases || [];
+        renderCasesSummary();
+    } catch (e) {
+        console.error('Error loading cases:', e);
+    }
+}
+
+function renderCasesSummary() {
+    const container = document.getElementById('cases-summary');
+    const badge = document.getElementById('cases-count');
+    const openCases = casesData.filter(c => c.status === 'open' || c.status === 'in_progress');
+    badge.textContent = openCases.length;
+
+    if (casesData.length === 0) {
+        container.innerHTML = '<div class="empty-state">No cases</div>';
+        return;
+    }
+
+    container.innerHTML = casesData.slice(0, 10).map(c => {
+        const statusColor = c.status === 'open' ? '#1976d2' : c.status === 'in_progress' ? '#f57c00' : '#616161';
+        return `
+            <div class="list-item" onclick="showCaseDetail(${c.id})" title="${escapeHtml(c.title)}">
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                    <strong>${escapeHtml(c.case_number)}</strong> ${escapeHtml(c.title)}
+                </span>
+                <span class="list-item-count" style="background:${statusColor}">${c.alert_count}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+async function showCaseDetail(caseId) {
+    try {
+        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        if (!response.ok) throw new Error('Failed to load case');
+        const caseData = await response.json();
+        alert(`Case ${caseData.case_number}: ${caseData.title}\nStatus: ${caseData.status}\nAlerts: ${caseData.alerts.length}`);
+    } catch (e) {
+        console.error('Error loading case:', e);
+    }
+}
+
+function showCreateCaseForm(alertId) {
+    const overlay = document.createElement('div');
+    overlay.className = 'case-create-overlay';
+    overlay.id = 'case-create-overlay';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+    overlay.innerHTML = `
+        <div class="case-create-form">
+            <h3>Create Investigation Case</h3>
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="case-title" placeholder="Case title...">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="case-description" placeholder="Describe the investigation..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Severity</label>
+                <select id="case-severity">
+                    <option value="">Select severity</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="document.getElementById('case-create-overlay').remove()">Cancel</button>
+                <button class="btn btn-primary" onclick="submitCreateCase('${escapeHtml(alertId)}')">Create Case</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    document.getElementById('case-title').focus();
+}
+
+async function submitCreateCase(alertId) {
+    const title = document.getElementById('case-title').value.trim();
+    const description = document.getElementById('case-description').value.trim();
+    const severity = document.getElementById('case-severity').value;
+
+    if (!title) {
+        alert('Please enter a case title');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/elasticsearch/alerts/cases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title,
+                description: description || null,
+                severity: severity || null,
+                alert_ids: alertId ? [alertId] : [],
+            }),
+        });
+
+        if (!response.ok) throw new Error('Failed to create case');
+        const result = await response.json();
+
+        document.getElementById('case-create-overlay').remove();
+        await loadCases();
+        // Reload triage for current alert
+        if (currentDetailAlert) {
+            await loadTriage(currentDetailAlert.id);
+        }
+    } catch (e) {
+        console.error('Error creating case:', e);
+        alert('Failed to create case');
+    }
+}
+
+async function linkAlertToCase(alertId) {
+    if (casesData.length === 0) {
+        alert('No cases available. Create a case first.');
+        return;
+    }
+
+    const options = casesData.map(c => `${c.case_number}: ${c.title}`).join('\n');
+    const choice = prompt(`Enter case number to link this alert to:\n\nAvailable cases:\n${options}`);
+    if (!choice) return;
+
+    const caseMatch = casesData.find(c => choice.startsWith(c.case_number));
+    if (!caseMatch) {
+        alert('Case not found');
+        return;
+    }
+
+    try {
+        await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ case_id: caseMatch.id }),
+        });
+        await loadTriage(alertId);
+    } catch (e) {
+        console.error('Error linking to case:', e);
+    }
+}
+
+// =========================================================================
+// Triage
+// =========================================================================
+async function loadTriage(alertId) {
+    try {
+        const response = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`);
+        if (!response.ok) return;
+        const data = await response.json();
+
+        // Update cache
+        if (data.triage) {
+            triageCache[alertId] = data.triage;
+        }
+
+        // If we're viewing this alert in the modal, update the triage bar
+        if (currentDetailAlert && currentDetailAlert.id === alertId) {
+            renderTriageBar(alertId, data.triage);
+            renderCommentsTab(alertId, data.comments || []);
+            if (data.triage && data.triage.case_id) {
+                renderCaseTab(data.triage.case_id);
+            } else {
+                document.getElementById('detail-tab-case').innerHTML = '<div class="empty-state">Not linked to any case. Use "Create Case" or "Link to Case" in the triage bar above.</div>';
+            }
+        }
+    } catch (e) {
+        console.error('Error loading triage:', e);
+    }
+}
+
+function renderTriageBar(alertId, triage) {
+    const bar = document.getElementById('triage-bar');
+    if (!bar) return;
+
+    const status = triage ? triage.status : 'open';
+    const priority = triage ? (triage.priority || '') : '';
+    const caseNumber = triage ? triage.case_number : null;
+    const caseId = triage ? triage.case_id : null;
+
+    const statusOptions = TRIAGE_STATUSES.map(s =>
+        `<option value="${s}" ${s === status ? 'selected' : ''}>${s.replace('_', ' ')}</option>`
+    ).join('');
+
+    const priorityOptions = ['', ...PRIORITIES].map(p =>
+        `<option value="${p}" ${p === priority ? 'selected' : ''}>${p || '-- priority --'}</option>`
+    ).join('');
+
+    let caseHtml = '';
+    if (caseNumber) {
+        caseHtml = `<span class="triage-case-link" onclick="switchDetailTab('case', document.querySelector('[data-tab=case]'))">${escapeHtml(caseNumber)}</span>`;
+    } else {
+        caseHtml = `
+            <button class="btn btn-sm btn-primary" onclick="showCreateCaseForm('${escapeHtml(alertId)}')">Create Case</button>
+            <button class="btn btn-sm btn-secondary" onclick="linkAlertToCase('${escapeHtml(alertId)}')">Link to Case</button>
+        `;
+    }
+
+    bar.innerHTML = `
+        <div class="triage-group">
+            <label>Status</label>
+            <select onchange="updateTriage('${escapeHtml(alertId)}', 'status', this.value)">${statusOptions}</select>
+        </div>
+        <div class="triage-group">
+            <label>Priority</label>
+            <select onchange="updateTriage('${escapeHtml(alertId)}', 'priority', this.value)">${priorityOptions}</select>
+        </div>
+        <div class="triage-group" style="margin-left:auto;">
+            ${caseHtml}
+        </div>
+    `;
+}
+
+async function updateTriage(alertId, field, value) {
+    try {
+        const body = {};
+        body[field] = value || null;
+        const response = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error('Failed to update triage');
+        const result = await response.json();
+
+        // Update cache
+        triageCache[alertId] = {
+            ...triageCache[alertId],
+            status: result.status,
+            priority: result.priority,
+            case_id: result.case_id,
+            assigned_to_id: result.assigned_to_id,
+        };
+
+        // Re-render table row indicator
+        renderAlerts();
+    } catch (e) {
+        console.error('Error updating triage:', e);
+    }
+}
+
+// =========================================================================
+// Comments
+// =========================================================================
+function renderCommentsTab(alertId, comments) {
+    const container = document.getElementById('detail-tab-comments');
+    if (!container) return;
+
+    let html = '<div class="comments-list">';
+    if (comments.length === 0) {
+        html += '<div class="empty-state">No comments yet</div>';
+    } else {
+        comments.forEach(c => {
+            html += `
+                <div class="comment-item">
+                    <div class="comment-header">
+                        <span class="comment-user">${escapeHtml(c.user)}</span>
+                        <span class="comment-time">${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</span>
+                    </div>
+                    <div class="comment-body">${escapeHtml(c.content)}</div>
+                </div>
+            `;
+        });
+    }
+    html += '</div>';
+
+    html += `
+        <div class="comment-form">
+            <textarea id="comment-input" placeholder="Add a comment..."></textarea>
+            <button class="btn btn-primary" onclick="addComment('${escapeHtml(alertId)}')">Submit</button>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+async function addComment(alertId) {
+    const input = document.getElementById('comment-input');
+    const content = input.value.trim();
+    if (!content) return;
+
+    try {
+        const response = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/comments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content }),
+        });
+        if (!response.ok) throw new Error('Failed to add comment');
+
+        input.value = '';
+        // Reload triage data (includes comments)
+        await loadTriage(alertId);
+    } catch (e) {
+        console.error('Error adding comment:', e);
+    }
+}
+
+// =========================================================================
+// Case Tab
+// =========================================================================
+async function renderCaseTab(caseId) {
+    const container = document.getElementById('detail-tab-case');
+    if (!container) return;
+
+    container.innerHTML = '<div class="loading">Loading case...</div>';
+
+    try {
+        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        if (!response.ok) throw new Error('Failed');
+        const c = await response.json();
+
+        container.innerHTML = `
+            <div class="case-detail-box">
+                <h4>${escapeHtml(c.case_number)}: ${escapeHtml(c.title)}</h4>
+                <div class="case-meta">
+                    <div>
+                        <div class="case-meta-label">Status</div>
+                        <div>${escapeHtml(c.status)}</div>
+                    </div>
+                    <div>
+                        <div class="case-meta-label">Severity</div>
+                        <div>${escapeHtml(c.severity || '-')}</div>
+                    </div>
+                    <div>
+                        <div class="case-meta-label">Created By</div>
+                        <div>${escapeHtml(c.created_by || '-')}</div>
+                    </div>
+                    <div>
+                        <div class="case-meta-label">Assigned To</div>
+                        <div>${escapeHtml(c.assigned_to || 'Unassigned')}</div>
+                    </div>
+                </div>
+                ${c.description ? `<p style="font-size:0.875rem;line-height:1.5;">${escapeHtml(c.description)}</p>` : ''}
+                <div class="case-alerts-list">
+                    <h5>Linked Alerts (${c.alerts.length})</h5>
+                    ${c.alerts.length > 0 ? c.alerts.map(a => `
+                        <div class="related-alert-item">
+                            <span class="triage-dot triage-${a.status}"></span>
+                            <span style="font-size:0.8125rem;flex:1;">${escapeHtml(a.es_alert_id)}</span>
+                            <span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(a.priority || '')}</span>
+                        </div>
+                    `).join('') : '<div class="empty-state">No other alerts linked</div>'}
+                </div>
+            </div>
+        `;
+    } catch (e) {
+        container.innerHTML = '<div class="empty-state">Failed to load case details</div>';
+    }
+}
+
+// =========================================================================
+// Filtering
+// =========================================================================
+function applyFilters() {
+    const severity = document.getElementById('alert-severity-filter').value;
+    const status = document.getElementById('alert-status-filter').value;
+    const search = document.getElementById('alert-search').value.toLowerCase().trim();
+
+    filteredAlerts = allAlerts.filter(a => {
+        if (severity && a.severity !== severity) return false;
+        if (status && a.status !== status) return false;
+        if (entityFilter) {
+            if (entityFilter.type === 'host' && a.host !== entityFilter.value) return false;
+            if (entityFilter.type === 'user' && a.user !== entityFilter.value) return false;
+            if (entityFilter.type === 'rule' && a.rule_name !== entityFilter.value) return false;
+        }
+        if (search) {
+            const haystack = [a.title, a.message, a.host, a.user, a.rule_name]
+                .filter(Boolean).join(' ').toLowerCase();
+            if (!haystack.includes(search)) return false;
+        }
+        return true;
+    });
+
+    applySorting();
+    renderAlerts();
+    renderSidePanels();
+}
+
+function filterByEntity(type, value) {
+    entityFilter = { type, value };
+    const banner = document.getElementById('active-filter-banner');
+    document.getElementById('active-filter-text').textContent =
+        `Filtering by ${type}: ${value}`;
+    banner.style.display = 'flex';
+    applyFilters();
+}
+
+function clearEntityFilter() {
+    entityFilter = null;
+    document.getElementById('active-filter-banner').style.display = 'none';
+    applyFilters();
+}
+
+function clearAllFilters() {
+    document.getElementById('alert-severity-filter').value = '';
+    document.getElementById('alert-status-filter').value = '';
+    document.getElementById('alert-search').value = '';
+    clearEntityFilter();
+}
+
+// =========================================================================
+// Sorting
+// =========================================================================
+function sortBy(field) {
+    if (currentSort.field === field) {
+        currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSort.field = field;
+        currentSort.dir = field === 'severity' || field === 'timestamp' ? 'desc' : 'asc';
+    }
+
+    // Update sort arrows
+    document.querySelectorAll('.sort-arrow').forEach(el => el.className = 'sort-arrow');
+    const arrow = document.getElementById(`sort-${field}`);
+    if (arrow) arrow.className = `sort-arrow ${currentSort.dir}`;
+
+    applySorting();
+    renderAlerts();
+}
+
+function applySorting() {
+    const { field, dir } = currentSort;
+    const mult = dir === 'asc' ? 1 : -1;
+
+    filteredAlerts.sort((a, b) => {
+        let va, vb;
+        if (field === 'severity') {
+            va = SEVERITY_ORDER[a.severity] || 99;
+            vb = SEVERITY_ORDER[b.severity] || 99;
+        } else if (field === 'timestamp') {
+            va = new Date(a.timestamp).getTime();
+            vb = new Date(b.timestamp).getTime();
+        } else {
+            va = (a[field] || '').toLowerCase();
+            vb = (b[field] || '').toLowerCase();
+        }
+        if (va < vb) return -1 * mult;
+        if (va > vb) return 1 * mult;
+        return 0;
+    });
+}
+
+// =========================================================================
+// Rendering
+// =========================================================================
+function renderAlerts() {
+    const tbody = document.getElementById('alerts-tbody');
+
+    if (filteredAlerts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">No alerts match the current filters</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filteredAlerts.map(a => {
+        const triage = triageCache[a.id];
+        const triageStatus = triage ? triage.status : 'none';
+        return `
+        <tr class="alert-row" onclick="showAlertDetail('${escapeHtml(a.id)}')">
+            <td style="width:32px;text-align:center;"><span class="triage-dot triage-${triageStatus}" title="Triage: ${triageStatus}"></span></td>
+            <td><span class="severity-badge severity-${a.severity}">${a.severity}</span></td>
+            <td title="${escapeHtml(a.title)}">${escapeHtml(a.title)}</td>
+            <td title="${escapeHtml(a.host || '-')}">${escapeHtml(a.host || '-')}</td>
+            <td title="${escapeHtml(a.user || '-')}">${escapeHtml(a.user || '-')}</td>
+            <td title="${escapeHtml(a.rule_name || '-')}">${escapeHtml(a.rule_name || '-')}</td>
+            <td><span class="status-badge alert-status-${a.status}">${a.status}</span></td>
+            <td>${formatDate(a.timestamp)}</td>
+        </tr>
+    `}).join('');
+}
+
+function renderSidePanels() {
+    // Use allAlerts (not filteredAlerts) for aggregations so panels always show full picture
+    const source = allAlerts;
+
+    // Hosts
+    const hostCounts = {};
+    source.forEach(a => { if (a.host) hostCounts[a.host] = (hostCounts[a.host] || 0) + 1; });
+    renderSideList('top-hosts-list', 'hosts-count', hostCounts, 'host');
+
+    // Rules
+    const ruleCounts = {};
+    source.forEach(a => { if (a.rule_name) ruleCounts[a.rule_name] = (ruleCounts[a.rule_name] || 0) + 1; });
+    renderSideList('top-rules-list', 'rules-count', ruleCounts, 'rule');
+
+    // Users
+    const userCounts = {};
+    source.forEach(a => { if (a.user) userCounts[a.user] = (userCounts[a.user] || 0) + 1; });
+    renderSideList('top-users-list', 'users-count', userCounts, 'user');
+}
+
+function renderSideList(containerId, countBadgeId, counts, entityType) {
+    const container = document.getElementById(containerId);
+    const badge = document.getElementById(countBadgeId);
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+    badge.textContent = Object.keys(counts).length;
+
+    if (entries.length === 0) {
+        container.innerHTML = '<div class="empty-state">None</div>';
+        return;
+    }
+
+    container.innerHTML = entries.map(([name, count]) => `
+        <div class="list-item" onclick="filterByEntity('${entityType}', '${escapeHtml(name)}')" title="Filter by ${entityType}: ${escapeHtml(name)}">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(name)}</span>
+            <span class="list-item-count">${count}</span>
+        </div>
+    `).join('');
+}
+
+function renderThreatBanner() {
+    const total = allAlerts.length;
+    const criticalCount = allAlerts.filter(a => a.severity === 'critical').length;
+    const highCount = allAlerts.filter(a => a.severity === 'high').length;
+    const openCount = allAlerts.filter(a => a.status === 'open').length;
+
+    // Compute threat level
+    let level = 'normal';
+    if (criticalCount >= 5) level = 'critical';
+    else if (criticalCount >= 1) level = 'high';
+    else if (highCount >= 5) level = 'high';
+    else if (highCount >= 1) level = 'medium';
+    else if (total > 0) level = 'low';
+
+    const levelEl = document.getElementById('alerts-threat-level');
+    levelEl.className = `threat-level ${level}`;
+    levelEl.querySelector('.threat-text').textContent = `Threat Level: ${level.toUpperCase()}`;
+
+    document.getElementById('alerts-threat-stats').innerHTML = `
+        <div class="threat-stat">
+            <div class="threat-stat-value">${total}</div>
+            <div class="threat-stat-label">Total</div>
+        </div>
+        <div class="threat-stat">
+            <div class="threat-stat-value">${criticalCount}</div>
+            <div class="threat-stat-label">Critical</div>
+        </div>
+        <div class="threat-stat">
+            <div class="threat-stat-value">${highCount}</div>
+            <div class="threat-stat-label">High</div>
+        </div>
+        <div class="threat-stat">
+            <div class="threat-stat-value">${openCount}</div>
+            <div class="threat-stat-label">Open</div>
+        </div>
+    `;
+}
+
+// =========================================================================
+// Alert Detail Modal
+// =========================================================================
+async function showAlertDetail(alertId) {
+    const alert = allAlerts.find(a => a.id === alertId);
+    if (!alert) return;
+
+    currentDetailAlert = alert;
+
+    const body = document.getElementById('alert-detail-body');
+    document.getElementById('alert-detail-title').textContent = alert.title;
+
+    // Triage bar placeholder
+    let html = `<div class="triage-bar" id="triage-bar"><span style="color:var(--text-muted);font-size:0.8125rem;">Loading triage...</span></div>`;
+
+    // Metadata grid
+    html += `<div class="alert-meta-grid">
+        <div class="alert-meta-item">
+            <div class="alert-meta-label">Severity</div>
+            <div class="alert-meta-value"><span class="severity-badge severity-${alert.severity}">${alert.severity}</span></div>
+        </div>
+        <div class="alert-meta-item">
+            <div class="alert-meta-label">Status</div>
+            <div class="alert-meta-value"><span class="status-badge alert-status-${alert.status}">${alert.status}</span></div>
+        </div>
+        <div class="alert-meta-item">
+            <div class="alert-meta-label">Host</div>
+            <div class="alert-meta-value">${escapeHtml(alert.host || '-')}</div>
+        </div>
+        <div class="alert-meta-item">
+            <div class="alert-meta-label">User</div>
+            <div class="alert-meta-value">${escapeHtml(alert.user || '-')}</div>
+        </div>
+        <div class="alert-meta-item">
+            <div class="alert-meta-label">Source</div>
+            <div class="alert-meta-value">${escapeHtml(alert.source)}</div>
+        </div>
+        <div class="alert-meta-item">
+            <div class="alert-meta-label">Rule</div>
+            <div class="alert-meta-value">${escapeHtml(alert.rule_name || '-')}</div>
+        </div>
+        <div class="alert-meta-item" style="grid-column: span 2;">
+            <div class="alert-meta-label">Timestamp</div>
+            <div class="alert-meta-value">${new Date(alert.timestamp).toLocaleString()}</div>
+        </div>
+    </div>`;
+
+    // Message
+    html += `<div class="alert-message-box">${escapeHtml(alert.message)}</div>`;
+
+    // Tags
+    if (alert.tags && alert.tags.length > 0) {
+        html += `<div class="alert-tags">${alert.tags.map(t => `<span class="alert-tag">${escapeHtml(t)}</span>`).join('')}</div>`;
+    }
+
+    // Tabs (added Comments and Case)
+    html += `
+    <div class="detail-tabs">
+        <button class="detail-tab-btn active" data-tab="related" onclick="switchDetailTab('related', this)">Related Alerts</button>
+        <button class="detail-tab-btn" data-tab="timeline" onclick="switchDetailTab('timeline', this)">Timeline</button>
+        <button class="detail-tab-btn" data-tab="comments" onclick="switchDetailTab('comments', this)">Comments</button>
+        <button class="detail-tab-btn" data-tab="case" onclick="switchDetailTab('case', this)">Case</button>
+        <button class="detail-tab-btn" data-tab="rawdata" onclick="switchDetailTab('rawdata', this)">Raw Data</button>
+    </div>
+    <div id="detail-tab-related" class="detail-tab-content active">
+        <div class="loading">Loading related alerts...</div>
+    </div>
+    <div id="detail-tab-timeline" class="detail-tab-content">
+        <div class="loading">Loading timeline...</div>
+    </div>
+    <div id="detail-tab-comments" class="detail-tab-content">
+        <div class="loading">Loading comments...</div>
+    </div>
+    <div id="detail-tab-case" class="detail-tab-content">
+        <div class="loading">Loading case info...</div>
+    </div>
+    <div id="detail-tab-rawdata" class="detail-tab-content">
+        <div class="raw-data-container">${syntaxHighlightJSON(alert.raw_data)}</div>
+    </div>`;
+
+    body.innerHTML = html;
+
+    // Open modal
+    document.getElementById('alert-detail-modal').classList.add('show');
+
+    // Load related alerts and triage data in parallel
+    loadRelatedAlerts(alert);
+    loadTriage(alertId);
+}
+
+function closeAlertModal() {
+    document.getElementById('alert-detail-modal').classList.remove('show');
+    currentDetailAlert = null;
+}
+
+// Close modal on background click
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('alert-detail-modal');
+    if (e.target === modal) {
+        closeAlertModal();
+    }
+});
+
+// Close modal on Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        // Close case create overlay first if open
+        const overlay = document.getElementById('case-create-overlay');
+        if (overlay) {
+            overlay.remove();
+            return;
+        }
+        closeAlertModal();
+    }
+});
+
+function switchDetailTab(tabId, btn) {
+    document.querySelectorAll('.detail-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.detail-tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(`detail-tab-${tabId}`).classList.add('active');
+}
+
+// =========================================================================
+// Related Alerts & Timeline
+// =========================================================================
+async function loadRelatedAlerts(alert) {
+    const relatedContainer = document.getElementById('detail-tab-related');
+    const timelineContainer = document.getElementById('detail-tab-timeline');
+
+    try {
+        const params = new URLSearchParams();
+        if (alert.host) params.append('host', alert.host);
+        if (alert.user) params.append('user', alert.user);
+        if (alert.rule_name) params.append('rule_name', alert.rule_name);
+
+        const response = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alert.id)}/related?${params}`);
+        if (!response.ok) throw new Error('Failed to load related alerts');
+
+        const data = await response.json();
+        const related = data.related || {};
+
+        // Render related alerts tabs
+        let relHtml = '';
+
+        if (related.by_host && related.by_host.length > 0) {
+            relHtml += renderRelatedSection('By Host', related.by_host);
+        }
+        if (related.by_user && related.by_user.length > 0) {
+            relHtml += renderRelatedSection('By User', related.by_user);
+        }
+        if (related.by_rule && related.by_rule.length > 0) {
+            relHtml += renderRelatedSection('By Rule', related.by_rule);
+        }
+
+        if (!relHtml) {
+            relHtml = '<div class="empty-state">No related alerts found</div>';
+        }
+
+        relatedContainer.innerHTML = relHtml;
+
+        // Render timeline - merge all related alerts + current alert
+        const allRelated = [
+            ...(related.by_host || []),
+            ...(related.by_user || []),
+            ...(related.by_rule || [])
+        ];
+
+        // Deduplicate by id
+        const seen = new Set();
+        const timelineAlerts = [];
+        // Add current alert
+        timelineAlerts.push({ ...alert, _isCurrent: true });
+        seen.add(alert.id);
+
+        allRelated.forEach(a => {
+            if (!seen.has(a.id)) {
+                seen.add(a.id);
+                timelineAlerts.push(a);
+            }
+        });
+
+        // Sort chronologically
+        timelineAlerts.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+        renderTimeline(timelineContainer, timelineAlerts);
+
+    } catch (error) {
+        console.error('Error loading related alerts:', error);
+        relatedContainer.innerHTML = '<div class="empty-state">Failed to load related alerts</div>';
+        timelineContainer.innerHTML = '<div class="empty-state">Failed to load timeline</div>';
+    }
+}
+
+function renderRelatedSection(title, alerts) {
+    return `
+        <div class="related-section">
+            <h4>${title} (${alerts.length})</h4>
+            ${alerts.slice(0, 10).map(a => `
+                <div class="related-alert-item">
+                    <span class="severity-badge severity-${a.severity}">${a.severity}</span>
+                    <span class="related-alert-time">${formatDate(a.timestamp)}</span>
+                    <span class="related-alert-title" title="${escapeHtml(a.title)}">${escapeHtml(a.title)}</span>
+                    <span style="color:var(--text-muted);font-size:0.75rem;">${escapeHtml(a.host || '')}</span>
+                </div>
+            `).join('')}
+            ${alerts.length > 10 ? `<div style="padding:0.5rem;color:var(--text-muted);font-size:0.75rem;">...and ${alerts.length - 10} more</div>` : ''}
+        </div>
+    `;
+}
+
+function renderTimeline(container, alerts) {
+    if (alerts.length === 0) {
+        container.innerHTML = '<div class="empty-state">No timeline data</div>';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="timeline">
+            ${alerts.map(a => `
+                <div class="timeline-item ${a._isCurrent ? 'current' : ''} severity-${a.severity}">
+                    <div class="timeline-time">${new Date(a.timestamp).toLocaleString()}</div>
+                    <div class="timeline-title">
+                        <span class="severity-badge severity-${a.severity}" style="font-size:0.65rem;">${a.severity}</span>
+                        ${escapeHtml(a.title)}
+                        ${a._isCurrent ? '<span class="badge" style="margin-left:0.5rem;font-size:0.65rem;">CURRENT</span>' : ''}
+                    </div>
+                    <div class="timeline-host">${[a.host, a.user].filter(Boolean).join(' / ')}</div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// =========================================================================
+// JSON Syntax Highlighting
+// =========================================================================
+function syntaxHighlightJSON(obj) {
+    if (!obj) return '<span class="json-null">null</span>';
+    const json = JSON.stringify(obj, null, 2);
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function(match) {
+        let cls = 'json-number';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+                cls = 'json-key';
+            } else {
+                cls = 'json-string';
+            }
+        } else if (/true|false/.test(match)) {
+            cls = 'json-boolean';
+        } else if (/null/.test(match)) {
+            cls = 'json-null';
+        }
+        return `<span class="${cls}">${escapeHtml(match)}</span>`;
+    });
+}
+
+// =========================================================================
+// Auto-Refresh
+// =========================================================================
+function startAutoRefresh() {
+    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+    autoRefreshTimer = setInterval(() => {
+        if (autoRefreshEnabled && !currentDetailAlert) {
+            loadAlerts();
+        }
+    }, 30000);
+}
+
+function toggleAutoRefresh() {
+    autoRefreshEnabled = document.getElementById('auto-refresh-cb').checked;
+    const indicator = document.getElementById('auto-refresh-indicator');
+    if (autoRefreshEnabled) {
+        indicator.classList.remove('paused');
+    } else {
+        indicator.classList.add('paused');
+    }
+}
+</script>
+{% endraw %}
+{% endblock %}
