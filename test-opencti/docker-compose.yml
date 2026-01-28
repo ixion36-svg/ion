@@ -1,0 +1,133 @@
+# OpenCTI local test instance
+# Run with: docker compose up -d
+# Access at: http://localhost:8888
+# Admin login: admin@opencti.io / OpenCTITest123!
+# API token: 5b3d8e6f-2a1c-4b9d-8e7f-3c6a9d4b2e1f
+
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7.4
+    container_name: opencti-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: opencti-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.ml.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    ports:
+      - "9201:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    container_name: opencti-minio
+    environment:
+      MINIO_ROOT_USER: opencti
+      MINIO_ROOT_PASSWORD: OpenCTITest123!
+    ports:
+      - "9002:9000"
+    volumes:
+      - minio-data:/data
+    command: server /data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: opencti-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: opencti
+      RABBITMQ_DEFAULT_PASS: OpenCTITest123!
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  opencti:
+    image: opencti/platform:6.4.4
+    container_name: opencti-platform
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=8096
+      - APP__PORT=8080
+      - APP__BASE_URL=http://localhost:8888
+      - APP__ADMIN__EMAIL=admin@opencti.io
+      - APP__ADMIN__PASSWORD=OpenCTITest123!
+      - APP__ADMIN__TOKEN=5b3d8e6f-2a1c-4b9d-8e7f-3c6a9d4b2e1f
+      - APP__APP_LOGS__LOGS_LEVEL=info
+      - REDIS__HOSTNAME=redis
+      - REDIS__PORT=6379
+      - ELASTICSEARCH__URL=http://elasticsearch:9200
+      - MINIO__ENDPOINT=minio
+      - MINIO__PORT=9000
+      - MINIO__USE_SSL=false
+      - MINIO__ACCESS_KEY=opencti
+      - MINIO__SECRET_KEY=OpenCTITest123!
+      - RABBITMQ__HOSTNAME=rabbitmq
+      - RABBITMQ__PORT=5672
+      - RABBITMQ__PORT_MANAGEMENT=15672
+      - RABBITMQ__MANAGEMENT_SSL=false
+      - RABBITMQ__USERNAME=opencti
+      - RABBITMQ__PASSWORD=OpenCTITest123!
+    ports:
+      - "8888:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 120s
+
+  worker:
+    image: opencti/worker:6.4.4
+    container_name: opencti-worker
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=5b3d8e6f-2a1c-4b9d-8e7f-3c6a9d4b2e1f
+      - WORKER_LOG_LEVEL=info
+    depends_on:
+      opencti:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  elasticsearch-data:
+  minio-data:
+  rabbitmq-data:

@@ -198,6 +198,12 @@
 
 {% block scripts %}
 <style>
+/* Full-width override for alerts page */
+.container:has(.alerts-grid) {
+    max-width: 100%;
+    padding: 1.5rem 2.5rem;
+}
+
 /* Alerts Investigation Page Styles */
 .alerts-filters {
     display: flex;
@@ -223,8 +229,9 @@
 
 .alerts-grid {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 1fr 300px;
     gap: 1.5rem;
+    align-items: start;
 }
 
 @media (max-width: 1200px) {
@@ -285,14 +292,14 @@
 .analytics-row {
     display: grid;
     grid-template-columns: 2fr 1fr 1fr;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    gap: 1rem;
+    margin-bottom: 1rem;
 }
 .analytics-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 0.875rem;
+    padding: 1rem 1.25rem;
 }
 .analytics-card h4 {
     font-size: 0.75rem;
@@ -305,14 +312,14 @@
     grid-column: span 1;
 }
 .chart-container {
-    min-height: 140px;
+    min-height: 200px;
     position: relative;
 }
 .chart-container-sm {
-    min-height: 140px;
+    min-height: 200px;
 }
 .chart-container-geo {
-    min-height: 180px;
+    min-height: 240px;
 }
 /* SVG chart styles */
 .chart-bar { transition: opacity 0.15s; cursor: default; }
@@ -1188,6 +1195,137 @@
     margin: 0 0 0.5rem;
     font-size: 0.8125rem;
 }
+
+/* ============================================= */
+/* OpenCTI Enrichment                            */
+/* ============================================= */
+.enrich-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 4px;
+    background: rgba(139, 92, 246, 0.08);
+    color: #8b5cf6;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.enrich-btn:hover {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.5);
+}
+.enrich-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.enrich-btn .enrich-icon {
+    font-size: 0.875rem;
+}
+
+.enrich-results {
+    margin-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.5rem;
+}
+
+.enrich-result-item {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: var(--bg);
+    border-radius: 4px;
+    border-left: 3px solid #8b5cf6;
+}
+
+.enrich-result-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+}
+
+.enrich-match-badge {
+    display: inline-block;
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.enrich-match-badge.found {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.enrich-match-badge.clean {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+}
+
+.enrich-indicator {
+    padding: 0.375rem 0.5rem;
+    margin: 0.25rem 0;
+    background: rgba(139, 92, 246, 0.05);
+    border-radius: 3px;
+    font-size: 0.8rem;
+}
+
+.enrich-indicator-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.enrich-indicator-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.125rem;
+}
+
+.enrich-actor {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    margin-right: 0.25rem;
+}
+
+.enrich-label {
+    display: inline-block;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 3px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    margin-right: 0.25rem;
+}
+
+.enrich-no-match {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-style: italic;
+}
+
+.observable-enriched {
+    position: relative;
+}
+
+.observable-enriched .enrich-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-left: 0.375rem;
+}
+
+.enrich-dot.hit { background: #ef4444; }
+.enrich-dot.miss { background: #22c55e; }
 </style>
 
 {% raw %}
@@ -1776,13 +1914,19 @@ function renderTriageBar(alertId, triage) {
             </div>
         </div>
         <div class="observables-section">
-            <label>Observables</label>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.375rem;">
+                <label style="margin-bottom:0;">Observables</label>
+                <button class="enrich-btn" id="enrich-btn" onclick="enrichObservables('${escapeHtml(alertId)}')" ${observables.length === 0 ? 'disabled' : ''}>
+                    <span class="enrich-icon">&#9733;</span> Enrich via OpenCTI
+                </button>
+            </div>
             <div id="observables-list">${observablesListHtml}</div>
             <div class="observable-add-row">
                 <select id="observable-type-select">${typeOptions}</select>
                 <input type="text" id="observable-value-input" placeholder="Value..." onkeydown="if(event.key==='Enter'){addObservable('${escapeHtml(alertId)}');}">
                 <button class="btn btn-sm btn-primary" onclick="addObservable('${escapeHtml(alertId)}')">Add</button>
             </div>
+            <div id="enrich-results"></div>
         </div>
     `;
 }
@@ -1871,6 +2015,183 @@ async function autoPopulateObservables(alertId, alert) {
     } catch (e) {
         console.error('Error auto-populating observables:', e);
     }
+}
+
+// =========================================================================
+// OpenCTI Enrichment
+// =========================================================================
+async function enrichObservables(alertId) {
+    const btn = document.getElementById('enrich-btn');
+    const resultsContainer = document.getElementById('enrich-results');
+    if (!btn || !resultsContainer) return;
+
+    const cached = triageCache[alertId];
+    const observables = (cached && cached.observables) ? cached.observables : [];
+    if (observables.length === 0) return;
+
+    // Map DocForge observable types to OpenCTI types
+    const typeMap = {
+        'source_ip': 'ipv4-addr',
+        'destination_ip': 'ipv4-addr',
+        'hostname': 'domain-name',
+        'domain': 'domain-name',
+        'url': 'url',
+        'user_account': null,  // not enrichable
+    };
+
+    const enrichable = observables
+        .map(obs => {
+            const mappedType = typeMap[obs.type] !== undefined ? typeMap[obs.type] : obs.type;
+            if (!mappedType) return null;
+            return { type: mappedType, value: obs.value, original_type: obs.type };
+        })
+        .filter(Boolean);
+
+    if (enrichable.length === 0) {
+        resultsContainer.innerHTML = '<div class="enrich-no-match" style="margin-top:0.5rem;">No enrichable observables (IPs, domains, URLs, hashes).</div>';
+        return;
+    }
+
+    // Show loading state
+    btn.disabled = true;
+    btn.innerHTML = '<span class="enrich-icon">&#8987;</span> Enriching...';
+    resultsContainer.innerHTML = '<div style="color:var(--text-muted);font-size:0.8125rem;margin-top:0.5rem;">Querying OpenCTI...</div>';
+
+    try {
+        const payload = {
+            observables: enrichable.map(o => ({ type: o.type, value: o.value })),
+        };
+        const response = await fetch('/api/opencti/enrich/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || errData.error || 'Enrichment request failed');
+        }
+
+        const data = await response.json();
+
+        if (data.error) {
+            resultsContainer.innerHTML = `<div class="enrich-no-match" style="margin-top:0.5rem;">${escapeHtml(data.error)}</div>`;
+            return;
+        }
+
+        renderEnrichResults(resultsContainer, data.results || [], enrichable);
+
+        // Update observable list with enrichment dots
+        updateObservableEnrichDots(data.results || []);
+    } catch (e) {
+        console.error('Error enriching observables:', e);
+        resultsContainer.innerHTML = `<div class="enrich-no-match" style="margin-top:0.5rem;">Enrichment failed: ${escapeHtml(e.message)}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="enrich-icon">&#9733;</span> Enrich via OpenCTI';
+    }
+}
+
+function renderEnrichResults(container, results, enrichable) {
+    if (!results || results.length === 0) {
+        container.innerHTML = '<div class="enrich-no-match" style="margin-top:0.5rem;">No results returned.</div>';
+        return;
+    }
+
+    const foundCount = results.filter(r => r.found).length;
+    let html = `<div class="enrich-results">
+        <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;font-weight:600;margin-bottom:0.5rem;">
+            OpenCTI Enrichment &mdash; ${foundCount} of ${results.length} matched
+        </div>`;
+
+    results.forEach((r, idx) => {
+        const origType = enrichable[idx] ? enrichable[idx].original_type : r.type;
+        const matchBadge = r.found
+            ? '<span class="enrich-match-badge found">MATCH</span>'
+            : '<span class="enrich-match-badge clean">NO MATCH</span>';
+
+        html += `<div class="enrich-result-item">
+            <div class="enrich-result-header">
+                ${matchBadge}
+                <span class="observable-badge ${escapeHtml(origType)}">${escapeHtml(origType.replace('_', ' '))}</span>
+                <span style="font-size:0.8125rem;font-weight:500;">${escapeHtml(r.value)}</span>
+            </div>`;
+
+        if (r.found) {
+            // Labels
+            if (r.labels && r.labels.length > 0) {
+                html += '<div style="margin:0.25rem 0;">';
+                r.labels.forEach(lbl => {
+                    const bg = lbl.color ? lbl.color + '22' : 'rgba(139,92,246,0.1)';
+                    const fg = lbl.color || '#8b5cf6';
+                    html += `<span class="enrich-label" style="background:${bg};color:${fg};">${escapeHtml(lbl.value)}</span>`;
+                });
+                html += '</div>';
+            }
+
+            // Threat actors
+            if (r.threat_actors && r.threat_actors.length > 0) {
+                html += '<div style="margin:0.25rem 0;">';
+                r.threat_actors.forEach(ta => {
+                    html += `<span class="enrich-actor" title="${escapeHtml(ta.description || '')}">&#9760; ${escapeHtml(ta.name)}</span>`;
+                });
+                html += '</div>';
+            }
+
+            // Indicators
+            if (r.indicators && r.indicators.length > 0) {
+                r.indicators.forEach(ind => {
+                    html += `<div class="enrich-indicator">
+                        <div class="enrich-indicator-name">${escapeHtml(ind.name)}</div>
+                        ${ind.description ? `<div class="enrich-indicator-desc">${escapeHtml(ind.description)}</div>` : ''}
+                        ${ind.score !== null && ind.score !== undefined ? `<div class="enrich-indicator-desc">Score: ${ind.score}</div>` : ''}
+                    </div>`;
+                });
+            }
+
+            // Observable score
+            if (r.observable && r.observable.score !== null && r.observable.score !== undefined) {
+                html += `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Observable score: ${r.observable.score}</div>`;
+            }
+        }
+
+        if (r.error) {
+            html += `<div style="font-size:0.75rem;color:#ef4444;margin-top:0.25rem;">${escapeHtml(r.error)}</div>`;
+        }
+
+        html += '</div>';
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function updateObservableEnrichDots(results) {
+    const obsList = document.getElementById('observables-list');
+    if (!obsList) return;
+
+    const rows = obsList.querySelectorAll('.observable-row');
+    // Build a lookup by value
+    const resultByValue = {};
+    results.forEach(r => {
+        resultByValue[r.value] = r.found;
+    });
+
+    rows.forEach(row => {
+        const valueSpan = row.querySelector('.observable-value');
+        if (!valueSpan) return;
+        const value = valueSpan.textContent.trim();
+        if (value in resultByValue) {
+            // Remove existing dots
+            const existingDot = row.querySelector('.enrich-dot');
+            if (existingDot) existingDot.remove();
+
+            const dot = document.createElement('span');
+            dot.className = 'enrich-dot ' + (resultByValue[value] ? 'hit' : 'miss');
+            dot.title = resultByValue[value] ? 'Found in OpenCTI' : 'Not found in OpenCTI';
+            valueSpan.appendChild(dot);
+        }
+    });
 }
 
 async function updateTriage(alertId, field, value) {
@@ -2353,7 +2674,7 @@ function renderTrendChart() {
 
     const maxCount = Math.max(1, ...buckets.map(b => b.count));
     const w = container.clientWidth || 400;
-    const h = 130;
+    const h = container.clientHeight || 190;
     const pad = { top: 10, right: 10, bottom: 28, left: 32 };
     const chartW = w - pad.left - pad.right;
     const chartH = h - pad.top - pad.bottom;
@@ -2417,8 +2738,8 @@ function renderDonut(containerId, data, colors) {
     }
 
     const w = container.clientWidth || 200;
-    const h = 140;
-    const cx = 60, cy = h / 2, r = 48, inner = 28;
+    const h = container.clientHeight || 190;
+    const cx = 70, cy = h / 2, r = 58, inner = 34;
     let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">`;
 
     let angle = -Math.PI / 2;
@@ -2444,7 +2765,7 @@ function renderDonut(containerId, data, colors) {
     svg += `<text x="${cx}" y="${cy + 10}" text-anchor="middle" class="chart-value">total</text>`;
 
     // Legend
-    const legendX = 130;
+    const legendX = 145;
     data.forEach((d, i) => {
         if (d.value === 0) return;
         const ly = 16 + i * 18;
@@ -2540,7 +2861,7 @@ function renderGeoMap() {
 
     const points = extractGeoPoints();
     const w = container.clientWidth || 500;
-    const h = 170;
+    const h = container.clientHeight || 230;
 
     let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">`;
 

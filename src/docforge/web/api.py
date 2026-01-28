@@ -3469,3 +3469,175 @@ async def get_es_alert_stats(
         }
     except ElasticsearchError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# OpenCTI Integration Endpoints
+# ============================================================================
+
+from docforge.services.opencti_service import (
+    OpenCTIService,
+    OpenCTIError,
+    get_opencti_service,
+    reset_opencti_service,
+)
+from docforge.core.config import get_opencti_config
+
+
+class OpenCTIConfigUpdate(BaseModel):
+    url: str
+    token: str
+    verify_ssl: bool = True
+
+
+class OpenCTIEnrichRequest(BaseModel):
+    type: str  # e.g., "ipv4-addr", "domain-name", "file-sha256", "url"
+    value: str
+
+
+class OpenCTIEnrichBatchRequest(BaseModel):
+    observables: List[dict]  # [{"type": "...", "value": "..."}, ...]
+
+
+@router.get("/opencti/config")
+async def get_opencti_config_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    """Get OpenCTI configuration status (no sensitive data)."""
+    config = get_opencti_config()
+    return {
+        "enabled": config.get("enabled", False),
+        "url": config.get("url", ""),
+        "has_token": bool(config.get("token")),
+        "verify_ssl": config.get("verify_ssl", True),
+    }
+
+
+@router.post("/opencti/config", dependencies=[Depends(require_admin)])
+async def update_opencti_config_endpoint(
+    config_update: OpenCTIConfigUpdate,
+    current_user: User = Depends(get_current_user),
+):
+    """Update OpenCTI configuration (admin only)."""
+    import os
+
+    config = get_config()
+    config.opencti_enabled = True
+    config.opencti_url = config_update.url
+    config.opencti_token = config_update.token
+    config.opencti_verify_ssl = config_update.verify_ssl
+
+    data_dir = os.environ.get("DOCFORGE_DATA_DIR")
+    if data_dir:
+        config_path = Path(data_dir) / ".docforge" / "config.json"
+    else:
+        config_path = Path.cwd() / ".docforge" / "config.json"
+
+    config.to_file(config_path)
+    reset_opencti_service()
+
+    # Test connection with new config
+    service = get_opencti_service()
+    connection_result = await service.test_connection()
+
+    return {
+        "success": True,
+        "message": "OpenCTI configuration saved",
+        "connection": connection_result,
+    }
+
+
+@router.delete("/opencti/config", dependencies=[Depends(require_admin)])
+async def disable_opencti_config_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    """Disable OpenCTI integration (admin only)."""
+    import os
+
+    config = get_config()
+    config.opencti_enabled = False
+    config.opencti_url = ""
+    config.opencti_token = ""
+
+    data_dir = os.environ.get("DOCFORGE_DATA_DIR")
+    if data_dir:
+        config_path = Path(data_dir) / ".docforge" / "config.json"
+    else:
+        config_path = Path.cwd() / ".docforge" / "config.json"
+
+    config.to_file(config_path)
+    reset_opencti_service()
+
+    return {"success": True, "message": "OpenCTI integration disabled"}
+
+
+@router.get("/opencti/test")
+async def test_opencti_connection(
+    current_user: User = Depends(get_current_user),
+):
+    """Test the OpenCTI connection."""
+    service = get_opencti_service()
+    result = await service.test_connection()
+    return result
+
+
+@router.post("/opencti/enrich/batch")
+async def enrich_batch(
+    request_data: OpenCTIEnrichBatchRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Enrich multiple observables via OpenCTI.
+
+    Request body: {"observables": [{"type": "ipv4-addr", "value": "1.2.3.4"}, ...]}
+    """
+    config = get_opencti_config()
+    if not config.get("enabled"):
+        return {
+            "results": [],
+            "error": "OpenCTI integration is not enabled",
+        }
+
+    service = get_opencti_service()
+    if not service.is_configured:
+        return {
+            "results": [],
+            "error": "OpenCTI is not configured",
+        }
+
+    results = await service.enrich_batch(request_data.observables)
+    return {
+        "results": results,
+        "total": len(results),
+        "found": sum(1 for r in results if r.get("found")),
+    }
+
+
+@router.post("/opencti/enrich")
+async def enrich_observable(
+    request_data: OpenCTIEnrichRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Enrich a single observable via OpenCTI.
+
+    Request body: {"type": "ipv4-addr", "value": "1.2.3.4"}
+    """
+    config = get_opencti_config()
+    if not config.get("enabled"):
+        return {
+            "found": False,
+            "type": request_data.type,
+            "value": request_data.value,
+            "error": "OpenCTI integration is not enabled",
+        }
+
+    service = get_opencti_service()
+    if not service.is_configured:
+        return {
+            "found": False,
+            "type": request_data.type,
+            "value": request_data.value,
+            "error": "OpenCTI is not configured",
+        }
+
+    result = await service.enrich_observable(request_data.type, request_data.value)
+    return result
