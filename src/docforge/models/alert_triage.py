@@ -107,6 +107,7 @@ class AlertTriage(Base, TimestampMixin):
     priority: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     analyst_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     observables: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    mitre_techniques: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
 
     # Relationships
     assigned_to: Mapped[Optional["User"]] = relationship(

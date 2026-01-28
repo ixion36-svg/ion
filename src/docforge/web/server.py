@@ -201,6 +201,12 @@ async def alerts_page(request: Request):
     return templates.TemplateResponse("alerts.html", {"request": request})
 
 
+@app.get("/tools", response_class=HTMLResponse)
+async def tools_page(request: Request):
+    """Render the document tools page."""
+    return templates.TemplateResponse("tools.html", {"request": request})
+
+
 def main():
     """Run the web server."""
     import argparse

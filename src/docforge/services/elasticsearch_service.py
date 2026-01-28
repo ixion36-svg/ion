@@ -30,6 +30,9 @@ class ElasticsearchAlert:
     user: Optional[str] = None
     tags: List[str] = None
     raw_data: Dict[str, Any] = None
+    mitre_technique_id: Optional[str] = None
+    mitre_technique_name: Optional[str] = None
+    mitre_tactic_name: Optional[str] = None
 
     def __post_init__(self):
         if self.tags is None:
@@ -52,6 +55,9 @@ class ElasticsearchAlert:
             "user": self.user,
             "tags": self.tags,
             "raw_data": self.raw_data,
+            "mitre_technique_id": self.mitre_technique_id,
+            "mitre_technique_name": self.mitre_technique_name,
+            "mitre_tactic_name": self.mitre_tactic_name,
         }
 
 
@@ -384,6 +390,41 @@ class ElasticsearchService:
             source.get("rule_name")
         )
 
+        # MITRE ATT&CK fields
+        # Primary path: threat.technique.id/name, threat.tactic.name (ECS/seed data format)
+        threat = source.get("threat", {})
+        mitre_technique_id = None
+        mitre_technique_name = None
+        mitre_tactic_name = None
+
+        if isinstance(threat, dict):
+            technique = threat.get("technique", {})
+            tactic = threat.get("tactic", {})
+            if isinstance(technique, dict):
+                mitre_technique_id = technique.get("id")
+                mitre_technique_name = technique.get("name")
+            elif isinstance(technique, list) and technique:
+                mitre_technique_id = technique[0].get("id")
+                mitre_technique_name = technique[0].get("name")
+            if isinstance(tactic, dict):
+                mitre_tactic_name = tactic.get("name")
+            elif isinstance(tactic, list) and tactic:
+                mitre_tactic_name = tactic[0].get("name")
+
+        # Fallback: signal.rule.threat[0].technique[0] (Elastic SIEM format)
+        if not mitre_technique_id:
+            signal_threats = source.get("signal", {}).get("rule", {}).get("threat", [])
+            if isinstance(signal_threats, list) and signal_threats:
+                first_threat = signal_threats[0]
+                if isinstance(first_threat, dict):
+                    techniques = first_threat.get("technique", [])
+                    if isinstance(techniques, list) and techniques:
+                        mitre_technique_id = techniques[0].get("id")
+                        mitre_technique_name = techniques[0].get("name")
+                    tactic_obj = first_threat.get("tactic", {})
+                    if isinstance(tactic_obj, dict):
+                        mitre_tactic_name = tactic_obj.get("name")
+
         return ElasticsearchAlert(
             id=alert_id,
             title=title,
@@ -397,6 +438,9 @@ class ElasticsearchService:
             user=user,
             tags=tags,
             raw_data=source,
+            mitre_technique_id=mitre_technique_id,
+            mitre_technique_name=mitre_technique_name,
+            mitre_tactic_name=mitre_tactic_name,
         )
 
     async def get_related_alerts(
