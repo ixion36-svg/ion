@@ -6,9 +6,12 @@ Provides functionality to fetch alerts and security events from Elasticsearch.
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+import logging
 import httpx
 
 from docforge.core.config import get_elasticsearch_config
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -70,6 +73,7 @@ class ElasticsearchService:
         username: Optional[str] = None,
         password: Optional[str] = None,
         alert_index: Optional[str] = None,
+        case_index: Optional[str] = None,
         verify_ssl: bool = True,
     ):
         """Initialize Elasticsearch service.
@@ -80,6 +84,7 @@ class ElasticsearchService:
             username: Basic auth username
             password: Basic auth password
             alert_index: Index pattern for alerts (e.g., ".alerts-*" or "alerts-*")
+            case_index: Index for synced case documents
             verify_ssl: Whether to verify SSL certificates
         """
         config = get_elasticsearch_config()
@@ -88,6 +93,7 @@ class ElasticsearchService:
         self.username = username or config.get("username", "")
         self.password = password or config.get("password", "")
         self.alert_index = alert_index or config.get("alert_index", ".alerts-*,.watcher-history-*,alerts-*")
+        self.case_index = case_index or config.get("case_index", "docforge-cases")
         self.verify_ssl = verify_ssl if verify_ssl is not None else config.get("verify_ssl", True)
 
     @property
@@ -532,3 +538,47 @@ class ElasticsearchService:
             "by_severity": {b["key"]: b["doc_count"] for b in severity_buckets},
             "by_status": {b["key"]: b["doc_count"] for b in status_buckets},
         }
+
+    async def index_case(self, case_doc: dict) -> bool:
+        """Index (upsert) a case document into Elasticsearch.
+
+        Args:
+            case_doc: Full case document dict. Must contain an 'id' key used as the ES document ID.
+
+        Returns:
+            True on success, False on failure (logs warning, does not raise).
+        """
+        case_id = case_doc.get("id")
+        if case_id is None:
+            logger.warning("index_case called without 'id' in case_doc")
+            return False
+
+        try:
+            await self._request(
+                "PUT",
+                f"/{self.case_index}/_doc/{case_id}",
+                json=case_doc,
+            )
+            return True
+        except Exception as e:
+            logger.warning("Failed to index case %s to Elasticsearch: %s", case_id, e)
+            return False
+
+    async def delete_case(self, case_id: int) -> bool:
+        """Delete a case document from Elasticsearch.
+
+        Args:
+            case_id: The case ID (used as the ES document ID).
+
+        Returns:
+            True on success, False on failure (logs warning, does not raise).
+        """
+        try:
+            await self._request(
+                "DELETE",
+                f"/{self.case_index}/_doc/{case_id}",
+            )
+            return True
+        except Exception as e:
+            logger.warning("Failed to delete case %s from Elasticsearch: %s", case_id, e)
+            return False

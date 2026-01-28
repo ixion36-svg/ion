@@ -2,8 +2,10 @@
 
 import asyncio
 import json
+import logging
 import re
 import secrets
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List, Generator
 from dataclasses import dataclass
@@ -2818,6 +2820,13 @@ class AutoPopulateRequest(BaseModel):
     raw_data: Optional[dict] = None
 
 
+class AlertContext(BaseModel):
+    alert_id: str
+    host: Optional[str] = None
+    user: Optional[str] = None
+    raw_data: Optional[dict] = None
+
+
 class CommentCreate(BaseModel):
     content: str
 
@@ -2836,6 +2845,7 @@ class CaseCreate(BaseModel):
     affected_users: Optional[List[str]] = None
     triggered_rules: Optional[List[str]] = None
     evidence_summary: Optional[str] = None
+    alert_contexts: Optional[List["AlertContext"]] = None
 
 
 class CaseUpdate(BaseModel):
@@ -2881,6 +2891,56 @@ async def list_cases(
             for c in cases
         ]
     }
+
+
+_case_es_logger = logging.getLogger(__name__)
+
+
+def _build_case_es_doc(case, session) -> dict:
+    """Build the full Elasticsearch document from an AlertCase ORM object."""
+    now = datetime.now(timezone.utc).isoformat()
+    return {
+        "id": case.id,
+        "@timestamp": now,
+        "case_number": case.case_number,
+        "title": case.title,
+        "description": case.description,
+        "status": case.status.value if hasattr(case.status, "value") else case.status,
+        "severity": case.severity,
+        "created_by": case.created_by.username if case.created_by else None,
+        "assigned_to": case.assigned_to.username if case.assigned_to else None,
+        "affected_hosts": case.affected_hosts or [],
+        "affected_users": case.affected_users or [],
+        "triggered_rules": case.triggered_rules or [],
+        "evidence_summary": case.evidence_summary,
+        "source_alert_ids": case.source_alert_ids or [],
+        "alert_count": len(case.source_alert_ids) if case.source_alert_ids else 0,
+        "notes": [
+            {
+                "user": n.user.username if n.user else "Unknown",
+                "content": n.content,
+                "created_at": n.created_at.isoformat() if n.created_at else None,
+            }
+            for n in case.notes
+        ],
+        "created_at": case.created_at.isoformat() if case.created_at else None,
+        "updated_at": case.updated_at.isoformat() if case.updated_at else None,
+    }
+
+
+async def _sync_case_to_es(case, session):
+    """Sync a case to Elasticsearch. Logs warnings on failure, never raises."""
+    try:
+        es_config = get_elasticsearch_config()
+        if not es_config.get("enabled"):
+            return
+        es_service = get_elasticsearch_service()
+        if not es_service.is_configured:
+            return
+        doc = _build_case_es_doc(case, session)
+        await es_service.index_case(doc)
+    except Exception as e:
+        _case_es_logger.warning("Failed to sync case %s to ES: %s", getattr(case, "id", "?"), e)
 
 
 @router.post("/elasticsearch/alerts/cases")
@@ -2931,7 +2991,20 @@ async def create_case(
             triage.case_id = new_case.id
             linked += 1
 
+    # Auto-populate observables for linked alerts if context provided
+    if data.alert_contexts:
+        context_map = {ctx.alert_id: ctx for ctx in data.alert_contexts}
+        for alert_id in (data.alert_ids or []):
+            ctx = context_map.get(alert_id)
+            if not ctx:
+                continue
+            triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+            if triage:
+                _populate_triage_observables(triage, ctx.host, ctx.user, ctx.raw_data)
+
     session.commit()
+    session.refresh(new_case)
+    await _sync_case_to_es(new_case, session)
     return {
         "id": new_case.id,
         "case_number": new_case.case_number,
@@ -2960,6 +3033,8 @@ async def add_case_note(
     )
     session.add(note)
     session.commit()
+    session.refresh(case)
+    await _sync_case_to_es(case, session)
     return {
         "id": note.id,
         "case_id": note.case_id,
@@ -3041,6 +3116,8 @@ async def update_case(
         case.assigned_to_id = data.assigned_to_id
 
     session.commit()
+    session.refresh(case)
+    await _sync_case_to_es(case, session)
     return {
         "id": case.id,
         "case_number": case.case_number,
@@ -3048,6 +3125,39 @@ async def update_case(
         "status": case.status.value if hasattr(case.status, "value") else case.status,
         "message": "Case updated",
     }
+
+
+class BatchTriageRequest(BaseModel):
+    alert_ids: List[str]
+
+
+@router.post("/elasticsearch/alerts-triage/batch")
+async def get_batch_triage(
+    data: BatchTriageRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Get triage data (including case info) for multiple alerts at once."""
+    if not data.alert_ids:
+        return {"triage": {}}
+
+    triages = (
+        session.query(AlertTriage)
+        .filter(AlertTriage.es_alert_id.in_(data.alert_ids))
+        .all()
+    )
+
+    result = {}
+    for t in triages:
+        result[t.es_alert_id] = {
+            "status": t.status.value if hasattr(t.status, "value") else t.status,
+            "priority": t.priority,
+            "case_id": t.case_id,
+            "case_number": t.case.case_number if t.case else None,
+            "case_title": t.case.title if t.case else None,
+        }
+
+    return {"triage": result}
 
 
 @router.get("/elasticsearch/alerts/{alert_id}/triage")
@@ -3225,6 +3335,36 @@ def _extract_observables_from_raw(raw_data: dict) -> list:
     return observables
 
 
+def _populate_triage_observables(triage, host=None, user=None, raw_data=None) -> bool:
+    """Populate observables on a triage record from alert context.
+
+    Extracts host→hostname, user→user_account, raw_data→ECS fields.
+    Returns True if populated, False if skipped (already has observables).
+    """
+    if triage.observables:
+        return False
+
+    observables = []
+    seen = set()
+
+    def _add(obs_type: str, value: str):
+        value = str(value).strip()
+        if value and (obs_type, value) not in seen:
+            seen.add((obs_type, value))
+            observables.append({"type": obs_type, "value": value})
+
+    if host:
+        _add("hostname", host)
+    if user:
+        _add("user_account", user)
+    if raw_data:
+        for obs in _extract_observables_from_raw(raw_data):
+            _add(obs["type"], obs["value"])
+
+    triage.observables = observables if observables else None
+    return True
+
+
 @router.post("/elasticsearch/alerts/{alert_id}/triage/auto-populate-observables")
 async def auto_populate_observables(
     alert_id: str,
@@ -3239,36 +3379,10 @@ async def auto_populate_observables(
         session.add(triage)
         session.flush()
 
-    # If observables already exist, return them without overwriting
-    if triage.observables:
-        return {"observables": triage.observables, "auto_populated": False}
-
-    observables = []
-    seen = set()
-
-    def _add(obs_type: str, value: str):
-        value = str(value).strip()
-        if value and (obs_type, value) not in seen:
-            seen.add((obs_type, value))
-            observables.append({"type": obs_type, "value": value})
-
-    # Extract from host → hostname
-    if data.host:
-        _add("hostname", data.host)
-
-    # Extract from user → user_account
-    if data.user:
-        _add("user_account", data.user)
-
-    # Extract from raw_data using ECS field mapping
-    if data.raw_data:
-        for obs in _extract_observables_from_raw(data.raw_data):
-            _add(obs["type"], obs["value"])
-
-    triage.observables = observables if observables else None
+    populated = _populate_triage_observables(triage, data.host, data.user, data.raw_data)
     session.commit()
 
-    return {"observables": triage.observables, "auto_populated": True}
+    return {"observables": triage.observables, "auto_populated": populated}
 
 
 @router.post("/elasticsearch/alerts/{alert_id}/comments")

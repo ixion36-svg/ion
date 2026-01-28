@@ -42,6 +42,7 @@ class Config:
     elasticsearch_username: str = ""  # Basic auth username
     elasticsearch_password: str = ""  # Basic auth password
     elasticsearch_alert_index: str = ".alerts-*,.watcher-history-*,alerts-*"  # Alert index pattern
+    elasticsearch_case_index: str = "docforge-cases"  # Index for synced case documents
     elasticsearch_verify_ssl: bool = True
 
     @classmethod
@@ -85,6 +86,7 @@ class Config:
             elasticsearch_username=data.get("elasticsearch_username", ""),
             elasticsearch_password=data.get("elasticsearch_password", ""),
             elasticsearch_alert_index=data.get("elasticsearch_alert_index", ".alerts-*,.watcher-history-*,alerts-*"),
+            elasticsearch_case_index=data.get("elasticsearch_case_index", "docforge-cases"),
             elasticsearch_verify_ssl=data.get("elasticsearch_verify_ssl", True),
         )
 
@@ -121,6 +123,7 @@ class Config:
                     "elasticsearch_username": self.elasticsearch_username,
                     "elasticsearch_password": self.elasticsearch_password,
                     "elasticsearch_alert_index": self.elasticsearch_alert_index,
+                    "elasticsearch_case_index": self.elasticsearch_case_index,
                     "elasticsearch_verify_ssl": self.elasticsearch_verify_ssl,
                 },
                 f,
@@ -201,6 +204,8 @@ def get_config() -> Config:
             _config.elasticsearch_password = os.environ.get("DOCFORGE_ELASTICSEARCH_PASSWORD", "")
         if os.environ.get("DOCFORGE_ELASTICSEARCH_ALERT_INDEX"):
             _config.elasticsearch_alert_index = os.environ.get("DOCFORGE_ELASTICSEARCH_ALERT_INDEX", "")
+        if os.environ.get("DOCFORGE_ELASTICSEARCH_CASE_INDEX"):
+            _config.elasticsearch_case_index = os.environ.get("DOCFORGE_ELASTICSEARCH_CASE_INDEX", "docforge-cases")
         if os.environ.get("DOCFORGE_ELASTICSEARCH_VERIFY_SSL"):
             _config.elasticsearch_verify_ssl = _get_env_bool("DOCFORGE_ELASTICSEARCH_VERIFY_SSL", True)
 
@@ -260,5 +265,6 @@ def get_elasticsearch_config() -> dict:
         "username": config.elasticsearch_username,
         "password": config.elasticsearch_password,
         "alert_index": config.elasticsearch_alert_index,
+        "case_index": config.elasticsearch_case_index,
         "verify_ssl": config.elasticsearch_verify_ssl,
     }
