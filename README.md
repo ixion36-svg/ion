@@ -16,6 +16,7 @@ Documentation Template Management System with version control, template renderin
 - **Rewrite Suggestions**: Professional, concise, formal, and technical style improvements
 - **Table Detection**: Recognizes Markdown, CSV, and TSV tables
 - **Alert Investigation**: Elasticsearch-integrated SOC alert triage with case management, observables, and analytics
+- **OpenCTI Integration**: IOC enrichment against OpenCTI threat intelligence — look up IPs, domains, hashes, and URLs for linked indicators, threat actors, and scores
 - **Web UI**: Browser-based interface with role-based access control
 - **Authentication**: Local auth + optional Keycloak/OIDC SSO support
 - **GitLab Integration**: Create, manage, and track GitLab issues directly from DocForge
@@ -231,6 +232,17 @@ See [DEPLOYMENT_GUIDE.md](deploy/DEPLOYMENT_GUIDE.md) for detailed instructions 
 | `/api/collections/{id}` | PUT | Update folder |
 | `/api/collections/{id}` | DELETE | Delete folder |
 
+### OpenCTI Integration
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/opencti/config` | GET | Get OpenCTI configuration status |
+| `/api/opencti/config` | POST | Configure OpenCTI integration (admin) |
+| `/api/opencti/config` | DELETE | Disable OpenCTI integration (admin) |
+| `/api/opencti/test` | GET | Test OpenCTI connection |
+| `/api/opencti/enrich` | POST | Enrich a single observable (type + value) |
+| `/api/opencti/enrich/batch` | POST | Enrich multiple observables |
+
 ### GitLab Integration
 
 | Endpoint | Method | Description |
@@ -249,6 +261,42 @@ See [DEPLOYMENT_GUIDE.md](deploy/DEPLOYMENT_GUIDE.md) for detailed instructions 
 | `/api/gitlab/labels` | GET | List project labels |
 | `/api/gitlab/milestones` | GET | List project milestones |
 | `/api/gitlab/members` | GET | List project members |
+
+## OpenCTI Integration
+
+DocForge integrates with [OpenCTI](https://www.opencti.io/) to enrich alert observables with threat intelligence. When investigating an alert, analysts can click "Enrich via OpenCTI" to look up IPs, domains, hashes, and URLs against the OpenCTI platform and see matching indicators, threat actors, and threat scores inline.
+
+### Configuration
+
+```bash
+# Environment variables
+DOCFORGE_OPENCTI_ENABLED=true
+DOCFORGE_OPENCTI_URL=https://opencti.example.com
+DOCFORGE_OPENCTI_TOKEN=your-api-token-uuid
+DOCFORGE_OPENCTI_VERIFY_SSL=true
+```
+
+Or in `.docforge/config.json`:
+```json
+{
+    "opencti_enabled": true,
+    "opencti_url": "https://opencti.example.com",
+    "opencti_token": "your-api-token-uuid",
+    "opencti_verify_ssl": true
+}
+```
+
+### Test Instance
+
+A Docker Compose stack with seed data is provided for local testing:
+
+```bash
+cd test-opencti
+docker compose up -d
+python seed_opencti.py
+```
+
+See [OPENCTI_INTEGRATION.md](deploy/OPENCTI_INTEGRATION.md) for full setup details, API reference, and troubleshooting.
 
 ## GitLab Integration
 

@@ -35,6 +35,12 @@ class Config:
     gitlab_token: str = ""  # Personal access token with api scope
     gitlab_project_id: str = ""  # Project ID or path (e.g., "group/project" or "123")
 
+    # OpenCTI integration
+    opencti_enabled: bool = False
+    opencti_url: str = ""  # e.g., http://localhost:8888
+    opencti_token: str = ""  # API bearer token (UUID)
+    opencti_verify_ssl: bool = True
+
     # Elasticsearch integration
     elasticsearch_enabled: bool = False
     elasticsearch_url: str = ""  # e.g., https://localhost:9200
@@ -79,6 +85,11 @@ class Config:
             gitlab_url=data.get("gitlab_url", ""),
             gitlab_token=data.get("gitlab_token", ""),
             gitlab_project_id=data.get("gitlab_project_id", ""),
+            # OpenCTI integration
+            opencti_enabled=data.get("opencti_enabled", False),
+            opencti_url=data.get("opencti_url", ""),
+            opencti_token=data.get("opencti_token", ""),
+            opencti_verify_ssl=data.get("opencti_verify_ssl", True),
             # Elasticsearch integration
             elasticsearch_enabled=data.get("elasticsearch_enabled", False),
             elasticsearch_url=data.get("elasticsearch_url", ""),
@@ -116,6 +127,11 @@ class Config:
                     "gitlab_url": self.gitlab_url,
                     "gitlab_token": self.gitlab_token,
                     "gitlab_project_id": self.gitlab_project_id,
+                    # OpenCTI integration
+                    "opencti_enabled": self.opencti_enabled,
+                    "opencti_url": self.opencti_url,
+                    "opencti_token": self.opencti_token,
+                    "opencti_verify_ssl": self.opencti_verify_ssl,
                     # Elasticsearch integration
                     "elasticsearch_enabled": self.elasticsearch_enabled,
                     "elasticsearch_url": self.elasticsearch_url,
@@ -191,6 +207,16 @@ def get_config() -> Config:
         if os.environ.get("DOCFORGE_GITLAB_PROJECT_ID"):
             _config.gitlab_project_id = os.environ.get("DOCFORGE_GITLAB_PROJECT_ID", "")
 
+        # OpenCTI environment variable overrides
+        if os.environ.get("DOCFORGE_OPENCTI_ENABLED"):
+            _config.opencti_enabled = _get_env_bool("DOCFORGE_OPENCTI_ENABLED")
+        if os.environ.get("DOCFORGE_OPENCTI_URL"):
+            _config.opencti_url = os.environ.get("DOCFORGE_OPENCTI_URL", "")
+        if os.environ.get("DOCFORGE_OPENCTI_TOKEN"):
+            _config.opencti_token = os.environ.get("DOCFORGE_OPENCTI_TOKEN", "")
+        if os.environ.get("DOCFORGE_OPENCTI_VERIFY_SSL"):
+            _config.opencti_verify_ssl = _get_env_bool("DOCFORGE_OPENCTI_VERIFY_SSL", True)
+
         # Elasticsearch environment variable overrides
         if os.environ.get("DOCFORGE_ELASTICSEARCH_ENABLED"):
             _config.elasticsearch_enabled = _get_env_bool("DOCFORGE_ELASTICSEARCH_ENABLED")
@@ -249,6 +275,20 @@ def get_gitlab_config() -> dict:
         "url": config.gitlab_url,
         "token": config.gitlab_token,
         "project_id": config.gitlab_project_id,
+    }
+
+
+def get_opencti_config() -> dict:
+    """Get OpenCTI configuration from the global config.
+
+    Returns a dictionary with OpenCTI configuration.
+    """
+    config = get_config()
+    return {
+        "enabled": config.opencti_enabled,
+        "url": config.opencti_url,
+        "token": config.opencti_token,
+        "verify_ssl": config.opencti_verify_ssl,
     }
 
 
