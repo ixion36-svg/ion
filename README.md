@@ -17,6 +17,7 @@ Documentation Template Management System with version control, template renderin
 - **Table Detection**: Recognizes Markdown, CSV, and TSV tables
 - **Alert Investigation**: Elasticsearch-integrated SOC alert triage with case management, observables, and analytics
 - **OpenCTI Integration**: IOC enrichment against OpenCTI threat intelligence — look up IPs, domains, hashes, and URLs for linked indicators, threat actors, and scores
+- **SOC Tools**: Client-side document processing tools for security analysts
 - **Web UI**: Browser-based interface with role-based access control
 - **Authentication**: Local auth + optional Keycloak/OIDC SSO support
 - **GitLab Integration**: Create, manage, and track GitLab issues directly from DocForge
@@ -395,6 +396,52 @@ Geo data is extracted from standard ECS fields populated by Elasticsearch's GeoI
 | `/api/elasticsearch/alerts/cases/{id}` | GET | Get case detail with linked alerts and notes |
 | `/api/elasticsearch/alerts/cases/{id}` | PATCH | Update case (status, severity, title, description) |
 | `/api/elasticsearch/alerts/cases/{id}/notes` | POST | Add investigation note to a case |
+
+## SOC Tools
+
+The Tools page (`/tools`) provides a suite of client-side document processing utilities for security analysts. All text processing happens in the browser—no sensitive data is sent to the server (except for IOC Lookup which queries OpenCTI).
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| **IOC Processor** | Defang/refang URLs, IPs, and emails. Extract IOCs from text. Custom find/replace rules saved to localStorage. |
+| **Timestamp Converter** | Convert between Unix (seconds/milliseconds), ISO 8601, RFC 2822, local time, and Windows FILETIME formats. |
+| **Hash Identifier** | Identify hash types (MD5, SHA-1, SHA-256, SHA-512, NTLM, bcrypt, CRC32, etc.) by length and format. |
+| **URL Parser** | Parse URLs into components (protocol, host, path, query parameters, fragment). Shows defanged version. |
+| **Regex Tester** | Test regular expressions with highlighting, capture groups, and match statistics. |
+| **Email Header Analyzer** | Parse email headers to extract key fields, authentication results, mail path (Received chain), and IOCs. |
+| **Log Parser** | Auto-detect and parse JSON, CEF, Syslog (RFC 3164), Apache access logs, Windows Event XML, and Key=Value formats. |
+| **Encoding/Decoding** | Convert between plain text, Base64, Hex, URL encoding, HTML entities, Binary, ROT13, and ASCII decimal. |
+| **IOC Lookup** | Query OpenCTI for threat intelligence on IPs, domains, hashes, and URLs. Supports single and bulk lookups with CSV export. |
+
+### IOC Processor Features
+
+- **Auto-detect IOCs**: URLs, IPv4 addresses, email addresses, domains, MD5/SHA1/SHA256 hashes
+- **Defang/Refang**: Convert `http://evil.com` → `hxxp://evil[.]com` and back
+- **Extract IOCs**: Pull all detected IOCs into a clean list
+- **Quick Actions**: Base64 encode/decode, URL encode/decode, uppercase/lowercase, sort/unique/reverse lines, remove empty lines, trim whitespace
+- **Custom Rules**: Create find/replace rules that persist in localStorage
+
+### Timestamp Formats Supported
+
+| Format | Example |
+|--------|---------|
+| Unix (seconds) | `1706454000` |
+| Unix (milliseconds) | `1706454000000` |
+| ISO 8601 | `2024-01-28T15:00:00Z` |
+| Local Time | `2024-01-28 15:00:00` |
+| RFC 2822 | `Sun, 28 Jan 2024 15:00:00 +0000` |
+| Windows FILETIME | `133508412000000000` |
+
+### Log Formats Auto-Detected
+
+- **JSON**: Standard JSON objects
+- **CEF**: Common Event Format (`CEF:0|vendor|product|...`)
+- **Syslog**: RFC 3164 format (`Jan 28 15:00:00 hostname process[pid]: message`)
+- **Apache**: Combined/Common log format
+- **Windows XML**: Windows Event Log XML format
+- **Key=Value**: Generic key=value pair format
 
 ## Testing
 

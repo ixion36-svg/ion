@@ -136,10 +136,14 @@ function updateUserMenu() {
         const adminLinks = document.getElementById('nav-admin-links');
         const auditLink = document.getElementById('nav-audit-link');
         const securityLink = document.getElementById('nav-security-link');
-        const alertsLink = document.getElementById('nav-alerts-link');
         if (adminLinks) adminLinks.style.display = 'block';
         if (auditLink) auditLink.style.display = 'block';
         if (securityLink) securityLink.style.display = 'block';
+    }
+
+    // Show alerts link for admin or analyst roles
+    if (currentUserData.roles.includes('admin') || currentUserData.roles.includes('analyst')) {
+        const alertsLink = document.getElementById('nav-alerts-link');
         if (alertsLink) alertsLink.style.display = 'block';
     }
 }

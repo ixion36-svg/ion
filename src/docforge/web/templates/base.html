@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}DocForge{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/chat.css">
 </head>
 <body>
     <nav class="navbar">
@@ -16,6 +17,7 @@
             <li><a href="/templates" class="{% if '/templates' in request.url.path %}active{% endif %}">Templates</a></li>
             <li><a href="/documents" class="{% if '/documents' in request.url.path %}active{% endif %}">Documents</a></li>
             <li><a href="/extract" class="{% if '/extract' in request.url.path %}active{% endif %}">Extract</a></li>
+            <li><a href="/tools" class="{% if '/tools' in request.url.path %}active{% endif %}">Tools</a></li>
             <li><a href="/gitlab" class="{% if '/gitlab' in request.url.path %}active{% endif %}">GitLab</a></li>
             <li class="nav-admin-links" id="nav-admin-links" style="display: none;">
                 <a href="/users" class="{% if '/users' in request.url.path %}active{% endif %}">Users</a>
@@ -30,6 +32,13 @@
                 <a href="/alerts" class="{% if '/alerts' in request.url.path %}active{% endif %}">Alerts</a>
             </li>
         </ul>
+        <!-- Chat toggle button -->
+        <button class="chat-toggle-btn" id="chat-toggle-btn" onclick="toggleChat()" title="Chat">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span class="chat-unread-badge" id="chat-unread-badge" style="display: none;">0</span>
+        </button>
         <div class="user-menu" id="user-menu">
             <button class="user-menu-btn" onclick="toggleUserDropdown()">
                 <span class="user-avatar" id="user-avatar">?</span>
@@ -61,6 +70,7 @@
     <!-- Markdown parser -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="/static/js/app.js"></script>
+    <script src="/static/js/chat.js"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

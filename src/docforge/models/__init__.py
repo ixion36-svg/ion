@@ -29,6 +29,12 @@ from docforge.models.alert_triage import (
     AlertCaseStatus,
     CaseNote,
 )
+from docforge.models.chat import (
+    ChatRoom,
+    ChatRoomMember,
+    ChatMessage,
+    MessageReaction,
+)
 
 __all__ = [
     "Base",
@@ -59,4 +65,8 @@ __all__ = [
     "AlertCase",
     "AlertCaseStatus",
     "CaseNote",
+    "ChatRoom",
+    "ChatRoomMember",
+    "ChatMessage",
+    "MessageReaction",
 ]

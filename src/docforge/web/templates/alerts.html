@@ -32,6 +32,12 @@
 </div>
 <div class="analytics-dashboard" id="analytics-dashboard" style="display:none;">
     <div class="analytics-row">
+        <div class="analytics-card mitre-heatmap-card">
+            <h4>MITRE ATT&CK Technique Heatmap</h4>
+            <div id="chart-mitre-heatmap" class="mitre-heatmap"></div>
+        </div>
+    </div>
+    <div class="analytics-row">
         <div class="analytics-card">
             <h4>Alert Trend</h4>
             <div id="chart-trend" class="chart-container"></div>
@@ -885,6 +891,149 @@
 }
 
 /* ============================================= */
+/* MITRE ATT&CK Badges and Heatmap               */
+/* ============================================= */
+.mitre-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.mitre-badge:hover { opacity: 0.8; }
+.mitre-badge.auto {
+    background: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
+    border: 1px solid rgba(220, 53, 69, 0.4);
+}
+.mitre-badge.manual {
+    background: rgba(138, 43, 226, 0.12);
+    color: #9c5fd0;
+    border: 1px dashed rgba(138, 43, 226, 0.5);
+}
+.mitre-badge .remove-btn {
+    margin-left: 0.125rem;
+    opacity: 0.6;
+    font-size: 0.75rem;
+}
+.mitre-badge .remove-btn:hover { opacity: 1; }
+
+.mitre-inline-badge {
+    display: inline-block;
+    padding: 0.0625rem 0.25rem;
+    background: rgba(220, 53, 69, 0.12);
+    color: #dc3545;
+    border-radius: 2px;
+    font-size: 0.625rem;
+    font-weight: 600;
+    margin-left: 0.375rem;
+    vertical-align: middle;
+}
+
+.mitre-section {
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+}
+.mitre-section label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.375rem;
+}
+.mitre-techniques-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-bottom: 0.5rem;
+}
+.mitre-add-row {
+    display: flex;
+    gap: 0.375rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.mitre-add-row input,
+.mitre-add-row select {
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.375rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+.mitre-add-row input { width: 70px; }
+.mitre-add-row input.mitre-name-input { width: 140px; }
+.mitre-add-row select { min-width: 130px; }
+
+/* MITRE Heatmap */
+.mitre-heatmap-card {
+    grid-column: 1 / -1;
+}
+.mitre-heatmap {
+    display: grid;
+    grid-template-columns: repeat(14, 1fr);
+    gap: 2px;
+    font-size: 0.6875rem;
+}
+.mitre-heatmap-header {
+    background: var(--bg-secondary);
+    padding: 0.375rem 0.25rem;
+    text-align: center;
+    font-weight: 600;
+    border-radius: 3px 3px 0 0;
+    position: sticky;
+    top: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.mitre-heatmap-col {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.mitre-heatmap-cell {
+    padding: 0.25rem;
+    text-align: center;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+    min-height: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.mitre-heatmap-cell:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    z-index: 1;
+}
+.mitre-heatmap-cell .tech-id { font-weight: 600; }
+.mitre-heatmap-cell .tech-count {
+    font-size: 0.625rem;
+    opacity: 0.8;
+}
+.mitre-heatmap-cell.heat-0 { background: var(--bg-secondary); color: var(--text-muted); }
+.mitre-heatmap-cell.heat-1 { background: rgba(255, 193, 7, 0.25); color: #ffc107; }
+.mitre-heatmap-cell.heat-2 { background: rgba(255, 152, 0, 0.35); color: #ff9800; }
+.mitre-heatmap-cell.heat-3 { background: rgba(255, 87, 34, 0.45); color: #ff5722; }
+.mitre-heatmap-cell.heat-4 { background: rgba(244, 67, 54, 0.55); color: #f44336; }
+.mitre-heatmap-cell.heat-5 { background: rgba(211, 47, 47, 0.7); color: #fff; }
+
+.mitre-badges-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.5rem;
+}
+
+/* ============================================= */
 /* Comments tab                                  */
 /* ============================================= */
 .comments-list {
@@ -1347,6 +1496,104 @@ const SEVERITY_ORDER = { critical: 1, high: 2, medium: 3, low: 4, info: 5 };
 const TRIAGE_STATUSES = ['open', 'investigating', 'escalated', 'resolved', 'closed', 'false_positive'];
 const PRIORITIES = ['critical', 'high', 'medium', 'low'];
 const OBSERVABLE_TYPES = ['hostname', 'source_ip', 'destination_ip', 'url', 'domain', 'user_account'];
+
+// MITRE ATT&CK Tactics (in kill chain order)
+const MITRE_TACTICS = [
+    'Reconnaissance', 'Resource Development', 'Initial Access', 'Execution',
+    'Persistence', 'Privilege Escalation', 'Defense Evasion', 'Credential Access',
+    'Discovery', 'Lateral Movement', 'Collection', 'Command and Control',
+    'Exfiltration', 'Impact'
+];
+
+// Common MITRE techniques by tactic (subset for UI)
+const MITRE_TECHNIQUE_MAP = {
+    'Reconnaissance': [
+        { id: 'T1595', name: 'Active Scanning' },
+        { id: 'T1592', name: 'Gather Victim Host Information' },
+        { id: 'T1589', name: 'Gather Victim Identity Information' },
+    ],
+    'Resource Development': [
+        { id: 'T1583', name: 'Acquire Infrastructure' },
+        { id: 'T1586', name: 'Compromise Accounts' },
+        { id: 'T1588', name: 'Obtain Capabilities' },
+    ],
+    'Initial Access': [
+        { id: 'T1566', name: 'Phishing' },
+        { id: 'T1190', name: 'Exploit Public-Facing Application' },
+        { id: 'T1133', name: 'External Remote Services' },
+        { id: 'T1078', name: 'Valid Accounts' },
+    ],
+    'Execution': [
+        { id: 'T1059', name: 'Command and Scripting Interpreter' },
+        { id: 'T1204', name: 'User Execution' },
+        { id: 'T1053', name: 'Scheduled Task/Job' },
+        { id: 'T1203', name: 'Exploitation for Client Execution' },
+    ],
+    'Persistence': [
+        { id: 'T1547', name: 'Boot or Logon Autostart Execution' },
+        { id: 'T1136', name: 'Create Account' },
+        { id: 'T1543', name: 'Create or Modify System Process' },
+        { id: 'T1053', name: 'Scheduled Task/Job' },
+    ],
+    'Privilege Escalation': [
+        { id: 'T1055', name: 'Process Injection' },
+        { id: 'T1068', name: 'Exploitation for Privilege Escalation' },
+        { id: 'T1548', name: 'Abuse Elevation Control Mechanism' },
+        { id: 'T1078', name: 'Valid Accounts' },
+    ],
+    'Defense Evasion': [
+        { id: 'T1070', name: 'Indicator Removal' },
+        { id: 'T1562', name: 'Impair Defenses' },
+        { id: 'T1055', name: 'Process Injection' },
+        { id: 'T1027', name: 'Obfuscated Files or Information' },
+        { id: 'T1036', name: 'Masquerading' },
+    ],
+    'Credential Access': [
+        { id: 'T1110', name: 'Brute Force' },
+        { id: 'T1003', name: 'OS Credential Dumping' },
+        { id: 'T1555', name: 'Credentials from Password Stores' },
+        { id: 'T1558', name: 'Steal or Forge Kerberos Tickets' },
+    ],
+    'Discovery': [
+        { id: 'T1087', name: 'Account Discovery' },
+        { id: 'T1083', name: 'File and Directory Discovery' },
+        { id: 'T1057', name: 'Process Discovery' },
+        { id: 'T1018', name: 'Remote System Discovery' },
+    ],
+    'Lateral Movement': [
+        { id: 'T1021', name: 'Remote Services' },
+        { id: 'T1570', name: 'Lateral Tool Transfer' },
+        { id: 'T1080', name: 'Taint Shared Content' },
+    ],
+    'Collection': [
+        { id: 'T1560', name: 'Archive Collected Data' },
+        { id: 'T1005', name: 'Data from Local System' },
+        { id: 'T1114', name: 'Email Collection' },
+    ],
+    'Command and Control': [
+        { id: 'T1071', name: 'Application Layer Protocol' },
+        { id: 'T1105', name: 'Ingress Tool Transfer' },
+        { id: 'T1571', name: 'Non-Standard Port' },
+        { id: 'T1572', name: 'Protocol Tunneling' },
+    ],
+    'Exfiltration': [
+        { id: 'T1041', name: 'Exfiltration Over C2 Channel' },
+        { id: 'T1048', name: 'Exfiltration Over Alternative Protocol' },
+        { id: 'T1567', name: 'Exfiltration Over Web Service' },
+    ],
+    'Impact': [
+        { id: 'T1486', name: 'Data Encrypted for Impact' },
+        { id: 'T1489', name: 'Service Stop' },
+        { id: 'T1490', name: 'Inhibit System Recovery' },
+        { id: 'T1485', name: 'Data Destruction' },
+    ],
+};
+
+// Reverse lookup: technique ID -> tactic
+const TECHNIQUE_TO_TACTIC = {};
+Object.entries(MITRE_TECHNIQUE_MAP).forEach(([tactic, techniques]) => {
+    techniques.forEach(t => { TECHNIQUE_TO_TACTIC[t.id] = tactic; });
+});
 
 const debouncedSearch = debounce(() => applyFilters(), 300);
 
@@ -1855,6 +2102,22 @@ function renderTriageBar(alertId, triage) {
     const caseId = triage ? triage.case_id : null;
     const analystNotes = triage ? (triage.analyst_notes || '') : '';
     const observables = triage ? (triage.observables || []) : [];
+    const mitreTechniques = triage ? (triage.mitre_techniques || []) : [];
+
+    // Merge auto-detected MITRE from alert with saved techniques
+    const alert = currentDetailAlert;
+    const allMitreTechniques = [...mitreTechniques];
+    if (alert && alert.mitre_technique_id) {
+        const autoExists = allMitreTechniques.some(t => t.technique_id === alert.mitre_technique_id);
+        if (!autoExists) {
+            allMitreTechniques.unshift({
+                technique_id: alert.mitre_technique_id,
+                technique_name: alert.mitre_technique_name || '',
+                tactic_name: alert.mitre_tactic_name || '',
+                source: 'auto'
+            });
+        }
+    }
 
     const statusOptions = TRIAGE_STATUSES.map(s =>
         `<option value="${s}" ${s === status ? 'selected' : ''}>${s.replace('_', ' ')}</option>`
@@ -1927,6 +2190,43 @@ function renderTriageBar(alertId, triage) {
                 <button class="btn btn-sm btn-primary" onclick="addObservable('${escapeHtml(alertId)}')">Add</button>
             </div>
             <div id="enrich-results"></div>
+        </div>
+        ${renderMitreSection(alertId, allMitreTechniques)}
+    `;
+}
+
+function renderMitreSection(alertId, techniques) {
+    // Build techniques list HTML
+    let techniquesListHtml = '';
+    if (techniques.length > 0) {
+        techniquesListHtml = techniques.map((tech, idx) => {
+            const isAuto = tech.source === 'auto';
+            const removeBtn = !isAuto
+                ? `<span class="remove-btn" onclick="event.stopPropagation();removeMitreTechnique('${escapeHtml(alertId)}', ${idx})">&times;</span>`
+                : '';
+            return `<span class="mitre-badge ${isAuto ? 'auto' : 'manual'}" onclick="filterByMitreTechnique('${escapeHtml(tech.technique_id)}'); closeAlertModal();" title="${isAuto ? 'Auto-detected' : 'Manually added'} - Click to filter">
+                <strong>${escapeHtml(tech.technique_id)}</strong>
+                ${tech.technique_name ? ` - ${escapeHtml(tech.technique_name)}` : ''}
+                ${removeBtn}
+            </span>`;
+        }).join('');
+    } else {
+        techniquesListHtml = '<span style="color:var(--text-muted);font-size:0.8125rem;font-style:italic;">No MITRE techniques</span>';
+    }
+
+    // Build tactic dropdown options
+    const tacticOptions = MITRE_TACTICS.map(t => `<option value="${t}">${t}</option>`).join('');
+
+    return `
+        <div class="mitre-section">
+            <label>MITRE ATT&CK Techniques</label>
+            <div class="mitre-techniques-list" id="mitre-techniques-list">${techniquesListHtml}</div>
+            <div class="mitre-add-row">
+                <input type="text" id="mitre-id-input" placeholder="T1234" maxlength="9">
+                <input type="text" id="mitre-name-input" class="mitre-name-input" placeholder="Technique name">
+                <select id="mitre-tactic-select">${tacticOptions}</select>
+                <button class="btn btn-sm btn-primary" onclick="addMitreTechnique('${escapeHtml(alertId)}')">Add</button>
+            </div>
         </div>
     `;
 }
@@ -2015,6 +2315,100 @@ async function autoPopulateObservables(alertId, alert) {
     } catch (e) {
         console.error('Error auto-populating observables:', e);
     }
+}
+
+// =========================================================================
+// MITRE ATT&CK Techniques
+// =========================================================================
+function addMitreTechnique(alertId) {
+    const idInput = document.getElementById('mitre-id-input');
+    const nameInput = document.getElementById('mitre-name-input');
+    const tacticSelect = document.getElementById('mitre-tactic-select');
+    if (!idInput || !nameInput || !tacticSelect) return;
+
+    const techId = idInput.value.trim().toUpperCase();
+    const techName = nameInput.value.trim();
+    const tacticName = tacticSelect.value;
+
+    // Validate technique ID format
+    if (!/^T\d{4}(\.\d{3})?$/.test(techId)) {
+        alert('Invalid technique ID format. Use T#### or T####.###');
+        return;
+    }
+
+    const cached = triageCache[alertId];
+    const current = (cached && cached.mitre_techniques) ? [...cached.mitre_techniques] : [];
+
+    // Check for duplicate
+    if (current.some(t => t.technique_id === techId)) {
+        alert('This technique is already added.');
+        return;
+    }
+
+    current.push({
+        technique_id: techId,
+        technique_name: techName,
+        tactic_name: tacticName,
+        source: 'manual'
+    });
+
+    idInput.value = '';
+    nameInput.value = '';
+    saveMitreTechniques(alertId, current);
+}
+
+function removeMitreTechnique(alertId, index) {
+    const cached = triageCache[alertId];
+    const current = (cached && cached.mitre_techniques) ? [...cached.mitre_techniques] : [];
+
+    // Only allow removing manual techniques
+    if (index >= 0 && index < current.length && current[index].source !== 'auto') {
+        current.splice(index, 1);
+        saveMitreTechniques(alertId, current);
+    }
+}
+
+async function saveMitreTechniques(alertId, techniques) {
+    try {
+        const response = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mitre_techniques: techniques }),
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            alert(err.detail || 'Failed to save techniques');
+            return;
+        }
+        const result = await response.json();
+
+        // Update cache
+        triageCache[alertId] = {
+            ...triageCache[alertId],
+            mitre_techniques: result.mitre_techniques,
+        };
+
+        // Re-render triage bar
+        if (currentDetailAlert && currentDetailAlert.id === alertId) {
+            renderTriageBar(alertId, triageCache[alertId]);
+        }
+
+        // Refresh heatmap if visible
+        if (document.getElementById('analytics-dashboard').style.display !== 'none') {
+            renderMitreHeatmap();
+        }
+    } catch (e) {
+        console.error('Error saving MITRE techniques:', e);
+    }
+}
+
+function filterByMitreTechnique(techId) {
+    entityFilter = { type: 'mitre', value: techId };
+    const banner = document.getElementById('active-filter-banner');
+    document.getElementById('active-filter-text').textContent =
+        `Filtering by MITRE technique: ${techId}`;
+    banner.style.display = 'flex';
+    applyFilters();
 }
 
 // =========================================================================
@@ -2416,9 +2810,10 @@ function applyFilters() {
             if (entityFilter.type === 'host' && a.host !== entityFilter.value) return false;
             if (entityFilter.type === 'user' && a.user !== entityFilter.value) return false;
             if (entityFilter.type === 'rule' && a.rule_name !== entityFilter.value) return false;
+            if (entityFilter.type === 'mitre' && a.mitre_technique_id !== entityFilter.value) return false;
         }
         if (search) {
-            const haystack = [a.title, a.message, a.host, a.user, a.rule_name]
+            const haystack = [a.title, a.message, a.host, a.user, a.rule_name, a.mitre_technique_id, a.mitre_technique_name, a.mitre_tactic_name]
                 .filter(Boolean).join(' ').toLowerCase();
             if (!haystack.includes(search)) return false;
         }
@@ -2511,11 +2906,14 @@ function renderAlerts() {
         const caseName = triage && triage.case_number
             ? `<span class="case-link-badge" title="${escapeHtml(triage.case_title || '')}">${escapeHtml(triage.case_number)}</span>`
             : '<span style="color:var(--text-muted);">-</span>';
+        const mitreBadge = a.mitre_technique_id
+            ? `<span class="mitre-inline-badge" title="${escapeHtml(a.mitre_technique_name || '')} (${escapeHtml(a.mitre_tactic_name || '')})">${escapeHtml(a.mitre_technique_id)}</span>`
+            : '';
         return `
         <tr class="alert-row" onclick="showAlertDetail('${escapeHtml(a.id)}')">
             <td style="width:32px;text-align:center;"><span class="triage-dot triage-${triageStatus}" title="Triage: ${triageStatus}"></span></td>
             <td><span class="severity-badge severity-${a.severity}">${a.severity}</span></td>
-            <td title="${escapeHtml(a.title)}">${escapeHtml(a.title)}</td>
+            <td title="${escapeHtml(a.title)}">${escapeHtml(a.title)}${mitreBadge}</td>
             <td title="${escapeHtml(a.host || '-')}">${escapeHtml(a.host || '-')}</td>
             <td title="${escapeHtml(a.user || '-')}">${escapeHtml(a.user || '-')}</td>
             <td title="${escapeHtml(a.rule_name || '-')}">${escapeHtml(a.rule_name || '-')}</td>
@@ -2622,12 +3020,104 @@ function toggleAnalytics() {
 
 function renderAnalytics() {
     if (document.getElementById('analytics-dashboard').style.display === 'none') return;
+    renderMitreHeatmap();
     renderTrendChart();
     renderSeverityDonut();
     renderStatusDonut();
     renderGeoMap();
     renderHBarChart('chart-top-hosts', allAlerts, 'host', '#4fc3f7');
     renderHBarChart('chart-top-rules', allAlerts, 'rule_name', '#ba68c8');
+}
+
+// --- MITRE ATT&CK Heatmap ---
+function renderMitreHeatmap() {
+    const container = document.getElementById('chart-mitre-heatmap');
+    if (!container) return;
+
+    // Aggregate technique counts from alerts
+    const techCounts = {};
+    allAlerts.forEach(a => {
+        if (a.mitre_technique_id) {
+            const id = a.mitre_technique_id;
+            if (!techCounts[id]) {
+                techCounts[id] = {
+                    id: id,
+                    name: a.mitre_technique_name || '',
+                    tactic: a.mitre_tactic_name || '',
+                    count: 0
+                };
+            }
+            techCounts[id].count++;
+        }
+    });
+
+    // If no MITRE data, show empty state
+    if (Object.keys(techCounts).length === 0) {
+        container.innerHTML = '<div class="empty-state" style="text-align:center;padding:1rem;color:var(--text-muted);">No MITRE ATT&CK data in current alerts</div>';
+        return;
+    }
+
+    // Build a map of tactic -> techniques with counts
+    const tacticData = {};
+    MITRE_TACTICS.forEach(t => { tacticData[t] = []; });
+
+    // Add known techniques from our map with 0 counts initially
+    Object.entries(MITRE_TECHNIQUE_MAP).forEach(([tactic, techniques]) => {
+        techniques.forEach(tech => {
+            if (!tacticData[tactic].some(t => t.id === tech.id)) {
+                tacticData[tactic].push({ id: tech.id, name: tech.name, count: 0 });
+            }
+        });
+    });
+
+    // Update counts from actual alert data
+    Object.values(techCounts).forEach(tech => {
+        const tactic = tech.tactic || TECHNIQUE_TO_TACTIC[tech.id] || 'Impact';
+        if (!tacticData[tactic]) tacticData[tactic] = [];
+        const existing = tacticData[tactic].find(t => t.id === tech.id);
+        if (existing) {
+            existing.count = tech.count;
+            existing.name = tech.name || existing.name;
+        } else {
+            tacticData[tactic].push({ id: tech.id, name: tech.name, count: tech.count });
+        }
+    });
+
+    // Find max count for heat scaling
+    const maxCount = Math.max(1, ...Object.values(techCounts).map(t => t.count));
+
+    // Render heatmap as CSS grid columns
+    let html = '';
+    MITRE_TACTICS.forEach(tactic => {
+        const techniques = tacticData[tactic].filter(t => t.count > 0).sort((a, b) => b.count - a.count);
+        const shortTactic = tactic.replace('Resource Development', 'Res.Dev')
+                                   .replace('Initial Access', 'Init.Acc')
+                                   .replace('Privilege Escalation', 'Priv.Esc')
+                                   .replace('Defense Evasion', 'Def.Eva')
+                                   .replace('Credential Access', 'Cred.Acc')
+                                   .replace('Lateral Movement', 'Lat.Mov')
+                                   .replace('Command and Control', 'C2')
+                                   .replace('Exfiltration', 'Exfil');
+
+        html += `<div class="mitre-heatmap-col">
+            <div class="mitre-heatmap-header" title="${escapeHtml(tactic)}">${escapeHtml(shortTactic)}</div>`;
+
+        if (techniques.length === 0) {
+            html += `<div class="mitre-heatmap-cell heat-0" style="flex:1;">-</div>`;
+        } else {
+            techniques.forEach(tech => {
+                const heatLevel = Math.min(5, Math.ceil((tech.count / maxCount) * 5));
+                html += `<div class="mitre-heatmap-cell heat-${heatLevel}" onclick="filterByMitreTechnique('${escapeHtml(tech.id)}')" title="${escapeHtml(tech.name)} (${tech.count} alerts)">
+                    <span class="tech-id">${escapeHtml(tech.id)}</span>
+                    <span class="tech-count">${tech.count}</span>
+                </div>`;
+            });
+        }
+
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
 }
 
 // --- Trend chart: alert volume over time buckets ---
@@ -3015,6 +3505,17 @@ async function showAlertDetail(alertId) {
     // Tags
     if (alert.tags && alert.tags.length > 0) {
         html += `<div class="alert-tags">${alert.tags.map(t => `<span class="alert-tag">${escapeHtml(t)}</span>`).join('')}</div>`;
+    }
+
+    // MITRE ATT&CK Badges (auto-detected from alert)
+    if (alert.mitre_technique_id) {
+        html += `<div class="mitre-badges-row">
+            <span class="mitre-badge auto" onclick="filterByMitreTechnique('${escapeHtml(alert.mitre_technique_id)}'); closeAlertModal();" title="Click to filter by this technique">
+                <strong>${escapeHtml(alert.mitre_technique_id)}</strong>
+                ${alert.mitre_technique_name ? ` - ${escapeHtml(alert.mitre_technique_name)}` : ''}
+                ${alert.mitre_tactic_name ? ` <span style="opacity:0.7;">(${escapeHtml(alert.mitre_tactic_name)})</span>` : ''}
+            </span>
+        </div>`;
     }
 
     // Tabs (added Comments and Case)

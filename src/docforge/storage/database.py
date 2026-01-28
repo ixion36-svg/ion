@@ -87,6 +87,12 @@ def _run_migrations(engine: Engine) -> None:
                     text("ALTER TABLE alert_triage ADD COLUMN observables JSON")
                 )
                 logger.info("Migrated: alert_triage.observables")
+        if "mitre_techniques" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE alert_triage ADD COLUMN mitre_techniques JSON")
+                )
+                logger.info("Migrated: alert_triage.mitre_techniques")
 
 
 def init_db(db_path: Optional[Path] = None) -> Engine:
