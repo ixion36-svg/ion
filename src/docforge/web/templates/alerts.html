@@ -24,6 +24,43 @@
     <div class="threat-stats" id="alerts-threat-stats"></div>
 </div>
 
+<!-- Analytics Dashboard (collapsible) -->
+<div class="analytics-toggle">
+    <button class="btn btn-secondary btn-sm" id="analytics-toggle-btn" onclick="toggleAnalytics()">
+        <span id="analytics-toggle-icon">&#9654;</span> Analytics Dashboard
+    </button>
+</div>
+<div class="analytics-dashboard" id="analytics-dashboard" style="display:none;">
+    <div class="analytics-row">
+        <div class="analytics-card">
+            <h4>Alert Trend</h4>
+            <div id="chart-trend" class="chart-container"></div>
+        </div>
+        <div class="analytics-card">
+            <h4>Severity Breakdown</h4>
+            <div id="chart-severity" class="chart-container chart-container-sm"></div>
+        </div>
+        <div class="analytics-card">
+            <h4>Status Overview</h4>
+            <div id="chart-status" class="chart-container chart-container-sm"></div>
+        </div>
+    </div>
+    <div class="analytics-row">
+        <div class="analytics-card analytics-card-wide">
+            <h4>Geographic Origin</h4>
+            <div id="chart-geo" class="chart-container chart-container-geo"></div>
+        </div>
+        <div class="analytics-card">
+            <h4>Top Hosts</h4>
+            <div id="chart-top-hosts" class="chart-container"></div>
+        </div>
+        <div class="analytics-card">
+            <h4>Top Rules</h4>
+            <div id="chart-top-rules" class="chart-container"></div>
+        </div>
+    </div>
+</div>
+
 <!-- Active Filter Banner -->
 <div class="active-filter-banner" id="active-filter-banner" style="display: none;">
     <span id="active-filter-text"></span>
@@ -79,6 +116,7 @@
                             User <span class="sort-arrow" id="sort-user"></span>
                         </th>
                         <th>Rule</th>
+                        <th>Case</th>
                         <th>Status</th>
                         <th class="sortable" onclick="sortBy('timestamp')">
                             Time <span class="sort-arrow" id="sort-timestamp"></span>
@@ -86,7 +124,7 @@
                     </tr>
                 </thead>
                 <tbody id="alerts-tbody">
-                    <tr><td colspan="8" class="loading">Loading alerts...</td></tr>
+                    <tr><td colspan="9" class="loading">Loading alerts...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -230,6 +268,76 @@
 .threat-stat { text-align: center; }
 .threat-stat-value { font-size: 1.5rem; font-weight: bold; }
 .threat-stat-label { font-size: 0.875rem; opacity: 0.8; }
+
+/* Analytics Dashboard */
+.analytics-toggle {
+    margin-bottom: 0.75rem;
+}
+.analytics-toggle .btn {
+    font-size: 0.8125rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.analytics-dashboard {
+    margin-bottom: 1.25rem;
+}
+.analytics-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.analytics-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.875rem;
+}
+.analytics-card h4 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0 0 0.5rem 0;
+    letter-spacing: 0.5px;
+}
+.analytics-card-wide {
+    grid-column: span 1;
+}
+.chart-container {
+    min-height: 140px;
+    position: relative;
+}
+.chart-container-sm {
+    min-height: 140px;
+}
+.chart-container-geo {
+    min-height: 180px;
+}
+/* SVG chart styles */
+.chart-bar { transition: opacity 0.15s; cursor: default; }
+.chart-bar:hover { opacity: 0.8; }
+.chart-label { font-size: 11px; fill: currentColor; }
+.chart-value { font-size: 10px; fill: var(--text-muted); }
+.chart-axis { stroke: var(--border); stroke-width: 1; }
+.chart-grid { stroke: var(--border); stroke-width: 0.5; opacity: 0.3; }
+/* Donut chart */
+.donut-segment { transition: opacity 0.15s; cursor: default; }
+.donut-segment:hover { opacity: 0.8; }
+.donut-legend { font-size: 11px; fill: currentColor; }
+.donut-legend-value { font-size: 11px; fill: var(--text-muted); }
+/* Geo map */
+.geo-dot { transition: r 0.15s; }
+.geo-dot:hover { r: 5; }
+.geo-land { fill: var(--border); stroke: var(--bg-card); stroke-width: 0.5; opacity: 0.4; }
+.geo-grid-line { stroke: var(--border); stroke-width: 0.3; opacity: 0.2; }
+.geo-empty { font-size: 12px; fill: var(--text-muted); text-anchor: middle; }
+/* Horizontal bar chart */
+.hbar-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
+.hbar-label { font-size: 0.75rem; width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+.hbar-track { flex: 1; height: 16px; background: rgba(128,128,128,0.1); border-radius: 3px; overflow: hidden; }
+.hbar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.hbar-count { font-size: 0.75rem; color: var(--text-muted); width: 32px; text-align: right; flex-shrink: 0; }
 
 /* Active Filter Banner */
 .active-filter-banner {
@@ -660,6 +768,13 @@
     text-decoration: underline;
 }
 
+.case-link-badge {
+    font-size: 0.75rem;
+    color: var(--primary);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 /* ============================================= */
 /* Observables                                   */
 /* ============================================= */
@@ -915,6 +1030,104 @@
     justify-content: flex-end;
     margin-top: 1rem;
 }
+
+/* Case management modal overlay */
+.case-mgmt-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.case-mgmt-modal {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    width: 94%;
+    max-width: 600px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.3);
+}
+
+.case-mgmt-modal h3 {
+    margin: 0 0 1rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.case-mgmt-modal h3 .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 0.25rem;
+}
+
+.case-mgmt-modal h3 .close-btn:hover {
+    color: var(--text-primary);
+}
+
+.case-meta-editable {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.case-meta-editable .meta-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.case-meta-editable .meta-field label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.case-meta-editable .meta-field select {
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.case-meta-editable .meta-field .meta-value {
+    font-size: 0.8125rem;
+    padding: 0.375rem 0;
+}
+
+.case-mgmt-section {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+.case-mgmt-section h5 {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+.case-mgmt-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.25rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
 .case-context-group {
     display: flex;
     align-items: center;
@@ -1014,7 +1227,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadAlerts() {
     const hours = document.getElementById('alert-time-range').value;
     const tbody = document.getElementById('alerts-tbody');
-    tbody.innerHTML = '<tr><td colspan="8" class="loading">Loading alerts...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading alerts...</td></tr>';
 
     try {
         const params = new URLSearchParams({ hours, limit: 200 });
@@ -1031,12 +1244,45 @@ async function loadAlerts() {
         allAlerts = data.alerts || [];
         applyFilters();
         renderThreatBanner();
+        renderAnalytics();
+        // Load triage/case data for all alerts in batch
+        loadTriageBatch();
     } catch (error) {
         console.error('Error loading alerts:', error);
-        tbody.innerHTML = '<tr><td colspan="8" class="error">Error loading alerts. Check Elasticsearch connection.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="error">Error loading alerts. Check Elasticsearch connection.</td></tr>';
         document.getElementById('top-hosts-list').innerHTML = '<div class="empty-state">-</div>';
         document.getElementById('top-rules-list').innerHTML = '<div class="empty-state">-</div>';
         document.getElementById('top-users-list').innerHTML = '<div class="empty-state">-</div>';
+    }
+}
+
+async function loadTriageBatch() {
+    if (allAlerts.length === 0) return;
+    try {
+        const alertIds = allAlerts.map(a => a.id);
+        const response = await fetch('/api/elasticsearch/alerts-triage/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alert_ids: alertIds }),
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const triageMap = data.triage || {};
+        // Merge into triageCache (don't overwrite fuller records from loadTriage)
+        for (const [alertId, triageInfo] of Object.entries(triageMap)) {
+            if (!triageCache[alertId]) {
+                triageCache[alertId] = triageInfo;
+            } else {
+                // Update case info even if we already have triage
+                triageCache[alertId].case_id = triageInfo.case_id;
+                triageCache[alertId].case_number = triageInfo.case_number;
+                triageCache[alertId].case_title = triageInfo.case_title;
+            }
+        }
+        // Re-render table with case info
+        renderAlerts();
+    } catch (e) {
+        console.error('Error loading batch triage:', e);
     }
 }
 
@@ -1084,9 +1330,191 @@ async function showCaseDetail(caseId) {
         const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
         if (!response.ok) throw new Error('Failed to load case');
         const caseData = await response.json();
-        alert(`Case ${caseData.case_number}: ${caseData.title}\nStatus: ${caseData.status}\nAlerts: ${caseData.alerts.length}`);
+        renderCaseManagementModal(caseData);
     } catch (e) {
         console.error('Error loading case:', e);
+    }
+}
+
+function renderCaseManagementModal(caseData) {
+    // Remove any existing modal
+    const existing = document.getElementById('case-mgmt-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'case-mgmt-overlay';
+    overlay.id = 'case-mgmt-overlay';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+    const statusOptions = ['open', 'in_progress', 'closed'].map(s =>
+        `<option value="${s}" ${s === caseData.status ? 'selected' : ''}>${s.replace('_', ' ')}</option>`
+    ).join('');
+
+    const severityOptions = ['critical', 'high', 'medium', 'low'].map(s =>
+        `<option value="${s}" ${s === caseData.severity ? 'selected' : ''}>${s}</option>`
+    ).join('');
+
+    // Context tags
+    function renderTags(items, label, colorClass) {
+        if (!items || items.length === 0) return '';
+        const badges = items.map(i => `<span class="context-tag ${colorClass}">${escapeHtml(i)}</span>`).join('');
+        return `<div class="case-context-group"><span class="case-context-label">${label}:</span> ${badges}</div>`;
+    }
+
+    const contextHtml = [
+        renderTags(caseData.affected_hosts, 'Hosts', 'tag-host'),
+        renderTags(caseData.affected_users, 'Users', 'tag-user'),
+        renderTags(caseData.triggered_rules, 'Rules', 'tag-rule'),
+    ].filter(Boolean).join('');
+
+    // Evidence summary
+    const evidenceHtml = caseData.evidence_summary
+        ? `<div class="case-mgmt-section"><h5>Evidence Summary</h5><p style="font-size:0.8125rem;line-height:1.5;margin:0;">${escapeHtml(caseData.evidence_summary)}</p></div>`
+        : '';
+
+    // Description
+    const descHtml = caseData.description
+        ? `<div class="case-mgmt-section"><h5>Description</h5><p style="font-size:0.8125rem;line-height:1.5;margin:0;">${escapeHtml(caseData.description)}</p></div>`
+        : '';
+
+    // Linked alerts
+    const alerts = caseData.alerts || [];
+    const alertsHtml = `
+        <div class="case-mgmt-section">
+            <h5>Linked Alerts (${alerts.length})</h5>
+            ${alerts.length > 0 ? alerts.map(a => `
+                <div class="related-alert-item">
+                    <span class="triage-dot triage-${a.status}"></span>
+                    <span style="font-size:0.8125rem;flex:1;">${escapeHtml(a.es_alert_id)}</span>
+                    <span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(a.priority || '')}</span>
+                </div>
+            `).join('') : '<div class="empty-state">No linked alerts</div>'}
+        </div>
+    `;
+
+    // Notes journal
+    const notes = caseData.notes || [];
+    let notesHtml = '<div class="case-mgmt-section"><h5>Investigation Notes</h5>';
+    if (notes.length === 0) {
+        notesHtml += '<div class="empty-state">No notes yet</div>';
+    } else {
+        notes.forEach(n => {
+            notesHtml += `
+                <div class="comment-item">
+                    <div class="comment-header">
+                        <span class="comment-user">${escapeHtml(n.user)}</span>
+                        <span class="comment-time">${n.created_at ? new Date(n.created_at).toLocaleString() : ''}</span>
+                    </div>
+                    <div class="comment-body">${escapeHtml(n.content)}</div>
+                </div>
+            `;
+        });
+    }
+    notesHtml += `
+        <div class="comment-form" style="margin-top:0.75rem;">
+            <textarea id="case-mgmt-note-input" placeholder="Add investigation note..."></textarea>
+            <button class="btn btn-primary" onclick="addCaseNoteFromModal(${caseData.id})">Add Note</button>
+        </div>
+    </div>`;
+
+    overlay.innerHTML = `
+        <div class="case-mgmt-modal">
+            <h3>
+                <span>${escapeHtml(caseData.case_number)}: ${escapeHtml(caseData.title)}</span>
+                <button class="close-btn" onclick="document.getElementById('case-mgmt-overlay').remove()" title="Close">&times;</button>
+            </h3>
+            <div class="case-meta-editable">
+                <div class="meta-field">
+                    <label>Status</label>
+                    <select onchange="updateCaseField(${caseData.id}, 'status', this.value)">${statusOptions}</select>
+                </div>
+                <div class="meta-field">
+                    <label>Severity</label>
+                    <select onchange="updateCaseField(${caseData.id}, 'severity', this.value)">${severityOptions}</select>
+                </div>
+                <div class="meta-field">
+                    <label>Created By</label>
+                    <div class="meta-value">${escapeHtml(caseData.created_by || '-')}</div>
+                </div>
+                <div class="meta-field">
+                    <label>Assigned To</label>
+                    <div class="meta-value">${escapeHtml(caseData.assigned_to || 'Unassigned')}</div>
+                </div>
+                <div class="meta-field">
+                    <label>Created</label>
+                    <div class="meta-value">${caseData.created_at ? new Date(caseData.created_at).toLocaleString() : '-'}</div>
+                </div>
+                <div class="meta-field">
+                    <label>Updated</label>
+                    <div class="meta-value">${caseData.updated_at ? new Date(caseData.updated_at).toLocaleString() : '-'}</div>
+                </div>
+            </div>
+            ${contextHtml ? `<div style="display:flex;flex-direction:column;gap:0.375rem;">${contextHtml}</div>` : ''}
+            ${evidenceHtml}
+            ${descHtml}
+            ${alertsHtml}
+            ${notesHtml}
+            <div class="case-mgmt-footer">
+                <button class="btn btn-secondary" onclick="document.getElementById('case-mgmt-overlay').remove()">Close</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+}
+
+async function updateCaseField(caseId, field, value) {
+    try {
+        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ [field]: value }),
+        });
+        if (!response.ok) throw new Error('Failed to update case');
+
+        // Refresh cases side panel
+        await loadCases();
+
+        // If alert detail modal is showing this case's tab, refresh it
+        if (currentDetailAlert) {
+            const caseTab = document.getElementById('detail-tab-case');
+            if (caseTab && caseTab.classList.contains('active')) {
+                const triageResp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(currentDetailAlert.id)}/triage`);
+                if (triageResp.ok) {
+                    const triageData = await triageResp.json();
+                    if (triageData.triage && triageData.triage.case_id === caseId) {
+                        renderCaseTab(caseId);
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Error updating case field:', e);
+    }
+}
+
+async function addCaseNoteFromModal(caseId) {
+    const input = document.getElementById('case-mgmt-note-input');
+    if (!input) return;
+    const content = input.value.trim();
+    if (!content) return;
+
+    try {
+        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}/notes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content }),
+        });
+        if (!response.ok) throw new Error('Failed to add note');
+
+        // Re-fetch case and re-render modal
+        const caseResp = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        if (caseResp.ok) {
+            const caseData = await caseResp.json();
+            renderCaseManagementModal(caseData);
+        }
+    } catch (e) {
+        console.error('Error adding case note:', e);
     }
 }
 
@@ -1189,6 +1617,12 @@ async function submitCreateCase(alertId) {
                 affected_users: affectedUsers.length ? affectedUsers : null,
                 triggered_rules: triggeredRules.length ? triggeredRules : null,
                 evidence_summary: evidenceSummary || null,
+                alert_contexts: alertId && alertData ? [{
+                    alert_id: alertId,
+                    host: alertData.host || null,
+                    user: alertData.user || null,
+                    raw_data: alertData.raw_data || null,
+                }] : null,
             }),
         });
 
@@ -1582,7 +2016,10 @@ async function renderCaseTab(caseId) {
 
         container.innerHTML = `
             <div class="case-detail-box">
-                <h4>${escapeHtml(c.case_number)}: ${escapeHtml(c.title)}</h4>
+                <h4 style="display:flex;align-items:center;justify-content:space-between;">
+                    <span>${escapeHtml(c.case_number)}: ${escapeHtml(c.title)}</span>
+                    <button class="btn btn-sm" onclick="showCaseDetail(${c.id})" title="Open case management modal" style="font-size:0.75rem;">Manage Case</button>
+                </h4>
                 <div class="case-meta">
                     <div>
                         <div class="case-meta-label">Status</div>
@@ -1743,13 +2180,16 @@ function renderAlerts() {
     const tbody = document.getElementById('alerts-tbody');
 
     if (filteredAlerts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty">No alerts match the current filters</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="empty">No alerts match the current filters</td></tr>';
         return;
     }
 
     tbody.innerHTML = filteredAlerts.map(a => {
         const triage = triageCache[a.id];
         const triageStatus = triage ? triage.status : 'none';
+        const caseName = triage && triage.case_number
+            ? `<span class="case-link-badge" title="${escapeHtml(triage.case_title || '')}">${escapeHtml(triage.case_number)}</span>`
+            : '<span style="color:var(--text-muted);">-</span>';
         return `
         <tr class="alert-row" onclick="showAlertDetail('${escapeHtml(a.id)}')">
             <td style="width:32px;text-align:center;"><span class="triage-dot triage-${triageStatus}" title="Triage: ${triageStatus}"></span></td>
@@ -1758,6 +2198,7 @@ function renderAlerts() {
             <td title="${escapeHtml(a.host || '-')}">${escapeHtml(a.host || '-')}</td>
             <td title="${escapeHtml(a.user || '-')}">${escapeHtml(a.user || '-')}</td>
             <td title="${escapeHtml(a.rule_name || '-')}">${escapeHtml(a.rule_name || '-')}</td>
+            <td>${caseName}</td>
             <td><span class="status-badge alert-status-${a.status}">${a.status}</span></td>
             <td>${formatDate(a.timestamp)}</td>
         </tr>
@@ -1840,6 +2281,364 @@ function renderThreatBanner() {
             <div class="threat-stat-label">Open</div>
         </div>
     `;
+}
+
+// =========================================================================
+// Analytics Dashboard
+// =========================================================================
+function toggleAnalytics() {
+    const dash = document.getElementById('analytics-dashboard');
+    const icon = document.getElementById('analytics-toggle-icon');
+    if (dash.style.display === 'none') {
+        dash.style.display = 'block';
+        icon.innerHTML = '&#9660;';
+        renderAnalytics();
+    } else {
+        dash.style.display = 'none';
+        icon.innerHTML = '&#9654;';
+    }
+}
+
+function renderAnalytics() {
+    if (document.getElementById('analytics-dashboard').style.display === 'none') return;
+    renderTrendChart();
+    renderSeverityDonut();
+    renderStatusDonut();
+    renderGeoMap();
+    renderHBarChart('chart-top-hosts', allAlerts, 'host', '#4fc3f7');
+    renderHBarChart('chart-top-rules', allAlerts, 'rule_name', '#ba68c8');
+}
+
+// --- Trend chart: alert volume over time buckets ---
+function renderTrendChart() {
+    const container = document.getElementById('chart-trend');
+    if (!container || allAlerts.length === 0) {
+        container.innerHTML = '<div class="empty-state">No data</div>';
+        return;
+    }
+
+    // Determine bucket size based on time range
+    const hours = parseInt(document.getElementById('alert-time-range').value) || 24;
+    let bucketMs, bucketCount, labelFn;
+    if (hours <= 1) {
+        bucketMs = 5 * 60 * 1000; bucketCount = 12;
+        labelFn = d => d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    } else if (hours <= 24) {
+        bucketMs = 60 * 60 * 1000; bucketCount = 24;
+        labelFn = d => d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    } else if (hours <= 168) {
+        bucketMs = 6 * 60 * 60 * 1000; bucketCount = Math.ceil(hours / 6);
+        labelFn = d => d.toLocaleDateString([], {month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString([], {hour:'2-digit'});
+    } else {
+        bucketMs = 24 * 60 * 60 * 1000; bucketCount = Math.ceil(hours / 24);
+        labelFn = d => d.toLocaleDateString([], {month:'short',day:'numeric'});
+    }
+
+    const now = Date.now();
+    const start = now - hours * 3600000;
+    const buckets = [];
+    for (let i = 0; i < bucketCount; i++) {
+        buckets.push({ start: start + i * bucketMs, count: 0, critical: 0, high: 0 });
+    }
+
+    allAlerts.forEach(a => {
+        const t = new Date(a.timestamp).getTime();
+        const idx = Math.floor((t - start) / bucketMs);
+        if (idx >= 0 && idx < bucketCount) {
+            buckets[idx].count++;
+            if (a.severity === 'critical') buckets[idx].critical++;
+            else if (a.severity === 'high') buckets[idx].high++;
+        }
+    });
+
+    const maxCount = Math.max(1, ...buckets.map(b => b.count));
+    const w = container.clientWidth || 400;
+    const h = 130;
+    const pad = { top: 10, right: 10, bottom: 28, left: 32 };
+    const chartW = w - pad.left - pad.right;
+    const chartH = h - pad.top - pad.bottom;
+    const barW = Math.max(2, (chartW / bucketCount) - 2);
+
+    let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">`;
+
+    // Y-axis grid
+    for (let i = 0; i <= 4; i++) {
+        const y = pad.top + (chartH * i / 4);
+        svg += `<line x1="${pad.left}" y1="${y}" x2="${w - pad.right}" y2="${y}" class="chart-grid"/>`;
+        if (i % 2 === 0) {
+            const val = Math.round(maxCount * (1 - i / 4));
+            svg += `<text x="${pad.left - 4}" y="${y + 3}" class="chart-value" text-anchor="end">${val}</text>`;
+        }
+    }
+
+    // Bars
+    buckets.forEach((b, i) => {
+        const x = pad.left + (i * (chartW / bucketCount)) + 1;
+        const barH = (b.count / maxCount) * chartH;
+        const y = pad.top + chartH - barH;
+
+        // Stacked: critical (bottom), high, rest
+        const critH = (b.critical / maxCount) * chartH;
+        const highH = (b.high / maxCount) * chartH;
+        const restH = barH - critH - highH;
+
+        let cy = y;
+        if (restH > 0) {
+            svg += `<rect x="${x}" y="${cy}" width="${barW}" height="${restH}" fill="#4fc3f7" rx="1" class="chart-bar"><title>${labelFn(new Date(b.start))}: ${b.count} alerts</title></rect>`;
+            cy += restH;
+        }
+        if (highH > 0) {
+            svg += `<rect x="${x}" y="${cy}" width="${barW}" height="${highH}" fill="#ff9800" rx="1" class="chart-bar"><title>${b.high} high</title></rect>`;
+            cy += highH;
+        }
+        if (critH > 0) {
+            svg += `<rect x="${x}" y="${cy}" width="${barW}" height="${critH}" fill="#f44336" rx="1" class="chart-bar"><title>${b.critical} critical</title></rect>`;
+        }
+
+        // X-axis labels (show ~6 labels max)
+        if (bucketCount <= 6 || i % Math.ceil(bucketCount / 6) === 0) {
+            svg += `<text x="${x + barW / 2}" y="${h - 4}" class="chart-value" text-anchor="middle">${labelFn(new Date(b.start))}</text>`;
+        }
+    });
+
+    svg += '</svg>';
+    container.innerHTML = svg;
+}
+
+// --- Donut chart helper ---
+function renderDonut(containerId, data, colors) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const total = data.reduce((s, d) => s + d.value, 0);
+    if (total === 0) {
+        container.innerHTML = '<div class="empty-state">No data</div>';
+        return;
+    }
+
+    const w = container.clientWidth || 200;
+    const h = 140;
+    const cx = 60, cy = h / 2, r = 48, inner = 28;
+    let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">`;
+
+    let angle = -Math.PI / 2;
+    data.forEach((d, i) => {
+        if (d.value === 0) return;
+        const sliceAngle = (d.value / total) * 2 * Math.PI;
+        const x1 = cx + r * Math.cos(angle);
+        const y1 = cy + r * Math.sin(angle);
+        const x2 = cx + r * Math.cos(angle + sliceAngle);
+        const y2 = cy + r * Math.sin(angle + sliceAngle);
+        const ix1 = cx + inner * Math.cos(angle);
+        const iy1 = cy + inner * Math.sin(angle);
+        const ix2 = cx + inner * Math.cos(angle + sliceAngle);
+        const iy2 = cy + inner * Math.sin(angle + sliceAngle);
+        const largeArc = sliceAngle > Math.PI ? 1 : 0;
+
+        svg += `<path d="M${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} L${ix2},${iy2} A${inner},${inner} 0 ${largeArc},0 ${ix1},${iy1} Z" fill="${colors[i % colors.length]}" class="donut-segment"><title>${d.label}: ${d.value} (${Math.round(d.value/total*100)}%)</title></path>`;
+        angle += sliceAngle;
+    });
+
+    // Center total
+    svg += `<text x="${cx}" y="${cy - 4}" text-anchor="middle" class="chart-value" style="font-size:16px;font-weight:bold;fill:currentColor;">${total}</text>`;
+    svg += `<text x="${cx}" y="${cy + 10}" text-anchor="middle" class="chart-value">total</text>`;
+
+    // Legend
+    const legendX = 130;
+    data.forEach((d, i) => {
+        if (d.value === 0) return;
+        const ly = 16 + i * 18;
+        svg += `<rect x="${legendX}" y="${ly - 8}" width="10" height="10" rx="2" fill="${colors[i % colors.length]}"/>`;
+        svg += `<text x="${legendX + 16}" y="${ly}" class="donut-legend">${d.label}</text>`;
+        svg += `<text x="${legendX + 16}" y="${ly + 12}" class="donut-legend-value">${d.value} (${Math.round(d.value/total*100)}%)</text>`;
+    });
+
+    svg += '</svg>';
+    container.innerHTML = svg;
+}
+
+function renderSeverityDonut() {
+    const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    allAlerts.forEach(a => { if (counts.hasOwnProperty(a.severity)) counts[a.severity]++; });
+    renderDonut('chart-severity', [
+        { label: 'Critical', value: counts.critical },
+        { label: 'High', value: counts.high },
+        { label: 'Medium', value: counts.medium },
+        { label: 'Low', value: counts.low },
+        { label: 'Info', value: counts.info },
+    ], ['#f44336', '#ff9800', '#ffc107', '#4caf50', '#2196f3']);
+}
+
+function renderStatusDonut() {
+    const counts = { open: 0, acknowledged: 0, resolved: 0 };
+    allAlerts.forEach(a => {
+        const s = a.status || 'open';
+        if (counts.hasOwnProperty(s)) counts[s]++;
+        else counts.open++;
+    });
+    renderDonut('chart-status', [
+        { label: 'Open', value: counts.open },
+        { label: 'Acknowledged', value: counts.acknowledged },
+        { label: 'Resolved', value: counts.resolved },
+    ], ['#1976d2', '#f57c00', '#616161']);
+}
+
+// --- Geo map: extract lat/lon from raw_data ECS geo fields ---
+function extractGeoPoints() {
+    const points = [];
+    const seen = new Set();
+    allAlerts.forEach(a => {
+        if (!a.raw_data) return;
+        // Try multiple ECS geo field paths
+        const geoPaths = [
+            'source.geo', 'destination.geo', 'client.geo', 'server.geo', 'host.geo'
+        ];
+        geoPaths.forEach(path => {
+            const parts = path.split('.');
+            let obj = a.raw_data;
+            for (const p of parts) {
+                if (obj && typeof obj === 'object') obj = obj[p];
+                else { obj = null; break; }
+            }
+            if (!obj) return;
+
+            let lat, lon, country, city;
+            // location can be { lat, lon } or "lat,lon" string
+            if (obj.location) {
+                if (typeof obj.location === 'object') {
+                    lat = parseFloat(obj.location.lat);
+                    lon = parseFloat(obj.location.lon);
+                } else if (typeof obj.location === 'string') {
+                    const parts = obj.location.split(',');
+                    if (parts.length === 2) {
+                        lat = parseFloat(parts[0]);
+                        lon = parseFloat(parts[1]);
+                    }
+                }
+            }
+            country = obj.country_name || obj.country_iso_code || '';
+            city = obj.city_name || '';
+
+            if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) {
+                const key = `${lat.toFixed(1)},${lon.toFixed(1)}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    points.push({ lat, lon, country, city, count: 1, severity: a.severity });
+                } else {
+                    const existing = points.find(p => `${p.lat.toFixed(1)},${p.lon.toFixed(1)}` === key);
+                    if (existing) existing.count++;
+                }
+            }
+        });
+    });
+    return points;
+}
+
+function renderGeoMap() {
+    const container = document.getElementById('chart-geo');
+    if (!container) return;
+
+    const points = extractGeoPoints();
+    const w = container.clientWidth || 500;
+    const h = 170;
+
+    let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">`;
+
+    // Simple equirectangular projection background
+    // Draw grid lines for reference
+    const mapPad = { left: 10, right: 10, top: 5, bottom: 5 };
+    const mapW = w - mapPad.left - mapPad.right;
+    const mapH = h - mapPad.top - mapPad.bottom;
+
+    // Background rect
+    svg += `<rect x="${mapPad.left}" y="${mapPad.top}" width="${mapW}" height="${mapH}" fill="rgba(128,128,128,0.03)" rx="4"/>`;
+
+    // Grid lines (every 60 degrees longitude, 30 degrees latitude)
+    for (let lon = -180; lon <= 180; lon += 60) {
+        const x = mapPad.left + ((lon + 180) / 360) * mapW;
+        svg += `<line x1="${x}" y1="${mapPad.top}" x2="${x}" y2="${mapPad.top + mapH}" class="geo-grid-line"/>`;
+    }
+    for (let lat = -60; lat <= 90; lat += 30) {
+        const y = mapPad.top + ((90 - lat) / 180) * mapH;
+        svg += `<line x1="${mapPad.left}" y1="${y}" x2="${mapPad.left + mapW}" y2="${y}" class="geo-grid-line"/>`;
+    }
+
+    // Simplified continent outlines (rough polygons for visual context)
+    const continents = [
+        // North America (simplified)
+        [[-130,50],[-125,60],[-100,65],[-80,60],[-60,48],[-75,30],[-95,18],[-105,20],[-120,35],[-130,50]],
+        // South America
+        [[-80,10],[-60,5],[-35,-5],[-35,-25],[-50,-35],[-70,-55],[-75,-45],[-70,-15],[-80,10]],
+        // Europe
+        [[-10,36],[0,43],[5,48],[10,55],[30,60],[40,55],[30,42],[25,36],[10,38],[-10,36]],
+        // Africa
+        [[-15,15],[-15,30],[10,37],[30,32],[40,12],[50,0],[40,-15],[30,-35],[18,-35],[10,-5],[-15,5],[-15,15]],
+        // Asia
+        [[30,42],[40,55],[60,55],[75,45],[90,28],[100,22],[105,35],[120,40],[130,45],[140,50],[145,45],[130,30],[120,20],[105,10],[95,18],[80,28],[60,40],[30,42]],
+        // Australia
+        [[115,-15],[130,-12],[150,-15],[153,-25],[148,-35],[135,-35],[115,-30],[115,-15]],
+    ];
+
+    continents.forEach(poly => {
+        const pts = poly.map(([lon, lat]) => {
+            const x = mapPad.left + ((lon + 180) / 360) * mapW;
+            const y = mapPad.top + ((90 - lat) / 180) * mapH;
+            return `${x},${y}`;
+        }).join(' ');
+        svg += `<polygon points="${pts}" class="geo-land"/>`;
+    });
+
+    if (points.length === 0) {
+        svg += `<text x="${w / 2}" y="${h / 2}" class="geo-empty">No geo data in alerts</text>`;
+        svg += `<text x="${w / 2}" y="${h / 2 + 16}" class="geo-empty" style="font-size:10px;opacity:0.6;">Geo fields (source.geo, destination.geo) are extracted from ECS alert data</text>`;
+    } else {
+        // Plot points
+        const maxCount = Math.max(1, ...points.map(p => p.count));
+        points.forEach(p => {
+            const x = mapPad.left + ((p.lon + 180) / 360) * mapW;
+            const y = mapPad.top + ((90 - p.lat) / 180) * mapH;
+            const r = 3 + (p.count / maxCount) * 5;
+            const color = p.severity === 'critical' ? '#f44336' : p.severity === 'high' ? '#ff9800' : '#4fc3f7';
+            svg += `<circle cx="${x}" cy="${y}" r="${r}" fill="${color}" opacity="0.7" class="geo-dot"><title>${p.city ? p.city + ', ' : ''}${p.country} (${p.count} alert${p.count > 1 ? 's' : ''})</title></circle>`;
+        });
+
+        // Summary
+        const countries = [...new Set(points.map(p => p.country).filter(Boolean))];
+        svg += `<text x="${w - mapPad.right - 4}" y="${h - 4}" class="chart-value" text-anchor="end">${points.length} locations, ${countries.length} countries</text>`;
+    }
+
+    svg += '</svg>';
+    container.innerHTML = svg;
+}
+
+// --- Horizontal bar chart ---
+function renderHBarChart(containerId, alerts, field, color) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const counts = {};
+    alerts.forEach(a => {
+        const val = a[field];
+        if (val) counts[val] = (counts[val] || 0) + 1;
+    });
+
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 7);
+    if (entries.length === 0) {
+        container.innerHTML = '<div class="empty-state">No data</div>';
+        return;
+    }
+
+    const maxVal = entries[0][1];
+    container.innerHTML = entries.map(([name, count]) => {
+        const pct = (count / maxVal * 100).toFixed(0);
+        return `
+            <div class="hbar-row">
+                <span class="hbar-label" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+                <span class="hbar-track"><span class="hbar-fill" style="width:${pct}%;background:${color};"></span></span>
+                <span class="hbar-count">${count}</span>
+            </div>
+        `;
+    }).join('');
 }
 
 // =========================================================================
@@ -1945,15 +2744,22 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Close modal on Escape
+// Close modal on Escape — dismiss highest z-index first
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-        // Close case create overlay first if open
-        const overlay = document.getElementById('case-create-overlay');
-        if (overlay) {
-            overlay.remove();
+        // Case management modal (z-index 1200) — highest
+        const mgmtOverlay = document.getElementById('case-mgmt-overlay');
+        if (mgmtOverlay) {
+            mgmtOverlay.remove();
             return;
         }
+        // Case create overlay (z-index 1100)
+        const createOverlay = document.getElementById('case-create-overlay');
+        if (createOverlay) {
+            createOverlay.remove();
+            return;
+        }
+        // Alert detail modal
         closeAlertModal();
     }
 });

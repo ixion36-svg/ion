@@ -15,6 +15,7 @@ Documentation Template Management System with version control, template renderin
 - **Spell Check**: Built-in spell checking with SOC/technical term awareness
 - **Rewrite Suggestions**: Professional, concise, formal, and technical style improvements
 - **Table Detection**: Recognizes Markdown, CSV, and TSV tables
+- **Alert Investigation**: Elasticsearch-integrated SOC alert triage with case management, observables, and analytics
 - **Web UI**: Browser-based interface with role-based access control
 - **Authentication**: Local auth + optional Keycloak/OIDC SSO support
 - **GitLab Integration**: Create, manage, and track GitLab issues directly from DocForge
@@ -289,6 +290,63 @@ Create a Personal Access Token with the `api` scope:
 - **Comments**: Add comments to issues
 - **Labels & Milestones**: View and assign project labels and milestones
 - **Direct Links**: Quick links to view issues in GitLab
+
+## Alert Investigation
+
+DocForge includes a built-in alert investigation page (`/alerts`) that connects to Elasticsearch to provide SOC analysts with triage, case management, and analytics capabilities.
+
+### Triage & Observables
+
+- **Alert Table**: Sortable, filterable table showing severity, title, host, user, rule, case, status, and time
+- **Triage Workflow**: Per-alert status tracking (open, investigating, escalated, resolved, closed, false positive)
+- **Observables**: Auto-extracted from alert data — hostnames, IPs, URLs, domains, user accounts via ECS field mapping
+- **Auto-populate on Case Creation**: When a case is created from an alert, observables are populated server-side immediately (idempotent — won't overwrite existing observables)
+- **Comments**: Per-alert discussion thread for analyst collaboration
+
+### Case Management
+
+- **Case Creation**: Create investigation cases from alerts with auto-populated title, description, severity, affected hosts/users, triggered rules, and evidence summary
+- **Case Management Modal**: Full overlay modal accessible from the cases side panel or the alert detail Case tab, with:
+  - Editable status (open, in_progress, closed) and severity dropdowns
+  - Read-only metadata (created by, assigned to, dates)
+  - Context tags (affected hosts, users, triggered rules)
+  - Evidence summary and description
+  - Linked alerts list with triage status indicators
+  - Investigation notes journal with add-note capability
+- **Manage Case Button**: Available in the alert detail Case tab for quick access
+
+### Analytics Dashboard
+
+A collapsible analytics panel (no external dependencies — pure SVG/CSS) provides:
+
+| Visualization | Description |
+|---------------|-------------|
+| **Alert Trend** | Stacked bar chart of alert volume over time (auto-sized buckets based on selected time range). Critical and high severity alerts shown in red/orange |
+| **Severity Breakdown** | Donut chart with counts and percentages for critical, high, medium, low, and info |
+| **Status Overview** | Donut chart showing open, acknowledged, and resolved alert distribution |
+| **Geographic Origin** | Equirectangular world map plotting alert source locations from ECS geo fields (`source.geo`, `destination.geo`, `client.geo`, `server.geo`, `host.geo`). Dot size scales by count, color by severity |
+| **Top Hosts** | Horizontal bar chart of the top 7 hosts by alert count |
+| **Top Rules** | Horizontal bar chart of the top 7 detection rules by alert count |
+
+Geo data is extracted from standard ECS fields populated by Elasticsearch's GeoIP ingest processor. No external mapping libraries are used.
+
+### Alert Investigation API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/elasticsearch/alerts` | GET | List alerts (params: hours, severity, status, limit) |
+| `/api/elasticsearch/alerts/stats` | GET | Alert statistics and aggregations |
+| `/api/elasticsearch/alerts/{id}/triage` | GET | Get triage state and comments for an alert |
+| `/api/elasticsearch/alerts/{id}/triage` | PUT | Update triage status, assignee, priority, observables |
+| `/api/elasticsearch/alerts/{id}/triage/auto-populate-observables` | POST | Auto-populate observables from alert context |
+| `/api/elasticsearch/alerts/triage/batch` | POST | Batch fetch triage data (including case info) for multiple alerts |
+| `/api/elasticsearch/alerts/{id}/comments` | POST | Add comment to an alert |
+| `/api/elasticsearch/alerts/{id}/related` | GET | Get related alerts by host, user, rule |
+| `/api/elasticsearch/alerts/cases` | GET | List investigation cases |
+| `/api/elasticsearch/alerts/cases` | POST | Create case (with optional alert_contexts for auto-populating observables) |
+| `/api/elasticsearch/alerts/cases/{id}` | GET | Get case detail with linked alerts and notes |
+| `/api/elasticsearch/alerts/cases/{id}` | PATCH | Update case (status, severity, title, description) |
+| `/api/elasticsearch/alerts/cases/{id}/notes` | POST | Add investigation note to a case |
 
 ## Testing
 

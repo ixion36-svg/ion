@@ -451,6 +451,65 @@ If logs aren't parsing correctly:
 }
 ```
 
+## Alert Investigation Integration
+
+DocForge includes a built-in alert investigation page (`/alerts`) that queries Elasticsearch for security alerts and provides triage, case management, and analytics.
+
+### Supported Alert Indices
+
+The alert investigation module searches across these index patterns:
+- `.alerts-*` (Kibana default SIEM alerts)
+- `.watcher-history-*` (Elasticsearch Watcher)
+- `alerts-*` (Custom alert indices)
+
+### ECS Fields Used by Alert Investigation
+
+The alert parser extracts data from these ECS fields:
+
+| Category | Fields | Used For |
+|----------|--------|----------|
+| **Timestamp** | `@timestamp`, `timestamp`, `kibana.alert.start` | Alert time ordering |
+| **Title/Rule** | `kibana.alert.rule.name`, `signal.rule.name`, `rule.name` | Alert title and rule name |
+| **Severity** | `kibana.alert.severity`, `event.severity`, `signal.rule.severity` | Severity classification |
+| **Status** | `kibana.alert.status`, `status`, `state` | Alert status |
+| **Host** | `host.name`, `host.hostname`, `agent.hostname` | Affected host identification |
+| **User** | `user.name`, `user_name`, `winlog.user.name` | Affected user identification |
+| **Source IP** | `source.ip`, `source.address` | Observable extraction |
+| **Destination IP** | `destination.ip`, `destination.address` | Observable extraction |
+| **URL** | `url.full`, `url.original` | Observable extraction |
+| **Domain** | `url.domain`, `dns.question.name`, `destination.domain` | Observable extraction |
+
+### GeoIP Data for Analytics
+
+The analytics dashboard's geographic map visualization uses ECS geo fields from the alert's raw data:
+
+- `source.geo.location` (lat/lon)
+- `destination.geo.location` (lat/lon)
+- `client.geo.location` (lat/lon)
+- `server.geo.location` (lat/lon)
+- `host.geo.location` (lat/lon)
+
+These fields are populated by Elasticsearch's **GeoIP ingest processor**. To enable geographic data in alerts:
+
+1. Ensure the GeoIP ingest processor is installed and configured in your Elasticsearch cluster
+2. Alert ingest pipelines should include a GeoIP processor step for IP fields
+3. The MaxMind GeoLite2 database (bundled with Elasticsearch) provides the geographic mapping
+
+If no geo data is present in alerts, the map displays an informational message instead.
+
+### Configuring Elasticsearch for Alerts
+
+```bash
+# Required environment variables
+DOCFORGE_ELASTICSEARCH_ENABLED=true
+DOCFORGE_ELASTICSEARCH_HOSTS=https://elasticsearch:9200
+DOCFORGE_ELASTICSEARCH_USERNAME=elastic
+DOCFORGE_ELASTICSEARCH_PASSWORD=changeme
+
+# Optional: Custom alert index pattern
+DOCFORGE_ELASTICSEARCH_ALERT_INDEX=.alerts-*
+```
+
 ## Security Considerations
 
 1. **Credential Management**: Store Elasticsearch credentials securely (environment variables, secrets manager)
