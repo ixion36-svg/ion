@@ -9,6 +9,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from ixion.models.base import Base
 from ixion.core.config import get_config
 
+# Import all models to ensure they are registered with Base.metadata
+# This is required for create_all() to create all tables
+import ixion.models  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 _engine: Optional[Engine] = None

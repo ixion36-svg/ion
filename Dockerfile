@@ -1,4 +1,6 @@
-# DocForge - Air-gapped Deployment Image
+# IXION - Air-gapped Deployment Image
+# Intelligence eXchange & Integration Operations Network
+# Part of Guarded Glass Security Toolkit
 # Multi-stage build for smaller final image
 
 # ============================================================================
@@ -42,7 +44,7 @@ RUN python -c "import nltk; \
 FROM python:3.11-slim as runtime
 
 # Security: Run as non-root user
-RUN groupadd -r docforge && useradd -r -g docforge docforge
+RUN groupadd -r ixion && useradd -r -g ixion ixion
 
 WORKDIR /app
 
@@ -51,9 +53,9 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy NLTK data from builder
-COPY --from=builder /root/nltk_data /home/docforge/nltk_data
-RUN chown -R docforge:docforge /home/docforge/nltk_data
-ENV NLTK_DATA=/home/docforge/nltk_data
+COPY --from=builder /root/nltk_data /home/ixion/nltk_data
+RUN chown -R ixion:ixion /home/ixion/nltk_data
+ENV NLTK_DATA=/home/ixion/nltk_data
 
 # Copy application source and entrypoint
 COPY src/ src/
@@ -61,14 +63,14 @@ COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Create data directory for database and config
-RUN mkdir -p /data/.docforge && chown -R docforge:docforge /data
+RUN mkdir -p /data/.ixion && chown -R ixion:ixion /data
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-ENV DOCFORGE_DATA_DIR=/data
-ENV DOCFORGE_HOST=0.0.0.0
-ENV DOCFORGE_PORT=8000
+ENV IXION_DATA_DIR=/data
+ENV IXION_HOST=0.0.0.0
+ENV IXION_PORT=8000
 
 # Expose port
 EXPOSE 8000
@@ -78,7 +80,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/stats')" || exit 1
 
 # Switch to non-root user
-USER docforge
+USER ixion
 
 # Entrypoint handles initialization
 ENTRYPOINT ["docker-entrypoint.sh"]

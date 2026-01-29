@@ -14,6 +14,8 @@ from ixion.web.api import router as api_router, limiter
 from ixion.web.security_api import router as security_router
 from ixion.web.integration_api import router as integration_router
 from ixion.web.admin_api import router as admin_router
+from ixion.web.observable_api import router as observable_router
+from ixion.web.ai_api import router as ai_router
 from ixion.core.config import get_config, get_elasticsearch_config
 from ixion.core.logging import setup_logging, get_logger
 from ixion.storage.database import init_db
@@ -108,6 +110,8 @@ app.include_router(api_router, prefix="/api")
 app.include_router(security_router, prefix="/api/security")
 app.include_router(integration_router, prefix="/api/integrations")
 app.include_router(admin_router, prefix="/api/admin")
+app.include_router(observable_router, prefix="/api")
+app.include_router(ai_router)
 
 
 @app.on_event("startup")
@@ -217,6 +221,12 @@ async def alerts_page(request: Request):
     return templates.TemplateResponse("alerts.html", {"request": request})
 
 
+@app.get("/observables", response_class=HTMLResponse)
+async def observables_page(request: Request):
+    """Render the observables tracking page."""
+    return templates.TemplateResponse("observables.html", {"request": request})
+
+
 @app.get("/tools", response_class=HTMLResponse)
 async def tools_page(request: Request):
     """Render the document tools page."""
@@ -233,6 +243,12 @@ async def integrations_page(request: Request):
 async def settings_page(request: Request):
     """Render the system settings page (admin only)."""
     return templates.TemplateResponse("settings.html", {"request": request})
+
+
+@app.get("/chat", response_class=HTMLResponse)
+async def chat_page(request: Request):
+    """Render the AI chat page."""
+    return templates.TemplateResponse("chat.html", {"request": request})
 
 
 def main():

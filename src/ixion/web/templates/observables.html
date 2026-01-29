@@ -1,0 +1,2466 @@
+{% extends "base.html" %}
+
+{% block title %}Observables - IXION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Observables</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="loadStats()">Refresh</button>
+        <button class="btn btn-secondary" onclick="showGraphView()">Relationship Graph</button>
+        <button class="btn btn-secondary" onclick="showPatternsView()">Detect Patterns</button>
+        <button class="btn btn-secondary" onclick="showWatchlist()">Watchlist <span class="badge" id="watchlist-count" style="display:none">0</span></button>
+        <button class="btn btn-secondary" onclick="showImportModal()">Import</button>
+        <button class="btn btn-secondary" onclick="exportCSV()">Export CSV</button>
+        <button class="btn btn-primary" onclick="showMigrateModal()">Migrate Legacy</button>
+    </div>
+</div>
+
+<!-- Watchlist Alerts Banner -->
+<div class="watchlist-banner" id="watchlist-banner" style="display:none">
+    <div class="watchlist-alert-icon">!</div>
+    <span id="watchlist-alert-text">You have unread watchlist alerts</span>
+    <button class="btn btn-sm btn-warning" onclick="showWatchlistAlerts()">View Alerts</button>
+    <button class="btn btn-sm btn-link" onclick="dismissWatchlistBanner()">Dismiss</button>
+</div>
+
+<!-- Quick Stats -->
+<div class="stats-banner" id="stats-banner">
+    <div class="stat-card">
+        <div class="stat-value" id="stat-total">-</div>
+        <div class="stat-label">Total</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-ips">-</div>
+        <div class="stat-label">IPs</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-domains">-</div>
+        <div class="stat-label">Domains</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-enriched">-</div>
+        <div class="stat-label">Enriched</div>
+    </div>
+    <div class="stat-card stat-card-threat">
+        <div class="stat-value" id="stat-critical">-</div>
+        <div class="stat-label">Critical/High</div>
+    </div>
+    <div class="stat-card stat-card-watched">
+        <div class="stat-value" id="stat-watched">-</div>
+        <div class="stat-label">Watched</div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="observables-filters">
+    <input type="text" id="search-input" class="search-input" placeholder="Search observables..." oninput="debouncedSearch()">
+    <select id="type-filter" onchange="loadObservables()">
+        <option value="">All Types</option>
+        <option value="ipv4">IPv4</option>
+        <option value="ipv6">IPv6</option>
+        <option value="domain">Domain</option>
+        <option value="hostname">Hostname</option>
+        <option value="url">URL</option>
+        <option value="email">Email</option>
+        <option value="sha256">SHA256</option>
+        <option value="sha1">SHA1</option>
+        <option value="md5">MD5</option>
+        <option value="user_account">User Account</option>
+        <option value="mac">MAC Address</option>
+        <option value="cve">CVE</option>
+    </select>
+    <select id="threat-filter" onchange="loadObservables()">
+        <option value="">All Threat Levels</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+        <option value="benign">Benign</option>
+        <option value="unknown">Unknown</option>
+    </select>
+    <select id="whitelist-filter" onchange="loadObservables()">
+        <option value="">All</option>
+        <option value="true">Whitelisted</option>
+        <option value="false">Not Whitelisted</option>
+    </select>
+    <select id="enriched-filter" onchange="loadObservables()">
+        <option value="">All</option>
+        <option value="true">Enriched Only</option>
+        <option value="false">Not Enriched</option>
+    </select>
+    <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
+</div>
+
+<!-- Results Table -->
+<div class="card">
+    <div class="card-body">
+        <table class="data-table" id="observables-table">
+            <thead>
+                <tr>
+                    <th>Value</th>
+                    <th>Type</th>
+                    <th>Threat</th>
+                    <th>Sightings</th>
+                    <th>First Seen</th>
+                    <th>Last Seen</th>
+                    <th>Enriched</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="observables-tbody">
+                <tr><td colspan="8" class="loading">Loading observables...</td></tr>
+            </tbody>
+        </table>
+        <div class="pagination" id="pagination"></div>
+    </div>
+</div>
+
+<!-- Observable Detail Modal -->
+<div class="modal" id="observable-detail-modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2 id="detail-title">Observable Details</h2>
+            <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="detail-body">
+            <!-- Populated by JS -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeDetailModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Relationship Graph Modal -->
+<div class="modal" id="graph-modal">
+    <div class="modal-content modal-xlarge">
+        <div class="modal-header">
+            <h3>Observable Relationship Graph</h3>
+            <button class="modal-close" onclick="closeGraphModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="graph-controls">
+                <label>Min Co-occurrence: <input type="number" id="graph-min-cooccur" value="2" min="1" max="50" onchange="loadGraph()"></label>
+                <label>Max Nodes: <input type="number" id="graph-max-nodes" value="50" min="10" max="200" onchange="loadGraph()"></label>
+                <button class="btn btn-sm btn-secondary" onclick="loadGraph()">Refresh</button>
+                <button class="btn btn-sm btn-secondary" onclick="resetGraphView()">Reset View</button>
+            </div>
+            <div class="graph-legend">
+                <span class="legend-item"><span class="legend-dot" style="background:#ef4444;"></span> IP</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#8b5cf6;"></span> Domain</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#3b82f6;"></span> Hostname</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#22c55e;"></span> URL</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span> Email</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#06b6d4;"></span> User</span>
+            </div>
+            <div id="graph-container" class="graph-container">
+                <div class="loading">Loading graph...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Patterns Modal -->
+<div class="modal" id="patterns-modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>Observable Patterns</h3>
+            <button class="modal-close" onclick="closePatternsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="patterns-controls">
+                <label>Min Occurrences: <input type="number" id="pattern-min-occur" value="3" min="2" max="50" onchange="loadPatterns()"></label>
+                <button class="btn btn-sm btn-secondary" onclick="loadPatterns()">Refresh</button>
+            </div>
+            <p class="patterns-desc">Patterns are groups of observables that frequently appear together in alerts.</p>
+            <div id="patterns-list" class="patterns-list">
+                <div class="loading">Analyzing patterns...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Migration Modal -->
+<div class="modal" id="migrate-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Migrate Legacy Observables</h3>
+            <button class="modal-close" onclick="closeMigrateModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>This will extract observables from the legacy JSON fields in alert triage records and create normalized observable records with proper links.</p>
+            <p><strong>Note:</strong> This operation is idempotent - running it multiple times won't create duplicates.</p>
+            <div id="migrate-result" style="display:none;">
+                <h4>Migration Results</h4>
+                <div id="migrate-stats"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeMigrateModal()">Cancel</button>
+            <button class="btn btn-primary" id="migrate-btn" onclick="runMigration()">Run Migration</button>
+        </div>
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal" id="import-modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>Import Observables</h3>
+            <button class="modal-close" onclick="closeImportModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="import-tabs">
+                <button class="import-tab active" onclick="switchImportTab('csv')">CSV Import</button>
+                <button class="import-tab" onclick="switchImportTab('stix')">STIX Import</button>
+            </div>
+
+            <div id="csv-import-tab" class="import-tab-content">
+                <p>Import observables from CSV. Expected format:</p>
+                <pre class="import-example">type,value,tags,notes
+ipv4,192.168.1.1,"malware,apt","Suspicious IP"
+domain,evil.com,,
+sha256,abc123...,c2,</pre>
+                <div class="form-group">
+                    <label>Default Type (if not in CSV):</label>
+                    <select id="import-default-type">
+                        <option value="">-- Select --</option>
+                        <option value="ipv4">IPv4</option>
+                        <option value="domain">Domain</option>
+                        <option value="hostname">Hostname</option>
+                        <option value="url">URL</option>
+                        <option value="sha256">SHA256</option>
+                        <option value="sha1">SHA1</option>
+                        <option value="md5">MD5</option>
+                        <option value="user_account">User Account</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>CSV Data:</label>
+                    <textarea id="import-csv-data" rows="10" placeholder="Paste CSV data here..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Additional Tags (comma-separated):</label>
+                    <input type="text" id="import-tags" placeholder="e.g., imported, threat-intel">
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="import-auto-enrich"> Auto-enrich imported observables</label>
+                </div>
+            </div>
+
+            <div id="stix-import-tab" class="import-tab-content" style="display:none">
+                <p>Import from STIX 2.1 bundle JSON:</p>
+                <div class="form-group">
+                    <label>STIX Bundle JSON:</label>
+                    <textarea id="import-stix-data" rows="15" placeholder='{"type": "bundle", "objects": [...]}'></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Additional Tags (comma-separated):</label>
+                    <input type="text" id="import-stix-tags" placeholder="e.g., stix-import, threat-intel">
+                </div>
+            </div>
+
+            <div id="import-result" style="display:none">
+                <h4>Import Results</h4>
+                <div id="import-stats"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+            <button class="btn btn-primary" id="import-btn" onclick="runImport()">Import</button>
+        </div>
+    </div>
+</div>
+
+<!-- Watchlist Modal -->
+<div class="modal" id="watchlist-modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>Watched Observables</h3>
+            <button class="modal-close" onclick="closeWatchlistModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Observables on the watchlist will trigger alerts when seen in new alerts.</p>
+            <table class="data-table" id="watchlist-table">
+                <thead>
+                    <tr>
+                        <th>Value</th>
+                        <th>Type</th>
+                        <th>Threat Level</th>
+                        <th>Reason</th>
+                        <th>Watched By</th>
+                        <th>Watched At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="watchlist-tbody">
+                    <tr><td colspan="7" class="loading">Loading watchlist...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Watchlist Alerts Modal -->
+<div class="modal" id="watchlist-alerts-modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>Watchlist Alerts</h3>
+            <button class="modal-close" onclick="closeWatchlistAlertsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="watchlist-alerts-filter">
+                <select id="watchlist-alerts-filter" onchange="loadWatchlistAlerts()">
+                    <option value="">All Alerts</option>
+                    <option value="false">Unread Only</option>
+                    <option value="true">Read Only</option>
+                </select>
+                <button class="btn btn-sm btn-secondary" onclick="markAllAlertsRead()">Mark All Read</button>
+            </div>
+            <div id="watchlist-alerts-list" class="watchlist-alerts-list">
+                <div class="loading">Loading alerts...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Timeline Modal -->
+<div class="modal" id="timeline-modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h3>Observable Timeline</h3>
+            <button class="modal-close" onclick="closeTimelineModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="timeline-observable-info"></div>
+            <div id="timeline-heatmap" class="timeline-heatmap"></div>
+            <div id="timeline-events" class="timeline-events">
+                <div class="loading">Loading timeline...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* Stats Banner */
+.stats-banner {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    min-width: 120px;
+    text-align: center;
+}
+
+.stat-card-threat {
+    border-color: rgba(239, 68, 68, 0.3);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, var(--bg-secondary) 100%);
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.stat-card-threat .stat-value {
+    color: #ef4444;
+}
+
+.stat-card-watched {
+    border-color: rgba(245, 158, 11, 0.3);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, var(--bg-secondary) 100%);
+}
+
+.stat-card-watched .stat-value {
+    color: #f59e0b;
+}
+
+/* Watchlist Banner */
+.watchlist-banner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(245, 158, 11, 0.1) 100%);
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.watchlist-alert-icon {
+    background: #f59e0b;
+    color: #000;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+/* Import Modal Styles */
+.import-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+}
+
+.import-tab {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border-radius: 4px 4px 0 0;
+}
+
+.import-tab.active {
+    color: var(--primary);
+    background: var(--bg-secondary);
+}
+
+.import-example {
+    background: var(--bg-secondary);
+    padding: 0.75rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+}
+
+.import-tab-content .form-group {
+    margin-bottom: 1rem;
+}
+
+.import-tab-content textarea {
+    width: 100%;
+    font-family: monospace;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.5rem;
+    color: var(--text);
+}
+
+/* Watchlist Alerts */
+.watchlist-alerts-filter {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.watchlist-alerts-list {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.watchlist-alert-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.watchlist-alert-item.unread {
+    border-color: rgba(245, 158, 11, 0.5);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, var(--bg-secondary) 100%);
+}
+
+.watchlist-alert-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.watchlist-alert-type {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    background: var(--bg-card);
+    border-radius: 4px;
+}
+
+.watchlist-alert-time {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Timeline Styles */
+.timeline-heatmap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+}
+
+.heatmap-day {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    background: var(--bg-card);
+}
+
+.heatmap-day.level-1 { background: rgba(34, 197, 94, 0.3); }
+.heatmap-day.level-2 { background: rgba(34, 197, 94, 0.5); }
+.heatmap-day.level-3 { background: rgba(34, 197, 94, 0.7); }
+.heatmap-day.level-4 { background: #22c55e; }
+
+.timeline-events {
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.timeline-event {
+    display: flex;
+    gap: 1rem;
+    padding: 0.75rem;
+    border-left: 3px solid var(--border);
+    margin-left: 1rem;
+    margin-bottom: 0.5rem;
+    background: var(--bg-secondary);
+    border-radius: 0 8px 8px 0;
+}
+
+.timeline-event.sighting {
+    border-left-color: var(--primary);
+}
+
+.timeline-event.enrichment {
+    border-left-color: #8b5cf6;
+}
+
+.timeline-event-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+}
+
+.timeline-event.sighting .timeline-event-icon {
+    background: rgba(59, 130, 246, 0.2);
+    color: var(--primary);
+}
+
+.timeline-event.enrichment .timeline-event-icon {
+    background: rgba(139, 92, 246, 0.2);
+    color: #8b5cf6;
+}
+
+.timeline-event-content {
+    flex: 1;
+}
+
+.timeline-event-time {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Badge for watchlist count */
+.header-actions .badge {
+    background: #f59e0b;
+    color: #000;
+    padding: 0.15rem 0.4rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    margin-left: 0.3rem;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.25rem;
+}
+
+/* Filters */
+.observables-filters {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.observables-filters select,
+.observables-filters .search-input {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.observables-filters .search-input {
+    flex: 1;
+    min-width: 250px;
+}
+
+/* Observable Type Badges */
+.obs-type-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    min-width: 60px;
+    text-align: center;
+}
+
+.obs-type-badge.ipv4,
+.obs-type-badge.ipv6 { background: #5f1e1e; color: #f07d7d; }
+.obs-type-badge.domain { background: #3a1e5f; color: #a87df0; }
+.obs-type-badge.hostname { background: #1e3a5f; color: #7db8f0; }
+.obs-type-badge.url { background: #1e5f2e; color: #7df098; }
+.obs-type-badge.email { background: #5f4a1e; color: #f0c87d; }
+.obs-type-badge.sha256,
+.obs-type-badge.sha1,
+.obs-type-badge.md5 { background: #3a3a3a; color: #b0b0b0; }
+.obs-type-badge.user_account { background: #1e5f5f; color: #7df0f0; }
+.obs-type-badge.mac { background: #4a1e5f; color: #c87df0; }
+.obs-type-badge.cve { background: #5f1e4a; color: #f07dc8; }
+
+/* Threat Level Badges */
+.threat-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.threat-badge.critical { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.threat-badge.high { background: rgba(249, 115, 22, 0.2); color: #f97316; }
+.threat-badge.medium { background: rgba(234, 179, 8, 0.2); color: #eab308; }
+.threat-badge.low { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+.threat-badge.benign { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+.threat-badge.unknown { background: rgba(156, 163, 175, 0.2); color: #9ca3af; }
+
+/* Enrichment indicator */
+.enriched-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.enriched-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.enriched-dot.yes { background: #8b5cf6; }
+.enriched-dot.no { background: var(--border); }
+
+/* Observable Value Display */
+.obs-value {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: monospace;
+    font-size: 0.8125rem;
+}
+
+.obs-value.whitelisted {
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+
+.obs-value.watched {
+    background: rgba(245, 158, 11, 0.1);
+    padding: 0.1rem 0.25rem;
+    border-radius: 3px;
+}
+
+.watched-icon {
+    margin-right: 0.25rem;
+}
+
+.actions-cell {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.btn-warning {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: #f59e0b;
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.pagination button {
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.8125rem;
+}
+
+.pagination button:hover:not(:disabled) {
+    background: var(--bg-secondary);
+}
+
+.pagination button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pagination button.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* Detail Modal Sections */
+.detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.detail-value {
+    font-family: monospace;
+    font-size: 1.25rem;
+    font-weight: 600;
+    word-break: break-all;
+}
+
+.detail-meta {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+.detail-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.detail-section {
+    margin-bottom: 1.5rem;
+}
+
+.detail-section h4 {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.detail-enrichment {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.enrichment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.enrichment-source {
+    font-weight: 600;
+    color: #8b5cf6;
+}
+
+.enrichment-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.enrichment-score {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.score-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.score-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+
+.score-fill.critical { background: #ef4444; }
+.score-fill.high { background: #f97316; }
+.score-fill.medium { background: #eab308; }
+.score-fill.low { background: #3b82f6; }
+.score-fill.benign { background: #22c55e; }
+
+.enrichment-labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-bottom: 0.75rem;
+}
+
+.enrichment-label {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    background: rgba(139, 92, 246, 0.15);
+    color: #a78bfa;
+}
+
+.threat-actor-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.related-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.related-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8125rem;
+}
+
+.related-item:last-child {
+    border-bottom: none;
+}
+
+.related-item:hover {
+    background: var(--bg-secondary);
+}
+
+.co-occur-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    margin: 0.25rem;
+    cursor: pointer;
+}
+
+.co-occur-badge:hover {
+    border-color: var(--primary);
+}
+
+.notes-textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    resize: vertical;
+}
+
+.tags-input-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    min-height: 40px;
+}
+
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    background: var(--primary);
+    color: white;
+}
+
+.tag-chip .remove {
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.tag-chip .remove:hover {
+    opacity: 1;
+}
+
+.tags-input-container input {
+    flex: 1;
+    min-width: 100px;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    outline: none;
+    font-size: 0.75rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+/* Graph Modal */
+.modal-xlarge {
+    max-width: 95vw;
+    width: 1400px;
+    height: 85vh;
+}
+
+.modal-xlarge .modal-body {
+    height: calc(100% - 60px);
+    display: flex;
+    flex-direction: column;
+}
+
+.graph-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.graph-controls label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+}
+
+.graph-controls input {
+    width: 60px;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text-primary);
+}
+
+.graph-legend {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.graph-container {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #1a1a2e;
+    min-height: 400px;
+}
+
+/* Patterns */
+.patterns-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.patterns-controls label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+}
+
+.patterns-controls input {
+    width: 60px;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text-primary);
+}
+
+.patterns-desc {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+.patterns-list {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.pattern-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.pattern-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.pattern-count {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.pattern-count-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.pattern-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.pattern-observables {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.pattern-observable {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    cursor: pointer;
+}
+
+.pattern-observable:hover {
+    border-color: var(--primary);
+}
+
+.pattern-observable .obs-type-badge {
+    min-width: auto;
+    padding: 0.0625rem 0.25rem;
+    font-size: 0.625rem;
+}
+
+.pattern-actions {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+/* Toast animations */
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+</style>
+
+{% raw %}
+<script>
+// State
+let observables = [];
+let currentPage = 1;
+let pageSize = 50;
+let totalCount = 0;
+let currentObservable = null;
+
+const debouncedSearch = debounce(() => loadObservables(), 300);
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    loadStats();
+    loadObservables();
+});
+
+// Utility
+function debounce(fn, delay) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+
+function timeAgo(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+    if (seconds < 604800) return Math.floor(seconds / 86400) + 'd ago';
+    return date.toLocaleDateString();
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleString();
+}
+
+function showToast(message, type = 'info') {
+    // Create toast element if it doesn't exist
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.style.cssText = 'position: fixed; bottom: 20px; right: 20px; z-index: 10000;';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.style.cssText = `
+        background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#22c55e' : '#3b82f6'};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        margin-top: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        animation: slideIn 0.3s ease;
+    `;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.animation = 'fadeOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Load Stats
+async function loadStats() {
+    try {
+        const response = await fetch('/api/observables/stats');
+        if (!response.ok) throw new Error('Failed to load stats');
+        const data = await response.json();
+
+        document.getElementById('stat-total').textContent = data.total.toLocaleString();
+
+        const ipCount = (data.by_type.ipv4 || 0) + (data.by_type.ipv6 || 0);
+        document.getElementById('stat-ips').textContent = ipCount.toLocaleString();
+
+        const domainCount = (data.by_type.domain || 0) + (data.by_type.hostname || 0);
+        document.getElementById('stat-domains').textContent = domainCount.toLocaleString();
+
+        document.getElementById('stat-enriched').textContent = data.enriched.toLocaleString();
+
+        const criticalHigh = (data.by_threat_level.critical || 0) + (data.by_threat_level.high || 0);
+        document.getElementById('stat-critical').textContent = criticalHigh.toLocaleString();
+
+        // Load watched count
+        loadWatchedCount();
+        // Check for unread watchlist alerts
+        checkWatchlistAlerts();
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+// Load watched count
+async function loadWatchedCount() {
+    try {
+        const response = await fetch('/api/observables/watchlist?limit=1');
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('stat-watched').textContent = data.total.toLocaleString();
+            const badge = document.getElementById('watchlist-count');
+            if (data.total > 0) {
+                badge.textContent = data.total;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading watched count:', error);
+    }
+}
+
+// Check for unread watchlist alerts
+async function checkWatchlistAlerts() {
+    try {
+        const response = await fetch('/api/observables/watchlist/alerts?is_read=false&limit=1');
+        if (response.ok) {
+            const data = await response.json();
+            const banner = document.getElementById('watchlist-banner');
+            if (data.total > 0) {
+                document.getElementById('watchlist-alert-text').textContent =
+                    `You have ${data.total} unread watchlist alert${data.total > 1 ? 's' : ''}`;
+                banner.style.display = 'flex';
+            } else {
+                banner.style.display = 'none';
+            }
+        }
+    } catch (error) {
+        console.error('Error checking watchlist alerts:', error);
+    }
+}
+
+function dismissWatchlistBanner() {
+    document.getElementById('watchlist-banner').style.display = 'none';
+}
+
+// Load Observables
+async function loadObservables() {
+    const tbody = document.getElementById('observables-tbody');
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">Loading observables...</td></tr>';
+
+    try {
+        const params = new URLSearchParams();
+        const query = document.getElementById('search-input').value.trim();
+        const type = document.getElementById('type-filter').value;
+        const threat = document.getElementById('threat-filter').value;
+        const whitelist = document.getElementById('whitelist-filter').value;
+        const enriched = document.getElementById('enriched-filter').value;
+
+        if (query) params.set('query', query);
+        if (type) params.set('type', type);
+        if (threat) params.set('threat_level', threat);
+        if (whitelist) params.set('is_whitelisted', whitelist);
+        if (enriched) params.set('is_enriched', enriched);
+        params.set('limit', pageSize);
+        params.set('offset', (currentPage - 1) * pageSize);
+
+        const response = await fetch(`/api/observables?${params}`);
+        if (!response.ok) {
+            if (response.status === 401) {
+                window.location.href = '/login?redirect=/observables';
+                return;
+            }
+            throw new Error('Failed to load observables');
+        }
+
+        const data = await response.json();
+        observables = data.observables;
+        totalCount = data.total;
+
+        renderObservables();
+        renderPagination();
+    } catch (error) {
+        console.error('Error loading observables:', error);
+        tbody.innerHTML = '<tr><td colspan="8" class="error">Error loading observables.</td></tr>';
+    }
+}
+
+function renderObservables() {
+    const tbody = document.getElementById('observables-tbody');
+
+    if (observables.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No observables found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = observables.map(obs => `
+        <tr onclick="showObservableDetail(${obs.id})" style="cursor: pointer;">
+            <td>
+                <span class="obs-value ${obs.is_whitelisted ? 'whitelisted' : ''} ${obs.is_watched ? 'watched' : ''}" title="${escapeHtml(obs.value)}">
+                    ${obs.is_watched ? '<span class="watched-icon" title="Watched">&#128065;</span>' : ''}
+                    ${escapeHtml(obs.value)}
+                </span>
+            </td>
+            <td><span class="obs-type-badge ${obs.type}">${obs.type}</span></td>
+            <td><span class="threat-badge ${obs.threat_level}">${obs.threat_level}</span></td>
+            <td>${obs.sighting_count}</td>
+            <td title="${obs.first_seen}">${timeAgo(obs.first_seen)}</td>
+            <td title="${obs.last_seen}">${timeAgo(obs.last_seen)}</td>
+            <td>
+                <span class="enriched-indicator">
+                    <span class="enriched-dot ${obs.has_enrichment ? 'yes' : 'no'}"></span>
+                    ${obs.has_enrichment ? timeAgo(obs.latest_enrichment_at) : '-'}
+                </span>
+            </td>
+            <td class="actions-cell" onclick="event.stopPropagation();">
+                <button class="btn btn-sm ${obs.is_watched ? 'btn-warning' : ''}" onclick="toggleWatchlist(${obs.id}, ${obs.is_watched})" title="${obs.is_watched ? 'Remove from watchlist' : 'Add to watchlist'}">
+                    <span style="font-size: 0.875rem;">&#128065;</span>
+                </button>
+                <button class="btn btn-sm" onclick="enrichObservable(${obs.id})" title="Enrich">
+                    <span style="font-size: 0.875rem;">&#128269;</span>
+                </button>
+                <button class="btn btn-sm" onclick="showTimeline(${obs.id})" title="View Timeline">
+                    <span style="font-size: 0.875rem;">&#128197;</span>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderPagination() {
+    const container = document.getElementById('pagination');
+    const totalPages = Math.ceil(totalCount / pageSize);
+
+    if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+
+    let html = '';
+    html += `<button ${currentPage === 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})">Prev</button>`;
+
+    // Show first page
+    if (currentPage > 3) {
+        html += `<button onclick="goToPage(1)">1</button>`;
+        if (currentPage > 4) html += `<span style="padding: 0 0.5rem;">...</span>`;
+    }
+
+    // Show pages around current
+    for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+        html += `<button class="${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+    }
+
+    // Show last page
+    if (currentPage < totalPages - 2) {
+        if (currentPage < totalPages - 3) html += `<span style="padding: 0 0.5rem;">...</span>`;
+        html += `<button onclick="goToPage(${totalPages})">${totalPages}</button>`;
+    }
+
+    html += `<button ${currentPage === totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})">Next</button>`;
+
+    container.innerHTML = html;
+}
+
+function goToPage(page) {
+    currentPage = page;
+    loadObservables();
+}
+
+function clearFilters() {
+    document.getElementById('search-input').value = '';
+    document.getElementById('type-filter').value = '';
+    document.getElementById('threat-filter').value = '';
+    document.getElementById('whitelist-filter').value = '';
+    document.getElementById('enriched-filter').value = '';
+    currentPage = 1;
+    loadObservables();
+}
+
+// Observable Detail
+async function showObservableDetail(id) {
+    const modal = document.getElementById('observable-detail-modal');
+    const body = document.getElementById('detail-body');
+    body.innerHTML = '<div class="loading">Loading...</div>';
+    modal.style.display = 'flex';
+
+    try {
+        // Fetch observable detail, alerts, cases, and co-occurring in parallel
+        const [detailRes, alertsRes, casesRes, coRes] = await Promise.all([
+            fetch(`/api/observables/${id}`),
+            fetch(`/api/observables/${id}/alerts?limit=10`),
+            fetch(`/api/observables/${id}/cases?limit=10`),
+            fetch(`/api/observables/${id}/co-occurring?limit=10`),
+        ]);
+
+        if (!detailRes.ok) throw new Error('Failed to load observable');
+
+        const detail = await detailRes.json();
+        const alerts = alertsRes.ok ? await alertsRes.json() : { alerts: [] };
+        const cases = casesRes.ok ? await casesRes.json() : { cases: [] };
+        const coOccurring = coRes.ok ? await coRes.json() : { co_occurring: [] };
+
+        currentObservable = detail;
+        renderObservableDetail(detail, alerts.alerts, cases.cases, coOccurring.co_occurring);
+    } catch (error) {
+        console.error('Error loading observable:', error);
+        body.innerHTML = '<div class="error">Error loading observable details.</div>';
+    }
+}
+
+function renderObservableDetail(obs, alerts, cases, coOccurring) {
+    const body = document.getElementById('detail-body');
+
+    // Build enrichment section
+    let enrichmentHtml = '';
+    if (obs.enrichment) {
+        const e = obs.enrichment;
+        const scoreClass = e.score >= 80 ? 'critical' : e.score >= 60 ? 'high' : e.score >= 40 ? 'medium' : e.score >= 20 ? 'low' : 'benign';
+
+        enrichmentHtml = `
+            <div class="detail-enrichment">
+                <div class="enrichment-header">
+                    <span class="enrichment-source">${e.source}</span>
+                    <span class="enrichment-time">Last enriched: ${timeAgo(e.enriched_at)}</span>
+                </div>
+                ${e.score !== null ? `
+                <div class="enrichment-score">
+                    <span>Score: ${e.score}/100</span>
+                    <div class="score-bar">
+                        <div class="score-fill ${scoreClass}" style="width: ${e.score}%"></div>
+                    </div>
+                    <span class="threat-badge ${e.is_malicious ? 'high' : 'benign'}">${e.is_malicious ? 'Malicious' : 'Clean'}</span>
+                </div>
+                ` : ''}
+                ${e.labels && e.labels.length ? `
+                <div class="enrichment-labels">
+                    ${e.labels.map(l => `<span class="enrichment-label">${escapeHtml(l)}</span>`).join('')}
+                </div>
+                ` : ''}
+                ${e.threat_actors && e.threat_actors.length ? `
+                <div style="margin-bottom: 0.5rem;">
+                    <strong style="font-size: 0.75rem; color: var(--text-muted);">Threat Actors:</strong><br>
+                    ${e.threat_actors.map(ta => `<span class="threat-actor-tag">${escapeHtml(ta.name)}</span>`).join('')}
+                </div>
+                ` : ''}
+                ${e.indicators && e.indicators.length ? `
+                <div style="font-size: 0.75rem; color: var(--text-muted);">
+                    ${e.indicators.length} indicator(s) found
+                </div>
+                ` : ''}
+            </div>
+        `;
+    } else {
+        enrichmentHtml = `
+            <div style="text-align: center; padding: 1rem; color: var(--text-muted);">
+                No enrichment data available.
+                <button class="btn btn-sm btn-primary" style="margin-left: 0.5rem;" onclick="enrichObservable(${obs.id})">Enrich Now</button>
+            </div>
+        `;
+    }
+
+    // Build related alerts section
+    let alertsHtml = '';
+    if (alerts.length > 0) {
+        alertsHtml = `
+            <div class="related-list">
+                ${alerts.map(a => `
+                    <div class="related-item">
+                        <div>
+                            <span style="font-family: monospace; font-size: 0.75rem;">${escapeHtml(a.es_alert_id.substring(0, 20))}...</span>
+                        </div>
+                        <div>
+                            <span class="threat-badge ${a.priority || 'unknown'}">${a.priority || 'N/A'}</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">${timeAgo(a.created_at)}</span>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            ${obs.alert_count > alerts.length ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">+ ${obs.alert_count - alerts.length} more alerts</div>` : ''}
+        `;
+    } else {
+        alertsHtml = '<div class="empty-state">No related alerts</div>';
+    }
+
+    // Build related cases section
+    let casesHtml = '';
+    if (cases.length > 0) {
+        casesHtml = `
+            <div class="related-list">
+                ${cases.map(c => `
+                    <div class="related-item">
+                        <div>
+                            <strong>${escapeHtml(c.case_number)}</strong>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">${escapeHtml(c.title)}</span>
+                        </div>
+                        <span class="threat-badge ${c.severity || 'unknown'}">${c.severity || 'N/A'}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        casesHtml = '<div class="empty-state">No related cases</div>';
+    }
+
+    // Build co-occurring section
+    let coHtml = '';
+    if (coOccurring.length > 0) {
+        coHtml = coOccurring.map(co => `
+            <span class="co-occur-badge" onclick="showObservableDetail(${co.id})">
+                <span class="obs-type-badge ${co.type}" style="min-width: auto; padding: 0.0625rem 0.25rem;">${co.type}</span>
+                ${escapeHtml(co.value.substring(0, 30))}${co.value.length > 30 ? '...' : ''}
+                <span style="color: var(--text-muted);">(${co.co_occurrence_count})</span>
+            </span>
+        `).join('');
+    } else {
+        coHtml = '<div class="empty-state">No co-occurring observables</div>';
+    }
+
+    body.innerHTML = `
+        <div class="detail-header">
+            <div>
+                <div class="detail-value">${escapeHtml(obs.value)}</div>
+                <div class="detail-meta">
+                    <span class="obs-type-badge ${obs.type}">${obs.type}</span>
+                    <span class="threat-badge ${obs.threat_level}">${obs.threat_level}</span>
+                    ${obs.is_whitelisted ? '<span style="color: #22c55e;">Whitelisted</span>' : ''}
+                    <span>First seen: ${timeAgo(obs.first_seen)}</span>
+                    <span>Sightings: ${obs.sighting_count}</span>
+                </div>
+            </div>
+            <div class="detail-actions">
+                <button class="btn btn-sm" onclick="enrichObservable(${obs.id})">Enrich</button>
+                <button class="btn btn-sm" onclick="viewObservableGraph(${obs.id})">View Relationships</button>
+                <button class="btn btn-sm ${obs.is_whitelisted ? 'btn-secondary' : ''}" onclick="toggleWhitelist(${obs.id}, ${!obs.is_whitelisted})">
+                    ${obs.is_whitelisted ? 'Remove from Whitelist' : 'Whitelist'}
+                </button>
+            </div>
+        </div>
+
+        <div class="detail-section">
+            <h4>Enrichment</h4>
+            ${enrichmentHtml}
+        </div>
+
+        <div class="detail-section">
+            <h4>Related Cases (${obs.case_count})</h4>
+            ${casesHtml}
+        </div>
+
+        <div class="detail-section">
+            <h4>Related Alerts (${obs.alert_count})</h4>
+            ${alertsHtml}
+        </div>
+
+        <div class="detail-section">
+            <h4>Co-occurring Observables</h4>
+            <div style="display: flex; flex-wrap: wrap;">
+                ${coHtml}
+            </div>
+        </div>
+
+        <div class="detail-section">
+            <h4>Notes</h4>
+            <textarea class="notes-textarea" id="detail-notes" placeholder="Add analyst notes...">${escapeHtml(obs.notes || '')}</textarea>
+            <button class="btn btn-sm btn-primary" style="margin-top: 0.5rem;" onclick="saveNotes(${obs.id})">Save Notes</button>
+        </div>
+
+        <div class="detail-section">
+            <h4>Tags</h4>
+            <div class="tags-input-container" id="tags-container">
+                ${(obs.tags || []).map(t => `
+                    <span class="tag-chip">
+                        ${escapeHtml(t)}
+                        <span class="remove" onclick="removeTag(${obs.id}, '${escapeHtml(t)}')">&times;</span>
+                    </span>
+                `).join('')}
+                <input type="text" id="tag-input" placeholder="Add tag..." onkeypress="handleTagInput(event, ${obs.id})">
+            </div>
+        </div>
+    `;
+}
+
+function closeDetailModal() {
+    document.getElementById('observable-detail-modal').style.display = 'none';
+    currentObservable = null;
+}
+
+// Actions
+async function enrichObservable(id) {
+    try {
+        showToast('Enriching observable...', 'info');
+        const response = await fetch(`/api/observables/${id}/enrich?source=opencti`, { method: 'POST' });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Enrichment failed');
+        }
+        const data = await response.json();
+        showToast('Enrichment complete', 'success');
+
+        // Reload if in detail view
+        if (currentObservable && currentObservable.id === id) {
+            showObservableDetail(id);
+        }
+        loadObservables();
+        loadStats();
+    } catch (error) {
+        console.error('Enrichment error:', error);
+        showToast(error.message, 'error');
+    }
+}
+
+async function toggleWhitelist(id, whitelist) {
+    try {
+        const response = await fetch(`/api/observables/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_whitelisted: whitelist }),
+        });
+        if (!response.ok) throw new Error('Failed to update');
+        showToast(whitelist ? 'Added to whitelist' : 'Removed from whitelist', 'success');
+        if (currentObservable && currentObservable.id === id) {
+            showObservableDetail(id);
+        }
+        loadObservables();
+    } catch (error) {
+        console.error('Whitelist error:', error);
+        showToast('Failed to update whitelist status', 'error');
+    }
+}
+
+async function saveNotes(id) {
+    try {
+        const notes = document.getElementById('detail-notes').value;
+        const response = await fetch(`/api/observables/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes }),
+        });
+        if (!response.ok) throw new Error('Failed to save');
+        showToast('Notes saved', 'success');
+    } catch (error) {
+        console.error('Save notes error:', error);
+        showToast('Failed to save notes', 'error');
+    }
+}
+
+function handleTagInput(event, id) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        const input = document.getElementById('tag-input');
+        const tag = input.value.trim();
+        if (tag) {
+            addTag(id, tag);
+            input.value = '';
+        }
+    }
+}
+
+async function addTag(id, tag) {
+    try {
+        const currentTags = currentObservable?.tags || [];
+        if (currentTags.includes(tag)) return;
+        const newTags = [...currentTags, tag];
+        const response = await fetch(`/api/observables/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tags: newTags }),
+        });
+        if (!response.ok) throw new Error('Failed to add tag');
+        showObservableDetail(id);
+    } catch (error) {
+        console.error('Add tag error:', error);
+        showToast('Failed to add tag', 'error');
+    }
+}
+
+async function removeTag(id, tag) {
+    try {
+        const currentTags = currentObservable?.tags || [];
+        const newTags = currentTags.filter(t => t !== tag);
+        const response = await fetch(`/api/observables/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tags: newTags }),
+        });
+        if (!response.ok) throw new Error('Failed to remove tag');
+        showObservableDetail(id);
+    } catch (error) {
+        console.error('Remove tag error:', error);
+        showToast('Failed to remove tag', 'error');
+    }
+}
+
+// Migration
+function showMigrateModal() {
+    document.getElementById('migrate-result').style.display = 'none';
+    document.getElementById('migrate-btn').disabled = false;
+    document.getElementById('migrate-modal').style.display = 'flex';
+}
+
+function closeMigrateModal() {
+    document.getElementById('migrate-modal').style.display = 'none';
+}
+
+async function runMigration() {
+    const btn = document.getElementById('migrate-btn');
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+
+    try {
+        const response = await fetch('/api/observables/migrate', { method: 'POST' });
+        if (!response.ok) throw new Error('Migration failed');
+        const data = await response.json();
+
+        document.getElementById('migrate-stats').innerHTML = `
+            <p><strong>Alerts processed:</strong> ${data.alerts_processed}</p>
+            <p><strong>Observables created:</strong> ${data.observables_created}</p>
+            <p><strong>Existing observables found:</strong> ${data.observables_existing}</p>
+            <p><strong>Links created:</strong> ${data.links_created}</p>
+            <p><strong>Errors:</strong> ${data.errors}</p>
+        `;
+        document.getElementById('migrate-result').style.display = 'block';
+        showToast('Migration complete', 'success');
+        loadStats();
+        loadObservables();
+    } catch (error) {
+        console.error('Migration error:', error);
+        showToast('Migration failed', 'error');
+    }
+
+    btn.textContent = 'Run Migration';
+    btn.disabled = false;
+}
+
+// =============================================================================
+// Graph Visualization
+// =============================================================================
+let graphNetwork = null;
+let graphData = null;
+
+function showGraphView() {
+    document.getElementById('graph-modal').style.display = 'flex';
+    loadGraph();
+}
+
+function closeGraphModal() {
+    document.getElementById('graph-modal').style.display = 'none';
+    if (graphNetwork) {
+        graphNetwork.destroy();
+        graphNetwork = null;
+    }
+}
+
+async function loadGraph(centerId = null) {
+    const container = document.getElementById('graph-container');
+    container.innerHTML = '<div class="loading" style="display:flex;align-items:center;justify-content:center;height:100%;">Loading graph...</div>';
+
+    try {
+        const minCooccur = document.getElementById('graph-min-cooccur').value;
+        const maxNodes = document.getElementById('graph-max-nodes').value;
+
+        const params = new URLSearchParams({
+            min_co_occurrence: minCooccur,
+            limit: maxNodes,
+        });
+        if (centerId) params.set('observable_id', centerId);
+
+        const response = await fetch(`/api/observables/graph?${params}`);
+        if (!response.ok) throw new Error('Failed to load graph');
+
+        graphData = await response.json();
+
+        if (graphData.nodes.length === 0) {
+            container.innerHTML = '<div class="empty-state" style="display:flex;align-items:center;justify-content:center;height:100%;">No relationships found. Try lowering minimum co-occurrence or add more observables.</div>';
+            return;
+        }
+
+        renderGraph(container, graphData);
+    } catch (error) {
+        console.error('Error loading graph:', error);
+        container.innerHTML = '<div class="error" style="display:flex;align-items:center;justify-content:center;height:100%;">Error loading graph data.</div>';
+    }
+}
+
+function renderGraph(container, data) {
+    // Clear container
+    container.innerHTML = '';
+
+    // Load vis.js if not already loaded
+    if (typeof vis === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/vis-network@9.1.6/dist/vis-network.min.js';
+        script.onload = () => doRenderGraph(container, data);
+        document.head.appendChild(script);
+    } else {
+        doRenderGraph(container, data);
+    }
+}
+
+function doRenderGraph(container, data) {
+    const nodes = new vis.DataSet(data.nodes.map(n => ({
+        ...n,
+        borderWidth: n.is_center ? 4 : 2,
+        shadow: true,
+        shape: n.is_center ? 'box' : 'ellipse',
+    })));
+
+    const edges = new vis.DataSet(data.edges.map(e => ({
+        ...e,
+        color: {
+            color: e.weight >= 5 ? '#ef4444' : e.weight >= 3 ? '#f59e0b' : '#4a5568',
+            highlight: '#8b5cf6',
+            opacity: 0.8,
+        },
+        width: Math.min(1 + e.weight, 8),
+        smooth: { type: 'continuous', roundness: 0.5 },
+        label: `${e.weight}x`,
+        title: `Seen together ${e.weight} times`,
+    })));
+
+    const options = {
+        nodes: {
+            font: {
+                color: '#ffffff',
+                size: 12,
+                face: 'monospace',
+                multi: 'html',
+            },
+            borderWidth: 2,
+            shadow: {
+                enabled: true,
+                color: 'rgba(0,0,0,0.5)',
+                size: 10,
+            },
+            margin: 10,
+        },
+        edges: {
+            font: {
+                color: '#ffffff',
+                size: 11,
+                strokeWidth: 3,
+                strokeColor: '#1a1a2e',
+                align: 'middle',
+            },
+            arrows: { to: false },
+            smooth: {
+                enabled: true,
+                type: 'continuous',
+            },
+        },
+        physics: {
+            forceAtlas2Based: {
+                gravitationalConstant: -80,
+                centralGravity: 0.005,
+                springLength: 150,
+                springConstant: 0.05,
+                damping: 0.4,
+            },
+            maxVelocity: 50,
+            solver: 'forceAtlas2Based',
+            stabilization: { iterations: 200 },
+        },
+        interaction: {
+            hover: true,
+            tooltipDelay: 100,
+            navigationButtons: true,
+            keyboard: true,
+            zoomView: true,
+        },
+        layout: {
+            improvedLayout: true,
+        },
+    };
+
+    graphNetwork = new vis.Network(container, { nodes, edges }, options);
+
+    // Click to focus on node
+    graphNetwork.on('click', function(params) {
+        if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0];
+            const node = data.nodes.find(n => n.id === nodeId);
+            if (node && !node.is_center) {
+                loadGraph(nodeId);
+            }
+        }
+    });
+
+    // Double-click to open detail
+    graphNetwork.on('doubleClick', function(params) {
+        if (params.nodes.length > 0) {
+            closeGraphModal();
+            showObservableDetail(params.nodes[0]);
+        }
+    });
+}
+
+function resetGraphView() {
+    if (graphNetwork) {
+        graphNetwork.fit();
+    }
+    loadGraph();
+}
+
+function viewObservableGraph(observableId) {
+    closeDetailModal();
+    document.getElementById('graph-modal').style.display = 'flex';
+    loadGraph(observableId);
+}
+
+// =============================================================================
+// Pattern Detection
+// =============================================================================
+
+function showPatternsView() {
+    document.getElementById('patterns-modal').style.display = 'flex';
+    loadPatterns();
+}
+
+function closePatternsModal() {
+    document.getElementById('patterns-modal').style.display = 'none';
+}
+
+async function loadPatterns() {
+    const container = document.getElementById('patterns-list');
+    container.innerHTML = '<div class="loading">Analyzing patterns...</div>';
+
+    try {
+        const minOccur = document.getElementById('pattern-min-occur').value;
+        const params = new URLSearchParams({ min_occurrences: minOccur });
+
+        const response = await fetch(`/api/observables/patterns?${params}`);
+        if (!response.ok) throw new Error('Failed to load patterns');
+
+        const data = await response.json();
+        renderPatterns(data.patterns);
+    } catch (error) {
+        console.error('Error loading patterns:', error);
+        container.innerHTML = '<div class="error">Error analyzing patterns.</div>';
+    }
+}
+
+function renderPatterns(patterns) {
+    const container = document.getElementById('patterns-list');
+
+    if (patterns.length === 0) {
+        container.innerHTML = '<div class="empty-state">No patterns detected. Try lowering minimum occurrences or add more observables.</div>';
+        return;
+    }
+
+    container.innerHTML = patterns.map((p, idx) => `
+        <div class="pattern-card">
+            <div class="pattern-header">
+                <div>
+                    <span class="pattern-count">${p.occurrence_count}</span>
+                    <span class="pattern-count-label">occurrences</span>
+                </div>
+                <div class="pattern-meta">
+                    First: ${p.first_seen ? timeAgo(p.first_seen) : 'N/A'} |
+                    Last: ${p.last_seen ? timeAgo(p.last_seen) : 'N/A'}
+                </div>
+            </div>
+            <div class="pattern-observables">
+                ${p.observables.map(o => `
+                    <span class="pattern-observable" onclick="showObservableDetail(${o.id}); closePatternsModal();">
+                        <span class="obs-type-badge ${o.type}">${o.type}</span>
+                        <span>${escapeHtml(o.value.substring(0, 40))}${o.value.length > 40 ? '...' : ''}</span>
+                        <span class="threat-badge ${o.threat_level}" style="font-size:0.5625rem;">${o.threat_level}</span>
+                    </span>
+                `).join('')}
+            </div>
+            <div class="pattern-actions">
+                <button class="btn btn-sm" onclick="viewPatternInGraph(${idx})">View in Graph</button>
+            </div>
+        </div>
+    `).join('');
+
+    // Store patterns for graph view
+    window.detectedPatterns = patterns;
+}
+
+function viewPatternInGraph(patternIdx) {
+    if (!window.detectedPatterns || !window.detectedPatterns[patternIdx]) return;
+    const pattern = window.detectedPatterns[patternIdx];
+    if (pattern.observables.length > 0) {
+        closePatternsModal();
+        showGraphView();
+        // Load graph centered on first observable in pattern
+        setTimeout(() => loadGraph(pattern.observables[0].id), 500);
+    }
+}
+
+// Utility
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// =============================================================================
+// Import Functions
+// =============================================================================
+let currentImportTab = 'csv';
+
+function showImportModal() {
+    document.getElementById('import-modal').style.display = 'flex';
+    document.getElementById('import-result').style.display = 'none';
+}
+
+function closeImportModal() {
+    document.getElementById('import-modal').style.display = 'none';
+}
+
+function switchImportTab(tab) {
+    currentImportTab = tab;
+    document.querySelectorAll('.import-tab').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.import-tab-content').forEach(el => el.style.display = 'none');
+
+    if (tab === 'csv') {
+        document.querySelector('.import-tab:first-child').classList.add('active');
+        document.getElementById('csv-import-tab').style.display = 'block';
+    } else {
+        document.querySelector('.import-tab:last-child').classList.add('active');
+        document.getElementById('stix-import-tab').style.display = 'block';
+    }
+}
+
+async function runImport() {
+    const btn = document.getElementById('import-btn');
+    btn.textContent = 'Importing...';
+    btn.disabled = true;
+
+    try {
+        let response;
+
+        if (currentImportTab === 'csv') {
+            const csvData = document.getElementById('import-csv-data').value;
+            const defaultType = document.getElementById('import-default-type').value;
+            const tags = document.getElementById('import-tags').value.split(',').map(t => t.trim()).filter(t => t);
+            const autoEnrich = document.getElementById('import-auto-enrich').checked;
+
+            response = await fetch('/api/observables/import/csv', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    csv_data: csvData,
+                    default_type: defaultType || null,
+                    tags: tags.length ? tags : null,
+                    auto_enrich: autoEnrich,
+                }),
+            });
+        } else {
+            const stixData = document.getElementById('import-stix-data').value;
+            const tags = document.getElementById('import-stix-tags').value.split(',').map(t => t.trim()).filter(t => t);
+
+            let stixBundle;
+            try {
+                stixBundle = JSON.parse(stixData);
+            } catch (e) {
+                throw new Error('Invalid JSON format');
+            }
+
+            response = await fetch('/api/observables/import/stix', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    stix_bundle: stixBundle,
+                    tags: tags.length ? tags : null,
+                }),
+            });
+        }
+
+        if (!response.ok) throw new Error('Import failed');
+        const result = await response.json();
+
+        document.getElementById('import-result').style.display = 'block';
+        document.getElementById('import-stats').innerHTML = `
+            <div class="import-result-stats">
+                <p><strong>Created:</strong> ${result.created}</p>
+                <p><strong>Updated:</strong> ${result.updated}</p>
+                ${result.enriched ? `<p><strong>Enriched:</strong> ${result.enriched}</p>` : ''}
+                ${result.errors && result.errors.length ? `<p><strong>Errors:</strong> ${result.errors.length}</p>` : ''}
+            </div>
+        `;
+
+        showToast(`Imported ${result.total_processed} observables`, 'success');
+        loadStats();
+        loadObservables();
+    } catch (error) {
+        console.error('Import error:', error);
+        showToast(`Import failed: ${error.message}`, 'error');
+    }
+
+    btn.textContent = 'Import';
+    btn.disabled = false;
+}
+
+async function exportCSV() {
+    try {
+        const typeFilter = document.getElementById('type-filter').value;
+        const params = typeFilter ? `?types=${typeFilter}` : '';
+
+        const response = await fetch(`/api/observables/export/csv${params}`);
+        if (!response.ok) throw new Error('Export failed');
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'observables.csv';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        a.remove();
+
+        showToast('Export complete', 'success');
+    } catch (error) {
+        console.error('Export error:', error);
+        showToast('Export failed', 'error');
+    }
+}
+
+// =============================================================================
+// Watchlist Functions
+// =============================================================================
+function showWatchlist() {
+    document.getElementById('watchlist-modal').style.display = 'flex';
+    loadWatchlist();
+}
+
+function closeWatchlistModal() {
+    document.getElementById('watchlist-modal').style.display = 'none';
+}
+
+async function loadWatchlist() {
+    const tbody = document.getElementById('watchlist-tbody');
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading watchlist...</td></tr>';
+
+    try {
+        const response = await fetch('/api/observables/watchlist?limit=100');
+        if (!response.ok) throw new Error('Failed to load watchlist');
+        const data = await response.json();
+
+        if (data.items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty">No watched observables. Click the eye icon on any observable to add it to the watchlist.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.items.map(obs => `
+            <tr>
+                <td><code>${escapeHtml(obs.value)}</code></td>
+                <td><span class="badge badge-type">${obs.type}</span></td>
+                <td><span class="badge badge-${obs.threat_level}">${obs.threat_level}</span></td>
+                <td>${escapeHtml(obs.watch_reason) || '-'}</td>
+                <td>${escapeHtml(obs.watched_by) || '-'}</td>
+                <td>${obs.watched_at ? formatDate(obs.watched_at) : '-'}</td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="removeFromWatchlist(${obs.id})" title="Remove from watchlist">Remove</button>
+                    <button class="btn btn-sm btn-secondary" onclick="showTimeline(${obs.id})" title="View Timeline">Timeline</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading watchlist:', error);
+        tbody.innerHTML = '<tr><td colspan="7" class="error">Error loading watchlist</td></tr>';
+    }
+}
+
+function toggleWatchlist(observableId, isWatched) {
+    if (isWatched) {
+        removeFromWatchlist(observableId);
+    } else {
+        addToWatchlist(observableId);
+    }
+}
+
+async function addToWatchlist(observableId, reason = null) {
+    if (!reason) {
+        reason = prompt('Why are you watching this observable? (optional)');
+    }
+
+    try {
+        const response = await fetch(`/api/observables/watchlist/${observableId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ reason }),
+        });
+
+        if (!response.ok) throw new Error('Failed to add to watchlist');
+
+        showToast('Added to watchlist', 'success');
+        loadWatchedCount();
+        loadObservables();
+    } catch (error) {
+        console.error('Error adding to watchlist:', error);
+        showToast('Failed to add to watchlist', 'error');
+    }
+}
+
+async function removeFromWatchlist(observableId) {
+    if (!confirm('Remove this observable from the watchlist?')) return;
+
+    try {
+        const response = await fetch(`/api/observables/watchlist/${observableId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) throw new Error('Failed to remove from watchlist');
+
+        showToast('Removed from watchlist', 'success');
+        loadWatchedCount();
+        loadWatchlist();
+        loadObservables();
+    } catch (error) {
+        console.error('Error removing from watchlist:', error);
+        showToast('Failed to remove from watchlist', 'error');
+    }
+}
+
+// =============================================================================
+// Watchlist Alerts Functions
+// =============================================================================
+function showWatchlistAlerts() {
+    document.getElementById('watchlist-alerts-modal').style.display = 'flex';
+    loadWatchlistAlerts();
+}
+
+function closeWatchlistAlertsModal() {
+    document.getElementById('watchlist-alerts-modal').style.display = 'none';
+}
+
+async function loadWatchlistAlerts() {
+    const container = document.getElementById('watchlist-alerts-list');
+    container.innerHTML = '<div class="loading">Loading alerts...</div>';
+
+    try {
+        const filter = document.getElementById('watchlist-alerts-filter').value;
+        const params = filter ? `?is_read=${filter}` : '';
+
+        const response = await fetch(`/api/observables/watchlist/alerts${params}`);
+        if (!response.ok) throw new Error('Failed to load alerts');
+        const data = await response.json();
+
+        if (data.items.length === 0) {
+            container.innerHTML = '<div class="empty-state">No watchlist alerts</div>';
+            return;
+        }
+
+        container.innerHTML = data.items.map(alert => `
+            <div class="watchlist-alert-item ${alert.is_read ? '' : 'unread'}">
+                <div class="watchlist-alert-header">
+                    <span class="watchlist-alert-type">${alert.alert_type}</span>
+                    <span class="watchlist-alert-time">${formatDate(alert.created_at)}</span>
+                </div>
+                <p><strong>${escapeHtml(alert.observable_type)}:</strong> <code>${escapeHtml(alert.observable_value)}</code></p>
+                <p>${escapeHtml(alert.message)}</p>
+                ${!alert.is_read ? `<button class="btn btn-sm btn-secondary" onclick="markAlertRead(${alert.id})">Mark Read</button>` : ''}
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading watchlist alerts:', error);
+        container.innerHTML = '<div class="error">Error loading alerts</div>';
+    }
+}
+
+async function markAlertRead(alertId) {
+    try {
+        const response = await fetch(`/api/observables/watchlist/alerts/${alertId}/read`, {
+            method: 'POST',
+        });
+
+        if (!response.ok) throw new Error('Failed to mark alert read');
+
+        loadWatchlistAlerts();
+        checkWatchlistAlerts();
+    } catch (error) {
+        console.error('Error marking alert read:', error);
+        showToast('Failed to mark alert read', 'error');
+    }
+}
+
+async function markAllAlertsRead() {
+    // Get all unread alerts and mark them read
+    try {
+        const response = await fetch('/api/observables/watchlist/alerts?is_read=false&limit=100');
+        if (!response.ok) throw new Error('Failed to load alerts');
+        const data = await response.json();
+
+        for (const alert of data.items) {
+            await fetch(`/api/observables/watchlist/alerts/${alert.id}/read`, {
+                method: 'POST',
+            });
+        }
+
+        loadWatchlistAlerts();
+        checkWatchlistAlerts();
+        showToast('All alerts marked as read', 'success');
+    } catch (error) {
+        console.error('Error marking all alerts read:', error);
+        showToast('Failed to mark alerts read', 'error');
+    }
+}
+
+// =============================================================================
+// Timeline Functions
+// =============================================================================
+function showTimeline(observableId) {
+    document.getElementById('timeline-modal').style.display = 'flex';
+    loadTimeline(observableId);
+}
+
+function closeTimelineModal() {
+    document.getElementById('timeline-modal').style.display = 'none';
+}
+
+async function loadTimeline(observableId) {
+    const eventsContainer = document.getElementById('timeline-events');
+    const heatmapContainer = document.getElementById('timeline-heatmap');
+    const infoContainer = document.getElementById('timeline-observable-info');
+
+    eventsContainer.innerHTML = '<div class="loading">Loading timeline...</div>';
+    heatmapContainer.innerHTML = '';
+    infoContainer.innerHTML = '';
+
+    try {
+        // Load observable info
+        const obsResponse = await fetch(`/api/observables/${observableId}`);
+        if (obsResponse.ok) {
+            const obsData = await obsResponse.json();
+            infoContainer.innerHTML = `
+                <h4 style="margin-bottom: 0.5rem;">
+                    <span class="badge badge-type">${obsData.type}</span>
+                    <code>${escapeHtml(obsData.value)}</code>
+                </h4>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">
+                    First seen: ${formatDate(obsData.first_seen)} |
+                    Last seen: ${formatDate(obsData.last_seen)} |
+                    Sightings: ${obsData.sighting_count}
+                </p>
+            `;
+        }
+
+        // Load heatmap
+        const heatmapResponse = await fetch(`/api/observables/${observableId}/heatmap?days=30`);
+        if (heatmapResponse.ok) {
+            const heatmapData = await heatmapResponse.json();
+            renderHeatmap(heatmapContainer, heatmapData.heatmap);
+        }
+
+        // Load timeline events
+        const response = await fetch(`/api/observables/${observableId}/timeline?limit=50`);
+        if (!response.ok) throw new Error('Failed to load timeline');
+        const data = await response.json();
+
+        if (data.events.length === 0) {
+            eventsContainer.innerHTML = '<div class="empty-state">No timeline events</div>';
+            return;
+        }
+
+        eventsContainer.innerHTML = data.events.map(event => {
+            if (event.type === 'sighting') {
+                return `
+                    <div class="timeline-event sighting">
+                        <div class="timeline-event-icon">S</div>
+                        <div class="timeline-event-content">
+                            <div class="timeline-event-time">${formatDate(event.timestamp)}</div>
+                            <p><strong>Sighting</strong> - ${event.source_type}${event.context ? ` (${event.context})` : ''}</p>
+                        </div>
+                    </div>
+                `;
+            } else if (event.type === 'enrichment') {
+                return `
+                    <div class="timeline-event enrichment">
+                        <div class="timeline-event-icon">E</div>
+                        <div class="timeline-event-content">
+                            <div class="timeline-event-time">${formatDate(event.timestamp)}</div>
+                            <p><strong>Enrichment</strong> from ${event.source}${event.is_malicious ? ' - <span style="color:#ef4444">MALICIOUS</span>' : ''}</p>
+                            ${event.score ? `<p>Score: ${event.score}/100</p>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+            return '';
+        }).join('');
+    } catch (error) {
+        console.error('Error loading timeline:', error);
+        eventsContainer.innerHTML = '<div class="error">Error loading timeline</div>';
+    }
+}
+
+function renderHeatmap(container, data) {
+    // Generate last 30 days
+    const days = [];
+    const today = new Date();
+    for (let i = 29; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        const count = data[dateStr] || 0;
+        let level = 0;
+        if (count > 0) level = 1;
+        if (count > 2) level = 2;
+        if (count > 5) level = 3;
+        if (count > 10) level = 4;
+        days.push({ date: dateStr, count, level });
+    }
+
+    container.innerHTML = days.map(d =>
+        `<div class="heatmap-day level-${d.level}" title="${d.date}: ${d.count} sightings"></div>`
+    ).join('');
+}
+</script>
+{% endraw %}
+{% endblock %}

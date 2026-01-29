@@ -60,6 +60,9 @@ class User(Base, TimestampMixin):
     audit_logs: Mapped[List["AuditLog"]] = relationship(
         "AuditLog", back_populates="user"
     )
+    ai_chat_sessions: Mapped[List["AIChatSession"]] = relationship(
+        "AIChatSession", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username='{self.username}')>"
