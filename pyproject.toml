@@ -3,14 +3,14 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "docforge"
+name = "ixion"
 version = "0.1.0"
-description = "Documentation Template Management System"
+description = "Intelligence eXchange & Integration Operations Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "DocForge Team"}
+    {name = "Guarded Glass Team"}
 ]
 dependencies = [
     "typer[all]>=0.9.0",
@@ -44,8 +44,8 @@ dev = [
 ]
 
 [project.scripts]
-docforge = "docforge.cli.main:app"
-docforge-web = "docforge.web.server:main"
+ixion = "ixion.cli.main:app"
+ixion-web = "ixion.web.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
