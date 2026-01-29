@@ -1,0 +1,1285 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings - IXION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>System Settings</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="loadAllSettings()">Refresh</button>
+    </div>
+</div>
+
+<div class="settings-layout">
+    <!-- Sidebar Navigation -->
+    <nav class="settings-nav">
+        <a href="#general" class="settings-nav-item active" data-section="general">General</a>
+        <a href="#elasticsearch" class="settings-nav-item" data-section="elasticsearch">Elasticsearch</a>
+        <a href="#gitlab" class="settings-nav-item" data-section="gitlab">GitLab</a>
+        <a href="#opencti" class="settings-nav-item" data-section="opencti">OpenCTI</a>
+        <a href="#oidc" class="settings-nav-item" data-section="oidc">OIDC / Keycloak</a>
+        <a href="#sessions" class="settings-nav-item" data-section="sessions">Active Sessions</a>
+        <a href="#database" class="settings-nav-item" data-section="database">Database</a>
+        <a href="#system" class="settings-nav-item" data-section="system">System Info</a>
+    </nav>
+
+    <!-- Settings Content -->
+    <div class="settings-content">
+        <!-- General Settings -->
+        <section id="general" class="settings-section active">
+            <h2>General Settings</h2>
+            <p class="section-description">Basic application configuration.</p>
+
+            <form id="general-form" onsubmit="saveSettings(event, 'general')">
+                <div class="form-group">
+                    <label for="default_format">Default Document Format</label>
+                    <select id="default_format" name="default_format">
+                        <option value="markdown">Markdown</option>
+                        <option value="html">HTML</option>
+                        <option value="text">Plain Text</option>
+                    </select>
+                    <span class="form-help">Default format for new documents</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="max_versions_to_keep">Max Versions to Keep</label>
+                    <input type="number" id="max_versions_to_keep" name="max_versions_to_keep" min="1" max="1000">
+                    <span class="form-help">Maximum number of document versions to retain</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="auto_save" name="auto_save">
+                        Enable Auto-Save
+                    </label>
+                    <span class="form-help">Automatically save documents while editing</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="cookie_secure" name="cookie_secure">
+                        Secure Cookies (HTTPS only)
+                    </label>
+                    <span class="form-help">Enable when using HTTPS in production</span>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Elasticsearch Settings -->
+        <section id="elasticsearch" class="settings-section">
+            <h2>Elasticsearch Integration</h2>
+            <p class="section-description">Configure connection to Elasticsearch for alerts and case management.</p>
+
+            <form id="elasticsearch-form" onsubmit="saveSettings(event, 'elasticsearch')">
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="elasticsearch_enabled" name="elasticsearch_enabled">
+                        Enable Elasticsearch Integration
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="elasticsearch_url">Elasticsearch URL</label>
+                    <input type="url" id="elasticsearch_url" name="elasticsearch_url" placeholder="https://localhost:9200">
+                    <span class="form-help">Full URL including protocol and port</span>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="elasticsearch_username">Username</label>
+                        <input type="text" id="elasticsearch_username" name="elasticsearch_username" placeholder="elastic">
+                    </div>
+                    <div class="form-group">
+                        <label for="elasticsearch_password">Password</label>
+                        <input type="password" id="elasticsearch_password" name="elasticsearch_password" placeholder="Leave blank to keep current">
+                        <span class="form-help" id="elasticsearch_password_status"></span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="elasticsearch_api_key">API Key (alternative to username/password)</label>
+                    <input type="password" id="elasticsearch_api_key" name="elasticsearch_api_key" placeholder="Leave blank to keep current">
+                    <span class="form-help" id="elasticsearch_api_key_status"></span>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="elasticsearch_alert_index">Alert Index Pattern</label>
+                        <input type="text" id="elasticsearch_alert_index" name="elasticsearch_alert_index" placeholder=".alerts-*">
+                    </div>
+                    <div class="form-group">
+                        <label for="elasticsearch_case_index">Case Index</label>
+                        <input type="text" id="elasticsearch_case_index" name="elasticsearch_case_index" placeholder="ixion-cases">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="elasticsearch_verify_ssl" name="elasticsearch_verify_ssl">
+                        Verify SSL Certificate
+                    </label>
+                    <span class="form-help">Disable for self-signed certificates (not recommended for production)</span>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="testConnection('elasticsearch')">Test Connection</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- GitLab Settings -->
+        <section id="gitlab" class="settings-section">
+            <h2>GitLab Integration</h2>
+            <p class="section-description">Configure GitLab for template synchronization and version control.</p>
+
+            <form id="gitlab-form" onsubmit="saveSettings(event, 'gitlab')">
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="gitlab_enabled" name="gitlab_enabled">
+                        Enable GitLab Integration
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="gitlab_url">GitLab URL</label>
+                    <input type="url" id="gitlab_url" name="gitlab_url" placeholder="https://gitlab.example.com">
+                    <span class="form-help">Your GitLab instance URL</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="gitlab_token">Personal Access Token</label>
+                    <input type="password" id="gitlab_token" name="gitlab_token" placeholder="Leave blank to keep current">
+                    <span class="form-help" id="gitlab_token_status">Token with 'api' scope required</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="gitlab_project_id">Project ID or Path</label>
+                    <input type="text" id="gitlab_project_id" name="gitlab_project_id" placeholder="group/project or 123">
+                    <span class="form-help">Project ID number or full path (e.g., "mygroup/myproject")</span>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="testConnection('gitlab')">Test Connection</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- OpenCTI Settings -->
+        <section id="opencti" class="settings-section">
+            <h2>OpenCTI Integration</h2>
+            <p class="section-description">Configure OpenCTI for threat intelligence integration.</p>
+
+            <form id="opencti-form" onsubmit="saveSettings(event, 'opencti')">
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="opencti_enabled" name="opencti_enabled">
+                        Enable OpenCTI Integration
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="opencti_url">OpenCTI URL</label>
+                    <input type="url" id="opencti_url" name="opencti_url" placeholder="http://localhost:8888">
+                    <span class="form-help">Your OpenCTI instance URL</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="opencti_token">API Token</label>
+                    <input type="password" id="opencti_token" name="opencti_token" placeholder="Leave blank to keep current">
+                    <span class="form-help" id="opencti_token_status">Bearer token (UUID format)</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="opencti_verify_ssl" name="opencti_verify_ssl">
+                        Verify SSL Certificate
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="testConnection('opencti')">Test Connection</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- OIDC Settings -->
+        <section id="oidc" class="settings-section">
+            <h2>OIDC / Keycloak Authentication</h2>
+            <p class="section-description">Configure single sign-on with Keycloak or other OIDC providers.</p>
+
+            <form id="oidc-form" onsubmit="saveSettings(event, 'oidc')">
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="oidc_enabled" name="oidc_enabled">
+                        Enable OIDC Authentication
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="oidc_keycloak_url">Keycloak URL</label>
+                    <input type="url" id="oidc_keycloak_url" name="oidc_keycloak_url" placeholder="https://keycloak.example.com">
+                    <span class="form-help">Base URL of your Keycloak server</span>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="oidc_realm">Realm</label>
+                        <input type="text" id="oidc_realm" name="oidc_realm" placeholder="master">
+                    </div>
+                    <div class="form-group">
+                        <label for="oidc_client_id">Client ID</label>
+                        <input type="text" id="oidc_client_id" name="oidc_client_id" placeholder="ixion">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="oidc_client_secret">Client Secret</label>
+                    <input type="password" id="oidc_client_secret" name="oidc_client_secret" placeholder="Leave blank to keep current">
+                    <span class="form-help" id="oidc_client_secret_status"></span>
+                </div>
+
+                <div class="form-group">
+                    <label for="oidc_role_claim">Role Claim Path</label>
+                    <input type="text" id="oidc_role_claim" name="oidc_role_claim" placeholder="realm_access.roles">
+                    <span class="form-help">JWT claim path for user roles</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="oidc_auto_create_users" name="oidc_auto_create_users">
+                        Auto-create Users on First Login
+                    </label>
+                    <span class="form-help">Automatically create user accounts for new OIDC users</span>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Active Sessions -->
+        <section id="sessions" class="settings-section">
+            <h2>Active Sessions</h2>
+            <p class="section-description">View active user sessions. Users shown have logged in recently.</p>
+
+            <div class="sessions-actions">
+                <button class="btn btn-secondary" onclick="loadSessions()">Refresh</button>
+            </div>
+
+            <div id="sessions-list" class="sessions-list">
+                <div class="loading">Loading sessions...</div>
+            </div>
+        </section>
+
+        <!-- Database Management -->
+        <section id="database" class="settings-section">
+            <h2>Database Management</h2>
+            <p class="section-description">View database statistics, create backups, and manage data.</p>
+
+            <!-- Database Stats -->
+            <div class="db-section">
+                <h3>Statistics</h3>
+                <div id="db-stats" class="info-grid">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Backup Actions -->
+            <div class="db-section">
+                <h3>Backup & Restore</h3>
+                <div class="db-actions">
+                    <button class="btn btn-primary" onclick="createBackup()">Create Backup</button>
+                    <button class="btn btn-secondary" onclick="loadBackups()">Refresh List</button>
+                </div>
+
+                <div id="backups-list" class="backups-list">
+                    <div class="loading">Loading backups...</div>
+                </div>
+            </div>
+
+            <!-- Cleanup -->
+            <div class="db-section">
+                <h3>Data Cleanup</h3>
+                <p class="section-description">Remove old logs and temporary data to free up space.</p>
+                <div class="cleanup-form">
+                    <div class="form-group" style="max-width: 200px;">
+                        <label for="cleanup-days">Keep data from last</label>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="number" id="cleanup-days" value="30" min="1" max="365" style="width: 80px;">
+                            <span>days</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-warning" onclick="cleanupDatabase()">Run Cleanup</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- System Information -->
+        <section id="system" class="settings-section">
+            <h2>System Information</h2>
+            <p class="section-description">View system details and environment information.</p>
+
+            <div id="system-info" class="info-grid">
+                <div class="loading">Loading system information...</div>
+            </div>
+
+            <h3 style="margin-top: 2rem;">Environment Variables</h3>
+            <p class="section-description">IXION-related environment variables (sensitive values masked).</p>
+
+            <div id="env-vars" class="env-vars-list">
+                <div class="loading">Loading...</div>
+            </div>
+        </section>
+    </div>
+</div>
+
+<style>
+.settings-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 2rem;
+    margin-top: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    .settings-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Sidebar Navigation */
+.settings-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.settings-nav-item {
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.settings-nav-item:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.settings-nav-item.active {
+    background: var(--accent-color);
+    color: white;
+}
+
+/* Settings Sections */
+.settings-section {
+    display: none;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.settings-section.active {
+    display: block;
+}
+
+.settings-section h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+}
+
+.section-description {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+}
+
+/* Form Styles */
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.form-group input[type="text"],
+.form-group input[type="url"],
+.form-group input[type="number"],
+.form-group input[type="password"],
+.form-group select {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-help {
+    display: block;
+    margin-top: 0.375rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 600px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.checkbox-label {
+    display: flex !important;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.form-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Info Grid for System Info */
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.info-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.info-card-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+}
+
+.info-card-value {
+    font-size: 0.9rem;
+    font-weight: 500;
+    word-break: break-all;
+}
+
+.info-card-value.mono {
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+/* Packages List */
+.packages-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.package-badge {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: monospace;
+}
+
+/* Environment Variables */
+.env-vars-list {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.env-var-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.85rem;
+}
+
+.env-var-item:last-child {
+    border-bottom: none;
+}
+
+.env-var-name {
+    font-family: monospace;
+    color: var(--text-primary);
+}
+
+.env-var-value {
+    font-family: monospace;
+    color: var(--text-muted);
+}
+
+.loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+/* Status Indicators */
+.status-set {
+    color: #22c55e;
+}
+
+.status-unset {
+    color: var(--text-muted);
+}
+
+/* Sessions List */
+.sessions-actions {
+    margin-bottom: 1rem;
+}
+
+.sessions-list {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.session-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.session-item:last-child {
+    border-bottom: none;
+}
+
+.session-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.session-user {
+    font-weight: 600;
+}
+
+.session-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.session-roles {
+    display: flex;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.role-badge {
+    background: var(--bg-secondary);
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+}
+
+/* Database Sections */
+.db-section {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.db-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.db-section h3 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+}
+
+.db-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.backups-list {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.backup-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.backup-item:last-child {
+    border-bottom: none;
+}
+
+.backup-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.backup-name {
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+.backup-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.backup-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.cleanup-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+}
+
+.btn-warning {
+    background: #f59e0b;
+    color: white;
+    border: none;
+}
+
+.btn-warning:hover {
+    background: #d97706;
+}
+
+/* Table Stats */
+.table-stats {
+    margin-top: 1rem;
+}
+
+.table-stat-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.875rem;
+}
+
+.table-stat-item:last-child {
+    border-bottom: none;
+}
+
+.table-stat-name {
+    font-family: monospace;
+}
+
+.table-stat-count {
+    font-weight: 600;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentConfig = {};
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadAllSettings();
+    setupNavigation();
+});
+
+function setupNavigation() {
+    document.querySelectorAll('.settings-nav-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const section = item.dataset.section;
+
+            // Update nav active state
+            document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+
+            // Show corresponding section
+            document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+            document.getElementById(section).classList.add('active');
+
+            // Load section data on demand
+            if (section === 'system') {
+                loadSystemInfo();
+            } else if (section === 'sessions') {
+                loadSessions();
+            } else if (section === 'database') {
+                loadDatabaseStats();
+                loadBackups();
+            }
+        });
+    });
+}
+
+async function loadAllSettings() {
+    try {
+        const response = await fetch('/api/admin/config', {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load configuration');
+
+        currentConfig = await response.json();
+        populateForms(currentConfig);
+
+    } catch (error) {
+        showToast('Error loading settings: ' + error.message, 'error');
+    }
+}
+
+function populateForms(config) {
+    // General settings
+    document.getElementById('default_format').value = config.general.default_format;
+    document.getElementById('max_versions_to_keep').value = config.general.max_versions_to_keep;
+    document.getElementById('auto_save').checked = config.general.auto_save;
+    document.getElementById('cookie_secure').checked = config.general.cookie_secure;
+
+    // Elasticsearch
+    document.getElementById('elasticsearch_enabled').checked = config.elasticsearch.elasticsearch_enabled;
+    document.getElementById('elasticsearch_url').value = config.elasticsearch.elasticsearch_url || '';
+    document.getElementById('elasticsearch_username').value = config.elasticsearch.elasticsearch_username || '';
+    document.getElementById('elasticsearch_alert_index').value = config.elasticsearch.elasticsearch_alert_index || '';
+    document.getElementById('elasticsearch_case_index').value = config.elasticsearch.elasticsearch_case_index || '';
+    document.getElementById('elasticsearch_verify_ssl').checked = config.elasticsearch.elasticsearch_verify_ssl;
+    updateSecretStatus('elasticsearch_password', config.elasticsearch.elasticsearch_password_set);
+    updateSecretStatus('elasticsearch_api_key', config.elasticsearch.elasticsearch_api_key_set);
+
+    // GitLab
+    document.getElementById('gitlab_enabled').checked = config.gitlab.gitlab_enabled;
+    document.getElementById('gitlab_url').value = config.gitlab.gitlab_url || '';
+    document.getElementById('gitlab_project_id').value = config.gitlab.gitlab_project_id || '';
+    updateSecretStatus('gitlab_token', config.gitlab.gitlab_token_set);
+
+    // OpenCTI
+    document.getElementById('opencti_enabled').checked = config.opencti.opencti_enabled;
+    document.getElementById('opencti_url').value = config.opencti.opencti_url || '';
+    document.getElementById('opencti_verify_ssl').checked = config.opencti.opencti_verify_ssl;
+    updateSecretStatus('opencti_token', config.opencti.opencti_token_set);
+
+    // OIDC
+    document.getElementById('oidc_enabled').checked = config.oidc.oidc_enabled;
+    document.getElementById('oidc_keycloak_url').value = config.oidc.oidc_keycloak_url || '';
+    document.getElementById('oidc_realm').value = config.oidc.oidc_realm || '';
+    document.getElementById('oidc_client_id').value = config.oidc.oidc_client_id || '';
+    document.getElementById('oidc_role_claim').value = config.oidc.oidc_role_claim || '';
+    document.getElementById('oidc_auto_create_users').checked = config.oidc.oidc_auto_create_users;
+    updateSecretStatus('oidc_client_secret', config.oidc.oidc_client_secret_set);
+}
+
+function updateSecretStatus(fieldId, isSet) {
+    const statusEl = document.getElementById(fieldId + '_status');
+    if (statusEl) {
+        if (isSet) {
+            statusEl.innerHTML = '<span class="status-set">Currently set</span>';
+        } else {
+            statusEl.innerHTML = '<span class="status-unset">Not configured</span>';
+        }
+    }
+}
+
+async function saveSettings(event, section) {
+    event.preventDefault();
+
+    const form = event.target;
+    const data = {};
+
+    // Collect form data based on section
+    if (section === 'general') {
+        data.default_format = form.default_format.value;
+        data.max_versions_to_keep = parseInt(form.max_versions_to_keep.value);
+        data.auto_save = form.auto_save.checked;
+        data.cookie_secure = form.cookie_secure.checked;
+    } else if (section === 'elasticsearch') {
+        data.elasticsearch_enabled = form.elasticsearch_enabled.checked;
+        data.elasticsearch_url = form.elasticsearch_url.value;
+        data.elasticsearch_username = form.elasticsearch_username.value;
+        if (form.elasticsearch_password.value) {
+            data.elasticsearch_password = form.elasticsearch_password.value;
+        }
+        if (form.elasticsearch_api_key.value) {
+            data.elasticsearch_api_key = form.elasticsearch_api_key.value;
+        }
+        data.elasticsearch_alert_index = form.elasticsearch_alert_index.value;
+        data.elasticsearch_case_index = form.elasticsearch_case_index.value;
+        data.elasticsearch_verify_ssl = form.elasticsearch_verify_ssl.checked;
+    } else if (section === 'gitlab') {
+        data.gitlab_enabled = form.gitlab_enabled.checked;
+        data.gitlab_url = form.gitlab_url.value;
+        if (form.gitlab_token.value) {
+            data.gitlab_token = form.gitlab_token.value;
+        }
+        data.gitlab_project_id = form.gitlab_project_id.value;
+    } else if (section === 'opencti') {
+        data.opencti_enabled = form.opencti_enabled.checked;
+        data.opencti_url = form.opencti_url.value;
+        if (form.opencti_token.value) {
+            data.opencti_token = form.opencti_token.value;
+        }
+        data.opencti_verify_ssl = form.opencti_verify_ssl.checked;
+    } else if (section === 'oidc') {
+        data.oidc_enabled = form.oidc_enabled.checked;
+        data.oidc_keycloak_url = form.oidc_keycloak_url.value;
+        data.oidc_realm = form.oidc_realm.value;
+        data.oidc_client_id = form.oidc_client_id.value;
+        if (form.oidc_client_secret.value) {
+            data.oidc_client_secret = form.oidc_client_secret.value;
+        }
+        data.oidc_role_claim = form.oidc_role_claim.value;
+        data.oidc_auto_create_users = form.oidc_auto_create_users.checked;
+    }
+
+    try {
+        const response = await fetch(`/api/admin/config/${section}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save settings');
+        }
+
+        showToast('Settings saved successfully', 'success');
+
+        // Clear password fields after save
+        form.querySelectorAll('input[type="password"]').forEach(input => {
+            input.value = '';
+        });
+
+        // Reload to get updated status
+        loadAllSettings();
+
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+async function testConnection(integration) {
+    showToast(`Testing ${integration} connection...`, 'info');
+
+    try {
+        const response = await fetch(`/api/admin/config/test/${integration}`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast(`${integration}: Connection successful!`, 'success');
+        } else {
+            showToast(`${integration}: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+// =============================================================================
+// Sessions Management
+// =============================================================================
+
+async function loadSessions() {
+    const container = document.getElementById('sessions-list');
+    container.innerHTML = '<div class="loading">Loading sessions...</div>';
+
+    try {
+        const response = await fetch('/api/admin/sessions', {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load sessions');
+
+        const data = await response.json();
+
+        if (data.sessions.length === 0) {
+            container.innerHTML = '<div class="loading">No active sessions</div>';
+            return;
+        }
+
+        container.innerHTML = data.sessions.map(session => `
+            <div class="session-item">
+                <div class="session-info">
+                    <span class="session-user">${escapeHtml(session.username)}</span>
+                    <span class="session-meta">${escapeHtml(session.email || 'No email')}</span>
+                    <span class="session-meta">Last login: ${session.last_login ? formatDateTime(session.last_login) : 'Never'}</span>
+                    <div class="session-roles">
+                        ${session.roles.map(role => `<span class="role-badge">${escapeHtml(role)}</span>`).join('')}
+                    </div>
+                </div>
+                <div class="session-actions">
+                    ${session.username !== currentConfig.currentUser ?
+                        `<button class="btn btn-sm btn-danger" onclick="revokeSession(${session.user_id}, '${escapeHtml(session.username)}')">Revoke</button>` :
+                        '<span class="session-meta">(current)</span>'}
+                </div>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        container.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
+    }
+}
+
+async function revokeSession(userId, username) {
+    if (!confirm(`Are you sure you want to revoke the session for ${username}?`)) return;
+
+    try {
+        const response = await fetch(`/api/admin/sessions/${userId}/revoke`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to revoke session');
+        }
+
+        showToast('Session revoked successfully', 'success');
+        loadSessions();
+
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+// =============================================================================
+// Database Management
+// =============================================================================
+
+async function loadDatabaseStats() {
+    const container = document.getElementById('db-stats');
+    container.innerHTML = '<div class="loading">Loading...</div>';
+
+    try {
+        const response = await fetch('/api/admin/database/stats', {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load database stats');
+
+        const stats = await response.json();
+
+        container.innerHTML = `
+            <div class="info-card">
+                <div class="info-card-label">Database Size</div>
+                <div class="info-card-value">${stats.database_size_mb} MB</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Total Tables</div>
+                <div class="info-card-value">${stats.total_tables || 0}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Total Rows</div>
+                <div class="info-card-value">${formatNumber(stats.total_rows || 0)}</div>
+            </div>
+            <div class="info-card" style="grid-column: 1 / -1;">
+                <div class="info-card-label">Tables</div>
+                <div class="table-stats">
+                    ${stats.tables.map(t => `
+                        <div class="table-stat-item">
+                            <span class="table-stat-name">${t.name}</span>
+                            <span class="table-stat-count">${formatNumber(t.row_count)} rows</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+    } catch (error) {
+        container.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
+    }
+}
+
+async function loadBackups() {
+    const container = document.getElementById('backups-list');
+    container.innerHTML = '<div class="loading">Loading backups...</div>';
+
+    try {
+        const response = await fetch('/api/admin/database/backups', {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load backups');
+
+        const data = await response.json();
+
+        if (data.backups.length === 0) {
+            container.innerHTML = '<div class="loading" style="padding: 1rem;">No backups found. Click "Create Backup" to create one.</div>';
+            return;
+        }
+
+        container.innerHTML = data.backups.map(backup => `
+            <div class="backup-item">
+                <div class="backup-info">
+                    <span class="backup-name">${escapeHtml(backup.filename)}</span>
+                    <span class="backup-meta">${backup.size_mb} MB | Created: ${formatDateTime(backup.created_at)}</span>
+                </div>
+                <div class="backup-actions">
+                    <button class="btn btn-sm" onclick="restoreBackup('${escapeHtml(backup.filename)}')">Restore</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteBackup('${escapeHtml(backup.filename)}')">Delete</button>
+                </div>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        container.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
+    }
+}
+
+async function createBackup() {
+    showToast('Creating backup...', 'info');
+
+    try {
+        const response = await fetch('/api/admin/database/backup', {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to create backup');
+        }
+
+        const result = await response.json();
+        showToast(`Backup created: ${result.backup_size_mb} MB`, 'success');
+        loadBackups();
+
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+async function restoreBackup(filename) {
+    if (!confirm(`Are you sure you want to restore from ${filename}?\n\nA backup of the current database will be created first. You may need to restart the server after restoring.`)) return;
+
+    showToast('Restoring backup...', 'info');
+
+    try {
+        const response = await fetch(`/api/admin/database/restore/${encodeURIComponent(filename)}`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to restore backup');
+        }
+
+        const result = await response.json();
+        showToast('Database restored. Please restart the server.', 'success');
+        loadBackups();
+
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+async function deleteBackup(filename) {
+    if (!confirm(`Are you sure you want to delete ${filename}?`)) return;
+
+    try {
+        const response = await fetch(`/api/admin/database/backups/${encodeURIComponent(filename)}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete backup');
+        }
+
+        showToast('Backup deleted', 'success');
+        loadBackups();
+
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+async function cleanupDatabase() {
+    const days = parseInt(document.getElementById('cleanup-days').value);
+    if (!days || days < 1) {
+        showToast('Please enter a valid number of days', 'error');
+        return;
+    }
+
+    if (!confirm(`This will delete logs and temporary data older than ${days} days. Continue?`)) return;
+
+    showToast('Running cleanup...', 'info');
+
+    try {
+        const response = await fetch(`/api/admin/database/cleanup?days_to_keep=${days}`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Cleanup failed');
+        }
+
+        const result = await response.json();
+        showToast(`Cleaned up ${result.total_deleted} records`, 'success');
+        loadDatabaseStats();
+
+    } catch (error) {
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+function formatNumber(num) {
+    return num.toLocaleString();
+}
+
+function formatDateTime(isoString) {
+    if (!isoString) return 'N/A';
+    return new Date(isoString).toLocaleString();
+}
+
+// =============================================================================
+// System Information
+// =============================================================================
+
+async function loadSystemInfo() {
+    const infoContainer = document.getElementById('system-info');
+    const envContainer = document.getElementById('env-vars');
+
+    try {
+        const [infoResponse, envResponse] = await Promise.all([
+            fetch('/api/admin/system/info', { credentials: 'include' }),
+            fetch('/api/admin/system/env', { credentials: 'include' })
+        ]);
+
+        if (!infoResponse.ok) throw new Error('Failed to load system info');
+
+        const info = await infoResponse.json();
+        const env = await envResponse.json();
+
+        // Render system info
+        infoContainer.innerHTML = `
+            <div class="info-card">
+                <div class="info-card-label">IXION Version</div>
+                <div class="info-card-value">${info.ixion_version}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Python Version</div>
+                <div class="info-card-value mono">${info.python_version.split(' ')[0]}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Platform</div>
+                <div class="info-card-value">${info.platform}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Architecture</div>
+                <div class="info-card-value">${info.architecture}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Data Directory</div>
+                <div class="info-card-value mono">${info.data_directory}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Database Size</div>
+                <div class="info-card-value">${info.database_size_mb} MB</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Config Path</div>
+                <div class="info-card-value mono">${info.config_path}</div>
+            </div>
+            ${info.disk ? `
+            <div class="info-card">
+                <div class="info-card-label">Disk Usage</div>
+                <div class="info-card-value">${info.disk.used_gb} / ${info.disk.total_gb} GB (${info.disk.percent}%)</div>
+            </div>
+            ` : ''}
+            <div class="info-card" style="grid-column: 1 / -1;">
+                <div class="info-card-label">Installed Packages</div>
+                <div class="packages-list">
+                    ${Object.entries(info.packages).map(([name, version]) =>
+                        `<span class="package-badge">${name}==${version}</span>`
+                    ).join('')}
+                </div>
+            </div>
+        `;
+
+        // Render environment variables
+        const vars = env.variables || {};
+        if (Object.keys(vars).length === 0) {
+            envContainer.innerHTML = '<p class="loading">No IXION environment variables set</p>';
+        } else {
+            envContainer.innerHTML = Object.entries(vars).map(([name, value]) => `
+                <div class="env-var-item">
+                    <span class="env-var-name">${name}</span>
+                    <span class="env-var-value">${escapeHtml(value)}</span>
+                </div>
+            `).join('');
+        }
+
+    } catch (error) {
+        infoContainer.innerHTML = `<p class="loading">Error: ${error.message}</p>`;
+        envContainer.innerHTML = '';
+    }
+}
+</script>
+{% endblock %}

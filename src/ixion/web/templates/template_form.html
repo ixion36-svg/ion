@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}{% if template_id %}Edit Template{% else %}New Template{% endif %} - IXION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{% if template_id %}Edit Template{% else %}New Template{% endif %}</h1>
+</div>
+
+<form id="template-form" class="form">
+    <div class="form-group">
+        <label for="name">Name *</label>
+        <input type="text" id="name" name="name" required placeholder="Enter template name">
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="format">Format</label>
+            <select id="format" name="format">
+                <option value="markdown">Markdown</option>
+                <option value="html">HTML</option>
+                <option value="text">Plain Text</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="tags">Tags (comma-separated)</label>
+            <input type="text" id="tags" name="tags" placeholder="e.g., work, formal, invoice">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="2" placeholder="Brief description of the template"></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="content">Template Content</label>
+        <div class="editor-toolbar">
+            <button type="button" onclick="insertVariable()" class="btn btn-sm">Insert Variable</button>
+            <button type="button" onclick="insertIf()" class="btn btn-sm">Insert If</button>
+            <button type="button" onclick="insertFor()" class="btn btn-sm">Insert For Loop</button>
+        </div>
+        <textarea id="content" name="content" rows="20" placeholder="Enter template content using Jinja2 syntax..."></textarea>
+    </div>
+
+    {% if template_id %}
+    <div class="form-row">
+        <div class="form-group">
+            <label for="message">Version Message</label>
+            <input type="text" id="message" name="message" placeholder="Describe your changes">
+        </div>
+        <div class="form-group">
+            <label for="author">Author</label>
+            <input type="text" id="author" name="author" placeholder="Your name">
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">{% if template_id %}Save Changes{% else %}Create Template{% endif %}</button>
+        <a href="/templates" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% raw %}
+const templateId = {% endraw %}{{ template_id|default('null') }}{% raw %};
+
+function insertVariable() {
+    const name = prompt('Variable name:');
+    if (name) {
+        insertAtCursor(document.getElementById('content'), '{{ ' + name + ' }}');
+    }
+}
+
+function insertIf() {
+    const condition = prompt('Condition variable:');
+    if (condition) {
+        insertAtCursor(document.getElementById('content'), '{% if ' + condition + ' %}\n\n{% endif %}');
+    }
+}
+
+function insertFor() {
+    const item = prompt('Item variable name:');
+    const collection = prompt('Collection variable name:');
+    if (item && collection) {
+        insertAtCursor(document.getElementById('content'), '{% for ' + item + ' in ' + collection + ' %}\n{{ ' + item + ' }}\n{% endfor %}');
+    }
+}
+
+function insertAtCursor(textarea, text) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const before = textarea.value.substring(0, start);
+    const after = textarea.value.substring(end);
+    textarea.value = before + text + after;
+    textarea.selectionStart = textarea.selectionEnd = start + text.length;
+    textarea.focus();
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    if (templateId) {
+        try {
+            const template = await api.get('/api/templates/' + templateId);
+            document.getElementById('name').value = template.name;
+            document.getElementById('format').value = template.format;
+            document.getElementById('description').value = template.description || '';
+            document.getElementById('content').value = template.content;
+            document.getElementById('tags').value = template.tags.join(', ');
+
+            // Pre-fill author from preferences
+            const prefs = JSON.parse(localStorage.getItem('ixion_prefs') || '{}');
+            if (prefs.author) {
+                document.getElementById('author').value = prefs.author;
+            }
+        } catch (e) {
+            showToast('Failed to load template', 'error');
+        }
+    }
+});
+
+document.getElementById('template-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const data = {
+        name: document.getElementById('name').value,
+        format: document.getElementById('format').value,
+        description: document.getElementById('description').value || null,
+        content: document.getElementById('content').value,
+    };
+
+    const tagsInput = document.getElementById('tags').value;
+    if (!templateId && tagsInput) {
+        data.tags = tagsInput.split(',').map(t => t.trim()).filter(t => t);
+    }
+
+    if (templateId) {
+        data.message = document.getElementById('message').value || null;
+        data.author = document.getElementById('author').value || null;
+    }
+
+    try {
+        if (templateId) {
+            await api.put('/api/templates/' + templateId, data);
+            showToast('Template updated', 'success');
+        } else {
+            const result = await api.post('/api/templates', data);
+            showToast('Template created', 'success');
+            window.location.href = '/templates/' + result.id;
+            return;
+        }
+        window.location.href = '/templates/' + templateId;
+    } catch (e) {
+        showToast(e.message || 'Failed to save template', 'error');
+    }
+});
+{% endraw %}
+</script>
+{% endblock %}
