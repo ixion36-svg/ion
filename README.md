@@ -1,72 +1,131 @@
-# DocForge
+# IXION
 
-Documentation Template Management System with version control, template rendering, intelligent extraction, and SOC-focused NLP analysis.
+**Intelligence eXchange & Integration Operations Network**
+
+A Security Operations Center (SOC) platform with AI-powered analysis, alert triage, observable tracking, and threat intelligence integration.
 
 ## Features
 
-- **Template Management**: Create, edit, and organize document templates in folders
-- **Version Control**: Auto-save with snapshots, named checkpoints, diff, and rollback
-- **Template Rendering**: Jinja2-based rendering with JSON/CSV data support
-- **Multi-format Support**: Markdown, HTML, Plain Text, DOCX
-- **Template Extraction**: Pattern detection to generate templates from existing documents
-- **Folder Organization**: Organize templates and documents into hierarchical folders (SOI, SOP, KB, WI, etc.)
-- **Tagging System**: Auto-assign to folders when tag matches folder name
-- **SOC Entity Detection**: Detects IPs, CVEs, hashes, domains, MITRE ATT&CK IDs, and more
-- **Spell Check**: Built-in spell checking with SOC/technical term awareness
-- **Rewrite Suggestions**: Professional, concise, formal, and technical style improvements
-- **Table Detection**: Recognizes Markdown, CSV, and TSV tables
-- **Alert Investigation**: Elasticsearch-integrated SOC alert triage with case management, observables, and analytics
-- **OpenCTI Integration**: IOC enrichment against OpenCTI threat intelligence — look up IPs, domains, hashes, and URLs for linked indicators, threat actors, and scores
+- **AI Assistant**: Local LLM integration via Ollama for security analysis, code generation, and threat investigation
+- **File Analysis**: Upload files for AI review with edit and download capabilities
+- **Alert Investigation**: Elasticsearch-integrated SOC alert triage with case management and analytics
+- **Observable Tracking**: Centralized observable management with cross-case correlation and enrichment
+- **OpenCTI Integration**: IOC enrichment against OpenCTI threat intelligence
+- **Template Management**: Document templates with version control and Jinja2 rendering
 - **SOC Tools**: Client-side document processing tools for security analysts
-- **Web UI**: Browser-based interface with role-based access control
-- **Authentication**: Local auth + optional Keycloak/OIDC SSO support
-- **GitLab Integration**: Create, manage, and track GitLab issues directly from DocForge
+- **Real-time Chat**: Team collaboration with chat rooms
+- **Role-based Access**: Web UI with authentication and RBAC
+- **GitLab Integration**: Issue tracking directly from IXION
 
-## Installation
+---
+
+## Deployment
+
+### Option 1: Docker (Recommended)
 
 ```bash
-cd C:\Projects\docforge
+# Clone the repository
+git clone https://github.com/ixion36-svg/ixion.git
+cd ixion
+
+# Copy and configure environment
+cp .env.example .env
+# Edit .env with your settings (see Configuration below)
+
+# Build and run
+docker build -t ixion:latest .
+docker-compose up -d
+
+# Pull an AI model (first time only)
+docker exec -it ixion-ollama ollama pull qwen2.5:0.5b
+
+# Access at http://localhost:8000
+```
+
+### Option 2: Local Development
+
+```bash
+# Clone the repository
+git clone https://github.com/ixion36-svg/ixion.git
+cd ixion
+
+# Install Python dependencies
 pip install -e .
+
+# Install Ollama (for AI features)
+# Windows: Download from https://ollama.ai
+# Linux: curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull a model
+ollama pull qwen2.5:0.5b
+
+# Start Ollama service
+ollama serve
+
+# In another terminal, start IXION
+python -m uvicorn src.ixion.web.server:app --host 0.0.0.0 --port 8000
+
+# Access at http://localhost:8000
 ```
 
-For development:
+---
+
+## Configuration
+
+Copy `.env.example` to `.env` and configure:
+
 ```bash
-pip install -e ".[dev]"
+# Required
+IXION_ADMIN_PASSWORD=your-secure-password
+
+# AI Features (Ollama)
+IXION_OLLAMA_ENABLED=true
+IXION_OLLAMA_URL=http://localhost:11434    # or http://ollama:11434 in Docker
+IXION_OLLAMA_MODEL=qwen2.5:0.5b            # or qwen2.5-coder:7b for better results
+
+# Optional Integrations
+IXION_ELASTICSEARCH_ENABLED=false
+IXION_ELASTICSEARCH_URL=https://elasticsearch:9200
+
+IXION_OPENCTI_ENABLED=false
+IXION_OPENCTI_URL=https://opencti.example.com
+IXION_OPENCTI_TOKEN=your-api-token
 ```
 
-## Quick Start
+---
 
-### Initialize DocForge
+## Default Login
 
-```bash
-docforge init
-```
-
-### Start Web UI (Recommended)
-
-```bash
-docforge web
-```
-
-Then open http://127.0.0.1:8000 in your browser.
-
-Options:
-- `--host` / `-h`: Host to bind to (default: 127.0.0.1)
-- `--port` / `-p`: Port to bind to (default: 8000)
-- `--reload`: Enable auto-reload for development
-
-### Default Login
-
-- Username: `admin`
-- Password: `changeme`
+- **Username:** `admin`
+- **Password:** `changeme` (or value of `IXION_ADMIN_PASSWORD`)
 
 **Important:** Change the admin password after first login!
+
+---
+
+## AI Models
+
+Recommended models for Ollama:
+
+| Model | Size | Use Case |
+|-------|------|----------|
+| `qwen2.5:0.5b` | ~400MB | Testing, low resources |
+| `qwen2.5:3b` | ~2GB | Balanced performance |
+| `qwen2.5-coder:7b` | ~4GB | Best for code/security analysis |
+| `llama3.2:3b` | ~2GB | General purpose |
+
+Pull models with:
+```bash
+ollama pull qwen2.5-coder:7b
+```
+
+---
 
 ## SOC Features
 
 ### Entity Detection
 
-DocForge automatically detects SOC-relevant entities in documents:
+IXION automatically detects SOC-relevant entities in documents:
 
 | Category | Entities Detected |
 |----------|-------------------|
@@ -265,7 +324,7 @@ See [DEPLOYMENT_GUIDE.md](deploy/DEPLOYMENT_GUIDE.md) for detailed instructions 
 
 ## OpenCTI Integration
 
-DocForge integrates with [OpenCTI](https://www.opencti.io/) to enrich alert observables with threat intelligence. When investigating an alert, analysts can click "Enrich via OpenCTI" to look up IPs, domains, hashes, and URLs against the OpenCTI platform and see matching indicators, threat actors, and threat scores inline.
+IXION integrates with [OpenCTI](https://www.opencti.io/) to enrich alert observables with threat intelligence. When investigating an alert, analysts can click "Enrich via OpenCTI" to look up IPs, domains, hashes, and URLs against the OpenCTI platform and see matching indicators, threat actors, and threat scores inline.
 
 ### Configuration
 
@@ -301,7 +360,7 @@ See [OPENCTI_INTEGRATION.md](deploy/OPENCTI_INTEGRATION.md) for full setup detai
 
 ## GitLab Integration
 
-DocForge integrates with GitLab to manage issues directly from the UI.
+IXION integrates with GitLab to manage issues directly from the UI.
 
 ### Configuration
 
@@ -330,7 +389,7 @@ Or in `.docforge/config.json`:
 Create a Personal Access Token with the `api` scope:
 1. Go to GitLab > User Settings > Access Tokens
 2. Create a token with the `api` scope
-3. Copy the token and configure in DocForge
+3. Copy the token and configure in IXION
 
 ### Features
 
@@ -342,7 +401,7 @@ Create a Personal Access Token with the `api` scope:
 
 ## Alert Investigation
 
-DocForge includes a built-in alert investigation page (`/alerts`) that connects to Elasticsearch to provide SOC analysts with triage, case management, and analytics capabilities.
+IXION includes a built-in alert investigation page (`/alerts`) that connects to Elasticsearch to provide SOC analysts with triage, case management, and analytics capabilities.
 
 ### Triage & Observables
 
