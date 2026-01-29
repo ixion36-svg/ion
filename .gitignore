@@ -71,7 +71,7 @@ venv.bak/
 *.sqlite3
 
 # Local config
-.docforge/
+.ixion/
 
 # OS
 .DS_Store

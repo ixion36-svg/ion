@@ -842,6 +842,48 @@
     color: var(--text-primary);
 }
 
+.observable-value.observable-link {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-decoration-color: var(--text-muted);
+}
+
+.observable-value.observable-link:hover {
+    color: var(--primary);
+    text-decoration-color: var(--primary);
+}
+
+.threat-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-left: 0.25rem;
+}
+
+.threat-indicator.critical { background: #ef4444; animation: pulse-threat 1.5s infinite; }
+.threat-indicator.high { background: #f97316; }
+.threat-indicator.medium { background: #eab308; }
+.threat-indicator.low { background: #3b82f6; }
+.threat-indicator.benign { background: #22c55e; }
+
+@keyframes pulse-threat {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+.observable-row.enriched {
+    border-left: 2px solid #8b5cf6;
+    padding-left: 0.5rem;
+    margin-left: -0.5rem;
+}
+
+.observable-row.malicious {
+    border-left-color: #ef4444;
+    background: rgba(239, 68, 68, 0.05);
+}
+
 .btn-icon {
     background: none;
     border: none;
@@ -2141,9 +2183,10 @@ function renderTriageBar(alertId, triage) {
     let observablesListHtml = '';
     if (observables.length > 0) {
         observablesListHtml = observables.map((obs, idx) =>
-            `<div class="observable-row">
+            `<div class="observable-row" data-value="${escapeHtml(obs.value)}" data-type="${escapeHtml(obs.type)}">
                 <span class="observable-badge ${escapeHtml(obs.type)}">${escapeHtml(obs.type.replace('_', ' '))}</span>
-                <span class="observable-value">${escapeHtml(obs.value)}</span>
+                <span class="observable-value observable-link" onclick="openObservableDetail('${escapeHtml(obs.type)}', '${escapeHtml(obs.value)}')" title="View in Observables">${escapeHtml(obs.value)}</span>
+                <span class="threat-indicator" id="threat-${idx}" style="display:none;"></span>
                 <button class="btn-icon" onclick="removeObservable('${escapeHtml(alertId)}', ${idx})" title="Remove">&times;</button>
             </div>`
         ).join('');
@@ -2584,8 +2627,21 @@ function updateObservableEnrichDots(results) {
             dot.className = 'enrich-dot ' + (resultByValue[value] ? 'hit' : 'miss');
             dot.title = resultByValue[value] ? 'Found in OpenCTI' : 'Not found in OpenCTI';
             valueSpan.appendChild(dot);
+
+            // Add styling to the row
+            if (resultByValue[value]) {
+                row.classList.add('enriched', 'malicious');
+            }
         }
     });
+}
+
+// Open observable detail page in new tab or navigate
+function openObservableDetail(type, value) {
+    // Search for this observable and open the observables page
+    const params = new URLSearchParams({ query: value });
+    if (type) params.set('type', type);
+    window.open(`/observables?${params}`, '_blank');
 }
 
 async function updateTriage(alertId, field, value) {

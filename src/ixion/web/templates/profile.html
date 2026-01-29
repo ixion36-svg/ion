@@ -58,6 +58,52 @@
             <button class="btn btn-secondary" onclick="logout()">Sign Out</button>
         </div>
     </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Appearance</h2>
+        </div>
+        <div class="card-body">
+            <div class="mode-toggle">
+                <h4>Mode</h4>
+                <div class="mode-switch">
+                    <button class="mode-btn" data-mode="dark" onclick="setMode('dark')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                        Dark
+                    </button>
+                    <button class="mode-btn" data-mode="light" onclick="setMode('light')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"/>
+                            <line x1="12" y1="1" x2="12" y2="3"/>
+                            <line x1="12" y1="21" x2="12" y2="23"/>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                            <line x1="1" y1="12" x2="3" y2="12"/>
+                            <line x1="21" y1="12" x2="23" y2="12"/>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                        </svg>
+                        Light
+                    </button>
+                </div>
+            </div>
+            <div class="theme-switcher">
+                <h4>Accent Color</h4>
+                <div class="theme-options">
+                    <button class="theme-option" data-theme="cyan" title="Cyan (Default)" onclick="setTheme('cyan')"></button>
+                    <button class="theme-option" data-theme="blue" title="Blue" onclick="setTheme('blue')"></button>
+                    <button class="theme-option" data-theme="purple" title="Purple" onclick="setTheme('purple')"></button>
+                    <button class="theme-option" data-theme="pink" title="Pink" onclick="setTheme('pink')"></button>
+                    <button class="theme-option" data-theme="red" title="Red" onclick="setTheme('red')"></button>
+                    <button class="theme-option" data-theme="orange" title="Orange" onclick="setTheme('orange')"></button>
+                    <button class="theme-option" data-theme="gold" title="Gold" onclick="setTheme('gold')"></button>
+                    <button class="theme-option" data-theme="green" title="Green" onclick="setTheme('green')"></button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -172,7 +218,50 @@ async function logout() {
     }
 }
 
+// Theme switcher
+function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('ixion-theme', theme);
+
+    // Update active state
+    document.querySelectorAll('.theme-option').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.theme === theme);
+    });
+
+    showToast(`Accent color changed to ${theme}`, 'success');
+}
+
+function setMode(mode) {
+    document.documentElement.setAttribute('data-mode', mode);
+    localStorage.setItem('ixion-mode', mode);
+
+    // Update active state
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+
+    showToast(`Switched to ${mode} mode`, 'success');
+}
+
+function loadTheme() {
+    const savedTheme = localStorage.getItem('ixion-theme') || 'cyan';
+    const savedMode = localStorage.getItem('ixion-mode') || 'dark';
+
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    document.documentElement.setAttribute('data-mode', savedMode);
+
+    // Update active states
+    document.querySelectorAll('.theme-option').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.theme === savedTheme);
+    });
+
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === savedMode);
+    });
+}
+
 // Initialize
 loadProfile();
+loadTheme();
 </script>
 {% endblock %}

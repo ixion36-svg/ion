@@ -159,6 +159,8 @@ function updateUserMenu() {
     if (currentUserData.roles.includes('admin') || currentUserData.roles.includes('analyst')) {
         const alertsLink = document.getElementById('nav-alerts-link');
         if (alertsLink) alertsLink.style.display = 'block';
+        const observablesLink = document.getElementById('nav-observables-link');
+        if (observablesLink) observablesLink.style.display = 'block';
     }
 }
 

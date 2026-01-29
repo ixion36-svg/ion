@@ -51,6 +51,12 @@ class Config:
     elasticsearch_case_index: str = "ixion-cases"  # Index for synced case documents
     elasticsearch_verify_ssl: bool = True
 
+    # Ollama AI integration
+    ollama_enabled: bool = False
+    ollama_url: str = "http://localhost:11434"  # Ollama API URL
+    ollama_model: str = "qwen2.5:0.5b"  # Default model (use small for testing)
+    ollama_timeout: int = 120  # Request timeout in seconds
+
     @classmethod
     def from_file(cls, path: Path) -> "Config":
         """Load configuration from a JSON file."""
@@ -99,6 +105,11 @@ class Config:
             elasticsearch_alert_index=data.get("elasticsearch_alert_index", ".alerts-*,.watcher-history-*,alerts-*"),
             elasticsearch_case_index=data.get("elasticsearch_case_index", "ixion-cases"),
             elasticsearch_verify_ssl=data.get("elasticsearch_verify_ssl", True),
+            # Ollama AI integration
+            ollama_enabled=data.get("ollama_enabled", False),
+            ollama_url=data.get("ollama_url", "http://localhost:11434"),
+            ollama_model=data.get("ollama_model", "qwen2.5:0.5b"),
+            ollama_timeout=data.get("ollama_timeout", 120),
         )
 
     def to_file(self, path: Path) -> None:
@@ -141,6 +152,11 @@ class Config:
                     "elasticsearch_alert_index": self.elasticsearch_alert_index,
                     "elasticsearch_case_index": self.elasticsearch_case_index,
                     "elasticsearch_verify_ssl": self.elasticsearch_verify_ssl,
+                    # Ollama AI integration
+                    "ollama_enabled": self.ollama_enabled,
+                    "ollama_url": self.ollama_url,
+                    "ollama_model": self.ollama_model,
+                    "ollama_timeout": self.ollama_timeout,
                 },
                 f,
                 indent=2,
@@ -234,6 +250,16 @@ def get_config() -> Config:
             _config.elasticsearch_case_index = os.environ.get("IXION_ELASTICSEARCH_CASE_INDEX", "ixion-cases")
         if os.environ.get("IXION_ELASTICSEARCH_VERIFY_SSL"):
             _config.elasticsearch_verify_ssl = _get_env_bool("IXION_ELASTICSEARCH_VERIFY_SSL", True)
+
+        # Ollama environment overrides
+        if os.environ.get("IXION_OLLAMA_ENABLED"):
+            _config.ollama_enabled = _get_env_bool("IXION_OLLAMA_ENABLED", False)
+        if os.environ.get("IXION_OLLAMA_URL") or os.environ.get("OLLAMA_URL"):
+            _config.ollama_url = os.environ.get("IXION_OLLAMA_URL") or os.environ.get("OLLAMA_URL", "http://localhost:11434")
+        if os.environ.get("IXION_OLLAMA_MODEL"):
+            _config.ollama_model = os.environ.get("IXION_OLLAMA_MODEL", "qwen2.5:0.5b")
+        if os.environ.get("IXION_OLLAMA_TIMEOUT"):
+            _config.ollama_timeout = int(os.environ.get("IXION_OLLAMA_TIMEOUT", "120"))
 
     return _config
 

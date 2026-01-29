@@ -45,6 +45,22 @@ from ixion.models.integration import (
     IntegrationLog,
     IntegrationHealthCheck,
 )
+from ixion.models.observable import (
+    Observable,
+    ObservableType,
+    ThreatLevel,
+    ObservableEnrichment,
+    ObservableAlertLink,
+    ObservableCaseLink,
+    WatchlistAlert,
+    WatchlistAlertType,
+    ObservableSighting,
+)
+from ixion.models.ai_chat import (
+    AIChatSession,
+    AIChatMessage,
+    AIContextType,
+)
 
 __all__ = [
     "Base",
@@ -88,4 +104,18 @@ __all__ = [
     "WebhookLog",
     "IntegrationLog",
     "IntegrationHealthCheck",
+    # Observable models
+    "Observable",
+    "ObservableType",
+    "ThreatLevel",
+    "ObservableEnrichment",
+    "ObservableAlertLink",
+    "ObservableCaseLink",
+    "WatchlistAlert",
+    "WatchlistAlertType",
+    "ObservableSighting",
+    # AI Chat models
+    "AIChatSession",
+    "AIChatMessage",
+    "AIContextType",
 ]
