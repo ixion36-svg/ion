@@ -171,12 +171,474 @@ class KibanaSyncService:
             logger.error(f"Error syncing status for case {case.case_number}: {e}")
             return False
 
+    async def sync_case_status_to_kibana(self, session: Session, case: AlertCase) -> bool:
+        """Sync case status from IXION to Kibana.
+
+        Returns True if Kibana was updated.
+        """
+        if not case.kibana_case_id or not self.kibana_service.enabled:
+            return False
+
+        try:
+            # Get current Kibana case to check status and get version
+            kibana_case = self.kibana_service.get_case(case.kibana_case_id)
+            if not kibana_case:
+                return False
+
+            kibana_status = kibana_case.get("status")
+            kibana_version = kibana_case.get("version")
+
+            # Map IXION status to Kibana status
+            status_map = {
+                "open": "open",
+                "in_progress": "in-progress",
+                "resolved": "closed",
+                "closed": "closed",
+            }
+
+            ixion_status = case.status.value if hasattr(case.status, "value") else case.status
+            target_kibana_status = status_map.get(ixion_status)
+
+            if not target_kibana_status:
+                return False
+
+            # Only update if different
+            if kibana_status != target_kibana_status:
+                result = self.kibana_service.update_case(
+                    case_id=case.kibana_case_id,
+                    version=kibana_version,
+                    status=target_kibana_status,
+                )
+                if result:
+                    case.kibana_case_version = result.get("version")
+                    session.commit()
+                    logger.info(f"Synced status to Kibana for case {case.case_number}: {target_kibana_status}")
+                    return True
+
+            return False
+
+        except Exception as e:
+            logger.error(f"Error syncing status to Kibana for case {case.case_number}: {e}")
+            return False
+
+    async def sync_all_case_statuses(self, session: Session) -> dict:
+        """Bidirectional sync of case statuses between IXION and Kibana.
+
+        Uses last-update-wins strategy based on updated_at timestamps.
+        Returns dict with sync statistics.
+        """
+        if not self.kibana_service.enabled:
+            return {"from_kibana": 0, "to_kibana": 0, "error": "Kibana not enabled"}
+
+        from_kibana = 0
+        to_kibana = 0
+
+        try:
+            # Get all cases with Kibana IDs
+            cases = session.query(AlertCase).filter(
+                AlertCase.kibana_case_id.isnot(None)
+            ).all()
+
+            for case in cases:
+                try:
+                    kibana_case = self.kibana_service.get_case(case.kibana_case_id)
+                    if not kibana_case:
+                        continue
+
+                    # Parse timestamps
+                    kibana_updated = kibana_case.get("updated_at") or kibana_case.get("created_at")
+                    ixion_updated = case.updated_at or case.created_at
+
+                    # Convert Kibana timestamp to datetime for comparison
+                    if kibana_updated:
+                        from datetime import datetime
+                        kibana_dt = datetime.fromisoformat(kibana_updated.replace("Z", "+00:00"))
+                        # Make ixion_updated timezone-aware if needed
+                        if ixion_updated.tzinfo is None:
+                            from datetime import timezone
+                            ixion_updated = ixion_updated.replace(tzinfo=timezone.utc)
+
+                        # Last update wins
+                        if kibana_dt > ixion_updated:
+                            if await self.sync_case_status_from_kibana(session, case):
+                                from_kibana += 1
+                        else:
+                            if await self.sync_case_status_to_kibana(session, case):
+                                to_kibana += 1
+                    else:
+                        # No Kibana timestamp, sync from ixion
+                        if await self.sync_case_status_to_kibana(session, case):
+                            to_kibana += 1
+
+                except Exception as e:
+                    logger.warning(f"Error syncing status for case {case.case_number}: {e}")
+                    continue
+
+            return {"from_kibana": from_kibana, "to_kibana": to_kibana}
+
+        except Exception as e:
+            logger.error(f"Error in bidirectional status sync: {e}")
+            return {"from_kibana": from_kibana, "to_kibana": to_kibana, "error": str(e)}
+
+    async def import_cases_from_kibana(self, session: Session) -> dict:
+        """Import cases created in Kibana that don't exist in IXION.
+
+        Imports the case with attached alerts, extracting observables and
+        building evidence summary to match IXION's case format.
+
+        Returns dict with import statistics.
+        """
+        if not self.kibana_service.enabled:
+            return {"imported": 0, "skipped": 0, "error": "Kibana not enabled"}
+
+        imported = 0
+        skipped = 0
+        errors = []
+
+        try:
+            # Get all cases from Kibana
+            kibana_cases = self.kibana_service.list_cases(per_page=100)
+            cases_list = kibana_cases.get("cases", [])
+
+            # Get existing Kibana case IDs in IXION
+            existing_kibana_ids = {
+                c.kibana_case_id for c in session.query(AlertCase.kibana_case_id).filter(
+                    AlertCase.kibana_case_id.isnot(None)
+                ).all()
+            }
+
+            # Get admin user for case creation
+            admin_user = session.query(User).filter_by(username="admin").first()
+            if not admin_user:
+                return {"imported": 0, "skipped": 0, "error": "No admin user found"}
+
+            # Generate next case number
+            max_case = session.query(AlertCase).order_by(AlertCase.id.desc()).first()
+            next_num = (max_case.id + 1) if max_case else 1
+
+            # Get elasticsearch service for fetching alert details
+            es_service = ElasticsearchService()
+
+            for kibana_case in cases_list:
+                kibana_id = kibana_case.get("id")
+
+                # Skip if already exists in IXION
+                if kibana_id in existing_kibana_ids:
+                    skipped += 1
+                    continue
+
+                # Skip if this case was created by IXION (has ixion tag or CASE- prefix)
+                tags = kibana_case.get("tags", [])
+                title = kibana_case.get("title", "")
+                if "ixion" in tags or title.startswith("[CASE-"):
+                    skipped += 1
+                    continue
+
+                try:
+                    # Map Kibana severity to IXION
+                    severity_map = {
+                        "low": "low",
+                        "medium": "medium",
+                        "high": "high",
+                        "critical": "critical",
+                    }
+                    severity = severity_map.get(
+                        kibana_case.get("severity", "medium"), "medium"
+                    )
+
+                    # Map Kibana status to IXION
+                    status_map = {
+                        "open": "open",
+                        "in-progress": "in_progress",
+                        "closed": "closed",
+                    }
+                    status = status_map.get(
+                        kibana_case.get("status", "open"), "open"
+                    )
+
+                    # Get attached alerts from Kibana case
+                    kibana_alerts = self.kibana_service.get_case_alerts(kibana_id)
+                    alert_ids = [a["id"] for a in kibana_alerts]
+                    alert_index = kibana_alerts[0]["index"] if kibana_alerts else None
+
+                    # Fetch full alert data from Elasticsearch
+                    source_alert_ids = []
+                    evidence_parts = []
+                    affected_hosts = set()
+                    affected_users = set()
+                    triggered_rules = set()
+                    observables = []
+                    seen_observables = set()
+
+                    if alert_ids and es_service:
+                        try:
+                            es_alerts = await es_service.get_alerts_by_ids(alert_ids, alert_index)
+
+                            for alert in es_alerts:
+                                source_alert_ids.append(alert.id)
+
+                                # Build evidence summary
+                                evidence_parts.append(
+                                    f"Alert \"{alert.title}\" triggered at {alert.timestamp.strftime('%d/%m/%Y, %H:%M:%S')}. "
+                                    f"Severity: {alert.severity}."
+                                )
+
+                                # Extract hosts and users
+                                if alert.host:
+                                    affected_hosts.add(alert.host)
+                                if alert.user:
+                                    affected_users.add(alert.user)
+
+                                # Extract rule name
+                                if alert.rule_name:
+                                    triggered_rules.add(alert.rule_name)
+
+                                # Extract observables from raw data
+                                if alert.raw_data:
+                                    extracted = self._extract_observables_from_raw(alert.raw_data)
+                                    for obs in extracted:
+                                        key = (obs["type"], obs["value"])
+                                        if key not in seen_observables:
+                                            seen_observables.add(key)
+                                            observables.append(obs)
+
+                        except Exception as e:
+                            logger.warning(f"Could not fetch alerts from ES for case {kibana_id}: {e}")
+
+                    # Create IXION case with full data
+                    case_number = f"CASE-{next_num:04d}"
+                    new_case = AlertCase(
+                        case_number=case_number,
+                        title=f"[Kibana] {title}",
+                        description=kibana_case.get("description", ""),
+                        status=status,
+                        severity=severity,
+                        created_by_id=admin_user.id,
+                        kibana_case_id=kibana_id,
+                        kibana_case_version=kibana_case.get("version"),
+                        source_alert_ids=source_alert_ids if source_alert_ids else None,
+                        evidence_summary=" ".join(evidence_parts) if evidence_parts else None,
+                        affected_hosts=list(affected_hosts) if affected_hosts else None,
+                        affected_users=list(affected_users) if affected_users else None,
+                        triggered_rules=list(triggered_rules) if triggered_rules else None,
+                        observables=observables if observables else None,
+                    )
+
+                    session.add(new_case)
+                    session.flush()  # Get the ID
+
+                    # Import user comments from Kibana (not alert attachments)
+                    comments = self.kibana_service.get_case_comments(kibana_id)
+                    for comment in comments:
+                        if comment.get("type") != "user":
+                            continue
+
+                        comment_text = comment.get("comment", "")
+                        created_by = comment.get("created_by", {}).get("username", "unknown")
+
+                        note = CaseNote(
+                            case_id=new_case.id,
+                            user_id=admin_user.id,
+                            content=f"[From Kibana - {created_by}] {comment_text}",
+                        )
+
+                        created_at_str = comment.get("created_at")
+                        if created_at_str:
+                            try:
+                                note.created_at = datetime.fromisoformat(
+                                    created_at_str.replace("Z", "+00:00")
+                                )
+                            except (ValueError, TypeError):
+                                pass
+
+                        session.add(note)
+
+                    next_num += 1
+                    imported += 1
+                    logger.info(
+                        f"Imported case from Kibana: {case_number} "
+                        f"(Kibana ID: {kibana_id}, Alerts: {len(source_alert_ids)}, "
+                        f"Observables: {len(observables)})"
+                    )
+
+                except Exception as e:
+                    errors.append(f"Failed to import {kibana_id}: {str(e)}")
+                    logger.error(f"Error importing case {kibana_id}: {e}")
+
+            session.commit()
+
+        except Exception as e:
+            logger.error(f"Error importing cases from Kibana: {e}")
+            session.rollback()
+            return {"imported": 0, "skipped": skipped, "error": str(e)}
+
+        return {
+            "imported": imported,
+            "skipped": skipped,
+            "errors": errors if errors else None,
+        }
+
+    def _extract_observables_from_raw(self, raw_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract observables from ECS-style alert data.
+
+        Matches the extraction logic used in the main API.
+        """
+        observables = []
+        seen = set()
+
+        def _add(obs_type: str, value: str):
+            if not value or not isinstance(value, str):
+                return
+            value = value.strip()
+            if not value or len(value) < 2:
+                return
+            key = (obs_type, value.lower())
+            if key not in seen:
+                seen.add(key)
+                observables.append({"type": obs_type, "value": value})
+
+        # Extract IPs
+        for path in [
+            "source.ip", "destination.ip", "client.ip", "server.ip",
+            "host.ip", "related.ip", "source.address", "destination.address"
+        ]:
+            val = self._get_nested(raw_data, path)
+            if val:
+                if isinstance(val, list):
+                    for v in val:
+                        _add("source_ip" if "source" in path or "client" in path else "destination_ip", v)
+                else:
+                    _add("source_ip" if "source" in path or "client" in path else "destination_ip", val)
+
+        # Extract hostnames
+        for path in ["host.name", "host.hostname", "agent.hostname", "destination.domain"]:
+            val = self._get_nested(raw_data, path)
+            if val:
+                _add("hostname", val)
+
+        # Extract domains
+        for path in ["url.domain", "dns.question.name", "destination.domain"]:
+            val = self._get_nested(raw_data, path)
+            if val:
+                _add("domain", val)
+
+        # Extract URLs
+        for path in ["url.full", "url.original"]:
+            val = self._get_nested(raw_data, path)
+            if val:
+                _add("url", val)
+
+        # Extract users
+        for path in ["user.name", "user.id", "related.user", "winlog.event_data.TargetUserName",
+                     "winlog.event_data.SubjectUserName"]:
+            val = self._get_nested(raw_data, path)
+            if val:
+                if isinstance(val, list):
+                    for v in val:
+                        _add("user_account", v)
+                else:
+                    _add("user_account", val)
+
+        # Extract file hashes
+        for path in ["file.hash.sha256", "file.hash.sha1", "file.hash.md5",
+                     "process.hash.sha256", "process.hash.sha1", "process.hash.md5"]:
+            val = self._get_nested(raw_data, path)
+            if val:
+                if "sha256" in path:
+                    _add("file_hash_sha256", val)
+                elif "sha1" in path:
+                    _add("file_hash_sha1", val)
+                elif "md5" in path:
+                    _add("file_hash_md5", val)
+
+        return observables
+
+    def _get_nested(self, data: Dict[str, Any], path: str) -> Any:
+        """Get nested value from dict using dot notation."""
+        keys = path.split(".")
+        val = data
+        for key in keys:
+            if isinstance(val, dict):
+                val = val.get(key)
+            else:
+                return None
+        return val
+
+    async def get_unimported_kibana_cases(self) -> list:
+        """Get list of Kibana cases that haven't been imported to IXION."""
+        if not self.kibana_service.enabled:
+            return []
+
+        engine = get_engine()
+        factory = get_session_factory(engine)
+        session = factory()
+
+        try:
+            # Get all cases from Kibana
+            kibana_cases = self.kibana_service.list_cases(per_page=100)
+            cases_list = kibana_cases.get("cases", [])
+
+            # Get existing Kibana case IDs in IXION
+            existing_kibana_ids = {
+                c.kibana_case_id for c in session.query(AlertCase.kibana_case_id).filter(
+                    AlertCase.kibana_case_id.isnot(None)
+                ).all()
+            }
+
+            unimported = []
+            for kibana_case in cases_list:
+                kibana_id = kibana_case.get("id")
+                title = kibana_case.get("title", "")
+                tags = kibana_case.get("tags", [])
+
+                # Skip if already exists or was created by IXION
+                if kibana_id in existing_kibana_ids:
+                    continue
+                if "ixion" in tags or title.startswith("[CASE-"):
+                    continue
+
+                unimported.append({
+                    "id": kibana_id,
+                    "title": title,
+                    "status": kibana_case.get("status"),
+                    "severity": kibana_case.get("severity"),
+                    "created_at": kibana_case.get("created_at"),
+                    "created_by": kibana_case.get("created_by", {}).get("username"),
+                    "comment_count": kibana_case.get("totalComment", 0),
+                    "alert_count": kibana_case.get("totalAlerts", 0),
+                })
+
+            return unimported
+
+        finally:
+            session.close()
+
     async def _background_sync_loop(self, interval_seconds: int = 60):
         """Background loop to periodically sync from Kibana."""
         logger.info(f"Starting Kibana sync background task (interval: {interval_seconds}s)")
 
         while self._running:
             try:
+                engine = get_engine()
+                factory = get_session_factory(engine)
+                session = factory()
+                try:
+                    # Import new cases created in Kibana
+                    import_result = await self.import_cases_from_kibana(session)
+                    if import_result.get("imported", 0) > 0:
+                        logger.info(f"Kibana sync: {import_result['imported']} cases imported from Kibana")
+
+                    # Bidirectional status sync (last-update-wins)
+                    status_result = await self.sync_all_case_statuses(session)
+                    if status_result.get("from_kibana", 0) > 0 or status_result.get("to_kibana", 0) > 0:
+                        logger.info(
+                            f"Kibana sync: status synced - {status_result['from_kibana']} from Kibana, "
+                            f"{status_result['to_kibana']} to Kibana"
+                        )
+                finally:
+                    session.close()
+
+                # Sync comments for existing linked cases
                 result = await self.sync_all_cases()
                 if result.get("synced", 0) > 0:
                     logger.info(f"Kibana sync: {result['synced']} comments synced from {result['cases']} cases")

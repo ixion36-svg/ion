@@ -727,3 +727,688 @@ class ElasticsearchService:
             }
         except ElasticsearchError as e:
             return {"error": str(e)}
+
+    async def discover_search(
+        self,
+        index_pattern: str,
+        query: str = "*",
+        time_field: str = "@timestamp",
+        time_from: Optional[str] = "now-24h",
+        time_to: Optional[str] = "now",
+        size: int = 100,
+        sort_field: Optional[str] = None,
+        sort_order: str = "desc",
+        fields: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Execute a discover-style search across Elasticsearch indices.
+
+        Args:
+            index_pattern: Index pattern to search (e.g., "logs-*", "filebeat-*")
+            query: Query string in Lucene/KQL syntax (default "*" for all)
+            time_field: Field to use for time filtering (default "@timestamp")
+            time_from: Start time (ES date math, e.g., "now-24h", "2024-01-01")
+            time_to: End time (ES date math, e.g., "now")
+            size: Number of results to return (max 10000)
+            sort_field: Field to sort by (defaults to time_field)
+            sort_order: Sort order ("asc" or "desc")
+            fields: Specific fields to return (None for all)
+
+        Returns:
+            Dict with hits, total count, and aggregations
+        """
+        if not self.is_configured:
+            return {"error": "Elasticsearch is not configured", "hits": [], "total": 0}
+
+        # Limit size to prevent memory issues
+        size = min(size, 10000)
+
+        # Build the query
+        must_clauses = []
+
+        # Add query string if not wildcard
+        if query and query != "*":
+            must_clauses.append({
+                "query_string": {
+                    "query": query,
+                    "default_operator": "AND",
+                    "analyze_wildcard": True,
+                }
+            })
+
+        # Add time range filter if time_field exists
+        if time_field and time_from:
+            time_range = {"gte": time_from}
+            if time_to:
+                time_range["lte"] = time_to
+            must_clauses.append({
+                "range": {
+                    time_field: time_range
+                }
+            })
+
+        # Build search body
+        search_body: Dict[str, Any] = {
+            "size": size,
+            "track_total_hits": True,
+        }
+
+        if must_clauses:
+            search_body["query"] = {
+                "bool": {
+                    "must": must_clauses
+                }
+            }
+        else:
+            search_body["query"] = {"match_all": {}}
+
+        # Add sorting
+        sort_by = sort_field or time_field
+        if sort_by:
+            search_body["sort"] = [{sort_by: {"order": sort_order, "unmapped_type": "date"}}]
+
+        # Add field filtering
+        if fields:
+            search_body["_source"] = fields
+
+        try:
+            # URL encode the index pattern
+            encoded_index = index_pattern.replace(",", "%2C")
+            result = await self._request(
+                "POST",
+                f"/{encoded_index}/_search",
+                json=search_body
+            )
+
+            hits = result.get("hits", {})
+            documents = []
+
+            for hit in hits.get("hits", []):
+                doc = {
+                    "_index": hit.get("_index"),
+                    "_id": hit.get("_id"),
+                    **hit.get("_source", {})
+                }
+                documents.append(doc)
+
+            return {
+                "hits": documents,
+                "total": hits.get("total", {}).get("value", 0),
+                "max_score": hits.get("max_score"),
+                "took_ms": result.get("took", 0),
+                "timed_out": result.get("timed_out", False),
+            }
+
+        except ElasticsearchError as e:
+            return {"error": str(e), "hits": [], "total": 0}
+
+    async def discover_histogram(
+        self,
+        index_pattern: str,
+        query: str = "*",
+        time_field: str = "@timestamp",
+        time_from: str = "now-24h",
+        time_to: str = "now",
+        interval: str = "1h",
+    ) -> Dict[str, Any]:
+        """Get a time histogram for discover visualization.
+
+        Args:
+            index_pattern: Index pattern to search
+            query: Query string
+            time_field: Time field for histogram
+            time_from: Start time
+            time_to: End time
+            interval: Histogram interval (e.g., "1h", "1d", "5m")
+
+        Returns:
+            Dict with histogram buckets
+        """
+        if not self.is_configured:
+            return {"error": "Elasticsearch is not configured", "buckets": []}
+
+        # Build query
+        must_clauses = []
+
+        if query and query != "*":
+            must_clauses.append({
+                "query_string": {
+                    "query": query,
+                    "default_operator": "AND",
+                    "analyze_wildcard": True,
+                }
+            })
+
+        if time_field and time_from:
+            must_clauses.append({
+                "range": {
+                    time_field: {"gte": time_from, "lte": time_to}
+                }
+            })
+
+        search_body: Dict[str, Any] = {
+            "size": 0,
+            "aggs": {
+                "events_over_time": {
+                    "date_histogram": {
+                        "field": time_field,
+                        "fixed_interval": interval,
+                        "min_doc_count": 0,
+                        "extended_bounds": {
+                            "min": time_from,
+                            "max": time_to
+                        }
+                    }
+                }
+            }
+        }
+
+        if must_clauses:
+            search_body["query"] = {"bool": {"must": must_clauses}}
+
+        try:
+            encoded_index = index_pattern.replace(",", "%2C")
+            result = await self._request(
+                "POST",
+                f"/{encoded_index}/_search",
+                json=search_body
+            )
+
+            buckets = result.get("aggregations", {}).get("events_over_time", {}).get("buckets", [])
+
+            return {
+                "buckets": [
+                    {
+                        "timestamp": b.get("key_as_string") or b.get("key"),
+                        "count": b.get("doc_count", 0)
+                    }
+                    for b in buckets
+                ],
+                "total": sum(b.get("doc_count", 0) for b in buckets),
+                "interval": interval,
+            }
+
+        except ElasticsearchError as e:
+            return {"error": str(e), "buckets": []}
+
+    async def list_indices(
+        self,
+        pattern: str = "*",
+        include_system: bool = False,
+        include_stats: bool = True,
+    ) -> Dict[str, Any]:
+        """List available Elasticsearch indices.
+
+        Args:
+            pattern: Index pattern to filter (e.g., "logs-*")
+            include_system: Include system indices (starting with .)
+            include_stats: Include document count and size stats
+
+        Returns:
+            Dict with list of indices and their metadata
+        """
+        if not self.is_configured:
+            return {"error": "Elasticsearch is not configured", "indices": []}
+
+        try:
+            # Get index list with stats
+            if include_stats:
+                result = await self._request("GET", f"/_cat/indices/{pattern}?format=json&h=index,health,status,docs.count,store.size,creation.date")
+            else:
+                result = await self._request("GET", f"/_cat/indices/{pattern}?format=json&h=index,health,status")
+
+            indices = []
+            for idx in result:
+                index_name = idx.get("index", "")
+
+                # Filter system indices if requested
+                if not include_system and index_name.startswith("."):
+                    continue
+
+                index_info = {
+                    "name": index_name,
+                    "health": idx.get("health"),
+                    "status": idx.get("status"),
+                }
+
+                if include_stats:
+                    index_info["doc_count"] = int(idx.get("docs.count", 0) or 0)
+                    index_info["size"] = idx.get("store.size", "0b")
+                    index_info["created"] = idx.get("creation.date")
+
+                indices.append(index_info)
+
+            # Sort by name
+            indices.sort(key=lambda x: x["name"])
+
+            return {
+                "indices": indices,
+                "total": len(indices),
+            }
+
+        except ElasticsearchError as e:
+            return {"error": str(e), "indices": []}
+
+    async def get_index_mappings(
+        self,
+        index_pattern: str,
+    ) -> Dict[str, Any]:
+        """Get field mappings for an index pattern.
+
+        Args:
+            index_pattern: Index or pattern to get mappings for
+
+        Returns:
+            Dict with field names, types, and metadata
+        """
+        if not self.is_configured:
+            return {"error": "Elasticsearch is not configured", "fields": []}
+
+        try:
+            encoded_index = index_pattern.replace(",", "%2C")
+            result = await self._request("GET", f"/{encoded_index}/_mapping")
+
+            # Extract and flatten field mappings
+            fields = []
+            seen_fields = set()
+
+            for index_name, index_data in result.items():
+                mappings = index_data.get("mappings", {})
+                properties = mappings.get("properties", {})
+
+                def extract_fields(props: dict, prefix: str = ""):
+                    for field_name, field_data in props.items():
+                        full_name = f"{prefix}{field_name}" if prefix else field_name
+
+                        if full_name in seen_fields:
+                            continue
+                        seen_fields.add(full_name)
+
+                        field_type = field_data.get("type", "object")
+                        field_info = {
+                            "name": full_name,
+                            "type": field_type,
+                            "searchable": field_type not in ["object", "nested"],
+                            "aggregatable": field_type in ["keyword", "long", "integer", "short", "byte", "double", "float", "date", "boolean", "ip"],
+                        }
+
+                        # Add format for date fields
+                        if field_type == "date" and "format" in field_data:
+                            field_info["format"] = field_data["format"]
+
+                        fields.append(field_info)
+
+                        # Recurse into nested properties
+                        if "properties" in field_data:
+                            extract_fields(field_data["properties"], f"{full_name}.")
+
+                extract_fields(properties)
+
+            # Sort fields by name
+            fields.sort(key=lambda x: x["name"])
+
+            return {
+                "fields": fields,
+                "total": len(fields),
+                "index_pattern": index_pattern,
+            }
+
+        except ElasticsearchError as e:
+            return {"error": str(e), "fields": []}
+
+    async def get_field_stats(
+        self,
+        index_pattern: str,
+        field: str,
+        size: int = 10,
+        time_field: Optional[str] = "@timestamp",
+        time_from: Optional[str] = "now-24h",
+        time_to: Optional[str] = "now",
+    ) -> Dict[str, Any]:
+        """Get statistics and top values for a specific field.
+
+        Args:
+            index_pattern: Index pattern to search
+            field: Field to analyze
+            size: Number of top values to return
+            time_field: Time field for filtering
+            time_from: Start time
+            time_to: End time
+
+        Returns:
+            Dict with field statistics and top values
+        """
+        if not self.is_configured:
+            return {"error": "Elasticsearch is not configured"}
+
+        # Build time range filter
+        query: Dict[str, Any] = {"match_all": {}}
+        if time_field and time_from:
+            query = {
+                "bool": {
+                    "filter": [{
+                        "range": {
+                            time_field: {"gte": time_from, "lte": time_to or "now"}
+                        }
+                    }]
+                }
+            }
+
+        search_body = {
+            "size": 0,
+            "query": query,
+            "aggs": {
+                "field_stats": {
+                    "terms": {
+                        "field": field,
+                        "size": size,
+                        "missing": "__missing__"
+                    }
+                },
+                "cardinality": {
+                    "cardinality": {
+                        "field": field
+                    }
+                },
+                "value_count": {
+                    "value_count": {
+                        "field": field
+                    }
+                }
+            }
+        }
+
+        try:
+            encoded_index = index_pattern.replace(",", "%2C")
+            result = await self._request(
+                "POST",
+                f"/{encoded_index}/_search",
+                json=search_body
+            )
+
+            aggs = result.get("aggregations", {})
+            buckets = aggs.get("field_stats", {}).get("buckets", [])
+
+            top_values = []
+            for b in buckets:
+                key = b.get("key")
+                if key == "__missing__":
+                    key = None
+                top_values.append({
+                    "value": key,
+                    "count": b.get("doc_count", 0)
+                })
+
+            return {
+                "field": field,
+                "index_pattern": index_pattern,
+                "top_values": top_values,
+                "unique_count": aggs.get("cardinality", {}).get("value", 0),
+                "total_count": aggs.get("value_count", {}).get("value", 0),
+                "doc_count": result.get("hits", {}).get("total", {}).get("value", 0),
+            }
+
+        except ElasticsearchError as e:
+            return {"error": str(e)}
+
+    async def ioc_hunt(
+        self,
+        ioc_value: str,
+        ioc_type: Optional[str] = None,
+        index_pattern: str = "*,-.*",
+        time_field: str = "@timestamp",
+        time_from: Optional[str] = "now-30d",
+        time_to: Optional[str] = "now",
+        size: int = 100,
+    ) -> Dict[str, Any]:
+        """Hunt for an IOC (Indicator of Compromise) across all indices.
+
+        Automatically detects IOC type and searches relevant fields.
+
+        Args:
+            ioc_value: The IOC value to search for (IP, hash, domain, URL, email)
+            ioc_type: Override auto-detection (ip, hash, domain, url, email)
+            index_pattern: Indices to search (default excludes system indices)
+            time_field: Time field for filtering
+            time_from: Start time
+            time_to: End time
+            size: Max results per index
+
+        Returns:
+            Dict with hits grouped by index and IOC metadata
+        """
+        if not self.is_configured:
+            return {"error": "Elasticsearch is not configured", "hits": [], "total": 0}
+
+        import re
+
+        # Auto-detect IOC type if not provided
+        if not ioc_type:
+            ioc_type = self._detect_ioc_type(ioc_value)
+
+        # Define fields to search based on IOC type
+        field_patterns = {
+            "ip": [
+                "source.ip", "destination.ip", "client.ip", "server.ip",
+                "host.ip", "source_ip", "dest_ip", "src_ip", "dst_ip",
+                "ip", "ipaddress", "remote_ip", "local_ip", "*ip*"
+            ],
+            "hash": [
+                "file.hash.*", "hash.*", "file.sha256", "file.sha1", "file.md5",
+                "sha256", "sha1", "md5", "hash", "file_hash", "process.hash.*"
+            ],
+            "domain": [
+                "dns.question.name", "url.domain", "destination.domain",
+                "host.name", "domain", "hostname", "server.domain",
+                "destination.registered_domain", "url.registered_domain"
+            ],
+            "url": [
+                "url.full", "url.original", "http.request.url", "url",
+                "request.url", "uri", "http_url"
+            ],
+            "email": [
+                "user.email", "email.from", "email.to", "source.user.email",
+                "destination.user.email", "email", "sender", "recipient"
+            ],
+        }
+
+        search_fields = field_patterns.get(ioc_type, ["*"])
+
+        # Build multi-field query
+        should_clauses = []
+
+        # For IPs, use term queries on IP fields
+        if ioc_type == "ip":
+            for field in search_fields:
+                if "*" in field:
+                    should_clauses.append({
+                        "query_string": {
+                            "query": f"{ioc_value}",
+                            "fields": [field],
+                            "default_operator": "AND"
+                        }
+                    })
+                else:
+                    should_clauses.append({"term": {field: ioc_value}})
+        else:
+            # For other types, use multi_match and query_string
+            should_clauses.append({
+                "multi_match": {
+                    "query": ioc_value,
+                    "fields": [f for f in search_fields if "*" not in f],
+                    "type": "phrase"
+                }
+            })
+            # Also search with wildcards for flexible matching
+            should_clauses.append({
+                "query_string": {
+                    "query": f"\"{ioc_value}\"",
+                    "default_operator": "AND",
+                    "analyze_wildcard": True
+                }
+            })
+
+        # Build time filter
+        must_clauses = []
+        if time_field and time_from:
+            must_clauses.append({
+                "range": {
+                    time_field: {"gte": time_from, "lte": time_to or "now"}
+                }
+            })
+
+        search_body: Dict[str, Any] = {
+            "size": size,
+            "track_total_hits": True,
+            "query": {
+                "bool": {
+                    "must": must_clauses if must_clauses else [{"match_all": {}}],
+                    "should": should_clauses,
+                    "minimum_should_match": 1
+                }
+            },
+            "sort": [{time_field: {"order": "desc", "unmapped_type": "date"}}] if time_field else [],
+            "aggs": {
+                "by_index": {
+                    "terms": {
+                        "field": "_index",
+                        "size": 50
+                    }
+                }
+            }
+        }
+
+        try:
+            encoded_index = index_pattern.replace(",", "%2C")
+            result = await self._request(
+                "POST",
+                f"/{encoded_index}/_search",
+                json=search_body
+            )
+
+            hits = result.get("hits", {})
+            documents = []
+
+            for hit in hits.get("hits", []):
+                doc = {
+                    "_index": hit.get("_index"),
+                    "_id": hit.get("_id"),
+                    "_score": hit.get("_score"),
+                    **hit.get("_source", {})
+                }
+                documents.append(doc)
+
+            # Group hits by index
+            index_buckets = result.get("aggregations", {}).get("by_index", {}).get("buckets", [])
+            indices_found = [
+                {"index": b["key"], "count": b["doc_count"]}
+                for b in index_buckets
+            ]
+
+            return {
+                "ioc_value": ioc_value,
+                "ioc_type": ioc_type,
+                "hits": documents,
+                "total": hits.get("total", {}).get("value", 0),
+                "indices_found": indices_found,
+                "took_ms": result.get("took", 0),
+                "search_fields": search_fields,
+            }
+
+        except ElasticsearchError as e:
+            return {"error": str(e), "hits": [], "total": 0}
+
+    def _detect_ioc_type(self, value: str) -> str:
+        """Auto-detect the type of IOC based on its format."""
+        import re
+
+        value = value.strip()
+
+        # IPv4
+        if re.match(r'^(\d{1,3}\.){3}\d{1,3}$', value):
+            return "ip"
+
+        # IPv6 (simplified check)
+        if re.match(r'^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$', value):
+            return "ip"
+
+        # MD5 hash (32 hex chars)
+        if re.match(r'^[a-fA-F0-9]{32}$', value):
+            return "hash"
+
+        # SHA1 hash (40 hex chars)
+        if re.match(r'^[a-fA-F0-9]{40}$', value):
+            return "hash"
+
+        # SHA256 hash (64 hex chars)
+        if re.match(r'^[a-fA-F0-9]{64}$', value):
+            return "hash"
+
+        # URL
+        if re.match(r'^https?://', value, re.IGNORECASE):
+            return "url"
+
+        # Email
+        if re.match(r'^[^@]+@[^@]+\.[^@]+$', value):
+            return "email"
+
+        # Domain (basic check - contains dot, no spaces, not IP)
+        if '.' in value and ' ' not in value and not re.match(r'^(\d{1,3}\.){3}\d{1,3}$', value):
+            return "domain"
+
+        # Default to generic search
+        return "unknown"
+
+    async def ioc_hunt_bulk(
+        self,
+        ioc_values: List[str],
+        index_pattern: str = "*,-.*",
+        time_from: Optional[str] = "now-30d",
+        time_to: Optional[str] = "now",
+    ) -> Dict[str, Any]:
+        """Hunt for multiple IOCs at once.
+
+        Args:
+            ioc_values: List of IOC values to search for
+            index_pattern: Indices to search
+            time_from: Start time
+            time_to: End time
+
+        Returns:
+            Dict with results for each IOC
+        """
+        if not self.is_configured:
+            return {"error": "Elasticsearch is not configured", "results": []}
+
+        results = []
+        found_count = 0
+        not_found_count = 0
+
+        for ioc in ioc_values[:100]:  # Limit to 100 IOCs
+            result = await self.ioc_hunt(
+                ioc_value=ioc.strip(),
+                index_pattern=index_pattern,
+                time_from=time_from,
+                time_to=time_to,
+                size=10  # Limit per IOC for bulk search
+            )
+
+            ioc_result = {
+                "ioc_value": ioc,
+                "ioc_type": result.get("ioc_type", "unknown"),
+                "found": result.get("total", 0) > 0,
+                "hit_count": result.get("total", 0),
+                "indices": [i["index"] for i in result.get("indices_found", [])],
+            }
+            results.append(ioc_result)
+
+            if ioc_result["found"]:
+                found_count += 1
+            else:
+                not_found_count += 1
+
+        return {
+            "results": results,
+            "total_searched": len(results),
+            "found_count": found_count,
+            "not_found_count": not_found_count,
+        }

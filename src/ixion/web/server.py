@@ -248,6 +248,12 @@ async def tools_page(request: Request):
     return templates.TemplateResponse("tools.html", {"request": request})
 
 
+@app.get("/discover", response_class=HTMLResponse)
+async def discover_page(request: Request):
+    """Render the discover and hunt page for analysts."""
+    return templates.TemplateResponse("discover.html", {"request": request})
+
+
 @app.get("/integrations", response_class=HTMLResponse)
 async def integrations_page(request: Request):
     """Render the integrations management page (admin only)."""
