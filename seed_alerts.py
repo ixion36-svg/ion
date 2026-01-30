@@ -6,8 +6,8 @@ import random
 from datetime import datetime, timedelta
 
 ES_URL = "http://localhost:9200"
-AUTH = ("elastic", "DocforgeTest123!")
-INDEX = "alerts-docforge"
+AUTH = ("elastic", "testpassword123")
+INDEX = "alerts-ixion"
 
 def main():
     now = datetime.utcnow()

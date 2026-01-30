@@ -72,6 +72,7 @@ venv.bak/
 
 # Local config
 .ixion/
+docker-compose.local.yml
 
 # OS
 .DS_Store
