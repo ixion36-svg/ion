@@ -3835,6 +3835,321 @@ async def get_es_alert_stats(
 
 
 # ============================================================================
+# Elasticsearch Discover Search Endpoints
+# ============================================================================
+
+
+class DiscoverSearchRequest(BaseModel):
+    """Request model for discover search."""
+    index_pattern: str = "logs-*"
+    query: str = "*"
+    time_field: str = "@timestamp"
+    time_from: Optional[str] = "now-24h"
+    time_to: Optional[str] = "now"
+    size: int = 100
+    sort_field: Optional[str] = None
+    sort_order: str = "desc"
+    fields: Optional[List[str]] = None
+
+
+class DiscoverHistogramRequest(BaseModel):
+    """Request model for discover histogram."""
+    index_pattern: str = "logs-*"
+    query: str = "*"
+    time_field: str = "@timestamp"
+    time_from: str = "now-24h"
+    time_to: str = "now"
+    interval: str = "1h"
+
+
+@router.post("/elasticsearch/discover/search")
+async def discover_search(
+    request: DiscoverSearchRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Execute a discover-style search across Elasticsearch indices.
+
+    Supports Lucene/KQL query syntax for flexible searching.
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.discover_search(
+            index_pattern=request.index_pattern,
+            query=request.query,
+            time_field=request.time_field,
+            time_from=request.time_from,
+            time_to=request.time_to,
+            size=request.size,
+            sort_field=request.sort_field,
+            sort_order=request.sort_order,
+            fields=request.fields,
+        )
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/elasticsearch/discover/histogram")
+async def discover_histogram(
+    request: DiscoverHistogramRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Get a time histogram for discover visualization."""
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.discover_histogram(
+            index_pattern=request.index_pattern,
+            query=request.query,
+            time_field=request.time_field,
+            time_from=request.time_from,
+            time_to=request.time_to,
+            interval=request.interval,
+        )
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Elasticsearch Index Browser Endpoints
+# ============================================================================
+
+
+@router.get("/elasticsearch/indices")
+async def list_indices(
+    pattern: str = "*",
+    include_system: bool = False,
+    include_stats: bool = True,
+    current_user: User = Depends(get_current_user),
+):
+    """List available Elasticsearch indices.
+
+    Args:
+        pattern: Index pattern to filter (e.g., "logs-*")
+        include_system: Include system indices (starting with .)
+        include_stats: Include document count and size stats
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.list_indices(
+            pattern=pattern,
+            include_system=include_system,
+            include_stats=include_stats,
+        )
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/elasticsearch/indices/{index_pattern}/mappings")
+async def get_index_mappings(
+    index_pattern: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Get field mappings for an index pattern.
+
+    Returns field names, types, and whether they are searchable/aggregatable.
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.get_index_mappings(index_pattern=index_pattern)
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class FieldStatsRequest(BaseModel):
+    """Request model for field statistics."""
+    index_pattern: str
+    field: str
+    size: int = 10
+    time_field: Optional[str] = "@timestamp"
+    time_from: Optional[str] = "now-24h"
+    time_to: Optional[str] = "now"
+
+
+@router.post("/elasticsearch/indices/field-stats")
+async def get_field_stats(
+    request: FieldStatsRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Get statistics and top values for a specific field.
+
+    Returns cardinality, top values, and counts.
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.get_field_stats(
+            index_pattern=request.index_pattern,
+            field=request.field,
+            size=request.size,
+            time_field=request.time_field,
+            time_from=request.time_from,
+            time_to=request.time_to,
+        )
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# IOC Hunt Endpoints
+# ============================================================================
+
+
+class IOCHuntRequest(BaseModel):
+    """Request model for IOC hunt."""
+    ioc_value: str
+    ioc_type: Optional[str] = None  # ip, hash, domain, url, email (auto-detected if not provided)
+    index_pattern: str = "*,-.*"
+    time_field: str = "@timestamp"
+    time_from: Optional[str] = "now-30d"
+    time_to: Optional[str] = "now"
+    size: int = 100
+
+
+class IOCHuntBulkRequest(BaseModel):
+    """Request model for bulk IOC hunt."""
+    ioc_values: List[str]
+    index_pattern: str = "*,-.*"
+    time_from: Optional[str] = "now-30d"
+    time_to: Optional[str] = "now"
+
+
+@router.post("/elasticsearch/ioc-hunt")
+async def ioc_hunt(
+    request: IOCHuntRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Hunt for an IOC (Indicator of Compromise) across all Elasticsearch indices.
+
+    Automatically detects IOC type (IP, hash, domain, URL, email) and searches
+    relevant fields. Returns matching documents and index statistics.
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.ioc_hunt(
+            ioc_value=request.ioc_value,
+            ioc_type=request.ioc_type,
+            index_pattern=request.index_pattern,
+            time_field=request.time_field,
+            time_from=request.time_from,
+            time_to=request.time_to,
+            size=request.size,
+        )
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/elasticsearch/ioc-hunt/bulk")
+async def ioc_hunt_bulk(
+    request: IOCHuntBulkRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Hunt for multiple IOCs at once.
+
+    Searches for up to 100 IOCs and returns a summary of which were found
+    and in which indices.
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.ioc_hunt_bulk(
+            ioc_values=request.ioc_values,
+            index_pattern=request.index_pattern,
+            time_from=request.time_from,
+            time_to=request.time_to,
+        )
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
 # OpenCTI Integration Endpoints
 # ============================================================================
 
