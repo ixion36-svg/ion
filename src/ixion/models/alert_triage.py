@@ -66,6 +66,11 @@ class AlertCase(Base, TimestampMixin):
     triggered_rules: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     evidence_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     source_alert_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    observables: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+
+    # Kibana Cases integration
+    kibana_case_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    kibana_case_version: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     # Relationships
     created_by: Mapped["User"] = relationship(

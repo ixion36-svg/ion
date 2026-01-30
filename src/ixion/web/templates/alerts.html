@@ -24,6 +24,61 @@
     <div class="threat-stats" id="alerts-threat-stats"></div>
 </div>
 
+<!-- Quick Stats Bar -->
+<div class="alert-stats-bar" id="alert-stats-bar">
+    <div class="stats-group">
+        <div class="stat-item">
+            <span class="stat-value" id="stat-total">-</span>
+            <span class="stat-label">Total</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item clickable" onclick="quickFilterByTriage('open')">
+            <span class="stat-value stat-open" id="stat-open">-</span>
+            <span class="stat-label">Open</span>
+        </div>
+        <div class="stat-item clickable" onclick="quickFilterByTriage('investigating')">
+            <span class="stat-value stat-investigating" id="stat-investigating">-</span>
+            <span class="stat-label">Investigating</span>
+        </div>
+        <div class="stat-item clickable" onclick="quickFilterByTriage('escalated')">
+            <span class="stat-value stat-escalated" id="stat-escalated">-</span>
+            <span class="stat-label">Escalated</span>
+        </div>
+        <div class="stat-item clickable" onclick="quickFilterByTriage('resolved')">
+            <span class="stat-value stat-resolved" id="stat-resolved">-</span>
+            <span class="stat-label">Resolved</span>
+        </div>
+    </div>
+    <div class="stats-group">
+        <div class="stat-item clickable" onclick="quickFilterBySeverity('critical')">
+            <span class="stat-value severity-critical" id="stat-critical">-</span>
+            <span class="stat-label">Critical</span>
+        </div>
+        <div class="stat-item clickable" onclick="quickFilterBySeverity('high')">
+            <span class="stat-value severity-high" id="stat-high">-</span>
+            <span class="stat-label">High</span>
+        </div>
+        <div class="stat-item clickable" onclick="quickFilterBySeverity('medium')">
+            <span class="stat-value severity-medium" id="stat-medium">-</span>
+            <span class="stat-label">Medium</span>
+        </div>
+        <div class="stat-item clickable" onclick="quickFilterBySeverity('low')">
+            <span class="stat-value severity-low" id="stat-low">-</span>
+            <span class="stat-label">Low</span>
+        </div>
+    </div>
+    <div class="stats-group stats-cases">
+        <div class="stat-item">
+            <span class="stat-value" id="stat-cases">-</span>
+            <span class="stat-label">Cases</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value" id="stat-unassigned">-</span>
+            <span class="stat-label">Unassigned</span>
+        </div>
+    </div>
+</div>
+
 <!-- Analytics Dashboard (collapsible) -->
 <div class="analytics-toggle">
     <button class="btn btn-secondary btn-sm" id="analytics-toggle-btn" onclick="toggleAnalytics()">
@@ -98,6 +153,98 @@
     </select>
     <input type="text" id="alert-search" class="search-input" placeholder="Search alerts..." oninput="debouncedSearch()">
     <button class="btn btn-secondary" onclick="clearAllFilters()">Clear</button>
+    <span class="filter-separator">|</span>
+    <select id="saved-filters-select" class="saved-filters-select" onchange="loadSavedFilter()">
+        <option value="">Saved Views...</option>
+    </select>
+    <button class="btn btn-secondary btn-icon" onclick="saveCurrentFilter()" title="Save current filters">&#128190;</button>
+    <button class="btn btn-secondary btn-icon" onclick="manageSavedFilters()" title="Manage saved views">&#9881;</button>
+</div>
+
+<!-- Bulk Actions Toolbar -->
+<div class="bulk-actions-toolbar" id="bulk-actions-toolbar" style="display: none;">
+    <div class="bulk-actions-info">
+        <input type="checkbox" id="select-all-cb" onchange="toggleSelectAll()" title="Select all visible alerts">
+        <span id="selected-count">0</span> alerts selected
+        <button class="btn btn-sm btn-link" onclick="clearSelection()">Clear selection</button>
+    </div>
+    <div class="bulk-actions-buttons">
+        <select id="bulk-status" class="bulk-select">
+            <option value="">Change Status...</option>
+            <option value="open">Open</option>
+            <option value="investigating">Investigating</option>
+            <option value="escalated">Escalated</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
+            <option value="false_positive">False Positive</option>
+        </select>
+        <select id="bulk-assign" class="bulk-select">
+            <option value="">Assign To...</option>
+            <option value="-1">Unassign</option>
+        </select>
+        <select id="bulk-priority" class="bulk-select">
+            <option value="">Set Priority...</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="applyBulkAction()">Apply</button>
+        <span class="bulk-separator">|</span>
+        <button class="btn btn-secondary btn-sm" onclick="showCreateCaseFromSelected()">Create Case</button>
+        <button class="btn btn-secondary btn-sm" onclick="addToExistingCase()">Add to Case</button>
+    </div>
+</div>
+
+<!-- Alert Context Menu -->
+<div id="alert-context-menu" class="context-menu" style="display: none;">
+    <div class="context-menu-item" onclick="contextMenuAction('open')">
+        <span class="context-icon">&#128269;</span> View Details
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="contextMenuAction('assign-me')">
+        <span class="context-icon">&#128100;</span> Assign to Me
+    </div>
+    <div class="context-menu-submenu">
+        <div class="context-menu-item">
+            <span class="context-icon">&#9654;</span> Set Status
+            <span class="submenu-arrow">&#9656;</span>
+        </div>
+        <div class="context-submenu">
+            <div class="context-menu-item" onclick="contextMenuAction('status', 'open')">Open</div>
+            <div class="context-menu-item" onclick="contextMenuAction('status', 'investigating')">Investigating</div>
+            <div class="context-menu-item" onclick="contextMenuAction('status', 'escalated')">Escalated</div>
+            <div class="context-menu-item" onclick="contextMenuAction('status', 'resolved')">Resolved</div>
+            <div class="context-menu-item" onclick="contextMenuAction('status', 'closed')">Closed</div>
+            <div class="context-menu-item" onclick="contextMenuAction('status', 'false_positive')">False Positive</div>
+        </div>
+    </div>
+    <div class="context-menu-submenu">
+        <div class="context-menu-item">
+            <span class="context-icon">&#9733;</span> Set Priority
+            <span class="submenu-arrow">&#9656;</span>
+        </div>
+        <div class="context-submenu">
+            <div class="context-menu-item" onclick="contextMenuAction('priority', 'critical')">Critical</div>
+            <div class="context-menu-item" onclick="contextMenuAction('priority', 'high')">High</div>
+            <div class="context-menu-item" onclick="contextMenuAction('priority', 'medium')">Medium</div>
+            <div class="context-menu-item" onclick="contextMenuAction('priority', 'low')">Low</div>
+        </div>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="contextMenuAction('create-case')">
+        <span class="context-icon">&#128193;</span> Create Case
+    </div>
+    <div class="context-menu-item" onclick="contextMenuAction('add-to-case')">
+        <span class="context-icon">&#128194;</span> Add to Case...
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item" onclick="contextMenuAction('copy-id')">
+        <span class="context-icon">&#128203;</span> Copy Alert ID
+    </div>
+    <div class="context-menu-item" onclick="contextMenuAction('kibana')">
+        <span class="context-icon">&#128279;</span> Open in Kibana
+    </div>
 </div>
 
 <!-- Main Grid -->
@@ -108,6 +255,7 @@
             <table class="data-table" id="alerts-table">
                 <thead>
                     <tr>
+                        <th style="width:40px;" class="checkbox-col"><input type="checkbox" id="header-select-all" onchange="toggleSelectAll()" title="Select all visible alerts"></th>
                         <th style="width:32px;"></th>
                         <th class="sortable" onclick="sortBy('severity')">
                             Severity <span class="sort-arrow" id="sort-severity"></span>
@@ -127,10 +275,11 @@
                         <th class="sortable" onclick="sortBy('timestamp')">
                             Time <span class="sort-arrow" id="sort-timestamp"></span>
                         </th>
+                        <th style="width:80px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="alerts-tbody">
-                    <tr><td colspan="9" class="loading">Loading alerts...</td></tr>
+                    <tr><td colspan="11" class="loading">Loading alerts...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -190,6 +339,11 @@
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2 id="alert-detail-title">Alert Details</h2>
+            <div class="investigation-timer" id="investigation-timer">
+                <span class="timer-icon">&#9201;</span>
+                <span class="timer-display" id="timer-display">00:00</span>
+                <button class="timer-btn" id="timer-toggle-btn" onclick="toggleInvestigationTimer()" title="Pause/Resume timer">&#10074;&#10074;</button>
+            </div>
             <button class="modal-close" onclick="closeAlertModal()">&times;</button>
         </div>
         <div class="modal-body" id="alert-detail-body">
@@ -231,6 +385,404 @@
 .alerts-filters .search-input {
     flex: 1;
     min-width: 200px;
+}
+
+/* Alert Stats Bar */
+.alert-stats-bar {
+    display: flex;
+    gap: 2rem;
+    padding: 0.75rem 1.25rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.stats-group {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.stats-cases {
+    margin-left: auto;
+}
+
+.stat-item {
+    text-align: center;
+    min-width: 50px;
+}
+
+.stat-item.clickable {
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius);
+    transition: background 0.15s;
+}
+
+.stat-item.clickable:hover {
+    background: var(--bg-hover);
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat-divider {
+    width: 1px;
+    height: 30px;
+    background: var(--border);
+}
+
+.stat-open { color: #3b82f6; }
+.stat-investigating { color: #f59e0b; }
+.stat-escalated { color: #ef4444; }
+.stat-resolved { color: #10b981; }
+
+/* Bulk Actions Toolbar */
+.bulk-actions-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-card);
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    gap: 1rem;
+}
+
+.bulk-actions-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--text);
+}
+
+.bulk-actions-info input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.bulk-actions-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.bulk-select {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.8rem;
+    background: var(--bg);
+    color: var(--text);
+    min-width: 130px;
+}
+
+.bulk-separator {
+    color: var(--text-muted);
+    margin: 0 0.25rem;
+}
+
+/* Checkbox column styling */
+.checkbox-col {
+    text-align: center;
+    width: 40px;
+}
+
+.checkbox-col input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.alert-row.selected {
+    background: rgba(var(--primary-rgb, 59, 130, 246), 0.1);
+}
+
+.alert-row:hover .checkbox-col input[type="checkbox"] {
+    opacity: 1;
+}
+
+/* Notification Toasts */
+.notification-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 10000;
+    animation: slideIn 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.notification-success {
+    background: #10b981;
+    color: white;
+}
+
+.notification-error {
+    background: #ef4444;
+    color: white;
+}
+
+.notification-warning {
+    background: #f59e0b;
+    color: white;
+}
+
+.notification-info {
+    background: #3b82f6;
+    color: white;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Context Menu */
+.context-menu {
+    position: fixed;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    min-width: 180px;
+    z-index: 10001;
+    padding: 0.25rem 0;
+}
+
+.context-menu-item {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text);
+}
+
+.context-menu-item:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.context-menu-item:hover .context-icon {
+    color: white;
+}
+
+.context-icon {
+    width: 16px;
+    text-align: center;
+}
+
+.context-menu-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0.25rem 0;
+}
+
+.context-menu-submenu {
+    position: relative;
+}
+
+.context-menu-submenu .submenu-arrow {
+    margin-left: auto;
+    font-size: 0.75rem;
+}
+
+.context-submenu {
+    display: none;
+    position: absolute;
+    left: 100%;
+    top: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    min-width: 140px;
+    padding: 0.25rem 0;
+}
+
+.context-menu-submenu:hover > .context-submenu {
+    display: block;
+}
+
+/* Quick Actions Column */
+.quick-actions-col {
+    width: 80px;
+    text-align: center;
+}
+
+.quick-actions {
+    display: none;
+    gap: 0.25rem;
+    justify-content: center;
+}
+
+.alert-row:hover .quick-actions {
+    display: flex;
+}
+
+.quick-action-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.quick-action-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* Saved Filters */
+.filter-separator {
+    color: var(--text-muted);
+    margin: 0 0.25rem;
+}
+
+.saved-filters-select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    background: var(--bg-card);
+    min-width: 140px;
+}
+
+.btn-icon {
+    padding: 0.5rem 0.6rem;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+/* Saved Filters Modal */
+.saved-filters-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10002;
+}
+
+.saved-filters-content {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    min-width: 400px;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.saved-filter-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+}
+
+.saved-filter-item:hover {
+    background: var(--bg-hover);
+}
+
+.saved-filter-name {
+    font-weight: 500;
+}
+
+.saved-filter-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.saved-filter-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Investigation Timer */
+.investigation-timer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--bg);
+    padding: 0.35rem 0.75rem;
+    border-radius: var(--radius);
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    margin-left: auto;
+    margin-right: 1rem;
+}
+
+.timer-icon {
+    font-size: 1rem;
+}
+
+.timer-display {
+    min-width: 50px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.timer-display.paused {
+    color: var(--text-muted);
+}
+
+.timer-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.7rem;
+    padding: 0.2rem;
+    color: var(--text-muted);
+    letter-spacing: -2px;
+}
+
+.timer-btn:hover {
+    color: var(--primary);
+}
+
+.timer-btn.playing::before {
+    content: "▶";
+    letter-spacing: normal;
 }
 
 .alerts-grid {
@@ -580,10 +1132,22 @@
     margin-bottom: 0.5rem;
 }
 
+.related-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.related-section-header h4 {
+    margin: 0;
+}
+
 .related-alert-item {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    justify-content: space-between;
+    gap: 0.5rem;
     padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--border);
     font-size: 0.8125rem;
@@ -593,10 +1157,27 @@
     border-bottom: none;
 }
 
-.related-alert-time {
+.related-alert-item.same-case {
+    background: rgba(var(--primary-rgb, 59, 130, 246), 0.1);
+}
+
+.related-alert-main {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    cursor: pointer;
+    min-width: 0;
+}
+
+.related-alert-main:hover {
+    color: var(--primary);
+}
+
+.related-alert-meta {
     color: var(--text-muted);
     font-size: 0.75rem;
-    min-width: 130px;
+    white-space: nowrap;
 }
 
 .related-alert-title {
@@ -604,6 +1185,66 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.related-alert-actions {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.similarity-badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.35rem;
+    border-radius: 3px;
+    font-weight: 600;
+    min-width: 32px;
+    text-align: center;
+}
+
+.similarity-high {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.similarity-medium {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+}
+
+.similarity-low {
+    background: rgba(107, 114, 128, 0.2);
+    color: #6b7280;
+}
+
+.case-badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.35rem;
+    background: var(--primary);
+    color: white;
+    border-radius: 3px;
+}
+
+.btn-xs {
+    padding: 0.15rem 0.35rem;
+    font-size: 0.7rem;
+}
+
+/* Keyboard Navigation */
+.alert-row.keyboard-selected {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+}
+
+kbd {
+    display: inline-block;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+    font-family: monospace;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
 /* Timeline */
@@ -1533,6 +2174,14 @@ let autoRefreshTimer = null;
 let currentDetailAlert = null;
 let triageCache = {}; // { es_alert_id: { status, priority, case_id, ... } }
 let casesData = []; // cached list of cases
+let selectedAlertIds = new Set(); // for bulk operations
+
+// Investigation timer state
+let investigationTimerInterval = null;
+let investigationStartTime = null;
+let investigationElapsedTime = 0; // in seconds
+let investigationTimerPaused = false;
+let investigationTimerAlertId = null;
 
 const SEVERITY_ORDER = { critical: 1, high: 2, medium: 3, low: 4, info: 5 };
 const TRIAGE_STATUSES = ['open', 'investigating', 'escalated', 'resolved', 'closed', 'false_positive'];
@@ -1640,6 +2289,28 @@ Object.entries(MITRE_TECHNIQUE_MAP).forEach(([tactic, techniques]) => {
 const debouncedSearch = debounce(() => applyFilters(), 300);
 
 // =========================================================================
+// Notifications
+// =========================================================================
+function showNotification(message, type = 'info') {
+    // Remove existing notifications
+    const existing = document.querySelector('.notification-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `notification-toast notification-${type}`;
+    toast.innerHTML = `
+        <span>${escapeHtml(message)}</span>
+        <button onclick="this.parentElement.remove()" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1.2rem;">&times;</button>
+    `;
+    document.body.appendChild(toast);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (toast.parentElement) toast.remove();
+    }, 5000);
+}
+
+// =========================================================================
 // Initialization
 // =========================================================================
 document.addEventListener('DOMContentLoaded', function() {
@@ -1654,7 +2325,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadAlerts() {
     const hours = document.getElementById('alert-time-range').value;
     const tbody = document.getElementById('alerts-tbody');
-    tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading alerts...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="loading">Loading alerts...</td></tr>';
 
     try {
         const params = new URLSearchParams({ hours, limit: 200 });
@@ -1676,7 +2347,7 @@ async function loadAlerts() {
         loadTriageBatch();
     } catch (error) {
         console.error('Error loading alerts:', error);
-        tbody.innerHTML = '<tr><td colspan="9" class="error">Error loading alerts. Check Elasticsearch connection.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="error">Error loading alerts. Check Elasticsearch connection.</td></tr>';
         document.getElementById('top-hosts-list').innerHTML = '<div class="empty-state">-</div>';
         document.getElementById('top-rules-list').innerHTML = '<div class="empty-state">-</div>';
         document.getElementById('top-users-list').innerHTML = '<div class="empty-state">-</div>';
@@ -1708,6 +2379,7 @@ async function loadTriageBatch() {
         }
         // Re-render table with case info
         renderAlerts();
+        updateStatsBar();
     } catch (e) {
         console.error('Error loading batch triage:', e);
     }
@@ -2879,6 +3551,7 @@ function applyFilters() {
     applySorting();
     renderAlerts();
     renderSidePanels();
+    updateStatsBar();
 }
 
 function filterByEntity(type, value) {
@@ -2952,7 +3625,7 @@ function renderAlerts() {
     const tbody = document.getElementById('alerts-tbody');
 
     if (filteredAlerts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="empty">No alerts match the current filters</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="empty">No alerts match the current filters</td></tr>';
         return;
     }
 
@@ -2965,8 +3638,16 @@ function renderAlerts() {
         const mitreBadge = a.mitre_technique_id
             ? `<span class="mitre-inline-badge" title="${escapeHtml(a.mitre_technique_name || '')} (${escapeHtml(a.mitre_tactic_name || '')})">${escapeHtml(a.mitre_technique_id)}</span>`
             : '';
+        const isSelected = selectedAlertIds.has(a.id);
         return `
-        <tr class="alert-row" onclick="showAlertDetail('${escapeHtml(a.id)}')">
+        <tr class="alert-row ${isSelected ? 'selected' : ''}"
+            onclick="showAlertDetail('${escapeHtml(a.id)}')"
+            oncontextmenu="showContextMenu(event, '${escapeHtml(a.id)}')"
+            data-alert-id="${escapeHtml(a.id)}">
+            <td class="checkbox-col" onclick="event.stopPropagation()">
+                <input type="checkbox" class="alert-checkbox" data-alert-id="${escapeHtml(a.id)}"
+                       ${isSelected ? 'checked' : ''} onchange="toggleAlertSelection('${escapeHtml(a.id)}', this.checked)">
+            </td>
             <td style="width:32px;text-align:center;"><span class="triage-dot triage-${triageStatus}" title="Triage: ${triageStatus}"></span></td>
             <td><span class="severity-badge severity-${a.severity}">${a.severity}</span></td>
             <td title="${escapeHtml(a.title)}">${escapeHtml(a.title)}${mitreBadge}</td>
@@ -2976,6 +3657,13 @@ function renderAlerts() {
             <td>${caseName}</td>
             <td><span class="status-badge alert-status-${a.status}">${a.status}</span></td>
             <td>${formatDate(a.timestamp)}</td>
+            <td class="quick-actions-col" onclick="event.stopPropagation()">
+                <div class="quick-actions">
+                    <button class="quick-action-btn" onclick="quickAssignToMe('${escapeHtml(a.id)}')" title="Assign to me">&#128100;</button>
+                    <button class="quick-action-btn" onclick="quickStatusChange('${escapeHtml(a.id)}', 'investigating')" title="Mark investigating">&#128270;</button>
+                    <button class="quick-action-btn" onclick="showCreateCaseForm('${escapeHtml(a.id)}')" title="Create case">&#128193;</button>
+                </div>
+            </td>
         </tr>
     `}).join('');
 }
@@ -2998,6 +3686,67 @@ function renderSidePanels() {
     const userCounts = {};
     source.forEach(a => { if (a.user) userCounts[a.user] = (userCounts[a.user] || 0) + 1; });
     renderSideList('top-users-list', 'users-count', userCounts, 'user');
+}
+
+function updateStatsBar() {
+    const source = allAlerts;
+
+    // Total
+    document.getElementById('stat-total').textContent = source.length;
+
+    // By triage status
+    const triageStatusCounts = { open: 0, investigating: 0, escalated: 0, resolved: 0, closed: 0, false_positive: 0 };
+    source.forEach(a => {
+        const triage = triageCache[a.id];
+        const status = triage?.status || 'open';
+        if (triageStatusCounts[status] !== undefined) {
+            triageStatusCounts[status]++;
+        }
+    });
+
+    document.getElementById('stat-open').textContent = triageStatusCounts.open;
+    document.getElementById('stat-investigating').textContent = triageStatusCounts.investigating;
+    document.getElementById('stat-escalated').textContent = triageStatusCounts.escalated;
+    document.getElementById('stat-resolved').textContent = triageStatusCounts.resolved;
+
+    // By severity
+    const severityCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    source.forEach(a => {
+        const sev = (a.severity || 'info').toLowerCase();
+        if (severityCounts[sev] !== undefined) {
+            severityCounts[sev]++;
+        }
+    });
+
+    document.getElementById('stat-critical').textContent = severityCounts.critical;
+    document.getElementById('stat-high').textContent = severityCounts.high;
+    document.getElementById('stat-medium').textContent = severityCounts.medium;
+    document.getElementById('stat-low').textContent = severityCounts.low;
+
+    // Cases count
+    const caseIds = new Set();
+    source.forEach(a => {
+        const triage = triageCache[a.id];
+        if (triage?.case_id) caseIds.add(triage.case_id);
+    });
+    document.getElementById('stat-cases').textContent = caseIds.size;
+
+    // Unassigned
+    const unassigned = source.filter(a => {
+        const triage = triageCache[a.id];
+        return !triage?.assigned_to_id;
+    }).length;
+    document.getElementById('stat-unassigned').textContent = unassigned;
+}
+
+function quickFilterByTriage(status) {
+    document.getElementById('alert-triage-filter').value = status;
+    applyFilters();
+}
+
+function quickFilterBySeverity(severity) {
+    document.getElementById('alert-severity-filter').value = severity;
+    applyFilters();
 }
 
 function renderSideList(containerId, countBadgeId, counts, entityType) {
@@ -3604,6 +4353,9 @@ async function showAlertDetail(alertId) {
     // Open modal
     document.getElementById('alert-detail-modal').classList.add('show');
 
+    // Start investigation timer
+    startInvestigationTimer(alertId);
+
     // Load related alerts and triage data in parallel
     loadRelatedAlerts(alert);
     loadTriage(alertId);
@@ -3612,6 +4364,9 @@ async function showAlertDetail(alertId) {
 function closeAlertModal() {
     document.getElementById('alert-detail-modal').classList.remove('show');
     currentDetailAlert = null;
+
+    // Stop investigation timer
+    stopInvestigationTimer();
 }
 
 // Close modal on background click
@@ -3672,13 +4427,13 @@ async function loadRelatedAlerts(alert) {
         let relHtml = '';
 
         if (related.by_host && related.by_host.length > 0) {
-            relHtml += renderRelatedSection('By Host', related.by_host);
+            relHtml += renderRelatedSection('By Host', related.by_host, 'host');
         }
         if (related.by_user && related.by_user.length > 0) {
-            relHtml += renderRelatedSection('By User', related.by_user);
+            relHtml += renderRelatedSection('By User', related.by_user, 'user');
         }
         if (related.by_rule && related.by_rule.length > 0) {
-            relHtml += renderRelatedSection('By Rule', related.by_rule);
+            relHtml += renderRelatedSection('By Rule', related.by_rule, 'rule');
         }
 
         if (!relHtml) {
@@ -3720,21 +4475,179 @@ async function loadRelatedAlerts(alert) {
     }
 }
 
-function renderRelatedSection(title, alerts) {
+function renderRelatedSection(title, alerts, matchType) {
+    const currentCase = currentDetailAlert && triageCache[currentDetailAlert.id]?.case_id;
+
     return `
         <div class="related-section">
-            <h4>${title} (${alerts.length})</h4>
-            ${alerts.slice(0, 10).map(a => `
-                <div class="related-alert-item">
-                    <span class="severity-badge severity-${a.severity}">${a.severity}</span>
-                    <span class="related-alert-time">${formatDate(a.timestamp)}</span>
-                    <span class="related-alert-title" title="${escapeHtml(a.title)}">${escapeHtml(a.title)}</span>
-                    <span style="color:var(--text-muted);font-size:0.75rem;">${escapeHtml(a.host || '')}</span>
+            <div class="related-section-header">
+                <h4>${title} (${alerts.length})</h4>
+                ${currentCase ? `<button class="btn btn-sm btn-secondary" onclick="linkAllToCase('${matchType}', ${currentCase})">Link all to case</button>` : ''}
+            </div>
+            ${alerts.slice(0, 10).map(a => {
+                const triage = triageCache[a.id];
+                const inSameCase = triage && currentCase && triage.case_id === currentCase;
+                const hasCase = triage && triage.case_id;
+                const similarity = calculateSimilarity(currentDetailAlert, a, matchType);
+
+                return `
+                <div class="related-alert-item ${inSameCase ? 'same-case' : ''}">
+                    <div class="related-alert-main" onclick="showAlertDetail('${escapeHtml(a.id)}')">
+                        <span class="severity-badge severity-${a.severity}">${a.severity}</span>
+                        <span class="similarity-badge similarity-${similarity.level}" title="${similarity.reasons.join(', ')}">${similarity.score}%</span>
+                        <span class="related-alert-title" title="${escapeHtml(a.title)}">${escapeHtml(a.title)}</span>
+                        <span class="related-alert-meta">${formatDate(a.timestamp)}</span>
+                    </div>
+                    <div class="related-alert-actions">
+                        ${hasCase
+                            ? `<span class="case-badge" title="In case ${triage.case_number || triage.case_id}">${triage.case_number || 'Case'}</span>`
+                            : currentCase
+                                ? `<button class="btn btn-xs btn-link" onclick="linkToCurrentCase('${escapeHtml(a.id)}')">+ Link</button>`
+                                : ''
+                        }
+                    </div>
                 </div>
-            `).join('')}
+            `}).join('')}
             ${alerts.length > 10 ? `<div style="padding:0.5rem;color:var(--text-muted);font-size:0.75rem;">...and ${alerts.length - 10} more</div>` : ''}
         </div>
     `;
+}
+
+function calculateSimilarity(alertA, alertB, primaryMatch) {
+    if (!alertA || !alertB) return { score: 0, level: 'low', reasons: [] };
+
+    let score = 0;
+    const reasons = [];
+
+    // Primary match gets base score
+    if (primaryMatch === 'host' && alertA.host === alertB.host) {
+        score += 30;
+        reasons.push('Same host');
+    }
+    if (primaryMatch === 'user' && alertA.user === alertB.user) {
+        score += 30;
+        reasons.push('Same user');
+    }
+    if (primaryMatch === 'rule' && alertA.rule_name === alertB.rule_name) {
+        score += 40;
+        reasons.push('Same rule');
+    }
+
+    // Additional matches
+    if (primaryMatch !== 'host' && alertA.host && alertA.host === alertB.host) {
+        score += 20;
+        reasons.push('Same host');
+    }
+    if (primaryMatch !== 'user' && alertA.user && alertA.user === alertB.user) {
+        score += 15;
+        reasons.push('Same user');
+    }
+    if (primaryMatch !== 'rule' && alertA.rule_name && alertA.rule_name === alertB.rule_name) {
+        score += 25;
+        reasons.push('Same rule');
+    }
+
+    // Same severity adds weight
+    if (alertA.severity === alertB.severity) {
+        score += 10;
+        reasons.push('Same severity');
+    }
+
+    // MITRE technique match
+    if (alertA.mitre_technique_id && alertA.mitre_technique_id === alertB.mitre_technique_id) {
+        score += 15;
+        reasons.push('Same MITRE technique');
+    }
+
+    // Time proximity (within 1 hour)
+    const timeA = new Date(alertA.timestamp).getTime();
+    const timeB = new Date(alertB.timestamp).getTime();
+    const hourMs = 3600000;
+    if (Math.abs(timeA - timeB) < hourMs) {
+        score += 10;
+        reasons.push('Within 1 hour');
+    }
+
+    score = Math.min(score, 100);
+    const level = score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low';
+
+    return { score, level, reasons };
+}
+
+async function linkToCurrentCase(alertId) {
+    const currentTriage = triageCache[currentDetailAlert?.id];
+    if (!currentTriage?.case_id) {
+        showNotification('Current alert is not linked to a case', 'warning');
+        return;
+    }
+
+    try {
+        const resp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ case_id: currentTriage.case_id })
+        });
+
+        if (!resp.ok) throw new Error('Failed to link alert');
+
+        showNotification('Alert linked to case', 'success');
+        await loadTriageData();
+
+        // Refresh the related alerts view
+        if (currentDetailAlert) {
+            loadRelatedAlerts(currentDetailAlert);
+        }
+    } catch (err) {
+        console.error('Link error:', err);
+        showNotification('Failed to link alert to case', 'error');
+    }
+}
+
+async function linkAllToCase(matchType, caseId) {
+    if (!confirm(`Link all related alerts (by ${matchType}) to the current case?`)) return;
+
+    const currentAlert = currentDetailAlert;
+    if (!currentAlert) return;
+
+    // Get related alerts of this type
+    const relatedAlerts = allAlerts.filter(a => {
+        if (a.id === currentAlert.id) return false;
+        if (matchType === 'host') return a.host === currentAlert.host;
+        if (matchType === 'user') return a.user === currentAlert.user;
+        if (matchType === 'rule') return a.rule_name === currentAlert.rule_name;
+        return false;
+    });
+
+    // Filter to only those not already in a case
+    const alertsToLink = relatedAlerts.filter(a => !triageCache[a.id]?.case_id);
+
+    if (alertsToLink.length === 0) {
+        showNotification('All related alerts are already linked to cases', 'info');
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts-triage/bulk-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                alert_ids: alertsToLink.map(a => a.id),
+                case_id: caseId
+            })
+        });
+
+        if (!resp.ok) throw new Error('Failed to link alerts');
+
+        const result = await resp.json();
+        showNotification(`Linked ${result.updated} alerts to case`, 'success');
+        await loadTriageData();
+
+        // Refresh the related alerts view
+        loadRelatedAlerts(currentAlert);
+    } catch (err) {
+        console.error('Bulk link error:', err);
+        showNotification('Failed to link alerts to case', 'error');
+    }
 }
 
 function renderTimeline(container, alerts) {
@@ -3804,6 +4717,1016 @@ function toggleAutoRefresh() {
         indicator.classList.add('paused');
     }
 }
+
+// =========================================================================
+// Investigation Timer
+// =========================================================================
+function startInvestigationTimer(alertId) {
+    // Stop any existing timer
+    stopInvestigationTimer();
+
+    investigationTimerAlertId = alertId;
+    investigationStartTime = Date.now();
+    investigationElapsedTime = 0;
+    investigationTimerPaused = false;
+
+    updateTimerDisplay();
+    investigationTimerInterval = setInterval(updateTimerDisplay, 1000);
+
+    // Update button state
+    const btn = document.getElementById('timer-toggle-btn');
+    if (btn) {
+        btn.innerHTML = '&#10074;&#10074;'; // Pause icon
+        btn.classList.remove('playing');
+    }
+}
+
+function stopInvestigationTimer() {
+    if (investigationTimerInterval) {
+        clearInterval(investigationTimerInterval);
+        investigationTimerInterval = null;
+    }
+
+    // Store the investigation time if we want to save it
+    if (investigationTimerAlertId && investigationElapsedTime > 0) {
+        // Could save to localStorage or backend here
+        const key = `investigation_time_${investigationTimerAlertId}`;
+        const existing = parseInt(localStorage.getItem(key) || '0');
+        localStorage.setItem(key, existing + investigationElapsedTime);
+    }
+
+    investigationStartTime = null;
+    investigationTimerAlertId = null;
+}
+
+function toggleInvestigationTimer() {
+    const btn = document.getElementById('timer-toggle-btn');
+    const display = document.getElementById('timer-display');
+
+    if (investigationTimerPaused) {
+        // Resume
+        investigationTimerPaused = false;
+        investigationStartTime = Date.now();
+        investigationTimerInterval = setInterval(updateTimerDisplay, 1000);
+        btn.innerHTML = '&#10074;&#10074;'; // Pause icon
+        btn.classList.remove('playing');
+        display.classList.remove('paused');
+    } else {
+        // Pause
+        investigationTimerPaused = true;
+        if (investigationTimerInterval) {
+            clearInterval(investigationTimerInterval);
+            investigationTimerInterval = null;
+        }
+        // Add elapsed time since last start
+        if (investigationStartTime) {
+            investigationElapsedTime += Math.floor((Date.now() - investigationStartTime) / 1000);
+        }
+        btn.innerHTML = '&#9654;'; // Play icon
+        btn.classList.add('playing');
+        display.classList.add('paused');
+    }
+}
+
+function updateTimerDisplay() {
+    let totalSeconds = investigationElapsedTime;
+    if (!investigationTimerPaused && investigationStartTime) {
+        totalSeconds += Math.floor((Date.now() - investigationStartTime) / 1000);
+    }
+
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const display = document.getElementById('timer-display');
+    if (display) {
+        if (hours > 0) {
+            display.textContent = `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        } else {
+            display.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+    }
+}
+
+function getStoredInvestigationTime(alertId) {
+    const key = `investigation_time_${alertId}`;
+    return parseInt(localStorage.getItem(key) || '0');
+}
+
+// =========================================================================
+// Saved Filters/Views
+// =========================================================================
+const SAVED_FILTERS_KEY = 'ixion_saved_filters';
+
+function getSavedFilters() {
+    try {
+        return JSON.parse(localStorage.getItem(SAVED_FILTERS_KEY) || '[]');
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveSavedFilters(filters) {
+    localStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify(filters));
+    populateSavedFiltersDropdown();
+}
+
+function getCurrentFilterState() {
+    return {
+        timeRange: document.getElementById('alert-time-range').value,
+        triageStatus: document.getElementById('alert-triage-filter').value,
+        severity: document.getElementById('alert-severity-filter').value,
+        status: document.getElementById('alert-status-filter').value,
+        search: document.getElementById('alert-search').value,
+        entityFilter: entityFilter
+    };
+}
+
+function applyFilterState(state) {
+    document.getElementById('alert-time-range').value = state.timeRange || '24';
+    document.getElementById('alert-triage-filter').value = state.triageStatus || '';
+    document.getElementById('alert-severity-filter').value = state.severity || '';
+    document.getElementById('alert-status-filter').value = state.status || '';
+    document.getElementById('alert-search').value = state.search || '';
+    entityFilter = state.entityFilter || null;
+    applyFilters();
+}
+
+function saveCurrentFilter() {
+    const state = getCurrentFilterState();
+
+    // Check if there are any filters applied
+    const hasFilters = state.triageStatus || state.severity || state.status ||
+                       state.search || state.entityFilter;
+
+    if (!hasFilters && state.timeRange === '24') {
+        showNotification('No filters to save', 'warning');
+        return;
+    }
+
+    // Generate a description
+    const parts = [];
+    if (state.timeRange !== '24') parts.push(`Time: ${state.timeRange}h`);
+    if (state.triageStatus) parts.push(`Triage: ${state.triageStatus}`);
+    if (state.severity) parts.push(`Severity: ${state.severity}`);
+    if (state.status) parts.push(`Status: ${state.status}`);
+    if (state.search) parts.push(`Search: "${state.search}"`);
+    if (state.entityFilter) parts.push(`${state.entityFilter.type}: ${state.entityFilter.value}`);
+    const description = parts.join(', ');
+
+    // Prompt for name
+    const name = prompt('Enter a name for this saved view:', description.substring(0, 30));
+    if (!name) return;
+
+    const filters = getSavedFilters();
+    filters.push({
+        id: Date.now().toString(),
+        name: name.trim(),
+        description,
+        state,
+        createdAt: new Date().toISOString()
+    });
+
+    saveSavedFilters(filters);
+    showNotification(`View "${name}" saved`, 'success');
+}
+
+function loadSavedFilter() {
+    const select = document.getElementById('saved-filters-select');
+    const filterId = select.value;
+
+    if (!filterId) return;
+
+    const filters = getSavedFilters();
+    const filter = filters.find(f => f.id === filterId);
+
+    if (filter) {
+        applyFilterState(filter.state);
+        showNotification(`Loaded view: ${filter.name}`, 'info');
+    }
+
+    // Reset dropdown
+    select.value = '';
+}
+
+function populateSavedFiltersDropdown() {
+    const select = document.getElementById('saved-filters-select');
+    const filters = getSavedFilters();
+
+    // Clear existing options except the first
+    select.innerHTML = '<option value="">Saved Views...</option>';
+
+    filters.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.id;
+        opt.textContent = f.name;
+        opt.title = f.description;
+        select.appendChild(opt);
+    });
+}
+
+function manageSavedFilters() {
+    const filters = getSavedFilters();
+
+    if (filters.length === 0) {
+        showNotification('No saved views yet. Use the save button to create one.', 'info');
+        return;
+    }
+
+    const filterItems = filters.map(f => `
+        <div class="saved-filter-item" data-id="${f.id}">
+            <div>
+                <div class="saved-filter-name">${escapeHtml(f.name)}</div>
+                <div class="saved-filter-desc">${escapeHtml(f.description)}</div>
+            </div>
+            <div class="saved-filter-actions">
+                <button class="btn btn-sm btn-primary" onclick="loadFilterById('${f.id}')">Load</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteFilter('${f.id}')">Delete</button>
+            </div>
+        </div>
+    `).join('');
+
+    const modalHtml = `
+        <div id="saved-filters-modal" class="saved-filters-modal" onclick="if(event.target===this)this.remove()">
+            <div class="saved-filters-content">
+                <div class="modal-header" style="margin-bottom:1rem;">
+                    <h3>Manage Saved Views</h3>
+                    <button class="modal-close" onclick="document.getElementById('saved-filters-modal').remove()">&times;</button>
+                </div>
+                <div class="saved-filters-list">
+                    ${filterItems}
+                </div>
+                <div class="modal-footer" style="margin-top:1rem;text-align:right;">
+                    <button class="btn btn-secondary" onclick="document.getElementById('saved-filters-modal').remove()">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal
+    const existing = document.getElementById('saved-filters-modal');
+    if (existing) existing.remove();
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function loadFilterById(filterId) {
+    const filters = getSavedFilters();
+    const filter = filters.find(f => f.id === filterId);
+
+    if (filter) {
+        applyFilterState(filter.state);
+        showNotification(`Loaded view: ${filter.name}`, 'info');
+        const modal = document.getElementById('saved-filters-modal');
+        if (modal) modal.remove();
+    }
+}
+
+function deleteFilter(filterId) {
+    if (!confirm('Delete this saved view?')) return;
+
+    const filters = getSavedFilters().filter(f => f.id !== filterId);
+    saveSavedFilters(filters);
+
+    // Remove the item from the modal
+    const item = document.querySelector(`.saved-filter-item[data-id="${filterId}"]`);
+    if (item) item.remove();
+
+    // If no more filters, close the modal
+    if (filters.length === 0) {
+        const modal = document.getElementById('saved-filters-modal');
+        if (modal) modal.remove();
+        showNotification('All saved views deleted', 'info');
+    } else {
+        showNotification('View deleted', 'success');
+    }
+}
+
+// Initialize saved filters dropdown on page load
+document.addEventListener('DOMContentLoaded', populateSavedFiltersDropdown);
+
+// =========================================================================
+// Context Menu & Quick Actions
+// =========================================================================
+let contextMenuAlertId = null;
+
+function showContextMenu(event, alertId) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    contextMenuAlertId = alertId;
+    const menu = document.getElementById('alert-context-menu');
+
+    // Position the menu
+    const x = event.clientX;
+    const y = event.clientY;
+
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.style.display = 'block';
+
+    // Adjust if menu goes off screen
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+        menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+    }
+    if (rect.bottom > window.innerHeight) {
+        menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+    }
+}
+
+function hideContextMenu() {
+    const menu = document.getElementById('alert-context-menu');
+    menu.style.display = 'none';
+    contextMenuAlertId = null;
+}
+
+// Hide context menu when clicking elsewhere
+document.addEventListener('click', hideContextMenu);
+document.addEventListener('scroll', hideContextMenu);
+
+async function contextMenuAction(action, value) {
+    hideContextMenu();
+
+    if (!contextMenuAlertId) return;
+    const alertId = contextMenuAlertId;
+
+    switch (action) {
+        case 'open':
+            showAlertDetail(alertId);
+            break;
+
+        case 'assign-me':
+            await quickAssignToMe(alertId);
+            break;
+
+        case 'status':
+            await quickStatusChange(alertId, value);
+            break;
+
+        case 'priority':
+            await quickPriorityChange(alertId, value);
+            break;
+
+        case 'create-case':
+            showCreateCaseForm(alertId);
+            break;
+
+        case 'add-to-case':
+            // Select this alert and open add to case dialog
+            selectedAlertIds.clear();
+            selectedAlertIds.add(alertId);
+            updateBulkActionsUI();
+            addToExistingCase();
+            break;
+
+        case 'copy-id':
+            navigator.clipboard.writeText(alertId).then(() => {
+                showNotification('Alert ID copied to clipboard', 'success');
+            }).catch(() => {
+                showNotification('Failed to copy alert ID', 'error');
+            });
+            break;
+
+        case 'kibana':
+            // Open alert in Kibana Security
+            const kibanaUrl = `/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/kibana-url`;
+            try {
+                const resp = await fetch(kibanaUrl);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.url) {
+                        window.open(data.url, '_blank');
+                    } else {
+                        showNotification('Kibana URL not available', 'warning');
+                    }
+                } else {
+                    // Fallback: construct a basic Kibana URL
+                    showNotification('Opening Kibana Security...', 'info');
+                    window.open('/kibana/app/security/alerts', '_blank');
+                }
+            } catch (e) {
+                window.open('/kibana/app/security/alerts', '_blank');
+            }
+            break;
+    }
+}
+
+async function quickAssignToMe(alertId) {
+    try {
+        const resp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assigned_to_id: currentUserData?.id || null })
+        });
+
+        if (!resp.ok) throw new Error('Failed to assign alert');
+
+        showNotification('Alert assigned to you', 'success');
+        await loadTriageData();
+        renderAlerts();
+    } catch (err) {
+        console.error('Assign error:', err);
+        showNotification('Failed to assign alert', 'error');
+    }
+}
+
+async function quickStatusChange(alertId, status) {
+    try {
+        const resp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+
+        if (!resp.ok) throw new Error('Failed to update status');
+
+        showNotification(`Status changed to ${status}`, 'success');
+        await loadTriageData();
+        renderAlerts();
+    } catch (err) {
+        console.error('Status change error:', err);
+        showNotification('Failed to update status', 'error');
+    }
+}
+
+async function quickPriorityChange(alertId, priority) {
+    try {
+        const resp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ priority })
+        });
+
+        if (!resp.ok) throw new Error('Failed to update priority');
+
+        showNotification(`Priority set to ${priority}`, 'success');
+        await loadTriageData();
+        renderAlerts();
+    } catch (err) {
+        console.error('Priority change error:', err);
+        showNotification('Failed to update priority', 'error');
+    }
+}
+
+// =========================================================================
+// Bulk Actions
+// =========================================================================
+function toggleAlertSelection(alertId, isSelected) {
+    if (isSelected) {
+        selectedAlertIds.add(alertId);
+    } else {
+        selectedAlertIds.delete(alertId);
+    }
+    updateBulkActionsUI();
+}
+
+function toggleSelectAll() {
+    const headerCheckbox = document.getElementById('header-select-all');
+    const isChecked = headerCheckbox.checked;
+
+    if (isChecked) {
+        // Select all visible alerts
+        filteredAlerts.forEach(a => selectedAlertIds.add(a.id));
+    } else {
+        // Deselect all
+        selectedAlertIds.clear();
+    }
+
+    // Update checkboxes in table
+    document.querySelectorAll('.alert-checkbox').forEach(cb => {
+        cb.checked = isChecked;
+        cb.closest('tr').classList.toggle('selected', isChecked);
+    });
+
+    updateBulkActionsUI();
+}
+
+function clearSelection() {
+    selectedAlertIds.clear();
+    document.querySelectorAll('.alert-checkbox').forEach(cb => {
+        cb.checked = false;
+        cb.closest('tr').classList.remove('selected');
+    });
+    document.getElementById('header-select-all').checked = false;
+    updateBulkActionsUI();
+}
+
+function updateBulkActionsUI() {
+    const count = selectedAlertIds.size;
+    const toolbar = document.getElementById('bulk-actions-toolbar');
+    const countSpan = document.getElementById('selected-count');
+
+    if (count > 0) {
+        toolbar.style.display = 'flex';
+        countSpan.textContent = count;
+    } else {
+        toolbar.style.display = 'none';
+    }
+
+    // Sync header checkbox state
+    const headerCheckbox = document.getElementById('header-select-all');
+    const allVisible = filteredAlerts.length > 0 && filteredAlerts.every(a => selectedAlertIds.has(a.id));
+    headerCheckbox.checked = allVisible;
+    headerCheckbox.indeterminate = count > 0 && !allVisible;
+}
+
+async function applyBulkAction() {
+    if (selectedAlertIds.size === 0) {
+        showNotification('No alerts selected', 'warning');
+        return;
+    }
+
+    const status = document.getElementById('bulk-status').value;
+    const assignee = document.getElementById('bulk-assign').value;
+    const priority = document.getElementById('bulk-priority').value;
+
+    if (!status && !assignee && !priority) {
+        showNotification('Select an action to apply', 'warning');
+        return;
+    }
+
+    const payload = {
+        alert_ids: Array.from(selectedAlertIds)
+    };
+
+    if (status) payload.status = status;
+    if (assignee) payload.assigned_to_id = assignee === '-1' ? null : parseInt(assignee);
+    if (priority) payload.priority = priority;
+
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts-triage/bulk-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.detail || 'Bulk update failed');
+        }
+
+        const result = await resp.json();
+        showNotification(`Updated ${result.updated} alerts`, 'success');
+
+        // Reset dropdowns
+        document.getElementById('bulk-status').value = '';
+        document.getElementById('bulk-assign').value = '';
+        document.getElementById('bulk-priority').value = '';
+
+        // Reload triage data
+        await loadTriageData();
+        renderAlerts();
+
+    } catch (err) {
+        console.error('Bulk update error:', err);
+        showNotification(err.message, 'error');
+    }
+}
+
+function showCreateCaseFromSelected() {
+    if (selectedAlertIds.size === 0) {
+        showNotification('No alerts selected', 'warning');
+        return;
+    }
+
+    // Get selected alerts data
+    const selectedAlerts = allAlerts.filter(a => selectedAlertIds.has(a.id));
+
+    // Auto-populate from multiple alerts
+    const prefillTitle = selectedAlerts.length === 1
+        ? selectedAlerts[0].title
+        : `Investigation: ${selectedAlerts.length} related alerts`;
+
+    // Collect hosts, users, rules from all selected alerts
+    const hosts = [...new Set(selectedAlerts.map(a => a.host).filter(Boolean))];
+    const users = [...new Set(selectedAlerts.map(a => a.user).filter(Boolean))];
+    const rules = [...new Set(selectedAlerts.map(a => a.rule_name).filter(Boolean))];
+    const severities = selectedAlerts.map(a => a.severity).filter(Boolean);
+    const highestSeverity = severities.includes('critical') ? 'critical'
+        : severities.includes('high') ? 'high'
+        : severities.includes('medium') ? 'medium'
+        : severities.includes('low') ? 'low' : '';
+
+    const descLines = [];
+    descLines.push(`Alerts: ${selectedAlerts.length}`);
+    if (hosts.length) descLines.push(`Hosts: ${hosts.join(', ')}`);
+    if (users.length) descLines.push(`Users: ${users.join(', ')}`);
+    if (rules.length) descLines.push(`Rules: ${rules.join(', ')}`);
+    const prefillDesc = descLines.join('\n');
+
+    const evidenceLines = [];
+    evidenceLines.push(`${selectedAlerts.length} alert(s) grouped for investigation.`);
+    if (hosts.length) evidenceLines.push(`Affected hosts: ${hosts.join(', ')}.`);
+    if (users.length) evidenceLines.push(`Affected users: ${users.join(', ')}.`);
+    if (rules.length) evidenceLines.push(`Triggered rules: ${rules.join(', ')}.`);
+    const prefillEvidence = evidenceLines.join(' ');
+
+    const severityOptions = ['', 'critical', 'high', 'medium', 'low'].map(s =>
+        `<option value="${s}" ${s === highestSeverity ? 'selected' : ''}>${s || 'Select severity'}</option>`
+    ).join('');
+
+    // Create overlay similar to single-alert case creation
+    const overlay = document.createElement('div');
+    overlay.className = 'case-create-overlay';
+    overlay.id = 'bulk-case-create-overlay';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+    overlay.innerHTML = `
+        <div class="case-create-form">
+            <h3>Create Case from ${selectedAlerts.length} Alert(s)</h3>
+            <label>Title *</label>
+            <input type="text" id="bulk-case-title" value="${escapeHtml(prefillTitle)}" />
+
+            <label>Description</label>
+            <textarea id="bulk-case-description" rows="4">${escapeHtml(prefillDesc)}</textarea>
+
+            <label>Severity</label>
+            <select id="bulk-case-severity">${severityOptions}</select>
+
+            <label>Evidence Summary</label>
+            <textarea id="bulk-case-evidence" rows="3">${escapeHtml(prefillEvidence)}</textarea>
+
+            <div class="case-form-actions">
+                <button class="btn btn-secondary" onclick="document.getElementById('bulk-case-create-overlay').remove()">Cancel</button>
+                <button class="btn btn-primary" onclick="submitBulkCreateCase()">Create Case</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+}
+
+async function submitBulkCreateCase() {
+    const title = document.getElementById('bulk-case-title').value.trim();
+    const description = document.getElementById('bulk-case-description').value.trim();
+    const severity = document.getElementById('bulk-case-severity').value;
+    const evidenceSummary = document.getElementById('bulk-case-evidence').value.trim();
+
+    if (!title) {
+        showNotification('Please enter a case title', 'warning');
+        return;
+    }
+
+    const alertIds = Array.from(selectedAlertIds);
+    const selectedAlerts = allAlerts.filter(a => selectedAlertIds.has(a.id));
+
+    // Collect hosts, users, rules
+    const affectedHosts = [...new Set(selectedAlerts.map(a => a.host).filter(Boolean))];
+    const affectedUsers = [...new Set(selectedAlerts.map(a => a.user).filter(Boolean))];
+    const triggeredRules = [...new Set(selectedAlerts.map(a => a.rule_name).filter(Boolean))];
+
+    // Build alert contexts for each selected alert
+    const alertContexts = selectedAlerts.map(a => ({
+        alert_id: a.id,
+        host: a.host || null,
+        user: a.user || null,
+        raw_data: a.raw_data || null,
+    }));
+
+    try {
+        const response = await fetch('/api/elasticsearch/alerts/cases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title,
+                description: description || null,
+                severity: severity || null,
+                alert_ids: alertIds,
+                affected_hosts: affectedHosts.length ? affectedHosts : null,
+                affected_users: affectedUsers.length ? affectedUsers : null,
+                triggered_rules: triggeredRules.length ? triggeredRules : null,
+                evidence_summary: evidenceSummary || null,
+                alert_contexts: alertContexts.length ? alertContexts : null,
+            }),
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to create case');
+        }
+
+        const result = await response.json();
+        document.getElementById('bulk-case-create-overlay').remove();
+        showNotification(`Case ${result.case_number} created with ${alertIds.length} alerts`, 'success');
+
+        // Clear selection and reload
+        clearSelection();
+        await loadCases();
+        await loadTriageData();
+        renderAlerts();
+
+    } catch (e) {
+        console.error('Error creating case:', e);
+        showNotification(e.message || 'Failed to create case', 'error');
+    }
+}
+
+async function addToExistingCase() {
+    if (selectedAlertIds.size === 0) {
+        showNotification('No alerts selected', 'warning');
+        return;
+    }
+
+    // Fetch available cases
+    if (casesData.length === 0) {
+        try {
+            const resp = await fetch('/api/cases/');
+            if (resp.ok) {
+                casesData = await resp.json();
+            }
+        } catch (err) {
+            console.error('Failed to load cases:', err);
+        }
+    }
+
+    const openCases = casesData.filter(c => c.status === 'open' || c.status === 'in_progress');
+
+    if (openCases.length === 0) {
+        showNotification('No open cases available. Create a new case instead.', 'warning');
+        return;
+    }
+
+    // Create a simple case picker modal
+    const caseOptions = openCases.map(c =>
+        `<option value="${c.id}">${escapeHtml(c.case_number)} - ${escapeHtml(c.title)}</option>`
+    ).join('');
+
+    const modalHtml = `
+        <div id="add-to-case-modal" class="modal" style="display: flex;">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3>Add Alerts to Case</h3>
+                    <button class="modal-close" onclick="closeAddToCaseModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>Adding ${selectedAlertIds.size} alert(s) to case:</p>
+                    <select id="target-case-id" class="form-control" style="width: 100%; margin: 1rem 0;">
+                        ${caseOptions}
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeAddToCaseModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="confirmAddToCase()">Add to Case</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove any existing modal
+    const existing = document.getElementById('add-to-case-modal');
+    if (existing) existing.remove();
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeAddToCaseModal() {
+    const modal = document.getElementById('add-to-case-modal');
+    if (modal) modal.remove();
+}
+
+async function confirmAddToCase() {
+    const caseId = document.getElementById('target-case-id').value;
+    if (!caseId) return;
+
+    const payload = {
+        alert_ids: Array.from(selectedAlertIds),
+        case_id: parseInt(caseId)
+    };
+
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts-triage/bulk-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.detail || 'Failed to add alerts to case');
+        }
+
+        const result = await resp.json();
+        showNotification(`Added ${result.updated} alerts to case`, 'success');
+
+        closeAddToCaseModal();
+        clearSelection();
+        await loadTriageData();
+        renderAlerts();
+
+    } catch (err) {
+        console.error('Add to case error:', err);
+        showNotification(err.message, 'error');
+    }
+}
+
+// Populate bulk assign dropdown with users
+async function loadBulkAssignOptions() {
+    try {
+        const resp = await fetch('/api/users/');
+        if (!resp.ok) return;
+        const users = await resp.json();
+
+        const select = document.getElementById('bulk-assign');
+        users.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.id;
+            opt.textContent = u.username;
+            select.appendChild(opt);
+        });
+    } catch (err) {
+        console.error('Failed to load users for bulk assign:', err);
+    }
+}
+
+// Initialize bulk assign options on page load
+document.addEventListener('DOMContentLoaded', loadBulkAssignOptions);
+
+// =========================================================================
+// Keyboard Shortcuts
+// =========================================================================
+let selectedRowIndex = -1;
+
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', handleKeyboardShortcut);
+}
+
+function handleKeyboardShortcut(e) {
+    // Don't trigger shortcuts when typing in inputs
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+        // But allow Escape to blur inputs
+        if (e.key === 'Escape') {
+            e.target.blur();
+        }
+        return;
+    }
+
+    // Check for modal states
+    const detailModalOpen = document.getElementById('alert-detail-modal')?.classList.contains('show');
+    const anyModalOpen = document.querySelector('.modal.show, .case-create-overlay, .saved-filters-modal, #add-to-case-modal');
+
+    switch (e.key) {
+        case 'Escape':
+            if (detailModalOpen) {
+                closeAlertModal();
+                e.preventDefault();
+            } else if (anyModalOpen) {
+                // Let existing handlers deal with it
+            } else {
+                // Clear selection
+                clearSelection();
+                selectedRowIndex = -1;
+                updateSelectedRow();
+            }
+            break;
+
+        case 'j':
+        case 'ArrowDown':
+            if (!anyModalOpen) {
+                e.preventDefault();
+                navigateAlerts(1);
+            }
+            break;
+
+        case 'k':
+        case 'ArrowUp':
+            if (!anyModalOpen) {
+                e.preventDefault();
+                navigateAlerts(-1);
+            }
+            break;
+
+        case 'Enter':
+            if (!anyModalOpen && selectedRowIndex >= 0 && filteredAlerts[selectedRowIndex]) {
+                e.preventDefault();
+                showAlertDetail(filteredAlerts[selectedRowIndex].id);
+            }
+            break;
+
+        case ' ': // Space to toggle selection
+            if (!anyModalOpen && selectedRowIndex >= 0 && filteredAlerts[selectedRowIndex]) {
+                e.preventDefault();
+                const alertId = filteredAlerts[selectedRowIndex].id;
+                const isSelected = selectedAlertIds.has(alertId);
+                toggleAlertSelection(alertId, !isSelected);
+                // Update checkbox visual
+                const checkbox = document.querySelector(`.alert-checkbox[data-alert-id="${alertId}"]`);
+                if (checkbox) checkbox.checked = !isSelected;
+            }
+            break;
+
+        case 'a':
+            if (detailModalOpen && currentDetailAlert) {
+                e.preventDefault();
+                quickAssignToMe(currentDetailAlert.id);
+            }
+            break;
+
+        case 's':
+            if (detailModalOpen && currentDetailAlert && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                showStatusQuickPicker();
+            }
+            break;
+
+        case 'c':
+            if (detailModalOpen && currentDetailAlert && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                showCreateCaseForm(currentDetailAlert.id);
+            }
+            break;
+
+        case 'r':
+            if (!anyModalOpen && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                loadAlerts();
+            }
+            break;
+
+        case '?':
+            if (!anyModalOpen) {
+                e.preventDefault();
+                showKeyboardShortcutsHelp();
+            }
+            break;
+    }
+}
+
+function navigateAlerts(direction) {
+    if (filteredAlerts.length === 0) return;
+
+    selectedRowIndex += direction;
+
+    // Wrap around
+    if (selectedRowIndex < 0) selectedRowIndex = filteredAlerts.length - 1;
+    if (selectedRowIndex >= filteredAlerts.length) selectedRowIndex = 0;
+
+    updateSelectedRow();
+}
+
+function updateSelectedRow() {
+    // Remove previous selection
+    document.querySelectorAll('.alert-row.keyboard-selected').forEach(row => {
+        row.classList.remove('keyboard-selected');
+    });
+
+    if (selectedRowIndex >= 0 && filteredAlerts[selectedRowIndex]) {
+        const alertId = filteredAlerts[selectedRowIndex].id;
+        const row = document.querySelector(`.alert-row[data-alert-id="${alertId}"]`);
+        if (row) {
+            row.classList.add('keyboard-selected');
+            row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }
+}
+
+function showStatusQuickPicker() {
+    const statuses = ['open', 'investigating', 'escalated', 'resolved', 'closed', 'false_positive'];
+    const options = statuses.map((s, i) => `${i + 1}. ${s}`).join('\n');
+    const choice = prompt(`Select status:\n${options}\n\nEnter number (1-6):`);
+
+    if (choice && statuses[parseInt(choice) - 1]) {
+        quickStatusChange(currentDetailAlert.id, statuses[parseInt(choice) - 1]);
+    }
+}
+
+function showKeyboardShortcutsHelp() {
+    const helpHtml = `
+        <div id="keyboard-help-modal" class="saved-filters-modal" onclick="if(event.target===this)this.remove()">
+            <div class="saved-filters-content" style="max-width:400px;">
+                <div class="modal-header" style="margin-bottom:1rem;">
+                    <h3>Keyboard Shortcuts</h3>
+                    <button class="modal-close" onclick="document.getElementById('keyboard-help-modal').remove()">&times;</button>
+                </div>
+                <div style="display:grid;grid-template-columns:auto 1fr;gap:0.5rem 1rem;">
+                    <kbd>j</kbd><span>Next alert</span>
+                    <kbd>k</kbd><span>Previous alert</span>
+                    <kbd>Enter</kbd><span>Open alert details</span>
+                    <kbd>Space</kbd><span>Toggle alert selection</span>
+                    <kbd>Esc</kbd><span>Close modal / Clear selection</span>
+                    <kbd>r</kbd><span>Refresh alerts</span>
+                    <kbd>?</kbd><span>Show this help</span>
+                    <div style="grid-column:span 2;border-top:1px solid var(--border);margin:0.5rem 0;"></div>
+                    <strong style="grid-column:span 2;">When viewing alert details:</strong>
+                    <kbd>a</kbd><span>Assign to me</span>
+                    <kbd>s</kbd><span>Change status</span>
+                    <kbd>c</kbd><span>Create case</span>
+                </div>
+                <div class="modal-footer" style="margin-top:1rem;text-align:right;">
+                    <button class="btn btn-secondary" onclick="document.getElementById('keyboard-help-modal').remove()">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const existing = document.getElementById('keyboard-help-modal');
+    if (existing) existing.remove();
+
+    document.body.insertAdjacentHTML('beforeend', helpHtml);
+}
+
+// Initialize keyboard shortcuts
+document.addEventListener('DOMContentLoaded', initKeyboardShortcuts);
 </script>
 {% endraw %}
 {% endblock %}

@@ -18,7 +18,8 @@ import httpx
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from ixion.core.config import get_config, get_oidc_config, get_gitlab_config
+from ixion.core.config import get_config, get_oidc_config, get_gitlab_config, get_kibana_config
+from ixion.services.kibana_cases_service import get_kibana_cases_service
 
 # Rate limiter - uses IP address as key
 limiter = Limiter(key_func=get_remote_address)
@@ -2870,6 +2871,18 @@ class TriageUpdate(BaseModel):
     mitre_techniques: Optional[List[dict]] = None
 
 
+class BulkTriageUpdate(BaseModel):
+    """Bulk update multiple alerts at once."""
+    alert_ids: List[str]
+    status: Optional[str] = None
+    assigned_to_id: Optional[int] = None
+    priority: Optional[str] = None
+    case_id: Optional[int] = None
+    add_to_new_case: Optional[bool] = False
+    new_case_title: Optional[str] = None
+    new_case_severity: Optional[str] = None
+
+
 class AutoPopulateRequest(BaseModel):
     host: Optional[str] = None
     user: Optional[str] = None
@@ -2923,6 +2936,16 @@ async def list_cases(
     if status:
         query = query.filter(AlertCase.status == status)
     cases = query.order_by(AlertCase.created_at.desc()).all()
+
+    # Get Kibana service for URL generation
+    kibana_service = get_kibana_cases_service()
+    kibana_enabled = kibana_service.enabled
+
+    def get_kibana_url(case):
+        if kibana_enabled and case.kibana_case_id:
+            return kibana_service.get_case_url(case.kibana_case_id)
+        return None
+
     return {
         "cases": [
             {
@@ -2941,6 +2964,9 @@ async def list_cases(
                 "triggered_rules": c.triggered_rules,
                 "evidence_summary": c.evidence_summary,
                 "source_alert_ids": c.source_alert_ids,
+                "observables_count": len(c.observables) if c.observables else 0,
+                "kibana_case_id": c.kibana_case_id,
+                "kibana_url": get_kibana_url(c),
                 "created_at": c.created_at.isoformat() if c.created_at else None,
                 "updated_at": c.updated_at.isoformat() if c.updated_at else None,
             }
@@ -3048,6 +3074,10 @@ async def create_case(
             linked += 1
 
     # Auto-populate observables for linked alerts if context provided
+    # and aggregate all observables for the case
+    case_observables = []
+    seen_observables = set()
+
     if data.alert_contexts:
         context_map = {ctx.alert_id: ctx for ctx in data.alert_contexts}
         for alert_id in (data.alert_ids or []):
@@ -3058,15 +3088,93 @@ async def create_case(
             if triage:
                 _populate_triage_observables(triage, ctx.host, ctx.user, ctx.raw_data)
 
+            # Extract observables from raw_data for case-level aggregation
+            if ctx.raw_data:
+                for obs in _extract_observables_from_raw(ctx.raw_data):
+                    key = (obs["type"], obs["value"])
+                    if key not in seen_observables:
+                        seen_observables.add(key)
+                        case_observables.append(obs)
+
+    # Store aggregated observables on the case
+    if case_observables:
+        new_case.observables = case_observables
+
     session.commit()
     session.refresh(new_case)
     await _sync_case_to_es(new_case, session)
+
+    # Sync to Kibana Cases if enabled
+    kibana_url = None
+    try:
+        kibana_service = get_kibana_cases_service()
+        if kibana_service.enabled:
+            # Build description with case context
+            kibana_desc = data.description or ""
+            if data.affected_hosts:
+                kibana_desc += f"\n\n**Affected Hosts:** {', '.join(data.affected_hosts)}"
+            if data.affected_users:
+                kibana_desc += f"\n\n**Affected Users:** {', '.join(data.affected_users)}"
+            if data.evidence_summary:
+                kibana_desc += f"\n\n**Evidence Summary:**\n{data.evidence_summary}"
+
+            # Add observables to description
+            if case_observables:
+                kibana_desc += "\n\n**Observables:**\n"
+                # Group observables by type for cleaner display
+                obs_by_type = {}
+                for obs in case_observables:
+                    obs_type = obs["type"]
+                    if obs_type not in obs_by_type:
+                        obs_by_type[obs_type] = []
+                    obs_by_type[obs_type].append(obs["value"])
+                for obs_type, values in sorted(obs_by_type.items()):
+                    kibana_desc += f"- **{obs_type}:** {', '.join(values[:5])}"
+                    if len(values) > 5:
+                        kibana_desc += f" (+{len(values) - 5} more)"
+                    kibana_desc += "\n"
+
+            # Add linked alert IDs to description for reference
+            if data.alert_ids:
+                kibana_desc += f"\n**Linked Alert IDs ({len(data.alert_ids)}):**\n"
+                kibana_desc += "\n".join(f"- `{aid}`" for aid in data.alert_ids[:10])
+                if len(data.alert_ids) > 10:
+                    kibana_desc += f"\n- ... and {len(data.alert_ids) - 10} more"
+
+            kibana_case = kibana_service.create_case(
+                title=f"[{case_number}] {data.title}",
+                description=kibana_desc.strip(),
+                severity=data.severity or "low",
+                tags=[case_number, "ixion"],
+            )
+            if kibana_case:
+                new_case.kibana_case_id = kibana_case.get("id")
+                new_case.kibana_case_version = kibana_case.get("version")
+                session.commit()
+                kibana_url = kibana_service.get_case_url(new_case.kibana_case_id)
+
+                # Attach alerts to Kibana case if using securitySolution owner
+                if data.alert_ids and kibana_service.config.get("case_owner") == "securitySolution":
+                    try:
+                        kibana_service.attach_alerts_to_case(
+                            case_id=new_case.kibana_case_id,
+                            alert_ids=data.alert_ids,
+                            alert_index=".alerts-security.alerts-default",
+                        )
+                    except Exception as attach_err:
+                        _case_es_logger.warning("Failed to attach alerts to Kibana case: %s", attach_err)
+    except Exception as e:
+        _case_es_logger.warning("Failed to sync case to Kibana: %s", e)
+
     return {
         "id": new_case.id,
         "case_number": new_case.case_number,
         "title": new_case.title,
         "status": new_case.status.value if hasattr(new_case.status, "value") else new_case.status,
         "linked_alerts": linked,
+        "observables": new_case.observables or [],
+        "kibana_case_id": new_case.kibana_case_id,
+        "kibana_url": kibana_url,
     }
 
 
@@ -3091,6 +3199,17 @@ async def add_case_note(
     session.commit()
     session.refresh(case)
     await _sync_case_to_es(case, session)
+
+    # Sync note to Kibana as comment
+    if case.kibana_case_id:
+        try:
+            kibana_service = get_kibana_cases_service()
+            if kibana_service.enabled:
+                comment_text = f"**{current_user.username}:** {data.content}"
+                kibana_service.add_comment(case.kibana_case_id, comment_text)
+        except Exception as e:
+            _case_es_logger.warning("Failed to sync note to Kibana: %s", e)
+
     return {
         "id": note.id,
         "case_id": note.case_id,
@@ -3111,6 +3230,16 @@ async def get_case_detail(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
+    # Get Kibana URL if available
+    kibana_url = None
+    if case.kibana_case_id:
+        try:
+            kibana_service = get_kibana_cases_service()
+            if kibana_service.enabled:
+                kibana_url = kibana_service.get_case_url(case.kibana_case_id)
+        except Exception:
+            pass
+
     return {
         "id": case.id,
         "case_number": case.case_number,
@@ -3126,6 +3255,9 @@ async def get_case_detail(
         "triggered_rules": case.triggered_rules,
         "evidence_summary": case.evidence_summary,
         "source_alert_ids": case.source_alert_ids,
+        "observables": case.observables or [],
+        "kibana_case_id": case.kibana_case_id,
+        "kibana_url": kibana_url,
         "created_at": case.created_at.isoformat() if case.created_at else None,
         "updated_at": case.updated_at.isoformat() if case.updated_at else None,
         "alerts": [
@@ -3174,11 +3306,49 @@ async def update_case(
     session.commit()
     session.refresh(case)
     await _sync_case_to_es(case, session)
+
+    # Sync updates to Kibana
+    kibana_url = None
+    if case.kibana_case_id:
+        try:
+            kibana_service = get_kibana_cases_service()
+            if kibana_service.enabled:
+                # Map IXION status to Kibana status
+                kibana_status = None
+                if data.status:
+                    status_map = {
+                        "open": "open",
+                        "in_progress": "in-progress",
+                        "resolved": "closed",
+                        "closed": "closed",
+                    }
+                    kibana_status = status_map.get(data.status)
+
+                # Get current version from Kibana
+                kibana_case = kibana_service.get_case(case.kibana_case_id)
+                if kibana_case:
+                    version = kibana_case.get("version")
+                    updated = kibana_service.update_case(
+                        case_id=case.kibana_case_id,
+                        version=version,
+                        title=f"[{case.case_number}] {case.title}" if data.title else None,
+                        description=data.description,
+                        status=kibana_status,
+                        severity=data.severity,
+                    )
+                    if updated:
+                        case.kibana_case_version = updated.get("version")
+                        session.commit()
+                kibana_url = kibana_service.get_case_url(case.kibana_case_id)
+        except Exception as e:
+            _case_es_logger.warning("Failed to sync case update to Kibana: %s", e)
+
     return {
         "id": case.id,
         "case_number": case.case_number,
         "title": case.title,
         "status": case.status.value if hasattr(case.status, "value") else case.status,
+        "kibana_url": kibana_url,
         "message": "Case updated",
     }
 
@@ -3214,6 +3384,74 @@ async def get_batch_triage(
         }
 
     return {"triage": result}
+
+
+@router.post("/elasticsearch/alerts-triage/bulk-update")
+async def bulk_update_triage(
+    data: BulkTriageUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Bulk update triage status, assignee, priority for multiple alerts."""
+    if not data.alert_ids:
+        raise HTTPException(status_code=400, detail="No alert IDs provided")
+
+    updated = 0
+    new_case = None
+
+    # If creating a new case for these alerts
+    if data.add_to_new_case and data.new_case_title:
+        # Generate case number
+        last_case = session.query(AlertCase).order_by(AlertCase.id.desc()).first()
+        next_num = 1 if not last_case else last_case.id + 1
+        case_number = f"CASE-{next_num:04d}"
+
+        new_case = AlertCase(
+            case_number=case_number,
+            title=data.new_case_title,
+            status=AlertCaseStatus.OPEN,
+            severity=data.new_case_severity or "medium",
+            created_by_id=current_user.id,
+            source_alert_ids=data.alert_ids,
+        )
+        session.add(new_case)
+        session.flush()
+
+    for alert_id in data.alert_ids:
+        triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+        if not triage:
+            triage = AlertTriage(es_alert_id=alert_id)
+            session.add(triage)
+            session.flush()
+
+        if data.status is not None:
+            triage.status = data.status
+        if data.assigned_to_id is not None:
+            triage.assigned_to_id = data.assigned_to_id if data.assigned_to_id > 0 else None
+        if data.priority is not None:
+            triage.priority = data.priority
+        if data.case_id is not None:
+            triage.case_id = data.case_id if data.case_id > 0 else None
+        if new_case:
+            triage.case_id = new_case.id
+
+        updated += 1
+
+    session.commit()
+
+    result = {
+        "updated": updated,
+        "alert_ids": data.alert_ids,
+    }
+
+    if new_case:
+        result["new_case"] = {
+            "id": new_case.id,
+            "case_number": new_case.case_number,
+            "title": new_case.title,
+        }
+
+    return result
 
 
 @router.get("/elasticsearch/alerts/{alert_id}/triage")
@@ -3338,7 +3576,7 @@ async def update_alert_triage(
 
 
 def _extract_observables_from_raw(raw_data: dict) -> list:
-    """Extract observables from ECS-style raw alert data."""
+    """Extract observables from ECS-style and Kibana Security alert data."""
     observables = []
     seen = set()
 
@@ -3349,7 +3587,17 @@ def _extract_observables_from_raw(raw_data: dict) -> list:
             observables.append({"type": obs_type, "value": value})
 
     def _get_nested(data: dict, dotted_key: str):
-        """Retrieve a nested value using dot notation."""
+        """Retrieve a nested value using dot notation.
+
+        Handles both formats:
+        - Flattened dot notation keys: data["source.ip"]
+        - Nested objects: data["source"]["ip"]
+        """
+        # First try flattened dot notation (Kibana Security alerts)
+        if dotted_key in data:
+            return data[dotted_key]
+
+        # Then try nested object traversal (ECS standard)
         keys = dotted_key.split(".")
         current = data
         for k in keys:
@@ -3359,47 +3607,83 @@ def _extract_observables_from_raw(raw_data: dict) -> list:
                 return None
         return current
 
+    def _extract_field(fields: list, obs_type: str):
+        """Extract value from multiple possible field paths."""
+        for field in fields:
+            val = _get_nested(raw_data, field)
+            if val:
+                if isinstance(val, list):
+                    for v in val:
+                        if v:
+                            _add(obs_type, str(v))
+                else:
+                    _add(obs_type, str(val))
+
     ip_pattern = re.compile(
         r"^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$"
     )
 
+    # === IP Addresses ===
     # source.ip → source_ip
-    val = _get_nested(raw_data, "source.ip")
-    if val:
-        if isinstance(val, list):
-            for v in val:
-                _add("source_ip", v)
-        else:
-            _add("source_ip", val)
+    _extract_field(["source.ip", "client.ip"], "source_ip")
 
     # destination.ip → destination_ip
-    val = _get_nested(raw_data, "destination.ip")
-    if val:
-        if isinstance(val, list):
-            for v in val:
-                _add("destination_ip", v)
-        else:
-            _add("destination_ip", val)
+    _extract_field(["destination.ip", "server.ip"], "destination_ip")
 
-    # url.full / url.original → url
-    for field in ("url.full", "url.original"):
-        val = _get_nested(raw_data, field)
-        if val:
-            if isinstance(val, list):
-                for v in val:
-                    _add("url", v)
-            else:
-                _add("url", val)
+    # host.ip → host_ip
+    _extract_field(["host.ip"], "host_ip")
 
-    # url.domain / dns.question.name / destination.domain → domain
-    for field in ("url.domain", "dns.question.name", "destination.domain"):
-        val = _get_nested(raw_data, field)
-        if val:
-            if isinstance(val, list):
-                for v in val:
-                    _add("domain", v)
-            else:
-                _add("domain", val)
+    # === Hostnames ===
+    _extract_field(["host.name", "host.hostname", "agent.hostname"], "hostname")
+
+    # === User Accounts ===
+    _extract_field(["user.name", "user.id", "winlog.event_data.TargetUserName"], "user_account")
+
+    # === URLs and Domains ===
+    _extract_field(["url.full", "url.original"], "url")
+    _extract_field(["url.domain", "dns.question.name", "destination.domain"], "domain")
+
+    # === File Information ===
+    _extract_field(["file.path", "process.executable", "file.name"], "file_path")
+    _extract_field(["file.hash.sha256", "process.hash.sha256"], "sha256")
+    _extract_field(["file.hash.md5", "process.hash.md5"], "md5")
+    _extract_field(["file.hash.sha1", "process.hash.sha1"], "sha1")
+
+    # === Process Information ===
+    _extract_field(["process.name", "process.executable"], "process_name")
+    _extract_field(["process.command_line", "process.args"], "command_line")
+    _extract_field(["process.pid"], "process_id")
+    _extract_field(["process.parent.name"], "parent_process")
+
+    # === Network ===
+    _extract_field(["destination.port", "server.port"], "port")
+    _extract_field(["network.protocol", "network.transport"], "protocol")
+
+    # === Email ===
+    _extract_field(["email.from.address", "email.sender.address"], "email")
+    _extract_field(["email.subject"], "email_subject")
+
+    # === Registry (Windows) ===
+    _extract_field(["registry.path", "registry.key"], "registry_key")
+    _extract_field(["registry.value"], "registry_value")
+
+    # === MITRE ATT&CK ===
+    _extract_field(["threat.technique.id", "kibana.alert.rule.threat.technique.id"], "mitre_technique")
+    _extract_field(["threat.technique.name", "kibana.alert.rule.threat.technique.name"], "mitre_technique_name")
+    _extract_field(["threat.tactic.name", "kibana.alert.rule.threat.tactic.name"], "mitre_tactic")
+
+    # === Event Context ===
+    _extract_field(["event.action", "kibana.alert.original_event.action"], "event_action")
+    _extract_field(["event.category", "kibana.alert.original_event.category"], "event_category")
+    _extract_field(["event.outcome", "kibana.alert.original_event.outcome"], "event_outcome")
+    _extract_field(["message"], "message")
+
+    # === Kibana Security Alert specific fields ===
+    _extract_field(["kibana.alert.rule.name", "rule.name"], "rule_name")
+    _extract_field(["kibana.alert.rule.description", "rule.description"], "rule_description")
+    _extract_field(["kibana.alert.reason"], "alert_reason")
+    _extract_field(["kibana.alert.severity", "severity"], "severity")
+    _extract_field(["kibana.alert.risk_score"], "risk_score")
 
     # source.address / destination.address → source_ip / destination_ip (if IP-shaped)
     for field, obs_type in (("source.address", "source_ip"), ("destination.address", "destination_ip")):
@@ -4419,4 +4703,344 @@ async def search_chat_users(
             }
             for u in users
         ]
+    }
+
+
+# ============================================================================
+# Kibana Cases Integration Endpoints
+# ============================================================================
+
+
+class KibanaCaseCreate(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    severity: Optional[str] = "low"
+    tags: Optional[List[str]] = None
+    alert_ids: Optional[List[str]] = None
+    alert_index: Optional[str] = "alerts-ixion"
+
+
+class KibanaCaseUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    severity: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+
+class KibanaCaseComment(BaseModel):
+    comment: str
+
+
+@router.get("/kibana/config")
+async def get_kibana_config_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    """Get Kibana Cases configuration status."""
+    config = get_kibana_config()
+    return {
+        "enabled": config.get("enabled", False),
+        "url": config.get("url", ""),
+        "has_credentials": bool(config.get("username") and config.get("password")),
+        "space_id": config.get("space_id", "default"),
+        "case_owner": config.get("case_owner", "securitySolution"),
+    }
+
+
+@router.get("/kibana/status")
+async def get_kibana_status(
+    current_user: User = Depends(get_current_user),
+):
+    """Test Kibana connectivity and return status."""
+    service = get_kibana_cases_service()
+    if not service.enabled:
+        return {
+            "connected": False,
+            "error": "Kibana Cases integration not enabled",
+        }
+
+    result = service.test_connection()
+    return {
+        "connected": result.get("success", False),
+        "version": result.get("version"),
+        "status": result.get("status"),
+        "error": result.get("error"),
+    }
+
+
+@router.get("/kibana/cases")
+async def list_kibana_cases(
+    status: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 20,
+    current_user: User = Depends(get_current_user),
+):
+    """List cases from Kibana."""
+    service = get_kibana_cases_service()
+    if not service.enabled:
+        raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
+
+    result = service.list_cases(status=status, page=page, per_page=per_page)
+    if "error" in result and result.get("error"):
+        raise HTTPException(status_code=502, detail=result["error"])
+
+    # Transform to consistent format
+    cases = []
+    for c in result.get("cases", []):
+        cases.append({
+            "id": c.get("id"),
+            "title": c.get("title"),
+            "description": c.get("description"),
+            "status": c.get("status"),
+            "severity": c.get("severity"),
+            "tags": c.get("tags", []),
+            "created_by": c.get("created_by", {}).get("username"),
+            "created_at": c.get("created_at"),
+            "updated_at": c.get("updated_at"),
+            "kibana_url": service.get_case_url(c.get("id")),
+            "comments_count": c.get("totalComment", 0),
+            "alerts_count": c.get("totalAlerts", 0),
+        })
+
+    return {
+        "cases": cases,
+        "total": result.get("total", 0),
+        "page": result.get("page", page),
+        "per_page": result.get("per_page", per_page),
+    }
+
+
+@router.post("/kibana/cases")
+async def create_kibana_case(
+    data: KibanaCaseCreate,
+    current_user: User = Depends(get_current_user),
+):
+    """Create a new case in Kibana."""
+    service = get_kibana_cases_service()
+    if not service.enabled:
+        raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
+
+    # Map severity
+    severity_map = {
+        "critical": "critical",
+        "high": "high",
+        "medium": "medium",
+        "low": "low",
+    }
+    severity = severity_map.get(data.severity, "low")
+
+    result = service.create_case(
+        title=data.title,
+        description=data.description or "",
+        severity=severity,
+        tags=data.tags,
+    )
+
+    if not result:
+        raise HTTPException(status_code=502, detail="Failed to create case in Kibana")
+
+    case_id = result.get("id")
+
+    # Attach alerts if provided
+    if data.alert_ids and case_id:
+        service.attach_alerts_to_case(
+            case_id=case_id,
+            alert_ids=data.alert_ids,
+            alert_index=data.alert_index or "alerts-ixion",
+        )
+
+    return {
+        "id": case_id,
+        "title": result.get("title"),
+        "status": result.get("status"),
+        "severity": result.get("severity"),
+        "kibana_url": service.get_case_url(case_id),
+        "message": "Case created in Kibana",
+    }
+
+
+@router.get("/kibana/cases/{case_id}")
+async def get_kibana_case(
+    case_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Get a case from Kibana by ID."""
+    service = get_kibana_cases_service()
+    if not service.enabled:
+        raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
+
+    result = service.get_case(case_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Case not found in Kibana")
+
+    comments = service.get_case_comments(case_id)
+
+    return {
+        "id": result.get("id"),
+        "title": result.get("title"),
+        "description": result.get("description"),
+        "status": result.get("status"),
+        "severity": result.get("severity"),
+        "tags": result.get("tags", []),
+        "created_by": result.get("created_by", {}).get("username"),
+        "created_at": result.get("created_at"),
+        "updated_at": result.get("updated_at"),
+        "version": result.get("version"),
+        "kibana_url": service.get_case_url(case_id),
+        "comments": [
+            {
+                "id": c.get("id"),
+                "comment": c.get("comment"),
+                "created_by": c.get("created_by", {}).get("username"),
+                "created_at": c.get("created_at"),
+            }
+            for c in comments
+            if c.get("type") == "user"
+        ],
+    }
+
+
+@router.patch("/kibana/cases/{case_id}")
+async def update_kibana_case(
+    case_id: str,
+    data: KibanaCaseUpdate,
+    current_user: User = Depends(get_current_user),
+):
+    """Update a case in Kibana."""
+    service = get_kibana_cases_service()
+    if not service.enabled:
+        raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
+
+    # Get current case to get version
+    current = service.get_case(case_id)
+    if not current:
+        raise HTTPException(status_code=404, detail="Case not found in Kibana")
+
+    version = current.get("version")
+
+    # Map status
+    status_map = {
+        "open": "open",
+        "in_progress": "in-progress",
+        "in-progress": "in-progress",
+        "resolved": "closed",
+        "closed": "closed",
+    }
+
+    result = service.update_case(
+        case_id=case_id,
+        version=version,
+        title=data.title,
+        description=data.description,
+        status=status_map.get(data.status) if data.status else None,
+        severity=data.severity,
+        tags=data.tags,
+    )
+
+    if not result:
+        raise HTTPException(status_code=502, detail="Failed to update case in Kibana")
+
+    return {
+        "id": result.get("id"),
+        "title": result.get("title"),
+        "status": result.get("status"),
+        "kibana_url": service.get_case_url(case_id),
+        "message": "Case updated in Kibana",
+    }
+
+
+@router.post("/kibana/cases/{case_id}/comments")
+async def add_kibana_case_comment(
+    case_id: str,
+    data: KibanaCaseComment,
+    current_user: User = Depends(get_current_user),
+):
+    """Add a comment to a Kibana case."""
+    service = get_kibana_cases_service()
+    if not service.enabled:
+        raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
+
+    result = service.add_comment(
+        case_id=case_id,
+        comment=data.comment,
+    )
+
+    if not result:
+        raise HTTPException(status_code=502, detail="Failed to add comment to Kibana case")
+
+    return {
+        "case_id": case_id,
+        "comment": data.comment,
+        "message": "Comment added to Kibana case",
+    }
+
+
+@router.delete("/kibana/cases/{case_id}")
+async def delete_kibana_case(
+    case_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a case from Kibana."""
+    service = get_kibana_cases_service()
+    if not service.enabled:
+        raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
+
+    success = service.delete_case(case_id)
+    if not success:
+        raise HTTPException(status_code=502, detail="Failed to delete case from Kibana")
+
+    return {
+        "message": "Case deleted from Kibana",
+    }
+
+
+# ============================================================================
+# Kibana Bidirectional Sync Endpoints
+# ============================================================================
+
+from ixion.services.kibana_sync_service import get_kibana_sync_service
+
+
+@router.post("/kibana/sync")
+async def sync_from_kibana(
+    current_user: User = Depends(get_current_user),
+):
+    """Manually trigger sync of comments from Kibana to IXION."""
+    sync_service = get_kibana_sync_service()
+
+    result = await sync_service.sync_all_cases()
+
+    return {
+        "message": "Sync completed",
+        "comments_synced": result.get("synced", 0),
+        "cases_processed": result.get("cases", 0),
+        "error": result.get("error"),
+    }
+
+
+@router.post("/kibana/sync/case/{case_id}")
+async def sync_case_from_kibana(
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Sync comments from Kibana for a specific case."""
+    case = session.query(AlertCase).filter_by(id=case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if not case.kibana_case_id:
+        raise HTTPException(status_code=400, detail="Case not linked to Kibana")
+
+    sync_service = get_kibana_sync_service()
+    synced = await sync_service.sync_case_comments(session, case)
+
+    # Also sync status
+    status_updated = await sync_service.sync_case_status_from_kibana(session, case)
+
+    return {
+        "message": "Case sync completed",
+        "comments_synced": synced,
+        "status_updated": status_updated,
+        "case_number": case.case_number,
     }
