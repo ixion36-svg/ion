@@ -57,6 +57,22 @@ class Config:
     ollama_model: str = "qwen2.5:0.5b"  # Default model (use small for testing)
     ollama_timeout: int = 120  # Request timeout in seconds
 
+    # Kibana Cases integration
+    kibana_cases_enabled: bool = False
+    kibana_url: str = ""  # e.g., http://localhost:5601
+    kibana_username: str = ""  # Kibana username (uses ES credentials if not set)
+    kibana_password: str = ""  # Kibana password
+    kibana_space_id: str = "default"  # Kibana space ID
+    kibana_case_owner: str = "securitySolution"  # Case owner app (securitySolution, observability, cases)
+
+    # VirusTotal integration
+    virustotal_enabled: bool = False
+    virustotal_api_key: str = ""  # VirusTotal API key
+
+    # AbuseIPDB integration
+    abuseipdb_enabled: bool = False
+    abuseipdb_api_key: str = ""  # AbuseIPDB API key
+
     @classmethod
     def from_file(cls, path: Path) -> "Config":
         """Load configuration from a JSON file."""
@@ -110,6 +126,19 @@ class Config:
             ollama_url=data.get("ollama_url", "http://localhost:11434"),
             ollama_model=data.get("ollama_model", "qwen2.5:0.5b"),
             ollama_timeout=data.get("ollama_timeout", 120),
+            # Kibana Cases integration
+            kibana_cases_enabled=data.get("kibana_cases_enabled", False),
+            kibana_url=data.get("kibana_url", ""),
+            kibana_username=data.get("kibana_username", ""),
+            kibana_password=data.get("kibana_password", ""),
+            kibana_space_id=data.get("kibana_space_id", "default"),
+            kibana_case_owner=data.get("kibana_case_owner", "securitySolution"),
+            # VirusTotal integration
+            virustotal_enabled=data.get("virustotal_enabled", False),
+            virustotal_api_key=data.get("virustotal_api_key", ""),
+            # AbuseIPDB integration
+            abuseipdb_enabled=data.get("abuseipdb_enabled", False),
+            abuseipdb_api_key=data.get("abuseipdb_api_key", ""),
         )
 
     def to_file(self, path: Path) -> None:
@@ -157,6 +186,19 @@ class Config:
                     "ollama_url": self.ollama_url,
                     "ollama_model": self.ollama_model,
                     "ollama_timeout": self.ollama_timeout,
+                    # Kibana Cases integration
+                    "kibana_cases_enabled": self.kibana_cases_enabled,
+                    "kibana_url": self.kibana_url,
+                    "kibana_username": self.kibana_username,
+                    "kibana_password": self.kibana_password,
+                    "kibana_space_id": self.kibana_space_id,
+                    "kibana_case_owner": self.kibana_case_owner,
+                    # VirusTotal integration
+                    "virustotal_enabled": self.virustotal_enabled,
+                    "virustotal_api_key": self.virustotal_api_key,
+                    # AbuseIPDB integration
+                    "abuseipdb_enabled": self.abuseipdb_enabled,
+                    "abuseipdb_api_key": self.abuseipdb_api_key,
                 },
                 f,
                 indent=2,
@@ -261,6 +303,32 @@ def get_config() -> Config:
         if os.environ.get("IXION_OLLAMA_TIMEOUT"):
             _config.ollama_timeout = int(os.environ.get("IXION_OLLAMA_TIMEOUT", "120"))
 
+        # Kibana Cases environment overrides
+        if os.environ.get("IXION_KIBANA_CASES_ENABLED"):
+            _config.kibana_cases_enabled = _get_env_bool("IXION_KIBANA_CASES_ENABLED", False)
+        if os.environ.get("IXION_KIBANA_URL"):
+            _config.kibana_url = os.environ.get("IXION_KIBANA_URL", "")
+        if os.environ.get("IXION_KIBANA_USERNAME"):
+            _config.kibana_username = os.environ.get("IXION_KIBANA_USERNAME", "")
+        if os.environ.get("IXION_KIBANA_PASSWORD"):
+            _config.kibana_password = os.environ.get("IXION_KIBANA_PASSWORD", "")
+        if os.environ.get("IXION_KIBANA_SPACE_ID"):
+            _config.kibana_space_id = os.environ.get("IXION_KIBANA_SPACE_ID", "default")
+        if os.environ.get("IXION_KIBANA_CASE_OWNER"):
+            _config.kibana_case_owner = os.environ.get("IXION_KIBANA_CASE_OWNER", "securitySolution")
+
+        # VirusTotal environment overrides
+        if os.environ.get("IXION_VIRUSTOTAL_ENABLED"):
+            _config.virustotal_enabled = _get_env_bool("IXION_VIRUSTOTAL_ENABLED", False)
+        if os.environ.get("IXION_VIRUSTOTAL_API_KEY"):
+            _config.virustotal_api_key = os.environ.get("IXION_VIRUSTOTAL_API_KEY", "")
+
+        # AbuseIPDB environment overrides
+        if os.environ.get("IXION_ABUSEIPDB_ENABLED"):
+            _config.abuseipdb_enabled = _get_env_bool("IXION_ABUSEIPDB_ENABLED", False)
+        if os.environ.get("IXION_ABUSEIPDB_API_KEY"):
+            _config.abuseipdb_api_key = os.environ.get("IXION_ABUSEIPDB_API_KEY", "")
+
     return _config
 
 
@@ -333,4 +401,23 @@ def get_elasticsearch_config() -> dict:
         "alert_index": config.elasticsearch_alert_index,
         "case_index": config.elasticsearch_case_index,
         "verify_ssl": config.elasticsearch_verify_ssl,
+    }
+
+
+def get_kibana_config() -> dict:
+    """Get Kibana Cases configuration from the global config.
+
+    Returns a dictionary with Kibana configuration.
+    """
+    config = get_config()
+    # Fall back to Elasticsearch credentials if Kibana-specific ones not set
+    username = config.kibana_username or config.elasticsearch_username
+    password = config.kibana_password or config.elasticsearch_password
+    return {
+        "enabled": config.kibana_cases_enabled,
+        "url": config.kibana_url,
+        "username": username,
+        "password": password,
+        "space_id": config.kibana_space_id,
+        "case_owner": config.kibana_case_owner,
     }

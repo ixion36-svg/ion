@@ -775,3 +775,788 @@ async def cleanup_old_data(
         }
     except Exception as e:
         raise HTTPException(500, f"Cleanup failed: {str(e)}")
+
+
+# =============================================================================
+# Integration Wizard Endpoints
+# =============================================================================
+
+class WizardIntegrationConfig(BaseModel):
+    """Configuration for a single integration in wizard mode."""
+    enabled: Optional[bool] = None
+    url: Optional[str] = None
+    api_key: Optional[str] = None
+    token: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    verify_ssl: Optional[bool] = None
+    # Elasticsearch specific
+    alert_index: Optional[str] = None
+    case_index: Optional[str] = None
+    # Kibana specific
+    space_id: Optional[str] = None
+    case_owner: Optional[str] = None
+    # GitLab specific
+    project_id: Optional[str] = None
+    # Ollama specific
+    model: Optional[str] = None
+    timeout: Optional[int] = None
+
+
+class WizardDiagnoseRequest(BaseModel):
+    """Request for AI-powered error diagnosis."""
+    integration: str
+    error_message: str
+    config: dict  # Sanitized config (no secrets)
+
+
+class WizardSaveAllRequest(BaseModel):
+    """Request to save all wizard configurations."""
+    integrations: dict  # Dict of integration_name -> WizardIntegrationConfig
+
+
+# AI Diagnosis system prompt
+DIAGNOSIS_SYSTEM_PROMPT = """You are an expert systems administrator helping diagnose integration configuration errors.
+
+When analyzing errors:
+1. Identify the root cause from the error message
+2. Consider common causes for this integration type
+3. Provide step-by-step solutions
+4. Include security considerations when relevant
+
+Format your response EXACTLY as follows (include all sections):
+
+DIAGNOSIS: [Brief description of what went wrong]
+
+CAUSE: [Most likely root cause]
+
+SOLUTIONS:
+1. [First solution - most likely to work]
+2. [Second solution - alternative approach]
+3. [Third solution if applicable]
+
+SECURITY NOTE: [Any security implications or recommendations]
+
+ACTIONABLE: [List any fixes that can be auto-applied, comma-separated. Valid options: disable_ssl_verification, increase_timeout, use_http. Leave empty if none apply]"""
+
+
+@router.get("/wizard/integrations")
+async def get_wizard_integrations(current_user: User = Depends(require_admin)):
+    """Get all integrations with their current status for the wizard."""
+    config = get_config()
+
+    integrations = {
+        "elasticsearch": {
+            "name": "Elasticsearch",
+            "description": "Search and analytics engine for alerts and case data",
+            "enabled": config.elasticsearch_enabled,
+            "configured": bool(config.elasticsearch_url) and (
+                bool(config.elasticsearch_api_key) or
+                (bool(config.elasticsearch_username) and bool(config.elasticsearch_password))
+            ),
+            "url": config.elasticsearch_url,
+            "fields": {
+                "url": {"type": "url", "label": "Elasticsearch URL", "placeholder": "https://localhost:9200", "required": True},
+                "username": {"type": "text", "label": "Username", "placeholder": "elastic"},
+                "password": {"type": "password", "label": "Password", "placeholder": "Leave blank to keep current"},
+                "api_key": {"type": "password", "label": "API Key (alternative)", "placeholder": "Leave blank to keep current"},
+                "alert_index": {"type": "text", "label": "Alert Index Pattern", "default": ".alerts-*,.watcher-history-*,alerts-*"},
+                "case_index": {"type": "text", "label": "Case Index", "default": "ixion-cases"},
+                "verify_ssl": {"type": "checkbox", "label": "Verify SSL Certificate", "default": True},
+            },
+            "auth_modes": ["basic", "api_key"],
+        },
+        "kibana": {
+            "name": "Kibana",
+            "description": "Elastic Kibana for case synchronization",
+            "enabled": config.kibana_cases_enabled,
+            "configured": bool(config.kibana_url),
+            "url": config.kibana_url,
+            "fields": {
+                "url": {"type": "url", "label": "Kibana URL", "placeholder": "http://localhost:5601", "required": True},
+                "username": {"type": "text", "label": "Username", "placeholder": "Uses ES credentials if empty"},
+                "password": {"type": "password", "label": "Password", "placeholder": "Leave blank to keep current"},
+                "space_id": {"type": "text", "label": "Space ID", "default": "default"},
+                "case_owner": {"type": "select", "label": "Case Owner", "options": ["securitySolution", "observability", "cases"], "default": "securitySolution"},
+            },
+        },
+        "gitlab": {
+            "name": "GitLab",
+            "description": "Version control and template synchronization",
+            "enabled": config.gitlab_enabled,
+            "configured": bool(config.gitlab_url) and bool(config.gitlab_token),
+            "url": config.gitlab_url,
+            "fields": {
+                "url": {"type": "url", "label": "GitLab URL", "placeholder": "https://gitlab.example.com", "required": True},
+                "token": {"type": "password", "label": "Personal Access Token", "placeholder": "Token with 'api' scope", "required": True},
+                "project_id": {"type": "text", "label": "Project ID or Path", "placeholder": "group/project or 123", "required": True},
+            },
+        },
+        "opencti": {
+            "name": "OpenCTI",
+            "description": "Cyber threat intelligence platform",
+            "enabled": config.opencti_enabled,
+            "configured": bool(config.opencti_url) and bool(config.opencti_token),
+            "url": config.opencti_url,
+            "fields": {
+                "url": {"type": "url", "label": "OpenCTI URL", "placeholder": "http://localhost:8888", "required": True},
+                "token": {"type": "password", "label": "API Token", "placeholder": "Bearer token (UUID)", "required": True},
+                "verify_ssl": {"type": "checkbox", "label": "Verify SSL Certificate", "default": True},
+            },
+        },
+        "ollama": {
+            "name": "Ollama",
+            "description": "Local AI model for chat and analysis",
+            "enabled": config.ollama_enabled,
+            "configured": bool(config.ollama_url),
+            "url": config.ollama_url,
+            "fields": {
+                "url": {"type": "url", "label": "Ollama URL", "placeholder": "http://localhost:11434", "default": "http://localhost:11434"},
+                "model": {"type": "select", "label": "Default Model", "options": [], "default": "qwen2.5:0.5b", "dynamic": True},
+                "timeout": {"type": "number", "label": "Request Timeout (seconds)", "default": 120, "min": 30, "max": 600},
+            },
+        },
+        "virustotal": {
+            "name": "VirusTotal",
+            "description": "Malware and URL scanning service",
+            "enabled": config.virustotal_enabled,
+            "configured": bool(config.virustotal_api_key),
+            "fields": {
+                "api_key": {"type": "password", "label": "API Key", "placeholder": "Your VirusTotal API key", "required": True},
+            },
+        },
+        "abuseipdb": {
+            "name": "AbuseIPDB",
+            "description": "IP address reputation database",
+            "enabled": config.abuseipdb_enabled,
+            "configured": bool(config.abuseipdb_api_key),
+            "fields": {
+                "api_key": {"type": "password", "label": "API Key", "placeholder": "Your AbuseIPDB API key", "required": True},
+            },
+        },
+    }
+
+    return {"integrations": integrations}
+
+
+@router.post("/wizard/test/{integration}")
+async def test_wizard_integration(
+    integration: str,
+    config_data: WizardIntegrationConfig,
+    current_user: User = Depends(require_admin),
+):
+    """Test connection for an integration without saving configuration."""
+    import httpx
+
+    if integration == "elasticsearch":
+        try:
+            url = (config_data.url or "").rstrip("/")
+            if not url:
+                return {"success": False, "error": "URL is required"}
+
+            headers = {"Content-Type": "application/json"}
+            auth = None
+
+            if config_data.api_key and not config_data.api_key.startswith("*"):
+                headers["Authorization"] = f"ApiKey {config_data.api_key}"
+            elif config_data.username and config_data.password:
+                if not config_data.password.startswith("*"):
+                    auth = (config_data.username, config_data.password)
+                else:
+                    # Use existing password from config
+                    existing = get_config()
+                    auth = (config_data.username, existing.elasticsearch_password)
+
+            async with httpx.AsyncClient(
+                headers=headers,
+                auth=auth,
+                verify=config_data.verify_ssl if config_data.verify_ssl is not None else True,
+                timeout=httpx.Timeout(10.0, connect=5.0),
+            ) as client:
+                response = await client.get(f"{url}/")
+                response.raise_for_status()
+                data = response.json()
+                return {
+                    "success": True,
+                    "details": {
+                        "cluster_name": data.get("cluster_name"),
+                        "version": data.get("version", {}).get("number"),
+                    }
+                }
+        except httpx.ConnectError as e:
+            return {"success": False, "error": f"Connection failed: {str(e)}"}
+        except httpx.HTTPStatusError as e:
+            return {"success": False, "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    elif integration == "kibana":
+        try:
+            url = (config_data.url or "").rstrip("/")
+            if not url:
+                return {"success": False, "error": "URL is required"}
+
+            # Get credentials - fall back to ES if not provided
+            existing = get_config()
+            username = config_data.username or existing.kibana_username or existing.elasticsearch_username
+            password = config_data.password if config_data.password and not config_data.password.startswith("*") else existing.kibana_password or existing.elasticsearch_password
+
+            auth = (username, password) if username and password else None
+            space_id = config_data.space_id or "default"
+
+            async with httpx.AsyncClient(
+                auth=auth,
+                timeout=httpx.Timeout(10.0, connect=5.0),
+            ) as client:
+                response = await client.get(f"{url}/api/status")
+                response.raise_for_status()
+                data = response.json()
+                return {
+                    "success": True,
+                    "details": {
+                        "version": data.get("version", {}).get("number"),
+                        "status": data.get("status", {}).get("overall", {}).get("level"),
+                    }
+                }
+        except httpx.ConnectError as e:
+            return {"success": False, "error": f"Connection failed: {str(e)}"}
+        except httpx.HTTPStatusError as e:
+            return {"success": False, "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    elif integration == "gitlab":
+        try:
+            url = (config_data.url or "").rstrip("/")
+            if not url:
+                return {"success": False, "error": "URL is required"}
+
+            existing = get_config()
+            token = config_data.token if config_data.token and not config_data.token.startswith("*") else existing.gitlab_token
+            if not token:
+                return {"success": False, "error": "Token is required"}
+
+            project_id = config_data.project_id or existing.gitlab_project_id
+            if not project_id:
+                return {"success": False, "error": "Project ID is required"}
+
+            async with httpx.AsyncClient(
+                headers={"PRIVATE-TOKEN": token},
+                timeout=httpx.Timeout(10.0, connect=5.0),
+            ) as client:
+                # URL-encode the project path if it contains /
+                import urllib.parse
+                encoded_project = urllib.parse.quote(project_id, safe="")
+                response = await client.get(f"{url}/api/v4/projects/{encoded_project}")
+                response.raise_for_status()
+                data = response.json()
+                return {
+                    "success": True,
+                    "details": {
+                        "project_name": data.get("name"),
+                        "web_url": data.get("web_url"),
+                    }
+                }
+        except httpx.ConnectError as e:
+            return {"success": False, "error": f"Connection failed: {str(e)}"}
+        except httpx.HTTPStatusError as e:
+            error_msg = f"HTTP {e.response.status_code}"
+            if e.response.status_code == 401:
+                error_msg = "Invalid token or insufficient permissions"
+            elif e.response.status_code == 404:
+                error_msg = "Project not found - check project ID"
+            return {"success": False, "error": error_msg}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    elif integration == "opencti":
+        try:
+            url = (config_data.url or "").rstrip("/")
+            if not url:
+                return {"success": False, "error": "URL is required"}
+
+            existing = get_config()
+            token = config_data.token if config_data.token and not config_data.token.startswith("*") else existing.opencti_token
+            if not token:
+                return {"success": False, "error": "Token is required"}
+
+            query = '{ about { version } }'
+            async with httpx.AsyncClient(
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                },
+                verify=config_data.verify_ssl if config_data.verify_ssl is not None else True,
+                timeout=httpx.Timeout(10.0, connect=5.0),
+            ) as client:
+                response = await client.post(
+                    f"{url}/graphql",
+                    json={"query": query}
+                )
+                response.raise_for_status()
+                data = response.json()
+                version = data.get("data", {}).get("about", {}).get("version", "unknown")
+                return {
+                    "success": True,
+                    "details": {"version": version}
+                }
+        except httpx.ConnectError as e:
+            return {"success": False, "error": f"Connection failed: {str(e)}"}
+        except httpx.HTTPStatusError as e:
+            return {"success": False, "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    elif integration == "ollama":
+        try:
+            url = (config_data.url or "http://localhost:11434").rstrip("/")
+
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(10.0, connect=5.0),
+            ) as client:
+                response = await client.get(f"{url}/api/tags")
+                response.raise_for_status()
+                data = response.json()
+                models = [m.get("name") for m in data.get("models", [])]
+                return {
+                    "success": True,
+                    "details": {
+                        "models": models,
+                        "model_count": len(models),
+                    }
+                }
+        except httpx.ConnectError as e:
+            return {"success": False, "error": f"Connection failed: Is Ollama running at {url}?"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    elif integration == "virustotal":
+        try:
+            existing = get_config()
+            api_key = config_data.api_key if config_data.api_key and not config_data.api_key.startswith("*") else existing.virustotal_api_key
+            if not api_key:
+                return {"success": False, "error": "API key is required"}
+
+            async with httpx.AsyncClient(
+                headers={"x-apikey": api_key},
+                timeout=httpx.Timeout(10.0, connect=5.0),
+            ) as client:
+                # Test with a simple API call
+                response = await client.get("https://www.virustotal.com/api/v3/ip_addresses/8.8.8.8")
+                if response.status_code == 401:
+                    return {"success": False, "error": "Invalid API key"}
+                response.raise_for_status()
+                return {"success": True, "details": {"status": "API key validated"}}
+        except httpx.ConnectError as e:
+            return {"success": False, "error": f"Connection failed: {str(e)}"}
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                return {"success": False, "error": "Invalid API key"}
+            return {"success": False, "error": f"HTTP {e.response.status_code}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    elif integration == "abuseipdb":
+        try:
+            existing = get_config()
+            api_key = config_data.api_key if config_data.api_key and not config_data.api_key.startswith("*") else existing.abuseipdb_api_key
+            if not api_key:
+                return {"success": False, "error": "API key is required"}
+
+            async with httpx.AsyncClient(
+                headers={
+                    "Key": api_key,
+                    "Accept": "application/json",
+                },
+                timeout=httpx.Timeout(10.0, connect=5.0),
+            ) as client:
+                response = await client.get(
+                    "https://api.abuseipdb.com/api/v2/check",
+                    params={"ipAddress": "8.8.8.8"}
+                )
+                if response.status_code == 401:
+                    return {"success": False, "error": "Invalid API key"}
+                response.raise_for_status()
+                return {"success": True, "details": {"status": "API key validated"}}
+        except httpx.ConnectError as e:
+            return {"success": False, "error": f"Connection failed: {str(e)}"}
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401 or e.response.status_code == 403:
+                return {"success": False, "error": "Invalid API key"}
+            return {"success": False, "error": f"HTTP {e.response.status_code}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    else:
+        raise HTTPException(400, f"Unknown integration: {integration}")
+
+
+@router.post("/wizard/diagnose")
+async def diagnose_integration_error(
+    request: WizardDiagnoseRequest,
+    current_user: User = Depends(require_admin),
+):
+    """Use AI to diagnose integration configuration errors."""
+    config = get_config()
+
+    # Check if Ollama is available
+    if not config.ollama_enabled:
+        return {
+            "available": False,
+            "message": "AI diagnosis requires Ollama to be enabled",
+        }
+
+    from ixion.services.ollama_service import get_ollama_service, OllamaError
+
+    try:
+        ollama = get_ollama_service()
+        if not await ollama.is_available():
+            return {
+                "available": False,
+                "message": "Ollama service is not running",
+            }
+
+        # Build the diagnosis prompt
+        prompt = f"""Integration: {request.integration}
+Error Message: {request.error_message}
+
+Configuration (secrets masked):
+{_format_config_for_diagnosis(request.config)}
+
+Please analyze this error and provide a diagnosis."""
+
+        # Get AI diagnosis
+        result = await ollama.chat(
+            messages=[{"role": "user", "content": prompt}],
+            system_prompt=DIAGNOSIS_SYSTEM_PROMPT,
+            temperature=0.3,  # Lower temperature for more consistent output
+        )
+
+        diagnosis_text = result.get("content", "")
+
+        # Parse the structured response
+        diagnosis = _parse_diagnosis_response(diagnosis_text)
+
+        return {
+            "available": True,
+            "diagnosis": diagnosis,
+            "raw_response": diagnosis_text,
+        }
+
+    except OllamaError as e:
+        return {
+            "available": False,
+            "message": f"AI diagnosis failed: {str(e)}",
+        }
+    except Exception as e:
+        return {
+            "available": False,
+            "message": f"Unexpected error: {str(e)}",
+        }
+
+
+def _format_config_for_diagnosis(config: dict) -> str:
+    """Format config dict for AI diagnosis, masking any potential secrets."""
+    lines = []
+    for key, value in config.items():
+        if any(s in key.lower() for s in ["password", "secret", "token", "key", "api_key"]):
+            value = "***MASKED***" if value else "(not set)"
+        elif value is None:
+            value = "(not set)"
+        lines.append(f"  {key}: {value}")
+    return "\n".join(lines)
+
+
+def _parse_diagnosis_response(text: str) -> dict:
+    """Parse structured diagnosis response from AI."""
+    result = {
+        "summary": "",
+        "cause": "",
+        "solutions": [],
+        "security_note": "",
+        "actionable": [],
+    }
+
+    # Parse DIAGNOSIS section
+    if "DIAGNOSIS:" in text:
+        start = text.find("DIAGNOSIS:") + len("DIAGNOSIS:")
+        end = text.find("CAUSE:") if "CAUSE:" in text else len(text)
+        result["summary"] = text[start:end].strip()
+
+    # Parse CAUSE section
+    if "CAUSE:" in text:
+        start = text.find("CAUSE:") + len("CAUSE:")
+        end = text.find("SOLUTIONS:") if "SOLUTIONS:" in text else len(text)
+        result["cause"] = text[start:end].strip()
+
+    # Parse SOLUTIONS section
+    if "SOLUTIONS:" in text:
+        start = text.find("SOLUTIONS:") + len("SOLUTIONS:")
+        end = text.find("SECURITY NOTE:") if "SECURITY NOTE:" in text else (
+            text.find("ACTIONABLE:") if "ACTIONABLE:" in text else len(text)
+        )
+        solutions_text = text[start:end].strip()
+        # Parse numbered solutions
+        import re
+        solutions = re.findall(r'\d+\.\s*(.+?)(?=\d+\.|$)', solutions_text, re.DOTALL)
+        result["solutions"] = [s.strip() for s in solutions if s.strip()]
+
+    # Parse SECURITY NOTE section
+    if "SECURITY NOTE:" in text:
+        start = text.find("SECURITY NOTE:") + len("SECURITY NOTE:")
+        end = text.find("ACTIONABLE:") if "ACTIONABLE:" in text else len(text)
+        result["security_note"] = text[start:end].strip()
+
+    # Parse ACTIONABLE section
+    if "ACTIONABLE:" in text:
+        start = text.find("ACTIONABLE:") + len("ACTIONABLE:")
+        actionable_text = text[start:].strip().split("\n")[0]
+        if actionable_text and actionable_text.lower() not in ["none", "n/a", ""]:
+            actions = [a.strip() for a in actionable_text.split(",")]
+            # Validate actionable items
+            valid_actions = ["disable_ssl_verification", "increase_timeout", "use_http"]
+            result["actionable"] = [a for a in actions if a in valid_actions]
+
+    return result
+
+
+@router.put("/wizard/save/{integration}")
+async def save_wizard_integration(
+    integration: str,
+    config_data: WizardIntegrationConfig,
+    current_user: User = Depends(require_admin),
+):
+    """Save configuration for a single integration."""
+    config = get_config()
+
+    if integration == "elasticsearch":
+        if config_data.enabled is not None:
+            config.elasticsearch_enabled = config_data.enabled
+        if config_data.url is not None:
+            config.elasticsearch_url = config_data.url.rstrip("/")
+        if config_data.api_key is not None and not config_data.api_key.startswith("*"):
+            config.elasticsearch_api_key = config_data.api_key
+        if config_data.username is not None:
+            config.elasticsearch_username = config_data.username
+        if config_data.password is not None and not config_data.password.startswith("*"):
+            config.elasticsearch_password = config_data.password
+        if config_data.alert_index is not None:
+            config.elasticsearch_alert_index = config_data.alert_index
+        if config_data.case_index is not None:
+            config.elasticsearch_case_index = config_data.case_index
+        if config_data.verify_ssl is not None:
+            config.elasticsearch_verify_ssl = config_data.verify_ssl
+
+    elif integration == "kibana":
+        if config_data.enabled is not None:
+            config.kibana_cases_enabled = config_data.enabled
+        if config_data.url is not None:
+            config.kibana_url = config_data.url.rstrip("/")
+        if config_data.username is not None:
+            config.kibana_username = config_data.username
+        if config_data.password is not None and not config_data.password.startswith("*"):
+            config.kibana_password = config_data.password
+        if config_data.space_id is not None:
+            config.kibana_space_id = config_data.space_id
+        if config_data.case_owner is not None:
+            config.kibana_case_owner = config_data.case_owner
+
+    elif integration == "gitlab":
+        if config_data.enabled is not None:
+            config.gitlab_enabled = config_data.enabled
+        if config_data.url is not None:
+            config.gitlab_url = config_data.url.rstrip("/")
+        if config_data.token is not None and not config_data.token.startswith("*"):
+            config.gitlab_token = config_data.token
+        if config_data.project_id is not None:
+            config.gitlab_project_id = config_data.project_id
+
+    elif integration == "opencti":
+        if config_data.enabled is not None:
+            config.opencti_enabled = config_data.enabled
+        if config_data.url is not None:
+            config.opencti_url = config_data.url.rstrip("/")
+        if config_data.token is not None and not config_data.token.startswith("*"):
+            config.opencti_token = config_data.token
+        if config_data.verify_ssl is not None:
+            config.opencti_verify_ssl = config_data.verify_ssl
+
+    elif integration == "ollama":
+        if config_data.enabled is not None:
+            config.ollama_enabled = config_data.enabled
+        if config_data.url is not None:
+            config.ollama_url = config_data.url.rstrip("/")
+        if config_data.model is not None:
+            config.ollama_model = config_data.model
+        if config_data.timeout is not None:
+            config.ollama_timeout = config_data.timeout
+
+    elif integration == "virustotal":
+        if config_data.enabled is not None:
+            config.virustotal_enabled = config_data.enabled
+        if config_data.api_key is not None and not config_data.api_key.startswith("*"):
+            config.virustotal_api_key = config_data.api_key
+
+    elif integration == "abuseipdb":
+        if config_data.enabled is not None:
+            config.abuseipdb_enabled = config_data.enabled
+        if config_data.api_key is not None and not config_data.api_key.startswith("*"):
+            config.abuseipdb_api_key = config_data.api_key
+
+    else:
+        raise HTTPException(400, f"Unknown integration: {integration}")
+
+    config.to_file(get_config_path())
+    reload_config()
+
+    return {"status": "saved", "integration": integration}
+
+
+@router.post("/wizard/save-all")
+async def save_all_wizard_integrations(
+    request: WizardSaveAllRequest,
+    current_user: User = Depends(require_admin),
+):
+    """Save all integration configurations at once."""
+    config = get_config()
+    saved = []
+    errors = []
+
+    for integration_name, config_data_dict in request.integrations.items():
+        try:
+            # Convert dict to WizardIntegrationConfig
+            config_data = WizardIntegrationConfig(**config_data_dict)
+
+            if integration_name == "elasticsearch":
+                if config_data.enabled is not None:
+                    config.elasticsearch_enabled = config_data.enabled
+                if config_data.url is not None:
+                    config.elasticsearch_url = config_data.url.rstrip("/")
+                if config_data.api_key is not None and not config_data.api_key.startswith("*"):
+                    config.elasticsearch_api_key = config_data.api_key
+                if config_data.username is not None:
+                    config.elasticsearch_username = config_data.username
+                if config_data.password is not None and not config_data.password.startswith("*"):
+                    config.elasticsearch_password = config_data.password
+                if config_data.alert_index is not None:
+                    config.elasticsearch_alert_index = config_data.alert_index
+                if config_data.case_index is not None:
+                    config.elasticsearch_case_index = config_data.case_index
+                if config_data.verify_ssl is not None:
+                    config.elasticsearch_verify_ssl = config_data.verify_ssl
+                saved.append("elasticsearch")
+
+            elif integration_name == "kibana":
+                if config_data.enabled is not None:
+                    config.kibana_cases_enabled = config_data.enabled
+                if config_data.url is not None:
+                    config.kibana_url = config_data.url.rstrip("/")
+                if config_data.username is not None:
+                    config.kibana_username = config_data.username
+                if config_data.password is not None and not config_data.password.startswith("*"):
+                    config.kibana_password = config_data.password
+                if config_data.space_id is not None:
+                    config.kibana_space_id = config_data.space_id
+                if config_data.case_owner is not None:
+                    config.kibana_case_owner = config_data.case_owner
+                saved.append("kibana")
+
+            elif integration_name == "gitlab":
+                if config_data.enabled is not None:
+                    config.gitlab_enabled = config_data.enabled
+                if config_data.url is not None:
+                    config.gitlab_url = config_data.url.rstrip("/")
+                if config_data.token is not None and not config_data.token.startswith("*"):
+                    config.gitlab_token = config_data.token
+                if config_data.project_id is not None:
+                    config.gitlab_project_id = config_data.project_id
+                saved.append("gitlab")
+
+            elif integration_name == "opencti":
+                if config_data.enabled is not None:
+                    config.opencti_enabled = config_data.enabled
+                if config_data.url is not None:
+                    config.opencti_url = config_data.url.rstrip("/")
+                if config_data.token is not None and not config_data.token.startswith("*"):
+                    config.opencti_token = config_data.token
+                if config_data.verify_ssl is not None:
+                    config.opencti_verify_ssl = config_data.verify_ssl
+                saved.append("opencti")
+
+            elif integration_name == "ollama":
+                if config_data.enabled is not None:
+                    config.ollama_enabled = config_data.enabled
+                if config_data.url is not None:
+                    config.ollama_url = config_data.url.rstrip("/")
+                if config_data.model is not None:
+                    config.ollama_model = config_data.model
+                if config_data.timeout is not None:
+                    config.ollama_timeout = config_data.timeout
+                saved.append("ollama")
+
+            elif integration_name == "virustotal":
+                if config_data.enabled is not None:
+                    config.virustotal_enabled = config_data.enabled
+                if config_data.api_key is not None and not config_data.api_key.startswith("*"):
+                    config.virustotal_api_key = config_data.api_key
+                saved.append("virustotal")
+
+            elif integration_name == "abuseipdb":
+                if config_data.enabled is not None:
+                    config.abuseipdb_enabled = config_data.enabled
+                if config_data.api_key is not None and not config_data.api_key.startswith("*"):
+                    config.abuseipdb_api_key = config_data.api_key
+                saved.append("abuseipdb")
+
+            else:
+                errors.append({"integration": integration_name, "error": "Unknown integration"})
+
+        except Exception as e:
+            errors.append({"integration": integration_name, "error": str(e)})
+
+    # Save all changes
+    config.to_file(get_config_path())
+    reload_config()
+
+    return {
+        "status": "completed",
+        "saved": saved,
+        "errors": errors,
+    }
+
+
+@router.get("/wizard/ollama/models")
+async def get_ollama_models(current_user: User = Depends(require_admin)):
+    """Get available Ollama models for selection."""
+    config = get_config()
+
+    if not config.ollama_url:
+        return {"available": False, "models": [], "error": "Ollama URL not configured"}
+
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=3.0)) as client:
+            response = await client.get(f"{config.ollama_url.rstrip('/')}/api/tags")
+            response.raise_for_status()
+            data = response.json()
+
+            models = []
+            for model in data.get("models", []):
+                models.append({
+                    "name": model.get("name"),
+                    "size": model.get("size"),
+                    "modified_at": model.get("modified_at"),
+                    "parameter_size": model.get("details", {}).get("parameter_size", ""),
+                })
+
+            return {
+                "available": True,
+                "models": models,
+                "current": config.ollama_model,
+            }
+
+    except httpx.ConnectError:
+        return {"available": False, "models": [], "error": "Cannot connect to Ollama"}
+    except Exception as e:
+        return {"available": False, "models": [], "error": str(e)}

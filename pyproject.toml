@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ixion"
-version = "0.1.0"
+version = "0.4.0"
 description = "Intelligence eXchange & Integration Operations Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,6 +33,8 @@ dependencies = [
     # NLP and text processing
     "nltk>=3.8.0",
     "pyspellchecker>=0.8.0",
+    # System monitoring
+    "psutil>=5.9.0",
 ]
 
 [project.optional-dependencies]
@@ -49,6 +51,9 @@ ixion-web = "ixion.web.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+ixion = ["web/static/**/*", "web/templates/**/*"]
 
 [tool.ruff]
 line-length = 100

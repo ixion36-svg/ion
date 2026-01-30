@@ -13,6 +13,10 @@
 <div class="settings-layout">
     <!-- Sidebar Navigation -->
     <nav class="settings-nav">
+        <a href="#wizard" class="settings-nav-item wizard-nav-item" data-section="wizard">
+            <span class="nav-icon">&#9889;</span> Integration Wizard
+        </a>
+        <div class="nav-divider"></div>
         <a href="#general" class="settings-nav-item active" data-section="general">General</a>
         <a href="#elasticsearch" class="settings-nav-item" data-section="elasticsearch">Elasticsearch</a>
         <a href="#gitlab" class="settings-nav-item" data-section="gitlab">GitLab</a>
@@ -25,6 +29,34 @@
 
     <!-- Settings Content -->
     <div class="settings-content">
+        <!-- Integration Wizard Section -->
+        <section id="wizard" class="settings-section">
+            <h2>Integration Wizard</h2>
+            <p class="section-description">Configure all your integrations with step-by-step guidance and AI-powered troubleshooting.</p>
+
+            <div class="wizard-launcher">
+                <div class="wizard-launcher-content">
+                    <div class="wizard-launcher-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <div class="wizard-launcher-text">
+                        <h3>Quick Setup</h3>
+                        <p>Configure your integrations with a guided wizard. Test connections and get AI-powered help when things go wrong.</p>
+                    </div>
+                    <button class="btn btn-primary btn-lg" onclick="openIntegrationWizard()">
+                        Launch Wizard
+                    </button>
+                </div>
+
+                <div class="wizard-status-grid" id="wizard-status-grid">
+                    <!-- Status cards will be loaded dynamically -->
+                    <div class="loading">Loading integration status...</div>
+                </div>
+            </div>
+        </section>
+
         <!-- General Settings -->
         <section id="general" class="settings-section active">
             <h2>General Settings</h2>
@@ -731,16 +763,741 @@
 .table-stat-count {
     font-weight: 600;
 }
+
+/* Nav Divider */
+.nav-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 0.5rem 0;
+}
+
+/* Wizard Nav Item */
+.wizard-nav-item {
+    background: linear-gradient(135deg, var(--accent-color), #8b5cf6);
+    color: white !important;
+    font-weight: 600;
+}
+
+.wizard-nav-item:hover {
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+}
+
+.nav-icon {
+    margin-right: 0.25rem;
+}
+
+/* Wizard Launcher Section */
+.wizard-launcher {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 2rem;
+}
+
+.wizard-launcher-content {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.wizard-launcher-icon {
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    background: var(--accent-color);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.wizard-launcher-text {
+    flex: 1;
+}
+
+.wizard-launcher-text h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+}
+
+.wizard-launcher-text p {
+    margin: 0;
+    color: var(--text-muted);
+}
+
+.btn-lg {
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+}
+
+.wizard-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.wizard-status-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.wizard-status-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.wizard-status-icon.configured {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+}
+
+.wizard-status-icon.not-configured {
+    background: rgba(156, 163, 175, 0.1);
+    color: #9ca3af;
+}
+
+.wizard-status-info {
+    flex: 1;
+}
+
+.wizard-status-name {
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.wizard-status-state {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Wizard Modal Styles */
+.wizard-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.wizard-modal {
+    background: var(--bg-primary);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 700px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.wizard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.wizard-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.wizard-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    line-height: 1;
+}
+
+.wizard-close:hover {
+    color: var(--text-primary);
+}
+
+.wizard-progress {
+    display: flex;
+    padding: 1rem 1.5rem;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.wizard-progress-step {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+}
+
+.wizard-progress-step.active {
+    background: var(--accent-color);
+    color: white;
+}
+
+.wizard-progress-step.completed {
+    background: #22c55e;
+    color: white;
+}
+
+.wizard-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.wizard-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.footer-spacer {
+    flex: 1;
+}
+
+/* Wizard Welcome */
+.wizard-welcome {
+    text-align: center;
+}
+
+.wizard-welcome-icon {
+    margin-bottom: 1.5rem;
+    color: var(--accent-color);
+}
+
+.wizard-welcome h3 {
+    margin-bottom: 0.5rem;
+}
+
+.wizard-welcome > p {
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+.wizard-status-overview {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.status-card {
+    text-align: center;
+}
+
+.status-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent-color);
+}
+
+.status-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.wizard-features {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.feature-icon {
+    color: #22c55e;
+    font-weight: bold;
+}
+
+/* Wizard Select */
+.wizard-select h3 {
+    margin-bottom: 0.5rem;
+}
+
+.wizard-select > p {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+.integration-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.integration-select-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.integration-select-card:hover {
+    border-color: var(--accent-color);
+}
+
+.integration-select-card.selected {
+    border-color: var(--accent-color);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.integration-checkbox {
+    flex-shrink: 0;
+}
+
+.integration-checkbox input {
+    width: 18px;
+    height: 18px;
+}
+
+.integration-info {
+    flex: 1;
+}
+
+.integration-name {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.integration-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.status-badge.configured {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+}
+
+.status-badge.not-configured {
+    background: rgba(156, 163, 175, 0.1);
+    color: #9ca3af;
+}
+
+.quick-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+/* Wizard Configure */
+.wizard-integration-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.integration-counter {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.wizard-integration-header h3 {
+    margin: 0.5rem 0 0.25rem 0;
+}
+
+.wizard-integration-header p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.wizard-substeps {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.substep {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    color: var(--text-muted);
+}
+
+.substep.active {
+    background: var(--accent-color);
+    color: white;
+}
+
+.substep.completed {
+    background: #22c55e;
+    color: white;
+}
+
+.wizard-form-container {
+    min-height: 200px;
+}
+
+.wizard-form .form-group {
+    margin-bottom: 1.25rem;
+}
+
+/* Wizard Test */
+.wizard-test {
+    text-align: center;
+}
+
+.wizard-test h4 {
+    margin-bottom: 0.5rem;
+}
+
+.wizard-test > p {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+.test-status {
+    padding: 2rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.test-status.pending {
+    background: var(--bg-secondary);
+}
+
+.test-status.success {
+    background: rgba(34, 197, 94, 0.1);
+}
+
+.test-status.error {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.test-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.test-status.success .test-icon {
+    color: #22c55e;
+}
+
+.test-status.error .test-icon {
+    color: #ef4444;
+}
+
+.test-status h4 {
+    margin: 0 0 0.5rem 0;
+}
+
+.error-message {
+    color: #ef4444;
+    font-family: monospace;
+    font-size: 0.85rem;
+    word-break: break-word;
+}
+
+.test-details {
+    text-align: left;
+    margin-top: 1rem;
+}
+
+.test-details ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.test-details li {
+    padding: 0.25rem 0;
+    font-size: 0.85rem;
+}
+
+/* AI Diagnosis Panel */
+.diagnosis-panel {
+    margin-top: 1.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+}
+
+.diagnosis-loading {
+    padding: 2rem;
+    text-align: center;
+}
+
+.diagnosis-loading .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem auto;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.diagnosis-content {
+    padding: 1.25rem;
+}
+
+.diagnosis-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.diagnosis-header h4 {
+    margin: 0;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+.diagnosis-summary,
+.diagnosis-cause {
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.diagnosis-solutions {
+    margin-bottom: 1rem;
+}
+
+.diagnosis-solutions h5 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.85rem;
+}
+
+.diagnosis-solutions ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.diagnosis-solutions li {
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+
+.diagnosis-actionable {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: rgba(245, 158, 11, 0.1);
+    border-radius: 6px;
+}
+
+.diagnosis-actionable h5 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.85rem;
+}
+
+.diagnosis-security {
+    padding: 0.75rem;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+.diagnosis-actions {
+    text-align: center;
+    margin-top: 1rem;
+}
+
+/* Wizard Summary */
+.wizard-summary h3 {
+    margin-bottom: 0.5rem;
+}
+
+.wizard-summary > p {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+.summary-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.summary-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+}
+
+.summary-status {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.summary-status.success {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+}
+
+.summary-status.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.summary-status.unknown {
+    background: rgba(156, 163, 175, 0.1);
+    color: #9ca3af;
+}
+
+.summary-info {
+    flex: 1;
+}
+
+.summary-name {
+    font-weight: 600;
+}
+
+.summary-config {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.summary-note {
+    padding: 1rem;
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+/* Wizard Result */
+.wizard-result {
+    text-align: center;
+    padding: 2rem;
+}
+
+.wizard-result.success .success-icon {
+    font-size: 3rem;
+    color: #22c55e;
+    margin-bottom: 1rem;
+}
+
+.wizard-result h3 {
+    margin-bottom: 0.5rem;
+}
+
+.wizard-result p {
+    color: var(--text-muted);
+}
+
+.wizard-saving {
+    text-align: center;
+    padding: 3rem;
+}
+
+.wizard-saving .spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--border-color);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem auto;
+}
+
+/* Resume Prompt */
+.wizard-resume {
+    text-align: center;
+}
+
+.wizard-resume h3 {
+    margin-bottom: 1rem;
+}
+
+.wizard-resume ul {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+}
+
+.wizard-resume li {
+    padding: 0.25rem 0;
+}
+
+@media (max-width: 600px) {
+    .wizard-launcher-content {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .wizard-modal {
+        max-height: 100vh;
+        border-radius: 0;
+    }
+}
 </style>
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/integration-wizard.js"></script>
 <script>
 let currentConfig = {};
 
 document.addEventListener('DOMContentLoaded', () => {
     loadAllSettings();
     setupNavigation();
+    loadWizardStatus();
 });
 
 function setupNavigation() {
@@ -765,9 +1522,51 @@ function setupNavigation() {
             } else if (section === 'database') {
                 loadDatabaseStats();
                 loadBackups();
+            } else if (section === 'wizard') {
+                loadWizardStatus();
             }
         });
     });
+}
+
+async function loadWizardStatus() {
+    const container = document.getElementById('wizard-status-grid');
+    if (!container) return;
+
+    try {
+        const response = await fetch('/api/admin/wizard/integrations', {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load integrations');
+
+        const data = await response.json();
+        const integrations = data.integrations || {};
+
+        let html = '';
+        for (const [name, meta] of Object.entries(integrations)) {
+            const isConfigured = meta.configured;
+            html += `
+                <div class="wizard-status-card">
+                    <div class="wizard-status-icon ${isConfigured ? 'configured' : 'not-configured'}">
+                        ${isConfigured ? '&#10003;' : '&#10007;'}
+                    </div>
+                    <div class="wizard-status-info">
+                        <div class="wizard-status-name">${escapeHtml(meta.name)}</div>
+                        <div class="wizard-status-state">
+                            ${isConfigured ? 'Configured' : 'Not configured'}
+                            ${meta.enabled ? ' (Enabled)' : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+
+    } catch (error) {
+        container.innerHTML = `<div class="loading">Error: ${error.message}</div>`;
+    }
 }
 
 async function loadAllSettings() {
