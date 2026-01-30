@@ -123,6 +123,21 @@ async def startup_event():
     # Always run create_all to ensure new tables are created
     init_db(config.db_path)
 
+    # Start Kibana bidirectional sync if enabled
+    try:
+        from ixion.services.kibana_sync_service import get_kibana_sync_service
+        from ixion.core.config import get_kibana_config
+
+        kibana_config = get_kibana_config()
+        if kibana_config.get("enabled"):
+            sync_service = get_kibana_sync_service()
+            sync_service.start_background_sync(interval_seconds=60)
+            import logging
+            logging.getLogger(__name__).info("Kibana bidirectional sync started (60s interval)")
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to start Kibana sync: {e}")
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):

@@ -1,102 +1,126 @@
 #!/bin/bash
 # =============================================================================
-# DocForge - Build Offline Deployment Package
+# IXION - Build Offline Deployment Package
 # =============================================================================
 # Run this script on a machine WITH internet access to create an air-gapped
 # deployment package that can be transferred to the secure environment.
 #
-# Usage: ./scripts/build-offline-package.sh [version]
-# Example: ./scripts/build-offline-package.sh 1.0.0
+# Usage: ./scripts/build-offline-package.sh [version] [model]
+# Example: ./scripts/build-offline-package.sh 1.0.0 qwen2.5:0.5b
 # =============================================================================
 
 set -e
 
 VERSION="${1:-latest}"
-PACKAGE_NAME="docforge-offline-${VERSION}"
+OLLAMA_MODEL="${2:-qwen2.5:0.5b}"
+PACKAGE_NAME="ixion-offline-${VERSION}"
 OUTPUT_DIR="./dist/${PACKAGE_NAME}"
 
 echo "=============================================="
-echo "Building DocForge Offline Package v${VERSION}"
+echo "Building IXION Offline Package v${VERSION}"
+echo "Including Ollama model: ${OLLAMA_MODEL}"
 echo "=============================================="
 
 # Create output directory
 rm -rf "${OUTPUT_DIR}"
 mkdir -p "${OUTPUT_DIR}"
+mkdir -p "${OUTPUT_DIR}/images"
+mkdir -p "${OUTPUT_DIR}/models"
 
-# Step 1: Build Docker image
+# Step 1: Build IXION Docker image
 echo ""
-echo "[1/4] Building Docker image..."
-docker build -t docforge:${VERSION} -t docforge:latest .
+echo "[1/6] Building IXION Docker image..."
+docker build -t ixion:${VERSION} -t ixion:latest .
 
-# Step 2: Save Docker image as tar
+# Step 2: Save IXION Docker image as tar
 echo ""
-echo "[2/4] Exporting Docker image..."
-docker save docforge:${VERSION} | gzip > "${OUTPUT_DIR}/docforge-image-${VERSION}.tar.gz"
+echo "[2/6] Exporting IXION Docker image..."
+docker save ixion:${VERSION} | gzip > "${OUTPUT_DIR}/images/ixion-${VERSION}.tar.gz"
 
-# Step 3: Copy deployment files
+# Step 3: Pull and save Ollama image
 echo ""
-echo "[3/4] Copying deployment files..."
+echo "[3/6] Pulling Ollama Docker image..."
+docker pull ollama/ollama:latest
+docker save ollama/ollama:latest | gzip > "${OUTPUT_DIR}/images/ollama-latest.tar.gz"
+
+# Step 4: Pull Ollama model and export it
+echo ""
+echo "[4/6] Pulling Ollama model: ${OLLAMA_MODEL}..."
+# Start a temporary Ollama container to pull the model
+docker run -d --name ixion-ollama-temp -v ixion-ollama-temp:/root/.ollama ollama/ollama:latest
+sleep 5
+
+# Pull the model
+docker exec ixion-ollama-temp ollama pull ${OLLAMA_MODEL}
+
+# Export the model data
+echo "Exporting model data..."
+docker run --rm -v ixion-ollama-temp:/source -v "$(pwd)/${OUTPUT_DIR}/models":/dest alpine \
+    sh -c "cd /source && tar czf /dest/ollama-models.tar.gz ."
+
+# Cleanup temp container
+docker stop ixion-ollama-temp
+docker rm ixion-ollama-temp
+docker volume rm ixion-ollama-temp
+
+# Step 5: Copy deployment files
+echo ""
+echo "[5/6] Copying deployment files..."
 cp docker-compose.yml "${OUTPUT_DIR}/"
+cp .env.example "${OUTPUT_DIR}/.env"
 cp SETUP.md "${OUTPUT_DIR}/" 2>/dev/null || true
+cp README.md "${OUTPUT_DIR}/" 2>/dev/null || true
 
 # Copy HTTPS deployment files
-mkdir -p "${OUTPUT_DIR}/nginx"
-mkdir -p "${OUTPUT_DIR}/ssl"
-cp deploy/docker-compose.https.yml "${OUTPUT_DIR}/" 2>/dev/null || true
-cp deploy/nginx/nginx.conf "${OUTPUT_DIR}/nginx/" 2>/dev/null || true
-cp deploy/generate-certs.sh "${OUTPUT_DIR}/" 2>/dev/null || true
-cp deploy/DEPLOYMENT_GUIDE.md "${OUTPUT_DIR}/" 2>/dev/null || true
-chmod +x "${OUTPUT_DIR}/generate-certs.sh" 2>/dev/null || true
-
-# Copy Elasticsearch/Filebeat deployment files
-mkdir -p "${OUTPUT_DIR}/filebeat"
-mkdir -p "${OUTPUT_DIR}/elasticsearch"
-cp deploy/docker-compose.elk.yml "${OUTPUT_DIR}/" 2>/dev/null || true
-cp deploy/filebeat/filebeat.yml "${OUTPUT_DIR}/filebeat/" 2>/dev/null || true
-cp deploy/elasticsearch/ilm-policy.json "${OUTPUT_DIR}/elasticsearch/" 2>/dev/null || true
-cp deploy/elasticsearch/ingest-pipeline.json "${OUTPUT_DIR}/elasticsearch/" 2>/dev/null || true
-cp deploy/elasticsearch/setup-elasticsearch.sh "${OUTPUT_DIR}/elasticsearch/" 2>/dev/null || true
-cp deploy/ELASTICSEARCH_INTEGRATION.md "${OUTPUT_DIR}/" 2>/dev/null || true
-chmod +x "${OUTPUT_DIR}/elasticsearch/setup-elasticsearch.sh" 2>/dev/null || true
+mkdir -p "${OUTPUT_DIR}/deploy"
+mkdir -p "${OUTPUT_DIR}/deploy/nginx"
+mkdir -p "${OUTPUT_DIR}/deploy/ssl"
+cp -r deploy/* "${OUTPUT_DIR}/deploy/" 2>/dev/null || true
 
 # Create deployment script
 cat > "${OUTPUT_DIR}/deploy.sh" << 'DEPLOY_EOF'
 #!/bin/bash
-# DocForge Offline Deployment Script
+# IXION Offline Deployment Script
 # Run this on the air-gapped target machine
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE_FILE=$(ls "${SCRIPT_DIR}"/docforge-image-*.tar.gz 2>/dev/null | head -1)
-
-if [ -z "$IMAGE_FILE" ]; then
-    echo "ERROR: No Docker image file found!"
-    exit 1
-fi
 
 echo "=============================================="
-echo "DocForge Offline Deployment"
+echo "IXION Offline Deployment"
 echo "=============================================="
 
-# Step 1: Load Docker image
+# Step 1: Load Docker images
 echo ""
-echo "[1/3] Loading Docker image..."
-echo "      This may take a few minutes..."
-gunzip -c "$IMAGE_FILE" | docker load
+echo "[1/4] Loading Docker images..."
+echo "      Loading IXION image..."
+gunzip -c "${SCRIPT_DIR}/images/ixion-"*.tar.gz | docker load
 
-# Step 2: Initialize database
+echo "      Loading Ollama image..."
+gunzip -c "${SCRIPT_DIR}/images/ollama-latest.tar.gz" | docker load
+
+# Step 2: Load Ollama models
 echo ""
-echo "[2/3] Initializing database..."
-docker run --rm -v docforge-data:/data docforge:latest \
+echo "[2/4] Loading Ollama models..."
+docker volume create ixion_ollama-models 2>/dev/null || true
+docker run --rm -v ixion_ollama-models:/dest -v "${SCRIPT_DIR}/models":/source alpine \
+    sh -c "cd /dest && tar xzf /source/ollama-models.tar.gz"
+echo "      Models loaded successfully!"
+
+# Step 3: Initialize database
+echo ""
+echo "[3/4] Initializing database..."
+docker volume create ixion_ixion-data 2>/dev/null || true
+docker run --rm -v ixion_ixion-data:/data ixion:latest \
     python -c "
 from pathlib import Path
-from docforge.storage.database import init_db
-from docforge.core.config import Config
+from ixion.storage.database import init_db
+from ixion.core.config import Config
 
-data_dir = Path('/data/.docforge')
+data_dir = Path('/data/.ixion')
 data_dir.mkdir(parents=True, exist_ok=True)
-db_path = data_dir / 'docforge.db'
+db_path = data_dir / 'ixion.db'
 
 if not db_path.exists():
     print('Creating database...')
@@ -108,16 +132,17 @@ else:
     print('Database already exists.')
 "
 
-# Step 3: Seed default users
+# Step 4: Seed default users
 echo ""
-echo "[3/3] Setting up authentication..."
-docker run --rm -v docforge-data:/data docforge:latest \
+echo "[4/4] Setting up authentication..."
+docker run --rm -v ixion_ixion-data:/data ixion:latest \
     python -c "
 from pathlib import Path
-from docforge.storage.database import get_engine, get_session_factory
-from docforge.auth.service import AuthService
+from ixion.storage.database import get_engine, get_session_factory
+from ixion.auth.service import AuthService
+import os
 
-db_path = Path('/data/.docforge/docforge.db')
+db_path = Path('/data/.ixion/ixion.db')
 engine = get_engine(db_path)
 factory = get_session_factory(engine)
 session = factory()
@@ -125,11 +150,12 @@ session = factory()
 auth = AuthService(session)
 auth.seed_permissions()
 auth.seed_roles()
-admin = auth.seed_admin_user(password='changeme')
+admin_password = os.environ.get('IXION_ADMIN_PASSWORD', 'changeme')
+admin = auth.seed_admin_user(password=admin_password)
 session.commit()
 
 if admin:
-    print('Admin user ready: admin / changeme')
+    print('Admin user ready: admin / ' + admin_password)
     print('WARNING: Change this password immediately!')
 "
 
@@ -138,14 +164,15 @@ echo "=============================================="
 echo "Deployment complete!"
 echo "=============================================="
 echo ""
-echo "To start DocForge:"
+echo "To start IXION:"
+echo "  cd ${SCRIPT_DIR}"
 echo "  docker-compose up -d"
 echo ""
 echo "Access the web UI at: http://localhost:8000"
 echo ""
 echo "Default credentials:"
 echo "  Username: admin"
-echo "  Password: changeme"
+echo "  Password: changeme (or value of IXION_ADMIN_PASSWORD)"
 echo ""
 echo "IMPORTANT: Change the admin password after first login!"
 echo ""
@@ -153,109 +180,94 @@ DEPLOY_EOF
 
 chmod +x "${OUTPUT_DIR}/deploy.sh"
 
-# Step 4: Create README
-cat > "${OUTPUT_DIR}/README.txt" << 'README_EOF'
+# Step 6: Create README
+cat > "${OUTPUT_DIR}/README.txt" << README_EOF
 ================================================================================
-DocForge Offline Deployment Package
+IXION Offline Deployment Package v${VERSION}
+Intelligence eXchange & Integration Operations Network
 ================================================================================
 
 CONTENTS:
-  - docforge-image-*.tar.gz   : Docker image (compressed)
-  - docker-compose.yml        : HTTP deployment config
-  - docker-compose.https.yml  : HTTPS deployment config (production)
-  - docker-compose.elk.yml    : Elasticsearch logging config
-  - deploy.sh                 : Deployment script
-  - nginx/nginx.conf          : Nginx reverse proxy config
-  - filebeat/filebeat.yml     : Filebeat log shipper config
-  - elasticsearch/            : Elasticsearch setup files (ILM, pipeline)
-  - generate-certs.sh         : Generate self-signed TLS certificates
-  - DEPLOYMENT_GUIDE.md       : Comprehensive deployment guide
-  - ELASTICSEARCH_INTEGRATION.md : Elasticsearch/logging guide
-  - SETUP.md                  : Quick setup reference
+  images/
+    - ixion-${VERSION}.tar.gz    : IXION Docker image
+    - ollama-latest.tar.gz       : Ollama LLM service image
+  models/
+    - ollama-models.tar.gz       : Pre-downloaded Ollama model (${OLLAMA_MODEL})
+  deploy/
+    - nginx/                     : Nginx reverse proxy configs
+    - ssl/                       : SSL certificate directory
+    - docker-compose.https.yml   : HTTPS deployment config
+  - docker-compose.yml           : Main deployment config
+  - .env                         : Environment configuration
+  - deploy.sh                    : Deployment script
+  - SETUP.md                     : Quick setup reference
+  - README.md                    : Full documentation
 
 REQUIREMENTS:
   - Docker Engine 20.10+
   - Docker Compose v2+
-  - ~500MB disk space for image
-  - ~100MB disk space for data
+  - 8GB+ RAM recommended (for Ollama)
+  - ~2GB disk space for images
+  - ~500MB disk space for models
 
 ================================================================================
-OPTION A: HTTP DEPLOYMENT (Development/Testing)
+QUICK START
 ================================================================================
 
   1. chmod +x deploy.sh && ./deploy.sh
-  2. docker-compose up -d
-  3. Access: http://localhost:8000
+  2. Edit .env to configure integrations (GitLab, OpenCTI, Elasticsearch)
+  3. docker-compose up -d
+  4. Access: http://localhost:8000
+  5. Login: admin / changeme
 
 ================================================================================
-OPTION B: HTTPS DEPLOYMENT (Production)
+HTTPS DEPLOYMENT (Production)
 ================================================================================
 
-  1. Place TLS certificates:
-     - ssl/server.crt  (certificate)
-     - ssl/server.key  (private key)
+  1. Place TLS certificates in deploy/ssl/:
+     - server.crt (certificate)
+     - server.key (private key)
 
-     Or generate self-signed certs (testing only):
-       chmod +x generate-certs.sh
-       ./generate-certs.sh your-hostname.com
-
-  2. Load nginx image (if not already available):
-     docker pull nginx:1.25-alpine  # On machine with internet
-     docker save nginx:1.25-alpine | gzip > nginx.tar.gz
-     # Transfer and load:
-     gunzip -c nginx.tar.gz | docker load
+  2. Update .env:
+     IXION_COOKIE_SECURE=true
 
   3. Deploy:
-     chmod +x deploy.sh && ./deploy.sh
-     docker-compose -f docker-compose.https.yml up -d
+     docker-compose -f deploy/docker-compose.https.yml up -d
 
   4. Access: https://localhost
 
 ================================================================================
-DEFAULT CREDENTIALS
+INTEGRATION CONFIGURATION
 ================================================================================
 
-  Username: admin
-  Password: changeme
+Edit .env before starting:
 
-  *** CHANGE THIS PASSWORD IMMEDIATELY AFTER FIRST LOGIN! ***
+  # GitLab
+  IXION_GITLAB_ENABLED=true
+  IXION_GITLAB_URL=https://gitlab.example.com
+  IXION_GITLAB_TOKEN=your-token
+  IXION_GITLAB_PROJECT_ID=1
 
-================================================================================
-OPTION C: ELASTICSEARCH LOGGING
-================================================================================
+  # OpenCTI
+  IXION_OPENCTI_ENABLED=true
+  IXION_OPENCTI_URL=https://opencti.example.com
+  IXION_OPENCTI_TOKEN=your-token
 
-  1. Ensure Elasticsearch is accessible from the deployment machine
-
-  2. Download Filebeat image (on machine with internet):
-     docker pull docker.elastic.co/beats/filebeat:8.11.0
-     docker save docker.elastic.co/beats/filebeat:8.11.0 | gzip > filebeat.tar.gz
-     # Transfer and load:
-     gunzip -c filebeat.tar.gz | docker load
-
-  3. Setup Elasticsearch indices:
-     chmod +x elasticsearch/setup-elasticsearch.sh
-     ./elasticsearch/setup-elasticsearch.sh http://elasticsearch:9200
-
-  4. Configure and deploy:
-     export ELASTICSEARCH_HOSTS='["http://elasticsearch:9200"]'
-     docker-compose -f docker-compose.elk.yml up -d
-
-  See ELASTICSEARCH_INTEGRATION.md for detailed configuration options.
+  # Elasticsearch
+  IXION_ELASTICSEARCH_ENABLED=true
+  IXION_ELASTICSEARCH_URL=https://elasticsearch.example.com:9200
+  IXION_ELASTICSEARCH_USERNAME=elastic
+  IXION_ELASTICSEARCH_PASSWORD=your-password
 
 ================================================================================
-CONFIGURATION
+AI ASSISTANT
 ================================================================================
 
-Edit docker-compose.yml or docker-compose.https.yml:
+The Ollama model (${OLLAMA_MODEL}) is pre-loaded and ready to use.
 
-  environment:
-    - DOCFORGE_COOKIE_SECURE=true        # Required for HTTPS
-    - DOCFORGE_ADMIN_PASSWORD=SecurePwd  # Initial admin password
-    - DOCFORGE_OIDC_ENABLED=true         # Enable Keycloak SSO
-    - DOCFORGE_OIDC_KEYCLOAK_URL=https://keycloak.example.com
-    - DOCFORGE_OIDC_REALM=docforge
-    - DOCFORGE_OIDC_CLIENT_ID=docforge-app
-    - DOCFORGE_OIDC_CLIENT_SECRET=secret
+To use a different model:
+  1. Update IXION_OLLAMA_MODEL in .env
+  2. Ensure the model is available in the models/ archive
 
 ================================================================================
 OPERATIONS
@@ -267,34 +279,38 @@ OPERATIONS
   Status:   docker-compose ps
 
   Backup:
-    docker run --rm -v docforge-data:/data -v $(pwd):/backup \
-      alpine tar czf /backup/docforge-backup.tar.gz -C /data .
+    docker run --rm -v ixion_ixion-data:/data -v \$(pwd):/backup \\
+      alpine tar czf /backup/ixion-backup.tar.gz -C /data .
 
   Restore:
-    docker run --rm -v docforge-data:/data -v $(pwd):/backup \
-      alpine tar xzf /backup/docforge-backup.tar.gz -C /data
+    docker-compose down
+    docker run --rm -v ixion_ixion-data:/data -v \$(pwd):/backup \\
+      alpine sh -c "rm -rf /data/* && tar xzf /backup/ixion-backup.tar.gz -C /data"
+    docker-compose up -d
 
-================================================================================
-For detailed instructions, see DEPLOYMENT_GUIDE.md
 ================================================================================
 README_EOF
 
 # Calculate sizes
-IMAGE_SIZE=$(du -h "${OUTPUT_DIR}/docforge-image-${VERSION}.tar.gz" | cut -f1)
+IXION_SIZE=$(du -h "${OUTPUT_DIR}/images/ixion-${VERSION}.tar.gz" | cut -f1)
+OLLAMA_SIZE=$(du -h "${OUTPUT_DIR}/images/ollama-latest.tar.gz" | cut -f1)
+MODEL_SIZE=$(du -h "${OUTPUT_DIR}/models/ollama-models.tar.gz" | cut -f1)
 TOTAL_SIZE=$(du -sh "${OUTPUT_DIR}" | cut -f1)
 
 echo ""
-echo "[4/4] Package created successfully!"
+echo "[6/6] Package created successfully!"
 echo ""
 echo "Package location: ${OUTPUT_DIR}"
-echo "Image size: ${IMAGE_SIZE}"
-echo "Total size: ${TOTAL_SIZE}"
 echo ""
-echo "Contents:"
-ls -la "${OUTPUT_DIR}"
+echo "Sizes:"
+echo "  IXION image:  ${IXION_SIZE}"
+echo "  Ollama image: ${OLLAMA_SIZE}"
+echo "  Ollama model: ${MODEL_SIZE}"
+echo "  Total:        ${TOTAL_SIZE}"
 echo ""
-echo "To deploy:"
-echo "  1. Copy '${OUTPUT_DIR}' to the air-gapped machine"
+echo "To deploy on air-gapped machine:"
+echo "  1. Copy '${OUTPUT_DIR}' to the target machine"
 echo "  2. Run: cd ${PACKAGE_NAME} && ./deploy.sh"
-echo "  3. Run: docker-compose up -d"
+echo "  3. Edit .env to configure integrations"
+echo "  4. Run: docker-compose up -d"
 echo ""
