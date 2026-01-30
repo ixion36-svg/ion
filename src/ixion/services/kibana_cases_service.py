@@ -308,6 +308,50 @@ class KibanaCasesService:
             logger.error(f"Error getting Kibana case comments: {e}")
             return []
 
+    def get_case_alerts(self, case_id: str) -> List[Dict[str, Any]]:
+        """Get all alerts attached to a case.
+
+        Returns list of alert info with IDs and indices.
+        """
+        if not self.enabled:
+            return []
+
+        try:
+            # Get the full case - alerts are included inline in comments array
+            case = self.get_case(case_id)
+            if not case:
+                return []
+
+            comments = case.get("comments", [])
+
+            alerts = []
+            for comment in comments:
+                if comment.get("type") == "alert":
+                    # Each alert comment can contain multiple alert IDs
+                    alert_ids = comment.get("alertId", [])
+                    if isinstance(alert_ids, str):
+                        alert_ids = [alert_ids]
+
+                    # Index can be string or list
+                    index = comment.get("index", ".alerts-security.alerts-default")
+                    if isinstance(index, list):
+                        index = index[0] if index else ".alerts-security.alerts-default"
+
+                    rule = comment.get("rule", {})
+
+                    for alert_id in alert_ids:
+                        alerts.append({
+                            "id": alert_id,
+                            "index": index,
+                            "rule_id": rule.get("id"),
+                            "rule_name": rule.get("name"),
+                        })
+
+            return alerts
+        except Exception as e:
+            logger.error(f"Error getting Kibana case alerts: {e}")
+            return []
+
     def attach_alerts_to_case(
         self,
         case_id: str,

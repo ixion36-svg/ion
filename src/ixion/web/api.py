@@ -20,6 +20,7 @@ from slowapi.util import get_remote_address
 
 from ixion.core.config import get_config, get_oidc_config, get_gitlab_config, get_kibana_config
 from ixion.services.kibana_cases_service import get_kibana_cases_service
+from ixion.services.kibana_sync_service import get_kibana_sync_service
 
 # Rate limiter - uses IP address as key
 limiter = Limiter(key_func=get_remote_address)
@@ -4859,6 +4860,40 @@ async def create_kibana_case(
     }
 
 
+@router.get("/kibana/cases/unimported")
+async def get_unimported_kibana_cases(
+    current_user: User = Depends(get_current_user),
+):
+    """Get list of cases created in Kibana that haven't been imported to IXION."""
+    sync_service = get_kibana_sync_service()
+
+    unimported = await sync_service.get_unimported_kibana_cases()
+
+    return {
+        "cases": unimported,
+        "count": len(unimported),
+    }
+
+
+@router.post("/kibana/cases/import")
+async def import_kibana_cases(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Import all cases created in Kibana that don't exist in IXION."""
+    sync_service = get_kibana_sync_service()
+
+    result = await sync_service.import_cases_from_kibana(session)
+
+    return {
+        "message": "Import completed",
+        "imported": result.get("imported", 0),
+        "skipped": result.get("skipped", 0),
+        "errors": result.get("errors"),
+        "error": result.get("error"),
+    }
+
+
 @router.get("/kibana/cases/{case_id}")
 async def get_kibana_case(
     case_id: str,
@@ -4997,8 +5032,6 @@ async def delete_kibana_case(
 # ============================================================================
 # Kibana Bidirectional Sync Endpoints
 # ============================================================================
-
-from ixion.services.kibana_sync_service import get_kibana_sync_service
 
 
 @router.post("/kibana/sync")

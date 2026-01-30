@@ -527,6 +527,55 @@ class ElasticsearchService:
 
         return related
 
+    async def get_alerts_by_ids(
+        self,
+        alert_ids: List[str],
+        index: Optional[str] = None,
+    ) -> List[ElasticsearchAlert]:
+        """Fetch specific alerts by their IDs.
+
+        Args:
+            alert_ids: List of alert IDs to fetch
+            index: Optional index to search (defaults to configured alert_index)
+
+        Returns:
+            List of ElasticsearchAlert objects
+        """
+        if not alert_ids:
+            return []
+
+        search_index = index or self.alert_index
+
+        query = {
+            "size": len(alert_ids),
+            "query": {
+                "ids": {
+                    "values": alert_ids
+                }
+            }
+        }
+
+        try:
+            result = await self._request(
+                "POST",
+                f"/{search_index}/_search",
+                json=query,
+            )
+        except ElasticsearchError as e:
+            logger.error(f"Error fetching alerts by ID: {e}")
+            return []
+
+        alerts = []
+        for hit in result.get("hits", {}).get("hits", []):
+            source = hit.get("_source", {})
+            alert = self._parse_alert(hit["_id"], source)
+            if alert:
+                # Include raw_data for observable extraction
+                alert.raw_data = source
+                alerts.append(alert)
+
+        return alerts
+
     async def get_alert_stats(self, hours: int = 24) -> Dict[str, Any]:
         """Get alert statistics."""
         query = {
