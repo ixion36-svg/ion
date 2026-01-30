@@ -1,8 +1,8 @@
-# DocForge Deployment Guide
+# IXION Deployment Guide
 
 ## Air-Gapped / Secure Environment Deployment
 
-This guide covers deploying DocForge in environments without internet access.
+This guide covers deploying IXION in environments without internet access.
 
 ### Features Included in Docker Image
 
@@ -59,25 +59,25 @@ Run these commands on a machine **with internet access**.
 ### Windows
 
 ```cmd
-cd C:\Projects\docforge
+cd C:\Projects\ixion
 scripts\build-offline-package.bat 1.0.0
 ```
 
 ### Linux/Mac
 
 ```bash
-cd /path/to/docforge
+cd /path/to/ixion
 chmod +x scripts/build-offline-package.sh
 ./scripts/build-offline-package.sh 1.0.0
 ```
 
 ### Output
 
-The build creates `dist/docforge-offline-1.0.0/` containing:
+The build creates `dist/ixion-offline-1.0.0/` containing:
 
 ```
-docforge-offline-1.0.0/
-├── docforge-image-1.0.0.zip    # Docker image (~150-200MB)
+ixion-offline-1.0.0/
+├── ixion-image-1.0.0.zip    # Docker image (~150-200MB)
 ├── docker-compose.yml           # Basic deployment config
 ├── deploy.sh                    # Deployment script
 └── README.txt                   # Quick reference
@@ -105,8 +105,8 @@ deploy/
 **Recommended directory structure on target:**
 
 ```
-/opt/docforge/
-├── docforge-image-1.0.0.zip
+/opt/ixion/
+├── ixion-image-1.0.0.zip
 ├── docker-compose.yml           # or docker-compose.https.yml
 ├── deploy.sh
 ├── nginx/
@@ -125,11 +125,11 @@ deploy/
 **Use for:** Development, testing, or when TLS is handled by external load balancer.
 
 ```bash
-cd /opt/docforge
+cd /opt/ixion
 
 # Load Docker image
-unzip -p docforge-image-*.zip | docker load
-# Or for .tar.gz: gunzip -c docforge-image-*.tar.gz | docker load
+unzip -p ixion-image-*.zip | docker load
+# Or for .tar.gz: gunzip -c ixion-image-*.tar.gz | docker load
 
 # Deploy
 ./deploy.sh
@@ -162,16 +162,16 @@ ssl/
 **Option 2: Generate self-signed certificates (testing only)**
 
 ```bash
-cd /opt/docforge
+cd /opt/ixion
 chmod +x generate-certs.sh
-./generate-certs.sh docforge.yourdomain.com
+./generate-certs.sh ixion.yourdomain.com
 ```
 
 #### Step 2: Load Docker Images
 
 ```bash
-# Load DocForge image
-unzip -p docforge-image-*.zip | docker load
+# Load IXION image
+unzip -p ixion-image-*.zip | docker load
 
 # Pull nginx image (if not included in offline package)
 # If no internet, you'll need to also export/import nginx:1.25-alpine
@@ -184,7 +184,7 @@ gunzip -c nginx-image.tar.gz | docker load
 #### Step 3: Deploy with HTTPS
 
 ```bash
-cd /opt/docforge
+cd /opt/ixion
 
 # Initialize database (first time only)
 ./deploy.sh
@@ -209,49 +209,49 @@ Configure in `docker-compose.yml` or `docker-compose.https.yml`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DOCFORGE_HOST` | `0.0.0.0` | Bind address |
-| `DOCFORGE_PORT` | `8000` | Application port |
-| `DOCFORGE_COOKIE_SECURE` | `false` | Set `true` for HTTPS |
-| `DOCFORGE_ADMIN_PASSWORD` | `changeme` | Initial admin password |
-| `DOCFORGE_OIDC_ENABLED` | `false` | Enable Keycloak SSO |
-| `DOCFORGE_OIDC_KEYCLOAK_URL` | - | Keycloak server URL |
-| `DOCFORGE_OIDC_REALM` | - | Keycloak realm |
-| `DOCFORGE_OIDC_CLIENT_ID` | - | OIDC client ID |
-| `DOCFORGE_OIDC_CLIENT_SECRET` | - | OIDC client secret |
-| `DOCFORGE_GITLAB_ENABLED` | `false` | Enable GitLab integration |
-| `DOCFORGE_GITLAB_URL` | - | GitLab server URL |
-| `DOCFORGE_GITLAB_TOKEN` | - | GitLab Personal Access Token |
-| `DOCFORGE_GITLAB_PROJECT_ID` | - | GitLab project ID or path |
+| `IXION_HOST` | `0.0.0.0` | Bind address |
+| `IXION_PORT` | `8000` | Application port |
+| `IXION_COOKIE_SECURE` | `false` | Set `true` for HTTPS |
+| `IXION_ADMIN_PASSWORD` | `changeme` | Initial admin password |
+| `IXION_OIDC_ENABLED` | `false` | Enable Keycloak SSO |
+| `IXION_OIDC_KEYCLOAK_URL` | - | Keycloak server URL |
+| `IXION_OIDC_REALM` | - | Keycloak realm |
+| `IXION_OIDC_CLIENT_ID` | - | OIDC client ID |
+| `IXION_OIDC_CLIENT_SECRET` | - | OIDC client secret |
+| `IXION_GITLAB_ENABLED` | `false` | Enable GitLab integration |
+| `IXION_GITLAB_URL` | - | GitLab server URL |
+| `IXION_GITLAB_TOKEN` | - | GitLab Personal Access Token |
+| `IXION_GITLAB_PROJECT_ID` | - | GitLab project ID or path |
 
 ### Example: Production HTTPS Configuration
 
 ```yaml
 environment:
-  - DOCFORGE_COOKIE_SECURE=true
-  - DOCFORGE_ADMIN_PASSWORD=YourSecurePassword123!
+  - IXION_COOKIE_SECURE=true
+  - IXION_ADMIN_PASSWORD=YourSecurePassword123!
 ```
 
 ### Example: With Keycloak SSO
 
 ```yaml
 environment:
-  - DOCFORGE_COOKIE_SECURE=true
-  - DOCFORGE_OIDC_ENABLED=true
-  - DOCFORGE_OIDC_KEYCLOAK_URL=https://keycloak.internal.company.com
-  - DOCFORGE_OIDC_REALM=docforge
-  - DOCFORGE_OIDC_CLIENT_ID=docforge-app
-  - DOCFORGE_OIDC_CLIENT_SECRET=your-client-secret-here
+  - IXION_COOKIE_SECURE=true
+  - IXION_OIDC_ENABLED=true
+  - IXION_OIDC_KEYCLOAK_URL=https://keycloak.internal.company.com
+  - IXION_OIDC_REALM=ixion
+  - IXION_OIDC_CLIENT_ID=ixion-app
+  - IXION_OIDC_CLIENT_SECRET=your-client-secret-here
 ```
 
 ### Example: With GitLab Integration
 
 ```yaml
 environment:
-  - DOCFORGE_COOKIE_SECURE=true
-  - DOCFORGE_GITLAB_ENABLED=true
-  - DOCFORGE_GITLAB_URL=https://gitlab.internal.company.com
-  - DOCFORGE_GITLAB_TOKEN=glpat-xxxxxxxxxxxx
-  - DOCFORGE_GITLAB_PROJECT_ID=security/documentation
+  - IXION_COOKIE_SECURE=true
+  - IXION_GITLAB_ENABLED=true
+  - IXION_GITLAB_URL=https://gitlab.internal.company.com
+  - IXION_GITLAB_TOKEN=glpat-xxxxxxxxxxxx
+  - IXION_GITLAB_PROJECT_ID=security/documentation
 ```
 
 **Note:** The GitLab token requires the `api` scope. Create a Personal Access Token in GitLab > User Settings > Access Tokens.
@@ -311,7 +311,7 @@ docker-compose -f docker-compose.https.yml down
 docker-compose logs -f
 
 # Specific service
-docker-compose logs -f docforge
+docker-compose logs -f ixion
 docker-compose logs -f nginx
 ```
 
@@ -327,12 +327,12 @@ docker-compose -f docker-compose.https.yml ps
 ```bash
 # Backup data volume
 docker run --rm \
-  -v docforge-data:/data \
+  -v ixion-data:/data \
   -v $(pwd):/backup \
-  alpine tar czf /backup/docforge-backup-$(date +%Y%m%d).tar.gz -C /data .
+  alpine tar czf /backup/ixion-backup-$(date +%Y%m%d).tar.gz -C /data .
 
 # Backup includes:
-# - Database (docforge.db)
+# - Database (ixion.db)
 # - Configuration (config.json)
 ```
 
@@ -344,21 +344,21 @@ docker-compose down
 
 # Restore data
 docker run --rm \
-  -v docforge-data:/data \
+  -v ixion-data:/data \
   -v $(pwd):/backup \
-  alpine sh -c "rm -rf /data/* && tar xzf /backup/docforge-backup-YYYYMMDD.tar.gz -C /data"
+  alpine sh -c "rm -rf /data/* && tar xzf /backup/ixion-backup-YYYYMMDD.tar.gz -C /data"
 
 # Restart services
 docker-compose up -d
 ```
 
-### Updating DocForge
+### Updating IXION
 
 1. Build new offline package with updated version
 2. Transfer to secure environment
 3. Load new image:
    ```bash
-   unzip -p docforge-image-NEW.zip | docker load
+   unzip -p ixion-image-NEW.zip | docker load
    ```
 4. Update image tag in docker-compose.yml if needed
 5. Restart:
@@ -375,7 +375,7 @@ docker-compose up -d
 
 ```bash
 # Check logs
-docker-compose logs docforge
+docker-compose logs ixion
 
 # Common issues:
 # - Database initialization failed
@@ -392,7 +392,7 @@ docker-compose ps
 docker-compose logs nginx
 
 # Test internal connectivity
-docker exec docforge-app curl -s http://localhost:8000/api/stats
+docker exec ixion-app curl -s http://localhost:8000/api/stats
 ```
 
 ### Certificate errors (HTTPS)
@@ -414,7 +414,7 @@ openssl rsa -in ssl/server.key -noout -modulus | md5sum
 
 ```bash
 # Check database exists
-docker exec docforge-app ls -la /data/.docforge/
+docker exec ixion-app ls -la /data/.ixion/
 
 # Reset database (WARNING: deletes all data!)
 docker-compose down -v
@@ -426,7 +426,7 @@ docker-compose up -d
 
 ```bash
 # Fix volume permissions
-docker run --rm -v docforge-data:/data alpine chown -R 1000:1000 /data
+docker run --rm -v ixion-data:/data alpine chown -R 1000:1000 /data
 ```
 
 ---
@@ -437,7 +437,7 @@ Before going to production, verify:
 
 - [ ] Changed default admin password
 - [ ] Using HTTPS with valid TLS certificates
-- [ ] `DOCFORGE_COOKIE_SECURE=true` is set
+- [ ] `IXION_COOKIE_SECURE=true` is set
 - [ ] Firewall configured (only ports 80/443 open if needed)
 - [ ] Regular backups scheduled
 - [ ] Log monitoring configured
@@ -458,7 +458,7 @@ Before going to production, verify:
 | Logs | `docker-compose logs -f` |
 | Status | `docker-compose ps` |
 | Backup | See [Backup](#backup) section |
-| Shell access | `docker exec -it docforge-app /bin/bash` |
+| Shell access | `docker exec -it ixion-app /bin/bash` |
 
 ---
 

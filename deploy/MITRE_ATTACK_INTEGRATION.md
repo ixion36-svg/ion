@@ -1,10 +1,10 @@
-# DocForge MITRE ATT&CK Integration Guide
+# IXION MITRE ATT&CK Integration Guide
 
-This guide explains how DocForge extracts, displays, and allows manual tagging of MITRE ATT&CK techniques for security alert investigation.
+This guide explains how IXION extracts, displays, and allows manual tagging of MITRE ATT&CK techniques for security alert investigation.
 
 ## Overview
 
-The MITRE ATT&CK framework provides a knowledge base of adversary tactics and techniques. DocForge integrates with this framework to:
+The MITRE ATT&CK framework provides a knowledge base of adversary tactics and techniques. IXION integrates with this framework to:
 
 - **Auto-extract** technique/tactic data from Elasticsearch alerts
 - **Display** technique badges on alerts for quick identification
@@ -25,7 +25,7 @@ The MITRE ATT&CK framework provides a knowledge base of adversary tactics and te
             │                    │                    │
             ▼                    ▼                    ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                      DocForge Alert Parser                               │
+│                      IXION Alert Parser                               │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │  MITRE Extraction:                                               │    │
 │  │  • threat.technique.id/name  (primary)                          │    │
@@ -36,7 +36,7 @@ The MITRE ATT&CK framework provides a knowledge base of adversary tactics and te
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         DocForge UI (/alerts)                            │
+│                         IXION UI (/alerts)                            │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
 │  │  Heatmap    │  │   Badges    │  │   Manual    │  │   Filter    │     │
 │  │ (Analytics) │  │ (Per Alert) │  │   Tagging   │  │ by Technique│     │
@@ -77,7 +77,7 @@ Technique IDs follow these patterns:
 
 ### ECS Field Mappings
 
-DocForge extracts MITRE data from alerts using these field paths:
+IXION extracts MITRE data from alerts using these field paths:
 
 | Field | Primary Path (ECS/Seed Data) | Fallback Path (Elastic SIEM) |
 |-------|------------------------------|------------------------------|
@@ -330,10 +330,10 @@ Clear filters using the existing "Clear Filter" button.
 No additional configuration required. MITRE extraction uses existing Elasticsearch connection settings:
 
 ```bash
-DOCFORGE_ELASTICSEARCH_ENABLED=true
-DOCFORGE_ELASTICSEARCH_HOSTS=https://elasticsearch:9200
-DOCFORGE_ELASTICSEARCH_USERNAME=elastic
-DOCFORGE_ELASTICSEARCH_PASSWORD=changeme
+IXION_ELASTICSEARCH_ENABLED=true
+IXION_ELASTICSEARCH_HOSTS=https://elasticsearch:9200
+IXION_ELASTICSEARCH_USERNAME=elastic
+IXION_ELASTICSEARCH_PASSWORD=changeme
 ```
 
 ### Database Migration
@@ -401,9 +401,9 @@ ALTER TABLE alert_triage ADD COLUMN mitre_techniques JSON
    - ECS format: `threat.technique.id`, `threat.technique.name`, `threat.tactic.name`
    - SIEM format: `signal.rule.threat[0].technique[0].id`, etc.
 
-3. **Check DocForge logs:**
+3. **Check IXION logs:**
    ```bash
-   grep "mitre" /var/log/docforge/app.log
+   grep "mitre" /var/log/ixion/app.log
    ```
 
 ### Heatmap Not Loading
@@ -434,10 +434,10 @@ If the `mitre_techniques` column wasn't added:
 
 ```bash
 # Check column exists
-sqlite3 docforge.db ".schema alert_triage"
+sqlite3 ixion.db ".schema alert_triage"
 
 # Manual migration if needed
-sqlite3 docforge.db "ALTER TABLE alert_triage ADD COLUMN mitre_techniques JSON"
+sqlite3 ixion.db "ALTER TABLE alert_triage ADD COLUMN mitre_techniques JSON"
 ```
 
 ## Best Practices

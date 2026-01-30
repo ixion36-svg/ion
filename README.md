@@ -258,7 +258,7 @@ Jane,jane@example.com,Marketing
 
 ```bash
 # Build image
-docker build -t docforge:latest .
+docker build -t ixion:latest .
 
 # Run
 docker-compose up -d
@@ -330,13 +330,13 @@ IXION integrates with [OpenCTI](https://www.opencti.io/) to enrich alert observa
 
 ```bash
 # Environment variables
-DOCFORGE_OPENCTI_ENABLED=true
-DOCFORGE_OPENCTI_URL=https://opencti.example.com
-DOCFORGE_OPENCTI_TOKEN=your-api-token-uuid
-DOCFORGE_OPENCTI_VERIFY_SSL=true
+IXION_OPENCTI_ENABLED=true
+IXION_OPENCTI_URL=https://opencti.example.com
+IXION_OPENCTI_TOKEN=your-api-token-uuid
+IXION_OPENCTI_VERIFY_SSL=true
 ```
 
-Or in `.docforge/config.json`:
+Or in `.ixion/config.json`:
 ```json
 {
     "opencti_enabled": true,
@@ -368,13 +368,13 @@ Configure GitLab via the web UI (GitLab page) or environment variables:
 
 ```bash
 # Environment variables
-DOCFORGE_GITLAB_ENABLED=true
-DOCFORGE_GITLAB_URL=https://gitlab.example.com
-DOCFORGE_GITLAB_TOKEN=glpat-xxxxxxxxxxxx
-DOCFORGE_GITLAB_PROJECT_ID=group/project
+IXION_GITLAB_ENABLED=true
+IXION_GITLAB_URL=https://gitlab.example.com
+IXION_GITLAB_TOKEN=glpat-xxxxxxxxxxxx
+IXION_GITLAB_PROJECT_ID=group/project
 ```
 
-Or in `.docforge/config.json`:
+Or in `.ixion/config.json`:
 ```json
 {
     "gitlab_enabled": true,
@@ -506,7 +506,7 @@ The Tools page (`/tools`) provides a suite of client-side document processing ut
 
 ```bash
 pytest tests/ -v
-pytest tests/ --cov=docforge --cov-report=term-missing
+pytest tests/ --cov=ixion --cov-report=term-missing
 ```
 
 ## Dependencies

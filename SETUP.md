@@ -1,4 +1,4 @@
-# DocForge Setup Instructions
+# IXION Setup Instructions
 
 ## Quick Start
 
@@ -9,16 +9,16 @@
 pip install -e ".[dev]"
 
 # Initialize database
-docforge init
+ixion init
 
 # Upgrade database schema
-docforge upgrade
+ixion upgrade
 
 # Seed default users
-docforge seed-users --admin-password YourPassword123
+ixion seed-users --admin-password YourPassword123
 
 # Start web server
-docforge web
+ixion web
 ```
 
 Access at: http://localhost:8000
@@ -43,20 +43,20 @@ scripts\build-offline-package.bat 1.0.0
 
 ### 2. Transfer to Secure Environment
 
-Copy `dist/docforge-offline-1.0.0/` to the target machine.
+Copy `dist/ixion-offline-1.0.0/` to the target machine.
 
 ### 3. Deploy
 
 **HTTP (Development/Testing):**
 ```bash
-cd docforge-offline-1.0.0
+cd ixion-offline-1.0.0
 ./deploy.sh
 docker-compose up -d
 ```
 
 **HTTPS (Production):**
 ```bash
-cd docforge-offline-1.0.0
+cd ixion-offline-1.0.0
 # Place certificates in ssl/server.crt and ssl/server.key
 ./deploy.sh
 docker-compose -f docker-compose.https.yml up -d
@@ -89,21 +89,21 @@ docker-compose -f docker-compose.https.yml up -d
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DOCFORGE_COOKIE_SECURE` | `false` | Set `true` for HTTPS |
-| `DOCFORGE_ADMIN_PASSWORD` | `changeme` | Initial admin password |
-| `DOCFORGE_OIDC_ENABLED` | `false` | Enable Keycloak SSO |
-| `DOCFORGE_OIDC_KEYCLOAK_URL` | - | Keycloak server URL |
-| `DOCFORGE_OIDC_REALM` | - | Keycloak realm name |
-| `DOCFORGE_OIDC_CLIENT_ID` | - | OIDC client ID |
-| `DOCFORGE_OIDC_CLIENT_SECRET` | - | OIDC client secret |
+| `IXION_COOKIE_SECURE` | `false` | Set `true` for HTTPS |
+| `IXION_ADMIN_PASSWORD` | `changeme` | Initial admin password |
+| `IXION_OIDC_ENABLED` | `false` | Enable Keycloak SSO |
+| `IXION_OIDC_KEYCLOAK_URL` | - | Keycloak server URL |
+| `IXION_OIDC_REALM` | - | Keycloak realm name |
+| `IXION_OIDC_CLIENT_ID` | - | OIDC client ID |
+| `IXION_OIDC_CLIENT_SECRET` | - | OIDC client secret |
 
 ### Config File
 
-Located at `.docforge/config.json`:
+Located at `.ixion/config.json`:
 
 ```json
 {
-  "db_path": ".docforge/docforge.db",
+  "db_path": ".ixion/ixion.db",
   "default_format": "markdown",
   "auto_save": true,
   "cookie_secure": true,
@@ -121,58 +121,58 @@ Located at `.docforge/config.json`:
 
 ### System
 ```bash
-docforge init              # Initialize database
-docforge upgrade           # Upgrade database schema
-docforge seed-users        # Create default roles and admin user
-docforge status            # Show system status
-docforge web               # Start web server
+ixion init              # Initialize database
+ixion upgrade           # Upgrade database schema
+ixion seed-users        # Create default roles and admin user
+ixion status            # Show system status
+ixion web               # Start web server
 ```
 
 ### Templates
 ```bash
-docforge template list
-docforge template create "My Template" --format markdown
-docforge template show 1
-docforge template edit 1
-docforge template delete 1
-docforge template search "keyword"
-docforge template import template.md
-docforge template export 1 -o output.md
+ixion template list
+ixion template create "My Template" --format markdown
+ixion template show 1
+ixion template edit 1
+ixion template delete 1
+ixion template search "keyword"
+ixion template import template.md
+ixion template export 1 -o output.md
 ```
 
 ### Collections
 ```bash
-docforge collection list
-docforge collection create "My Collection" -d "Description"
-docforge collection show 1
-docforge collection add 1 5      # Add template 5 to collection 1
-docforge collection remove 5     # Remove template from collection
-docforge collection delete 1
+ixion collection list
+ixion collection create "My Collection" -d "Description"
+ixion collection show 1
+ixion collection add 1 5      # Add template 5 to collection 1
+ixion collection remove 5     # Remove template from collection
+ixion collection delete 1
 ```
 
 ### Rendering
 ```bash
-docforge render preview 1 -d '{"name": "Value"}'
-docforge render run 1 -f data.json -o output.md
-docforge render validate-data 1 -d '{"name": "Value"}'
-docforge render batch 1 data.csv --name-field "title"
+ixion render preview 1 -d '{"name": "Value"}'
+ixion render run 1 -f data.json -o output.md
+ixion render validate-data 1 -d '{"name": "Value"}'
+ixion render batch 1 data.csv --name-field "title"
 ```
 
 ### Versions
 ```bash
-docforge version list 1
-docforge version show 1 2
-docforge version diff 1 1 2
-docforge version checkpoint 1 "Release v1.0"
-docforge version rollback 1 2
+ixion version list 1
+ixion version show 1 2
+ixion version diff 1 1 2
+ixion version checkpoint 1 "Release v1.0"
+ixion version rollback 1 2
 ```
 
 ### Documents
 ```bash
-docforge document list
-docforge document show 1
-docforge document export 1 -o output.md
-docforge document delete 1
+ixion document list
+ixion document show 1
+ixion document export 1 -o output.md
+ixion document delete 1
 ```
 
 ---
@@ -238,21 +238,21 @@ docforge document delete 1
 
 ### Backup (Docker)
 ```bash
-docker run --rm -v docforge-data:/data -v $(pwd):/backup \
-  alpine tar czf /backup/docforge-backup.tar.gz -C /data .
+docker run --rm -v ixion-data:/data -v $(pwd):/backup \
+  alpine tar czf /backup/ixion-backup.tar.gz -C /data .
 ```
 
 ### Restore (Docker)
 ```bash
 docker-compose down
-docker run --rm -v docforge-data:/data -v $(pwd):/backup \
-  alpine sh -c "rm -rf /data/* && tar xzf /backup/docforge-backup.tar.gz -C /data"
+docker run --rm -v ixion-data:/data -v $(pwd):/backup \
+  alpine sh -c "rm -rf /data/* && tar xzf /backup/ixion-backup.tar.gz -C /data"
 docker-compose up -d
 ```
 
 ### Backup (Local)
 ```bash
-cp -r .docforge .docforge-backup-$(date +%Y%m%d)
+cp -r .ixion .ixion-backup-$(date +%Y%m%d)
 ```
 
 ---
@@ -262,7 +262,7 @@ cp -r .docforge .docforge-backup-$(date +%Y%m%d)
 ### Common Issues
 
 **"Template not found"**
-- Verify the template ID exists: `docforge template list`
+- Verify the template ID exists: `ixion template list`
 
 **"Permission denied"**
 - Check user has required role
@@ -274,7 +274,7 @@ cp -r .docforge .docforge-backup-$(date +%Y%m%d)
 
 **Container won't start**
 ```bash
-docker-compose logs docforge
+docker-compose logs ixion
 ```
 
 For detailed troubleshooting, see `deploy/DEPLOYMENT_GUIDE.md`.
