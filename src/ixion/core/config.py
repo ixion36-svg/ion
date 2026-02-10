@@ -28,6 +28,7 @@ class Config:
 
     # Security settings
     cookie_secure: bool = False  # Set to True when using HTTPS in production
+    debug_mode: bool = False  # Enable API docs and detailed errors (disable in production)
 
     # GitLab integration
     gitlab_enabled: bool = False
@@ -102,6 +103,7 @@ class Config:
             oidc_role_mapping=data.get("oidc_role_mapping", {}),
             # Security settings
             cookie_secure=data.get("cookie_secure", False),
+            debug_mode=data.get("debug_mode", False),
             # GitLab integration
             gitlab_enabled=data.get("gitlab_enabled", False),
             gitlab_url=data.get("gitlab_url", ""),
@@ -162,6 +164,7 @@ class Config:
                     "oidc_role_mapping": self.oidc_role_mapping,
                     # Security settings
                     "cookie_secure": self.cookie_secure,
+                    "debug_mode": self.debug_mode,
                     # GitLab integration
                     "gitlab_enabled": self.gitlab_enabled,
                     "gitlab_url": self.gitlab_url,
@@ -244,6 +247,8 @@ def get_config() -> Config:
         # Override with environment variables
         if os.environ.get("IXION_COOKIE_SECURE"):
             _config.cookie_secure = _get_env_bool("IXION_COOKIE_SECURE")
+        if os.environ.get("IXION_DEBUG_MODE"):
+            _config.debug_mode = _get_env_bool("IXION_DEBUG_MODE")
         if os.environ.get("IXION_OIDC_ENABLED"):
             _config.oidc_enabled = _get_env_bool("IXION_OIDC_ENABLED")
         if os.environ.get("IXION_OIDC_KEYCLOAK_URL"):
