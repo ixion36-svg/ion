@@ -24,10 +24,12 @@ from ixion.models.security import (
 from ixion.models.alert_triage import (
     AlertTriage,
     AlertTriageStatus,
-    AlertComment,
     AlertCase,
     AlertCaseStatus,
-    CaseNote,
+    Note,
+    NoteEntityType,
+    AlertComment,  # Backward compatibility alias for Note
+    CaseNote,  # Backward compatibility alias for Note
 )
 from ixion.models.chat import (
     ChatRoom,
@@ -40,26 +42,41 @@ from ixion.models.integration import (
     IntegrationStatus,
     LogLevel,
     WebhookStatus,
+    IntegrationEventType,
     Webhook,
-    WebhookLog,
-    IntegrationLog,
-    IntegrationHealthCheck,
+    IntegrationEvent,
+    WebhookLog,  # Backward compatibility alias for IntegrationEvent
+    IntegrationLog,  # Backward compatibility alias for IntegrationEvent
+    IntegrationHealthCheck,  # Backward compatibility alias for IntegrationEvent
 )
 from ixion.models.observable import (
     Observable,
     ObservableType,
     ThreatLevel,
     ObservableEnrichment,
-    ObservableAlertLink,
-    ObservableCaseLink,
+    ObservableLink,
+    ObservableLinkType,
+    ObservableAlertLink,  # Backward compatibility alias for ObservableLink
+    ObservableCaseLink,  # Backward compatibility alias for ObservableLink
+    ObservableSighting,  # Backward compatibility alias for ObservableLink
     WatchlistAlert,
     WatchlistAlertType,
-    ObservableSighting,
 )
 from ixion.models.ai_chat import (
     AIChatSession,
     AIChatMessage,
     AIContextType,
+)
+from ixion.models.saved_search import (
+    SavedSearch,
+    SearchType,
+)
+from ixion.models.playbook import (
+    Playbook,
+    PlaybookStep,
+    PlaybookExecution,
+    StepType,
+    ExecutionStatus,
 )
 
 __all__ = [
@@ -87,10 +104,12 @@ __all__ = [
     "BlockedIP",
     "AlertTriage",
     "AlertTriageStatus",
-    "AlertComment",
     "AlertCase",
     "AlertCaseStatus",
-    "CaseNote",
+    "Note",
+    "NoteEntityType",
+    "AlertComment",  # Alias for Note
+    "CaseNote",  # Alias for Note
     "ChatRoom",
     "ChatRoomMember",
     "ChatMessage",
@@ -100,22 +119,35 @@ __all__ = [
     "IntegrationStatus",
     "LogLevel",
     "WebhookStatus",
+    "IntegrationEventType",
     "Webhook",
-    "WebhookLog",
-    "IntegrationLog",
-    "IntegrationHealthCheck",
+    "IntegrationEvent",
+    "WebhookLog",  # Alias for IntegrationEvent
+    "IntegrationLog",  # Alias for IntegrationEvent
+    "IntegrationHealthCheck",  # Alias for IntegrationEvent
     # Observable models
     "Observable",
     "ObservableType",
     "ThreatLevel",
     "ObservableEnrichment",
-    "ObservableAlertLink",
-    "ObservableCaseLink",
+    "ObservableLink",
+    "ObservableLinkType",
+    "ObservableAlertLink",  # Alias for ObservableLink
+    "ObservableCaseLink",  # Alias for ObservableLink
+    "ObservableSighting",  # Alias for ObservableLink
     "WatchlistAlert",
     "WatchlistAlertType",
-    "ObservableSighting",
     # AI Chat models
     "AIChatSession",
     "AIChatMessage",
     "AIContextType",
+    # Saved Search models
+    "SavedSearch",
+    "SearchType",
+    # Playbook models
+    "Playbook",
+    "PlaybookStep",
+    "PlaybookExecution",
+    "StepType",
+    "ExecutionStatus",
 ]

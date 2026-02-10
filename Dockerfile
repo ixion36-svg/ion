@@ -28,16 +28,6 @@ COPY src/ src/
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
 
-# Download NLTK data for NLP features
-RUN python -c "import nltk; \
-    nltk.download('punkt', quiet=True); \
-    nltk.download('punkt_tab', quiet=True); \
-    nltk.download('averaged_perceptron_tagger', quiet=True); \
-    nltk.download('averaged_perceptron_tagger_eng', quiet=True); \
-    nltk.download('maxent_ne_chunker', quiet=True); \
-    nltk.download('maxent_ne_chunker_tab', quiet=True); \
-    nltk.download('words', quiet=True)"
-
 # ============================================================================
 # Stage 2: Runtime stage - minimal image
 # ============================================================================
@@ -51,11 +41,6 @@ WORKDIR /app
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-
-# Copy NLTK data from builder
-COPY --from=builder /root/nltk_data /home/ixion/nltk_data
-RUN chown -R ixion:ixion /home/ixion/nltk_data
-ENV NLTK_DATA=/home/ixion/nltk_data
 
 # Copy application source and entrypoint
 COPY src/ src/

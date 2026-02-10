@@ -332,6 +332,264 @@ def upgrade() -> None:
                 conn.execute(text("ALTER TABLE templates ADD COLUMN collection_id INTEGER REFERENCES collections(id)"))
                 migrations_applied.append("templates.collection_id")
 
+        # =================================================================
+        # Saved Searches table migration
+        # =================================================================
+
+        if 'saved_searches' not in inspector.get_table_names():
+            console.print("  Creating 'saved_searches' table...")
+            conn.execute(text("""
+                CREATE TABLE saved_searches (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    search_type VARCHAR(50) NOT NULL DEFAULT 'discover',
+                    search_params JSON NOT NULL,
+                    created_by_id INTEGER NOT NULL REFERENCES users(id),
+                    is_shared BOOLEAN NOT NULL DEFAULT 0,
+                    is_favorite BOOLEAN NOT NULL DEFAULT 0,
+                    execution_count INTEGER NOT NULL DEFAULT 0,
+                    last_executed_at DATETIME,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_saved_searches_created_by ON saved_searches(created_by_id)"))
+            conn.execute(text("CREATE INDEX ix_saved_searches_shared ON saved_searches(is_shared)"))
+            migrations_applied.append("saved_searches table")
+
+        # =================================================================
+        # Playbooks tables migration
+        # =================================================================
+
+        if 'playbooks' not in inspector.get_table_names():
+            console.print("  Creating 'playbooks' table...")
+            conn.execute(text("""
+                CREATE TABLE playbooks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name VARCHAR(255) NOT NULL UNIQUE,
+                    description TEXT,
+                    is_active BOOLEAN NOT NULL DEFAULT 1,
+                    trigger_conditions JSON NOT NULL,
+                    priority INTEGER NOT NULL DEFAULT 0,
+                    created_by_id INTEGER NOT NULL REFERENCES users(id),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_playbooks_active ON playbooks(is_active)"))
+            conn.execute(text("CREATE INDEX ix_playbooks_priority ON playbooks(priority)"))
+            migrations_applied.append("playbooks table")
+
+        if 'playbook_steps' not in inspector.get_table_names():
+            console.print("  Creating 'playbook_steps' table...")
+            conn.execute(text("""
+                CREATE TABLE playbook_steps (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    playbook_id INTEGER NOT NULL REFERENCES playbooks(id),
+                    step_order INTEGER NOT NULL,
+                    step_type VARCHAR(50) NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    step_params JSON,
+                    is_required BOOLEAN NOT NULL DEFAULT 0
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_playbook_steps_playbook ON playbook_steps(playbook_id)"))
+            migrations_applied.append("playbook_steps table")
+
+        if 'playbook_executions' not in inspector.get_table_names():
+            console.print("  Creating 'playbook_executions' table...")
+            conn.execute(text("""
+                CREATE TABLE playbook_executions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    playbook_id INTEGER NOT NULL REFERENCES playbooks(id),
+                    es_alert_id VARCHAR(500) NOT NULL,
+                    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+                    started_at DATETIME,
+                    completed_at DATETIME,
+                    step_statuses JSON,
+                    executed_by_id INTEGER REFERENCES users(id),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_playbook_executions_alert ON playbook_executions(es_alert_id)"))
+            conn.execute(text("CREATE INDEX ix_playbook_executions_playbook ON playbook_executions(playbook_id)"))
+            conn.execute(text("CREATE INDEX ix_playbook_executions_status ON playbook_executions(status)"))
+            migrations_applied.append("playbook_executions table")
+
+        # =================================================================
+        # Unified Notes table (consolidates alert_comments + case_notes)
+        # =================================================================
+
+        if 'notes' not in inspector.get_table_names():
+            console.print("  Creating 'notes' table...")
+            conn.execute(text("""
+                CREATE TABLE notes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    entity_type VARCHAR(50) NOT NULL,
+                    entity_id VARCHAR(500) NOT NULL,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    content TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_notes_entity ON notes(entity_type, entity_id)"))
+            conn.execute(text("CREATE INDEX ix_notes_user_id ON notes(user_id)"))
+            conn.execute(text("CREATE INDEX ix_notes_created_at ON notes(created_at)"))
+            migrations_applied.append("notes table")
+
+            # Migrate data from old tables if they exist
+            if 'alert_comments' in inspector.get_table_names():
+                console.print("  Migrating data from 'alert_comments' to 'notes'...")
+                conn.execute(text("""
+                    INSERT INTO notes (entity_type, entity_id, user_id, content, created_at)
+                    SELECT 'alert', es_alert_id, user_id, content, created_at
+                    FROM alert_comments
+                """))
+                migrations_applied.append("alert_comments data migration")
+
+            if 'case_notes' in inspector.get_table_names():
+                console.print("  Migrating data from 'case_notes' to 'notes'...")
+                conn.execute(text("""
+                    INSERT INTO notes (entity_type, entity_id, user_id, content, created_at)
+                    SELECT 'case', CAST(case_id AS VARCHAR), user_id, content, created_at
+                    FROM case_notes
+                """))
+                migrations_applied.append("case_notes data migration")
+
+        # =================================================================
+        # Unified Observable Links table (consolidates observable_alert_links,
+        # observable_case_links, observable_sightings)
+        # =================================================================
+
+        if 'observable_links' not in inspector.get_table_names():
+            console.print("  Creating 'observable_links' table...")
+            conn.execute(text("""
+                CREATE TABLE observable_links (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    observable_id INTEGER NOT NULL REFERENCES observables(id) ON DELETE CASCADE,
+                    link_type VARCHAR(50) NOT NULL,
+                    entity_id INTEGER NOT NULL,
+                    context VARCHAR(100) NOT NULL,
+                    extracted_from VARCHAR(50) NOT NULL DEFAULT 'auto',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                    UNIQUE(observable_id, link_type, entity_id, context)
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_observable_links_observable_id ON observable_links(observable_id)"))
+            conn.execute(text("CREATE INDEX ix_observable_links_link_type ON observable_links(link_type)"))
+            conn.execute(text("CREATE INDEX ix_observable_links_entity_id ON observable_links(entity_id)"))
+            conn.execute(text("CREATE INDEX ix_observable_links_created_at ON observable_links(created_at)"))
+            migrations_applied.append("observable_links table")
+
+            # Migrate data from old tables if they exist
+            if 'observable_alert_links' in inspector.get_table_names():
+                console.print("  Migrating data from 'observable_alert_links' to 'observable_links'...")
+                conn.execute(text("""
+                    INSERT INTO observable_links (observable_id, link_type, entity_id, context, extracted_from, created_at)
+                    SELECT observable_id, 'alert', alert_triage_id, context, extracted_from, created_at
+                    FROM observable_alert_links
+                """))
+                migrations_applied.append("observable_alert_links data migration")
+
+            if 'observable_case_links' in inspector.get_table_names():
+                console.print("  Migrating data from 'observable_case_links' to 'observable_links'...")
+                conn.execute(text("""
+                    INSERT INTO observable_links (observable_id, link_type, entity_id, context, extracted_from, created_at)
+                    SELECT observable_id, 'case', case_id, context, 'manual', created_at
+                    FROM observable_case_links
+                """))
+                migrations_applied.append("observable_case_links data migration")
+
+            if 'observable_sightings' in inspector.get_table_names():
+                console.print("  Migrating data from 'observable_sightings' to 'observable_links'...")
+                conn.execute(text("""
+                    INSERT INTO observable_links (observable_id, link_type, entity_id, context, extracted_from, created_at)
+                    SELECT observable_id,
+                           CASE source_type WHEN 'alert' THEN 'alert' WHEN 'case' THEN 'case' ELSE 'manual' END,
+                           COALESCE(source_id, 0),
+                           COALESCE(context, source_type),
+                           'sighting',
+                           seen_at
+                    FROM observable_sightings
+                """))
+                migrations_applied.append("observable_sightings data migration")
+
+        # =================================================================
+        # Unified Integration Events table (consolidates webhook_logs,
+        # integration_logs, integration_health_checks)
+        # =================================================================
+
+        if 'integration_events' not in inspector.get_table_names():
+            console.print("  Creating 'integration_events' table...")
+            conn.execute(text("""
+                CREATE TABLE integration_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type VARCHAR(50) NOT NULL,
+                    integration_type VARCHAR(50) NOT NULL,
+                    action VARCHAR(100),
+                    message TEXT,
+                    details JSON,
+                    error_message TEXT,
+                    response_time_ms REAL,
+                    level VARCHAR(50),
+                    webhook_id INTEGER REFERENCES webhooks(id) ON DELETE SET NULL,
+                    webhook_event_type VARCHAR(100),
+                    payload JSON,
+                    headers JSON,
+                    source_ip VARCHAR(45),
+                    status VARCHAR(50),
+                    health_status VARCHAR(50),
+                    user_id INTEGER REFERENCES users(id),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+                )
+            """))
+            conn.execute(text("CREATE INDEX ix_integration_events_type ON integration_events(event_type)"))
+            conn.execute(text("CREATE INDEX ix_integration_events_integration_type ON integration_events(integration_type)"))
+            conn.execute(text("CREATE INDEX ix_integration_events_created_at ON integration_events(created_at)"))
+            conn.execute(text("CREATE INDEX ix_integration_events_webhook_id ON integration_events(webhook_id)"))
+            conn.execute(text("CREATE INDEX ix_integration_events_level ON integration_events(level)"))
+            conn.execute(text("CREATE INDEX ix_integration_events_status ON integration_events(status)"))
+            migrations_applied.append("integration_events table")
+
+            # Migrate data from old tables if they exist
+            if 'webhook_logs' in inspector.get_table_names():
+                console.print("  Migrating data from 'webhook_logs' to 'integration_events'...")
+                conn.execute(text("""
+                    INSERT INTO integration_events (event_type, integration_type, webhook_id, webhook_event_type,
+                                                     payload, headers, source_ip, status, error_message,
+                                                     response_time_ms, created_at)
+                    SELECT 'webhook',
+                           COALESCE((SELECT source_type FROM webhooks WHERE id = webhook_logs.webhook_id), 'custom'),
+                           webhook_id, event_type, payload, headers, source_ip, status,
+                           error_message, processing_time_ms, created_at
+                    FROM webhook_logs
+                """))
+                migrations_applied.append("webhook_logs data migration")
+
+            if 'integration_logs' in inspector.get_table_names():
+                console.print("  Migrating data from 'integration_logs' to 'integration_events'...")
+                conn.execute(text("""
+                    INSERT INTO integration_events (event_type, integration_type, level, action, message,
+                                                     details, user_id, created_at)
+                    SELECT 'activity', integration_type, level, action, message, details, user_id, timestamp
+                    FROM integration_logs
+                """))
+                migrations_applied.append("integration_logs data migration")
+
+            if 'integration_health_checks' in inspector.get_table_names():
+                console.print("  Migrating data from 'integration_health_checks' to 'integration_events'...")
+                conn.execute(text("""
+                    INSERT INTO integration_events (event_type, integration_type, health_status,
+                                                     response_time_ms, error_message, details, created_at)
+                    SELECT 'health_check', integration_type, status, response_time_ms,
+                           error_message, check_metadata, checked_at
+                    FROM integration_health_checks
+                """))
+                migrations_applied.append("integration_health_checks data migration")
+
         conn.commit()
 
     if migrations_applied:

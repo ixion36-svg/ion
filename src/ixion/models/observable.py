@@ -63,6 +63,14 @@ class ThreatLevel(str, Enum):
     CRITICAL = "critical"
 
 
+class ObservableLinkType(str, Enum):
+    """Types of entities that observables can be linked to."""
+
+    ALERT = "alert"
+    CASE = "case"
+    MANUAL = "manual"
+
+
 class Observable(Base, TimestampMixin):
     """Normalized observable record with enrichment and correlation tracking."""
 
@@ -114,13 +122,8 @@ class Observable(Base, TimestampMixin):
         order_by="desc(ObservableEnrichment.enriched_at)",
         cascade="all, delete-orphan",
     )
-    alert_links: Mapped[List["ObservableAlertLink"]] = relationship(
-        "ObservableAlertLink",
-        back_populates="observable",
-        cascade="all, delete-orphan",
-    )
-    case_links: Mapped[List["ObservableCaseLink"]] = relationship(
-        "ObservableCaseLink",
+    links: Mapped[List["ObservableLink"]] = relationship(
+        "ObservableLink",
         back_populates="observable",
         cascade="all, delete-orphan",
     )
@@ -129,6 +132,16 @@ class Observable(Base, TimestampMixin):
         back_populates="observable",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def alert_links(self) -> List["ObservableLink"]:
+        """Get links to alerts (backward compatibility)."""
+        return [l for l in self.links if l.link_type == ObservableLinkType.ALERT]
+
+    @property
+    def case_links(self) -> List["ObservableLink"]:
+        """Get links to cases (backward compatibility)."""
+        return [l for l in self.links if l.link_type == ObservableLinkType.CASE]
 
     def __repr__(self) -> str:
         return f"<Observable(id={self.id}, type='{self.type}', value='{self.value[:50]}...')>"
@@ -224,26 +237,29 @@ class ObservableEnrichment(Base):
         return f"<ObservableEnrichment(id={self.id}, source='{self.source}')>"
 
 
-class ObservableAlertLink(Base):
-    """Junction table linking observables to alert triage records."""
+class ObservableLink(Base):
+    """Unified junction table linking observables to alerts, cases, or manual entries."""
 
-    __tablename__ = "observable_alert_links"
+    __tablename__ = "observable_links"
     __table_args__ = (
         UniqueConstraint(
-            "observable_id", "alert_triage_id", "context",
-            name="uq_observable_alert_context"
+            "observable_id", "link_type", "entity_id", "context",
+            name="uq_observable_link"
         ),
-        Index("ix_observable_alert_links_observable_id", "observable_id"),
-        Index("ix_observable_alert_links_alert_triage_id", "alert_triage_id"),
+        Index("ix_observable_links_observable_id", "observable_id"),
+        Index("ix_observable_links_link_type", "link_type"),
+        Index("ix_observable_links_entity_id", "entity_id"),
+        Index("ix_observable_links_created_at", "created_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     observable_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("observables.id", ondelete="CASCADE"), nullable=False
     )
-    alert_triage_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("alert_triage.id", ondelete="CASCADE"), nullable=False
+    link_type: Mapped[str] = mapped_column(
+        SQLEnum(ObservableLinkType), nullable=False
     )
+    entity_id: Mapped[int] = mapped_column(Integer, nullable=False)  # alert_triage.id or alert_cases.id
     context: Mapped[str] = mapped_column(String(100), nullable=False)
     extracted_from: Mapped[str] = mapped_column(
         String(50), default="auto", nullable=False
@@ -254,47 +270,43 @@ class ObservableAlertLink(Base):
 
     # Relationships
     observable: Mapped["Observable"] = relationship(
-        "Observable", back_populates="alert_links"
+        "Observable", back_populates="links"
     )
-    alert_triage: Mapped["AlertTriage"] = relationship("AlertTriage")
+
+    # Backward compatibility properties
+    @property
+    def alert_triage_id(self) -> Optional[int]:
+        """Get alert triage ID if this is an alert link."""
+        return self.entity_id if self.link_type == ObservableLinkType.ALERT else None
+
+    @property
+    def case_id(self) -> Optional[int]:
+        """Get case ID if this is a case link."""
+        return self.entity_id if self.link_type == ObservableLinkType.CASE else None
+
+    @property
+    def seen_at(self) -> datetime:
+        """Alias for created_at (backward compatibility with ObservableSighting)."""
+        return self.created_at
+
+    @property
+    def source_type(self) -> str:
+        """Get source type (backward compatibility with ObservableSighting)."""
+        return self.link_type.value
+
+    @property
+    def source_id(self) -> int:
+        """Get source ID (backward compatibility with ObservableSighting)."""
+        return self.entity_id
 
     def __repr__(self) -> str:
-        return f"<ObservableAlertLink(observable_id={self.observable_id}, alert_triage_id={self.alert_triage_id})>"
+        return f"<ObservableLink(observable_id={self.observable_id}, link_type='{self.link_type}', entity_id={self.entity_id})>"
 
 
-class ObservableCaseLink(Base):
-    """Junction table linking observables to investigation cases."""
-
-    __tablename__ = "observable_case_links"
-    __table_args__ = (
-        UniqueConstraint(
-            "observable_id", "case_id", "context",
-            name="uq_observable_case_context"
-        ),
-        Index("ix_observable_case_links_observable_id", "observable_id"),
-        Index("ix_observable_case_links_case_id", "case_id"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    observable_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("observables.id", ondelete="CASCADE"), nullable=False
-    )
-    case_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("alert_cases.id", ondelete="CASCADE"), nullable=False
-    )
-    context: Mapped[str] = mapped_column(String(100), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.now(), nullable=False
-    )
-
-    # Relationships
-    observable: Mapped["Observable"] = relationship(
-        "Observable", back_populates="case_links"
-    )
-    case: Mapped["AlertCase"] = relationship("AlertCase")
-
-    def __repr__(self) -> str:
-        return f"<ObservableCaseLink(observable_id={self.observable_id}, case_id={self.case_id})>"
+# Backward compatibility aliases
+ObservableAlertLink = ObservableLink
+ObservableCaseLink = ObservableLink
+ObservableSighting = ObservableLink
 
 
 class WatchlistAlert(Base):
@@ -338,29 +350,3 @@ class WatchlistAlert(Base):
         return f"<WatchlistAlert(id={self.id}, type='{self.alert_type}', observable_id={self.observable_id})>"
 
 
-class ObservableSighting(Base):
-    """Historical record of observable sightings for timeline view."""
-
-    __tablename__ = "observable_sightings"
-    __table_args__ = (
-        Index("ix_observable_sightings_observable_id", "observable_id"),
-        Index("ix_observable_sightings_seen_at", "seen_at"),
-        Index("ix_observable_sightings_source_type", "source_type"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    observable_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("observables.id", ondelete="CASCADE"), nullable=False
-    )
-    seen_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.now(), nullable=False
-    )
-    source_type: Mapped[str] = mapped_column(String(50), nullable=False)  # "alert", "case", "manual"
-    source_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # alert_id or case_id
-    context: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)  # e.g., "source_ip", "destination_ip"
-
-    # Relationship
-    observable: Mapped["Observable"] = relationship("Observable")
-
-    def __repr__(self) -> str:
-        return f"<ObservableSighting(observable_id={self.observable_id}, seen_at={self.seen_at})>"

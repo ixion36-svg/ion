@@ -1,0 +1,591 @@
+{% extends "base.html" %}
+
+{% block title %}Analyst Workspace - IXION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Analyst Workspace</h1>
+    <p class="page-subtitle">Security Operations Center Tools & Investigation</p>
+</div>
+
+<!-- Quick Stats Bar -->
+<div class="analyst-stats-bar" id="analyst-stats">
+    <div class="stat-card stat-alerts" onclick="navigateTo('alerts')">
+        <span class="stat-icon">&#9888;</span>
+        <div class="stat-content">
+            <span class="stat-value" id="stat-open-alerts">-</span>
+            <span class="stat-label">Open Alerts</span>
+        </div>
+    </div>
+    <div class="stat-card stat-cases" onclick="navigateTo('alerts')">
+        <span class="stat-icon">&#128193;</span>
+        <div class="stat-content">
+            <span class="stat-value" id="stat-active-cases">-</span>
+            <span class="stat-label">Active Cases</span>
+        </div>
+    </div>
+    <div class="stat-card stat-observables" onclick="navigateTo('observables')">
+        <span class="stat-icon">&#128269;</span>
+        <div class="stat-content">
+            <span class="stat-value" id="stat-watched-iocs">-</span>
+            <span class="stat-label">Watched IOCs</span>
+        </div>
+    </div>
+    <div class="stat-card stat-playbooks" onclick="navigateTo('playbooks')">
+        <span class="stat-icon">&#128214;</span>
+        <div class="stat-content">
+            <span class="stat-value" id="stat-active-playbooks">-</span>
+            <span class="stat-label">Active Playbooks</span>
+        </div>
+    </div>
+</div>
+
+<!-- Main Tools Grid -->
+<div class="analyst-tools-grid">
+    <!-- Investigation Tools Section -->
+    <div class="tools-section">
+        <h2 class="section-title">Investigation</h2>
+        <div class="tools-cards">
+            <div class="tool-card" onclick="navigateTo('alerts')">
+                <div class="tool-icon">&#9888;</div>
+                <h3>Alert Triage</h3>
+                <p>Review, investigate, and escalate security alerts from Elasticsearch</p>
+                <div class="tool-actions">
+                    <span class="badge" id="badge-new-alerts">0 new</span>
+                </div>
+            </div>
+
+            <div class="tool-card" onclick="navigateTo('alerts')">
+                <div class="tool-icon">&#128193;</div>
+                <h3>Case Management</h3>
+                <p>Create and manage investigation cases, link alerts, and track progress</p>
+                <div class="tool-actions">
+                    <span class="badge badge-info" id="badge-active-cases">0 active</span>
+                </div>
+            </div>
+
+            <div class="tool-card" onclick="navigateTo('observables')">
+                <div class="tool-icon">&#128269;</div>
+                <h3>Observables</h3>
+                <p>Track and enrich IOCs - IPs, domains, hashes, URLs, and more</p>
+                <div class="tool-actions">
+                    <span class="badge badge-warning" id="badge-high-threat">0 high threat</span>
+                </div>
+            </div>
+
+            <div class="tool-card" onclick="navigateTo('playbooks')">
+                <div class="tool-icon">&#128214;</div>
+                <h3>Playbooks</h3>
+                <p>Create and execute investigation playbooks with automated steps</p>
+                <div class="tool-actions">
+                    <span class="badge badge-success" id="badge-playbooks">0 available</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search & Discovery Section -->
+    <div class="tools-section">
+        <h2 class="section-title">Search & Discovery</h2>
+        <div class="tools-cards">
+            <div class="tool-card" onclick="navigateTo('discover')">
+                <div class="tool-icon">&#128270;</div>
+                <h3>Discover</h3>
+                <p>Search and explore Elasticsearch data with saved queries</p>
+                <div class="tool-actions">
+                    <span class="badge" id="badge-saved-searches">0 saved</span>
+                </div>
+            </div>
+
+            <div class="tool-card" onclick="navigateTo('tools', 'lookup')">
+                <div class="tool-icon">&#127760;</div>
+                <h3>IOC Lookup</h3>
+                <p>Query threat intelligence via OpenCTI for IPs, domains, and hashes</p>
+            </div>
+
+            <div class="tool-card" onclick="navigateTo('tools', 'ioc')">
+                <div class="tool-icon">&#128196;</div>
+                <h3>IOC Processor</h3>
+                <p>Extract, defang, and process IOCs from text and logs</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SOC Utilities Section -->
+    <div class="tools-section">
+        <h2 class="section-title">SOC Utilities</h2>
+        <div class="tools-cards tools-cards-compact">
+            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'timestamp')">
+                <div class="tool-icon-sm">&#128339;</div>
+                <h4>Timestamp</h4>
+                <p>Convert between timestamp formats</p>
+            </div>
+
+            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'hash')">
+                <div class="tool-icon-sm">&#128273;</div>
+                <h4>Hash Identifier</h4>
+                <p>Identify hash types (MD5, SHA, etc.)</p>
+            </div>
+
+            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'url')">
+                <div class="tool-icon-sm">&#128279;</div>
+                <h4>URL Parser</h4>
+                <p>Parse and analyze URL components</p>
+            </div>
+
+            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'regex')">
+                <div class="tool-icon-sm">&#10024;</div>
+                <h4>Regex Tester</h4>
+                <p>Test regular expressions</p>
+            </div>
+
+            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'email')">
+                <div class="tool-icon-sm">&#128231;</div>
+                <h4>Email Headers</h4>
+                <p>Analyze email header information</p>
+            </div>
+
+            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'log')">
+                <div class="tool-icon-sm">&#128220;</div>
+                <h4>Log Parser</h4>
+                <p>Parse various log formats</p>
+            </div>
+
+            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'encoding')">
+                <div class="tool-icon-sm">&#128259;</div>
+                <h4>Encoding</h4>
+                <p>Encode/decode Base64, Hex, URL</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions Panel -->
+<div class="quick-actions-panel">
+    <h3>Quick Actions</h3>
+    <div class="quick-action-buttons">
+        <button class="btn btn-primary" onclick="navigateTo('alerts')">
+            <span>&#9888;</span> Triage Alerts
+        </button>
+        <button class="btn" onclick="navigateTo('discover')">
+            <span>&#128270;</span> Search Logs
+        </button>
+        <button class="btn" onclick="navigateTo('observables')">
+            <span>&#128269;</span> Lookup IOC
+        </button>
+        <button class="btn" onclick="openQuickIOCLookup()">
+            <span>&#127760;</span> Quick Lookup
+        </button>
+    </div>
+</div>
+
+<!-- Quick IOC Lookup Modal -->
+<div class="modal" id="quick-lookup-modal" style="display: none;">
+    <div class="modal-content modal-sm">
+        <div class="modal-header">
+            <h3>Quick IOC Lookup</h3>
+            <button class="modal-close" onclick="closeQuickLookup()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Enter IOC (IP, Domain, Hash, URL)</label>
+                <input type="text" id="quick-ioc-input" class="form-control" placeholder="e.g., 8.8.8.8, evil.com, d41d8cd98f00b204e9800998ecf8427e" onkeypress="if(event.key==='Enter') quickLookup()">
+            </div>
+            <div id="quick-lookup-results"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeQuickLookup()">Close</button>
+            <button class="btn btn-primary" onclick="quickLookup()">Lookup</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.page-subtitle {
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+.analyst-stats-bar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex: 1;
+    min-width: 180px;
+}
+
+.stat-card:hover {
+    border-color: var(--accent-color);
+    transform: translateY(-2px);
+}
+
+.stat-icon {
+    font-size: 1.5rem;
+}
+
+.stat-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.stat-alerts .stat-value { color: #ef4444; }
+.stat-cases .stat-value { color: #3b82f6; }
+.stat-observables .stat-value { color: #f59e0b; }
+.stat-playbooks .stat-value { color: #10b981; }
+
+.analyst-tools-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.tools-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.tools-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.tools-cards-compact {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
+.tool-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tool-card:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.tool-card-sm {
+    padding: 1rem;
+}
+
+.tool-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.tool-icon-sm {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.tool-card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.tool-card h4 {
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    color: var(--text-primary);
+}
+
+.tool-card p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+}
+
+.tool-card-sm p {
+    font-size: 0.8rem;
+    margin-bottom: 0;
+}
+
+.tool-actions {
+    margin-top: auto;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.badge-info { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+.badge-warning { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+.badge-success { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.badge-danger { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+.quick-actions-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 2rem;
+}
+
+.quick-actions-panel h3 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+}
+
+.quick-action-buttons {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.quick-action-buttons .btn span {
+    margin-right: 0.5rem;
+}
+
+/* Modal styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow: auto;
+}
+
+.modal-sm {
+    max-width: 450px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    loadAnalystStats();
+});
+
+async function loadAnalystStats() {
+    try {
+        // Load alert stats
+        const alertsResp = await fetch('/api/elasticsearch/alerts?size=0');
+        if (alertsResp.ok) {
+            const alertsData = await alertsResp.json();
+            const openAlerts = alertsData.total || 0;
+            document.getElementById('stat-open-alerts').textContent = openAlerts;
+            document.getElementById('badge-new-alerts').textContent = openAlerts + ' new';
+        }
+    } catch(e) { console.log('Could not load alert stats'); }
+
+    try {
+        // Load case stats
+        const casesResp = await fetch('/api/cases?status=open&status=investigating');
+        if (casesResp.ok) {
+            const casesData = await casesResp.json();
+            const activeCases = casesData.length || 0;
+            document.getElementById('stat-active-cases').textContent = activeCases;
+            document.getElementById('badge-active-cases').textContent = activeCases + ' active';
+        }
+    } catch(e) { console.log('Could not load case stats'); }
+
+    try {
+        // Load observable stats
+        const obsResp = await fetch('/api/observables/stats');
+        if (obsResp.ok) {
+            const obsData = await obsResp.json();
+            const watched = obsData.watched || 0;
+            const highThreat = (obsData.by_threat_level?.high || 0) + (obsData.by_threat_level?.critical || 0);
+            document.getElementById('stat-watched-iocs').textContent = watched;
+            document.getElementById('badge-high-threat').textContent = highThreat + ' high threat';
+        }
+    } catch(e) { console.log('Could not load observable stats'); }
+
+    try {
+        // Load playbook stats
+        const pbResp = await fetch('/api/playbooks?is_active=true');
+        if (pbResp.ok) {
+            const pbData = await pbResp.json();
+            const activePlaybooks = pbData.length || 0;
+            document.getElementById('stat-active-playbooks').textContent = activePlaybooks;
+            document.getElementById('badge-playbooks').textContent = activePlaybooks + ' available';
+        }
+    } catch(e) { console.log('Could not load playbook stats'); }
+
+    try {
+        // Load saved searches stats
+        const ssResp = await fetch('/api/saved-searches');
+        if (ssResp.ok) {
+            const ssData = await ssResp.json();
+            document.getElementById('badge-saved-searches').textContent = (ssData.length || 0) + ' saved';
+        }
+    } catch(e) { console.log('Could not load saved search stats'); }
+}
+
+function navigateTo(page, tab) {
+    let url = '/' + page;
+    if (tab) {
+        url = '/tools#' + tab;
+        // Store the tab to switch to
+        sessionStorage.setItem('tools_tab', tab);
+    }
+    window.location.href = url;
+}
+
+function openQuickIOCLookup() {
+    document.getElementById('quick-lookup-modal').style.display = 'flex';
+    document.getElementById('quick-ioc-input').focus();
+}
+
+function closeQuickLookup() {
+    document.getElementById('quick-lookup-modal').style.display = 'none';
+    document.getElementById('quick-ioc-input').value = '';
+    document.getElementById('quick-lookup-results').innerHTML = '';
+}
+
+async function quickLookup() {
+    const ioc = document.getElementById('quick-ioc-input').value.trim();
+    if (!ioc) {
+        showToast('Enter an IOC to lookup', 'warning');
+        return;
+    }
+
+    const resultsDiv = document.getElementById('quick-lookup-results');
+    resultsDiv.innerHTML = '<p>Looking up...</p>';
+
+    try {
+        const response = await fetch('/api/opencti/enrich', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: ioc })
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            resultsDiv.innerHTML = `<p class="error">${data.error}</p>`;
+        } else if (data.found === false) {
+            resultsDiv.innerHTML = '<p class="muted">No threat intelligence found.</p>';
+        } else {
+            let html = '<div class="lookup-result">';
+            if (data.score !== undefined) {
+                const scoreClass = data.score > 70 ? 'badge-danger' : data.score > 40 ? 'badge-warning' : 'badge-success';
+                html += `<p><strong>Risk Score:</strong> <span class="badge ${scoreClass}">${data.score}</span></p>`;
+            }
+            if (data.labels && data.labels.length) {
+                html += `<p><strong>Labels:</strong> ${data.labels.join(', ')}</p>`;
+            }
+            if (data.description) {
+                html += `<p><strong>Description:</strong> ${data.description}</p>`;
+            }
+            html += `<p><a href="/observables?search=${encodeURIComponent(ioc)}" class="btn btn-sm">View in Observables</a></p>`;
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+        }
+    } catch(e) {
+        resultsDiv.innerHTML = `<p class="error">Lookup failed: ${e.message}</p>`;
+    }
+}
+
+// Close modal on escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeQuickLookup();
+    }
+});
+
+// Close modal on backdrop click
+document.getElementById('quick-lookup-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'quick-lookup-modal') {
+        closeQuickLookup();
+    }
+});
+</script>
+{% endblock %}

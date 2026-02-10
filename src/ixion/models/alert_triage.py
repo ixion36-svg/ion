@@ -40,6 +40,13 @@ class AlertCaseStatus(str, Enum):
     CLOSED = "closed"
 
 
+class NoteEntityType(str, Enum):
+    """Entity types that can have notes attached."""
+
+    ALERT = "alert"
+    CASE = "case"
+
+
 class AlertCase(Base, TimestampMixin):
     """Investigation case grouping multiple alerts."""
 
@@ -82,9 +89,17 @@ class AlertCase(Base, TimestampMixin):
     triage_entries: Mapped[List["AlertTriage"]] = relationship(
         "AlertTriage", back_populates="case"
     )
-    notes: Mapped[List["CaseNote"]] = relationship(
-        "CaseNote", back_populates="case", order_by="CaseNote.created_at"
-    )
+
+    @property
+    def notes(self) -> List["Note"]:
+        """Get notes for this case (compatibility property)."""
+        from ixion.storage.database import get_session_factory
+        session_factory = get_session_factory()
+        with session_factory() as session:
+            return session.query(Note).filter(
+                Note.entity_type == NoteEntityType.CASE,
+                Note.entity_id == str(self.id)
+            ).order_by(Note.created_at).all()
 
     def __repr__(self) -> str:
         return f"<AlertCase(id={self.id}, case_number='{self.case_number}')>"
@@ -126,16 +141,21 @@ class AlertTriage(Base, TimestampMixin):
         return f"<AlertTriage(id={self.id}, es_alert_id='{self.es_alert_id}')>"
 
 
-class AlertComment(Base):
-    """Comment on an ES alert."""
+class Note(Base):
+    """Unified note/comment model for alerts and cases."""
 
-    __tablename__ = "alert_comments"
+    __tablename__ = "notes"
     __table_args__ = (
-        Index("ix_alert_comments_es_alert_id", "es_alert_id"),
+        Index("ix_notes_entity", "entity_type", "entity_id"),
+        Index("ix_notes_user_id", "user_id"),
+        Index("ix_notes_created_at", "created_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    es_alert_id: Mapped[str] = mapped_column(String(500), nullable=False)
+    entity_type: Mapped[str] = mapped_column(
+        SQLEnum(NoteEntityType), nullable=False
+    )
+    entity_id: Mapped[str] = mapped_column(String(500), nullable=False)  # es_alert_id or case_id as string
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=False
     )
@@ -147,33 +167,21 @@ class AlertComment(Base):
     # Relationships
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
 
-    def __repr__(self) -> str:
-        return f"<AlertComment(id={self.id}, es_alert_id='{self.es_alert_id}')>"
+    # Convenience properties for backward compatibility
+    @property
+    def es_alert_id(self) -> Optional[str]:
+        """Get alert ID if this is an alert note."""
+        return self.entity_id if self.entity_type == NoteEntityType.ALERT else None
 
-
-class CaseNote(Base):
-    """Investigation note on a case."""
-
-    __tablename__ = "case_notes"
-    __table_args__ = (
-        Index("ix_case_notes_case_id", "case_id"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    case_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("alert_cases.id"), nullable=False
-    )
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=False
-    )
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.now(), nullable=False
-    )
-
-    # Relationships
-    case: Mapped["AlertCase"] = relationship("AlertCase", back_populates="notes")
-    user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+    @property
+    def case_id(self) -> Optional[int]:
+        """Get case ID if this is a case note."""
+        return int(self.entity_id) if self.entity_type == NoteEntityType.CASE else None
 
     def __repr__(self) -> str:
-        return f"<CaseNote(id={self.id}, case_id={self.case_id})>"
+        return f"<Note(id={self.id}, entity_type='{self.entity_type}', entity_id='{self.entity_id}')>"
+
+
+# Backward compatibility aliases
+AlertComment = Note
+CaseNote = Note

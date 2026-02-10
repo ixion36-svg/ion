@@ -161,6 +161,8 @@ function updateUserMenu() {
         if (alertsLink) alertsLink.style.display = 'block';
         const observablesLink = document.getElementById('nav-observables-link');
         if (observablesLink) observablesLink.style.display = 'block';
+        const playbooksLink = document.getElementById('nav-playbooks-link');
+        if (playbooksLink) playbooksLink.style.display = 'block';
     }
 }
 

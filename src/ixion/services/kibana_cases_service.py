@@ -308,6 +308,53 @@ class KibanaCasesService:
             logger.error(f"Error getting Kibana case comments: {e}")
             return []
 
+    def get_case_alerts(self, case_id: str) -> List[Dict[str, Any]]:
+        """Get all alerts attached to a case.
+
+        Returns a list of alert references with 'id' and 'index' fields.
+        """
+        if not self.enabled:
+            return []
+
+        try:
+            # Alerts are stored as comments with type "alert"
+            path = self._get_api_path(f"/api/cases/{case_id}/comments/_find")
+            response = self.client.get(path, params={"perPage": 1000})
+
+            if response.status_code == 200:
+                data = response.json()
+                comments = data.get("comments", [])
+                alerts = []
+
+                for comment in comments:
+                    if comment.get("type") == "alert":
+                        # Alert comments contain alertId (string or list) and index
+                        alert_ids = comment.get("alertId", [])
+                        index = comment.get("index", ".alerts-security.alerts-default")
+
+                        # alertId can be a single string or a list
+                        if isinstance(alert_ids, str):
+                            alert_ids = [alert_ids]
+
+                        for alert_id in alert_ids:
+                            alerts.append({
+                                "id": alert_id,
+                                "index": index,
+                            })
+
+                return alerts
+            else:
+                # Log detailed error for debugging
+                try:
+                    error_body = response.text
+                except Exception:
+                    error_body = "Unable to read response body"
+                logger.error(f"Failed to get case alerts: {response.status_code} - {error_body}")
+                return []
+        except Exception as e:
+            logger.error(f"Error getting Kibana case alerts: {e}")
+            return []
+
     def attach_alerts_to_case(
         self,
         case_id: str,

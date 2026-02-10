@@ -11,8 +11,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ixion.models.integration import (
-    IntegrationLog,
-    IntegrationHealthCheck,
+    IntegrationEvent,
+    IntegrationEventType,
     IntegrationType,
     IntegrationStatus,
     LogLevel,
@@ -38,7 +38,7 @@ class IntegrationLogService:
         details: Optional[Dict[str, Any]] = None,
         user_id: Optional[int] = None,
         session: Optional[Session] = None,
-    ) -> IntegrationLog:
+    ) -> IntegrationEvent:
         """Create an integration log entry.
 
         Args:
@@ -51,10 +51,11 @@ class IntegrationLogService:
             session: Optional database session.
 
         Returns:
-            The created IntegrationLog instance.
+            The created IntegrationEvent instance.
         """
-        def _log(sess: Session) -> IntegrationLog:
-            log_entry = IntegrationLog(
+        def _log(sess: Session) -> IntegrationEvent:
+            log_entry = IntegrationEvent(
+                event_type=IntegrationEventType.ACTIVITY,
                 integration_type=integration_type,
                 level=level,
                 action=action,
@@ -80,7 +81,7 @@ class IntegrationLogService:
         message: str,
         details: Optional[Dict[str, Any]] = None,
         user_id: Optional[int] = None,
-    ) -> IntegrationLog:
+    ) -> IntegrationEvent:
         """Log a debug message."""
         return self.log(integration_type, action, message, LogLevel.DEBUG, details, user_id)
 
@@ -91,7 +92,7 @@ class IntegrationLogService:
         message: str,
         details: Optional[Dict[str, Any]] = None,
         user_id: Optional[int] = None,
-    ) -> IntegrationLog:
+    ) -> IntegrationEvent:
         """Log an info message."""
         return self.log(integration_type, action, message, LogLevel.INFO, details, user_id)
 
@@ -102,7 +103,7 @@ class IntegrationLogService:
         message: str,
         details: Optional[Dict[str, Any]] = None,
         user_id: Optional[int] = None,
-    ) -> IntegrationLog:
+    ) -> IntegrationEvent:
         """Log a warning message."""
         return self.log(integration_type, action, message, LogLevel.WARNING, details, user_id)
 
@@ -113,7 +114,7 @@ class IntegrationLogService:
         message: str,
         details: Optional[Dict[str, Any]] = None,
         user_id: Optional[int] = None,
-    ) -> IntegrationLog:
+    ) -> IntegrationEvent:
         """Log an error message."""
         return self.log(integration_type, action, message, LogLevel.ERROR, details, user_id)
 
@@ -126,7 +127,7 @@ class IntegrationLogService:
         limit: int = 100,
         offset: int = 0,
         session: Optional[Session] = None,
-    ) -> List[IntegrationLog]:
+    ) -> List[IntegrationEvent]:
         """Get integration logs with optional filters.
 
         Args:
@@ -139,24 +140,26 @@ class IntegrationLogService:
             session: Optional database session.
 
         Returns:
-            List of matching IntegrationLog instances.
+            List of matching IntegrationEvent instances (activity logs).
         """
-        def _get_logs(sess: Session) -> List[IntegrationLog]:
-            query = sess.query(IntegrationLog)
+        def _get_logs(sess: Session) -> List[IntegrationEvent]:
+            query = sess.query(IntegrationEvent).filter(
+                IntegrationEvent.event_type == IntegrationEventType.ACTIVITY
+            )
 
             # Time filter
             if hours:
                 since = datetime.utcnow() - timedelta(hours=hours)
-                query = query.filter(IntegrationLog.timestamp >= since)
+                query = query.filter(IntegrationEvent.created_at >= since)
 
             if integration_type is not None:
-                query = query.filter(IntegrationLog.integration_type == integration_type)
+                query = query.filter(IntegrationEvent.integration_type == integration_type)
             if level is not None:
-                query = query.filter(IntegrationLog.level == level)
+                query = query.filter(IntegrationEvent.level == level)
             if action is not None:
-                query = query.filter(IntegrationLog.action == action)
+                query = query.filter(IntegrationEvent.action == action)
 
-            return query.order_by(IntegrationLog.timestamp.desc()).offset(offset).limit(limit).all()
+            return query.order_by(IntegrationEvent.created_at.desc()).offset(offset).limit(limit).all()
 
         if session:
             return _get_logs(session)
@@ -181,19 +184,25 @@ class IntegrationLogService:
         def _get_stats(sess: Session) -> Dict[str, Any]:
             since = datetime.utcnow() - timedelta(hours=hours)
 
+            # Base query for activity logs
+            base_filter = [
+                IntegrationEvent.event_type == IntegrationEventType.ACTIVITY,
+                IntegrationEvent.created_at >= since,
+            ]
+
             # Total count
-            total = sess.query(func.count(IntegrationLog.id)).filter(
-                IntegrationLog.timestamp >= since
+            total = sess.query(func.count(IntegrationEvent.id)).filter(
+                *base_filter
             ).scalar() or 0
 
             # Count by integration type
             by_type = {}
             type_counts = sess.query(
-                IntegrationLog.integration_type,
-                func.count(IntegrationLog.id),
+                IntegrationEvent.integration_type,
+                func.count(IntegrationEvent.id),
             ).filter(
-                IntegrationLog.timestamp >= since
-            ).group_by(IntegrationLog.integration_type).all()
+                *base_filter
+            ).group_by(IntegrationEvent.integration_type).all()
 
             for integration_type, count in type_counts:
                 key = integration_type.value if hasattr(integration_type, 'value') else str(integration_type)
@@ -202,15 +211,16 @@ class IntegrationLogService:
             # Count by level
             by_level = {}
             level_counts = sess.query(
-                IntegrationLog.level,
-                func.count(IntegrationLog.id),
+                IntegrationEvent.level,
+                func.count(IntegrationEvent.id),
             ).filter(
-                IntegrationLog.timestamp >= since
-            ).group_by(IntegrationLog.level).all()
+                *base_filter
+            ).group_by(IntegrationEvent.level).all()
 
             for level, count in level_counts:
-                key = level.value if hasattr(level, 'value') else str(level)
-                by_level[key] = count
+                if level is not None:
+                    key = level.value if hasattr(level, 'value') else str(level)
+                    by_level[key] = count
 
             return {
                 "total": total,
@@ -237,7 +247,7 @@ class IntegrationLogService:
         error_message: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         session: Optional[Session] = None,
-    ) -> IntegrationHealthCheck:
+    ) -> IntegrationEvent:
         """Record a health check result.
 
         Args:
@@ -249,15 +259,16 @@ class IntegrationLogService:
             session: Optional database session.
 
         Returns:
-            The created IntegrationHealthCheck instance.
+            The created IntegrationEvent instance (health check).
         """
-        def _record(sess: Session) -> IntegrationHealthCheck:
-            health_check = IntegrationHealthCheck(
+        def _record(sess: Session) -> IntegrationEvent:
+            health_check = IntegrationEvent(
+                event_type=IntegrationEventType.HEALTH_CHECK,
                 integration_type=integration_type,
-                status=status,
+                health_status=status,
                 response_time_ms=response_time_ms,
                 error_message=error_message,
-                check_metadata=metadata,
+                details=metadata,
             )
             sess.add(health_check)
             sess.flush()
@@ -273,7 +284,7 @@ class IntegrationLogService:
     def get_latest_health_checks(
         self,
         session: Optional[Session] = None,
-    ) -> Dict[str, IntegrationHealthCheck]:
+    ) -> Dict[str, IntegrationEvent]:
         """Get the latest health check for each integration type.
 
         Args:
@@ -282,15 +293,14 @@ class IntegrationLogService:
         Returns:
             Dictionary mapping integration type to latest health check.
         """
-        def _get_latest(sess: Session) -> Dict[str, IntegrationHealthCheck]:
-            # Get all integration types
-            from ixion.models.integration import IntegrationType
+        def _get_latest(sess: Session) -> Dict[str, IntegrationEvent]:
             result = {}
 
             for int_type in IntegrationType:
-                latest = sess.query(IntegrationHealthCheck).filter(
-                    IntegrationHealthCheck.integration_type == int_type
-                ).order_by(IntegrationHealthCheck.checked_at.desc()).first()
+                latest = sess.query(IntegrationEvent).filter(
+                    IntegrationEvent.event_type == IntegrationEventType.HEALTH_CHECK,
+                    IntegrationEvent.integration_type == int_type,
+                ).order_by(IntegrationEvent.created_at.desc()).first()
 
                 if latest:
                     key = int_type.value if hasattr(int_type, 'value') else str(int_type)
@@ -310,7 +320,7 @@ class IntegrationLogService:
         hours: int = 24,
         limit: int = 100,
         session: Optional[Session] = None,
-    ) -> List[IntegrationHealthCheck]:
+    ) -> List[IntegrationEvent]:
         """Get health check history.
 
         Args:
@@ -320,18 +330,19 @@ class IntegrationLogService:
             session: Optional database session.
 
         Returns:
-            List of IntegrationHealthCheck instances.
+            List of IntegrationEvent instances (health checks).
         """
-        def _get_history(sess: Session) -> List[IntegrationHealthCheck]:
+        def _get_history(sess: Session) -> List[IntegrationEvent]:
             since = datetime.utcnow() - timedelta(hours=hours)
-            query = sess.query(IntegrationHealthCheck).filter(
-                IntegrationHealthCheck.checked_at >= since
+            query = sess.query(IntegrationEvent).filter(
+                IntegrationEvent.event_type == IntegrationEventType.HEALTH_CHECK,
+                IntegrationEvent.created_at >= since,
             )
 
             if integration_type is not None:
-                query = query.filter(IntegrationHealthCheck.integration_type == integration_type)
+                query = query.filter(IntegrationEvent.integration_type == integration_type)
 
-            return query.order_by(IntegrationHealthCheck.checked_at.desc()).limit(limit).all()
+            return query.order_by(IntegrationEvent.created_at.desc()).limit(limit).all()
 
         if session:
             return _get_history(session)
