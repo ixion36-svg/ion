@@ -7,6 +7,7 @@ A Security Operations Center (SOC) platform with AI-powered analysis, alert tria
 ## Features
 
 - **AI Assistant**: Local LLM integration via Ollama for security analysis, code generation, and threat investigation
+- **AI-Assisted Triage**: One-click AI analysis, observable extraction, MITRE technique suggestion, and contextual chat from alert detail view
 - **AI-Powered Document Analysis**: Entity extraction, spell checking, and rewrite suggestions powered by Ollama
 - **Alert Investigation**: Elasticsearch-integrated SOC alert triage with case management and analytics
 - **Investigation Playbooks**: Step-based investigation workflows with trigger conditions for alert triage
@@ -15,7 +16,7 @@ A Security Operations Center (SOC) platform with AI-powered analysis, alert tria
 - **OpenCTI Integration**: IOC enrichment against OpenCTI threat intelligence
 - **Template Management**: Document templates with version control and Jinja2 rendering
 - **SOC Tools**: Client-side document processing tools for security analysts
-- **Real-time Chat**: Team collaboration with chat rooms
+- **Real-time Chat**: Team collaboration with chat rooms and expandable AI chat panel
 - **Role-based Access**: Web UI with authentication and RBAC
 - **GitLab Integration**: Issue tracking directly from IXION
 
@@ -335,6 +336,17 @@ See [DEPLOYMENT_GUIDE.md](deploy/DEPLOYMENT_GUIDE.md) for detailed instructions 
 | `/api/extract/rewrite-suggestions` | POST | AI-powered writing improvement suggestions |
 | `/api/extract/apply-rewrites` | POST | Apply AI rewrite to text |
 
+### AI Assistant
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/ai/status` | GET | Check AI availability, model info, and queue status |
+| `/api/ai/chat` | POST | Send chat message (non-streaming) |
+| `/api/ai/chat/stream` | POST | Send chat message with SSE streaming response |
+| `/api/ai/analyze/alert` | POST | Analyze alert data and return AI assessment |
+| `/api/ai/triage/suggest` | POST | Structured triage suggestions (observables, MITRE techniques, priority) |
+| `/api/ai/case/generate` | POST | Generate case fields (title, description, evidence) from alert context |
+
 ### Saved Searches
 
 | Endpoint | Method | Description |
@@ -501,6 +513,22 @@ IXION includes a built-in alert investigation page (`/alerts`) that connects to 
   - Linked alerts list with triage status indicators
   - Investigation notes journal with add-note capability
 - **Manage Case Button**: Available in the alert detail Case tab for quick access
+
+### AI-Assisted Triage
+
+When Ollama is running, AI assist buttons appear throughout the alert investigation workflow:
+
+| Feature | Location | Description |
+|---------|----------|-------------|
+| **AI Analyze** | Alert detail modal | One-click AI analysis of alert context, severity assessment, and recommendations |
+| **AI Extract** | Triage bar (Observables) | AI extracts observables (IPs, domains, hostnames, URLs, user accounts) from alert data |
+| **AI Suggest** | Triage bar (MITRE) | AI suggests MITRE ATT&CK technique mappings based on alert content |
+| **Discuss with AI** | Alert detail + enrichment results | Opens AI chat panel pre-loaded with full alert context (metadata, observables, enrichment results) for conversational investigation |
+| **AI Summary** | Case management | Generates AI summary of case details and linked alerts |
+
+The chat panel is expandable (click the expand icon in the header) for a larger workspace when discussing complex investigations.
+
+All AI features degrade gracefully - buttons are hidden when Ollama is unavailable.
 
 ### Analytics Dashboard
 

@@ -8,6 +8,7 @@ This guide covers deploying DocForge in environments without internet access.
 
 - Full NLP processing (NLTK data pre-downloaded)
 - SOC entity detection (18 pattern types: IPs, CVEs, hashes, etc.)
+- AI-assisted alert triage (observable extraction, MITRE mapping, analysis, contextual chat)
 - Spell checking with technical term awareness
 - Rewrite suggestions (professional, concise, formal, technical styles)
 - Table detection (Markdown, CSV, TSV)
@@ -209,19 +210,22 @@ Configure in `docker-compose.yml` or `docker-compose.https.yml`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DOCFORGE_HOST` | `0.0.0.0` | Bind address |
-| `DOCFORGE_PORT` | `8000` | Application port |
-| `DOCFORGE_COOKIE_SECURE` | `false` | Set `true` for HTTPS |
-| `DOCFORGE_ADMIN_PASSWORD` | `changeme` | Initial admin password |
-| `DOCFORGE_OIDC_ENABLED` | `false` | Enable Keycloak SSO |
-| `DOCFORGE_OIDC_KEYCLOAK_URL` | - | Keycloak server URL |
-| `DOCFORGE_OIDC_REALM` | - | Keycloak realm |
-| `DOCFORGE_OIDC_CLIENT_ID` | - | OIDC client ID |
-| `DOCFORGE_OIDC_CLIENT_SECRET` | - | OIDC client secret |
-| `DOCFORGE_GITLAB_ENABLED` | `false` | Enable GitLab integration |
-| `DOCFORGE_GITLAB_URL` | - | GitLab server URL |
-| `DOCFORGE_GITLAB_TOKEN` | - | GitLab Personal Access Token |
-| `DOCFORGE_GITLAB_PROJECT_ID` | - | GitLab project ID or path |
+| `IXION_HOST` | `0.0.0.0` | Bind address |
+| `IXION_PORT` | `8000` | Application port |
+| `IXION_COOKIE_SECURE` | `false` | Set `true` for HTTPS |
+| `IXION_ADMIN_PASSWORD` | `changeme` | Initial admin password |
+| `IXION_OIDC_ENABLED` | `false` | Enable Keycloak SSO |
+| `IXION_OIDC_KEYCLOAK_URL` | - | Keycloak server URL |
+| `IXION_OIDC_REALM` | - | Keycloak realm |
+| `IXION_OIDC_CLIENT_ID` | - | OIDC client ID |
+| `IXION_OIDC_CLIENT_SECRET` | - | OIDC client secret |
+| `IXION_OLLAMA_ENABLED` | `true` | Enable Ollama AI integration |
+| `IXION_OLLAMA_URL` | `http://ollama:11434` | Ollama service URL |
+| `IXION_OLLAMA_MODEL` | `qwen2.5:0.5b` | Default AI model |
+| `IXION_GITLAB_ENABLED` | `false` | Enable GitLab integration |
+| `IXION_GITLAB_URL` | - | GitLab server URL |
+| `IXION_GITLAB_TOKEN` | - | GitLab Personal Access Token |
+| `IXION_GITLAB_PROJECT_ID` | - | GitLab project ID or path |
 
 ### Example: Production HTTPS Configuration
 
@@ -278,7 +282,20 @@ environment:
    - **Editor**: Create/edit templates and documents
    - **Viewer**: Read-only access
 
-### 3. Configure Roles (Optional)
+### 3. Set Up AI Model (If Using Ollama)
+
+```bash
+# Pull an AI model into the Ollama sidecar (first time only)
+docker exec -it ixion-ollama ollama pull qwen2.5:0.5b
+
+# Verify AI is available
+curl http://localhost:8000/api/ai/status
+# Should return: {"available": true, "default_model": "qwen2.5:0.5b", ...}
+```
+
+Once available, AI assist buttons (Analyze, Extract, Suggest, Discuss) will appear automatically in the alert investigation UI.
+
+### 4. Configure Roles (Optional)
 
 Default roles and permissions are pre-configured. Customize via the admin interface if needed.
 

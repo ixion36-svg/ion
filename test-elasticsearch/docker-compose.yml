@@ -27,6 +27,9 @@ services:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - ELASTICSEARCH_USERNAME=kibana_system
       - ELASTICSEARCH_PASSWORD=DocforgeTest123!
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=a7f3c9e1b5d2f8a4c6e0b3d7f9a1c5e2
+      - XPACK_SECURITY_ENCRYPTIONKEY=b8g4d0f2c6e3g9b5d7f1c4e8g0b2d6f3
+      - XPACK_REPORTING_ENCRYPTIONKEY=c9h5e1g3d7f4h0c6e8g2d5f9h1c3e7g4
     ports:
       - "5601:5601"
     depends_on:

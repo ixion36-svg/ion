@@ -319,6 +319,96 @@ Alert Data:
         raise HTTPException(status_code=503, detail=str(e))
 
 
+@router.post("/triage/suggest")
+async def triage_suggest(
+    alert_data: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """AI-assisted triage: suggest observables, MITRE techniques, and priority."""
+    service = get_ollama_service()
+
+    if not await service.is_available():
+        raise HTTPException(status_code=503, detail="AI service not available")
+
+    prompt = f"""You are a security analyst assistant. Analyze this alert and provide structured triage suggestions.
+
+Alert Data:
+```json
+{json.dumps(alert_data, indent=2, default=str)}
+```
+
+Respond EXACTLY in this format (no other text):
+
+OBSERVABLES:
+type|value
+type|value
+
+Valid types: hostname, source_ip, destination_ip, url, domain, user_account
+
+MITRE:
+Txxxx|Technique Name|Tactic
+Txxxx|Technique Name|Tactic
+
+PRIORITY: critical/high/medium/low
+
+Extract real observables from the alert data. Map to real MITRE ATT&CK techniques. Set priority based on severity and context."""
+
+    try:
+        result = await service.chat(
+            messages=[{"role": "user", "content": prompt}],
+            context_type="analyst",
+            temperature=0.2,
+            user_id=current_user.id,
+        )
+        return {
+            "suggestions": result["content"],
+            "model": result["model"],
+        }
+    except OllamaError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@router.post("/case/generate")
+async def case_generate(
+    request_data: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """AI-assisted case creation: generate title, description, and evidence summary."""
+    service = get_ollama_service()
+
+    if not await service.is_available():
+        raise HTTPException(status_code=503, detail="AI service not available")
+
+    prompt = f"""You are a security analyst writing an investigation case. Based on this alert and triage context, generate case fields.
+
+Alert and Triage Data:
+```json
+{json.dumps(request_data, indent=2, default=str)}
+```
+
+Respond EXACTLY in this format (no other text):
+
+TITLE: A concise, descriptive case title
+
+DESCRIPTION: A detailed description of the incident, what was detected, and why it matters. Include timeline and affected assets.
+
+EVIDENCE: A narrative summary of the evidence collected, including observables, detection rules triggered, and relevant indicators."""
+
+    try:
+        result = await service.chat(
+            messages=[{"role": "user", "content": prompt}],
+            context_type="analyst",
+            temperature=0.3,
+            user_id=current_user.id,
+        )
+        return {
+            "content": result["content"],
+            "model": result["model"],
+        }
+    except OllamaError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
 @router.post("/generate/query")
 async def generate_query(
     request: dict,

@@ -93,10 +93,13 @@ class AlertCase(Base, TimestampMixin):
     @property
     def notes(self) -> List["Note"]:
         """Get notes for this case (compatibility property)."""
+        from sqlalchemy.orm import joinedload
         from ixion.storage.database import get_session_factory
         session_factory = get_session_factory()
         with session_factory() as session:
-            return session.query(Note).filter(
+            return session.query(Note).options(
+                joinedload(Note.user)
+            ).filter(
                 Note.entity_type == NoteEntityType.CASE,
                 Note.entity_id == str(self.id)
             ).order_by(Note.created_at).all()
