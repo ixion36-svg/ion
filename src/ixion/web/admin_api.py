@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from ixion.auth.dependencies import require_admin
 from ixion.models.user import User
 from ixion.core.config import get_config, set_config, Config
+from ixion.core.url_validator import validate_integration_url
 
 router = APIRouter()
 
@@ -954,6 +955,11 @@ async def test_wizard_integration(
             if not url:
                 return {"success": False, "error": "URL is required"}
 
+            # Validate URL for SSRF protection
+            is_valid, error = validate_integration_url(url, "elasticsearch")
+            if not is_valid:
+                return {"success": False, "error": f"Invalid URL: {error}"}
+
             headers = {"Content-Type": "application/json"}
             auth = None
 
@@ -996,6 +1002,11 @@ async def test_wizard_integration(
             if not url:
                 return {"success": False, "error": "URL is required"}
 
+            # Validate URL for SSRF protection
+            is_valid, error = validate_integration_url(url, "kibana")
+            if not is_valid:
+                return {"success": False, "error": f"Invalid URL: {error}"}
+
             # Get credentials - fall back to ES if not provided
             existing = get_config()
             username = config_data.username or existing.kibana_username or existing.elasticsearch_username
@@ -1030,6 +1041,11 @@ async def test_wizard_integration(
             url = (config_data.url or "").rstrip("/")
             if not url:
                 return {"success": False, "error": "URL is required"}
+
+            # Validate URL for SSRF protection
+            is_valid, error = validate_integration_url(url, "gitlab")
+            if not is_valid:
+                return {"success": False, "error": f"Invalid URL: {error}"}
 
             existing = get_config()
             token = config_data.token if config_data.token and not config_data.token.startswith("*") else existing.gitlab_token
@@ -1075,6 +1091,11 @@ async def test_wizard_integration(
             if not url:
                 return {"success": False, "error": "URL is required"}
 
+            # Validate URL for SSRF protection
+            is_valid, error = validate_integration_url(url, "opencti")
+            if not is_valid:
+                return {"success": False, "error": f"Invalid URL: {error}"}
+
             existing = get_config()
             token = config_data.token if config_data.token and not config_data.token.startswith("*") else existing.opencti_token
             if not token:
@@ -1110,6 +1131,11 @@ async def test_wizard_integration(
     elif integration == "ollama":
         try:
             url = (config_data.url or "http://localhost:11434").rstrip("/")
+
+            # Validate URL for SSRF protection (ollama allows Docker service names)
+            is_valid, error = validate_integration_url(url, "ollama")
+            if not is_valid:
+                return {"success": False, "error": f"Invalid URL: {error}"}
 
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(10.0, connect=5.0),
