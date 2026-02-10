@@ -2,6 +2,27 @@
 
 ## Quick Start
 
+### Docker Deployment (Recommended)
+
+```bash
+# Clone repository
+git clone https://github.com/ixion36-svg/ixion.git
+cd ixion
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your Elasticsearch/OpenCTI URLs
+
+# Build and start
+docker build -t ixion:latest .
+docker-compose up -d
+
+# Pull AI model (first time)
+docker exec -it ixion-ollama ollama pull qwen2.5:0.5b
+
+# Access at http://localhost:8000
+```
+
 ### Local Development
 
 ```bash
@@ -9,77 +30,34 @@
 pip install -e ".[dev]"
 
 # Initialize database
-ixion init
+python -m ixion.cli.main init
 
 # Upgrade database schema
-ixion upgrade
+python -m ixion.cli.main upgrade
 
 # Seed default users
-ixion seed-users --admin-password YourPassword123
+python -m ixion.cli.main seed-users --admin-password YourPassword123
 
 # Start web server
-ixion web
+python -m ixion.cli.main web
 ```
 
 Access at: http://localhost:8000
 
 ---
 
-## Air-Gapped Deployment
+## Architecture
 
-For deploying to secure environments without internet access.
+IXION integrates with your existing infrastructure:
 
-### 1. Build Offline Package (on machine with internet)
-
-**Windows:**
-```cmd
-scripts\build-offline-package.bat 1.0.0
-```
-
-**Linux/Mac:**
-```bash
-./scripts/build-offline-package.sh 1.0.0
-```
-
-### 2. Transfer to Secure Environment
-
-Copy `dist/ixion-offline-1.0.0/` to the target machine.
-
-### 3. Deploy
-
-**HTTP (Development/Testing):**
-```bash
-cd ixion-offline-1.0.0
-./deploy.sh
-docker-compose up -d
-```
-
-**HTTPS (Production):**
-```bash
-cd ixion-offline-1.0.0
-# Place certificates in ssl/server.crt and ssl/server.key
-./deploy.sh
-docker-compose -f docker-compose.https.yml up -d
-```
-
-### 4. Login
-
-- URL: http://localhost:8000 (or https://localhost for HTTPS)
-- Username: `admin`
-- Password: `changeme` (CHANGE THIS!)
-
----
-
-## Deployment Files
-
-| File | Purpose |
-|------|---------|
-| `Dockerfile` | Docker image build |
-| `docker-compose.yml` | HTTP deployment |
-| `deploy/docker-compose.https.yml` | HTTPS deployment with nginx |
-| `deploy/nginx/nginx.conf` | Nginx reverse proxy config |
-| `deploy/generate-certs.sh` | Generate self-signed certs |
-| `deploy/DEPLOYMENT_GUIDE.md` | Comprehensive deployment guide |
+| Component | Included in Docker Image | Notes |
+|-----------|-------------------------|-------|
+| IXION Web App | Yes | Core application |
+| Ollama | Yes | Local AI/LLM service |
+| Elasticsearch | **No** | Connect to existing cluster |
+| Kibana | **No** | Connect for case sync |
+| OpenCTI | **No** | Connect for threat intel |
+| GitLab | **No** | Connect for issue tracking |
 
 ---
 
@@ -90,123 +68,88 @@ docker-compose -f docker-compose.https.yml up -d
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `IXION_COOKIE_SECURE` | `false` | Set `true` for HTTPS |
+| `IXION_DEBUG_MODE` | `false` | Enable API docs (disable in prod) |
 | `IXION_ADMIN_PASSWORD` | `changeme` | Initial admin password |
+| `IXION_ELASTICSEARCH_ENABLED` | `false` | Enable ES integration |
+| `IXION_ELASTICSEARCH_URL` | - | Elasticsearch URL |
+| `IXION_ELASTICSEARCH_API_KEY` | - | ES API key |
+| `IXION_OPENCTI_ENABLED` | `false` | Enable OpenCTI |
+| `IXION_OPENCTI_URL` | - | OpenCTI URL |
+| `IXION_OPENCTI_TOKEN` | - | OpenCTI API token |
+| `IXION_OLLAMA_ENABLED` | `false` | Enable AI features |
+| `IXION_OLLAMA_URL` | `http://ollama:11434` | Ollama service URL |
+| `IXION_OLLAMA_MODEL` | `qwen2.5:0.5b` | Default AI model |
+| `IXION_KIBANA_CASES_ENABLED` | `false` | Enable Kibana sync |
+| `IXION_KIBANA_URL` | - | Kibana URL |
 | `IXION_OIDC_ENABLED` | `false` | Enable Keycloak SSO |
-| `IXION_OIDC_KEYCLOAK_URL` | - | Keycloak server URL |
-| `IXION_OIDC_REALM` | - | Keycloak realm name |
-| `IXION_OIDC_CLIENT_ID` | - | OIDC client ID |
-| `IXION_OIDC_CLIENT_SECRET` | - | OIDC client secret |
 
 ### Config File
 
-Located at `.ixion/config.json`:
+Located at `.ixion/config.json` (or `/data/.ixion/config.json` in Docker):
 
 ```json
 {
   "db_path": ".ixion/ixion.db",
   "default_format": "markdown",
-  "auto_save": true,
   "cookie_secure": true,
-  "oidc_enabled": false,
-  "oidc_keycloak_url": "",
-  "oidc_realm": "",
-  "oidc_client_id": "",
-  "oidc_client_secret": ""
+  "debug_mode": false,
+  "elasticsearch_enabled": true,
+  "elasticsearch_url": "https://your-es:9200",
+  "opencti_enabled": true,
+  "opencti_url": "https://your-opencti:8080"
 }
 ```
 
 ---
 
-## CLI Commands
+## Integration Setup
 
-### System
-```bash
-ixion init              # Initialize database
-ixion upgrade           # Upgrade database schema
-ixion seed-users        # Create default roles and admin user
-ixion status            # Show system status
-ixion web               # Start web server
-```
+### Elasticsearch
 
-### Templates
-```bash
-ixion template list
-ixion template create "My Template" --format markdown
-ixion template show 1
-ixion template edit 1
-ixion template delete 1
-ixion template search "keyword"
-ixion template import template.md
-ixion template export 1 -o output.md
-```
+1. Enable in `.env`:
+   ```bash
+   IXION_ELASTICSEARCH_ENABLED=true
+   IXION_ELASTICSEARCH_URL=https://your-es:9200
+   IXION_ELASTICSEARCH_API_KEY=your-api-key
+   ```
 
-### Collections
-```bash
-ixion collection list
-ixion collection create "My Collection" -d "Description"
-ixion collection show 1
-ixion collection add 1 5      # Add template 5 to collection 1
-ixion collection remove 5     # Remove template from collection
-ixion collection delete 1
-```
+2. Test connection in IXION: Settings → Integrations → Test
 
-### Rendering
-```bash
-ixion render preview 1 -d '{"name": "Value"}'
-ixion render run 1 -f data.json -o output.md
-ixion render validate-data 1 -d '{"name": "Value"}'
-ixion render batch 1 data.csv --name-field "title"
-```
+3. Configure alert index pattern (default: `.alerts-*,.watcher-history-*,alerts-*`)
 
-### Versions
-```bash
-ixion version list 1
-ixion version show 1 2
-ixion version diff 1 1 2
-ixion version checkpoint 1 "Release v1.0"
-ixion version rollback 1 2
-```
+### OpenCTI
 
-### Documents
-```bash
-ixion document list
-ixion document show 1
-ixion document export 1 -o output.md
-ixion document delete 1
-```
+1. Get API token from OpenCTI: Settings → API Access
+
+2. Enable in `.env`:
+   ```bash
+   IXION_OPENCTI_ENABLED=true
+   IXION_OPENCTI_URL=https://your-opencti:8080
+   IXION_OPENCTI_TOKEN=your-uuid-token
+   ```
+
+3. Test connection in IXION: Settings → Integrations → Test
+
+### Kibana Cases
+
+1. Enable in `.env`:
+   ```bash
+   IXION_KIBANA_CASES_ENABLED=true
+   IXION_KIBANA_URL=https://your-kibana:5601
+   IXION_KIBANA_USERNAME=elastic
+   IXION_KIBANA_PASSWORD=your-password
+   ```
+
+2. Cases created in IXION will sync bidirectionally with Kibana
 
 ---
 
-## API Endpoints
+## Default Login
 
-### Authentication
-- `POST /api/auth/login` - Login
-- `POST /api/auth/logout` - Logout
-- `GET /api/auth/me` - Current user info
-- `POST /api/auth/change-password` - Change password
+- **Username:** `admin`
+- **Password:** `changeme` (or value of `IXION_ADMIN_PASSWORD`)
 
-### Collections
-- `GET /api/collections` - List collections
-- `POST /api/collections` - Create collection
-- `GET /api/collections/{id}` - Get collection
-- `PUT /api/collections/{id}` - Update collection
-- `DELETE /api/collections/{id}` - Delete collection
-
-### Templates
-- `GET /api/templates` - List templates
-- `POST /api/templates` - Create template
-- `GET /api/templates/{id}` - Get template
-- `PUT /api/templates/{id}` - Update template
-- `DELETE /api/templates/{id}` - Delete template
-- `POST /api/templates/{id}/validate` - Validate data
-- `POST /api/templates/{id}/preview` - Preview render
-- `POST /api/templates/{id}/render` - Render document
-- `POST /api/templates/{id}/batch-render` - Batch render
-
-### Documents
-- `GET /api/documents` - List documents
-- `GET /api/documents/{id}` - Get document
-- `DELETE /api/documents/{id}` - Delete document
+**Important:** Change the admin password after first login!
 
 ---
 
@@ -217,32 +160,38 @@ ixion document delete 1
 | **Admin** | Full access to all resources |
 | **Editor** | Create/edit templates and documents |
 | **Viewer** | Read-only access |
+| **Engineering** | Editor + system settings + integrations |
 
 ---
 
 ## Security Features
 
 - Session-based authentication with secure cookies
+- Session rotation on login (invalidates previous sessions)
 - OIDC/Keycloak SSO support
 - Role-based access control (RBAC)
 - Rate limiting on authentication endpoints
-- Security headers (CSP, HSTS, X-Frame-Options)
+- Security headers (CSP, HSTS, X-Frame-Options, Permissions-Policy)
 - Timing-attack resistant login
-- Sandboxed Jinja2 template rendering
+- Sandboxed Jinja2 template rendering (SSTI protection)
+- SSRF protection on integration endpoints
 - CSRF protection for OIDC flows
+- Attack detection with automatic IP blocking
 - Audit logging
 
 ---
 
 ## Backup & Restore
 
-### Backup (Docker)
+### Docker
+
+**Backup:**
 ```bash
 docker run --rm -v ixion-data:/data -v $(pwd):/backup \
   alpine tar czf /backup/ixion-backup.tar.gz -C /data .
 ```
 
-### Restore (Docker)
+**Restore:**
 ```bash
 docker-compose down
 docker run --rm -v ixion-data:/data -v $(pwd):/backup \
@@ -250,7 +199,8 @@ docker run --rm -v ixion-data:/data -v $(pwd):/backup \
 docker-compose up -d
 ```
 
-### Backup (Local)
+### Local
+
 ```bash
 cp -r .ixion .ixion-backup-$(date +%Y%m%d)
 ```
@@ -259,22 +209,45 @@ cp -r .ixion .ixion-backup-$(date +%Y%m%d)
 
 ## Troubleshooting
 
-### Common Issues
+### Container won't start
 
-**"Template not found"**
-- Verify the template ID exists: `ixion template list`
-
-**"Permission denied"**
-- Check user has required role
-- Verify authentication token is valid
-
-**"Database locked"**
-- Only one process should access the database at a time
-- Restart the web server if needed
-
-**Container won't start**
 ```bash
 docker-compose logs ixion
 ```
 
-For detailed troubleshooting, see `deploy/DEPLOYMENT_GUIDE.md`.
+### Can't connect to Elasticsearch
+
+1. Check URL is accessible from IXION container
+2. Verify API key or credentials
+3. Check SSL certificate (set `verify_ssl: false` for self-signed)
+
+### AI features not working
+
+1. Check Ollama is running: `docker-compose logs ollama`
+2. Verify model is pulled: `docker exec ixion-ollama ollama list`
+3. Pull model: `docker exec ixion-ollama ollama pull qwen2.5:0.5b`
+
+### API docs not accessible
+
+API documentation is disabled by default in production. To enable:
+```bash
+IXION_DEBUG_MODE=true
+```
+Then restart the container.
+
+---
+
+## CLI Commands
+
+```bash
+# Database
+python -m ixion.cli.main init              # Initialize database
+python -m ixion.cli.main upgrade           # Upgrade schema
+python -m ixion.cli.main seed-users        # Create default users
+
+# Server
+python -m ixion.cli.main web               # Start web server
+python -m ixion.cli.main web --port 8080   # Custom port
+```
+
+For more details, see [README.md](README.md).

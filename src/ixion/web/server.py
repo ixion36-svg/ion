@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 
 import ixion
 from ixion.web.api import router as api_router, limiter
+from ixion.core.config import get_config as get_app_config
 from ixion.web.security_api import router as security_router
 from ixion.web.integration_api import router as integration_router
 from ixion.web.admin_api import router as admin_router
@@ -42,10 +43,18 @@ logger = get_logger(__name__)
 # Get the directory containing this file
 BASE_DIR = Path(__file__).parent
 
+# Check if debug mode is enabled for API docs
+_app_config = get_app_config()
+_debug_mode = _app_config.debug_mode
+
 app = FastAPI(
     title="IXION",
     description="Intelligence eXchange & Integration Operations Network - Security Operations Portal for Guarded Glass",
     version=ixion.__version__,
+    # Disable API docs in production (when debug_mode is False)
+    docs_url="/docs" if _debug_mode else None,
+    redoc_url="/redoc" if _debug_mode else None,
+    openapi_url="/openapi.json" if _debug_mode else None,
 )
 
 
