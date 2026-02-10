@@ -10,6 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+import ixion
 from ixion.web.api import router as api_router, limiter
 from ixion.web.security_api import router as security_router
 from ixion.web.integration_api import router as integration_router
@@ -44,7 +45,7 @@ BASE_DIR = Path(__file__).parent
 app = FastAPI(
     title="IXION",
     description="Intelligence eXchange & Integration Operations Network - Security Operations Portal for Guarded Glass",
-    version="0.1.0",
+    version=ixion.__version__,
 )
 
 
