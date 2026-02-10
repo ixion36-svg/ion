@@ -143,6 +143,14 @@ async def startup_event():
     # Always run create_all to ensure new tables are created
     init_db(config.db_path)
 
+    # Seed default pattern-based playbooks
+    try:
+        from ixion.services.pattern_detection_service import seed_default_playbooks
+        seed_default_playbooks()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to seed default playbooks: {e}")
+
     # Start Kibana bidirectional sync if enabled
     try:
         from ixion.services.kibana_sync_service import get_kibana_sync_service

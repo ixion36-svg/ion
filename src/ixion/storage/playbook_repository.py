@@ -232,6 +232,19 @@ class PlaybookRepository:
     # Matching
     # =========================================================================
 
+    def find_playbook_for_pattern(self, pattern_id: str) -> Optional[Playbook]:
+        """Find the best active playbook associated with a pattern ID.
+
+        Returns the highest-priority active playbook whose trigger_conditions
+        contain the given pattern_id (via ``pattern_id`` or ``pattern_ids``).
+        """
+        playbooks = self.list_playbooks(active_only=True, include_steps=True)
+        matching = [pb for pb in playbooks if pb.matches_pattern(pattern_id)]
+        if not matching:
+            return None
+        # list_playbooks already sorted by priority desc
+        return matching[0]
+
     def find_matching_playbooks(
         self,
         rule_name: str | None = None,

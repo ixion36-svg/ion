@@ -122,6 +122,21 @@
     </div>
 </div>
 
+<!-- Pattern Detections Panel -->
+<div class="pattern-detections-panel" id="pattern-detections-panel" style="display:none;">
+    <div class="pattern-panel-header" onclick="togglePatternPanel()">
+        <div class="pattern-panel-title">
+            <span class="pattern-panel-icon" id="pattern-panel-icon">&#9654;</span>
+            <span>Pattern Detections</span>
+            <span class="pattern-count-badge" id="pattern-count-badge">0</span>
+        </div>
+        <button class="btn btn-sm btn-link pattern-dismiss-btn" onclick="event.stopPropagation();dismissPatternPanel()" title="Dismiss for this session">&#10005;</button>
+    </div>
+    <div class="pattern-panel-body" id="pattern-panel-body" style="display:none;">
+        <div id="pattern-cards-container"></div>
+    </div>
+</div>
+
 <!-- Active Filter Banner -->
 <div class="active-filter-banner" id="active-filter-banner" style="display: none;">
     <span id="active-filter-text"></span>
@@ -2329,6 +2344,132 @@ kbd {
     margin-top: 0.75rem; display: none;
 }
 .ai-case-summary.visible { display: block; }
+
+/* Pattern Detections Panel */
+.pattern-detections-panel {
+    margin: 0.75rem 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+.pattern-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 1rem;
+    cursor: pointer;
+    user-select: none;
+    background: rgba(239, 68, 68, 0.05);
+    border-bottom: 1px solid transparent;
+}
+.pattern-panel-header:hover { background: rgba(239, 68, 68, 0.08); }
+.pattern-detections-panel.expanded .pattern-panel-header {
+    border-bottom-color: var(--border);
+}
+.pattern-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text);
+}
+.pattern-panel-icon {
+    font-size: 0.625rem;
+    transition: transform 0.2s;
+    display: inline-block;
+}
+.pattern-detections-panel.expanded .pattern-panel-icon {
+    transform: rotate(90deg);
+}
+.pattern-count-badge {
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 0.125rem 0.5rem;
+    border-radius: 10px;
+    min-width: 1.25rem;
+    text-align: center;
+}
+.pattern-dismiss-btn {
+    color: var(--text-muted);
+    font-size: 1rem;
+    padding: 0 0.25rem;
+    opacity: 0.6;
+}
+.pattern-dismiss-btn:hover { opacity: 1; color: var(--text); }
+.pattern-panel-body {
+    padding: 0.75rem 1rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.625rem;
+}
+.pattern-cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 0.625rem;
+}
+.pattern-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.pattern-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.pattern-card-title {
+    font-weight: 600;
+    font-size: 0.8125rem;
+    color: var(--text);
+}
+.pattern-card-severity {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.pattern-card-severity.critical { background: rgba(239,68,68,0.15); color: #ef4444; }
+.pattern-card-severity.high { background: rgba(249,115,22,0.15); color: #f97316; }
+.pattern-card-severity.medium { background: rgba(234,179,8,0.15); color: #eab308; }
+.pattern-card-severity.low { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.pattern-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.pattern-card-meta span {
+    background: var(--bg-secondary);
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+.pattern-card-desc {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+.pattern-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: auto;
+    padding-top: 0.375rem;
+    border-top: 1px solid var(--border);
+}
+.pattern-card-actions .btn { font-size: 0.75rem; padding: 0.25rem 0.625rem; }
 </style>
 
 {% raw %}
@@ -2539,6 +2680,8 @@ async function loadAlerts() {
         renderAnalytics();
         // Load triage/case data for all alerts in batch
         loadTriageBatch();
+        // Load multi-alert pattern detections
+        loadPatternDetections();
     } catch (error) {
         console.error('Error loading alerts:', error);
         tbody.innerHTML = '<tr><td colspan="11" class="error">Error loading alerts. Check Elasticsearch connection.</td></tr>';
@@ -2546,6 +2689,127 @@ async function loadAlerts() {
         document.getElementById('top-rules-list').innerHTML = '<div class="empty-state">-</div>';
         document.getElementById('top-users-list').innerHTML = '<div class="empty-state">-</div>';
     }
+}
+
+// =========================================================================
+// Pattern Detections
+// =========================================================================
+let detectedPatterns = [];
+
+async function loadPatternDetections() {
+    if (sessionStorage.getItem('ixion_patterns_dismissed')) return;
+
+    const hours = document.getElementById('alert-time-range').value;
+    try {
+        const resp = await fetch(`/api/alerts/host-patterns?hours=${hours}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        detectedPatterns = data.patterns || [];
+
+        const panel = document.getElementById('pattern-detections-panel');
+        const badge = document.getElementById('pattern-count-badge');
+
+        if (detectedPatterns.length === 0) {
+            panel.style.display = 'none';
+            return;
+        }
+
+        badge.textContent = detectedPatterns.length;
+        panel.style.display = '';
+        renderPatternCards();
+    } catch (e) {
+        console.error('Error loading pattern detections:', e);
+    }
+}
+
+function renderPatternCards() {
+    const container = document.getElementById('pattern-cards-container');
+    if (!detectedPatterns.length) {
+        container.innerHTML = '<div class="empty-state">No patterns detected</div>';
+        return;
+    }
+
+    container.innerHTML = '<div class="pattern-cards-container">' + detectedPatterns.map(p => {
+        const groupLabel = p.group_by === 'host' ? 'Host' : 'User';
+        const hasExec = p.execution && p.execution.id;
+
+        let actionBtn = '';
+        if (hasExec) {
+            actionBtn = `<button class="btn btn-secondary" onclick="viewPatternExecution(${p.execution.id})">View Execution</button>`;
+        } else if (p.playbook) {
+            actionBtn = `<button class="btn btn-primary" onclick="startPatternPlaybook('${p.pattern_id}', ${p.playbook.id}, '${p.alert_ids[0]}')">Start Playbook</button>`;
+        }
+
+        return `
+            <div class="pattern-card">
+                <div class="pattern-card-header">
+                    <span class="pattern-card-title">${escapeHtml(p.pattern_name)}</span>
+                    <span class="pattern-card-severity ${p.severity}">${p.severity}</span>
+                </div>
+                <div class="pattern-card-meta">
+                    <span>${groupLabel}: <strong>${escapeHtml(p.group_key)}</strong></span>
+                    <span>${p.alert_count} alert${p.alert_count !== 1 ? 's' : ''}</span>
+                    <span>${p.rule_count} rule${p.rule_count !== 1 ? 's' : ''}</span>
+                    ${p.tactic_count ? `<span>${p.tactic_count} tactic${p.tactic_count !== 1 ? 's' : ''}</span>` : ''}
+                </div>
+                <div class="pattern-card-desc">${escapeHtml(p.description || '')}</div>
+                <div class="pattern-card-actions">
+                    ${actionBtn}
+                    <button class="btn btn-secondary" onclick="filterByPatternGroup('${p.group_by}', '${escapeHtml(p.group_key)}')">Show Alerts</button>
+                    ${p.auto_started ? '<span style="font-size:0.6875rem;color:#22c55e;align-self:center;">Auto-started</span>' : ''}
+                </div>
+            </div>
+        `;
+    }).join('') + '</div>';
+}
+
+function togglePatternPanel() {
+    const panel = document.getElementById('pattern-detections-panel');
+    const body = document.getElementById('pattern-panel-body');
+    const isExpanded = panel.classList.toggle('expanded');
+    body.style.display = isExpanded ? '' : 'none';
+}
+
+function dismissPatternPanel() {
+    sessionStorage.setItem('ixion_patterns_dismissed', '1');
+    document.getElementById('pattern-detections-panel').style.display = 'none';
+}
+
+async function startPatternPlaybook(patternId, playbookId, alertId) {
+    try {
+        const resp = await fetch(`/api/elasticsearch/alerts/${alertId}/playbook/${playbookId}/start`, { method: 'POST' });
+        if (!resp.ok) throw new Error('Failed to start playbook');
+        const data = await resp.json();
+        showToast('Playbook execution started', 'success');
+        loadPatternDetections();
+    } catch (e) {
+        showToast('Error starting playbook: ' + e.message, 'error');
+    }
+}
+
+function viewPatternExecution(executionId) {
+    // Navigate to the execution detail - reuse existing playbook execution view
+    window.location.href = `/playbooks?execution=${executionId}`;
+}
+
+function filterByPatternGroup(groupBy, value) {
+    // Use existing entity filter mechanism
+    if (groupBy === 'host') {
+        entityFilter = { type: 'host', value: value };
+    } else {
+        entityFilter = { type: 'user', value: value };
+    }
+    const banner = document.getElementById('active-filter-banner');
+    const text = document.getElementById('active-filter-text');
+    text.textContent = `Filtered by ${groupBy}: ${value}`;
+    banner.style.display = '';
+    applyFilters();
+}
+
+function escapePatternHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
 async function loadTriageBatch() {
