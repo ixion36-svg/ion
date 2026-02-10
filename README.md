@@ -11,6 +11,7 @@ A Security Operations Center (SOC) platform with AI-powered analysis, alert tria
 - **AI-Powered Document Analysis**: Entity extraction, spell checking, and rewrite suggestions powered by Ollama
 - **Alert Investigation**: Elasticsearch-integrated SOC alert triage with case management and analytics
 - **Investigation Playbooks**: Step-based investigation workflows with trigger conditions for alert triage
+- **Multi-Alert Pattern Detection**: Automatic detection of attack patterns across multiple alerts on the same host/user, with auto-triggered investigation playbooks
 - **Saved Searches**: Save, share, and re-run Elasticsearch queries from Discover page
 - **Observable Tracking**: Centralized observable management with cross-case correlation and enrichment
 - **OpenCTI Integration**: IOC enrichment against OpenCTI threat intelligence
@@ -372,6 +373,7 @@ See [DEPLOYMENT_GUIDE.md](deploy/DEPLOYMENT_GUIDE.md) for detailed instructions 
 | `/api/elasticsearch/alerts/{id}/playbook/{pb_id}/start` | POST | Start playbook execution |
 | `/api/playbook-executions/{id}` | GET | Get execution status |
 | `/api/playbook-executions/{id}/steps/{step_id}` | PUT | Mark step complete/skipped |
+| `/api/alerts/host-patterns` | GET | Detect multi-alert attack patterns across hosts/users |
 
 ### Collections (Folders)
 
@@ -617,6 +619,40 @@ Step-based investigation workflows that guide analysts through alert triage.
 | Edit | Modify playbook configuration and steps |
 | Activate/Deactivate | Toggle whether playbook is recommended for alerts |
 | Priority | Higher priority playbooks are checked first for matching |
+
+## Multi-Alert Pattern Detection
+
+IXION automatically detects attack patterns when multiple alerts accumulate on the same host or user, recommending (or auto-starting) the appropriate investigation playbook.
+
+### How It Works
+
+1. Alerts are grouped by host or user
+2. Six built-in pattern evaluators analyze each group for known attack signatures
+3. Detected patterns are matched to seeded playbooks via `trigger_conditions.pattern_id`
+4. High-confidence patterns (active intrusion, lateral movement, data exfiltration, ransomware) auto-start their playbook execution
+
+### Default Pattern Playbooks
+
+Six investigation playbooks are automatically seeded on startup:
+
+| Playbook | Priority | Auto-Execute | Pattern Detected |
+|----------|----------|-------------|------------------|
+| Ransomware Response | 99 | Yes | File encryption/rename + privilege escalation on same host |
+| Active Intrusion Response | 95 | Yes | Alerts spanning 3+ MITRE tactics on same host |
+| Data Exfiltration Response | 92 | Yes | C2/beacon + exfiltration alerts on same host |
+| Forensics Investigation | 90 | No | 3+ distinct rules on same host, at least 1 critical/high |
+| Lateral Movement Containment | 85 | Yes | Lateral movement technique + alerts on 2+ hosts from same source |
+| Compromised Account Investigation | 80 | No | Multiple auth failures + suspicious activity for same user |
+
+### Pattern Detections Panel
+
+The alerts page includes a collapsible **Pattern Detections** panel that:
+- Displays detected patterns with severity badges and affected host/user
+- Shows alert count, distinct rule count, and MITRE tactic count per pattern
+- Provides "Start Playbook" buttons (or "View Execution" for auto-started patterns)
+- Allows filtering the alert table to show only alerts in a pattern group
+- Dismissible per session via sessionStorage
+- Auto-refreshes when alerts are reloaded
 
 ## SOC Tools
 
