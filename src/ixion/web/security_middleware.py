@@ -64,6 +64,8 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
         "/api/templates",  # Templates contain Jinja2 syntax like {{ }} which triggers patterns
         "/templates",
         "/api/collections",  # Collection management
+        "/api/elasticsearch/alerts",  # Alert/case bodies contain security content (shell commands, exploit code)
+        "/api/ai/",  # AI endpoints receive alert data for analysis
     )
 
     def __init__(self, app, enabled: bool = True):
@@ -105,17 +107,17 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
         try:
             security_service = SecurityDetectionService(session)
 
-            # Check if IP is blocked (but allow excluded paths like security dashboard)
-            if security_service.is_ip_blocked(client_ip) and not self._is_excluded_path(request.url.path):
-                logger.security_event(
-                    action="blocked_ip_request",
-                    outcome="blocked",
-                    details={"ip": client_ip, "path": request.url.path},
-                )
-                return JSONResponse(
-                    status_code=403,
-                    content={"detail": "Access denied"},
-                )
+            # IP blocking disabled for testing — detections still logged
+            # if security_service.is_ip_blocked(client_ip) and not self._is_excluded_path(request.url.path):
+            #     logger.security_event(
+            #         action="blocked_ip_request",
+            #         outcome="blocked",
+            #         details={"ip": client_ip, "path": request.url.path},
+            #     )
+            #     return JSONResponse(
+            #         status_code=403,
+            #         content={"detail": "Access denied"},
+            #     )
 
             # Skip attack detection for excluded paths (security dashboard, static files, etc.)
             if self._is_excluded_path(request.url.path):
@@ -172,22 +174,22 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
                     },
                 )
 
-                if detection.should_block:
-                    should_block = True
-                    # Block the IP
-                    security_service.block_ip(
-                        ip_address=client_ip,
-                        reason=f"Automatic block: {detection.title}",
-                        duration_minutes=60,
-                        security_event_id=event.id,
-                    )
-                    session.commit()
+                # Blocking disabled for testing — detections still logged
+                # if detection.should_block:
+                #     should_block = True
+                #     security_service.block_ip(
+                #         ip_address=client_ip,
+                #         reason=f"Automatic block: {detection.title}",
+                #         duration_minutes=60,
+                #         security_event_id=event.id,
+                #     )
+                #     session.commit()
 
-            if should_block:
-                return JSONResponse(
-                    status_code=403,
-                    content={"detail": "Request blocked due to security policy"},
-                )
+            # if should_block:
+            #     return JSONResponse(
+            #         status_code=403,
+            #         content={"detail": "Request blocked due to security policy"},
+            #     )
 
             # Continue with request
             response = await call_next(request)

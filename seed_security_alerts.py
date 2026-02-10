@@ -6,8 +6,8 @@ import uuid
 from datetime import datetime, timedelta
 import random
 
-ES_URL = "http://localhost:9200"
-AUTH = ("elastic", "testpassword123")
+ES_URL = "http://127.0.0.1:9200"
+AUTH = ("elastic", "DocforgeTest123!")
 INDEX = ".alerts-security.alerts-default"
 
 def main():

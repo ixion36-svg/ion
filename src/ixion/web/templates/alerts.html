@@ -2257,6 +2257,78 @@ kbd {
 
 .enrich-dot.hit { background: #ef4444; }
 .enrich-dot.miss { background: #22c55e; }
+
+/* AI Assist Styles */
+.ai-assist-btn {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    padding: 0.375rem 0.75rem; border-radius: 6px;
+    background: #3b82f6; color: #fff; border: none;
+    font-size: 0.8125rem; font-weight: 600; cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+}
+.ai-assist-btn:hover { background: #2563eb; }
+.ai-assist-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ai-micro-btn {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.125rem 0.5rem; border-radius: 4px;
+    background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3);
+    font-size: 0.6875rem; font-weight: 600; cursor: pointer;
+    transition: background 0.15s;
+}
+.ai-micro-btn:hover { background: rgba(59,130,246,0.3); }
+.ai-micro-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.ai-analysis-bar {
+    margin: 0.75rem 0; padding: 0.5rem 0;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; gap: 0.75rem; flex-direction: column;
+}
+.ai-analysis-result {
+    width: 100%; margin-top: 0.5rem; display: none;
+}
+.ai-analysis-result.visible { display: block; }
+.ai-result-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.375rem 0.5rem; background: rgba(59,130,246,0.08);
+    border-radius: 6px 6px 0 0; border: 1px solid rgba(59,130,246,0.2);
+    border-bottom: none; font-size: 0.75rem; font-weight: 600; color: #60a5fa;
+}
+.ai-result-body {
+    padding: 0.75rem; background: var(--bg-secondary);
+    border: 1px solid rgba(59,130,246,0.2); border-radius: 0 0 6px 6px;
+    font-size: 0.8125rem; line-height: 1.6; white-space: pre-wrap;
+    max-height: 400px; overflow-y: auto;
+}
+.ai-model-tag {
+    display: inline-block; padding: 0.0625rem 0.375rem; border-radius: 3px;
+    background: rgba(59,130,246,0.15); color: #93c5fd; font-size: 0.6875rem; font-weight: 500;
+}
+.ai-loading {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.75rem; color: #60a5fa; font-size: 0.8125rem;
+}
+.ai-spinner {
+    width: 16px; height: 16px; border: 2px solid rgba(59,130,246,0.3);
+    border-top-color: #3b82f6; border-radius: 50%;
+    animation: ai-spin 0.8s linear infinite;
+}
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+.ai-error {
+    padding: 0.5rem 0.75rem; background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3); border-radius: 6px;
+    color: #f87171; font-size: 0.8125rem; margin-top: 0.5rem;
+}
+.ai-generate-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.5rem 0; margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+.ai-generate-row .ai-hint { font-size: 0.75rem; color: var(--text-muted); }
+.ai-case-summary {
+    margin-top: 0.75rem; display: none;
+}
+.ai-case-summary.visible { display: block; }
 </style>
 
 {% raw %}
@@ -2416,7 +2488,30 @@ document.addEventListener('DOMContentLoaded', function() {
     loadAlerts();
     loadCases();
     startAutoRefresh();
+    checkAIAvailability();
 });
+
+async function checkAIAvailability() {
+    try {
+        const resp = await fetch('/api/ai/status');
+        if (resp.ok) {
+            const data = await resp.json();
+            aiAvailable = data.available === true;
+        }
+    } catch (e) {
+        aiAvailable = false;
+    }
+}
+
+function formatAIContent(text) {
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`(.*?)`/g, '<code style="background:rgba(59,130,246,0.1);padding:0.125rem 0.25rem;border-radius:3px;">$1</code>')
+        .replace(/^### (.+)$/gm, '<div style="font-weight:700;margin-top:0.5rem;">$1</div>')
+        .replace(/^## (.+)$/gm, '<div style="font-weight:700;font-size:0.9375rem;margin-top:0.75rem;">$1</div>')
+        .replace(/^- (.+)$/gm, '<div style="padding-left:1rem;">&bull; $1</div>')
+        .replace(/^\d+\.\s(.+)$/gm, '<div style="padding-left:1rem;">$&</div>');
+}
 
 // =========================================================================
 // Data Loading
@@ -2619,8 +2714,12 @@ function renderCaseManagementModal(caseData) {
         <div class="case-mgmt-modal">
             <h3>
                 <span>${escapeHtml(caseData.case_number)}: ${escapeHtml(caseData.title)}</span>
-                <button class="close-btn" onclick="document.getElementById('case-mgmt-overlay').remove()" title="Close">&times;</button>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    ${aiAvailable ? `<button class="ai-micro-btn" onclick="aiSummarizeCase(${caseData.id})" title="AI case summary">AI Summary</button>` : ''}
+                    <button class="close-btn" onclick="document.getElementById('case-mgmt-overlay').remove()" title="Close">&times;</button>
+                </div>
             </h3>
+            <div class="ai-case-summary" id="ai-case-summary-${caseData.id}"></div>
             <div class="case-meta-editable">
                 <div class="meta-field">
                     <label>Status</label>
@@ -2992,7 +3091,10 @@ function renderTriageBar(alertId, triage) {
         </div>
         <div class="observables-section">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.375rem;">
-                <label style="margin-bottom:0;">Observables</label>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <label style="margin-bottom:0;">Observables</label>
+                    ${aiAvailable ? `<button class="ai-micro-btn" onclick="aiExtractObservables('${escapeHtml(alertId)}')" title="AI extract observables">AI Extract</button>` : ''}
+                </div>
                 <button class="enrich-btn" id="enrich-btn" onclick="enrichObservables('${escapeHtml(alertId)}')" ${observables.length === 0 ? 'disabled' : ''}>
                     <span class="enrich-icon">&#9733;</span> Enrich via OpenCTI
                 </button>
@@ -3042,7 +3144,10 @@ function renderMitreSection(alertId, techniques) {
 
     return `
         <div class="mitre-section">
-            <label>MITRE ATT&CK Techniques</label>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <label>MITRE ATT&CK Techniques</label>
+                ${aiAvailable ? `<button class="ai-micro-btn" onclick="aiSuggestMitre('${escapeHtml(alertId)}')" title="AI suggest MITRE techniques">AI Suggest</button>` : ''}
+            </div>
             <div class="mitre-techniques-list" id="mitre-techniques-list">${techniquesListHtml}</div>
             <div class="mitre-add-row">
                 <input type="text" id="mitre-id-input" placeholder="T1234" maxlength="9">
@@ -3109,6 +3214,356 @@ async function saveObservables(alertId, observables) {
     } catch (e) {
         console.error('Error saving observables:', e);
     }
+}
+
+// =========================================================================
+// AI Assist Functions
+// =========================================================================
+
+function getAlertPayload(alertId) {
+    const alert = allAlerts.find(a => a.id === alertId);
+    if (!alert) return null;
+    const triage = triageCache[alertId] || {};
+    return {
+        id: alert.id, title: alert.title, message: alert.message,
+        severity: alert.severity, rule_name: alert.rule_name,
+        host: alert.host, user: alert.user, source_ip: alert.source_ip,
+        destination_ip: alert.destination_ip, timestamp: alert.timestamp,
+        tags: alert.tags, mitre_technique_id: alert.mitre_technique_id,
+        mitre_technique_name: alert.mitre_technique_name,
+        mitre_tactic_name: alert.mitre_tactic_name,
+        triage_status: triage.status, triage_priority: triage.priority,
+        observables: triage.observables || [],
+    };
+}
+
+async function aiAnalyzeAlert(alertId) {
+    const container = document.getElementById('ai-analysis-result');
+    if (!container) return;
+    const payload = getAlertPayload(alertId);
+    if (!payload) return;
+
+    container.className = 'ai-analysis-result visible';
+    container.innerHTML = '<div class="ai-loading"><div class="ai-spinner"></div>Analyzing alert with AI...</div>';
+
+    try {
+        const resp = await fetch('/api/ai/analyze/alert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!resp.ok) throw new Error('AI service unavailable');
+        const data = await resp.json();
+        container.innerHTML = `
+            <div class="ai-result-header">
+                <span>AI Analysis</span>
+                <span class="ai-model-tag">${escapeHtml(data.model || '')}</span>
+            </div>
+            <div class="ai-result-body">${formatAIContent(escapeHtml(data.analysis || ''))}</div>
+        `;
+    } catch (e) {
+        container.innerHTML = `<div class="ai-error">AI analysis failed: ${escapeHtml(e.message)}</div>`;
+    }
+}
+
+async function aiSuggestPriority(alertId) {
+    const payload = getAlertPayload(alertId);
+    if (!payload) return;
+
+    try {
+        showNotification('Asking AI for priority suggestion...');
+        const resp = await fetch('/api/ai/triage/suggest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!resp.ok) throw new Error('AI service unavailable');
+        const data = await resp.json();
+        const text = data.suggestions || '';
+        const match = text.match(/PRIORITY:\s*(critical|high|medium|low)/i);
+        if (match) {
+            const priority = match[1].toLowerCase();
+            await updateTriage(alertId, 'priority', priority);
+            showNotification(`AI suggested priority: ${priority} (applied)`);
+        } else {
+            showNotification('AI could not determine priority');
+        }
+    } catch (e) {
+        showNotification('AI priority suggestion failed');
+    }
+}
+
+async function aiExtractObservables(alertId) {
+    const payload = getAlertPayload(alertId);
+    if (!payload) return;
+
+    try {
+        showNotification('AI extracting observables...');
+        const resp = await fetch('/api/ai/triage/suggest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!resp.ok) throw new Error('AI service unavailable');
+        const data = await resp.json();
+        const text = data.suggestions || '';
+
+        // Parse OBSERVABLES section
+        const obsMatch = text.match(/OBSERVABLES:\s*\n([\s\S]*?)(?=\n\s*(?:MITRE:|PRIORITY:)|$)/i);
+        if (!obsMatch) { showNotification('AI found no observables'); return; }
+
+        const lines = obsMatch[1].trim().split('\n').filter(l => l.includes('|'));
+        const newObs = [];
+        for (const line of lines) {
+            const parts = line.split('|').map(s => s.trim());
+            if (parts.length >= 2) {
+                const type = parts[0].toLowerCase().replace(/ /g, '_');
+                const value = parts[1];
+                if (OBSERVABLE_TYPES.includes(type) && value) {
+                    newObs.push({ type, value });
+                }
+            }
+        }
+
+        if (newObs.length === 0) { showNotification('AI found no valid observables'); return; }
+
+        // Merge with existing, dedup
+        const existing = (triageCache[alertId] && triageCache[alertId].observables) || [];
+        const existingSet = new Set(existing.map(o => `${o.type}:${o.value}`));
+        const merged = [...existing];
+        let added = 0;
+        for (const obs of newObs) {
+            const key = `${obs.type}:${obs.value}`;
+            if (!existingSet.has(key)) {
+                merged.push(obs);
+                existingSet.add(key);
+                added++;
+            }
+        }
+
+        if (added > 0) {
+            await saveObservables(alertId, merged);
+            showNotification(`AI extracted ${added} new observable(s)`);
+        } else {
+            showNotification('AI observables already present');
+        }
+    } catch (e) {
+        showNotification('AI observable extraction failed');
+    }
+}
+
+async function aiSuggestMitre(alertId) {
+    const payload = getAlertPayload(alertId);
+    if (!payload) return;
+
+    try {
+        showNotification('AI suggesting MITRE techniques...');
+        const resp = await fetch('/api/ai/triage/suggest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!resp.ok) throw new Error('AI service unavailable');
+        const data = await resp.json();
+        const text = data.suggestions || '';
+
+        // Parse MITRE section
+        const mitreMatch = text.match(/MITRE:\s*\n([\s\S]*?)(?=\n\s*(?:OBSERVABLES:|PRIORITY:)|$)/i);
+        if (!mitreMatch) { showNotification('AI found no MITRE techniques'); return; }
+
+        const lines = mitreMatch[1].trim().split('\n').filter(l => l.includes('|'));
+        const newTechs = [];
+        for (const line of lines) {
+            const parts = line.split('|').map(s => s.trim());
+            if (parts.length >= 2 && /^T\d{4}/.test(parts[0])) {
+                newTechs.push({
+                    technique_id: parts[0],
+                    technique_name: parts[1] || '',
+                    tactic: parts[2] || '',
+                    source: 'ai',
+                });
+            }
+        }
+
+        if (newTechs.length === 0) { showNotification('AI found no valid MITRE techniques'); return; }
+
+        // Merge with existing triage mitre techniques
+        const triage = triageCache[alertId] || {};
+        const existing = triage.mitre_techniques || [];
+        const existingIds = new Set(existing.map(t => t.technique_id));
+        const merged = [...existing];
+        let added = 0;
+        for (const tech of newTechs) {
+            if (!existingIds.has(tech.technique_id)) {
+                merged.push(tech);
+                existingIds.add(tech.technique_id);
+                added++;
+            }
+        }
+
+        if (added > 0) {
+            const resp2 = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mitre_techniques: merged }),
+            });
+            if (resp2.ok) {
+                const result = await resp2.json();
+                triageCache[alertId] = { ...triageCache[alertId], mitre_techniques: result.mitre_techniques };
+                if (currentDetailAlert && currentDetailAlert.id === alertId) {
+                    renderTriageBar(alertId, triageCache[alertId]);
+                }
+            }
+            showNotification(`AI suggested ${added} new MITRE technique(s)`);
+        } else {
+            showNotification('AI MITRE techniques already present');
+        }
+    } catch (e) {
+        showNotification('AI MITRE suggestion failed');
+    }
+}
+
+async function aiGenerateCase(alertId) {
+    const payload = getAlertPayload(alertId);
+    if (!payload) return;
+    const hint = document.getElementById('ai-generate-hint');
+
+    try {
+        if (hint) hint.textContent = 'Generating...';
+        const resp = await fetch('/api/ai/case/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!resp.ok) throw new Error('AI service unavailable');
+        const data = await resp.json();
+        const text = data.content || '';
+
+        const titleMatch = text.match(/TITLE:\s*(.+)/i);
+        const descMatch = text.match(/DESCRIPTION:\s*([\s\S]*?)(?=\nEVIDENCE:|$)/i);
+        const evidenceMatch = text.match(/EVIDENCE:\s*([\s\S]*)/i);
+
+        if (titleMatch) {
+            const el = document.getElementById('case-title');
+            if (el) el.value = titleMatch[1].trim();
+        }
+        if (descMatch) {
+            const el = document.getElementById('case-description');
+            if (el) el.value = descMatch[1].trim();
+        }
+        if (evidenceMatch) {
+            const el = document.getElementById('case-evidence-summary');
+            if (el) el.value = evidenceMatch[1].trim();
+        }
+
+        if (hint) hint.textContent = 'Fields populated by AI - review and edit as needed';
+        showNotification('AI generated case fields');
+    } catch (e) {
+        if (hint) hint.textContent = 'AI generation failed';
+        showNotification('AI case generation failed');
+    }
+}
+
+async function aiSummarizeCase(caseId) {
+    const container = document.getElementById(`ai-case-summary-${caseId}`);
+    if (!container) return;
+
+    container.className = 'ai-case-summary visible';
+    container.innerHTML = '<div class="ai-loading"><div class="ai-spinner"></div>Generating case summary...</div>';
+
+    try {
+        const resp = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        if (!resp.ok) throw new Error('Failed to load case');
+        const caseData = await resp.json();
+
+        const aiResp = await fetch('/api/ai/analyze/alert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'case_summary',
+                case_number: caseData.case_number,
+                title: caseData.title,
+                description: caseData.description,
+                status: caseData.status,
+                severity: caseData.severity,
+                evidence_summary: caseData.evidence_summary,
+                alerts_count: (caseData.alerts || []).length,
+                affected_hosts: caseData.affected_hosts,
+                affected_users: caseData.affected_users,
+                triggered_rules: caseData.triggered_rules,
+            }),
+        });
+        if (!aiResp.ok) throw new Error('AI service unavailable');
+        const data = await aiResp.json();
+
+        container.innerHTML = `
+            <div class="ai-result-header">
+                <span>AI Case Summary</span>
+                <span class="ai-model-tag">${escapeHtml(data.model || '')}</span>
+            </div>
+            <div class="ai-result-body">${formatAIContent(escapeHtml(data.analysis || ''))}</div>
+        `;
+    } catch (e) {
+        container.innerHTML = `<div class="ai-error">AI summary failed: ${escapeHtml(e.message)}</div>`;
+    }
+}
+
+function openAIChatWithContext(alertId) {
+    if (!aiAvailable) {
+        showNotification('AI service is not available', 'error');
+        return;
+    }
+
+    const payload = getAlertPayload(alertId);
+    if (!payload) return;
+
+    // Build context message
+    let context = `I'm investigating this security alert and need your help:\n\n`;
+    context += `Alert: ${payload.title}\n`;
+    context += `Severity: ${payload.severity}\n`;
+    context += `Rule: ${payload.rule_name || 'N/A'}\n`;
+    context += `Host: ${payload.host || 'N/A'}\n`;
+    context += `User: ${payload.user || 'N/A'}\n`;
+    context += `Source IP: ${payload.source_ip || 'N/A'}\n`;
+    context += `Destination IP: ${payload.destination_ip || 'N/A'}\n`;
+    if (payload.mitre_technique_id) {
+        context += `MITRE: ${payload.mitre_technique_id} - ${payload.mitre_technique_name || ''} (${payload.mitre_tactic_name || ''})\n`;
+    }
+    context += `Message: ${payload.message || 'N/A'}\n`;
+
+    if (payload.triage_status) context += `\nTriage Status: ${payload.triage_status}`;
+    if (payload.triage_priority) context += `\nPriority: ${payload.triage_priority}`;
+
+    if (payload.observables && payload.observables.length > 0) {
+        context += `\n\nObservables:\n`;
+        payload.observables.forEach(obs => {
+            context += `- ${obs.type}: ${obs.value}\n`;
+        });
+    }
+
+    // Include enrichment results if available
+    const enrichResults = document.getElementById('enrich-results');
+    if (enrichResults && enrichResults.innerText.trim()) {
+        context += `\nOpenCTI Enrichment Results:\n${enrichResults.innerText.trim()}\n`;
+    }
+
+    context += `\nHelp me investigate this alert. What are the key findings, potential impact, and recommended next steps?`;
+
+    // Open chat panel if closed
+    const panel = document.getElementById('chat-panel');
+    if (!panel || !panel.classList.contains('open')) {
+        toggleChat();
+    }
+
+    // Open AI chat, set analyst context, and send
+    setTimeout(() => {
+        openAIChat();
+        clearAIChat();
+        aiContextType = 'analyst';
+        const contextSelect = document.getElementById('ai-context-select');
+        if (contextSelect) contextSelect.value = 'analyst';
+        sendAIQuickPrompt(context);
+    }, 200);
 }
 
 async function autoPopulateObservables(alertId, alert) {
@@ -3375,13 +3830,13 @@ async function startPlaybook(alertId, playbookId) {
         }
 
         const result = await response.json();
-        showToast(result.already_started ? 'Playbook already in progress' : 'Playbook started', 'success');
+        showNotification(result.already_started ? 'Playbook already in progress' : 'Playbook started', 'success');
 
         // Refresh playbooks
         loadPlaybooksForAlert(alertId);
     } catch (error) {
         console.error('Failed to start playbook:', error);
-        showToast('Failed to start playbook: ' + error.message, 'error');
+        showNotification('Failed to start playbook: ' + error.message, 'error');
     }
 }
 
@@ -3402,7 +3857,7 @@ async function updateStepStatus(alertId, executionId, stepId, status) {
         loadPlaybooksForAlert(alertId);
     } catch (error) {
         console.error('Failed to update step:', error);
-        showToast('Failed to update step: ' + error.message, 'error');
+        showNotification('Failed to update step: ' + error.message, 'error');
     }
 }
 
@@ -3417,11 +3872,11 @@ async function completePlaybookExecution(alertId, executionId) {
             throw new Error(err.detail || 'Failed to complete playbook');
         }
 
-        showToast('Playbook completed', 'success');
+        showNotification('Playbook completed', 'success');
         loadPlaybooksForAlert(alertId);
     } catch (error) {
         console.error('Failed to complete playbook:', error);
-        showToast('Failed to complete: ' + error.message, 'error');
+        showNotification('Failed to complete: ' + error.message, 'error');
     }
 }
 
@@ -3455,7 +3910,7 @@ async function skipRemainingSteps(alertId, executionId) {
         }
     }
 
-    showToast('Remaining steps skipped', 'info');
+    showNotification('Remaining steps skipped', 'info');
     loadPlaybooksForAlert(alertId);
 }
 
@@ -3522,6 +3977,14 @@ async function enrichObservables(alertId) {
         }
 
         renderEnrichResults(resultsContainer, data.results || [], enrichable);
+
+        // Add "Discuss with AI" button after enrichment results
+        if (aiAvailable) {
+            const discussDiv = document.createElement('div');
+            discussDiv.style.marginTop = '0.5rem';
+            discussDiv.innerHTML = `<button class="ai-micro-btn" onclick="openAIChatWithContext('${alertId}')" title="Discuss enrichment results with AI">Discuss with AI</button>`;
+            resultsContainer.appendChild(discussDiv);
+        }
 
         // Update observable list with enrichment dots
         updateObservableEnrichDots(data.results || []);
@@ -3794,8 +4257,12 @@ async function renderCaseTab(caseId) {
             <div class="case-detail-box">
                 <h4 style="display:flex;align-items:center;justify-content:space-between;">
                     <span>${escapeHtml(c.case_number)}: ${escapeHtml(c.title)}</span>
-                    <button class="btn btn-sm" onclick="showCaseDetail(${c.id})" title="Open case management modal" style="font-size:0.75rem;">Manage Case</button>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        ${aiAvailable ? `<button class="ai-micro-btn" onclick="aiSummarizeCase(${c.id})" title="AI case summary">AI Summary</button>` : ''}
+                        <button class="btn btn-sm" onclick="showCaseDetail(${c.id})" title="Open case management modal" style="font-size:0.75rem;">Manage Case</button>
+                    </div>
                 </h4>
+                <div class="ai-case-summary" id="ai-case-summary-${c.id}"></div>
                 <div class="case-meta">
                     <div>
                         <div class="case-meta-label">Status</div>
@@ -4653,6 +5120,15 @@ async function showAlertDetail(alertId) {
                 ${alert.mitre_technique_name ? ` - ${escapeHtml(alert.mitre_technique_name)}` : ''}
                 ${alert.mitre_tactic_name ? ` <span style="opacity:0.7;">(${escapeHtml(alert.mitre_tactic_name)})</span>` : ''}
             </span>
+        </div>`;
+    }
+
+    // AI Analysis Bar
+    if (aiAvailable) {
+        html += `<div class="ai-analysis-bar">
+            <button class="ai-assist-btn" onclick="aiAnalyzeAlert('${escapeHtml(alert.id)}')">&#9733; AI Analyze</button>
+            <button class="ai-assist-btn" onclick="openAIChatWithContext('${escapeHtml(alert.id)}')" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3);color:#10b981;">&#9993; Discuss with AI</button>
+            <div class="ai-analysis-result" id="ai-analysis-result"></div>
         </div>`;
     }
 
