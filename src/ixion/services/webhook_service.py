@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 
 from ixion.models.integration import (
     Webhook,
-    WebhookLog,
+    IntegrationEvent,
+    IntegrationEventType,
     WebhookStatus,
     IntegrationType,
     generate_webhook_token,
@@ -361,15 +362,17 @@ class WebhookService:
             # Verify signature if webhook has a secret
             if webhook.secret and raw_payload:
                 if not self.verify_signature(webhook, raw_payload, signature or ""):
-                    log_entry = WebhookLog(
+                    log_entry = IntegrationEvent(
+                        event_type=IntegrationEventType.WEBHOOK,
+                        integration_type=webhook.source_type,
                         webhook_id=webhook.id,
-                        event_type=event_type,
+                        webhook_event_type=event_type,
                         payload=payload,
                         headers=dict(headers),
                         source_ip=source_ip,
                         status=WebhookStatus.INVALID_SIGNATURE,
                         error_message="Signature verification failed",
-                        processing_time_ms=(time.perf_counter() - start_time) * 1000,
+                        response_time_ms=(time.perf_counter() - start_time) * 1000,
                     )
                     session.add(log_entry)
                     session.flush()
@@ -414,15 +417,17 @@ class WebhookService:
 
             # Log the event
             processing_time_ms = (time.perf_counter() - start_time) * 1000
-            log_entry = WebhookLog(
+            log_entry = IntegrationEvent(
+                event_type=IntegrationEventType.WEBHOOK,
+                integration_type=webhook.source_type,
                 webhook_id=webhook.id,
-                event_type=event_type,
+                webhook_event_type=event_type,
                 payload=payload,
                 headers=dict(headers),
                 source_ip=source_ip,
                 status=status,
                 error_message=error_message,
-                processing_time_ms=processing_time_ms,
+                response_time_ms=processing_time_ms,
             )
             session.add(log_entry)
             session.flush()
@@ -446,7 +451,7 @@ class WebhookService:
         limit: int = 50,
         offset: int = 0,
         session: Optional[Session] = None,
-    ) -> List[WebhookLog]:
+    ) -> List[IntegrationEvent]:
         """Get logs for a webhook.
 
         Args:
@@ -457,13 +462,16 @@ class WebhookService:
             session: Optional database session.
 
         Returns:
-            List of WebhookLog instances.
+            List of IntegrationEvent instances (webhook logs).
         """
-        def _get_logs(sess: Session) -> List[WebhookLog]:
-            query = sess.query(WebhookLog).filter(WebhookLog.webhook_id == webhook_id)
+        def _get_logs(sess: Session) -> List[IntegrationEvent]:
+            query = sess.query(IntegrationEvent).filter(
+                IntegrationEvent.event_type == IntegrationEventType.WEBHOOK,
+                IntegrationEvent.webhook_id == webhook_id,
+            )
             if status is not None:
-                query = query.filter(WebhookLog.status == status)
-            return query.order_by(WebhookLog.created_at.desc()).offset(offset).limit(limit).all()
+                query = query.filter(IntegrationEvent.status == status)
+            return query.order_by(IntegrationEvent.created_at.desc()).offset(offset).limit(limit).all()
 
         if session:
             return _get_logs(session)

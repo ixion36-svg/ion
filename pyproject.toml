@@ -30,9 +30,6 @@ dependencies = [
     "slowapi>=0.1.9",
     "ecs-logging>=2.0.0",
     "python-json-logger>=2.0.0",
-    # NLP and text processing
-    "nltk>=3.8.0",
-    "pyspellchecker>=0.8.0",
     # System monitoring
     "psutil>=5.9.0",
 ]

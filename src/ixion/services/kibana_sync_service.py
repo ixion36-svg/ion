@@ -3,12 +3,13 @@
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Dict, List, Any
 
 from sqlalchemy.orm import Session
 
 from ixion.services.kibana_cases_service import get_kibana_cases_service
-from ixion.models.alert_triage import AlertCase, CaseNote
+from ixion.services.elasticsearch_service import ElasticsearchService
+from ixion.models.alert_triage import AlertCase, Note, NoteEntityType
 from ixion.models.user import User
 from ixion.storage.database import get_session_factory, get_engine
 
@@ -72,8 +73,9 @@ class KibanaSyncService:
                     continue
 
                 # Create new note
-                note = CaseNote(
-                    case_id=case.id,
+                note = Note(
+                    entity_type=NoteEntityType.CASE,
+                    entity_id=str(case.id),
                     user_id=system_user.id if system_user else 1,
                     content=formatted_content,
                 )
@@ -436,8 +438,9 @@ class KibanaSyncService:
                         comment_text = comment.get("comment", "")
                         created_by = comment.get("created_by", {}).get("username", "unknown")
 
-                        note = CaseNote(
-                            case_id=new_case.id,
+                        note = Note(
+                            entity_type=NoteEntityType.CASE,
+                            entity_id=str(new_case.id),
                             user_id=admin_user.id,
                             content=f"[From Kibana - {created_by}] {comment_text}",
                         )

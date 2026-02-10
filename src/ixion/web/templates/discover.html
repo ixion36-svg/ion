@@ -64,6 +64,62 @@
                 <button class="btn btn-primary" onclick="executeDiscoverSearch()">Search</button>
                 <button class="btn" onclick="getHistogram()">Show Histogram</button>
                 <button class="btn" onclick="exportSearchResults()">Export CSV</button>
+                <div class="saved-searches-actions">
+                    <button class="btn" onclick="openSaveSearchModal()">Save Search</button>
+                    <button class="btn" onclick="toggleSavedSearchesPanel()">Saved Searches</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Saved Searches Panel -->
+    <div class="tools-panel section-panel saved-searches-panel" id="saved-searches-panel" style="display: none;">
+        <div class="panel-header">
+            <h3>Saved Searches</h3>
+            <button class="btn btn-sm" onclick="loadSavedSearches()">Refresh</button>
+        </div>
+        <div class="saved-searches-container">
+            <div class="saved-searches-section" id="saved-searches-favorites">
+                <h4>Favorites</h4>
+                <div class="saved-searches-list" id="favorites-list"></div>
+            </div>
+            <div class="saved-searches-section" id="saved-searches-mine">
+                <h4>My Searches</h4>
+                <div class="saved-searches-list" id="my-searches-list"></div>
+            </div>
+            <div class="saved-searches-section" id="saved-searches-shared">
+                <h4>Shared Searches</h4>
+                <div class="saved-searches-list" id="shared-searches-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Search Modal -->
+    <div class="modal-overlay" id="save-search-modal" style="display: none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="save-search-modal-title">Save Search</h3>
+                <button class="modal-close" onclick="closeSaveSearchModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="save-search-name">Name</label>
+                    <input type="text" id="save-search-name" class="form-control" placeholder="Enter a name for this search">
+                </div>
+                <div class="form-group">
+                    <label for="save-search-description">Description (optional)</label>
+                    <textarea id="save-search-description" class="form-control" rows="2" placeholder="Describe what this search does"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="save-search-shared">
+                        Share with team
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeSaveSearchModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSearch()">Save</button>
             </div>
         </div>
     </div>
@@ -463,6 +519,153 @@
 
 .clickable:hover {
     text-decoration: underline;
+}
+
+/* Saved Searches styles */
+.saved-searches-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.saved-searches-panel {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.saved-searches-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.saved-searches-section h4 {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.saved-searches-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.saved-search-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.saved-search-item:hover {
+    background: var(--bg-hover);
+}
+
+.saved-search-favorite {
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.saved-search-favorite.active {
+    color: #f1c40f;
+}
+
+.saved-search-info {
+    flex: 1;
+}
+
+.saved-search-name {
+    font-weight: 500;
+}
+
+.saved-search-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.saved-search-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.saved-search-actions .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+/* Modal styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-dialog {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.modal-close:hover {
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.empty-searches {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    padding: 0.5rem;
 }
 </style>
 
@@ -915,9 +1118,269 @@ function showToast(message, type = 'info') {
     }
 }
 
+// ==================== SAVED SEARCHES ====================
+
+let savedSearchesData = [];
+let editingSearchId = null;
+
+async function loadSavedSearches() {
+    try {
+        const response = await fetch('/api/saved-searches?search_type=discover');
+        if (!response.ok) throw new Error('Failed to load saved searches');
+
+        const data = await response.json();
+        savedSearchesData = data.saved_searches || [];
+        displaySavedSearches();
+    } catch (error) {
+        showToast('Failed to load saved searches: ' + error.message, 'error');
+    }
+}
+
+function displaySavedSearches() {
+    const favoritesList = document.getElementById('favorites-list');
+    const myList = document.getElementById('my-searches-list');
+    const sharedList = document.getElementById('shared-searches-list');
+
+    // Get current user ID from somewhere (we'll approximate by checking created_by)
+    const favorites = savedSearchesData.filter(s => s.is_favorite);
+    const mine = savedSearchesData.filter(s => !s.is_shared || s.created_by_id === getCurrentUserId());
+    const shared = savedSearchesData.filter(s => s.is_shared && s.created_by_id !== getCurrentUserId());
+
+    favoritesList.innerHTML = favorites.length > 0
+        ? favorites.map(s => renderSavedSearchItem(s)).join('')
+        : '<div class="empty-searches">No favorites yet</div>';
+
+    myList.innerHTML = mine.length > 0
+        ? mine.map(s => renderSavedSearchItem(s)).join('')
+        : '<div class="empty-searches">No saved searches</div>';
+
+    sharedList.innerHTML = shared.length > 0
+        ? shared.map(s => renderSavedSearchItem(s)).join('')
+        : '<div class="empty-searches">No shared searches</div>';
+}
+
+function renderSavedSearchItem(search) {
+    const isOwner = search.created_by_id === getCurrentUserId();
+    const lastRun = search.last_executed_at ? new Date(search.last_executed_at).toLocaleDateString() : 'Never';
+
+    return `
+        <div class="saved-search-item" data-id="${search.id}">
+            <span class="saved-search-favorite ${search.is_favorite ? 'active' : ''}"
+                  onclick="event.stopPropagation(); toggleFavorite(${search.id})"
+                  title="${search.is_favorite ? 'Remove from favorites' : 'Add to favorites'}">
+                ${search.is_favorite ? '★' : '☆'}
+            </span>
+            <div class="saved-search-info" onclick="loadSavedSearch(${search.id})">
+                <div class="saved-search-name">${escapeHtml(search.name)}</div>
+                <div class="saved-search-meta">
+                    ${search.is_shared ? '🔗 Shared' : ''}
+                    ${search.execution_count} runs | Last: ${lastRun}
+                    ${!isOwner ? ` | By: ${search.created_by_username || 'Unknown'}` : ''}
+                </div>
+            </div>
+            <div class="saved-search-actions">
+                <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); executeSavedSearch(${search.id})">Run</button>
+                ${isOwner ? `
+                    <button class="btn btn-sm" onclick="event.stopPropagation(); editSavedSearch(${search.id})">Edit</button>
+                    <button class="btn btn-sm" onclick="event.stopPropagation(); deleteSavedSearch(${search.id})">Delete</button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function getCurrentUserId() {
+    // Get from session or global - for now check if window has currentUser
+    if (window.currentUser && window.currentUser.id) {
+        return window.currentUser.id;
+    }
+    return null;
+}
+
+function toggleSavedSearchesPanel() {
+    const panel = document.getElementById('saved-searches-panel');
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        loadSavedSearches();
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function openSaveSearchModal() {
+    editingSearchId = null;
+    document.getElementById('save-search-modal-title').textContent = 'Save Search';
+    document.getElementById('save-search-name').value = '';
+    document.getElementById('save-search-description').value = '';
+    document.getElementById('save-search-shared').checked = false;
+    document.getElementById('save-search-modal').style.display = 'flex';
+}
+
+function closeSaveSearchModal() {
+    document.getElementById('save-search-modal').style.display = 'none';
+    editingSearchId = null;
+}
+
+async function saveSearch() {
+    const name = document.getElementById('save-search-name').value.trim();
+    const description = document.getElementById('save-search-description').value.trim();
+    const isShared = document.getElementById('save-search-shared').checked;
+
+    if (!name) {
+        showToast('Please enter a name for the search', 'warning');
+        return;
+    }
+
+    // Gather current search params
+    const searchParams = {
+        index_pattern: document.getElementById('search-index').value,
+        query: document.getElementById('search-query').value,
+        time_field: document.getElementById('search-time-field').value,
+        time_from: document.getElementById('search-time-from').value,
+        time_to: 'now',
+        size: parseInt(document.getElementById('search-size').value),
+    };
+
+    try {
+        const url = editingSearchId
+            ? `/api/saved-searches/${editingSearchId}`
+            : '/api/saved-searches';
+        const method = editingSearchId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: name,
+                description: description || null,
+                search_type: 'discover',
+                search_params: searchParams,
+                is_shared: isShared,
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.detail || 'Failed to save search');
+        }
+
+        showToast(editingSearchId ? 'Search updated' : 'Search saved', 'success');
+        closeSaveSearchModal();
+        loadSavedSearches();
+    } catch (error) {
+        showToast('Failed to save search: ' + error.message, 'error');
+    }
+}
+
+function loadSavedSearch(searchId) {
+    const search = savedSearchesData.find(s => s.id === searchId);
+    if (!search) return;
+
+    const params = search.search_params;
+
+    // Load params into form
+    if (params.index_pattern) document.getElementById('search-index').value = params.index_pattern;
+    if (params.query) document.getElementById('search-query').value = params.query;
+    if (params.time_field) document.getElementById('search-time-field').value = params.time_field;
+    if (params.time_from) document.getElementById('search-time-from').value = params.time_from;
+    if (params.size) document.getElementById('search-size').value = params.size;
+
+    showToast(`Loaded: ${search.name}`, 'success');
+}
+
+async function executeSavedSearch(searchId) {
+    try {
+        const response = await fetch(`/api/saved-searches/${searchId}/execute`, {
+            method: 'POST',
+        });
+
+        if (!response.ok) throw new Error('Failed to execute search');
+
+        const data = await response.json();
+
+        // Load params into form first
+        const params = data.saved_search.search_params;
+        if (params.index_pattern) document.getElementById('search-index').value = params.index_pattern;
+        if (params.query) document.getElementById('search-query').value = params.query;
+        if (params.time_field) document.getElementById('search-time-field').value = params.time_field;
+        if (params.time_from) document.getElementById('search-time-from').value = params.time_from;
+        if (params.size) document.getElementById('search-size').value = params.size;
+
+        // Display results
+        displaySearchResults(data.results);
+
+        showToast(`Executed: ${data.saved_search.name}`, 'success');
+    } catch (error) {
+        showToast('Failed to execute search: ' + error.message, 'error');
+    }
+}
+
+function editSavedSearch(searchId) {
+    const search = savedSearchesData.find(s => s.id === searchId);
+    if (!search) return;
+
+    editingSearchId = searchId;
+    document.getElementById('save-search-modal-title').textContent = 'Edit Search';
+    document.getElementById('save-search-name').value = search.name;
+    document.getElementById('save-search-description').value = search.description || '';
+    document.getElementById('save-search-shared').checked = search.is_shared;
+
+    // Load the search params into the form first
+    loadSavedSearch(searchId);
+
+    document.getElementById('save-search-modal').style.display = 'flex';
+}
+
+async function deleteSavedSearch(searchId) {
+    const search = savedSearchesData.find(s => s.id === searchId);
+    if (!search) return;
+
+    if (!confirm(`Delete saved search "${search.name}"?`)) return;
+
+    try {
+        const response = await fetch(`/api/saved-searches/${searchId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) throw new Error('Failed to delete search');
+
+        showToast('Search deleted', 'success');
+        loadSavedSearches();
+    } catch (error) {
+        showToast('Failed to delete search: ' + error.message, 'error');
+    }
+}
+
+async function toggleFavorite(searchId) {
+    try {
+        const response = await fetch(`/api/saved-searches/${searchId}/favorite`, {
+            method: 'POST',
+        });
+
+        if (!response.ok) throw new Error('Failed to toggle favorite');
+
+        const data = await response.json();
+
+        // Update local data
+        const search = savedSearchesData.find(s => s.id === searchId);
+        if (search) {
+            search.is_favorite = data.is_favorite;
+        }
+
+        displaySavedSearches();
+    } catch (error) {
+        showToast('Failed to toggle favorite: ' + error.message, 'error');
+    }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
     // Tab is already on search by default
+    // Load current user info
+    fetch('/api/auth/me')
+        .then(r => r.json())
+        .then(data => { window.currentUser = data; })
+        .catch(() => {});
 });
 </script>
 {% endblock %}

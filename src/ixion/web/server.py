@@ -254,6 +254,12 @@ async def discover_page(request: Request):
     return templates.TemplateResponse("discover.html", {"request": request})
 
 
+@app.get("/analyst", response_class=HTMLResponse)
+async def analyst_page(request: Request):
+    """Render the unified analyst workspace page."""
+    return templates.TemplateResponse("analyst.html", {"request": request})
+
+
 @app.get("/integrations", response_class=HTMLResponse)
 async def integrations_page(request: Request):
     """Render the integrations management page (admin only)."""
@@ -264,6 +270,12 @@ async def integrations_page(request: Request):
 async def settings_page(request: Request):
     """Render the system settings page (admin only)."""
     return templates.TemplateResponse("settings.html", {"request": request})
+
+
+@app.get("/playbooks", response_class=HTMLResponse)
+async def playbooks_page(request: Request):
+    """Render the playbooks management page (admin only)."""
+    return templates.TemplateResponse("playbooks.html", {"request": request})
 
 
 @app.get("/chat", response_class=HTMLResponse)

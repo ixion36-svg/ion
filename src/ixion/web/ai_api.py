@@ -58,12 +58,21 @@ class ModelInfo(BaseModel):
     quantization: str
 
 
+class QueueStatus(BaseModel):
+    max_concurrent: int
+    active_requests: int
+    queue_length: int
+    max_queue_size: int
+    available_slots: int
+
+
 class StatusResponse(BaseModel):
     available: bool
     url: str
     default_model: str
     models_loaded: int
     models: List[str]
+    queue: Optional[QueueStatus] = None
     error: Optional[str] = None
 
 
@@ -107,6 +116,13 @@ async def get_ai_status(current_user: User = Depends(get_current_user)):
     service = get_ollama_service()
     status = await service.get_status()
     return StatusResponse(**status)
+
+
+@router.get("/queue")
+async def get_queue_status(current_user: User = Depends(get_current_user)):
+    """Get AI request queue status."""
+    service = get_ollama_service()
+    return await service.get_queue_status()
 
 
 @router.get("/models")
@@ -169,6 +185,7 @@ async def chat(
             context_type=request.context_type,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
+            user_id=current_user.id,
         )
 
         return ChatResponse(
@@ -216,6 +233,7 @@ async def chat_stream(
                 context_type=request.context_type,
                 temperature=request.temperature,
                 max_tokens=request.max_tokens,
+                user_id=current_user.id,
             ):
                 yield f"data: {json.dumps(chunk)}\n\n"
 
@@ -291,6 +309,7 @@ Alert Data:
             messages=[{"role": "user", "content": prompt}],
             context_type="analyst",
             temperature=0.3,  # Lower temperature for more focused analysis
+            user_id=current_user.id,
         )
         return {
             "analysis": result["content"],
@@ -324,6 +343,7 @@ Request: {description}"""
             messages=[{"role": "user", "content": prompt}],
             context_type="engineering",
             temperature=0.2,  # Very low temperature for precise query generation
+            user_id=current_user.id,
         )
         return {
             "query": result["content"].strip(),
@@ -495,6 +515,7 @@ async def chat_with_history(
                 async for chunk in ollama.chat_stream(
                     messages=chat_messages,
                     context_type=request.context_type,
+                    user_id=current_user.id,
                 ):
                     if chunk.get("content"):
                         full_response += chunk["content"]
@@ -520,6 +541,7 @@ async def chat_with_history(
             result = await ollama.chat(
                 messages=chat_messages,
                 context_type=request.context_type,
+                user_id=current_user.id,
             )
 
             # Save assistant response

@@ -1,0 +1,1000 @@
+{% extends "base.html" %}
+
+{% block title %}Playbooks - IXION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Investigation Playbooks</h1>
+    <div class="header-actions">
+        <button class="btn btn-primary" onclick="showCreatePlaybookModal()">+ New Playbook</button>
+    </div>
+</div>
+
+<!-- Playbooks List -->
+<section class="section">
+    <div class="section-header">
+        <h2>Playbooks</h2>
+        <div class="filter-controls">
+            <label class="checkbox-label">
+                <input type="checkbox" id="filter-active-only" checked onchange="loadPlaybooks()">
+                Active only
+            </label>
+        </div>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="playbooks-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Triggers</th>
+                    <th>Steps</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="playbooks-body">
+                <tr><td colspan="6" class="loading">Loading playbooks...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- Create/Edit Playbook Modal -->
+<div class="modal-overlay" id="playbook-modal" style="display: none;">
+    <div class="modal-dialog modal-large">
+        <div class="modal-header">
+            <h3 id="playbook-modal-title">Create Playbook</h3>
+            <button class="modal-close" onclick="closePlaybookModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="playbook-form">
+                <!-- Basic Info -->
+                <div class="form-section">
+                    <h4>Basic Information</h4>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label for="playbook-name">Name *</label>
+                            <input type="text" id="playbook-name" class="form-control" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="playbook-priority">Priority</label>
+                            <input type="number" id="playbook-priority" class="form-control" value="0" min="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="playbook-description">Description</label>
+                        <textarea id="playbook-description" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="playbook-active" checked>
+                            Active
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Trigger Conditions -->
+                <div class="form-section">
+                    <h4>Trigger Conditions</h4>
+                    <p class="form-help">Define when this playbook should be recommended for an alert. Leave empty to match all alerts.</p>
+
+                    <div class="form-group">
+                        <label for="trigger-rule-patterns">Rule Name Patterns (regex, one per line)</label>
+                        <textarea id="trigger-rule-patterns" class="form-control" rows="2" placeholder=".*Brute.*Force.*&#10;.*Suspicious.*Login.*"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Severities</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label"><input type="checkbox" class="trigger-severity" value="critical"> Critical</label>
+                            <label class="checkbox-label"><input type="checkbox" class="trigger-severity" value="high"> High</label>
+                            <label class="checkbox-label"><input type="checkbox" class="trigger-severity" value="medium"> Medium</label>
+                            <label class="checkbox-label"><input type="checkbox" class="trigger-severity" value="low"> Low</label>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="trigger-mitre-techniques">MITRE Techniques (comma-separated)</label>
+                            <input type="text" id="trigger-mitre-techniques" class="form-control" placeholder="T1078, T1110">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="trigger-mitre-tactics">MITRE Tactics (comma-separated)</label>
+                            <input type="text" id="trigger-mitre-tactics" class="form-control" placeholder="initial-access, persistence">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Steps -->
+                <div class="form-section">
+                    <h4>Steps</h4>
+                    <div id="steps-container"></div>
+                    <button type="button" class="btn btn-sm" onclick="addStep()">+ Add Step</button>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closePlaybookModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="savePlaybook()">Save Playbook</button>
+        </div>
+    </div>
+</div>
+
+<!-- View Playbook Modal -->
+<div class="modal-overlay" id="view-playbook-modal" style="display: none;">
+    <div class="modal-dialog modal-large">
+        <div class="modal-header">
+            <h3 id="view-playbook-title">Playbook Details</h3>
+            <button class="modal-close" onclick="closeViewModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="view-playbook-body">
+            <!-- Populated by JS -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeViewModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Playbooks page specific styles */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.section {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.section-header h2 {
+    margin: 0;
+}
+
+.filter-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.data-table th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+}
+
+.data-table tr:hover {
+    background: var(--bg-hover);
+}
+
+.loading {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem;
+}
+
+/* Status badges */
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.status-active {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+.status-inactive {
+    background: rgba(158, 158, 158, 0.2);
+    color: #9e9e9e;
+}
+
+/* Trigger tags */
+.trigger-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.trigger-tag {
+    background: var(--bg-tertiary);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+/* Modal styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-dialog {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-dialog.modal-large {
+    max-width: 800px;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.modal-close:hover {
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Form styles */
+.form-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.form-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.form-section h4 {
+    margin: 0 0 1rem 0;
+    color: var(--accent-color);
+}
+
+.form-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.form-help {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.checkbox-group {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Step builder */
+.step-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    position: relative;
+}
+
+.step-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.step-number {
+    font-weight: bold;
+    color: var(--accent-color);
+}
+
+.step-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.step-actions .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.step-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.step-row .form-group {
+    margin-bottom: 0;
+}
+
+/* View modal */
+.view-section {
+    margin-bottom: 1.5rem;
+}
+
+.view-section h4 {
+    margin: 0 0 0.5rem 0;
+    color: var(--accent-color);
+}
+
+.view-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.view-step {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.view-step-number {
+    font-weight: bold;
+    color: var(--accent-color);
+    min-width: 30px;
+}
+
+.view-step-content {
+    flex: 1;
+}
+
+.view-step-title {
+    font-weight: 500;
+}
+
+.view-step-meta {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let playbooks = [];
+let editingPlaybookId = null;
+let stepCounter = 0;
+
+// ==================== DATA LOADING ====================
+
+async function loadPlaybooks() {
+    const activeOnly = document.getElementById('filter-active-only').checked;
+
+    try {
+        const response = await fetch(`/api/playbooks?active_only=${activeOnly}`);
+        if (!response.ok) throw new Error('Failed to load playbooks');
+
+        const data = await response.json();
+        playbooks = data.playbooks || [];
+        displayPlaybooks();
+    } catch (error) {
+        showToast('Failed to load playbooks: ' + error.message, 'error');
+    }
+}
+
+function displayPlaybooks() {
+    const tbody = document.getElementById('playbooks-body');
+
+    if (playbooks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">No playbooks found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = playbooks.map(p => {
+        const triggers = getTriggersSummary(p.trigger_conditions);
+        return `
+            <tr>
+                <td>
+                    <strong>${escapeHtml(p.name)}</strong>
+                    ${p.description ? `<br><small class="text-secondary">${escapeHtml(p.description.substring(0, 50))}${p.description.length > 50 ? '...' : ''}</small>` : ''}
+                </td>
+                <td>
+                    <div class="trigger-tags">
+                        ${triggers.map(t => `<span class="trigger-tag">${escapeHtml(t)}</span>`).join('')}
+                    </div>
+                </td>
+                <td>${p.step_count} steps</td>
+                <td>${p.priority}</td>
+                <td><span class="status-badge ${p.is_active ? 'status-active' : 'status-inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
+                <td>
+                    <button class="btn btn-sm" onclick="viewPlaybook(${p.id})">View</button>
+                    <button class="btn btn-sm" onclick="editPlaybook(${p.id})">Edit</button>
+                    <button class="btn btn-sm" onclick="deletePlaybook(${p.id})">Delete</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function getTriggersSummary(conditions) {
+    if (!conditions) return ['All alerts'];
+
+    const triggers = [];
+    if (conditions.severities && conditions.severities.length) {
+        triggers.push(`Sev: ${conditions.severities.join(', ')}`);
+    }
+    if (conditions.rule_patterns && conditions.rule_patterns.length) {
+        triggers.push(`${conditions.rule_patterns.length} rule pattern(s)`);
+    }
+    if (conditions.mitre_techniques && conditions.mitre_techniques.length) {
+        triggers.push(`${conditions.mitre_techniques.length} MITRE technique(s)`);
+    }
+    if (conditions.mitre_tactics && conditions.mitre_tactics.length) {
+        triggers.push(`${conditions.mitre_tactics.length} MITRE tactic(s)`);
+    }
+    return triggers.length > 0 ? triggers : ['All alerts'];
+}
+
+// ==================== MODAL MANAGEMENT ====================
+
+function showCreatePlaybookModal() {
+    editingPlaybookId = null;
+    document.getElementById('playbook-modal-title').textContent = 'Create Playbook';
+    resetPlaybookForm();
+    document.getElementById('playbook-modal').style.display = 'flex';
+}
+
+function closePlaybookModal() {
+    document.getElementById('playbook-modal').style.display = 'none';
+    editingPlaybookId = null;
+}
+
+function resetPlaybookForm() {
+    document.getElementById('playbook-name').value = '';
+    document.getElementById('playbook-description').value = '';
+    document.getElementById('playbook-priority').value = '0';
+    document.getElementById('playbook-active').checked = true;
+    document.getElementById('trigger-rule-patterns').value = '';
+    document.getElementById('trigger-mitre-techniques').value = '';
+    document.getElementById('trigger-mitre-tactics').value = '';
+
+    // Reset severity checkboxes
+    document.querySelectorAll('.trigger-severity').forEach(cb => cb.checked = false);
+
+    // Clear steps
+    document.getElementById('steps-container').innerHTML = '';
+    stepCounter = 0;
+}
+
+async function viewPlaybook(id) {
+    const playbook = playbooks.find(p => p.id === id);
+    if (!playbook) return;
+
+    document.getElementById('view-playbook-title').textContent = playbook.name;
+
+    const triggers = getTriggersSummary(playbook.trigger_conditions);
+    const stepsHtml = (playbook.steps || []).map((s, i) => `
+        <div class="view-step">
+            <span class="view-step-number">${i + 1}</span>
+            <div class="view-step-content">
+                <div class="view-step-title">${escapeHtml(s.title)}</div>
+                <div class="view-step-meta">
+                    Type: ${s.step_type}
+                    ${s.is_required ? ' | Required' : ''}
+                    ${s.description ? ` | ${escapeHtml(s.description)}` : ''}
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    document.getElementById('view-playbook-body').innerHTML = `
+        <div class="view-section">
+            <h4>Description</h4>
+            <p>${escapeHtml(playbook.description || 'No description')}</p>
+        </div>
+        <div class="view-section">
+            <h4>Status</h4>
+            <p>
+                <span class="status-badge ${playbook.is_active ? 'status-active' : 'status-inactive'}">
+                    ${playbook.is_active ? 'Active' : 'Inactive'}
+                </span>
+                | Priority: ${playbook.priority}
+            </p>
+        </div>
+        <div class="view-section">
+            <h4>Trigger Conditions</h4>
+            <div class="trigger-tags" style="gap: 0.5rem;">
+                ${triggers.map(t => `<span class="trigger-tag">${escapeHtml(t)}</span>`).join('')}
+            </div>
+        </div>
+        <div class="view-section">
+            <h4>Steps (${(playbook.steps || []).length})</h4>
+            <div class="view-steps-list">
+                ${stepsHtml || '<p class="text-secondary">No steps defined</p>'}
+            </div>
+        </div>
+        <div class="view-section">
+            <h4>Metadata</h4>
+            <p class="text-secondary">
+                Created by: ${playbook.created_by_username || 'Unknown'}<br>
+                Created: ${playbook.created_at ? new Date(playbook.created_at).toLocaleString() : 'Unknown'}<br>
+                Updated: ${playbook.updated_at ? new Date(playbook.updated_at).toLocaleString() : 'Unknown'}
+            </p>
+        </div>
+    `;
+
+    document.getElementById('view-playbook-modal').style.display = 'flex';
+}
+
+function closeViewModal() {
+    document.getElementById('view-playbook-modal').style.display = 'none';
+}
+
+async function editPlaybook(id) {
+    const playbook = playbooks.find(p => p.id === id);
+    if (!playbook) return;
+
+    editingPlaybookId = id;
+    document.getElementById('playbook-modal-title').textContent = 'Edit Playbook';
+
+    // Fill form
+    document.getElementById('playbook-name').value = playbook.name;
+    document.getElementById('playbook-description').value = playbook.description || '';
+    document.getElementById('playbook-priority').value = playbook.priority;
+    document.getElementById('playbook-active').checked = playbook.is_active;
+
+    // Fill trigger conditions
+    const conditions = playbook.trigger_conditions || {};
+    document.getElementById('trigger-rule-patterns').value = (conditions.rule_patterns || []).join('\n');
+    document.getElementById('trigger-mitre-techniques').value = (conditions.mitre_techniques || []).join(', ');
+    document.getElementById('trigger-mitre-tactics').value = (conditions.mitre_tactics || []).join(', ');
+
+    // Fill severity checkboxes
+    document.querySelectorAll('.trigger-severity').forEach(cb => {
+        cb.checked = (conditions.severities || []).includes(cb.value);
+    });
+
+    // Fill steps
+    const stepsContainer = document.getElementById('steps-container');
+    stepsContainer.innerHTML = '';
+    stepCounter = 0;
+
+    (playbook.steps || []).forEach(step => {
+        addStep(step);
+    });
+
+    document.getElementById('playbook-modal').style.display = 'flex';
+}
+
+// ==================== STEP MANAGEMENT ====================
+
+function addStep(stepData = null) {
+    stepCounter++;
+    const stepsContainer = document.getElementById('steps-container');
+
+    const stepTypes = [
+        { value: 'manual_checklist', label: 'Manual Checklist' },
+        { value: 'auto_enrich_observables', label: 'Auto: Enrich Observables' },
+        { value: 'auto_update_status', label: 'Auto: Update Status' },
+        { value: 'auto_create_case', label: 'Auto: Create Case' },
+    ];
+
+    const stepHtml = `
+        <div class="step-item" id="step-${stepCounter}" data-step="${stepCounter}">
+            <div class="step-header">
+                <span class="step-number">Step ${stepCounter}</span>
+                <div class="step-actions">
+                    <button type="button" class="btn btn-sm" onclick="moveStepUp(${stepCounter})">Up</button>
+                    <button type="button" class="btn btn-sm" onclick="moveStepDown(${stepCounter})">Down</button>
+                    <button type="button" class="btn btn-sm" onclick="removeStep(${stepCounter})">Remove</button>
+                </div>
+            </div>
+            <div class="step-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>Type *</label>
+                    <select class="form-control step-type" onchange="onStepTypeChange(${stepCounter})">
+                        ${stepTypes.map(t => `<option value="${t.value}" ${stepData && stepData.step_type === t.value ? 'selected' : ''}>${t.label}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 2;">
+                    <label>Title *</label>
+                    <input type="text" class="form-control step-title" value="${stepData ? escapeHtml(stepData.title) : ''}" required>
+                </div>
+            </div>
+            <div class="step-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>Description</label>
+                    <input type="text" class="form-control step-description" value="${stepData ? escapeHtml(stepData.description || '') : ''}">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="step-required" ${stepData && stepData.is_required ? 'checked' : ''}>
+                        Required
+                    </label>
+                </div>
+            </div>
+            <div class="step-params-container" id="step-params-${stepCounter}">
+                <!-- Dynamic params based on step type -->
+            </div>
+        </div>
+    `;
+
+    stepsContainer.insertAdjacentHTML('beforeend', stepHtml);
+
+    // Load step params if editing
+    if (stepData && stepData.step_params) {
+        loadStepParams(stepCounter, stepData.step_type, stepData.step_params);
+    } else {
+        onStepTypeChange(stepCounter);
+    }
+}
+
+function removeStep(stepNum) {
+    const stepEl = document.getElementById(`step-${stepNum}`);
+    if (stepEl) stepEl.remove();
+    renumberSteps();
+}
+
+function moveStepUp(stepNum) {
+    const stepEl = document.getElementById(`step-${stepNum}`);
+    const prev = stepEl.previousElementSibling;
+    if (prev) {
+        stepEl.parentNode.insertBefore(stepEl, prev);
+        renumberSteps();
+    }
+}
+
+function moveStepDown(stepNum) {
+    const stepEl = document.getElementById(`step-${stepNum}`);
+    const next = stepEl.nextElementSibling;
+    if (next) {
+        stepEl.parentNode.insertBefore(next, stepEl);
+        renumberSteps();
+    }
+}
+
+function renumberSteps() {
+    const steps = document.querySelectorAll('.step-item');
+    steps.forEach((step, i) => {
+        step.querySelector('.step-number').textContent = `Step ${i + 1}`;
+    });
+}
+
+function onStepTypeChange(stepNum) {
+    const stepEl = document.getElementById(`step-${stepNum}`);
+    const type = stepEl.querySelector('.step-type').value;
+    loadStepParams(stepNum, type);
+}
+
+function loadStepParams(stepNum, type, existingParams = null) {
+    const paramsContainer = document.getElementById(`step-params-${stepNum}`);
+
+    let paramsHtml = '';
+
+    switch (type) {
+        case 'manual_checklist':
+            const items = existingParams ? (existingParams.checklist_items || []).join('\n') : '';
+            paramsHtml = `
+                <div class="form-group">
+                    <label>Checklist Items (one per line)</label>
+                    <textarea class="form-control step-checklist-items" rows="3">${escapeHtml(items)}</textarea>
+                </div>
+            `;
+            break;
+
+        case 'auto_enrich_observables':
+            paramsHtml = `
+                <div class="form-group">
+                    <label>Sources</label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="step-source" value="opencti" ${existingParams && existingParams.sources?.includes('opencti') ? 'checked' : 'checked'}>
+                        OpenCTI
+                    </label>
+                </div>
+            `;
+            break;
+
+        case 'auto_update_status':
+            const statuses = ['investigating', 'escalated', 'contained', 'resolved'];
+            const priorities = ['low', 'medium', 'high', 'critical'];
+            paramsHtml = `
+                <div class="step-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label>New Status</label>
+                        <select class="form-control step-new-status">
+                            ${statuses.map(s => `<option value="${s}" ${existingParams && existingParams.new_status === s ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Priority</label>
+                        <select class="form-control step-new-priority">
+                            ${priorities.map(p => `<option value="${p}" ${existingParams && existingParams.priority === p ? 'selected' : ''}>${p}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+            `;
+            break;
+
+        case 'auto_create_case':
+            paramsHtml = `
+                <div class="step-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label>Title Template</label>
+                        <input type="text" class="form-control step-case-title" value="${existingParams ? escapeHtml(existingParams.title_template || '') : 'Case: {rule_name}'}" placeholder="Case: {rule_name}">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Severity</label>
+                        <select class="form-control step-case-severity">
+                            <option value="low" ${existingParams && existingParams.severity === 'low' ? 'selected' : ''}>Low</option>
+                            <option value="medium" ${existingParams && existingParams.severity === 'medium' ? 'selected' : ''}>Medium</option>
+                            <option value="high" ${existingParams && existingParams.severity === 'high' ? 'selected' : ''}>High</option>
+                            <option value="critical" ${existingParams && existingParams.severity === 'critical' ? 'selected' : ''}>Critical</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+            break;
+    }
+
+    paramsContainer.innerHTML = paramsHtml;
+}
+
+function getStepParams(stepEl) {
+    const type = stepEl.querySelector('.step-type').value;
+    const params = {};
+
+    switch (type) {
+        case 'manual_checklist':
+            const itemsText = stepEl.querySelector('.step-checklist-items')?.value || '';
+            params.checklist_items = itemsText.split('\n').filter(i => i.trim());
+            break;
+
+        case 'auto_enrich_observables':
+            params.sources = [];
+            stepEl.querySelectorAll('.step-source:checked').forEach(cb => {
+                params.sources.push(cb.value);
+            });
+            break;
+
+        case 'auto_update_status':
+            params.new_status = stepEl.querySelector('.step-new-status')?.value;
+            params.priority = stepEl.querySelector('.step-new-priority')?.value;
+            break;
+
+        case 'auto_create_case':
+            params.title_template = stepEl.querySelector('.step-case-title')?.value || 'Case: {rule_name}';
+            params.severity = stepEl.querySelector('.step-case-severity')?.value || 'medium';
+            break;
+    }
+
+    return params;
+}
+
+// ==================== SAVE/DELETE ====================
+
+async function savePlaybook() {
+    const name = document.getElementById('playbook-name').value.trim();
+    if (!name) {
+        showToast('Please enter a name', 'warning');
+        return;
+    }
+
+    // Gather trigger conditions
+    const rulePatterns = document.getElementById('trigger-rule-patterns').value
+        .split('\n')
+        .map(p => p.trim())
+        .filter(p => p);
+
+    const severities = [];
+    document.querySelectorAll('.trigger-severity:checked').forEach(cb => {
+        severities.push(cb.value);
+    });
+
+    const mitreTechniques = document.getElementById('trigger-mitre-techniques').value
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t);
+
+    const mitreTactics = document.getElementById('trigger-mitre-tactics').value
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t);
+
+    const triggerConditions = {
+        rule_patterns: rulePatterns,
+        severities: severities,
+        mitre_techniques: mitreTechniques,
+        mitre_tactics: mitreTactics,
+    };
+
+    // Gather steps
+    const steps = [];
+    document.querySelectorAll('.step-item').forEach(stepEl => {
+        const type = stepEl.querySelector('.step-type').value;
+        const title = stepEl.querySelector('.step-title').value.trim();
+        const description = stepEl.querySelector('.step-description')?.value.trim() || null;
+        const isRequired = stepEl.querySelector('.step-required').checked;
+        const params = getStepParams(stepEl);
+
+        if (title) {
+            steps.push({
+                step_type: type,
+                title: title,
+                description: description,
+                step_params: params,
+                is_required: isRequired,
+            });
+        }
+    });
+
+    const payload = {
+        name: name,
+        description: document.getElementById('playbook-description').value.trim() || null,
+        priority: parseInt(document.getElementById('playbook-priority').value) || 0,
+        is_active: document.getElementById('playbook-active').checked,
+        trigger_conditions: triggerConditions,
+        steps: steps,
+    };
+
+    try {
+        const url = editingPlaybookId
+            ? `/api/playbooks/${editingPlaybookId}`
+            : '/api/playbooks';
+        const method = editingPlaybookId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.detail || 'Failed to save playbook');
+        }
+
+        showToast(editingPlaybookId ? 'Playbook updated' : 'Playbook created', 'success');
+        closePlaybookModal();
+        loadPlaybooks();
+    } catch (error) {
+        showToast('Failed to save playbook: ' + error.message, 'error');
+    }
+}
+
+async function deletePlaybook(id) {
+    const playbook = playbooks.find(p => p.id === id);
+    if (!playbook) return;
+
+    if (!confirm(`Delete playbook "${playbook.name}"?`)) return;
+
+    try {
+        const response = await fetch(`/api/playbooks/${id}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) throw new Error('Failed to delete playbook');
+
+        showToast('Playbook deleted', 'success');
+        loadPlaybooks();
+    } catch (error) {
+        showToast('Failed to delete playbook: ' + error.message, 'error');
+    }
+}
+
+// ==================== UTILITIES ====================
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showToast(message, type = 'info') {
+    if (typeof window.showToast === 'function') {
+        window.showToast(message, type);
+    } else {
+        alert(message);
+    }
+}
+
+// ==================== INIT ====================
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadPlaybooks();
+});
+</script>
+{% endblock %}
