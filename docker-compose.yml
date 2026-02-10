@@ -66,9 +66,12 @@ services:
       - ollama-models:/root/.ollama
 
     environment:
-      # Reduce memory usage for smaller deployments
-      - OLLAMA_NUM_PARALLEL=1
+      # Concurrency settings - adjust based on available RAM
+      # Each parallel slot needs ~2-4GB additional RAM
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-4}
       - OLLAMA_MAX_LOADED_MODELS=1
+      # Keep model in memory longer to reduce reload times
+      - OLLAMA_KEEP_ALIVE=30m
 
     # Resource limits - adjust based on available RAM
     # For 32GB system, can increase to 16-20GB

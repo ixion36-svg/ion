@@ -226,13 +226,20 @@ async def login(
     session.commit()
 
     # Set session cookie
+    # Auto-detect HTTPS from request or use configured value
     config = get_config()
+    is_https = (
+        request.url.scheme == "https" or
+        request.headers.get("X-Forwarded-Proto") == "https"
+    )
+    cookie_secure = config.cookie_secure or is_https
+
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=session_token,
         httponly=True,
         samesite="strict",
-        secure=config.cookie_secure,
+        secure=cookie_secure,
         max_age=24 * 60 * 60,  # 24 hours
     )
 
@@ -292,6 +299,7 @@ async def get_current_user_info(
 
 
 @router.post("/auth/change-password")
+@limiter.limit("5/minute")  # Rate limit password change attempts
 async def change_password(
     password_request: ChangePasswordRequest,
     request: Request,
@@ -451,16 +459,29 @@ async def oidc_callback(
         session.commit()
 
         # Create a IXION session for the user
-        auth_service = AuthService(session)
         ip_address = get_client_ip(request)
         user_agent = request.headers.get("User-Agent")
 
-        # Create session token
+        # Create session token with session rotation
         from ixion.storage.auth_repository import SessionRepository
         import secrets
         from datetime import datetime, timedelta
 
         session_repo = SessionRepository(session)
+        audit_repo = AuditLogRepository(session)
+
+        # Session rotation: invalidate all existing sessions for this user
+        old_session_count = session_repo.delete_all_for_user(user.id)
+        if old_session_count > 0:
+            audit_repo.create(
+                user_id=user.id,
+                action="session_rotation",
+                resource_type="user",
+                resource_id=user.id,
+                details={"old_sessions_invalidated": old_session_count, "source": "oidc"},
+                ip_address=ip_address,
+            )
+
         session_token = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(hours=24)
 
@@ -473,7 +494,6 @@ async def oidc_callback(
         )
 
         # Log OIDC login to audit
-        audit_repo = AuditLogRepository(session)
         audit_repo.create(
             user_id=user.id,
             action="oidc_login",
@@ -488,14 +508,21 @@ async def oidc_callback(
         session.commit()
 
         # Create redirect response with session cookie
+        # Auto-detect HTTPS from request or use configured value
         config = get_config()
+        is_https = (
+            request.url.scheme == "https" or
+            request.headers.get("X-Forwarded-Proto") == "https"
+        )
+        cookie_secure = config.cookie_secure or is_https
+
         redirect_response = RedirectResponse(url="/", status_code=302)
         redirect_response.set_cookie(
             key=SESSION_COOKIE_NAME,
             value=session_token,
             httponly=True,
             samesite="strict",
-            secure=config.cookie_secure,
+            secure=cookie_secure,
             max_age=24 * 60 * 60,  # 24 hours
         )
         # Clear the state cookie on successful login
@@ -719,6 +746,7 @@ async def update_user_roles(
 
 
 @router.post("/users/{user_id}/reset-password", dependencies=[Depends(require_permission("user:update"))])
+@limiter.limit("10/minute")  # Rate limit password resets
 async def reset_user_password(
     user_id: int,
     password_reset: PasswordReset,
@@ -1627,21 +1655,21 @@ async def revert_document_to_version(
 # Extract endpoints
 @router.get("/extract/nlp-status")
 async def get_nlp_status():
-    """Check if NLP is available for enhanced extraction."""
-    from ixion.extraction.nlp_service import get_nlp_service
+    """Check if AI document analysis is available."""
+    from ixion.services.ai_document_service import get_ai_document_service
 
-    nlp_service = get_nlp_service()
-    model_info = nlp_service.get_model_info()
+    service = get_ai_document_service()
+    info = service.get_service_info()
+    ai_available = await service.is_ai_available()
 
     return {
-        "nlp_available": model_info.get("available", False),
-        "model_name": model_info.get("model_name"),
-        "pipeline": model_info.get("pipeline", []),
-        "entity_labels": model_info.get("entity_labels", []),
-        "soc_patterns": model_info.get("soc_patterns", []),
-        "soc_pattern_count": model_info.get("soc_pattern_count", 0),
-        "spellcheck_available": model_info.get("spellcheck_available", False),
-        "error": model_info.get("error"),
+        "nlp_available": ai_available,  # Kept for backward compatibility
+        "ai_available": ai_available,
+        "model_name": info.get("backend", "ollama"),
+        "features": info.get("features", []),
+        "soc_patterns": info.get("soc_patterns", []),
+        "soc_pattern_count": info.get("soc_pattern_count", 0),
+        "spellcheck_available": ai_available,
     }
 
 
@@ -1664,28 +1692,28 @@ class ApplyRewriteRequest(BaseModel):
 
 @router.post("/extract/spell-check", dependencies=[Depends(require_permission("template:create"))])
 async def spell_check_text(request: SpellCheckRequest):
-    """Perform spell checking on text."""
-    from ixion.extraction.nlp_service import get_nlp_service
+    """Perform spell checking on text using AI."""
+    from ixion.services.ai_document_service import get_ai_document_service
 
-    nlp = get_nlp_service()
-    result = nlp.spell_check(request.text, request.ignore_patterns)
+    service = get_ai_document_service()
+    result = await service.spell_check(request.text)
 
     return {
         "original": result.original,
         "corrected": result.corrected,
         "misspelled": result.misspelled,
         "suggestion_count": result.suggestion_count,
-        "spellcheck_available": nlp.spellcheck_available,
+        "spellcheck_available": await service.is_ai_available(),
     }
 
 
 @router.post("/extract/rewrite-suggestions", dependencies=[Depends(require_permission("template:create"))])
 async def get_rewrite_suggestions(request: RewriteRequest):
-    """Get rewrite suggestions for text."""
-    from ixion.extraction.nlp_service import get_nlp_service
+    """Get rewrite suggestions for text using AI."""
+    from ixion.services.ai_document_service import get_ai_document_service
 
-    nlp = get_nlp_service()
-    suggestions = nlp.suggest_rewrites(request.text, request.style)
+    service = get_ai_document_service()
+    suggestions = await service.suggest_rewrites(request.text, request.style)
 
     return {
         "suggestions": suggestions,
@@ -1697,18 +1725,19 @@ async def get_rewrite_suggestions(request: RewriteRequest):
 
 @router.post("/extract/apply-rewrites", dependencies=[Depends(require_permission("template:create"))])
 async def apply_rewrites(request: ApplyRewriteRequest):
-    """Apply rewrite suggestions to text and return the rewritten version."""
-    from ixion.extraction.nlp_service import get_nlp_service
+    """Apply rewrite suggestions to text using AI."""
+    from ixion.services.ai_document_service import get_ai_document_service
 
-    nlp = get_nlp_service()
-    result = nlp.apply_rewrites(
-        request.text,
-        request.style,
-        request.apply_all,
-        request.selected_indices,
-    )
+    service = get_ai_document_service()
+    result = await service.apply_rewrites(request.text, request.style)
 
-    return result
+    return {
+        "original": result.original,
+        "rewritten": result.rewritten,
+        "changes_applied": result.changes_applied,
+        "changes": result.changes,
+        "style": result.style,
+    }
 
 
 @router.post("/extract/analyze", dependencies=[Depends(require_permission("template:create"))])
@@ -2852,10 +2881,10 @@ async def get_mitre_stats(
 from ixion.models.alert_triage import (
     AlertTriage,
     AlertTriageStatus,
-    AlertComment,
     AlertCase,
     AlertCaseStatus,
-    CaseNote,
+    Note,
+    NoteEntityType,
 )
 
 
@@ -3191,8 +3220,9 @@ async def add_case_note(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    note = CaseNote(
-        case_id=case_id,
+    note = Note(
+        entity_type=NoteEntityType.CASE,
+        entity_id=str(case_id),
         user_id=current_user.id,
         content=data.content,
     )
@@ -3464,9 +3494,9 @@ async def get_alert_triage(
     """Get triage state and comments for an alert."""
     triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
     comments = (
-        session.query(AlertComment)
-        .filter_by(es_alert_id=alert_id)
-        .order_by(AlertComment.created_at.asc())
+        session.query(Note)
+        .filter(Note.entity_type == NoteEntityType.ALERT, Note.entity_id == alert_id)
+        .order_by(Note.created_at.asc())
         .all()
     )
 
@@ -3757,8 +3787,9 @@ async def add_alert_comment(
     session: Session = Depends(get_db_session),
 ):
     """Add a comment to an alert."""
-    comment = AlertComment(
-        es_alert_id=alert_id,
+    comment = Note(
+        entity_type=NoteEntityType.ALERT,
+        entity_id=alert_id,
         user_id=current_user.id,
         content=data.content,
     )
@@ -3766,7 +3797,7 @@ async def add_alert_comment(
     session.commit()
     return {
         "id": comment.id,
-        "es_alert_id": comment.es_alert_id,
+        "es_alert_id": comment.entity_id,
         "user": current_user.username,
         "content": comment.content,
         "created_at": comment.created_at.isoformat() if comment.created_at else None,
@@ -3831,6 +3862,321 @@ async def get_es_alert_stats(
             "configured": True,
             **stats,
         }
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Elasticsearch Discover Search Endpoints
+# ============================================================================
+
+
+class DiscoverSearchRequest(BaseModel):
+    """Request model for discover search."""
+    index_pattern: str = "logs-*"
+    query: str = "*"
+    time_field: str = "@timestamp"
+    time_from: Optional[str] = "now-24h"
+    time_to: Optional[str] = "now"
+    size: int = 100
+    sort_field: Optional[str] = None
+    sort_order: str = "desc"
+    fields: Optional[List[str]] = None
+
+
+class DiscoverHistogramRequest(BaseModel):
+    """Request model for discover histogram."""
+    index_pattern: str = "logs-*"
+    query: str = "*"
+    time_field: str = "@timestamp"
+    time_from: str = "now-24h"
+    time_to: str = "now"
+    interval: str = "1h"
+
+
+@router.post("/elasticsearch/discover/search")
+async def discover_search(
+    request: DiscoverSearchRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Execute a discover-style search across Elasticsearch indices.
+
+    Supports Lucene/KQL query syntax for flexible searching.
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.discover_search(
+            index_pattern=request.index_pattern,
+            query=request.query,
+            time_field=request.time_field,
+            time_from=request.time_from,
+            time_to=request.time_to,
+            size=request.size,
+            sort_field=request.sort_field,
+            sort_order=request.sort_order,
+            fields=request.fields,
+        )
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/elasticsearch/discover/histogram")
+async def discover_histogram(
+    request: DiscoverHistogramRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Get a time histogram for discover visualization."""
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.discover_histogram(
+            index_pattern=request.index_pattern,
+            query=request.query,
+            time_field=request.time_field,
+            time_from=request.time_from,
+            time_to=request.time_to,
+            interval=request.interval,
+        )
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Elasticsearch Index Browser Endpoints
+# ============================================================================
+
+
+@router.get("/elasticsearch/indices")
+async def list_indices(
+    pattern: str = "*",
+    include_system: bool = False,
+    include_stats: bool = True,
+    current_user: User = Depends(get_current_user),
+):
+    """List available Elasticsearch indices.
+
+    Args:
+        pattern: Index pattern to filter (e.g., "logs-*")
+        include_system: Include system indices (starting with .)
+        include_stats: Include document count and size stats
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.list_indices(
+            pattern=pattern,
+            include_system=include_system,
+            include_stats=include_stats,
+        )
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/elasticsearch/indices/{index_pattern}/mappings")
+async def get_index_mappings(
+    index_pattern: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Get field mappings for an index pattern.
+
+    Returns field names, types, and whether they are searchable/aggregatable.
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.get_index_mappings(index_pattern=index_pattern)
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class FieldStatsRequest(BaseModel):
+    """Request model for field statistics."""
+    index_pattern: str
+    field: str
+    size: int = 10
+    time_field: Optional[str] = "@timestamp"
+    time_from: Optional[str] = "now-24h"
+    time_to: Optional[str] = "now"
+
+
+@router.post("/elasticsearch/indices/field-stats")
+async def get_field_stats(
+    request: FieldStatsRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Get statistics and top values for a specific field.
+
+    Returns cardinality, top values, and counts.
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.get_field_stats(
+            index_pattern=request.index_pattern,
+            field=request.field,
+            size=request.size,
+            time_field=request.time_field,
+            time_from=request.time_from,
+            time_to=request.time_to,
+        )
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# IOC Hunt Endpoints
+# ============================================================================
+
+
+class IOCHuntRequest(BaseModel):
+    """Request model for IOC hunt."""
+    ioc_value: str
+    ioc_type: Optional[str] = None  # ip, hash, domain, url, email (auto-detected if not provided)
+    index_pattern: str = "*,-.*"
+    time_field: str = "@timestamp"
+    time_from: Optional[str] = "now-30d"
+    time_to: Optional[str] = "now"
+    size: int = 100
+
+
+class IOCHuntBulkRequest(BaseModel):
+    """Request model for bulk IOC hunt."""
+    ioc_values: List[str]
+    index_pattern: str = "*,-.*"
+    time_from: Optional[str] = "now-30d"
+    time_to: Optional[str] = "now"
+
+
+@router.post("/elasticsearch/ioc-hunt")
+async def ioc_hunt(
+    request: IOCHuntRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Hunt for an IOC (Indicator of Compromise) across all Elasticsearch indices.
+
+    Automatically detects IOC type (IP, hash, domain, URL, email) and searches
+    relevant fields. Returns matching documents and index statistics.
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.ioc_hunt(
+            ioc_value=request.ioc_value,
+            ioc_type=request.ioc_type,
+            index_pattern=request.index_pattern,
+            time_field=request.time_field,
+            time_from=request.time_from,
+            time_to=request.time_to,
+            size=request.size,
+        )
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
+    except ElasticsearchError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/elasticsearch/ioc-hunt/bulk")
+async def ioc_hunt_bulk(
+    request: IOCHuntBulkRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Hunt for multiple IOCs at once.
+
+    Searches for up to 100 IOCs and returns a summary of which were found
+    and in which indices.
+    """
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        result = await service.ioc_hunt_bulk(
+            ioc_values=request.ioc_values,
+            index_pattern=request.index_pattern,
+            time_from=request.time_from,
+            time_to=request.time_to,
+        )
+
+        if "error" in result and result["error"]:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return result
+
     except ElasticsearchError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -5076,4 +5422,695 @@ async def sync_case_from_kibana(
         "comments_synced": synced,
         "status_updated": status_updated,
         "case_number": case.case_number,
+    }
+
+
+# ============================================================================
+# Saved Searches Endpoints
+# ============================================================================
+
+from ixion.models.saved_search import SavedSearch, SearchType
+from ixion.storage.saved_search_repository import SavedSearchRepository
+
+
+class SavedSearchCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    search_type: str = "discover"
+    search_params: dict
+    is_shared: bool = False
+
+
+class SavedSearchUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    search_params: Optional[dict] = None
+    is_shared: Optional[bool] = None
+
+
+@router.get("/saved-searches")
+async def list_saved_searches(
+    search_type: Optional[str] = None,
+    favorites_only: bool = False,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """List saved searches for the current user (owned + shared)."""
+    repo = SavedSearchRepository(session)
+    searches = repo.list_for_user(
+        user_id=current_user.id,
+        search_type=search_type,
+        favorites_only=favorites_only,
+    )
+
+    return {
+        "saved_searches": [s.to_dict() for s in searches],
+        "total": len(searches),
+    }
+
+
+@router.post("/saved-searches")
+async def create_saved_search(
+    data: SavedSearchCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Create a new saved search."""
+    if not data.name or not data.name.strip():
+        raise HTTPException(status_code=400, detail="Name is required")
+
+    if not data.search_params:
+        raise HTTPException(status_code=400, detail="Search params are required")
+
+    repo = SavedSearchRepository(session)
+    saved_search = repo.create(
+        name=data.name.strip(),
+        description=data.description,
+        search_type=data.search_type,
+        search_params=data.search_params,
+        created_by_id=current_user.id,
+        is_shared=data.is_shared,
+    )
+    session.commit()
+
+    return {
+        "saved_search": saved_search.to_dict(),
+        "message": "Saved search created",
+    }
+
+
+@router.get("/saved-searches/{search_id}")
+async def get_saved_search(
+    search_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Get a saved search by ID."""
+    repo = SavedSearchRepository(session)
+    saved_search = repo.get_by_id(search_id)
+
+    if not saved_search:
+        raise HTTPException(status_code=404, detail="Saved search not found")
+
+    # Check access: must be owner or search must be shared
+    if saved_search.created_by_id != current_user.id and not saved_search.is_shared:
+        raise HTTPException(status_code=404, detail="Saved search not found")
+
+    return {"saved_search": saved_search.to_dict()}
+
+
+@router.put("/saved-searches/{search_id}")
+async def update_saved_search(
+    search_id: int,
+    data: SavedSearchUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Update a saved search (owner only)."""
+    repo = SavedSearchRepository(session)
+    saved_search = repo.get_by_id(search_id)
+
+    if not saved_search:
+        raise HTTPException(status_code=404, detail="Saved search not found")
+
+    # Only owner can update
+    if saved_search.created_by_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the owner can update this search")
+
+    saved_search = repo.update(
+        saved_search,
+        name=data.name,
+        description=data.description,
+        search_params=data.search_params,
+        is_shared=data.is_shared,
+    )
+    session.commit()
+
+    return {
+        "saved_search": saved_search.to_dict(),
+        "message": "Saved search updated",
+    }
+
+
+@router.delete("/saved-searches/{search_id}")
+async def delete_saved_search(
+    search_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Delete a saved search (owner only)."""
+    repo = SavedSearchRepository(session)
+    saved_search = repo.get_by_id(search_id)
+
+    if not saved_search:
+        raise HTTPException(status_code=404, detail="Saved search not found")
+
+    # Only owner can delete
+    if saved_search.created_by_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the owner can delete this search")
+
+    repo.delete(saved_search)
+    session.commit()
+
+    return {"message": "Saved search deleted"}
+
+
+@router.post("/saved-searches/{search_id}/execute")
+async def execute_saved_search(
+    search_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Execute a saved search and return results."""
+    repo = SavedSearchRepository(session)
+    saved_search = repo.get_by_id(search_id)
+
+    if not saved_search:
+        raise HTTPException(status_code=404, detail="Saved search not found")
+
+    # Check access
+    if saved_search.created_by_id != current_user.id and not saved_search.is_shared:
+        raise HTTPException(status_code=404, detail="Saved search not found")
+
+    # Record execution
+    repo.record_execution(saved_search)
+    session.commit()
+
+    # Execute the search based on type
+    params = saved_search.search_params
+
+    if saved_search.search_type == SearchType.DISCOVER.value:
+        # Execute discover search
+        from ixion.services.elasticsearch_service import ElasticsearchService, get_elasticsearch_service
+
+        config = get_elasticsearch_config()
+        if not config.get("enabled"):
+            raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+        service = get_elasticsearch_service()
+        if not service.is_configured:
+            raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+        result = await service.discover_search(
+            index_pattern=params.get("index_pattern", "*"),
+            query=params.get("query", "*"),
+            time_field=params.get("time_field", "@timestamp"),
+            time_from=params.get("time_from", "now-24h"),
+            time_to=params.get("time_to", "now"),
+            size=params.get("size", 100),
+            sort_field=params.get("sort_field"),
+            sort_order=params.get("sort_order", "desc"),
+        )
+
+        return {
+            "saved_search": saved_search.to_dict(),
+            "results": result,
+        }
+
+    elif saved_search.search_type == SearchType.IOC_HUNT.value:
+        # Execute IOC hunt
+        from ixion.services.elasticsearch_service import get_elasticsearch_service
+
+        config = get_elasticsearch_config()
+        if not config.get("enabled"):
+            raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+        service = get_elasticsearch_service()
+        if not service.is_configured:
+            raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+        result = await service.ioc_hunt(
+            ioc_value=params.get("ioc_value", ""),
+            ioc_type=params.get("ioc_type"),
+            index_pattern=params.get("index_pattern", "*"),
+            time_field=params.get("time_field", "@timestamp"),
+            time_from=params.get("time_from", "now-24h"),
+            time_to=params.get("time_to", "now"),
+            size=params.get("size", 100),
+        )
+
+        return {
+            "saved_search": saved_search.to_dict(),
+            "results": result,
+        }
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown search type: {saved_search.search_type}")
+
+
+@router.post("/saved-searches/{search_id}/favorite")
+async def toggle_saved_search_favorite(
+    search_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Toggle favorite status of a saved search (owner only)."""
+    repo = SavedSearchRepository(session)
+    saved_search = repo.get_by_id(search_id)
+
+    if not saved_search:
+        raise HTTPException(status_code=404, detail="Saved search not found")
+
+    # Only owner can favorite
+    if saved_search.created_by_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the owner can favorite this search")
+
+    saved_search = repo.toggle_favorite(saved_search)
+    session.commit()
+
+    return {
+        "saved_search": saved_search.to_dict(),
+        "is_favorite": saved_search.is_favorite,
+    }
+
+
+# ============================================================================
+# Playbooks Endpoints
+# ============================================================================
+
+from ixion.models.playbook import Playbook, PlaybookStep, PlaybookExecution, StepType, ExecutionStatus
+from ixion.storage.playbook_repository import PlaybookRepository
+
+
+class PlaybookStepCreate(BaseModel):
+    step_type: str
+    title: str
+    description: Optional[str] = None
+    step_params: Optional[dict] = None
+    is_required: bool = False
+
+
+class PlaybookCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    is_active: bool = True
+    trigger_conditions: dict
+    priority: int = 0
+    steps: Optional[List[PlaybookStepCreate]] = None
+
+
+class PlaybookUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    trigger_conditions: Optional[dict] = None
+    priority: Optional[int] = None
+    steps: Optional[List[PlaybookStepCreate]] = None
+
+
+class StepStatusUpdate(BaseModel):
+    status: str  # 'completed', 'skipped', 'pending'
+    notes: Optional[str] = None
+
+
+@router.get("/playbooks")
+async def list_playbooks(
+    active_only: bool = False,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """List all playbooks."""
+    repo = PlaybookRepository(session)
+    playbooks = repo.list_playbooks(active_only=active_only)
+
+    return {
+        "playbooks": [p.to_dict(include_steps=True) for p in playbooks],
+        "total": len(playbooks),
+    }
+
+
+@router.post("/playbooks")
+async def create_playbook(
+    data: PlaybookCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Create a new playbook with steps."""
+    if not data.name or not data.name.strip():
+        raise HTTPException(status_code=400, detail="Name is required")
+
+    if not data.trigger_conditions:
+        raise HTTPException(status_code=400, detail="Trigger conditions are required")
+
+    repo = PlaybookRepository(session)
+
+    # Check for duplicate name
+    existing = repo.get_playbook_by_name(data.name.strip())
+    if existing:
+        raise HTTPException(status_code=400, detail="A playbook with this name already exists")
+
+    playbook = repo.create_playbook(
+        name=data.name.strip(),
+        description=data.description,
+        is_active=data.is_active,
+        trigger_conditions=data.trigger_conditions,
+        priority=data.priority,
+        created_by_id=current_user.id,
+    )
+
+    # Add steps if provided
+    if data.steps:
+        for order, step_data in enumerate(data.steps, start=1):
+            repo.add_step(
+                playbook=playbook,
+                step_order=order,
+                step_type=step_data.step_type,
+                title=step_data.title,
+                description=step_data.description,
+                step_params=step_data.step_params,
+                is_required=step_data.is_required,
+            )
+
+    session.commit()
+
+    # Refresh to get steps
+    playbook = repo.get_playbook_by_id(playbook.id)
+
+    return {
+        "playbook": playbook.to_dict(include_steps=True),
+        "message": "Playbook created",
+    }
+
+
+@router.get("/playbooks/{playbook_id}")
+async def get_playbook(
+    playbook_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Get a playbook by ID."""
+    repo = PlaybookRepository(session)
+    playbook = repo.get_playbook_by_id(playbook_id)
+
+    if not playbook:
+        raise HTTPException(status_code=404, detail="Playbook not found")
+
+    return {"playbook": playbook.to_dict(include_steps=True)}
+
+
+@router.put("/playbooks/{playbook_id}")
+async def update_playbook(
+    playbook_id: int,
+    data: PlaybookUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Update a playbook."""
+    repo = PlaybookRepository(session)
+    playbook = repo.get_playbook_by_id(playbook_id)
+
+    if not playbook:
+        raise HTTPException(status_code=404, detail="Playbook not found")
+
+    # Check name uniqueness if changing
+    if data.name and data.name.strip() != playbook.name:
+        existing = repo.get_playbook_by_name(data.name.strip())
+        if existing:
+            raise HTTPException(status_code=400, detail="A playbook with this name already exists")
+
+    playbook = repo.update_playbook(
+        playbook,
+        name=data.name.strip() if data.name else None,
+        description=data.description,
+        is_active=data.is_active,
+        trigger_conditions=data.trigger_conditions,
+        priority=data.priority,
+    )
+
+    # Replace steps if provided
+    if data.steps is not None:
+        steps_data = [
+            {
+                "step_type": s.step_type,
+                "title": s.title,
+                "description": s.description,
+                "step_params": s.step_params,
+                "is_required": s.is_required,
+            }
+            for s in data.steps
+        ]
+        repo.replace_steps(playbook, steps_data)
+
+    session.commit()
+
+    # Refresh
+    playbook = repo.get_playbook_by_id(playbook_id)
+
+    return {
+        "playbook": playbook.to_dict(include_steps=True),
+        "message": "Playbook updated",
+    }
+
+
+@router.delete("/playbooks/{playbook_id}")
+async def delete_playbook(
+    playbook_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Delete a playbook."""
+    repo = PlaybookRepository(session)
+    playbook = repo.get_playbook_by_id(playbook_id)
+
+    if not playbook:
+        raise HTTPException(status_code=404, detail="Playbook not found")
+
+    repo.delete_playbook(playbook)
+    session.commit()
+
+    return {"message": "Playbook deleted"}
+
+
+@router.get("/elasticsearch/alerts/{alert_id}/recommended-playbooks")
+async def get_recommended_playbooks(
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Get playbooks that match the given alert's characteristics."""
+    # First get the alert to extract its characteristics
+    from ixion.services.elasticsearch_service import get_elasticsearch_service
+
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    # Try to get alert details
+    alert = await service.get_alert_by_id(alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    # Extract characteristics for matching
+    rule_name = alert.rule_name
+    severity = alert.severity
+    mitre_techniques = alert.mitre_techniques or []
+    mitre_tactics = alert.mitre_tactics or []
+
+    # Find matching playbooks
+    repo = PlaybookRepository(session)
+    matching_playbooks = repo.find_matching_playbooks(
+        rule_name=rule_name,
+        severity=severity,
+        mitre_techniques=mitre_techniques,
+        mitre_tactics=mitre_tactics,
+    )
+
+    # Check for active executions
+    active_executions = repo.get_executions_for_alert(alert_id)
+    active_playbook_ids = {
+        e.playbook_id for e in active_executions
+        if e.status == ExecutionStatus.IN_PROGRESS.value
+    }
+
+    result = []
+    for playbook in matching_playbooks:
+        pb_dict = playbook.to_dict(include_steps=True)
+        pb_dict["has_active_execution"] = playbook.id in active_playbook_ids
+        result.append(pb_dict)
+
+    return {
+        "playbooks": result,
+        "total": len(result),
+        "alert": {
+            "id": alert_id,
+            "rule_name": rule_name,
+            "severity": severity,
+            "mitre_techniques": mitre_techniques,
+            "mitre_tactics": mitre_tactics,
+        },
+    }
+
+
+@router.post("/elasticsearch/alerts/{alert_id}/playbook/{playbook_id}/start")
+async def start_playbook_execution(
+    alert_id: str,
+    playbook_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Start a playbook execution for an alert."""
+    repo = PlaybookRepository(session)
+    playbook = repo.get_playbook_by_id(playbook_id)
+
+    if not playbook:
+        raise HTTPException(status_code=404, detail="Playbook not found")
+
+    if not playbook.is_active:
+        raise HTTPException(status_code=400, detail="Playbook is not active")
+
+    # Check for existing active execution
+    existing = repo.get_active_execution_for_alert(alert_id, playbook_id)
+    if existing:
+        return {
+            "execution": existing.to_dict(include_playbook=True),
+            "message": "Execution already in progress",
+            "already_started": True,
+        }
+
+    # Start new execution
+    execution = repo.start_execution(
+        playbook=playbook,
+        es_alert_id=alert_id,
+        executed_by_id=current_user.id,
+    )
+    session.commit()
+
+    # Refresh to get relationships
+    execution = repo.get_execution(execution.id)
+
+    return {
+        "execution": execution.to_dict(include_playbook=True),
+        "message": "Playbook execution started",
+    }
+
+
+@router.get("/playbook-executions/{execution_id}")
+async def get_playbook_execution(
+    execution_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Get a playbook execution by ID."""
+    repo = PlaybookRepository(session)
+    execution = repo.get_execution(execution_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    return {"execution": execution.to_dict(include_playbook=True)}
+
+
+@router.get("/elasticsearch/alerts/{alert_id}/playbook-executions")
+async def get_alert_playbook_executions(
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Get all playbook executions for an alert."""
+    repo = PlaybookRepository(session)
+    executions = repo.get_executions_for_alert(alert_id)
+
+    return {
+        "executions": [e.to_dict(include_playbook=True) for e in executions],
+        "total": len(executions),
+    }
+
+
+@router.put("/playbook-executions/{execution_id}/steps/{step_id}")
+async def update_step_status(
+    execution_id: int,
+    step_id: int,
+    data: StepStatusUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Update the status of a step in a playbook execution."""
+    repo = PlaybookRepository(session)
+    execution = repo.get_execution(execution_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    if execution.status != ExecutionStatus.IN_PROGRESS.value:
+        raise HTTPException(status_code=400, detail="Execution is not in progress")
+
+    # Verify step belongs to this playbook
+    step = repo.get_step_by_id(step_id)
+    if not step or step.playbook_id != execution.playbook_id:
+        raise HTTPException(status_code=404, detail="Step not found in this playbook")
+
+    # Update step status
+    valid_statuses = ["completed", "skipped", "pending"]
+    if data.status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+
+    execution = repo.update_step_status(
+        execution=execution,
+        step_id=step_id,
+        status=data.status,
+        completed_by_id=current_user.id,
+        completed_by_username=current_user.username,
+        notes=data.notes,
+    )
+    session.commit()
+
+    return {
+        "execution": execution.to_dict(include_playbook=True),
+        "step_id": step_id,
+        "status": data.status,
+    }
+
+
+@router.post("/playbook-executions/{execution_id}/complete")
+async def complete_playbook_execution(
+    execution_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Manually mark a playbook execution as completed."""
+    repo = PlaybookRepository(session)
+    execution = repo.get_execution(execution_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    if execution.status != ExecutionStatus.IN_PROGRESS.value:
+        raise HTTPException(status_code=400, detail="Execution is not in progress")
+
+    execution = repo.complete_execution(execution)
+    session.commit()
+
+    return {
+        "execution": execution.to_dict(include_playbook=True),
+        "message": "Execution completed",
+    }
+
+
+@router.post("/playbook-executions/{execution_id}/fail")
+async def fail_playbook_execution(
+    execution_id: int,
+    reason: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Mark a playbook execution as failed."""
+    repo = PlaybookRepository(session)
+    execution = repo.get_execution(execution_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    if execution.status != ExecutionStatus.IN_PROGRESS.value:
+        raise HTTPException(status_code=400, detail="Execution is not in progress")
+
+    execution = repo.fail_execution(execution, reason=reason)
+    session.commit()
+
+    return {
+        "execution": execution.to_dict(include_playbook=True),
+        "message": "Execution marked as failed",
     }

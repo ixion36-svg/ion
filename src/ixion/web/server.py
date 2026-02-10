@@ -10,6 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+import ixion
 from ixion.web.api import router as api_router, limiter
 from ixion.web.security_api import router as security_router
 from ixion.web.integration_api import router as integration_router
@@ -44,7 +45,7 @@ BASE_DIR = Path(__file__).parent
 app = FastAPI(
     title="IXION",
     description="Intelligence eXchange & Integration Operations Network - Security Operations Portal for Guarded Glass",
-    version="0.1.0",
+    version=ixion.__version__,
 )
 
 
@@ -70,6 +71,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Referrer policy
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
+        # HTTP Strict Transport Security (HSTS)
+        # Only set when request is HTTPS to avoid issues during development
+        if request.url.scheme == "https" or request.headers.get("X-Forwarded-Proto") == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
         # Content Security Policy (adjust as needed for your app)
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
@@ -78,6 +84,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "img-src 'self' data:; "
             "font-src 'self'; "
             "frame-ancestors 'none'"
+        )
+
+        # Permissions Policy (formerly Feature-Policy)
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), microphone=(), camera=(), payment=()"
         )
 
         return response
@@ -248,6 +259,18 @@ async def tools_page(request: Request):
     return templates.TemplateResponse("tools.html", {"request": request})
 
 
+@app.get("/discover", response_class=HTMLResponse)
+async def discover_page(request: Request):
+    """Render the discover and hunt page for analysts."""
+    return templates.TemplateResponse("discover.html", {"request": request})
+
+
+@app.get("/analyst", response_class=HTMLResponse)
+async def analyst_page(request: Request):
+    """Render the unified analyst workspace page."""
+    return templates.TemplateResponse("analyst.html", {"request": request})
+
+
 @app.get("/integrations", response_class=HTMLResponse)
 async def integrations_page(request: Request):
     """Render the integrations management page (admin only)."""
@@ -258,6 +281,12 @@ async def integrations_page(request: Request):
 async def settings_page(request: Request):
     """Render the system settings page (admin only)."""
     return templates.TemplateResponse("settings.html", {"request": request})
+
+
+@app.get("/playbooks", response_class=HTMLResponse)
+async def playbooks_page(request: Request):
+    """Render the playbooks management page (admin only)."""
+    return templates.TemplateResponse("playbooks.html", {"request": request})
 
 
 @app.get("/chat", response_class=HTMLResponse)

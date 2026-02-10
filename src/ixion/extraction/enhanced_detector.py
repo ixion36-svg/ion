@@ -1,15 +1,14 @@
-"""Enhanced pattern detector combining regex patterns with NLP-based NER."""
+"""Enhanced pattern detector combining regex patterns with AI-based entity extraction."""
 
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set
 
 from ixion.extraction.pattern_detector import PatternDetector, PatternMatch
-from ixion.extraction.nlp_service import get_nlp_service, NEREntity
 
 
 @dataclass
 class EnhancedMatch:
-    """Represents a detected pattern from either regex or NER."""
+    """Represents a detected pattern from either regex or AI."""
 
     pattern_type: str
     value: str
@@ -17,16 +16,16 @@ class EnhancedMatch:
     end: int
     confidence: float
     suggested_name: str
-    source: str  # "regex" or "nlp"
-    nlp_label: Optional[str] = None  # Original NER label if from NLP
+    source: str  # "regex" or "ai"
+    nlp_label: Optional[str] = None  # Original label if from AI
 
 
 class EnhancedPatternDetector:
-    """Pattern detector that combines regex patterns with NLP-based NER.
+    """Pattern detector that combines regex patterns with AI-based entity extraction.
 
     This detector uses both approaches:
-    1. Regex patterns for structured data (emails, phones, URLs, dates in specific formats)
-    2. NLP/NER for semantic entities (names, organizations, locations, contextual dates)
+    1. Regex patterns for structured data (emails, phones, URLs, dates, SOC indicators)
+    2. AI for semantic entities (names, organizations, locations)
 
     The results are merged, with conflicts resolved by confidence score.
     """
@@ -35,23 +34,24 @@ class EnhancedPatternDetector:
         """Initialize the enhanced detector.
 
         Args:
-            use_nlp: Whether to use NLP-based detection. Set to False to use regex only.
+            use_nlp: Whether to use AI-based detection. Set to False to use regex only.
         """
         self.regex_detector = PatternDetector()
         self.use_nlp = use_nlp
-        self._nlp_service = None
+        self._ai_service = None
 
     @property
-    def nlp_service(self):
-        """Lazy-load NLP service."""
-        if self._nlp_service is None:
-            self._nlp_service = get_nlp_service()
-        return self._nlp_service
+    def ai_service(self):
+        """Lazy-load AI document service."""
+        if self._ai_service is None:
+            from ixion.services.ai_document_service import get_ai_document_service
+            self._ai_service = get_ai_document_service()
+        return self._ai_service
 
     @property
     def nlp_available(self) -> bool:
-        """Check if NLP is available."""
-        return self.use_nlp and self.nlp_service.is_available
+        """Check if AI is available (kept for compatibility)."""
+        return self.use_nlp
 
     def detect(
         self,
@@ -59,30 +59,82 @@ class EnhancedPatternDetector:
         min_confidence: float = 0.5,
         use_nlp: Optional[bool] = None,
     ) -> List[EnhancedMatch]:
-        """Detect patterns using both regex and NLP.
+        """Detect patterns using regex and SOC pattern matching.
+
+        Note: For AI-based entity detection, use detect_async instead.
 
         Args:
             text: The text to analyze.
             min_confidence: Minimum confidence threshold (0-1).
-            use_nlp: Override the default NLP setting for this call.
+            use_nlp: Ignored (kept for compatibility). Use detect_async for AI.
+
+        Returns:
+            List of detected patterns from regex.
+        """
+        # Get regex matches (includes SOC patterns via AI document service)
+        regex_matches = self._get_regex_matches(text, min_confidence)
+
+        # Also get SOC entities from AI document service (synchronous, regex-based)
+        soc_entities = self.ai_service.extract_soc_entities(text, min_confidence)
+        soc_matches = [
+            EnhancedMatch(
+                pattern_type=e.pattern_type,
+                value=e.text,
+                start=e.start,
+                end=e.end,
+                confidence=e.confidence,
+                suggested_name=e.suggested_name,
+                source="regex",
+                nlp_label=e.label,
+            )
+            for e in soc_entities
+        ]
+
+        # Merge and deduplicate
+        all_matches = self._merge_matches(regex_matches, soc_matches)
+        all_matches.sort(key=lambda m: m.start)
+
+        return all_matches
+
+    async def detect_async(
+        self,
+        text: str,
+        min_confidence: float = 0.5,
+        use_ai: bool = True,
+    ) -> List[EnhancedMatch]:
+        """Detect patterns using both regex and AI.
+
+        Args:
+            text: The text to analyze.
+            min_confidence: Minimum confidence threshold (0-1).
+            use_ai: Whether to use AI-based entity detection.
 
         Returns:
             List of detected patterns, merged and deduplicated.
         """
-        should_use_nlp = use_nlp if use_nlp is not None else self.use_nlp
-
         # Get regex matches
         regex_matches = self._get_regex_matches(text, min_confidence)
 
-        # Get NLP matches if enabled
-        nlp_matches = []
-        if should_use_nlp and self.nlp_available:
-            nlp_matches = self._get_nlp_matches(text, min_confidence)
+        # Get AI matches if enabled
+        ai_matches = []
+        if use_ai:
+            entities = await self.ai_service.extract_entities_with_ai(text, min_confidence)
+            ai_matches = [
+                EnhancedMatch(
+                    pattern_type=e.pattern_type,
+                    value=e.text,
+                    start=e.start,
+                    end=e.end,
+                    confidence=e.confidence,
+                    suggested_name=e.suggested_name,
+                    source=e.source,
+                    nlp_label=e.label,
+                )
+                for e in entities
+            ]
 
         # Merge and deduplicate
-        all_matches = self._merge_matches(regex_matches, nlp_matches)
-
-        # Sort by position
+        all_matches = self._merge_matches(regex_matches, ai_matches)
         all_matches.sort(key=lambda m: m.start)
 
         return all_matches
@@ -106,25 +158,6 @@ class EnhancedPatternDetector:
             for m in regex_results
         ]
 
-    def _get_nlp_matches(
-        self, text: str, min_confidence: float
-    ) -> List[EnhancedMatch]:
-        """Get matches from NLP-based NER."""
-        entities = self.nlp_service.extract_entities(text, min_confidence)
-
-        return [
-            EnhancedMatch(
-                pattern_type=e.pattern_type,
-                value=e.text,
-                start=e.start,
-                end=e.end,
-                confidence=e.confidence,
-                suggested_name=e.suggested_name,
-                source="nlp",
-                nlp_label=e.label,
-            )
-            for e in entities
-        ]
 
     def _merge_matches(
         self,
@@ -186,7 +219,7 @@ class EnhancedPatternDetector:
 
         Args:
             text: The text to analyze.
-            source: "regex" or "nlp".
+            source: "regex" or "ai".
             min_confidence: Minimum confidence threshold.
 
         Returns:
@@ -194,12 +227,24 @@ class EnhancedPatternDetector:
         """
         if source == "regex":
             return self._get_regex_matches(text, min_confidence)
-        elif source == "nlp":
-            if self.nlp_available:
-                return self._get_nlp_matches(text, min_confidence)
-            return []
+        elif source in ("nlp", "ai"):
+            # Return SOC entities (synchronous regex-based detection)
+            soc_entities = self.ai_service.extract_soc_entities(text, min_confidence)
+            return [
+                EnhancedMatch(
+                    pattern_type=e.pattern_type,
+                    value=e.text,
+                    start=e.start,
+                    end=e.end,
+                    confidence=e.confidence,
+                    suggested_name=e.suggested_name,
+                    source="regex",
+                    nlp_label=e.label,
+                )
+                for e in soc_entities
+            ]
         else:
-            raise ValueError(f"Unknown source: {source}. Use 'regex' or 'nlp'.")
+            raise ValueError(f"Unknown source: {source}. Use 'regex' or 'ai'.")
 
     def get_detection_summary(
         self,

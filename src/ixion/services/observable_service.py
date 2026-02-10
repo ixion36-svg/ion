@@ -15,13 +15,12 @@ from sqlalchemy.orm import Session
 from ixion.models.observable import (
     Observable,
     ObservableEnrichment,
-    ObservableAlertLink,
-    ObservableCaseLink,
+    ObservableLink,
+    ObservableLinkType,
     ObservableType,
     ThreatLevel,
     WatchlistAlert,
     WatchlistAlertType,
-    ObservableSighting,
 )
 from ixion.models.alert_triage import AlertTriage, AlertCase
 from ixion.services.opencti_service import get_opencti_service, OpenCTIError
@@ -288,7 +287,7 @@ class ObservableService:
         alert_triage_id: int,
         context: str,
         extracted_from: str = "auto",
-    ) -> Optional[ObservableAlertLink]:
+    ) -> Optional[ObservableLink]:
         """Link an observable to an alert triage record.
 
         Args:
@@ -306,20 +305,22 @@ class ObservableService:
 
         # Check if link already exists
         existing = (
-            self.session.query(ObservableAlertLink)
+            self.session.query(ObservableLink)
             .filter(
-                ObservableAlertLink.observable_id == observable_id,
-                ObservableAlertLink.alert_triage_id == alert_triage_id,
-                ObservableAlertLink.context == context,
+                ObservableLink.observable_id == observable_id,
+                ObservableLink.link_type == ObservableLinkType.ALERT,
+                ObservableLink.entity_id == alert_triage_id,
+                ObservableLink.context == context,
             )
             .first()
         )
         if existing:
             return existing
 
-        link = ObservableAlertLink(
+        link = ObservableLink(
             observable_id=observable_id,
-            alert_triage_id=alert_triage_id,
+            link_type=ObservableLinkType.ALERT,
+            entity_id=alert_triage_id,
             context=context,
             extracted_from=extracted_from,
         )
@@ -332,7 +333,7 @@ class ObservableService:
         observable_id: int,
         case_id: int,
         context: str,
-    ) -> Optional[ObservableCaseLink]:
+    ) -> Optional[ObservableLink]:
         """Link an observable to a case.
 
         Args:
@@ -349,21 +350,24 @@ class ObservableService:
 
         # Check if link already exists
         existing = (
-            self.session.query(ObservableCaseLink)
+            self.session.query(ObservableLink)
             .filter(
-                ObservableCaseLink.observable_id == observable_id,
-                ObservableCaseLink.case_id == case_id,
-                ObservableCaseLink.context == context,
+                ObservableLink.observable_id == observable_id,
+                ObservableLink.link_type == ObservableLinkType.CASE,
+                ObservableLink.entity_id == case_id,
+                ObservableLink.context == context,
             )
             .first()
         )
         if existing:
             return existing
 
-        link = ObservableCaseLink(
+        link = ObservableLink(
             observable_id=observable_id,
-            case_id=case_id,
+            link_type=ObservableLinkType.CASE,
+            entity_id=case_id,
             context=context,
+            extracted_from="manual",
         )
         self.session.add(link)
         self.session.flush()
@@ -380,10 +384,11 @@ class ObservableService:
             True if any links were removed
         """
         result = (
-            self.session.query(ObservableAlertLink)
+            self.session.query(ObservableLink)
             .filter(
-                ObservableAlertLink.observable_id == observable_id,
-                ObservableAlertLink.alert_triage_id == alert_triage_id,
+                ObservableLink.observable_id == observable_id,
+                ObservableLink.link_type == ObservableLinkType.ALERT,
+                ObservableLink.entity_id == alert_triage_id,
             )
             .delete()
         )
@@ -400,10 +405,11 @@ class ObservableService:
             True if any links were removed
         """
         result = (
-            self.session.query(ObservableCaseLink)
+            self.session.query(ObservableLink)
             .filter(
-                ObservableCaseLink.observable_id == observable_id,
-                ObservableCaseLink.case_id == case_id,
+                ObservableLink.observable_id == observable_id,
+                ObservableLink.link_type == ObservableLinkType.CASE,
+                ObservableLink.entity_id == case_id,
             )
             .delete()
         )
@@ -590,13 +596,19 @@ class ObservableService:
             List of AlertTriage records
         """
         links = (
-            self.session.query(ObservableAlertLink)
-            .filter(ObservableAlertLink.observable_id == observable_id)
-            .order_by(desc(ObservableAlertLink.created_at))
+            self.session.query(ObservableLink)
+            .filter(
+                ObservableLink.observable_id == observable_id,
+                ObservableLink.link_type == ObservableLinkType.ALERT,
+            )
+            .order_by(desc(ObservableLink.created_at))
             .limit(limit)
             .all()
         )
-        return [link.alert_triage for link in links]
+        alert_ids = [link.entity_id for link in links]
+        if not alert_ids:
+            return []
+        return self.session.query(AlertTriage).filter(AlertTriage.id.in_(alert_ids)).all()
 
     def get_related_cases(
         self,
@@ -613,13 +625,19 @@ class ObservableService:
             List of AlertCase records
         """
         links = (
-            self.session.query(ObservableCaseLink)
-            .filter(ObservableCaseLink.observable_id == observable_id)
-            .order_by(desc(ObservableCaseLink.created_at))
+            self.session.query(ObservableLink)
+            .filter(
+                ObservableLink.observable_id == observable_id,
+                ObservableLink.link_type == ObservableLinkType.CASE,
+            )
+            .order_by(desc(ObservableLink.created_at))
             .limit(limit)
             .all()
         )
-        return [link.case for link in links]
+        case_ids = [link.entity_id for link in links]
+        if not case_ids:
+            return []
+        return self.session.query(AlertCase).filter(AlertCase.id.in_(case_ids)).all()
 
     def get_co_occurring_observables(
         self,
@@ -637,8 +655,11 @@ class ObservableService:
         """
         # Find all alerts containing this observable
         alert_ids_subq = (
-            self.session.query(ObservableAlertLink.alert_triage_id)
-            .filter(ObservableAlertLink.observable_id == observable_id)
+            self.session.query(ObservableLink.entity_id)
+            .filter(
+                ObservableLink.observable_id == observable_id,
+                ObservableLink.link_type == ObservableLinkType.ALERT,
+            )
             .subquery()
         )
 
@@ -646,11 +667,12 @@ class ObservableService:
         co_occurring = (
             self.session.query(
                 Observable,
-                func.count(ObservableAlertLink.id).label("count"),
+                func.count(ObservableLink.id).label("count"),
             )
-            .join(ObservableAlertLink)
+            .join(ObservableLink)
             .filter(
-                ObservableAlertLink.alert_triage_id.in_(alert_ids_subq),
+                ObservableLink.link_type == ObservableLinkType.ALERT,
+                ObservableLink.entity_id.in_(alert_ids_subq),
                 Observable.id != observable_id,
             )
             .group_by(Observable.id)
@@ -1071,11 +1093,12 @@ class ObservableService:
         # Get all alert links with timestamps
         links = (
             self.session.query(
-                ObservableAlertLink.observable_id,
-                ObservableAlertLink.alert_triage_id,
-                ObservableAlertLink.created_at,
+                ObservableLink.observable_id,
+                ObservableLink.entity_id,
+                ObservableLink.created_at,
             )
-            .order_by(ObservableAlertLink.created_at)
+            .filter(ObservableLink.link_type == ObservableLinkType.ALERT)
+            .order_by(ObservableLink.created_at)
             .all()
         )
 
@@ -1476,25 +1499,32 @@ class ObservableService:
         source_id: Optional[int] = None,
         context: Optional[str] = None,
         seen_at: Optional[datetime] = None,
-    ) -> ObservableSighting:
+    ) -> ObservableLink:
         """Record a sighting of an observable for timeline tracking.
 
         Args:
             observable_id: Observable ID
-            source_type: Type of source ("alert", "case", "manual")
+            source_type: Type of source ("alert", "case", "manual", "import")
             source_id: ID of the source (alert_id or case_id)
             context: Context of the sighting (e.g., "source_ip")
             seen_at: When it was seen (defaults to now)
 
         Returns:
-            Created sighting record
+            Created sighting record (as ObservableLink)
         """
-        sighting = ObservableSighting(
+        # Map source_type to ObservableLinkType
+        link_type_map = {
+            "alert": ObservableLinkType.ALERT,
+            "case": ObservableLinkType.CASE,
+        }
+        link_type = link_type_map.get(source_type, ObservableLinkType.MANUAL)
+
+        sighting = ObservableLink(
             observable_id=observable_id,
-            source_type=source_type,
-            source_id=source_id,
-            context=context,
-            seen_at=seen_at or datetime.utcnow(),
+            link_type=link_type,
+            entity_id=source_id or 0,
+            context=context or source_type,
+            extracted_from="sighting",
         )
         self.session.add(sighting)
         self.session.flush()
@@ -1514,10 +1544,11 @@ class ObservableService:
         Returns:
             List of timeline events
         """
-        sightings = (
-            self.session.query(ObservableSighting)
-            .filter(ObservableSighting.observable_id == observable_id)
-            .order_by(desc(ObservableSighting.seen_at))
+        # Get all links (sightings) for this observable
+        links = (
+            self.session.query(ObservableLink)
+            .filter(ObservableLink.observable_id == observable_id)
+            .order_by(desc(ObservableLink.created_at))
             .limit(limit)
             .all()
         )
@@ -1533,13 +1564,13 @@ class ObservableService:
 
         events = []
 
-        for s in sightings:
+        for link in links:
             events.append({
                 "type": "sighting",
-                "timestamp": s.seen_at.isoformat(),
-                "source_type": s.source_type,
-                "source_id": s.source_id,
-                "context": s.context,
+                "timestamp": link.created_at.isoformat(),
+                "source_type": link.link_type.value,
+                "source_id": link.entity_id,
+                "context": link.context,
             })
 
         for e in enrichments:
@@ -1575,14 +1606,14 @@ class ObservableService:
 
         sightings = (
             self.session.query(
-                func.date(ObservableSighting.seen_at).label("date"),
-                func.count(ObservableSighting.id).label("count"),
+                func.date(ObservableLink.created_at).label("date"),
+                func.count(ObservableLink.id).label("count"),
             )
             .filter(
-                ObservableSighting.observable_id == observable_id,
-                ObservableSighting.seen_at >= cutoff,
+                ObservableLink.observable_id == observable_id,
+                ObservableLink.created_at >= cutoff,
             )
-            .group_by(func.date(ObservableSighting.seen_at))
+            .group_by(func.date(ObservableLink.created_at))
             .all()
         )
 
@@ -2027,9 +2058,9 @@ class ObservableService:
             # Delete related records first
             obs_ids = [obs.id for obs in candidates]
 
-            # Delete sightings
-            self.session.query(ObservableSighting).filter(
-                ObservableSighting.observable_id.in_(obs_ids)
+            # Delete links (formerly sightings)
+            self.session.query(ObservableLink).filter(
+                ObservableLink.observable_id.in_(obs_ids)
             ).delete(synchronize_session=False)
 
             # Delete watchlist alerts
@@ -2037,7 +2068,7 @@ class ObservableService:
                 WatchlistAlert.observable_id.in_(obs_ids)
             ).delete(synchronize_session=False)
 
-            # Delete the observables (cascade will handle links)
+            # Delete the observables (cascade will handle remaining links)
             for obs in candidates:
                 summary["deleted_ids"].append(obs.id)
                 self.session.delete(obs)

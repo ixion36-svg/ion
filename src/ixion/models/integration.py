@@ -61,6 +61,13 @@ class WebhookStatus(str, Enum):
     HANDLER_ERROR = "handler_error"
 
 
+class IntegrationEventType(str, Enum):
+    """Types of integration events."""
+    WEBHOOK = "webhook"           # Incoming webhook event
+    ACTIVITY = "activity"         # General integration activity log
+    HEALTH_CHECK = "health_check" # Health check result
+
+
 def generate_webhook_token() -> str:
     """Generate a secure random webhook token."""
     return secrets.token_urlsafe(32)
@@ -95,8 +102,11 @@ class Webhook(Base, TimestampMixin):
 
     # Relationships
     created_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by_id])
-    logs: Mapped[List["WebhookLog"]] = relationship(
-        "WebhookLog", back_populates="webhook", cascade="all, delete-orphan"
+    logs: Mapped[List["IntegrationEvent"]] = relationship(
+        "IntegrationEvent",
+        back_populates="webhook",
+        foreign_keys="IntegrationEvent.webhook_id",
+        cascade="all, delete-orphan",
     )
 
     def to_dict(self, include_token: bool = False) -> dict:
@@ -120,131 +130,145 @@ class Webhook(Base, TimestampMixin):
         return data
 
 
-class WebhookLog(Base):
-    """Log entry for webhook events received."""
+class IntegrationEvent(Base):
+    """Unified event log for all integration activities.
 
-    __tablename__ = "webhook_logs"
+    Consolidates webhook logs, integration activity logs, and health checks
+    into a single table with an event_type discriminator.
+    """
+
+    __tablename__ = "integration_events"
     __table_args__ = (
-        Index("ix_webhook_logs_webhook_id", "webhook_id"),
-        Index("ix_webhook_logs_created_at", "created_at"),
-        Index("ix_webhook_logs_status", "status"),
+        Index("ix_integration_events_type", "event_type"),
+        Index("ix_integration_events_integration_type", "integration_type"),
+        Index("ix_integration_events_created_at", "created_at"),
+        Index("ix_integration_events_webhook_id", "webhook_id"),
+        Index("ix_integration_events_level", "level"),
+        Index("ix_integration_events_status", "status"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    webhook_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("webhooks.id", ondelete="CASCADE"), nullable=False
+
+    # Event classification
+    event_type: Mapped[str] = mapped_column(
+        SQLEnum(IntegrationEventType), nullable=False
     )
-    event_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    integration_type: Mapped[str] = mapped_column(
+        SQLEnum(IntegrationType), nullable=False
+    )
+
+    # Common fields
+    action: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    response_time_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Activity log specific
+    level: Mapped[Optional[str]] = mapped_column(
+        SQLEnum(LogLevel), nullable=True
+    )
+
+    # Webhook specific
+    webhook_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("webhooks.id", ondelete="SET NULL"), nullable=True
+    )
+    webhook_event_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     headers: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     source_ip: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
-    status: Mapped[str] = mapped_column(
-        SQLEnum(WebhookStatus), default=WebhookStatus.SUCCESS, nullable=False
+    status: Mapped[Optional[str]] = mapped_column(
+        SQLEnum(WebhookStatus), nullable=True
     )
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    processing_time_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Health check specific - reuses status but with IntegrationStatus
+    health_status: Mapped[Optional[str]] = mapped_column(
+        SQLEnum(IntegrationStatus), nullable=True
+    )
+
+    # User tracking
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+
+    # Timestamp
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), nullable=False
     )
 
     # Relationships
-    webhook: Mapped["Webhook"] = relationship("Webhook", back_populates="logs")
-
-    def to_dict(self) -> dict:
-        """Convert to dictionary for API response."""
-        return {
-            "id": self.id,
-            "webhook_id": self.webhook_id,
-            "event_type": self.event_type,
-            "payload": self.payload,
-            "headers": self.headers,
-            "source_ip": self.source_ip,
-            "status": self.status.value if isinstance(self.status, Enum) else self.status,
-            "error_message": self.error_message,
-            "processing_time_ms": self.processing_time_ms,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-        }
-
-
-class IntegrationLog(Base):
-    """Log entry for integration activities."""
-
-    __tablename__ = "integration_logs"
-    __table_args__ = (
-        Index("ix_integration_logs_integration_type", "integration_type"),
-        Index("ix_integration_logs_level", "level"),
-        Index("ix_integration_logs_timestamp", "timestamp"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    integration_type: Mapped[str] = mapped_column(
-        SQLEnum(IntegrationType), nullable=False
-    )
-    level: Mapped[str] = mapped_column(
-        SQLEnum(LogLevel), default=LogLevel.INFO, nullable=False
-    )
-    action: Mapped[str] = mapped_column(String(100), nullable=False)
-    message: Mapped[str] = mapped_column(Text, nullable=False)
-    details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    user_id: Mapped[Optional[int]] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )
-    timestamp: Mapped[datetime] = mapped_column(
-        DateTime, default=func.now(), nullable=False
-    )
-
-    # Relationships
+    webhook: Mapped[Optional["Webhook"]] = relationship("Webhook", back_populates="logs")
     user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[user_id])
 
-    def to_dict(self) -> dict:
-        """Convert to dictionary for API response."""
-        return {
-            "id": self.id,
-            "integration_type": self.integration_type.value if isinstance(self.integration_type, Enum) else self.integration_type,
-            "level": self.level.value if isinstance(self.level, Enum) else self.level,
-            "action": self.action,
-            "message": self.message,
-            "details": self.details,
-            "user_id": self.user_id,
-            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
-        }
+    # Backward compatibility properties
+    @property
+    def timestamp(self) -> datetime:
+        """Alias for created_at (backward compatibility with IntegrationLog)."""
+        return self.created_at
 
+    @property
+    def checked_at(self) -> datetime:
+        """Alias for created_at (backward compatibility with IntegrationHealthCheck)."""
+        return self.created_at
 
-class IntegrationHealthCheck(Base, TimestampMixin):
-    """Health check record for an integration."""
+    @property
+    def check_metadata(self) -> Optional[dict]:
+        """Alias for details (backward compatibility with IntegrationHealthCheck)."""
+        return self.details
 
-    __tablename__ = "integration_health_checks"
-    __table_args__ = (
-        Index("ix_integration_health_checks_type", "integration_type"),
-        Index("ix_integration_health_checks_checked_at", "checked_at"),
-    )
+    @property
+    def processing_time_ms(self) -> Optional[float]:
+        """Alias for response_time_ms (backward compatibility with WebhookLog)."""
+        return self.response_time_ms
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    integration_type: Mapped[str] = mapped_column(
-        SQLEnum(IntegrationType), nullable=False
-    )
-    status: Mapped[str] = mapped_column(
-        SQLEnum(IntegrationStatus), default=IntegrationStatus.HEALTHY, nullable=False
-    )
-    response_time_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    check_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    checked_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.now(), nullable=False
-    )
+    @property
+    def event_type_str(self) -> str:
+        """Get webhook_event_type for backward compatibility."""
+        return self.webhook_event_type or ""
 
     def to_dict(self) -> dict:
         """Convert to dictionary for API response."""
-        return {
+        base = {
             "id": self.id,
+            "event_type": self.event_type.value if isinstance(self.event_type, Enum) else self.event_type,
             "integration_type": self.integration_type.value if isinstance(self.integration_type, Enum) else self.integration_type,
-            "status": self.status.value if isinstance(self.status, Enum) else self.status,
-            "response_time_ms": self.response_time_ms,
-            "error_message": self.error_message,
-            "metadata": self.check_metadata,
-            "checked_at": self.checked_at.isoformat() if self.checked_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+        if self.event_type == IntegrationEventType.WEBHOOK:
+            base.update({
+                "webhook_id": self.webhook_id,
+                "webhook_event_type": self.webhook_event_type,
+                "payload": self.payload,
+                "headers": self.headers,
+                "source_ip": self.source_ip,
+                "status": self.status.value if isinstance(self.status, Enum) else self.status,
+                "error_message": self.error_message,
+                "response_time_ms": self.response_time_ms,
+            })
+        elif self.event_type == IntegrationEventType.ACTIVITY:
+            base.update({
+                "level": self.level.value if isinstance(self.level, Enum) else self.level,
+                "action": self.action,
+                "message": self.message,
+                "details": self.details,
+                "user_id": self.user_id,
+            })
+        elif self.event_type == IntegrationEventType.HEALTH_CHECK:
+            base.update({
+                "status": self.health_status.value if isinstance(self.health_status, Enum) else self.health_status,
+                "response_time_ms": self.response_time_ms,
+                "error_message": self.error_message,
+                "metadata": self.details,
+            })
+
+        return base
+
+
+# Backward compatibility aliases
+WebhookLog = IntegrationEvent
+IntegrationLog = IntegrationEvent
+IntegrationHealthCheck = IntegrationEvent
 
 
 # Type hint for User relationship (avoid circular import)

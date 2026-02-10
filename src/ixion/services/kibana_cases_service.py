@@ -311,43 +311,46 @@ class KibanaCasesService:
     def get_case_alerts(self, case_id: str) -> List[Dict[str, Any]]:
         """Get all alerts attached to a case.
 
-        Returns list of alert info with IDs and indices.
+        Returns a list of alert references with 'id' and 'index' fields.
         """
         if not self.enabled:
             return []
 
         try:
-            # Get the full case - alerts are included inline in comments array
-            case = self.get_case(case_id)
-            if not case:
+            # Alerts are stored as comments with type "alert"
+            path = self._get_api_path(f"/api/cases/{case_id}/comments/_find")
+            response = self.client.get(path, params={"perPage": 1000})
+
+            if response.status_code == 200:
+                data = response.json()
+                comments = data.get("comments", [])
+                alerts = []
+
+                for comment in comments:
+                    if comment.get("type") == "alert":
+                        # Alert comments contain alertId (string or list) and index
+                        alert_ids = comment.get("alertId", [])
+                        index = comment.get("index", ".alerts-security.alerts-default")
+
+                        # alertId can be a single string or a list
+                        if isinstance(alert_ids, str):
+                            alert_ids = [alert_ids]
+
+                        for alert_id in alert_ids:
+                            alerts.append({
+                                "id": alert_id,
+                                "index": index,
+                            })
+
+                return alerts
+            else:
+                # Log detailed error for debugging
+                try:
+                    error_body = response.text
+                except Exception:
+                    error_body = "Unable to read response body"
+                logger.error(f"Failed to get case alerts: {response.status_code} - {error_body}")
                 return []
-
-            comments = case.get("comments", [])
-
-            alerts = []
-            for comment in comments:
-                if comment.get("type") == "alert":
-                    # Each alert comment can contain multiple alert IDs
-                    alert_ids = comment.get("alertId", [])
-                    if isinstance(alert_ids, str):
-                        alert_ids = [alert_ids]
-
-                    # Index can be string or list
-                    index = comment.get("index", ".alerts-security.alerts-default")
-                    if isinstance(index, list):
-                        index = index[0] if index else ".alerts-security.alerts-default"
-
-                    rule = comment.get("rule", {})
-
-                    for alert_id in alert_ids:
-                        alerts.append({
-                            "id": alert_id,
-                            "index": index,
-                            "rule_id": rule.get("id"),
-                            "rule_name": rule.get("name"),
-                        })
-
-            return alerts
         except Exception as e:
             logger.error(f"Error getting Kibana case alerts: {e}")
             return []

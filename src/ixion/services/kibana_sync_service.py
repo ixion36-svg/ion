@@ -3,13 +3,13 @@
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, List, Any
 
 from sqlalchemy.orm import Session
 
 from ixion.services.kibana_cases_service import get_kibana_cases_service
 from ixion.services.elasticsearch_service import ElasticsearchService
-from ixion.models.alert_triage import AlertCase, CaseNote
+from ixion.models.alert_triage import AlertCase, Note, NoteEntityType
 from ixion.models.user import User
 from ixion.storage.database import get_session_factory, get_engine
 
@@ -73,8 +73,9 @@ class KibanaSyncService:
                     continue
 
                 # Create new note
-                note = CaseNote(
-                    case_id=case.id,
+                note = Note(
+                    entity_type=NoteEntityType.CASE,
+                    entity_id=str(case.id),
                     user_id=system_user.id if system_user else 1,
                     content=formatted_content,
                 )
@@ -171,6 +172,115 @@ class KibanaSyncService:
         except Exception as e:
             logger.error(f"Error syncing status for case {case.case_number}: {e}")
             return False
+
+    async def sync_case_status_to_kibana(self, session: Session, case: AlertCase) -> bool:
+        """Sync case status from IXION to Kibana.
+
+        Returns True if Kibana was updated.
+        """
+        if not case.kibana_case_id or not self.kibana_service.enabled:
+            return False
+
+        try:
+            # Get current Kibana case to check status and get version
+            kibana_case = self.kibana_service.get_case(case.kibana_case_id)
+            if not kibana_case:
+                return False
+
+            kibana_status = kibana_case.get("status")
+            kibana_version = kibana_case.get("version")
+
+            # Map IXION status to Kibana status
+            status_map = {
+                "open": "open",
+                "in_progress": "in-progress",
+                "resolved": "closed",
+                "closed": "closed",
+            }
+
+            ixion_status = case.status.value if hasattr(case.status, "value") else case.status
+            target_kibana_status = status_map.get(ixion_status)
+
+            if not target_kibana_status:
+                return False
+
+            # Only update if different
+            if kibana_status != target_kibana_status:
+                result = self.kibana_service.update_case(
+                    case_id=case.kibana_case_id,
+                    version=kibana_version,
+                    status=target_kibana_status,
+                )
+                if result:
+                    case.kibana_case_version = result.get("version")
+                    session.commit()
+                    logger.info(f"Synced status to Kibana for case {case.case_number}: {target_kibana_status}")
+                    return True
+
+            return False
+
+        except Exception as e:
+            logger.error(f"Error syncing status to Kibana for case {case.case_number}: {e}")
+            return False
+
+    async def sync_all_case_statuses(self, session: Session) -> dict:
+        """Bidirectional sync of case statuses between IXION and Kibana.
+
+        Uses last-update-wins strategy based on updated_at timestamps.
+        Returns dict with sync statistics.
+        """
+        if not self.kibana_service.enabled:
+            return {"from_kibana": 0, "to_kibana": 0, "error": "Kibana not enabled"}
+
+        from_kibana = 0
+        to_kibana = 0
+
+        try:
+            # Get all cases with Kibana IDs
+            cases = session.query(AlertCase).filter(
+                AlertCase.kibana_case_id.isnot(None)
+            ).all()
+
+            for case in cases:
+                try:
+                    kibana_case = self.kibana_service.get_case(case.kibana_case_id)
+                    if not kibana_case:
+                        continue
+
+                    # Parse timestamps
+                    kibana_updated = kibana_case.get("updated_at") or kibana_case.get("created_at")
+                    ixion_updated = case.updated_at or case.created_at
+
+                    # Convert Kibana timestamp to datetime for comparison
+                    if kibana_updated:
+                        from datetime import datetime
+                        kibana_dt = datetime.fromisoformat(kibana_updated.replace("Z", "+00:00"))
+                        # Make ixion_updated timezone-aware if needed
+                        if ixion_updated.tzinfo is None:
+                            from datetime import timezone
+                            ixion_updated = ixion_updated.replace(tzinfo=timezone.utc)
+
+                        # Last update wins
+                        if kibana_dt > ixion_updated:
+                            if await self.sync_case_status_from_kibana(session, case):
+                                from_kibana += 1
+                        else:
+                            if await self.sync_case_status_to_kibana(session, case):
+                                to_kibana += 1
+                    else:
+                        # No Kibana timestamp, sync from ixion
+                        if await self.sync_case_status_to_kibana(session, case):
+                            to_kibana += 1
+
+                except Exception as e:
+                    logger.warning(f"Error syncing status for case {case.case_number}: {e}")
+                    continue
+
+            return {"from_kibana": from_kibana, "to_kibana": to_kibana}
+
+        except Exception as e:
+            logger.error(f"Error in bidirectional status sync: {e}")
+            return {"from_kibana": from_kibana, "to_kibana": to_kibana, "error": str(e)}
 
     async def import_cases_from_kibana(self, session: Session) -> dict:
         """Import cases created in Kibana that don't exist in IXION.
@@ -328,8 +438,9 @@ class KibanaSyncService:
                         comment_text = comment.get("comment", "")
                         created_by = comment.get("created_by", {}).get("username", "unknown")
 
-                        note = CaseNote(
-                            case_id=new_case.id,
+                        note = Note(
+                            entity_type=NoteEntityType.CASE,
+                            entity_id=str(new_case.id),
                             user_id=admin_user.id,
                             content=f"[From Kibana - {created_by}] {comment_text}",
                         )
@@ -511,6 +622,26 @@ class KibanaSyncService:
 
         while self._running:
             try:
+                engine = get_engine()
+                factory = get_session_factory(engine)
+                session = factory()
+                try:
+                    # Import new cases created in Kibana
+                    import_result = await self.import_cases_from_kibana(session)
+                    if import_result.get("imported", 0) > 0:
+                        logger.info(f"Kibana sync: {import_result['imported']} cases imported from Kibana")
+
+                    # Bidirectional status sync (last-update-wins)
+                    status_result = await self.sync_all_case_statuses(session)
+                    if status_result.get("from_kibana", 0) > 0 or status_result.get("to_kibana", 0) > 0:
+                        logger.info(
+                            f"Kibana sync: status synced - {status_result['from_kibana']} from Kibana, "
+                            f"{status_result['to_kibana']} to Kibana"
+                        )
+                finally:
+                    session.close()
+
+                # Sync comments for existing linked cases
                 result = await self.sync_all_cases()
                 if result.get("synced", 0) > 0:
                     logger.info(f"Kibana sync: {result['synced']} comments synced from {result['cases']} cases")

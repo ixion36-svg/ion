@@ -7,8 +7,10 @@ A Security Operations Center (SOC) platform with AI-powered analysis, alert tria
 ## Features
 
 - **AI Assistant**: Local LLM integration via Ollama for security analysis, code generation, and threat investigation
-- **File Analysis**: Upload files for AI review with edit and download capabilities
+- **AI-Powered Document Analysis**: Entity extraction, spell checking, and rewrite suggestions powered by Ollama
 - **Alert Investigation**: Elasticsearch-integrated SOC alert triage with case management and analytics
+- **Investigation Playbooks**: Step-based investigation workflows with trigger conditions for alert triage
+- **Saved Searches**: Save, share, and re-run Elasticsearch queries from Discover page
 - **Observable Tracking**: Centralized observable management with cross-case correlation and enrichment
 - **OpenCTI Integration**: IOC enrichment against OpenCTI threat intelligence
 - **Template Management**: Document templates with version control and Jinja2 rendering
@@ -137,15 +139,15 @@ IXION automatically detects SOC-relevant entities in documents:
 | **Metadata** | ISO timestamps, severity levels (CRITICAL, HIGH, etc.) |
 | **Windows** | Event IDs, user accounts |
 
-### Spell Check
+### AI-Powered Spell Check
 
-- Intelligent spell checking that ignores technical terms
-- Automatically skips: IPs, CVEs, hashes, URLs, acronyms
+- Intelligent spell checking powered by local AI (Ollama)
+- Context-aware: ignores technical terms, IPs, CVEs, hashes, URLs, acronyms
 - Multiple suggestions with one-click correction
 
-### Rewrite Suggestions
+### AI Rewrite Suggestions
 
-Four style modes for document improvement:
+Four style modes for document improvement (powered by Ollama):
 - **Professional**: Removes filler words, stronger language
 - **Concise**: Simplifies verbose phrases
 - **Formal**: Expands contractions for formal documents
@@ -272,15 +274,42 @@ See [DEPLOYMENT_GUIDE.md](deploy/DEPLOYMENT_GUIDE.md) for detailed instructions 
 
 ## API Endpoints
 
-### NLP & Extraction
+### AI & Extraction
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/extract/nlp-status` | GET | Check NLP/SOC pattern availability |
+| `/api/extract/nlp-status` | GET | Check AI/SOC pattern availability |
 | `/api/extract/analyze` | POST | Analyze document for patterns |
 | `/api/extract/generate` | POST | Generate template from document |
-| `/api/extract/spell-check` | POST | Run spell check on text |
-| `/api/extract/rewrite-suggestions` | POST | Get writing improvement suggestions |
+| `/api/extract/spell-check` | POST | AI-powered spell check |
+| `/api/extract/rewrite-suggestions` | POST | AI-powered writing improvement suggestions |
+| `/api/extract/apply-rewrites` | POST | Apply AI rewrite to text |
+
+### Saved Searches
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/saved-searches` | GET | List user's + shared searches |
+| `/api/saved-searches` | POST | Create new saved search |
+| `/api/saved-searches/{id}` | GET | Get search by ID |
+| `/api/saved-searches/{id}` | PUT | Update saved search (owner only) |
+| `/api/saved-searches/{id}` | DELETE | Delete saved search (owner only) |
+| `/api/saved-searches/{id}/execute` | POST | Run search and return results |
+| `/api/saved-searches/{id}/favorite` | POST | Toggle favorite status |
+
+### Investigation Playbooks
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/playbooks` | GET | List all playbooks |
+| `/api/playbooks` | POST | Create playbook with steps |
+| `/api/playbooks/{id}` | GET | Get playbook with steps |
+| `/api/playbooks/{id}` | PUT | Update playbook |
+| `/api/playbooks/{id}` | DELETE | Delete playbook |
+| `/api/elasticsearch/alerts/{id}/recommended-playbooks` | GET | Get matching playbooks for alert |
+| `/api/elasticsearch/alerts/{id}/playbook/{pb_id}/start` | POST | Start playbook execution |
+| `/api/playbook-executions/{id}` | GET | Get execution status |
+| `/api/playbook-executions/{id}/steps/{step_id}` | PUT | Mark step complete/skipped |
 
 ### Collections (Folders)
 
@@ -456,6 +485,61 @@ Geo data is extracted from standard ECS fields populated by Elasticsearch's GeoI
 | `/api/elasticsearch/alerts/cases/{id}` | PATCH | Update case (status, severity, title, description) |
 | `/api/elasticsearch/alerts/cases/{id}/notes` | POST | Add investigation note to a case |
 
+## Saved Searches
+
+Save, share, and re-run Elasticsearch queries from the Discover page.
+
+### Features
+
+- **Save Current Search**: Save index pattern, query, time range, and sort settings
+- **Share with Team**: Optionally share saved searches with other analysts
+- **Favorites**: Mark frequently-used searches for quick access
+- **Execution Tracking**: Track how often searches are run and when they were last used
+- **One-Click Execute**: Run saved searches directly from the dropdown
+
+### Usage
+
+1. Navigate to the **Discover** page
+2. Configure your search (index pattern, query, time range)
+3. Click **Save Search** to save the current configuration
+4. Access saved searches from the **Saved Searches** dropdown
+5. Click a search to load its parameters, or click **Run** to execute immediately
+
+## Investigation Playbooks
+
+Step-based investigation workflows that guide analysts through alert triage.
+
+### Features
+
+- **Trigger Conditions**: Automatically recommend playbooks based on:
+  - Rule name patterns (regex matching)
+  - Alert severity levels
+  - MITRE ATT&CK techniques and tactics
+- **Step Types**:
+  - `manual_checklist`: Checklist items for analyst verification
+  - `auto_enrich_observables`: Automatic IOC enrichment via OpenCTI
+  - `auto_update_status`: Automatic triage status updates
+  - `auto_create_case`: Automatic case creation
+- **Execution Tracking**: Track playbook progress per alert
+- **Required Steps**: Mark critical steps that must be completed
+
+### Usage
+
+1. Navigate to **Playbooks** (Admin menu) to create playbooks
+2. Define trigger conditions (which alerts should recommend this playbook)
+3. Add steps with titles, descriptions, and types
+4. When investigating an alert, recommended playbooks appear in the triage bar
+5. Start a playbook and mark steps as complete during investigation
+
+### Playbook Management
+
+| Action | Description |
+|--------|-------------|
+| Create | Define name, description, trigger conditions, and steps |
+| Edit | Modify playbook configuration and steps |
+| Activate/Deactivate | Toggle whether playbook is recommended for alerts |
+| Priority | Higher priority playbooks are checked first for matching |
+
 ## SOC Tools
 
 The Tools page (`/tools`) provides a suite of client-side document processing utilities for security analysts. All text processing happens in the browser—no sensitive data is sent to the server (except for IOC Lookup which queries OpenCTI).
@@ -514,8 +598,7 @@ pytest tests/ --cov=ixion --cov-report=term-missing
 Core:
 - Python 3.11+
 - FastAPI, SQLAlchemy, Jinja2
-- NLTK (NLP processing)
-- pyspellchecker (spell checking)
+- Ollama (AI-powered analysis via local LLM)
 
 See [pyproject.toml](pyproject.toml) for full dependency list.
 

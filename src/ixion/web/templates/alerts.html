@@ -1717,6 +1717,105 @@ kbd {
 }
 
 /* ============================================= */
+/* Playbooks Section                             */
+/* ============================================= */
+.playbooks-section {
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+}
+.playbooks-section label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.375rem;
+}
+.playbook-recommendations {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.playbook-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    font-size: 0.8125rem;
+}
+.playbook-item-info {
+    flex: 1;
+}
+.playbook-item-name {
+    font-weight: 600;
+}
+.playbook-item-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.playbook-execution {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--primary);
+    border-radius: 4px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.playbook-execution-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.playbook-execution-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+.playbook-execution-status {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+}
+.playbook-execution-status.in_progress {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+}
+.playbook-execution-status.completed {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+.playbook-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+.playbook-step {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.5rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    font-size: 0.8125rem;
+}
+.playbook-step-checkbox {
+    cursor: pointer;
+}
+.playbook-step-title {
+    flex: 1;
+}
+.playbook-step.completed .playbook-step-title {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+.playbook-step-required {
+    font-size: 0.625rem;
+    color: #f44336;
+    text-transform: uppercase;
+}
+
+/* ============================================= */
 /* Comments tab                                  */
 /* ============================================= */
 .comments-list {
@@ -2907,7 +3006,16 @@ function renderTriageBar(alertId, triage) {
             <div id="enrich-results"></div>
         </div>
         ${renderMitreSection(alertId, allMitreTechniques)}
+        <div class="playbooks-section" id="playbooks-section">
+            <label>Investigation Playbooks</label>
+            <div id="playbooks-content">
+                <span style="color:var(--text-muted);font-size:0.8125rem;">Loading playbooks...</span>
+            </div>
+        </div>
     `;
+
+    // Load playbook recommendations after rendering
+    setTimeout(() => loadPlaybooksForAlert(alertId), 100);
 }
 
 function renderMitreSection(alertId, techniques) {
@@ -3124,6 +3232,231 @@ function filterByMitreTechnique(techId) {
         `Filtering by MITRE technique: ${techId}`;
     banner.style.display = 'flex';
     applyFilters();
+}
+
+// =========================================================================
+// Playbooks
+// =========================================================================
+let playbookCache = {};  // alertId -> { recommendations: [], activeExecution: null }
+
+async function loadPlaybooksForAlert(alertId) {
+    const container = document.getElementById('playbooks-content');
+    if (!container) return;
+
+    try {
+        // Load recommended playbooks and existing executions in parallel
+        const [recommendedRes, executionsRes] = await Promise.all([
+            fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/recommended-playbooks`),
+            fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/playbook-executions`)
+        ]);
+
+        const recommended = recommendedRes.ok ? await recommendedRes.json() : { playbooks: [] };
+        const executions = executionsRes.ok ? await executionsRes.json() : { executions: [] };
+
+        // Find active execution
+        const activeExecution = executions.executions.find(e => e.status === 'in_progress');
+
+        playbookCache[alertId] = {
+            recommendations: recommended.playbooks || [],
+            activeExecution: activeExecution || null,
+            allExecutions: executions.executions || []
+        };
+
+        renderPlaybooksSection(alertId);
+    } catch (error) {
+        console.error('Failed to load playbooks:', error);
+        container.innerHTML = '<span style="color:var(--text-muted);font-size:0.8125rem;">Failed to load playbooks</span>';
+    }
+}
+
+function renderPlaybooksSection(alertId) {
+    const container = document.getElementById('playbooks-content');
+    if (!container) return;
+
+    const cached = playbookCache[alertId];
+    if (!cached) {
+        container.innerHTML = '<span style="color:var(--text-muted);font-size:0.8125rem;">No playbooks available</span>';
+        return;
+    }
+
+    let html = '';
+
+    // Show active execution if any
+    if (cached.activeExecution) {
+        html += renderActiveExecution(alertId, cached.activeExecution);
+    }
+
+    // Show recommendations (excluding any with active execution)
+    const activePlaybookId = cached.activeExecution ? cached.activeExecution.playbook_id : null;
+    const availablePlaybooks = cached.recommendations.filter(p => p.id !== activePlaybookId);
+
+    if (availablePlaybooks.length > 0) {
+        html += '<div class="playbook-recommendations">';
+        html += availablePlaybooks.slice(0, 3).map(p => `
+            <div class="playbook-item">
+                <div class="playbook-item-info">
+                    <div class="playbook-item-name">${escapeHtml(p.name)}</div>
+                    <div class="playbook-item-meta">${p.step_count} steps | Priority: ${p.priority}</div>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="startPlaybook('${escapeHtml(alertId)}', ${p.id})">Start</button>
+            </div>
+        `).join('');
+        html += '</div>';
+    } else if (!cached.activeExecution) {
+        html += '<span style="color:var(--text-muted);font-size:0.8125rem;">No matching playbooks for this alert</span>';
+    }
+
+    // Show completed executions count
+    const completedCount = cached.allExecutions.filter(e => e.status === 'completed').length;
+    if (completedCount > 0) {
+        html += `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">${completedCount} playbook(s) completed previously</div>`;
+    }
+
+    container.innerHTML = html;
+}
+
+function renderActiveExecution(alertId, execution) {
+    const playbook = execution.playbook;
+    if (!playbook) return '';
+
+    const steps = playbook.steps || [];
+    const stepStatuses = execution.step_statuses || {};
+
+    const stepsHtml = steps.map(step => {
+        const status = stepStatuses[step.id] || {};
+        const isCompleted = status.status === 'completed';
+        const isSkipped = status.status === 'skipped';
+        const isDone = isCompleted || isSkipped;
+
+        return `
+            <div class="playbook-step ${isDone ? 'completed' : ''}">
+                <input type="checkbox" class="playbook-step-checkbox"
+                       ${isDone ? 'checked' : ''}
+                       onchange="updateStepStatus('${escapeHtml(alertId)}', ${execution.id}, ${step.id}, this.checked ? 'completed' : 'pending')">
+                <span class="playbook-step-title">${escapeHtml(step.title)}</span>
+                ${step.is_required ? '<span class="playbook-step-required">Required</span>' : ''}
+                ${isSkipped ? '<span style="font-size:0.625rem;color:var(--text-muted);">(skipped)</span>' : ''}
+            </div>
+        `;
+    }).join('');
+
+    const completedSteps = Object.values(stepStatuses).filter(s => s.status === 'completed' || s.status === 'skipped').length;
+    const progress = steps.length > 0 ? Math.round((completedSteps / steps.length) * 100) : 0;
+
+    return `
+        <div class="playbook-execution">
+            <div class="playbook-execution-header">
+                <span class="playbook-execution-title">${escapeHtml(playbook.name)}</span>
+                <span class="playbook-execution-status ${execution.status}">${execution.status.replace('_', ' ')}</span>
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem;">
+                Progress: ${progress}% (${completedSteps}/${steps.length} steps)
+            </div>
+            <div class="playbook-steps-list">
+                ${stepsHtml}
+            </div>
+            <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+                <button class="btn btn-sm" onclick="completePlaybookExecution('${escapeHtml(alertId)}', ${execution.id})">Complete</button>
+                <button class="btn btn-sm" onclick="skipRemainingSteps('${escapeHtml(alertId)}', ${execution.id})">Skip Remaining</button>
+            </div>
+        </div>
+    `;
+}
+
+async function startPlaybook(alertId, playbookId) {
+    try {
+        const response = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/playbook/${playbookId}/start`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to start playbook');
+        }
+
+        const result = await response.json();
+        showToast(result.already_started ? 'Playbook already in progress' : 'Playbook started', 'success');
+
+        // Refresh playbooks
+        loadPlaybooksForAlert(alertId);
+    } catch (error) {
+        console.error('Failed to start playbook:', error);
+        showToast('Failed to start playbook: ' + error.message, 'error');
+    }
+}
+
+async function updateStepStatus(alertId, executionId, stepId, status) {
+    try {
+        const response = await fetch(`/api/playbook-executions/${executionId}/steps/${stepId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: status })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to update step');
+        }
+
+        // Refresh playbooks
+        loadPlaybooksForAlert(alertId);
+    } catch (error) {
+        console.error('Failed to update step:', error);
+        showToast('Failed to update step: ' + error.message, 'error');
+    }
+}
+
+async function completePlaybookExecution(alertId, executionId) {
+    try {
+        const response = await fetch(`/api/playbook-executions/${executionId}/complete`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to complete playbook');
+        }
+
+        showToast('Playbook completed', 'success');
+        loadPlaybooksForAlert(alertId);
+    } catch (error) {
+        console.error('Failed to complete playbook:', error);
+        showToast('Failed to complete: ' + error.message, 'error');
+    }
+}
+
+async function skipRemainingSteps(alertId, executionId) {
+    const cached = playbookCache[alertId];
+    if (!cached || !cached.activeExecution) return;
+
+    const execution = cached.activeExecution;
+    const playbook = execution.playbook;
+    if (!playbook) return;
+
+    const steps = playbook.steps || [];
+    const stepStatuses = execution.step_statuses || {};
+
+    // Find steps that are not completed
+    const pendingSteps = steps.filter(step => {
+        const status = stepStatuses[step.id];
+        return !status || (status.status !== 'completed' && status.status !== 'skipped');
+    });
+
+    // Skip each pending step
+    for (const step of pendingSteps) {
+        try {
+            await fetch(`/api/playbook-executions/${executionId}/steps/${step.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'skipped' })
+            });
+        } catch (e) {
+            console.error('Failed to skip step:', e);
+        }
+    }
+
+    showToast('Remaining steps skipped', 'info');
+    loadPlaybooksForAlert(alertId);
 }
 
 // =========================================================================

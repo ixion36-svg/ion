@@ -7,13 +7,13 @@
     <h1>Extract Template from Document</h1>
 </div>
 
-<!-- NLP Status Banner -->
-<div id="nlp-status-banner" class="nlp-status-banner" style="display: none;">
-    <div class="nlp-status-content">
-        <span class="nlp-status-icon"></span>
-        <span class="nlp-status-text"></span>
+<!-- AI Status Banner -->
+<div id="ai-status-banner" class="ai-status-banner" style="display: none;">
+    <div class="ai-status-content">
+        <span class="ai-status-icon"></span>
+        <span class="ai-status-text"></span>
     </div>
-    <button class="nlp-status-close" onclick="this.parentElement.style.display='none'">&times;</button>
+    <button class="ai-status-close" onclick="this.parentElement.style.display='none'">&times;</button>
 </div>
 
 <div class="extract-layout">
@@ -30,9 +30,9 @@
 
         <div class="form-group">
             <label class="checkbox-label">
-                <input type="checkbox" id="use-nlp" checked>
-                <span>Use NLP Detection</span>
-                <small id="nlp-hint">(Enhanced entity recognition)</small>
+                <input type="checkbox" id="use-ai" checked>
+                <span>Use AI Detection</span>
+                <small id="ai-hint">(Enhanced entity recognition via Ollama)</small>
             </label>
         </div>
 
@@ -139,7 +139,7 @@
 
 {% block scripts %}
 <style>
-.nlp-status-banner {
+.ai-status-banner {
     padding: 0.75rem 1rem;
     border-radius: 4px;
     margin-bottom: 1rem;
@@ -147,23 +147,23 @@
     justify-content: space-between;
     align-items: center;
 }
-.nlp-status-banner.available {
+.ai-status-banner.available {
     background: #1a3a1a;
     border: 1px solid #2d5a2d;
 }
-.nlp-status-banner.unavailable {
+.ai-status-banner.unavailable {
     background: #3a2a1a;
     border: 1px solid #5a4a2d;
 }
-.nlp-status-content {
+.ai-status-content {
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
-.nlp-status-icon {
+.ai-status-icon {
     font-size: 1.2rem;
 }
-.nlp-status-close {
+.ai-status-close {
     background: none;
     border: none;
     color: inherit;
@@ -171,7 +171,7 @@
     font-size: 1.2rem;
     opacity: 0.7;
 }
-.nlp-status-close:hover {
+.ai-status-close:hover {
     opacity: 1;
 }
 .checkbox-label {
@@ -210,7 +210,7 @@
     border-radius: 3px;
     margin-left: 0.5rem;
 }
-.pattern-source.nlp {
+.pattern-source.ai {
     background: #2d4a5a;
     color: #7cb3c9;
 }
@@ -412,56 +412,56 @@
 {% raw %}
 let generatedContent = '';
 let currentDocText = '';
-let nlpAvailable = false;
+let aiAvailable = false;
 let spellcheckAvailable = false;
 
-// Check NLP status on page load
-async function checkNlpStatus() {
+// Check AI status on page load
+async function checkAiStatus() {
     try {
         const response = await fetch('/api/extract/nlp-status');
         const status = await response.json();
 
-        nlpAvailable = status.nlp_available;
+        aiAvailable = status.ai_available || status.nlp_available;
         spellcheckAvailable = status.spellcheck_available;
 
-        const banner = document.getElementById('nlp-status-banner');
-        const checkbox = document.getElementById('use-nlp');
-        const hint = document.getElementById('nlp-hint');
+        const banner = document.getElementById('ai-status-banner');
+        const checkbox = document.getElementById('use-ai');
+        const hint = document.getElementById('ai-hint');
 
         banner.style.display = 'flex';
 
-        if (status.nlp_available) {
-            banner.className = 'nlp-status-banner available';
-            banner.querySelector('.nlp-status-icon').textContent = '✓';
+        if (aiAvailable) {
+            banner.className = 'ai-status-banner available';
+            banner.querySelector('.ai-status-icon').textContent = '✓';
 
-            let statusText = 'NLP enabled: ' + status.model_name;
+            let statusText = 'AI enabled: ' + status.model_name;
             if (status.soc_pattern_count) {
                 statusText += ' + ' + status.soc_pattern_count + ' SOC patterns';
             }
             if (status.spellcheck_available) {
                 statusText += ' + Spell Check';
             }
-            banner.querySelector('.nlp-status-text').textContent = statusText;
+            banner.querySelector('.ai-status-text').textContent = statusText;
             hint.textContent = '(Detects names, IPs, CVEs, hashes, domains, and more)';
         } else {
-            banner.className = 'nlp-status-banner unavailable';
-            banner.querySelector('.nlp-status-icon').textContent = '⚠';
-            banner.querySelector('.nlp-status-text').textContent =
-                'NLP limited: SOC patterns only (' + status.soc_pattern_count + ' patterns)';
+            banner.className = 'ai-status-banner unavailable';
+            banner.querySelector('.ai-status-icon').textContent = '⚠';
+            banner.querySelector('.ai-status-text').textContent =
+                'AI unavailable: SOC patterns only (' + status.soc_pattern_count + ' patterns)';
             hint.textContent = '(SOC entities still detected via regex)';
         }
 
         // Update spell check status
         if (!spellcheckAvailable) {
             document.getElementById('run-spellcheck').disabled = true;
-            document.getElementById('spellcheck-status').textContent = 'Install pyspellchecker to enable';
+            document.getElementById('spellcheck-status').textContent = 'AI service required for spell check';
         }
     } catch (e) {
-        console.error('Failed to check NLP status:', e);
+        console.error('Failed to check AI status:', e);
     }
 }
 
-checkNlpStatus();
+checkAiStatus();
 
 // Tab switching
 document.querySelectorAll('.output-tab').forEach(tab => {
@@ -488,12 +488,12 @@ document.getElementById('analyze-btn').addEventListener('click', async () => {
     }
 
     const confidence = document.getElementById('confidence').value / 100;
-    const useNlp = document.getElementById('use-nlp').checked;
+    const useAi = document.getElementById('use-ai').checked;
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
 
     try {
-        const response = await fetch('/api/extract/analyze?confidence=' + confidence + '&use_nlp=' + useNlp, {
+        const response = await fetch('/api/extract/analyze?confidence=' + confidence + '&use_nlp=' + useAi, {
             method: 'POST',
             body: formData,
         });
@@ -665,12 +665,12 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
     }
 
     const confidence = document.getElementById('confidence').value / 100;
-    const useNlp = document.getElementById('use-nlp').checked;
+    const useAi = document.getElementById('use-ai').checked;
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
 
     try {
-        const response = await fetch('/api/extract/generate?confidence=' + confidence + '&use_nlp=' + useNlp, {
+        const response = await fetch('/api/extract/generate?confidence=' + confidence + '&use_nlp=' + useAi, {
             method: 'POST',
             body: formData,
         });
@@ -695,7 +695,7 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
 
         let msg = 'Template generated with ' + result.replacements_made + ' replacements';
         if (result.nlp_used) {
-            msg += ' (NLP enabled)';
+            msg += ' (AI enabled)';
         }
         showToast(msg, 'success');
     } catch (e) {
@@ -729,8 +729,8 @@ function showDetectionStats(stats) {
                     <span>${stats.by_source?.regex || 0}</span>
                 </div>
                 <div class="stat-item">
-                    <span class="label">NLP:</span>
-                    <span>${stats.by_source?.nlp || 0}</span>
+                    <span class="label">AI:</span>
+                    <span>${stats.by_source?.ai || stats.by_source?.nlp || 0}</span>
                 </div>
                 <div class="stat-item">
                     <span class="label">SOC:</span>
@@ -744,8 +744,8 @@ function showDetectionStats(stats) {
 }
 
 function formatPatternType(type) {
-    const nlpTypes = ['person_name', 'organization', 'location', 'date_nlp', 'time',
-                      'currency_nlp', 'percentage_nlp', 'number', 'ordinal', 'quantity',
+    const aiTypes = ['person_name', 'organization', 'location', 'date', 'time',
+                      'currency', 'percentage', 'number', 'ordinal', 'quantity',
                       'facility', 'product', 'event', 'work_of_art', 'law', 'language', 'group'];
     const socTypes = ['ipv4', 'ipv6', 'cve', 'mitre_attack', 'md5_hash', 'sha1_hash', 'sha256_hash',
                       'domain', 'url', 'email', 'mac_address', 'registry_key', 'severity',
@@ -756,8 +756,8 @@ function formatPatternType(type) {
     let sourceTag;
     if (socTypes.includes(type)) {
         sourceTag = '<span class="pattern-source soc">SOC</span>';
-    } else if (nlpTypes.includes(type)) {
-        sourceTag = '<span class="pattern-source nlp">NLP</span>';
+    } else if (aiTypes.includes(type)) {
+        sourceTag = '<span class="pattern-source ai">AI</span>';
     } else {
         sourceTag = '<span class="pattern-source regex">Regex</span>';
     }
