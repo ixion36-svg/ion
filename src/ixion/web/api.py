@@ -225,13 +225,20 @@ async def login(
     session.commit()
 
     # Set session cookie
+    # Auto-detect HTTPS from request or use configured value
     config = get_config()
+    is_https = (
+        request.url.scheme == "https" or
+        request.headers.get("X-Forwarded-Proto") == "https"
+    )
+    cookie_secure = config.cookie_secure or is_https
+
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=session_token,
         httponly=True,
         samesite="strict",
-        secure=config.cookie_secure,
+        secure=cookie_secure,
         max_age=24 * 60 * 60,  # 24 hours
     )
 
@@ -450,16 +457,29 @@ async def oidc_callback(
         session.commit()
 
         # Create a IXION session for the user
-        auth_service = AuthService(session)
         ip_address = get_client_ip(request)
         user_agent = request.headers.get("User-Agent")
 
-        # Create session token
+        # Create session token with session rotation
         from ixion.storage.auth_repository import SessionRepository
         import secrets
         from datetime import datetime, timedelta
 
         session_repo = SessionRepository(session)
+        audit_repo = AuditLogRepository(session)
+
+        # Session rotation: invalidate all existing sessions for this user
+        old_session_count = session_repo.delete_all_for_user(user.id)
+        if old_session_count > 0:
+            audit_repo.create(
+                user_id=user.id,
+                action="session_rotation",
+                resource_type="user",
+                resource_id=user.id,
+                details={"old_sessions_invalidated": old_session_count, "source": "oidc"},
+                ip_address=ip_address,
+            )
+
         session_token = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(hours=24)
 
@@ -472,7 +492,6 @@ async def oidc_callback(
         )
 
         # Log OIDC login to audit
-        audit_repo = AuditLogRepository(session)
         audit_repo.create(
             user_id=user.id,
             action="oidc_login",
@@ -487,14 +506,21 @@ async def oidc_callback(
         session.commit()
 
         # Create redirect response with session cookie
+        # Auto-detect HTTPS from request or use configured value
         config = get_config()
+        is_https = (
+            request.url.scheme == "https" or
+            request.headers.get("X-Forwarded-Proto") == "https"
+        )
+        cookie_secure = config.cookie_secure or is_https
+
         redirect_response = RedirectResponse(url="/", status_code=302)
         redirect_response.set_cookie(
             key=SESSION_COOKIE_NAME,
             value=session_token,
             httponly=True,
             samesite="strict",
-            secure=config.cookie_secure,
+            secure=cookie_secure,
             max_age=24 * 60 * 60,  # 24 hours
         )
         # Clear the state cookie on successful login

@@ -83,7 +83,20 @@ class AuthService:
             self._log_failed_login(username, ip_address, "Invalid password")
             return None, None, "Invalid username or password"
 
-        # Create session
+        # Session rotation: invalidate all existing sessions for this user
+        # This prevents session fixation attacks and ensures only one active session
+        old_session_count = self.session_repo.delete_all_for_user(user.id)
+        if old_session_count > 0:
+            self.audit_repo.create(
+                user_id=user.id,
+                action="session_rotation",
+                resource_type="user",
+                resource_id=user.id,
+                details={"old_sessions_invalidated": old_session_count},
+                ip_address=ip_address,
+            )
+
+        # Create new session
         session_token = self._generate_session_token()
         expires_at = datetime.utcnow() + timedelta(hours=self.session_lifetime_hours)
 

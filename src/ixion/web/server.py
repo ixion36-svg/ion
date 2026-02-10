@@ -70,6 +70,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Referrer policy
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
+        # HTTP Strict Transport Security (HSTS)
+        # Only set when request is HTTPS to avoid issues during development
+        if request.url.scheme == "https" or request.headers.get("X-Forwarded-Proto") == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
         # Content Security Policy (adjust as needed for your app)
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
@@ -78,6 +83,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "img-src 'self' data:; "
             "font-src 'self'; "
             "frame-ancestors 'none'"
+        )
+
+        # Permissions Policy (formerly Feature-Policy)
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), microphone=(), camera=(), payment=()"
         )
 
         return response
