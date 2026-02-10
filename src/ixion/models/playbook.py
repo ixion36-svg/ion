@@ -96,6 +96,15 @@ class Playbook(Base, TimestampMixin):
             result["steps"] = [step.to_dict() for step in self.steps]
         return result
 
+    def matches_pattern(self, pattern_id: str) -> bool:
+        """Check if this playbook is associated with the given pattern ID."""
+        conditions = self.trigger_conditions or {}
+        if conditions.get("pattern_id") == pattern_id:
+            return True
+        if pattern_id in conditions.get("pattern_ids", []):
+            return True
+        return False
+
     def matches_alert(
         self,
         rule_name: Optional[str] = None,

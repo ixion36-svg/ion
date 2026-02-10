@@ -5894,10 +5894,39 @@ async def get_recommended_playbooks(
     }
 
     result = []
+    seen_ids = set()
     for playbook in matching_playbooks:
         pb_dict = playbook.to_dict(include_steps=True)
         pb_dict["has_active_execution"] = playbook.id in active_playbook_ids
+        pb_dict["match_source"] = "alert"
         result.append(pb_dict)
+        seen_ids.add(playbook.id)
+
+    # Also include pattern-based recommendations for this alert's host/user
+    from ixion.services.pattern_detection_service import PatternDetectionService
+
+    try:
+        host = alert.host if hasattr(alert, "host") else None
+        user = alert.user if hasattr(alert, "user") else None
+        if host or user:
+            context_alerts = await service.get_alerts(hours=24, limit=200)
+            if context_alerts:
+                detector = PatternDetectionService()
+                patterns = detector.detect_patterns(context_alerts)
+                for p in patterns:
+                    if (p.group_by == "host" and p.group_key == host) or \
+                       (p.group_by == "user" and p.group_key == user):
+                        pb = repo.find_playbook_for_pattern(p.pattern_id)
+                        if pb and pb.id not in seen_ids:
+                            pb_dict = pb.to_dict(include_steps=True)
+                            pb_dict["has_active_execution"] = pb.id in active_playbook_ids
+                            pb_dict["match_source"] = "pattern"
+                            pb_dict["pattern_id"] = p.pattern_id
+                            pb_dict["pattern_name"] = p.pattern_name
+                            result.append(pb_dict)
+                            seen_ids.add(pb.id)
+    except Exception:
+        pass  # pattern enrichment is best-effort
 
     return {
         "playbooks": result,
@@ -6080,4 +6109,80 @@ async def fail_playbook_execution(
     return {
         "execution": execution.to_dict(include_playbook=True),
         "message": "Execution marked as failed",
+    }
+
+
+# ============================================================================
+# Multi-Alert Pattern Detection
+# ============================================================================
+
+@router.get("/alerts/host-patterns")
+async def get_host_patterns(
+    hours: int = 24,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Detect multi-alert attack patterns grouped by host/user.
+
+    Fetches alerts from Elasticsearch, runs pattern detection, matches to
+    playbooks, and auto-starts executions for auto_execute patterns.
+    """
+    from ixion.services.pattern_detection_service import PatternDetectionService
+
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        return {"patterns": [], "total": 0, "message": "Elasticsearch is not enabled"}
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        return {"patterns": [], "total": 0, "message": "Elasticsearch is not configured"}
+
+    try:
+        alerts = await service.get_alerts(hours=hours, limit=500)
+    except ElasticsearchError as e:
+        return {"patterns": [], "total": 0, "error": str(e)}
+
+    if not alerts:
+        return {"patterns": [], "total": 0}
+
+    detector = PatternDetectionService()
+    detected = detector.detect_patterns(alerts)
+
+    repo = PlaybookRepository(session)
+    results = []
+
+    for pattern in detected:
+        playbook = repo.find_playbook_for_pattern(pattern.pattern_id)
+
+        pattern_data = pattern.to_dict()
+        pattern_data["playbook"] = playbook.to_dict(include_steps=True) if playbook else None
+        pattern_data["execution"] = None
+        pattern_data["auto_started"] = False
+
+        if playbook and pattern.auto_execute:
+            # Auto-start: pick the first matched alert as the representative
+            representative_alert_id = pattern.matched_alerts[0].id if pattern.matched_alerts else None
+            if representative_alert_id:
+                existing = repo.get_active_execution_for_alert(
+                    representative_alert_id, playbook.id
+                )
+                if existing:
+                    pattern_data["execution"] = existing.to_dict(include_playbook=True)
+                else:
+                    execution = repo.start_execution(
+                        playbook=playbook,
+                        es_alert_id=representative_alert_id,
+                        executed_by_id=current_user.id,
+                    )
+                    pattern_data["execution"] = execution.to_dict(include_playbook=True)
+                    pattern_data["auto_started"] = True
+
+        results.append(pattern_data)
+
+    if any(r.get("auto_started") for r in results):
+        session.commit()
+
+    return {
+        "patterns": results,
+        "total": len(results),
     }
