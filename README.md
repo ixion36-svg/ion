@@ -23,6 +23,38 @@ A Security Operations Center (SOC) platform with AI-powered analysis, alert tria
 
 ## Deployment
 
+### Architecture
+
+IXION is designed to integrate with existing infrastructure:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Your Infrastructure                       │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │Elasticsearch│  │   Kibana    │  │  OpenCTI    │          │
+│  │  (alerts)   │  │  (cases)    │  │  (threat    │          │
+│  │             │  │             │  │   intel)    │          │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘          │
+│         │                │                │                  │
+│         └────────────────┼────────────────┘                  │
+│                          │                                   │
+│                    ┌─────▼─────┐                             │
+│                    │   IXION   │◄──── Docker Image           │
+│                    │  (+ Ollama)│     (ixion:latest)         │
+│                    └───────────┘                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**The IXION Docker image only contains:**
+- IXION web application
+- Ollama (local AI/LLM service)
+
+**External services (deployed separately):**
+- Elasticsearch - for alert data and log storage
+- Kibana - for case management sync
+- OpenCTI - for threat intelligence enrichment
+- GitLab - for issue tracking (optional)
+
 ### Option 1: Docker (Recommended)
 
 ```bash
@@ -32,10 +64,12 @@ cd ixion
 
 # Copy and configure environment
 cp .env.example .env
-# Edit .env with your settings (see Configuration below)
+# Edit .env with your integration settings (ES, OpenCTI, etc.)
 
-# Build and run
+# Build IXION image
 docker build -t ixion:latest .
+
+# Start IXION + Ollama
 docker-compose up -d
 
 # Pull an AI model (first time only)
@@ -43,6 +77,8 @@ docker exec -it ixion-ollama ollama pull qwen2.5:0.5b
 
 # Access at http://localhost:8000
 ```
+
+**Note:** The `docker-compose.yml` only starts IXION and Ollama. Connect to your existing Elasticsearch/OpenCTI via environment variables.
 
 ### Option 2: Local Development
 
@@ -80,18 +116,31 @@ Copy `.env.example` to `.env` and configure:
 # Required
 IXION_ADMIN_PASSWORD=your-secure-password
 
+# Security (Production)
+IXION_COOKIE_SECURE=true           # Enable for HTTPS deployments
+IXION_DEBUG_MODE=false             # Disable API docs in production (default)
+
 # AI Features (Ollama)
 IXION_OLLAMA_ENABLED=true
-IXION_OLLAMA_URL=http://localhost:11434    # or http://ollama:11434 in Docker
-IXION_OLLAMA_MODEL=qwen2.5:0.5b            # or qwen2.5-coder:7b for better results
+IXION_OLLAMA_URL=http://ollama:11434    # Docker service name
+IXION_OLLAMA_MODEL=qwen2.5:0.5b         # or qwen2.5-coder:7b for better results
 
-# Optional Integrations
-IXION_ELASTICSEARCH_ENABLED=false
-IXION_ELASTICSEARCH_URL=https://elasticsearch:9200
+# Elasticsearch (your existing cluster)
+IXION_ELASTICSEARCH_ENABLED=true
+IXION_ELASTICSEARCH_URL=https://your-es-cluster:9200
+IXION_ELASTICSEARCH_API_KEY=your-api-key
+# Or use username/password:
+# IXION_ELASTICSEARCH_USERNAME=elastic
+# IXION_ELASTICSEARCH_PASSWORD=your-password
 
-IXION_OPENCTI_ENABLED=false
-IXION_OPENCTI_URL=https://opencti.example.com
+# OpenCTI (your existing instance)
+IXION_OPENCTI_ENABLED=true
+IXION_OPENCTI_URL=https://your-opencti:8080
 IXION_OPENCTI_TOKEN=your-api-token
+
+# Kibana Cases Sync (optional)
+IXION_KIBANA_CASES_ENABLED=true
+IXION_KIBANA_URL=https://your-kibana:5601
 ```
 
 ---
@@ -254,19 +303,20 @@ John,john@example.com,Engineering
 Jane,jane@example.com,Marketing
 ```
 
-## Docker Deployment
+## Docker Details
 
-### Quick Start
+### What's Included
 
-```bash
-# Build image
-docker build -t docforge:latest .
+The `docker-compose.yml` deploys:
+- **ixion** - IXION web application (port 8000)
+- **ollama** - Local LLM service for AI features (internal only)
 
-# Run
-docker-compose up -d
+### Resource Requirements
 
-# Access at http://localhost:8000
-```
+| Service | CPU | Memory | Storage |
+|---------|-----|--------|---------|
+| IXION | 0.5-2 cores | 256MB-1GB | ~100MB |
+| Ollama | 1-4 cores | 2-8GB | ~5GB (per model) |
 
 ### Air-Gapped Deployment
 
@@ -359,13 +409,13 @@ IXION integrates with [OpenCTI](https://www.opencti.io/) to enrich alert observa
 
 ```bash
 # Environment variables
-DOCFORGE_OPENCTI_ENABLED=true
-DOCFORGE_OPENCTI_URL=https://opencti.example.com
-DOCFORGE_OPENCTI_TOKEN=your-api-token-uuid
-DOCFORGE_OPENCTI_VERIFY_SSL=true
+IXION_OPENCTI_ENABLED=true
+IXION_OPENCTI_URL=https://opencti.example.com
+IXION_OPENCTI_TOKEN=your-api-token-uuid
+IXION_OPENCTI_VERIFY_SSL=true
 ```
 
-Or in `.docforge/config.json`:
+Or in `.ixion/config.json`:
 ```json
 {
     "opencti_enabled": true,
@@ -393,17 +443,17 @@ IXION integrates with GitLab to manage issues directly from the UI.
 
 ### Configuration
 
-Configure GitLab via the web UI (GitLab page) or environment variables:
+Configure GitLab via the web UI (Settings → Integrations) or environment variables:
 
 ```bash
 # Environment variables
-DOCFORGE_GITLAB_ENABLED=true
-DOCFORGE_GITLAB_URL=https://gitlab.example.com
-DOCFORGE_GITLAB_TOKEN=glpat-xxxxxxxxxxxx
-DOCFORGE_GITLAB_PROJECT_ID=group/project
+IXION_GITLAB_ENABLED=true
+IXION_GITLAB_URL=https://gitlab.example.com
+IXION_GITLAB_TOKEN=glpat-xxxxxxxxxxxx
+IXION_GITLAB_PROJECT_ID=group/project
 ```
 
-Or in `.docforge/config.json`:
+Or in `.ixion/config.json`:
 ```json
 {
     "gitlab_enabled": true,
