@@ -298,6 +298,7 @@ async def get_current_user_info(
 
 
 @router.post("/auth/change-password")
+@limiter.limit("5/minute")  # Rate limit password change attempts
 async def change_password(
     password_request: ChangePasswordRequest,
     request: Request,
@@ -744,6 +745,7 @@ async def update_user_roles(
 
 
 @router.post("/users/{user_id}/reset-password", dependencies=[Depends(require_permission("user:update"))])
+@limiter.limit("10/minute")  # Rate limit password resets
 async def reset_user_password(
     user_id: int,
     password_reset: PasswordReset,
