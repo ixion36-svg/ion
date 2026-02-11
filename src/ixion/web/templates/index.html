@@ -36,6 +36,10 @@
             <div class="stat-value" id="open-cases-count">-</div>
             <div class="stat-label">Open Cases</div>
         </div>
+        <div class="stat-card stat-card-playbook analyst-visible" id="active-playbooks-card" style="display: none;">
+            <div class="stat-value" id="active-playbooks-count">-</div>
+            <div class="stat-label">Active Playbooks</div>
+        </div>
 
         <!-- Common stats -->
         <div class="stat-card">
@@ -114,6 +118,17 @@
                         <div class="action-icon">&#x2714;</div>
                         <div class="action-label">Tasks</div>
                     </a>
+                </div>
+            </section>
+
+            <!-- Active Playbooks -->
+            <section class="section playbooks-section" id="analyst-playbooks-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Active Playbooks</h2>
+                    <a href="/playbooks?tab=executions" class="btn btn-sm">View All</a>
+                </div>
+                <div id="analyst-playbooks-list" class="playbooks-list">
+                    <p class="loading">Loading...</p>
                 </div>
             </section>
 
@@ -802,6 +817,87 @@
     color: var(--text-muted);
     padding: 1rem;
 }
+
+.stat-card-playbook {
+    border-left: 4px solid #2196f3;
+}
+
+.stat-card-playbook .stat-value {
+    color: #2196f3;
+}
+
+.playbooks-section {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid #2196f3;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.playbooks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.playbook-exec-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--background);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.playbook-exec-item:hover {
+    background: var(--hover-bg, #f5f5f5);
+}
+
+.playbook-exec-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.playbook-exec-name {
+    font-weight: 500;
+    margin: 0;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.playbook-exec-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.playbook-exec-progress {
+    width: 60px;
+    height: 6px;
+    background: var(--border-color);
+    border-radius: 3px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.playbook-exec-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: #ffc107;
+}
+
+.playbook-exec-pct {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    min-width: 32px;
+    text-align: right;
+}
 </style>
 {% endblock %}
 
@@ -923,6 +1019,9 @@ async function setupAnalystDashboard(data) {
 
     // Load cases
     loadCases('analyst-cases-list');
+
+    // Active Playbooks
+    loadActivePlaybooks();
 
     // GitLab
     if (data.gitlab.enabled && data.gitlab.connected) {
@@ -1136,6 +1235,58 @@ function renderTemplates(containerId, templates) {
             </div>
         </div>
     `).join('');
+}
+
+async function loadActivePlaybooks() {
+    try {
+        // Load summary for stat card
+        const summaryResp = await api.get('/api/playbook-executions/summary');
+        const activeCount = summaryResp.in_progress + summaryResp.pending;
+        const card = document.getElementById('active-playbooks-card');
+        if (card) {
+            card.style.display = '';
+            document.getElementById('active-playbooks-count').textContent = activeCount;
+        }
+
+        // Load top 5 in-progress executions for the list
+        const execResp = await api.get('/api/playbook-executions?status=in_progress&limit=5');
+        const executions = execResp.executions || [];
+        const section = document.getElementById('analyst-playbooks-section');
+        const container = document.getElementById('analyst-playbooks-list');
+
+        if (executions.length === 0) {
+            if (activeCount === 0) {
+                // Don't show the section at all if no active playbooks
+                return;
+            }
+            section.style.display = 'block';
+            container.innerHTML = '<p class="empty-message">No in-progress executions</p>';
+            return;
+        }
+
+        section.style.display = 'block';
+        container.innerHTML = executions.map(e => {
+            const playbook = e.playbook || {};
+            return `
+                <div class="playbook-exec-item" onclick="window.location.href='/playbooks?execution=${e.id}'">
+                    <div class="playbook-exec-info">
+                        <p class="playbook-exec-name">${escapeHtml(playbook.name || 'Unknown')}</p>
+                        <div class="playbook-exec-meta">
+                            ${e.case_number ? escapeHtml(e.case_number) + ' &bull; ' : ''}
+                            ${e.executed_by_username || 'Unknown'} &bull; ${formatDate(e.started_at)}
+                        </div>
+                    </div>
+                    <div class="playbook-exec-progress">
+                        <div class="playbook-exec-progress-fill" style="width:${e.progress_pct}%;"></div>
+                    </div>
+                    <span class="playbook-exec-pct">${e.progress_pct}%</span>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        // Silently fail - playbooks section just won't appear
+        console.error('Failed to load active playbooks:', e);
+    }
 }
 
 async function loadCases(containerId) {

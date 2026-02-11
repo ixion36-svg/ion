@@ -66,6 +66,13 @@ class Config:
     kibana_space_id: str = "default"  # Kibana space ID
     kibana_case_owner: str = "securitySolution"  # Case owner app (securitySolution, observability, cases)
 
+    # DFIR-IRIS integration
+    dfir_iris_enabled: bool = False
+    dfir_iris_url: str = ""  # e.g., https://iris.example.com
+    dfir_iris_api_key: str = ""  # Bearer API key from IRIS user profile
+    dfir_iris_verify_ssl: bool = True
+    dfir_iris_default_customer: int = 1  # Default customer ID in IRIS
+
     # VirusTotal integration
     virustotal_enabled: bool = False
     virustotal_api_key: str = ""  # VirusTotal API key
@@ -135,6 +142,12 @@ class Config:
             kibana_password=data.get("kibana_password", ""),
             kibana_space_id=data.get("kibana_space_id", "default"),
             kibana_case_owner=data.get("kibana_case_owner", "securitySolution"),
+            # DFIR-IRIS integration
+            dfir_iris_enabled=data.get("dfir_iris_enabled", False),
+            dfir_iris_url=data.get("dfir_iris_url", ""),
+            dfir_iris_api_key=data.get("dfir_iris_api_key", ""),
+            dfir_iris_verify_ssl=data.get("dfir_iris_verify_ssl", True),
+            dfir_iris_default_customer=data.get("dfir_iris_default_customer", 1),
             # VirusTotal integration
             virustotal_enabled=data.get("virustotal_enabled", False),
             virustotal_api_key=data.get("virustotal_api_key", ""),
@@ -196,6 +209,12 @@ class Config:
                     "kibana_password": self.kibana_password,
                     "kibana_space_id": self.kibana_space_id,
                     "kibana_case_owner": self.kibana_case_owner,
+                    # DFIR-IRIS integration
+                    "dfir_iris_enabled": self.dfir_iris_enabled,
+                    "dfir_iris_url": self.dfir_iris_url,
+                    "dfir_iris_api_key": self.dfir_iris_api_key,
+                    "dfir_iris_verify_ssl": self.dfir_iris_verify_ssl,
+                    "dfir_iris_default_customer": self.dfir_iris_default_customer,
                     # VirusTotal integration
                     "virustotal_enabled": self.virustotal_enabled,
                     "virustotal_api_key": self.virustotal_api_key,
@@ -322,6 +341,18 @@ def get_config() -> Config:
         if os.environ.get("IXION_KIBANA_CASE_OWNER"):
             _config.kibana_case_owner = os.environ.get("IXION_KIBANA_CASE_OWNER", "securitySolution")
 
+        # DFIR-IRIS environment overrides
+        if os.environ.get("IXION_DFIR_IRIS_ENABLED"):
+            _config.dfir_iris_enabled = _get_env_bool("IXION_DFIR_IRIS_ENABLED")
+        if os.environ.get("IXION_DFIR_IRIS_URL"):
+            _config.dfir_iris_url = os.environ.get("IXION_DFIR_IRIS_URL", "")
+        if os.environ.get("IXION_DFIR_IRIS_API_KEY"):
+            _config.dfir_iris_api_key = os.environ.get("IXION_DFIR_IRIS_API_KEY", "")
+        if os.environ.get("IXION_DFIR_IRIS_VERIFY_SSL"):
+            _config.dfir_iris_verify_ssl = _get_env_bool("IXION_DFIR_IRIS_VERIFY_SSL", True)
+        if os.environ.get("IXION_DFIR_IRIS_DEFAULT_CUSTOMER"):
+            _config.dfir_iris_default_customer = int(os.environ.get("IXION_DFIR_IRIS_DEFAULT_CUSTOMER", "1"))
+
         # VirusTotal environment overrides
         if os.environ.get("IXION_VIRUSTOTAL_ENABLED"):
             _config.virustotal_enabled = _get_env_bool("IXION_VIRUSTOTAL_ENABLED", False)
@@ -425,4 +456,19 @@ def get_kibana_config() -> dict:
         "password": password,
         "space_id": config.kibana_space_id,
         "case_owner": config.kibana_case_owner,
+    }
+
+
+def get_dfir_iris_config() -> dict:
+    """Get DFIR-IRIS configuration from the global config.
+
+    Returns a dictionary with DFIR-IRIS configuration.
+    """
+    config = get_config()
+    return {
+        "enabled": config.dfir_iris_enabled,
+        "url": config.dfir_iris_url,
+        "api_key": config.dfir_iris_api_key,
+        "verify_ssl": config.dfir_iris_verify_ssl,
+        "default_customer": config.dfir_iris_default_customer,
     }

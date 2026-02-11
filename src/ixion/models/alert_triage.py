@@ -79,6 +79,9 @@ class AlertCase(Base, TimestampMixin):
     kibana_case_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     kibana_case_version: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
+    # DFIR-IRIS integration
+    dfir_iris_case_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
     # Relationships
     created_by: Mapped["User"] = relationship(
         "User", foreign_keys=[created_by_id]

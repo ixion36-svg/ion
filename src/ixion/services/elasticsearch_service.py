@@ -270,6 +270,31 @@ class ElasticsearchService:
 
         return alerts
 
+    async def get_alerts_by_ids(self, alert_ids: List[str]) -> List[ElasticsearchAlert]:
+        """Fetch multiple alerts by their document IDs."""
+        if not alert_ids:
+            return []
+
+        query = {
+            "size": len(alert_ids),
+            "query": {"ids": {"values": alert_ids}},
+        }
+        try:
+            result = await self._request(
+                "POST",
+                f"/{self.alert_index}/_search",
+                json=query,
+            )
+        except ElasticsearchError:
+            return []
+
+        alerts = []
+        for hit in result.get("hits", {}).get("hits", []):
+            alert = self._parse_alert(hit["_id"], hit.get("_source", {}))
+            if alert:
+                alerts.append(alert)
+        return alerts
+
     def _parse_alert(self, alert_id: str, source: Dict[str, Any]) -> Optional[ElasticsearchAlert]:
         """Parse an alert from various Elasticsearch formats."""
         # Try to extract common fields from different alert formats
@@ -391,25 +416,39 @@ class ElasticsearchService:
         )
 
         # MITRE ATT&CK fields
-        # Primary path: threat.technique.id/name, threat.tactic.name (ECS/seed data format)
+        # Helper to unwrap list-or-scalar values (ES may store as ["Impact"] or "Impact")
+        def _first(val):
+            if isinstance(val, list) and val:
+                return val[0]
+            return val
+
+        # Primary path: nested threat object (ECS format)
         threat = source.get("threat", {})
         mitre_technique_id = None
         mitre_technique_name = None
         mitre_tactic_name = None
 
-        if isinstance(threat, dict):
+        if isinstance(threat, dict) and threat:
             technique = threat.get("technique", {})
             tactic = threat.get("tactic", {})
             if isinstance(technique, dict):
-                mitre_technique_id = technique.get("id")
-                mitre_technique_name = technique.get("name")
+                mitre_technique_id = _first(technique.get("id"))
+                mitre_technique_name = _first(technique.get("name"))
             elif isinstance(technique, list) and technique:
-                mitre_technique_id = technique[0].get("id")
-                mitre_technique_name = technique[0].get("name")
+                mitre_technique_id = _first(technique[0].get("id"))
+                mitre_technique_name = _first(technique[0].get("name"))
             if isinstance(tactic, dict):
-                mitre_tactic_name = tactic.get("name")
+                mitre_tactic_name = _first(tactic.get("name"))
             elif isinstance(tactic, list) and tactic:
-                mitre_tactic_name = tactic[0].get("name")
+                mitre_tactic_name = _first(tactic[0].get("name"))
+
+        # Fallback: dot-notation keys (Kibana Security alert format)
+        if not mitre_technique_id:
+            mitre_technique_id = _first(source.get("threat.technique.id"))
+        if not mitre_technique_name:
+            mitre_technique_name = _first(source.get("threat.technique.name"))
+        if not mitre_tactic_name:
+            mitre_tactic_name = _first(source.get("threat.tactic.name"))
 
         # Fallback: signal.rule.threat[0].technique[0] (Elastic SIEM format)
         if not mitre_technique_id:
@@ -419,11 +458,11 @@ class ElasticsearchService:
                 if isinstance(first_threat, dict):
                     techniques = first_threat.get("technique", [])
                     if isinstance(techniques, list) and techniques:
-                        mitre_technique_id = techniques[0].get("id")
-                        mitre_technique_name = techniques[0].get("name")
+                        mitre_technique_id = _first(techniques[0].get("id"))
+                        mitre_technique_name = _first(techniques[0].get("name"))
                     tactic_obj = first_threat.get("tactic", {})
                     if isinstance(tactic_obj, dict):
-                        mitre_tactic_name = tactic_obj.get("name")
+                        mitre_tactic_name = _first(tactic_obj.get("name"))
 
         return ElasticsearchAlert(
             id=alert_id,

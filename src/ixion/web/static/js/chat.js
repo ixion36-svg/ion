@@ -1126,7 +1126,7 @@ async function showNewChatModal() {
     await ensureCurrentUser();
 
     await loadAvailableUsers();
-    loadCases();
+    await loadChatCaseOptions();
 }
 
 function hideNewChatModal() {
@@ -1163,23 +1163,29 @@ async function loadAvailableUsers() {
     }
 }
 
-async function loadCases() {
+async function loadChatCaseOptions() {
     try {
         const response = await fetch('/api/elasticsearch/alerts/cases');
         if (!response.ok) {
-            console.log('Cases API not available or returned error');
+            console.warn('loadChatCaseOptions: API returned', response.status);
             return;
         }
         const data = await response.json();
         const select = document.getElementById('case-link');
-        if (select && data.cases && data.cases.length > 0) {
+        if (!select) {
+            console.warn('loadChatCaseOptions: case-link select not found');
+            return;
+        }
+        const cases = data.cases || [];
+        if (cases.length > 0) {
             select.innerHTML = '<option value="">No case</option>' +
-                data.cases.map(c =>
+                cases.map(c =>
                     `<option value="${c.id}">${escapeHtml(c.case_number)} - ${escapeHtml(c.title)}</option>`
                 ).join('');
         }
+        console.log('loadChatCaseOptions: loaded', cases.length, 'cases');
     } catch (error) {
-        console.log('Cases API error (may not exist):', error.message);
+        console.error('loadChatCaseOptions failed:', error);
     }
 }
 
