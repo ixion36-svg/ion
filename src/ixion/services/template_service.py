@@ -36,6 +36,7 @@ class TemplateService:
         folder_path: str | None = None,
         tags: list[str] | None = None,
         collection_id: int | None = None,
+        document_type: str | None = None,
     ) -> Template:
         """Create a new template with initial version."""
         # Validate name
@@ -61,6 +62,10 @@ class TemplateService:
             description=description,
             folder_path=folder_path,
         )
+
+        # Set document type if specified
+        if document_type is not None:
+            template.document_type = document_type
 
         # Set collection if specified
         if collection_id is not None:
@@ -98,11 +103,12 @@ class TemplateService:
         folder_path: str | None = None,
         tags: list[str] | None = None,
         collection_id: int | None = None,
+        document_type: str | None = None,
     ) -> List[Template]:
         """List all templates with optional filters."""
         return self.template_repo.list_all(
             format=format, folder_path=folder_path, tag_names=tags,
-            collection_id=collection_id
+            collection_id=collection_id, document_type=document_type,
         )
 
     def search_templates(self, query: str) -> List[Template]:
@@ -120,6 +126,7 @@ class TemplateService:
         create_version: bool = True,
         version_message: str | None = None,
         version_author: str | None = None,
+        document_type: str | None = None,
     ) -> Template:
         """Update a template, optionally creating a new version."""
         template = self.get_template(template_id)
@@ -132,6 +139,10 @@ class TemplateService:
 
         # Store old content for diff
         old_content = template.content
+
+        # Update document type if provided
+        if document_type is not None:
+            template.document_type = document_type
 
         # Update template
         template = self.template_repo.update(

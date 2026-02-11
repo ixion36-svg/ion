@@ -64,6 +64,7 @@ class TemplateCreate(BaseModel):
     format: str = "markdown"
     description: Optional[str] = None
     tags: Optional[List[str]] = None
+    document_type: Optional[str] = None
 
 
 class TemplateUpdate(BaseModel):
@@ -73,6 +74,7 @@ class TemplateUpdate(BaseModel):
     description: Optional[str] = None
     message: Optional[str] = None
     author: Optional[str] = None
+    document_type: Optional[str] = None
 
 
 class RenderRequest(BaseModel):
@@ -1055,6 +1057,7 @@ async def list_templates(
     tag: Optional[str] = None,
     search: Optional[str] = None,
     collection_id: Optional[int] = None,
+    document_type: Optional[str] = None,
     services: Services = Depends(get_services),
 ):
     """List all templates."""
@@ -1063,7 +1066,8 @@ async def list_templates(
     else:
         tags = [tag] if tag else None
         templates = services.template.list_templates(
-            format=format, tags=tags, collection_id=collection_id
+            format=format, tags=tags, collection_id=collection_id,
+            document_type=document_type,
         )
 
     return [
@@ -1072,6 +1076,7 @@ async def list_templates(
             "name": t.name,
             "format": t.format,
             "description": t.description,
+            "document_type": t.document_type,
             "current_version": t.current_version,
             "tags": [tag.name for tag in t.tags],
             "collection_id": t.collection_id,
@@ -1093,6 +1098,7 @@ async def create_template(template: TemplateCreate, services: Services = Depends
             format=template.format,
             description=template.description,
             tags=template.tags,
+            document_type=template.document_type,
         )
         services.session.commit()
         return {"id": t.id, "name": t.name, "message": "Template created successfully"}
@@ -1111,6 +1117,7 @@ async def get_template(template_id: int, services: Services = Depends(get_servic
             "content": t.content,
             "format": t.format,
             "description": t.description,
+            "document_type": t.document_type,
             "current_version": t.current_version,
             "tags": [tag.name for tag in t.tags],
             "variables": [
@@ -1142,6 +1149,7 @@ async def update_template(template_id: int, template: TemplateUpdate, services: 
             description=template.description,
             version_message=template.message,
             version_author=template.author,
+            document_type=template.document_type,
         )
         services.session.commit()
         return {"id": t.id, "name": t.name, "current_version": t.current_version}
@@ -1160,6 +1168,13 @@ async def delete_template(template_id: int, services: Services = Depends(get_ser
         return {"message": "Template deleted successfully"}
     except TemplateNotFoundError:
         raise HTTPException(status_code=404, detail="Template not found")
+
+
+@router.get("/document-types", dependencies=[Depends(require_permission("template:read"))])
+async def list_document_types():
+    """List available document types for templates."""
+    from ixion.services.soc_template_service import DOCUMENT_TYPES
+    return {"types": DOCUMENT_TYPES}
 
 
 @router.put("/templates/{template_id}/tags", dependencies=[Depends(require_permission("template:update"))])
@@ -1429,6 +1444,7 @@ async def list_documents(
             "output_format": d.output_format,
             "source_template_id": d.source_template_id,
             "source_template_version": d.source_template_version,
+            "source_template_document_type": d.source_template.document_type if d.source_template else None,
             "current_version": d.current_version,
             "status": d.status,
             "collection_id": d.collection_id,
@@ -2884,6 +2900,8 @@ from ixion.models.alert_triage import (
     AlertTriageStatus,
     AlertCase,
     AlertCaseStatus,
+    CaseClosureReason,
+    KnownFalsePositive,
     Note,
     NoteEntityType,
 )
@@ -2954,6 +2972,8 @@ class CaseUpdate(BaseModel):
     assigned_to_id: Optional[int] = None
     description: Optional[str] = None
     severity: Optional[str] = None
+    closure_reason: Optional[str] = None
+    closure_notes: Optional[str] = None
 
 
 @router.get("/elasticsearch/alerts/cases")
@@ -3008,6 +3028,7 @@ async def list_cases(
                 "kibana_url": get_kibana_url(c),
                 "dfir_iris_case_id": c.dfir_iris_case_id,
                 "dfir_iris_url": get_iris_url(c),
+                "closure_reason": c.closure_reason,
                 "created_at": c.created_at.isoformat() if c.created_at else None,
                 "updated_at": c.updated_at.isoformat() if c.updated_at else None,
             }
@@ -3207,6 +3228,15 @@ async def create_case(
     except Exception as e:
         _case_es_logger.warning("Failed to sync case to Kibana: %s", e)
 
+    # Auto-check KFP registry for matches
+    fp_suggestions = _match_known_false_positives(
+        session,
+        hosts=data.affected_hosts,
+        users=data.affected_users,
+        ips=[o["value"] for o in (case_observables or []) if o.get("type") in ("source_ip", "destination_ip")],
+        rules=data.triggered_rules,
+    )
+
     return {
         "id": new_case.id,
         "case_number": new_case.case_number,
@@ -3218,6 +3248,7 @@ async def create_case(
         "kibana_url": kibana_url,
         "dfir_iris_case_id": new_case.dfir_iris_case_id,
         "dfir_iris_url": None,
+        "fp_suggestions": fp_suggestions,
     }
 
 
@@ -3313,6 +3344,10 @@ async def get_case_detail(
         "kibana_url": kibana_url,
         "dfir_iris_case_id": case.dfir_iris_case_id,
         "dfir_iris_url": dfir_iris_url,
+        "closure_reason": case.closure_reason,
+        "closure_notes": case.closure_notes,
+        "closed_by": case.closed_by.username if case.closed_by else None,
+        "closed_at": case.closed_at.isoformat() if case.closed_at else None,
         "created_at": case.created_at.isoformat() if case.created_at else None,
         "updated_at": case.updated_at.isoformat() if case.updated_at else None,
         "alerts": [
@@ -3353,10 +3388,35 @@ async def update_case(
         case.description = data.description
     if data.severity is not None:
         case.severity = data.severity
-    if data.status is not None:
-        case.status = data.status
     if data.assigned_to_id is not None:
         case.assigned_to_id = data.assigned_to_id
+    if data.status is not None:
+        old_status = case.status.value if hasattr(case.status, "value") else case.status
+        new_status = data.status
+        # Closing/resolving: require closure_reason
+        if new_status in ("closed", "resolved") and old_status not in ("closed", "resolved"):
+            if not data.closure_reason:
+                raise HTTPException(
+                    status_code=400,
+                    detail="closure_reason is required when closing or resolving a case",
+                )
+            valid_reasons = {r.value for r in CaseClosureReason}
+            if data.closure_reason not in valid_reasons:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid closure_reason. Must be one of: {', '.join(sorted(valid_reasons))}",
+                )
+            case.closure_reason = data.closure_reason
+            case.closure_notes = data.closure_notes
+            case.closed_by_id = current_user.id
+            case.closed_at = datetime.utcnow()
+        # Reopening: clear closure fields
+        elif new_status not in ("closed", "resolved") and old_status in ("closed", "resolved"):
+            case.closure_reason = None
+            case.closure_notes = None
+            case.closed_by_id = None
+            case.closed_at = None
+        case.status = new_status
 
     session.commit()
     session.refresh(case)
@@ -3412,6 +3472,10 @@ async def update_case(
         "case_number": case.case_number,
         "title": case.title,
         "status": case.status.value if hasattr(case.status, "value") else case.status,
+        "closure_reason": case.closure_reason,
+        "closure_notes": case.closure_notes,
+        "closed_by": case.closed_by.username if case.closed_by else None,
+        "closed_at": case.closed_at.isoformat() if case.closed_at else None,
         "kibana_url": kibana_url,
         "dfir_iris_case_id": case.dfir_iris_case_id,
         "dfir_iris_url": dfir_iris_url,
@@ -3641,6 +3705,295 @@ async def escalate_case_to_dfir_iris(
             status_code=500,
             detail=f"Escalation failed: {str(e)}",
         )
+
+
+# ============================================================================
+# Known False Positives Registry
+# ============================================================================
+
+
+def _match_known_false_positives(
+    session: Session,
+    hosts: Optional[List[str]] = None,
+    users: Optional[List[str]] = None,
+    ips: Optional[List[str]] = None,
+    rules: Optional[List[str]] = None,
+) -> list:
+    """Check active KFP entries for matches against the given observables."""
+    kfps = session.query(KnownFalsePositive).filter_by(is_active=True).all()
+    results = []
+    hosts_lower = {h.lower() for h in (hosts or []) if h}
+    users_lower = {u.lower() for u in (users or []) if u}
+    ips_lower = {i.lower() for i in (ips or []) if i}
+    rules_lower = {r.lower() for r in (rules or []) if r}
+
+    for kfp in kfps:
+        matched_fields = []
+        if kfp.match_hosts and hosts_lower:
+            kfp_hosts = {h.lower() for h in kfp.match_hosts}
+            if kfp_hosts & hosts_lower:
+                matched_fields.append("hosts")
+        if kfp.match_users and users_lower:
+            kfp_users = {u.lower() for u in kfp.match_users}
+            if kfp_users & users_lower:
+                matched_fields.append("users")
+        if kfp.match_ips and ips_lower:
+            kfp_ips = {i.lower() for i in kfp.match_ips}
+            if kfp_ips & ips_lower:
+                matched_fields.append("ips")
+        if kfp.match_rules and rules_lower:
+            kfp_rules = {r.lower() for r in kfp.match_rules}
+            if kfp_rules & rules_lower:
+                matched_fields.append("rules")
+        if matched_fields:
+            results.append({
+                "id": kfp.id,
+                "title": kfp.title,
+                "description": kfp.description,
+                "matched_fields": matched_fields,
+                "source_case_id": kfp.source_case_id,
+            })
+    return results
+
+
+class KFPCreate(BaseModel):
+    title: str
+    description: str
+    match_hosts: Optional[List[str]] = None
+    match_users: Optional[List[str]] = None
+    match_ips: Optional[List[str]] = None
+    match_rules: Optional[List[str]] = None
+    source_case_id: Optional[int] = None
+
+
+class KFPUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    match_hosts: Optional[List[str]] = None
+    match_users: Optional[List[str]] = None
+    match_ips: Optional[List[str]] = None
+    match_rules: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+class KFPMatchRequest(BaseModel):
+    hosts: Optional[List[str]] = None
+    users: Optional[List[str]] = None
+    ips: Optional[List[str]] = None
+    rules: Optional[List[str]] = None
+
+
+class CloseAsFPRequest(BaseModel):
+    known_fp_id: int
+
+
+@router.get("/known-false-positives")
+async def list_known_false_positives(
+    active_only: bool = True,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """List all known false positive entries."""
+    query = session.query(KnownFalsePositive)
+    if active_only:
+        query = query.filter_by(is_active=True)
+    kfps = query.order_by(KnownFalsePositive.created_at.desc()).all()
+    return {
+        "known_false_positives": [
+            {
+                "id": kfp.id,
+                "title": kfp.title,
+                "description": kfp.description,
+                "match_hosts": kfp.match_hosts,
+                "match_users": kfp.match_users,
+                "match_ips": kfp.match_ips,
+                "match_rules": kfp.match_rules,
+                "is_active": kfp.is_active,
+                "source_case_id": kfp.source_case_id,
+                "created_by": kfp.created_by.username if kfp.created_by else None,
+                "created_at": kfp.created_at.isoformat() if kfp.created_at else None,
+                "updated_at": kfp.updated_at.isoformat() if kfp.updated_at else None,
+            }
+            for kfp in kfps
+        ]
+    }
+
+
+@router.post("/known-false-positives")
+async def create_known_false_positive(
+    data: KFPCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Create a new known false positive entry."""
+    kfp = KnownFalsePositive(
+        title=data.title,
+        description=data.description,
+        match_hosts=data.match_hosts,
+        match_users=data.match_users,
+        match_ips=data.match_ips,
+        match_rules=data.match_rules,
+        source_case_id=data.source_case_id,
+        created_by_id=current_user.id,
+    )
+    session.add(kfp)
+    session.commit()
+    session.refresh(kfp)
+    return {
+        "id": kfp.id,
+        "title": kfp.title,
+        "description": kfp.description,
+        "match_hosts": kfp.match_hosts,
+        "match_users": kfp.match_users,
+        "match_ips": kfp.match_ips,
+        "match_rules": kfp.match_rules,
+        "is_active": kfp.is_active,
+        "source_case_id": kfp.source_case_id,
+        "created_by": kfp.created_by.username if kfp.created_by else None,
+        "created_at": kfp.created_at.isoformat() if kfp.created_at else None,
+    }
+
+
+@router.get("/known-false-positives/{kfp_id}")
+async def get_known_false_positive(
+    kfp_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Get a single known false positive entry."""
+    kfp = session.query(KnownFalsePositive).filter_by(id=kfp_id).first()
+    if not kfp:
+        raise HTTPException(status_code=404, detail="Known false positive not found")
+    return {
+        "id": kfp.id,
+        "title": kfp.title,
+        "description": kfp.description,
+        "match_hosts": kfp.match_hosts,
+        "match_users": kfp.match_users,
+        "match_ips": kfp.match_ips,
+        "match_rules": kfp.match_rules,
+        "is_active": kfp.is_active,
+        "source_case_id": kfp.source_case_id,
+        "created_by": kfp.created_by.username if kfp.created_by else None,
+        "created_at": kfp.created_at.isoformat() if kfp.created_at else None,
+        "updated_at": kfp.updated_at.isoformat() if kfp.updated_at else None,
+    }
+
+
+@router.put("/known-false-positives/{kfp_id}")
+async def update_known_false_positive(
+    kfp_id: int,
+    data: KFPUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Update a known false positive entry."""
+    kfp = session.query(KnownFalsePositive).filter_by(id=kfp_id).first()
+    if not kfp:
+        raise HTTPException(status_code=404, detail="Known false positive not found")
+    if data.title is not None:
+        kfp.title = data.title
+    if data.description is not None:
+        kfp.description = data.description
+    if data.match_hosts is not None:
+        kfp.match_hosts = data.match_hosts
+    if data.match_users is not None:
+        kfp.match_users = data.match_users
+    if data.match_ips is not None:
+        kfp.match_ips = data.match_ips
+    if data.match_rules is not None:
+        kfp.match_rules = data.match_rules
+    if data.is_active is not None:
+        kfp.is_active = data.is_active
+    session.commit()
+    session.refresh(kfp)
+    return {
+        "id": kfp.id,
+        "title": kfp.title,
+        "description": kfp.description,
+        "match_hosts": kfp.match_hosts,
+        "match_users": kfp.match_users,
+        "match_ips": kfp.match_ips,
+        "match_rules": kfp.match_rules,
+        "is_active": kfp.is_active,
+        "message": "Updated",
+    }
+
+
+@router.delete("/known-false-positives/{kfp_id}")
+async def delete_known_false_positive(
+    kfp_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Soft-delete a known false positive entry (set is_active=false)."""
+    kfp = session.query(KnownFalsePositive).filter_by(id=kfp_id).first()
+    if not kfp:
+        raise HTTPException(status_code=404, detail="Known false positive not found")
+    kfp.is_active = False
+    session.commit()
+    return {"message": "Known false positive deactivated"}
+
+
+@router.post("/known-false-positives/match")
+async def match_known_false_positives(
+    data: KFPMatchRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Check if given observables match any known false positive entries."""
+    matches = _match_known_false_positives(
+        session,
+        hosts=data.hosts,
+        users=data.users,
+        ips=data.ips,
+        rules=data.rules,
+    )
+    return {"matches": matches}
+
+
+@router.post("/elasticsearch/alerts/cases/{case_id}/close-as-fp")
+async def close_case_as_known_fp(
+    case_id: int,
+    data: CloseAsFPRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Close a case as a known false positive, setting all linked alerts to false_positive."""
+    case = session.query(AlertCase).filter_by(id=case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    kfp = session.query(KnownFalsePositive).filter_by(id=data.known_fp_id).first()
+    if not kfp:
+        raise HTTPException(status_code=404, detail="Known false positive entry not found")
+
+    # Close the case
+    case.status = AlertCaseStatus.CLOSED
+    case.closure_reason = CaseClosureReason.FALSE_POSITIVE.value
+    case.closure_notes = f"Matched known FP: {kfp.title}\n\n{kfp.description}"
+    case.closed_by_id = current_user.id
+    case.closed_at = datetime.utcnow()
+
+    # Set all linked AlertTriage entries to false_positive
+    updated_alerts = 0
+    for triage in case.triage_entries:
+        triage.status = AlertTriageStatus.FALSE_POSITIVE
+        updated_alerts += 1
+
+    session.commit()
+    session.refresh(case)
+    await _sync_case_to_es(case, session)
+
+    return {
+        "id": case.id,
+        "case_number": case.case_number,
+        "status": "closed",
+        "closure_reason": "false_positive",
+        "known_fp_title": kfp.title,
+        "updated_alerts": updated_alerts,
+        "message": "Case closed as known false positive",
+    }
 
 
 class BatchTriageRequest(BaseModel):

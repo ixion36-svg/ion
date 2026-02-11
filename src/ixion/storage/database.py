@@ -80,6 +80,22 @@ def _run_migrations(engine: Engine) -> None:
                     )
                     logger.info("Migrated: alert_cases.%s", col_name)
 
+    # AlertCase closure fields
+    if insp.has_table("alert_cases"):
+        existing = {col["name"] for col in insp.get_columns("alert_cases")}
+        for col_name, col_type in {
+            "closure_reason": "VARCHAR(50)",
+            "closure_notes": "TEXT",
+            "closed_by_id": "INTEGER",
+            "closed_at": "DATETIME",
+        }.items():
+            if col_name not in existing:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(f"ALTER TABLE alert_cases ADD COLUMN {col_name} {col_type}")
+                    )
+                    logger.info("Migrated: alert_cases.%s", col_name)
+
     # Migrations for alert_triage table
     if insp.has_table("alert_triage"):
         existing = {col["name"] for col in insp.get_columns("alert_triage")}
@@ -120,6 +136,14 @@ def _run_migrations(engine: Engine) -> None:
                 with engine.begin() as conn:
                     conn.execute(text(sql))
                     logger.info("Migrated: playbook_executions.%s", col)
+
+    # Migrations for templates table
+    if insp.has_table("templates"):
+        existing = {col["name"] for col in insp.get_columns("templates")}
+        if "document_type" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE templates ADD COLUMN document_type VARCHAR(50)"))
+                logger.info("Migrated: templates.document_type")
 
 
 def init_db(db_path: Optional[Path] = None) -> Engine:

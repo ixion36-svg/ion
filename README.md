@@ -16,6 +16,7 @@ A Security Operations Center (SOC) platform with AI-powered analysis, alert tria
 - **Observable Tracking**: Centralized observable management with cross-case correlation and enrichment
 - **OpenCTI Integration**: IOC enrichment against OpenCTI threat intelligence
 - **Template Management**: Document templates with version control and Jinja2 rendering
+- **SOC Documentation Templates**: 19 pre-built templates (SOP, SOI, WI, KB, IRP, AAR, Runbook, Threat Advisory, Detection Rule) aligned with NIST 800-61, NIST CSF 2.0, ISO 27035, SANS IR, SOC-CMM, and MITRE ATT&CK
 - **SOC Tools**: Client-side document processing tools for security analysts
 - **Real-time Chat**: Team collaboration with chat rooms and expandable AI chat panel
 - **Role-based Access**: Web UI with authentication and RBAC

@@ -2,7 +2,7 @@
 
 from typing import Optional, List
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ixion.models.document import Document, DocumentVersion
 
@@ -69,7 +69,7 @@ class DocumentRepository:
         include_archived: bool = False,
     ) -> List[Document]:
         """List all documents with optional filters."""
-        stmt = select(Document)
+        stmt = select(Document).options(joinedload(Document.source_template))
 
         if not include_archived:
             stmt = stmt.where(Document.status == "active")
@@ -79,7 +79,7 @@ class DocumentRepository:
             stmt = stmt.where(Document.output_format == output_format)
 
         stmt = stmt.order_by(Document.updated_at.desc())
-        return list(self.session.execute(stmt).scalars().all())
+        return list(self.session.execute(stmt).unique().scalars().all())
 
     def update(
         self,

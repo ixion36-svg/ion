@@ -40,6 +40,9 @@
                 <option value="html">HTML</option>
                 <option value="text">Plain Text</option>
             </select>
+            <select id="doctype-filter" class="filter-select">
+                <option value="">All Types</option>
+            </select>
         </div>
 
         <div id="current-folder-path" class="folder-path"></div>
@@ -232,13 +235,48 @@
     font-size: 0.75rem;
     padding: 2px 6px;
 }
+.doc-type-badge {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: white;
+    margin-left: 0.5rem;
+}
+.doc-type-SOP { background: #3b82f6; }
+.doc-type-SOI { background: #14b8a6; }
+.doc-type-WI { background: #6366f1; }
+.doc-type-KB { background: #22c55e; }
+.doc-type-RUNBOOK { background: #a855f7; }
+.doc-type-IRP { background: #ef4444; }
+.doc-type-AAR { background: #f97316; }
+.doc-type-THREAT_ADVISORY { background: #eab308; color: #1a1a1a; }
+.doc-type-DETECTION_RULE { background: #06b6d4; }
 </style>
 <script>
 {% raw %}
 let allTemplates = [];
 let allCollections = [];
+let documentTypes = {};
 let selectedFolderId = null;
 let moveTemplateId = null;
+
+async function loadDocumentTypes() {
+    try {
+        const resp = await api.get('/api/document-types');
+        documentTypes = resp.types || {};
+        const select = document.getElementById('doctype-filter');
+        select.innerHTML = '<option value="">All Types</option>';
+        Object.entries(documentTypes).forEach(([key, label]) => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = key + ' - ' + label;
+            select.appendChild(opt);
+        });
+    } catch (e) {
+        console.error('Failed to load document types:', e);
+    }
+}
 
 async function loadTemplates() {
     try {
@@ -338,12 +376,14 @@ function updateFolderPath() {
 function filterTemplates() {
     const search = document.getElementById('search-input').value.toLowerCase();
     const format = document.getElementById('format-filter').value;
+    const docType = document.getElementById('doctype-filter').value;
 
     return allTemplates.filter(t => {
         const matchesSearch = !search ||
             t.name.toLowerCase().includes(search) ||
             (t.description && t.description.toLowerCase().includes(search));
         const matchesFormat = !format || t.format === format;
+        const matchesDocType = !docType || t.document_type === docType;
 
         let matchesFolder = true;
         if (selectedFolderId === 'uncategorized') {
@@ -353,7 +393,7 @@ function filterTemplates() {
             matchesFolder = isInFolderOrSubfolder(t.collection_id, selectedFolderId);
         }
 
-        return matchesSearch && matchesFormat && matchesFolder;
+        return matchesSearch && matchesFormat && matchesDocType && matchesFolder;
     });
 }
 
@@ -388,10 +428,14 @@ function renderTemplates(templates) {
         const folderBadge = folder
             ? '<span class="collection-badge">' + escapeHtml(folder.name) + '</span>'
             : '';
+        const docTypeBadge = t.document_type
+            ? '<span class="doc-type-badge doc-type-' + t.document_type + '">' + t.document_type + '</span>'
+            : '';
 
         html += '<div class="card">';
         html += '<div class="card-header">';
         html += '<a href="/templates/' + t.id + '" class="card-title">' + escapeHtml(t.name) + '</a>';
+        html += docTypeBadge;
         html += folderBadge;
         html += '<span class="badge">' + t.format + '</span>';
         html += '</div>';
@@ -600,10 +644,12 @@ async function moveTemplate() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    await loadDocumentTypes();
     await loadCollections();
     await loadTemplates();
     document.getElementById('search-input').addEventListener('input', applyFilters);
     document.getElementById('format-filter').addEventListener('change', applyFilters);
+    document.getElementById('doctype-filter').addEventListener('change', applyFilters);
 });
 
 // Close modal on outside click

@@ -151,6 +151,14 @@ async def startup_event():
         import logging
         logging.getLogger(__name__).warning(f"Failed to seed default playbooks: {e}")
 
+    # Seed SOC documentation templates
+    try:
+        from ixion.services.soc_template_service import seed_soc_templates
+        seed_soc_templates()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to seed SOC templates: {e}")
+
     # Start Kibana bidirectional sync if enabled
     try:
         from ixion.services.kibana_sync_service import get_kibana_sync_service

@@ -40,6 +40,17 @@ class AlertCaseStatus(str, Enum):
     CLOSED = "closed"
 
 
+class CaseClosureReason(str, Enum):
+    """Reason for closing an investigation case."""
+
+    TRUE_POSITIVE = "true_positive"
+    FALSE_POSITIVE = "false_positive"
+    BENIGN_TRUE_POSITIVE = "benign_true_positive"
+    DUPLICATE = "duplicate"
+    INSUFFICIENT_DATA = "insufficient_data"
+    NOT_APPLICABLE = "not_applicable"
+
+
 class NoteEntityType(str, Enum):
     """Entity types that can have notes attached."""
 
@@ -82,12 +93,21 @@ class AlertCase(Base, TimestampMixin):
     # DFIR-IRIS integration
     dfir_iris_case_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
+    # Closure metadata
+    closure_reason: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    closure_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    closed_by_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
     # Relationships
     created_by: Mapped["User"] = relationship(
         "User", foreign_keys=[created_by_id]
     )
     assigned_to: Mapped[Optional["User"]] = relationship(
         "User", foreign_keys=[assigned_to_id]
+    )
+    closed_by: Mapped[Optional["User"]] = relationship(
+        "User", foreign_keys=[closed_by_id]
     )
     triage_entries: Mapped[List["AlertTriage"]] = relationship(
         "AlertTriage", back_populates="case"
@@ -186,6 +206,37 @@ class Note(Base):
 
     def __repr__(self) -> str:
         return f"<Note(id={self.id}, entity_type='{self.entity_type}', entity_id='{self.entity_id}')>"
+
+
+class KnownFalsePositive(Base, TimestampMixin):
+    """Registry of known false positive patterns for quick case resolution."""
+
+    __tablename__ = "known_false_positives"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # Matching criteria (any match = suggestion)
+    match_hosts: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    match_users: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    match_ips: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    match_rules: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    source_case_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("alert_cases.id"), nullable=True
+    )
+    created_by_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+
+    # Relationships
+    created_by: Mapped["User"] = relationship("User", foreign_keys=[created_by_id])
+    source_case: Mapped[Optional["AlertCase"]] = relationship("AlertCase")
+
+    def __repr__(self) -> str:
+        return f"<KnownFalsePositive(id={self.id}, title='{self.title}')>"
 
 
 # Backward compatibility aliases

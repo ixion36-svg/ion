@@ -83,6 +83,7 @@ class Template(Base, TimestampMixin):
     folder_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     current_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    document_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     collection_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("collections.id"), nullable=True
     )

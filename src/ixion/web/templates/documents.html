@@ -340,6 +340,23 @@
     font-size: 0.75rem;
     padding: 2px 6px;
 }
+.doc-type-badge {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: white;
+    margin-left: 0.5rem;
+}
+.doc-type-SOP { background: #3b82f6; }
+.doc-type-SOI { background: #14b8a6; }
+.doc-type-WI { background: #6366f1; }
+.doc-type-KB { background: #22c55e; }
+.doc-type-RUNBOOK { background: #a855f7; }
+.doc-type-IRP { background: #ef4444; }
+.doc-type-AAR { background: #f97316; }
+.doc-type-THREAT_ADVISORY { background: #eab308; color: #1a1a1a; }
+.doc-type-DETECTION_RULE { background: #06b6d4; }
 .toolbar {
     display: flex;
     gap: 0.5rem;
@@ -587,10 +604,13 @@ function renderDocuments(documents) {
         const folderBadge = folder
             ? '<span class="collection-badge">' + escapeHtml(folder.name) + '</span>'
             : '';
+        const docTypeBadge = d.source_template_document_type
+            ? '<span class="doc-type-badge doc-type-' + d.source_template_document_type + '">' + d.source_template_document_type + '</span>'
+            : '';
 
         html += '<div class="list-item' + (isArchived ? ' archived' : '') + '">';
         html += '<div class="list-item-content">';
-        html += '<span class="list-item-title">' + escapeHtml(d.name) + folderBadge + '</span>';
+        html += '<span class="list-item-title">' + escapeHtml(d.name) + docTypeBadge + folderBadge + '</span>';
         html += '<div class="list-item-meta">';
         html += '<span class="badge">' + d.output_format + '</span>';
         html += '<span class="badge badge-version">v' + (d.current_version || 1) + '</span>';

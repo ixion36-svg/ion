@@ -23,6 +23,12 @@
             </select>
         </div>
         <div class="form-group">
+            <label for="document_type">Document Type</label>
+            <select id="document_type" name="document_type">
+                <option value="">None</option>
+            </select>
+        </div>
+        <div class="form-group">
             <label for="tags">Tags (comma-separated)</label>
             <input type="text" id="tags" name="tags" placeholder="e.g., work, formal, invoice">
         </div>
@@ -101,11 +107,26 @@ function insertAtCursor(textarea, text) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Load document types dropdown
+    try {
+        const resp = await api.get('/api/document-types');
+        const dtSelect = document.getElementById('document_type');
+        Object.entries(resp.types || {}).forEach(([key, label]) => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = key + ' - ' + label;
+            dtSelect.appendChild(opt);
+        });
+    } catch (e) {
+        console.error('Failed to load document types:', e);
+    }
+
     if (templateId) {
         try {
             const template = await api.get('/api/templates/' + templateId);
             document.getElementById('name').value = template.name;
             document.getElementById('format').value = template.format;
+            document.getElementById('document_type').value = template.document_type || '';
             document.getElementById('description').value = template.description || '';
             document.getElementById('content').value = template.content;
             document.getElementById('tags').value = template.tags.join(', ');
@@ -127,6 +148,7 @@ document.getElementById('template-form').addEventListener('submit', async (e) =>
     const data = {
         name: document.getElementById('name').value,
         format: document.getElementById('format').value,
+        document_type: document.getElementById('document_type').value || null,
         description: document.getElementById('description').value || null,
         content: document.getElementById('content').value,
     };

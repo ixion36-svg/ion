@@ -60,6 +60,7 @@ class TemplateRepository:
         folder_path: str | None = None,
         tag_names: list[str] | None = None,
         collection_id: int | None = None,
+        document_type: str | None = None,
     ) -> List[Template]:
         """List all templates with optional filters."""
         stmt = select(Template).options(
@@ -74,6 +75,8 @@ class TemplateRepository:
             stmt = stmt.join(Template.tags).where(Tag.name.in_(tag_names))
         if collection_id is not None:
             stmt = stmt.where(Template.collection_id == collection_id)
+        if document_type:
+            stmt = stmt.where(Template.document_type == document_type)
 
         stmt = stmt.order_by(Template.name)
         return list(self.session.execute(stmt).unique().scalars().all())
