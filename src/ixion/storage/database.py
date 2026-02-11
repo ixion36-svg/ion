@@ -70,6 +70,7 @@ def _run_migrations(engine: Engine) -> None:
             "kibana_case_id": "VARCHAR(100)",
             "kibana_case_version": "VARCHAR(50)",
             "observables": "JSON",
+            "dfir_iris_case_id": "INTEGER",
         }
         with engine.begin() as conn:
             for col_name, col_type in new_columns.items():
@@ -100,6 +101,25 @@ def _run_migrations(engine: Engine) -> None:
                     text("ALTER TABLE alert_triage ADD COLUMN mitre_techniques JSON")
                 )
                 logger.info("Migrated: alert_triage.mitre_techniques")
+
+    # Migrations for playbook_executions table
+    if insp.has_table("playbook_executions"):
+        existing = {col["name"] for col in insp.get_columns("playbook_executions")}
+        if "case_id" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE playbook_executions ADD COLUMN case_id INTEGER REFERENCES alert_cases(id)")
+                )
+                logger.info("Migrated: playbook_executions.case_id")
+        for col, sql in [
+            ("outcome", "ALTER TABLE playbook_executions ADD COLUMN outcome VARCHAR(50)"),
+            ("outcome_notes", "ALTER TABLE playbook_executions ADD COLUMN outcome_notes TEXT"),
+            ("report_document_id", "ALTER TABLE playbook_executions ADD COLUMN report_document_id INTEGER REFERENCES documents(id)"),
+        ]:
+            if col not in existing:
+                with engine.begin() as conn:
+                    conn.execute(text(sql))
+                    logger.info("Migrated: playbook_executions.%s", col)
 
 
 def init_db(db_path: Optional[Path] = None) -> Engine:

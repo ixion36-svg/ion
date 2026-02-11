@@ -10,6 +10,7 @@ This guide covers deploying DocForge in environments without internet access.
 - SOC entity detection (18 pattern types: IPs, CVEs, hashes, etc.)
 - AI-assisted alert triage (observable extraction, MITRE mapping, analysis, contextual chat)
 - Multi-alert pattern detection with auto-triggered investigation playbooks
+- Playbook execution: action recording, outcome classification, and auto-generated investigation reports
 - Spell checking with technical term awareness
 - Rewrite suggestions (professional, concise, formal, technical styles)
 - Table detection (Markdown, CSV, TSV)

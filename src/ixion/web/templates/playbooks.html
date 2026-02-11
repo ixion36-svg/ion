@@ -6,39 +6,93 @@
 <div class="page-header">
     <h1>Investigation Playbooks</h1>
     <div class="header-actions">
-        <button class="btn btn-primary" onclick="showCreatePlaybookModal()">+ New Playbook</button>
+        <button class="btn btn-primary" id="btn-new-playbook" onclick="showCreatePlaybookModal()">+ New Playbook</button>
     </div>
 </div>
 
-<!-- Playbooks List -->
-<section class="section">
-    <div class="section-header">
-        <h2>Playbooks</h2>
-        <div class="filter-controls">
-            <label class="checkbox-label">
-                <input type="checkbox" id="filter-active-only" checked onchange="loadPlaybooks()">
-                Active only
-            </label>
+<!-- Tab Navigation -->
+<div class="tab-nav">
+    <button class="tab-btn active" data-tab="library" onclick="switchTab('library')">Playbook Library</button>
+    <button class="tab-btn" data-tab="executions" onclick="switchTab('executions')">
+        Active Executions <span class="tab-badge" id="executions-badge" style="display:none;">0</span>
+    </button>
+</div>
+
+<!-- TAB: Playbook Library -->
+<div class="tab-content" id="tab-library">
+    <section class="section">
+        <div class="section-header">
+            <h2>Playbooks</h2>
+            <div class="filter-controls">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="filter-active-only" checked onchange="loadPlaybooks()">
+                    Active only
+                </label>
+            </div>
         </div>
+        <div class="table-container">
+            <table class="data-table" id="playbooks-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Triggers</th>
+                        <th>Steps</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="playbooks-body">
+                    <tr><td colspan="6" class="loading">Loading playbooks...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<!-- TAB: Active Executions -->
+<div class="tab-content" id="tab-executions" style="display:none;">
+    <section class="section">
+        <div class="section-header">
+            <h2>Playbook Executions</h2>
+            <div class="filter-controls">
+                <select id="exec-status-filter" class="form-control" style="width:auto;" onchange="loadExecutions()">
+                    <option value="">All Statuses</option>
+                    <option value="in_progress" selected>In Progress</option>
+                    <option value="pending">Pending</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="data-table" id="executions-table">
+                <thead>
+                    <tr>
+                        <th>Playbook</th>
+                        <th>Alert / Case</th>
+                        <th>Progress</th>
+                        <th>Status</th>
+                        <th>Analyst</th>
+                        <th>Started</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="executions-body">
+                    <tr><td colspan="7" class="loading">Loading executions...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <!-- Inline execution detail panel -->
+    <div class="exec-detail-panel" id="exec-detail-panel" style="display:none;">
+        <div class="exec-detail-header">
+            <h3 id="exec-detail-title">Execution Details</h3>
+            <button class="modal-close" onclick="closeExecDetail()">&times;</button>
+        </div>
+        <div class="exec-detail-body" id="exec-detail-body"></div>
     </div>
-    <div class="table-container">
-        <table class="data-table" id="playbooks-table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Triggers</th>
-                    <th>Steps</th>
-                    <th>Priority</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="playbooks-body">
-                <tr><td colspan="6" class="loading">Loading playbooks...</td></tr>
-            </tbody>
-        </table>
-    </div>
-</section>
+</div>
 
 <!-- Create/Edit Playbook Modal -->
 <div class="modal-overlay" id="playbook-modal" style="display: none;">
@@ -449,6 +503,282 @@
     color: var(--text-secondary);
     margin-top: 0.25rem;
 }
+
+/* Tab Navigation */
+.tab-nav {
+    display: flex;
+    gap: 0;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.tab-btn {
+    padding: 0.75rem 1.25rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.tab-btn.active {
+    color: var(--accent-color);
+    border-bottom-color: var(--accent-color);
+}
+
+.tab-badge {
+    background: var(--accent-color);
+    color: white;
+    padding: 0.125rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    margin-left: 0.25rem;
+}
+
+/* Progress bar */
+.progress-bar-container {
+    width: 100%;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+
+.progress-bar-fill.status-in_progress { background: #ffc107; }
+.progress-bar-fill.status-completed { background: #4caf50; }
+.progress-bar-fill.status-failed { background: #f44336; }
+.progress-bar-fill.status-pending { background: #9e9e9e; }
+
+.progress-text {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+/* Execution status badges */
+.exec-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.exec-status.in_progress { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+.exec-status.completed { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+.exec-status.failed { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+.exec-status.pending { background: rgba(158, 158, 158, 0.2); color: #9e9e9e; }
+
+/* Outcome badges */
+.exec-outcome {
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.exec-outcome.true_positive { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+.exec-outcome.false_positive { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+.exec-outcome.benign_true_positive { background: rgba(33, 150, 243, 0.2); color: #2196f3; }
+.exec-outcome.risk_accepted { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+.exec-outcome.inconclusive { background: rgba(158, 158, 158, 0.2); color: #9e9e9e; }
+.exec-outcome.escalated { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+
+/* Step action data form */
+.step-action-form {
+    padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+}
+.step-action-form .form-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+    align-items: center;
+}
+.step-action-form label {
+    min-width: 110px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+.step-action-form input,
+.step-action-form textarea,
+.step-action-form select {
+    flex: 1;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    color: var(--text-primary);
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+.step-action-form textarea {
+    min-height: 40px;
+    resize: vertical;
+}
+
+/* Outcome picker modal overlay */
+.outcome-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.outcome-modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    width: 480px;
+    max-width: 90vw;
+}
+.outcome-modal h3 {
+    margin: 0 0 1rem 0;
+}
+.outcome-modal .form-group {
+    margin-bottom: 1rem;
+}
+.outcome-modal .form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+.outcome-modal select,
+.outcome-modal textarea {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    padding: 0.5rem;
+    font-size: 0.875rem;
+}
+.outcome-modal textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+.outcome-modal .btn-row {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+
+/* Execution detail panel */
+.exec-detail-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-color);
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.exec-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.exec-detail-header h3 {
+    margin: 0;
+}
+
+.exec-detail-body {
+    padding: 1.5rem;
+}
+
+.exec-step-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.exec-step-item.done {
+    opacity: 0.7;
+}
+
+.exec-step-item.done .exec-step-title {
+    text-decoration: line-through;
+    color: var(--text-secondary);
+}
+
+.exec-step-checkbox {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.exec-step-title {
+    flex: 1;
+}
+
+.exec-step-required {
+    font-size: 0.625rem;
+    color: #f44336;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.exec-step-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.exec-actions-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.case-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--accent-color);
+    text-decoration: none;
+}
+
+.case-link:hover {
+    text-decoration: underline;
+}
+
+.alert-id-display {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 </style>
 {% endblock %}
 
@@ -457,6 +787,365 @@
 let playbooks = [];
 let editingPlaybookId = null;
 let stepCounter = 0;
+let executionsList = [];
+let expandedExecutionId = null;
+
+// ==================== TAB MANAGEMENT ====================
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
+
+    document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
+    document.getElementById(`tab-${tab}`).style.display = 'block';
+
+    // Show/hide New Playbook button
+    document.getElementById('btn-new-playbook').style.display = tab === 'library' ? '' : 'none';
+
+    if (tab === 'executions') {
+        loadExecutions();
+    }
+}
+
+// ==================== EXECUTIONS DASHBOARD ====================
+
+async function loadExecutions() {
+    const status = document.getElementById('exec-status-filter').value;
+    const tbody = document.getElementById('executions-body');
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading executions...</td></tr>';
+
+    try {
+        const url = `/api/playbook-executions?limit=50${status ? '&status=' + status : ''}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to load executions');
+
+        const data = await response.json();
+        executionsList = data.executions || [];
+        displayExecutions();
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="7" class="loading">Error: ${escapeHtml(error.message)}</td></tr>`;
+    }
+
+    // Also load badge count
+    loadExecutionsBadge();
+}
+
+async function loadExecutionsBadge() {
+    try {
+        const response = await fetch('/api/playbook-executions/summary');
+        if (!response.ok) return;
+        const data = await response.json();
+        const badge = document.getElementById('executions-badge');
+        const activeCount = data.in_progress + data.pending;
+        if (activeCount > 0) {
+            badge.textContent = activeCount;
+            badge.style.display = '';
+        } else {
+            badge.style.display = 'none';
+        }
+    } catch (e) {
+        // Silently fail
+    }
+}
+
+function displayExecutions() {
+    const tbody = document.getElementById('executions-body');
+
+    if (executionsList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="loading">No executions found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = executionsList.map(e => {
+        const playbook = e.playbook || {};
+        const alertShort = e.es_alert_id ? e.es_alert_id.substring(0, 20) + (e.es_alert_id.length > 20 ? '...' : '') : '-';
+        const caseInfo = e.case_number ? `<a class="case-link" href="/alerts">${escapeHtml(e.case_number)}</a>` : '';
+        const startedAt = e.started_at ? new Date(e.started_at).toLocaleString() : '-';
+        const isExpanded = expandedExecutionId === e.id;
+
+        return `
+            <tr class="${isExpanded ? 'row-expanded' : ''}" data-exec-id="${e.id}">
+                <td><strong>${escapeHtml(playbook.name || 'Unknown')}</strong></td>
+                <td>
+                    <span class="alert-id-display" title="${escapeHtml(e.es_alert_id || '')}">${escapeHtml(alertShort)}</span>
+                    ${caseInfo ? `<br>${caseInfo}` : ''}
+                </td>
+                <td style="min-width:120px;">
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill status-${e.status}" style="width:${e.progress_pct}%;"></div>
+                    </div>
+                    <div class="progress-text">${e.completed_steps}/${e.total_steps} steps (${e.progress_pct}%)</div>
+                </td>
+                <td>
+                    <span class="exec-status ${e.status}">${e.status.replace('_', ' ')}</span>
+                    ${e.outcome ? `<br><span class="exec-outcome ${e.outcome}">${e.outcome.replace(/_/g, ' ')}</span>` : ''}
+                    ${e.report_document_id ? `<br><a href="/documents" style="font-size:0.7rem;">View Report</a>` : ''}
+                </td>
+                <td>${escapeHtml(e.executed_by_username || '-')}</td>
+                <td style="font-size:0.8rem;">${startedAt}</td>
+                <td>
+                    <button class="btn btn-sm" onclick="toggleExecDetail(${e.id})">${isExpanded ? 'Close' : 'Work'}</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function toggleExecDetail(executionId) {
+    if (expandedExecutionId === executionId) {
+        closeExecDetail();
+        return;
+    }
+    expandedExecutionId = executionId;
+    const exec = executionsList.find(e => e.id === executionId);
+    if (!exec) return;
+
+    renderExecDetail(exec);
+    document.getElementById('exec-detail-panel').style.display = 'block';
+    displayExecutions(); // Re-render to update button text
+}
+
+function closeExecDetail() {
+    expandedExecutionId = null;
+    document.getElementById('exec-detail-panel').style.display = 'none';
+    displayExecutions();
+}
+
+function renderExecDetail(exec) {
+    const playbook = exec.playbook || {};
+    const steps = playbook.steps || [];
+    const stepStatuses = exec.step_statuses || {};
+
+    document.getElementById('exec-detail-title').textContent = playbook.name || 'Execution Details';
+
+    const stepsHtml = steps.map(step => {
+        const status = stepStatuses[step.id] || {};
+        const isDone = status.status === 'completed' || status.status === 'skipped';
+        const isActive = exec.status === 'in_progress';
+        const completedBy = status.completed_by_username ? ` by ${escapeHtml(status.completed_by_username)}` : '';
+        const completedAt = status.completed_at ? ` at ${new Date(status.completed_at).toLocaleString()}` : '';
+        const ad = status.action_data || {};
+
+        return `
+            <div class="exec-step-item ${isDone ? 'done' : ''}">
+                <input type="checkbox" class="exec-step-checkbox"
+                       ${isDone ? 'checked' : ''} ${!isActive ? 'disabled' : ''}
+                       onchange="execUpdateStepWithData(${exec.id}, ${step.id}, this.checked ? 'completed' : 'pending')">
+                <span class="exec-step-title">${escapeHtml(step.title)}</span>
+                ${step.is_required ? '<span class="exec-step-required">Required</span>' : ''}
+                ${isDone ? `<span class="exec-step-meta">${status.status === 'skipped' ? 'Skipped' : 'Done'}${completedBy}${completedAt}</span>` : ''}
+            </div>
+            <div class="step-action-form" id="step-action-${step.id}">
+                <div class="form-row">
+                    <label>Action Taken</label>
+                    <input type="text" data-field="action_taken" data-step="${step.id}"
+                           value="${escapeHtml(ad.action_taken || '')}" ${!isActive ? 'disabled' : ''}
+                           placeholder="What action was performed?">
+                </div>
+                <div class="form-row">
+                    <label>Findings</label>
+                    <textarea data-field="findings" data-step="${step.id}" ${!isActive ? 'disabled' : ''}
+                              placeholder="What was found?">${escapeHtml(ad.findings || '')}</textarea>
+                </div>
+                <div class="form-row">
+                    <label>Evidence</label>
+                    <input type="text" data-field="evidence_collected" data-step="${step.id}"
+                           value="${escapeHtml(ad.evidence_collected || '')}" ${!isActive ? 'disabled' : ''}
+                           placeholder="Evidence collected (URLs, hashes, etc.)">
+                </div>
+                <div class="form-row">
+                    <label>Risk Assessment</label>
+                    <select data-field="risk_assessment" data-step="${step.id}" ${!isActive ? 'disabled' : ''}>
+                        <option value="">—</option>
+                        <option value="low" ${ad.risk_assessment === 'low' ? 'selected' : ''}>Low</option>
+                        <option value="medium" ${ad.risk_assessment === 'medium' ? 'selected' : ''}>Medium</option>
+                        <option value="high" ${ad.risk_assessment === 'high' ? 'selected' : ''}>High</option>
+                        <option value="critical" ${ad.risk_assessment === 'critical' ? 'selected' : ''}>Critical</option>
+                    </select>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const caseHtml = exec.case_number
+        ? `<div style="margin-bottom:1rem;"><strong>Case:</strong> <a class="case-link" href="/alerts">${escapeHtml(exec.case_number)} - ${escapeHtml(exec.case_title || '')}</a></div>`
+        : '';
+
+    const alertHtml = `<div style="margin-bottom:1rem;font-size:0.85rem;"><strong>Alert:</strong> <span class="text-secondary">${escapeHtml(exec.es_alert_id || '-')}</span></div>`;
+
+    const completedSteps = Object.values(stepStatuses).filter(s => s.status === 'completed' || s.status === 'skipped').length;
+    const progress = steps.length > 0 ? Math.round((completedSteps / steps.length) * 100) : 0;
+
+    const progressHtml = `
+        <div style="margin-bottom:1rem;">
+            <div class="progress-bar-container" style="height:12px;">
+                <div class="progress-bar-fill status-${exec.status}" style="width:${progress}%;"></div>
+            </div>
+            <div class="progress-text">${completedSteps}/${steps.length} steps completed (${progress}%)</div>
+        </div>
+    `;
+
+    let actionsHtml = '';
+    if (exec.status === 'in_progress') {
+        actionsHtml = `
+            <div class="exec-actions-bar">
+                <button class="btn btn-primary btn-sm" onclick="showOutcomeModal(${exec.id})">Complete &amp; Classify</button>
+                <button class="btn btn-sm" onclick="execFail(${exec.id})">Mark Failed</button>
+            </div>
+        `;
+    } else if (exec.status === 'completed') {
+        const outcomeLabel = exec.outcome ? exec.outcome.replace(/_/g, ' ') : '';
+        actionsHtml = `
+            <div class="exec-actions-bar" style="align-items:center;">
+                ${exec.outcome ? `<span class="exec-outcome ${exec.outcome}">${outcomeLabel}</span>` : ''}
+                ${exec.report_document_id ? `<a href="/documents" class="btn btn-sm">View Report</a>` : ''}
+                ${exec.report_document_id ? `<button class="btn btn-sm" onclick="execRegenerateReport(${exec.id})">Regenerate Report</button>` : ''}
+            </div>
+        `;
+    }
+
+    document.getElementById('exec-detail-body').innerHTML = `
+        ${caseHtml}
+        ${alertHtml}
+        ${progressHtml}
+        <div style="margin-bottom:0.5rem;font-weight:600;">Steps</div>
+        ${stepsHtml || '<div class="text-secondary">No steps defined</div>'}
+        ${actionsHtml}
+    `;
+}
+
+function getStepActionData(stepId) {
+    const form = document.getElementById(`step-action-${stepId}`);
+    if (!form) return null;
+    const data = {};
+    form.querySelectorAll('[data-field]').forEach(el => {
+        const val = el.value.trim();
+        if (val) data[el.dataset.field] = val;
+    });
+    return Object.keys(data).length > 0 ? data : null;
+}
+
+async function execUpdateStepWithData(executionId, stepId, status) {
+    try {
+        const actionData = getStepActionData(stepId);
+        const body = { status };
+        if (actionData) body.action_data = actionData;
+
+        const response = await fetch(`/api/playbook-executions/${executionId}/steps/${stepId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!response.ok) throw new Error('Failed to update step');
+
+        const data = await response.json();
+        const idx = executionsList.findIndex(e => e.id === executionId);
+        if (idx >= 0 && data.execution) {
+            const steps = data.execution.playbook?.steps || [];
+            const stepStatuses = data.execution.step_statuses || {};
+            const completedSteps = Object.values(stepStatuses).filter(s => s.status === 'completed' || s.status === 'skipped').length;
+            executionsList[idx] = {
+                ...executionsList[idx],
+                ...data.execution,
+                total_steps: steps.length,
+                completed_steps: completedSteps,
+                progress_pct: steps.length > 0 ? Math.round((completedSteps / steps.length) * 100) : 0,
+            };
+            displayExecutions();
+            renderExecDetail(executionsList[idx]);
+        }
+    } catch (error) {
+        showToast('Failed to update step: ' + error.message, 'error');
+    }
+}
+
+function showOutcomeModal(executionId) {
+    const overlay = document.createElement('div');
+    overlay.className = 'outcome-modal-overlay';
+    overlay.id = 'outcome-modal-overlay';
+    overlay.innerHTML = `
+        <div class="outcome-modal">
+            <h3>Complete Execution</h3>
+            <div class="form-group">
+                <label>Investigation Outcome</label>
+                <select id="outcome-select">
+                    <option value="">— Select outcome —</option>
+                    <option value="true_positive">True Positive</option>
+                    <option value="false_positive">False Positive</option>
+                    <option value="benign_true_positive">Benign True Positive</option>
+                    <option value="risk_accepted">Risk Accepted</option>
+                    <option value="inconclusive">Inconclusive</option>
+                    <option value="escalated">Escalated</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Outcome Notes</label>
+                <textarea id="outcome-notes" placeholder="Describe the reasoning and final determination..."></textarea>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-sm" onclick="closeOutcomeModal()">Cancel</button>
+                <button class="btn btn-primary btn-sm" onclick="execCompleteWithOutcome(${executionId})">Complete &amp; Generate Report</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeOutcomeModal();
+    });
+}
+
+function closeOutcomeModal() {
+    const overlay = document.getElementById('outcome-modal-overlay');
+    if (overlay) overlay.remove();
+}
+
+async function execCompleteWithOutcome(executionId) {
+    try {
+        const outcome = document.getElementById('outcome-select').value || null;
+        const outcomeNotes = document.getElementById('outcome-notes').value.trim() || null;
+
+        const response = await fetch(`/api/playbook-executions/${executionId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ outcome: outcome, outcome_notes: outcomeNotes })
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to complete execution');
+        }
+        const data = await response.json();
+        closeOutcomeModal();
+        showToast(`Execution completed${data.report_document_id ? ' — report generated' : ''}`, 'success');
+        closeExecDetail();
+        loadExecutions();
+    } catch (error) {
+        showToast('Failed to complete: ' + error.message, 'error');
+    }
+}
+
+async function execRegenerateReport(executionId) {
+    try {
+        const response = await fetch(`/api/playbook-executions/${executionId}/regenerate-report`, { method: 'POST' });
+        if (!response.ok) throw new Error('Failed to regenerate report');
+        const data = await response.json();
+        showToast(`Report regenerated (v${data.report_version || 'new'})`, 'success');
+        loadExecutions();
+    } catch (error) {
+        showToast('Failed to regenerate report: ' + error.message, 'error');
+    }
+}
+
+async function execFail(executionId) {
+    try {
+        const response = await fetch(`/api/playbook-executions/${executionId}/fail`, { method: 'POST' });
+        if (!response.ok) throw new Error('Failed');
+        showToast('Execution marked as failed', 'success');
+        closeExecDetail();
+        loadExecutions();
+    } catch (error) {
+        showToast('Failed: ' + error.message, 'error');
+    }
+}
 
 // ==================== DATA LOADING ====================
 
@@ -995,6 +1684,25 @@ function showToast(message, type = 'info') {
 
 document.addEventListener('DOMContentLoaded', function() {
     loadPlaybooks();
+    loadExecutionsBadge();
+
+    // Deep-link support: ?execution=ID switches to executions tab and expands
+    const params = new URLSearchParams(window.location.search);
+    const execParam = params.get('execution');
+    if (execParam) {
+        switchTab('executions');
+        // After executions load, expand the specified one
+        const origLoad = loadExecutions;
+        loadExecutions = async function() {
+            await origLoad.call(this);
+            loadExecutions = origLoad; // Restore original
+            const execId = parseInt(execParam);
+            if (execId) {
+                toggleExecDetail(execId);
+            }
+        };
+        loadExecutions();
+    }
 });
 </script>
 {% endblock %}

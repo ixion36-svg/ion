@@ -10,7 +10,7 @@ A Security Operations Center (SOC) platform with AI-powered analysis, alert tria
 - **AI-Assisted Triage**: One-click AI analysis, observable extraction, MITRE technique suggestion, and contextual chat from alert detail view
 - **AI-Powered Document Analysis**: Entity extraction, spell checking, and rewrite suggestions powered by Ollama
 - **Alert Investigation**: Elasticsearch-integrated SOC alert triage with case management and analytics
-- **Investigation Playbooks**: Step-based investigation workflows with trigger conditions for alert triage
+- **Investigation Playbooks**: Step-based investigation workflows with trigger conditions, action recording, outcome classification, and auto-generated investigation reports
 - **Multi-Alert Pattern Detection**: Automatic detection of attack patterns across multiple alerts on the same host/user, with auto-triggered investigation playbooks
 - **Saved Searches**: Save, share, and re-run Elasticsearch queries from Discover page
 - **Observable Tracking**: Centralized observable management with cross-case correlation and enrichment
@@ -372,7 +372,9 @@ See [DEPLOYMENT_GUIDE.md](deploy/DEPLOYMENT_GUIDE.md) for detailed instructions 
 | `/api/elasticsearch/alerts/{id}/recommended-playbooks` | GET | Get matching playbooks for alert |
 | `/api/elasticsearch/alerts/{id}/playbook/{pb_id}/start` | POST | Start playbook execution |
 | `/api/playbook-executions/{id}` | GET | Get execution status |
-| `/api/playbook-executions/{id}/steps/{step_id}` | PUT | Mark step complete/skipped |
+| `/api/playbook-executions/{id}/steps/{step_id}` | PUT | Update step status with action data (findings, evidence, risk) |
+| `/api/playbook-executions/{id}/complete` | POST | Complete execution with outcome classification and auto-generate report |
+| `/api/playbook-executions/{id}/regenerate-report` | POST | Regenerate investigation report (creates new version) |
 | `/api/alerts/host-patterns` | GET | Detect multi-alert attack patterns across hosts/users |
 
 ### Collections (Folders)
@@ -602,6 +604,18 @@ Step-based investigation workflows that guide analysts through alert triage.
   - `auto_create_case`: Automatic case creation
 - **Execution Tracking**: Track playbook progress per alert
 - **Required Steps**: Mark critical steps that must be completed
+- **Action Recording**: Per-step structured data capture:
+  - Action taken, findings, evidence collected, risk assessment (low/medium/high/critical)
+  - Data persists in step_statuses JSON and renders in the investigation report
+- **Outcome Classification**: On completion, classify the investigation result:
+  - True Positive, False Positive, Benign True Positive, Risk Accepted, Inconclusive, Escalated
+  - Color-coded outcome badges on playbooks page and case detail modal
+- **Auto-Generated Investigation Reports**: On completion, a Markdown investigation report is auto-generated and stored in the "Playbook Reports" collection:
+  - Header with execution metadata (analyst, dates, alert, case)
+  - Full steps table with action data, findings, evidence, and risk
+  - Timeline of step completions
+  - Outcome classification and notes
+  - Reports support versioning via regeneration (creates new document version)
 
 ### Usage
 
@@ -609,7 +623,9 @@ Step-based investigation workflows that guide analysts through alert triage.
 2. Define trigger conditions (which alerts should recommend this playbook)
 3. Add steps with titles, descriptions, and types
 4. When investigating an alert, recommended playbooks appear in the triage bar
-5. Start a playbook and mark steps as complete during investigation
+5. Start a playbook and work through steps — record findings and evidence per step
+6. Click **Complete & Classify** to select an outcome and auto-generate the investigation report
+7. View the report in the **Documents** page under the "Playbook Reports" collection
 
 ### Playbook Management
 
