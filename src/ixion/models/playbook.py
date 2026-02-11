@@ -15,12 +15,15 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.types import JSON
 
 from ixion.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from ixion.models.user import User
+    from ixion.models.alert_triage import AlertCase
+    from ixion.models.document import Document
 
 
 class StepType(str, Enum):
@@ -39,6 +42,17 @@ class ExecutionStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+class ExecutionOutcome(str, Enum):
+    """Classification of investigation outcome."""
+
+    TRUE_POSITIVE = "true_positive"
+    FALSE_POSITIVE = "false_positive"
+    BENIGN_TRUE_POSITIVE = "benign_true_positive"
+    RISK_ACCEPTED = "risk_accepted"
+    INCONCLUSIVE = "inconclusive"
+    ESCALATED = "escalated"
 
 
 class Playbook(Base, TimestampMixin):
@@ -95,6 +109,15 @@ class Playbook(Base, TimestampMixin):
         if include_steps:
             result["steps"] = [step.to_dict() for step in self.steps]
         return result
+
+    def matches_pattern(self, pattern_id: str) -> bool:
+        """Check if this playbook is associated with the given pattern ID."""
+        conditions = self.trigger_conditions or {}
+        if conditions.get("pattern_id") == pattern_id:
+            return True
+        if pattern_id in conditions.get("pattern_ids", []):
+            return True
+        return False
 
     def matches_alert(
         self,
@@ -210,11 +233,25 @@ class PlaybookExecution(Base, TimestampMixin):
     executed_by_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )
+    case_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("alert_cases.id"), nullable=True
+    )
+    outcome: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    outcome_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    report_document_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("documents.id"), nullable=True
+    )
 
     # Relationships
     playbook: Mapped["Playbook"] = relationship("Playbook", back_populates="executions")
     executed_by: Mapped[Optional["User"]] = relationship(
         "User", foreign_keys=[executed_by_id]
+    )
+    case: Mapped[Optional["AlertCase"]] = relationship(
+        "AlertCase", foreign_keys=[case_id]
+    )
+    report_document: Mapped[Optional["Document"]] = relationship(
+        "Document", foreign_keys=[report_document_id]
     )
 
     def __repr__(self) -> str:
@@ -234,6 +271,12 @@ class PlaybookExecution(Base, TimestampMixin):
             "executed_by_username": (
                 self.executed_by.username if self.executed_by else None
             ),
+            "case_id": self.case_id,
+            "case_number": self.case.case_number if self.case else None,
+            "case_title": self.case.title if self.case else None,
+            "outcome": self.outcome,
+            "outcome_notes": self.outcome_notes,
+            "report_document_id": self.report_document_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -254,18 +297,23 @@ class PlaybookExecution(Base, TimestampMixin):
         completed_by_id: Optional[int] = None,
         completed_by_username: Optional[str] = None,
         notes: Optional[str] = None,
+        action_data: Optional[dict] = None,
     ) -> None:
         """Update the status of a specific step."""
         if self.step_statuses is None:
             self.step_statuses = {}
 
-        self.step_statuses[str(step_id)] = {
+        entry = {
             "status": status,
             "completed_at": datetime.utcnow().isoformat() if status in ("completed", "skipped") else None,
             "completed_by_id": completed_by_id,
             "completed_by_username": completed_by_username,
             "notes": notes,
         }
+        if action_data:
+            entry["action_data"] = action_data
+        self.step_statuses[str(step_id)] = entry
+        flag_modified(self, "step_statuses")
 
     def check_completion(self) -> bool:
         """Check if all required steps are completed and update status."""

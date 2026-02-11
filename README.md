@@ -7,15 +7,17 @@ A Security Operations Center (SOC) platform with AI-powered analysis, alert tria
 ## Features
 
 - **AI Assistant**: Local LLM integration via Ollama for security analysis, code generation, and threat investigation
+- **AI-Assisted Triage**: One-click AI analysis, observable extraction, MITRE technique suggestion, and contextual chat from alert detail view
 - **AI-Powered Document Analysis**: Entity extraction, spell checking, and rewrite suggestions powered by Ollama
 - **Alert Investigation**: Elasticsearch-integrated SOC alert triage with case management and analytics
-- **Investigation Playbooks**: Step-based investigation workflows with trigger conditions for alert triage
+- **Investigation Playbooks**: Step-based investigation workflows with trigger conditions, action recording, outcome classification, and auto-generated investigation reports
+- **Multi-Alert Pattern Detection**: Automatic detection of attack patterns across multiple alerts on the same host/user, with auto-triggered investigation playbooks
 - **Saved Searches**: Save, share, and re-run Elasticsearch queries from Discover page
 - **Observable Tracking**: Centralized observable management with cross-case correlation and enrichment
 - **OpenCTI Integration**: IOC enrichment against OpenCTI threat intelligence
 - **Template Management**: Document templates with version control and Jinja2 rendering
 - **SOC Tools**: Client-side document processing tools for security analysts
-- **Real-time Chat**: Team collaboration with chat rooms
+- **Real-time Chat**: Team collaboration with chat rooms and expandable AI chat panel
 - **Role-based Access**: Web UI with authentication and RBAC
 - **GitLab Integration**: Issue tracking directly from IXION
 
@@ -335,6 +337,17 @@ See [DEPLOYMENT_GUIDE.md](deploy/DEPLOYMENT_GUIDE.md) for detailed instructions 
 | `/api/extract/rewrite-suggestions` | POST | AI-powered writing improvement suggestions |
 | `/api/extract/apply-rewrites` | POST | Apply AI rewrite to text |
 
+### AI Assistant
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/ai/status` | GET | Check AI availability, model info, and queue status |
+| `/api/ai/chat` | POST | Send chat message (non-streaming) |
+| `/api/ai/chat/stream` | POST | Send chat message with SSE streaming response |
+| `/api/ai/analyze/alert` | POST | Analyze alert data and return AI assessment |
+| `/api/ai/triage/suggest` | POST | Structured triage suggestions (observables, MITRE techniques, priority) |
+| `/api/ai/case/generate` | POST | Generate case fields (title, description, evidence) from alert context |
+
 ### Saved Searches
 
 | Endpoint | Method | Description |
@@ -359,7 +372,10 @@ See [DEPLOYMENT_GUIDE.md](deploy/DEPLOYMENT_GUIDE.md) for detailed instructions 
 | `/api/elasticsearch/alerts/{id}/recommended-playbooks` | GET | Get matching playbooks for alert |
 | `/api/elasticsearch/alerts/{id}/playbook/{pb_id}/start` | POST | Start playbook execution |
 | `/api/playbook-executions/{id}` | GET | Get execution status |
-| `/api/playbook-executions/{id}/steps/{step_id}` | PUT | Mark step complete/skipped |
+| `/api/playbook-executions/{id}/steps/{step_id}` | PUT | Update step status with action data (findings, evidence, risk) |
+| `/api/playbook-executions/{id}/complete` | POST | Complete execution with outcome classification and auto-generate report |
+| `/api/playbook-executions/{id}/regenerate-report` | POST | Regenerate investigation report (creates new version) |
+| `/api/alerts/host-patterns` | GET | Detect multi-alert attack patterns across hosts/users |
 
 ### Collections (Folders)
 
@@ -502,6 +518,22 @@ IXION includes a built-in alert investigation page (`/alerts`) that connects to 
   - Investigation notes journal with add-note capability
 - **Manage Case Button**: Available in the alert detail Case tab for quick access
 
+### AI-Assisted Triage
+
+When Ollama is running, AI assist buttons appear throughout the alert investigation workflow:
+
+| Feature | Location | Description |
+|---------|----------|-------------|
+| **AI Analyze** | Alert detail modal | One-click AI analysis of alert context, severity assessment, and recommendations |
+| **AI Extract** | Triage bar (Observables) | AI extracts observables (IPs, domains, hostnames, URLs, user accounts) from alert data |
+| **AI Suggest** | Triage bar (MITRE) | AI suggests MITRE ATT&CK technique mappings based on alert content |
+| **Discuss with AI** | Alert detail + enrichment results | Opens AI chat panel pre-loaded with full alert context (metadata, observables, enrichment results) for conversational investigation |
+| **AI Summary** | Case management | Generates AI summary of case details and linked alerts |
+
+The chat panel is expandable (click the expand icon in the header) for a larger workspace when discussing complex investigations.
+
+All AI features degrade gracefully - buttons are hidden when Ollama is unavailable.
+
 ### Analytics Dashboard
 
 A collapsible analytics panel (no external dependencies — pure SVG/CSS) provides:
@@ -572,6 +604,18 @@ Step-based investigation workflows that guide analysts through alert triage.
   - `auto_create_case`: Automatic case creation
 - **Execution Tracking**: Track playbook progress per alert
 - **Required Steps**: Mark critical steps that must be completed
+- **Action Recording**: Per-step structured data capture:
+  - Action taken, findings, evidence collected, risk assessment (low/medium/high/critical)
+  - Data persists in step_statuses JSON and renders in the investigation report
+- **Outcome Classification**: On completion, classify the investigation result:
+  - True Positive, False Positive, Benign True Positive, Risk Accepted, Inconclusive, Escalated
+  - Color-coded outcome badges on playbooks page and case detail modal
+- **Auto-Generated Investigation Reports**: On completion, a Markdown investigation report is auto-generated and stored in the "Playbook Reports" collection:
+  - Header with execution metadata (analyst, dates, alert, case)
+  - Full steps table with action data, findings, evidence, and risk
+  - Timeline of step completions
+  - Outcome classification and notes
+  - Reports support versioning via regeneration (creates new document version)
 
 ### Usage
 
@@ -579,7 +623,9 @@ Step-based investigation workflows that guide analysts through alert triage.
 2. Define trigger conditions (which alerts should recommend this playbook)
 3. Add steps with titles, descriptions, and types
 4. When investigating an alert, recommended playbooks appear in the triage bar
-5. Start a playbook and mark steps as complete during investigation
+5. Start a playbook and work through steps — record findings and evidence per step
+6. Click **Complete & Classify** to select an outcome and auto-generate the investigation report
+7. View the report in the **Documents** page under the "Playbook Reports" collection
 
 ### Playbook Management
 
@@ -589,6 +635,40 @@ Step-based investigation workflows that guide analysts through alert triage.
 | Edit | Modify playbook configuration and steps |
 | Activate/Deactivate | Toggle whether playbook is recommended for alerts |
 | Priority | Higher priority playbooks are checked first for matching |
+
+## Multi-Alert Pattern Detection
+
+IXION automatically detects attack patterns when multiple alerts accumulate on the same host or user, recommending (or auto-starting) the appropriate investigation playbook.
+
+### How It Works
+
+1. Alerts are grouped by host or user
+2. Six built-in pattern evaluators analyze each group for known attack signatures
+3. Detected patterns are matched to seeded playbooks via `trigger_conditions.pattern_id`
+4. High-confidence patterns (active intrusion, lateral movement, data exfiltration, ransomware) auto-start their playbook execution
+
+### Default Pattern Playbooks
+
+Six investigation playbooks are automatically seeded on startup:
+
+| Playbook | Priority | Auto-Execute | Pattern Detected |
+|----------|----------|-------------|------------------|
+| Ransomware Response | 99 | Yes | File encryption/rename + privilege escalation on same host |
+| Active Intrusion Response | 95 | Yes | Alerts spanning 3+ MITRE tactics on same host |
+| Data Exfiltration Response | 92 | Yes | C2/beacon + exfiltration alerts on same host |
+| Forensics Investigation | 90 | No | 3+ distinct rules on same host, at least 1 critical/high |
+| Lateral Movement Containment | 85 | Yes | Lateral movement technique + alerts on 2+ hosts from same source |
+| Compromised Account Investigation | 80 | No | Multiple auth failures + suspicious activity for same user |
+
+### Pattern Detections Panel
+
+The alerts page includes a collapsible **Pattern Detections** panel that:
+- Displays detected patterns with severity badges and affected host/user
+- Shows alert count, distinct rule count, and MITRE tactic count per pattern
+- Provides "Start Playbook" buttons (or "View Execution" for auto-started patterns)
+- Allows filtering the alert table to show only alerts in a pattern group
+- Dismissible per session via sessionStorage
+- Auto-refreshes when alerts are reloaded
 
 ## SOC Tools
 

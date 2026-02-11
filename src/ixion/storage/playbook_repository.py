@@ -232,6 +232,19 @@ class PlaybookRepository:
     # Matching
     # =========================================================================
 
+    def find_playbook_for_pattern(self, pattern_id: str) -> Optional[Playbook]:
+        """Find the best active playbook associated with a pattern ID.
+
+        Returns the highest-priority active playbook whose trigger_conditions
+        contain the given pattern_id (via ``pattern_id`` or ``pattern_ids``).
+        """
+        playbooks = self.list_playbooks(active_only=True, include_steps=True)
+        matching = [pb for pb in playbooks if pb.matches_pattern(pattern_id)]
+        if not matching:
+            return None
+        # list_playbooks already sorted by priority desc
+        return matching[0]
+
     def find_matching_playbooks(
         self,
         rule_name: str | None = None,
@@ -269,6 +282,7 @@ class PlaybookRepository:
         playbook: Playbook,
         es_alert_id: str,
         executed_by_id: int,
+        case_id: int | None = None,
     ) -> PlaybookExecution:
         """Start a new playbook execution for an alert."""
         execution = PlaybookExecution(
@@ -278,6 +292,7 @@ class PlaybookRepository:
             started_at=datetime.utcnow(),
             step_statuses={},
             executed_by_id=executed_by_id,
+            case_id=case_id,
         )
         self.session.add(execution)
         self.session.flush()
@@ -290,6 +305,7 @@ class PlaybookRepository:
             .options(
                 joinedload(PlaybookExecution.playbook).joinedload(Playbook.steps),
                 joinedload(PlaybookExecution.executed_by),
+                joinedload(PlaybookExecution.case),
             )
             .where(PlaybookExecution.id == execution_id)
         )
@@ -302,6 +318,7 @@ class PlaybookRepository:
             .options(
                 joinedload(PlaybookExecution.playbook).joinedload(Playbook.steps),
                 joinedload(PlaybookExecution.executed_by),
+                joinedload(PlaybookExecution.case),
             )
             .where(PlaybookExecution.es_alert_id == es_alert_id)
             .order_by(PlaybookExecution.created_at.desc())
@@ -340,6 +357,7 @@ class PlaybookRepository:
         completed_by_id: int | None = None,
         completed_by_username: str | None = None,
         notes: str | None = None,
+        action_data: dict | None = None,
     ) -> PlaybookExecution:
         """Update the status of a step in an execution."""
         execution.update_step_status(
@@ -348,6 +366,7 @@ class PlaybookRepository:
             completed_by_id=completed_by_id,
             completed_by_username=completed_by_username,
             notes=notes,
+            action_data=action_data,
         )
 
         # Check if all required steps are done
@@ -371,10 +390,29 @@ class PlaybookRepository:
         self.session.flush()
         return execution
 
-    def complete_execution(self, execution: PlaybookExecution) -> PlaybookExecution:
+    def complete_execution(
+        self,
+        execution: PlaybookExecution,
+        outcome: str | None = None,
+        outcome_notes: str | None = None,
+    ) -> PlaybookExecution:
         """Mark an execution as completed."""
         execution.status = ExecutionStatus.COMPLETED.value
         execution.completed_at = datetime.utcnow()
+        if outcome:
+            execution.outcome = outcome
+        if outcome_notes:
+            execution.outcome_notes = outcome_notes
+        self.session.flush()
+        return execution
+
+    def set_report_document(
+        self,
+        execution: PlaybookExecution,
+        document_id: int,
+    ) -> PlaybookExecution:
+        """Link a report document to an execution."""
+        execution.report_document_id = document_id
         self.session.flush()
         return execution
 
@@ -401,3 +439,48 @@ class PlaybookRepository:
 
         stmt = stmt.order_by(PlaybookExecution.created_at.desc()).limit(limit)
         return list(self.session.execute(stmt).unique().scalars().all())
+
+    def get_executions_for_case(self, case_id: int) -> List[PlaybookExecution]:
+        """Get all executions linked to a specific case."""
+        stmt = (
+            select(PlaybookExecution)
+            .options(
+                joinedload(PlaybookExecution.playbook).joinedload(Playbook.steps),
+                joinedload(PlaybookExecution.executed_by),
+                joinedload(PlaybookExecution.case),
+            )
+            .where(PlaybookExecution.case_id == case_id)
+            .order_by(PlaybookExecution.created_at.desc())
+        )
+        return list(self.session.execute(stmt).unique().scalars().all())
+
+    def get_executions_dashboard(
+        self,
+        status: str | None = None,
+        limit: int = 50,
+    ) -> List[PlaybookExecution]:
+        """Get executions for the dashboard with full relationships."""
+        stmt = (
+            select(PlaybookExecution)
+            .options(
+                joinedload(PlaybookExecution.playbook).joinedload(Playbook.steps),
+                joinedload(PlaybookExecution.executed_by),
+                joinedload(PlaybookExecution.case),
+            )
+        )
+
+        if status:
+            stmt = stmt.where(PlaybookExecution.status == status)
+
+        stmt = stmt.order_by(PlaybookExecution.created_at.desc()).limit(limit)
+        return list(self.session.execute(stmt).unique().scalars().all())
+
+    def get_execution_counts_by_status(self) -> dict:
+        """Get counts of executions grouped by status."""
+        stmt = (
+            select(PlaybookExecution.status, func.count(PlaybookExecution.id))
+            .group_by(PlaybookExecution.status)
+        )
+        rows = self.session.execute(stmt).all()
+        counts = {row[0]: row[1] for row in rows}
+        return counts

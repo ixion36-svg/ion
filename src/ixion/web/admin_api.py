@@ -802,6 +802,8 @@ class WizardIntegrationConfig(BaseModel):
     # Ollama specific
     model: Optional[str] = None
     timeout: Optional[int] = None
+    # DFIR-IRIS specific
+    default_customer: Optional[int] = None
 
 
 class WizardDiagnoseRequest(BaseModel):
@@ -933,6 +935,19 @@ async def get_wizard_integrations(current_user: User = Depends(require_admin)):
             "configured": bool(config.abuseipdb_api_key),
             "fields": {
                 "api_key": {"type": "password", "label": "API Key", "placeholder": "Your AbuseIPDB API key", "required": True},
+            },
+        },
+        "dfir_iris": {
+            "name": "DFIR-IRIS",
+            "description": "Incident response platform for case escalation",
+            "enabled": config.dfir_iris_enabled,
+            "configured": bool(config.dfir_iris_url) and bool(config.dfir_iris_api_key),
+            "url": config.dfir_iris_url,
+            "fields": {
+                "url": {"type": "url", "label": "DFIR-IRIS URL", "placeholder": "https://iris.example.com", "required": True},
+                "api_key": {"type": "password", "label": "API Key", "placeholder": "Bearer API key from IRIS user profile", "required": True},
+                "verify_ssl": {"type": "checkbox", "label": "Verify SSL Certificate", "default": True},
+                "default_customer": {"type": "number", "label": "Default Customer ID", "default": 1, "min": 1},
             },
         },
     }
@@ -1213,6 +1228,48 @@ async def test_wizard_integration(
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    elif integration == "dfir_iris":
+        try:
+            url = (config_data.url or "").rstrip("/")
+            if not url:
+                return {"success": False, "error": "URL is required"}
+
+            is_valid, error = validate_integration_url(url, "dfir_iris")
+            if not is_valid:
+                return {"success": False, "error": f"Invalid URL: {error}"}
+
+            existing = get_config()
+            api_key = config_data.api_key if config_data.api_key and not config_data.api_key.startswith("*") else existing.dfir_iris_api_key
+            if not api_key:
+                return {"success": False, "error": "API key is required"}
+
+            async with httpx.AsyncClient(
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                verify=config_data.verify_ssl if config_data.verify_ssl is not None else True,
+                timeout=httpx.Timeout(10.0, connect=5.0),
+            ) as client:
+                response = await client.get(f"{url}/manage/cases/list")
+                if response.status_code == 401:
+                    return {"success": False, "error": "Invalid API key or insufficient permissions"}
+                response.raise_for_status()
+                data = response.json()
+                return {
+                    "success": True,
+                    "details": {
+                        "status": data.get("status", "ok"),
+                        "message": "Connected to DFIR-IRIS",
+                    }
+                }
+        except httpx.ConnectError as e:
+            return {"success": False, "error": f"Connection failed: {str(e)}"}
+        except httpx.HTTPStatusError as e:
+            return {"success": False, "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     else:
         raise HTTPException(400, f"Unknown integration: {integration}")
 
@@ -1429,6 +1486,18 @@ async def save_wizard_integration(
         if config_data.api_key is not None and not config_data.api_key.startswith("*"):
             config.abuseipdb_api_key = config_data.api_key
 
+    elif integration == "dfir_iris":
+        if config_data.enabled is not None:
+            config.dfir_iris_enabled = config_data.enabled
+        if config_data.url is not None:
+            config.dfir_iris_url = config_data.url.rstrip("/")
+        if config_data.api_key is not None and not config_data.api_key.startswith("*"):
+            config.dfir_iris_api_key = config_data.api_key
+        if config_data.verify_ssl is not None:
+            config.dfir_iris_verify_ssl = config_data.verify_ssl
+        if config_data.default_customer is not None:
+            config.dfir_iris_default_customer = config_data.default_customer
+
     else:
         raise HTTPException(400, f"Unknown integration: {integration}")
 
@@ -1533,6 +1602,19 @@ async def save_all_wizard_integrations(
                 if config_data.api_key is not None and not config_data.api_key.startswith("*"):
                     config.abuseipdb_api_key = config_data.api_key
                 saved.append("abuseipdb")
+
+            elif integration_name == "dfir_iris":
+                if config_data.enabled is not None:
+                    config.dfir_iris_enabled = config_data.enabled
+                if config_data.url is not None:
+                    config.dfir_iris_url = config_data.url.rstrip("/")
+                if config_data.api_key is not None and not config_data.api_key.startswith("*"):
+                    config.dfir_iris_api_key = config_data.api_key
+                if config_data.verify_ssl is not None:
+                    config.dfir_iris_verify_ssl = config_data.verify_ssl
+                if config_data.default_customer is not None:
+                    config.dfir_iris_default_customer = config_data.default_customer
+                saved.append("dfir_iris")
 
             else:
                 errors.append({"integration": integration_name, "error": "Unknown integration"})

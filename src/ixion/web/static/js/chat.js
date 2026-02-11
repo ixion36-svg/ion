@@ -76,6 +76,11 @@ function createChatPanel() {
                             <path d="M12 5v14M5 12h14"/>
                         </svg>
                     </button>
+                    <button class="chat-expand-btn" id="chat-expand-btn" onclick="toggleChatExpand()" title="Expand">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" id="chat-expand-icon">
+                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                        </svg>
+                    </button>
                     <button class="chat-header-btn" onclick="toggleChat()" title="Close">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 6L6 18M6 6l12 12"/>
@@ -211,6 +216,29 @@ function toggleChat() {
     } else {
         panel.classList.remove('open');
         if (toggleBtn) toggleBtn.classList.remove('active');
+    }
+}
+
+let chatExpanded = false;
+
+function toggleChatExpand() {
+    const panel = document.getElementById('chat-panel');
+    if (!panel) return;
+
+    chatExpanded = !chatExpanded;
+    panel.classList.toggle('expanded', chatExpanded);
+
+    // Swap icon between expand and collapse
+    const icon = document.getElementById('chat-expand-icon');
+    const btn = document.getElementById('chat-expand-btn');
+    if (icon) {
+        if (chatExpanded) {
+            icon.innerHTML = '<path d="M4 14h6v6M14 4h6v6M3 21l7-7M21 3l-7 7"/>';
+            btn.title = 'Collapse';
+        } else {
+            icon.innerHTML = '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>';
+            btn.title = 'Expand';
+        }
     }
 }
 
@@ -1098,7 +1126,7 @@ async function showNewChatModal() {
     await ensureCurrentUser();
 
     await loadAvailableUsers();
-    loadCases();
+    await loadChatCaseOptions();
 }
 
 function hideNewChatModal() {
@@ -1135,23 +1163,29 @@ async function loadAvailableUsers() {
     }
 }
 
-async function loadCases() {
+async function loadChatCaseOptions() {
     try {
         const response = await fetch('/api/elasticsearch/alerts/cases');
         if (!response.ok) {
-            console.log('Cases API not available or returned error');
+            console.warn('loadChatCaseOptions: API returned', response.status);
             return;
         }
         const data = await response.json();
         const select = document.getElementById('case-link');
-        if (select && data.cases && data.cases.length > 0) {
+        if (!select) {
+            console.warn('loadChatCaseOptions: case-link select not found');
+            return;
+        }
+        const cases = data.cases || [];
+        if (cases.length > 0) {
             select.innerHTML = '<option value="">No case</option>' +
-                data.cases.map(c =>
+                cases.map(c =>
                     `<option value="${c.id}">${escapeHtml(c.case_number)} - ${escapeHtml(c.title)}</option>`
                 ).join('');
         }
+        console.log('loadChatCaseOptions: loaded', cases.length, 'cases');
     } catch (error) {
-        console.log('Cases API error (may not exist):', error.message);
+        console.error('loadChatCaseOptions failed:', error);
     }
 }
 

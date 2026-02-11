@@ -144,6 +144,21 @@ Located at `.ixion/config.json` (or `/data/.ixion/config.json` in Docker):
 
 ---
 
+## Auto-Seeded Playbooks
+
+On first startup, IXION automatically seeds **6 default pattern-based investigation playbooks** for multi-alert attack detection:
+
+- Ransomware Response (priority 99, auto-execute)
+- Active Intrusion Response (priority 95, auto-execute)
+- Data Exfiltration Response (priority 92, auto-execute)
+- Forensics Investigation (priority 90, recommend only)
+- Lateral Movement Containment (priority 85, auto-execute)
+- Compromised Account Investigation (priority 80, recommend only)
+
+These playbooks are created idempotently (safe to restart). They contain realistic SOC investigation steps and are triggered automatically when multi-alert patterns are detected on the same host or user. See the [README](README.md#multi-alert-pattern-detection) for details.
+
+---
+
 ## Default Login
 
 - **Username:** `admin`

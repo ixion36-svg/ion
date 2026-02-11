@@ -1,0 +1,91 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: iris-rabbitmq
+    restart: unless-stopped
+    networks:
+      - iris-net
+
+  db:
+    image: ghcr.io/dfir-iris/iriswebapp_db:v2.4.20
+    container_name: iris-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_ADMIN_USER: iris
+      POSTGRES_ADMIN_PASSWORD: iris_password
+      POSTGRES_DB: iris_db
+    volumes:
+      - iris_pgdata:/var/lib/postgresql/data
+    networks:
+      - iris-net
+
+  app:
+    image: ghcr.io/dfir-iris/iriswebapp_app:v2.4.20
+    container_name: iris-app
+    restart: unless-stopped
+    command: ["./iris-entrypoint.sh", "iriswebapp"]
+    depends_on:
+      - rabbitmq
+      - db
+    ports:
+      - "8100:8000"
+    environment:
+      DOCKERIZED: 1
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_ADMIN_USER: iris
+      POSTGRES_ADMIN_PASSWORD: iris_password
+      POSTGRES_SERVER: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: iris_db
+      IRIS_SECRET_KEY: iris-secret-key-change-me
+      IRIS_SECURITY_PASSWORD_SALT: iris-salt-change-me
+      CELERY_BROKER: amqp://rabbitmq
+      IRIS_AUTHENTICATION_TYPE: local
+    volumes:
+      - iris_downloads:/home/iris/downloads
+      - iris_templates:/home/iris/user_templates
+      - iris_server_data:/home/iris/server_data
+    networks:
+      - iris-net
+
+  worker:
+    image: ghcr.io/dfir-iris/iriswebapp_app:v2.4.20
+    container_name: iris-worker
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+      - db
+      - app
+    command: ["./wait-for-iriswebapp.sh", "app:8000", "./iris-entrypoint.sh", "iris-worker"]
+    environment:
+      DOCKERIZED: 1
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_ADMIN_USER: iris
+      POSTGRES_ADMIN_PASSWORD: iris_password
+      POSTGRES_SERVER: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: iris_db
+      IRIS_SECRET_KEY: iris-secret-key-change-me
+      IRIS_SECURITY_PASSWORD_SALT: iris-salt-change-me
+      CELERY_BROKER: amqp://rabbitmq
+      IRIS_WORKER: 1
+    volumes:
+      - iris_downloads:/home/iris/downloads
+      - iris_templates:/home/iris/user_templates
+      - iris_server_data:/home/iris/server_data
+    networks:
+      - iris-net
+
+volumes:
+  iris_pgdata:
+  iris_downloads:
+  iris_templates:
+  iris_server_data:
+
+networks:
+  iris-net:
+    driver: bridge

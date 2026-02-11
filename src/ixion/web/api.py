@@ -18,9 +18,10 @@ import httpx
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from ixion.core.config import get_config, get_oidc_config, get_gitlab_config, get_kibana_config
+from ixion.core.config import get_config, get_oidc_config, get_gitlab_config, get_kibana_config, get_dfir_iris_config
 from ixion.services.kibana_cases_service import get_kibana_cases_service
 from ixion.services.kibana_sync_service import get_kibana_sync_service
+from ixion.services.dfir_iris_service import get_dfir_iris_service
 
 # Rate limiter - uses IP address as key
 limiter = Limiter(key_func=get_remote_address)
@@ -2976,6 +2977,14 @@ async def list_cases(
             return kibana_service.get_case_url(case.kibana_case_id)
         return None
 
+    # Get DFIR-IRIS service for URL generation
+    iris_service = get_dfir_iris_service()
+
+    def get_iris_url(case):
+        if case.dfir_iris_case_id:
+            return iris_service.get_case_url(case.dfir_iris_case_id)
+        return None
+
     return {
         "cases": [
             {
@@ -2997,6 +3006,8 @@ async def list_cases(
                 "observables_count": len(c.observables) if c.observables else 0,
                 "kibana_case_id": c.kibana_case_id,
                 "kibana_url": get_kibana_url(c),
+                "dfir_iris_case_id": c.dfir_iris_case_id,
+                "dfir_iris_url": get_iris_url(c),
                 "created_at": c.created_at.isoformat() if c.created_at else None,
                 "updated_at": c.updated_at.isoformat() if c.updated_at else None,
             }
@@ -3205,6 +3216,8 @@ async def create_case(
         "observables": new_case.observables or [],
         "kibana_case_id": new_case.kibana_case_id,
         "kibana_url": kibana_url,
+        "dfir_iris_case_id": new_case.dfir_iris_case_id,
+        "dfir_iris_url": None,
     }
 
 
@@ -3271,6 +3284,15 @@ async def get_case_detail(
         except Exception:
             pass
 
+    # Get DFIR-IRIS URL if available
+    dfir_iris_url = None
+    if case.dfir_iris_case_id:
+        try:
+            iris_svc = get_dfir_iris_service()
+            dfir_iris_url = iris_svc.get_case_url(case.dfir_iris_case_id)
+        except Exception:
+            pass
+
     return {
         "id": case.id,
         "case_number": case.case_number,
@@ -3289,6 +3311,8 @@ async def get_case_detail(
         "observables": case.observables or [],
         "kibana_case_id": case.kibana_case_id,
         "kibana_url": kibana_url,
+        "dfir_iris_case_id": case.dfir_iris_case_id,
+        "dfir_iris_url": dfir_iris_url,
         "created_at": case.created_at.isoformat() if case.created_at else None,
         "updated_at": case.updated_at.isoformat() if case.updated_at else None,
         "alerts": [
@@ -3374,14 +3398,249 @@ async def update_case(
         except Exception as e:
             _case_es_logger.warning("Failed to sync case update to Kibana: %s", e)
 
+    # Get DFIR-IRIS URL if available
+    dfir_iris_url = None
+    if case.dfir_iris_case_id:
+        try:
+            iris_svc = get_dfir_iris_service()
+            dfir_iris_url = iris_svc.get_case_url(case.dfir_iris_case_id)
+        except Exception:
+            pass
+
     return {
         "id": case.id,
         "case_number": case.case_number,
         "title": case.title,
         "status": case.status.value if hasattr(case.status, "value") else case.status,
         "kibana_url": kibana_url,
+        "dfir_iris_case_id": case.dfir_iris_case_id,
+        "dfir_iris_url": dfir_iris_url,
         "message": "Case updated",
     }
+
+
+@router.post("/elasticsearch/alerts/cases/{case_id}/escalate/dfir-iris")
+async def escalate_case_to_dfir_iris(
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Escalate an IXION case to DFIR-IRIS for incident response."""
+    from datetime import datetime, timezone
+    from ixion.models.integration import IntegrationType, IntegrationEventType, LogLevel, IntegrationEvent
+
+    case = session.query(AlertCase).filter_by(id=case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    # Check if already escalated
+    if case.dfir_iris_case_id:
+        iris_svc = get_dfir_iris_service()
+        return {
+            "status": "already_escalated",
+            "iris_case_id": case.dfir_iris_case_id,
+            "iris_url": iris_svc.get_case_url(case.dfir_iris_case_id),
+            "message": "Case was already escalated to DFIR-IRIS",
+        }
+
+    # Check service availability
+    iris_service = get_dfir_iris_service()
+    if not iris_service.enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="DFIR-IRIS integration is not enabled or not configured",
+        )
+
+    # Build rich description
+    desc_parts = [case.description or "No description provided."]
+    if case.affected_hosts:
+        desc_parts.append(f"\n**Affected Hosts:** {', '.join(case.affected_hosts)}")
+    if case.affected_users:
+        desc_parts.append(f"\n**Affected Users:** {', '.join(case.affected_users)}")
+    if case.triggered_rules:
+        desc_parts.append(f"\n**Triggered Rules:** {', '.join(case.triggered_rules)}")
+    if case.evidence_summary:
+        desc_parts.append(f"\n**Evidence Summary:**\n{case.evidence_summary}")
+    if case.source_alert_ids:
+        desc_parts.append(f"\n**Linked IXION Alerts ({len(case.source_alert_ids)}):**")
+        for aid in case.source_alert_ids[:20]:
+            desc_parts.append(f"- `{aid}`")
+        if len(case.source_alert_ids) > 20:
+            desc_parts.append(f"- ... and {len(case.source_alert_ids) - 20} more")
+    if case.observables:
+        desc_parts.append(f"\n**Observables ({len(case.observables)}):**")
+        for obs in case.observables[:20]:
+            desc_parts.append(f"- [{obs.get('type', '?')}] {obs.get('value', '?')}")
+        if len(case.observables) > 20:
+            desc_parts.append(f"- ... and {len(case.observables) - 20} more")
+
+    description = "\n".join(desc_parts)
+
+    try:
+        # 1. Create IRIS case
+        iris_case = await iris_service.create_case(
+            title=f"[{case.case_number}] {case.title}",
+            description=description,
+            severity=case.severity or "medium",
+            soc_id=case.case_number,
+        )
+        iris_case_id = iris_case.get("case_id")
+        if not iris_case_id:
+            raise HTTPException(status_code=502, detail="DFIR-IRIS did not return a case ID")
+
+        # 2. Push observables as IOCs
+        iocs_pushed = 0
+        if case.observables:
+            for obs in case.observables:
+                obs_type = obs.get("type", "")
+                obs_value = obs.get("value", "")
+                if not obs_value:
+                    continue
+                try:
+                    iris_ioc_type_id = iris_service.map_ioc_type(obs_type)
+                    await iris_service.add_ioc(
+                        case_id=iris_case_id,
+                        value=obs_value,
+                        ioc_type_id=iris_ioc_type_id,
+                        description=f"Auto-imported from IXION {case.case_number} ({obs_type})",
+                        tags=["ixion", obs_type],
+                    )
+                    iocs_pushed += 1
+                except Exception as ioc_err:
+                    _case_es_logger.warning("Failed to push IOC %s to IRIS: %s", obs_value, ioc_err)
+
+        # 3. Push case notes
+        notes_pushed = 0
+        for note in case.notes:
+            try:
+                await iris_service.add_note(
+                    case_id=iris_case_id,
+                    title=f"Note by {note.user.username if note.user else 'Unknown'} ({note.created_at.strftime('%Y-%m-%d %H:%M') if note.created_at else 'N/A'})",
+                    content=note.content,
+                )
+                notes_pushed += 1
+            except Exception as note_err:
+                _case_es_logger.warning("Failed to push note to IRIS: %s", note_err)
+
+        # 4. Add timeline events for each alert in the case
+        now_iso = datetime.now(timezone.utc).isoformat()
+        events_pushed = 0
+        if case.source_alert_ids:
+            try:
+                es_service = get_elasticsearch_service()
+                es_alerts = await es_service.get_alerts_by_ids(case.source_alert_ids)
+
+                for alert in es_alerts:
+                    try:
+                        event_content_parts = []
+                        if alert.message:
+                            event_content_parts.append(alert.message)
+                        if alert.host:
+                            event_content_parts.append(f"**Host:** {alert.host}")
+                        if alert.user:
+                            event_content_parts.append(f"**User:** {alert.user}")
+                        if alert.severity:
+                            event_content_parts.append(f"**Severity:** {alert.severity}")
+                        if alert.mitre_technique_id:
+                            technique = alert.mitre_technique_id
+                            if alert.mitre_technique_name:
+                                technique += f" ({alert.mitre_technique_name})"
+                            event_content_parts.append(f"**MITRE:** {technique}")
+                        if alert.mitre_tactic_name:
+                            event_content_parts.append(f"**Tactic:** {alert.mitre_tactic_name}")
+
+                        event_tags = ["ixion", "alert"]
+                        if alert.severity:
+                            event_tags.append(alert.severity)
+                        if alert.mitre_technique_id:
+                            event_tags.append(alert.mitre_technique_id)
+
+                        category_id = iris_service.map_tactic_to_category(
+                            alert.mitre_tactic_name or ""
+                        )
+                        await iris_service.add_event(
+                            case_id=iris_case_id,
+                            title=f"[{alert.severity.upper()}] {alert.rule_name or alert.title}",
+                            date=alert.timestamp.isoformat() if alert.timestamp else now_iso,
+                            content="\n".join(event_content_parts),
+                            source=f"IXION ({alert.source})",
+                            tags=event_tags,
+                            category_id=category_id,
+                        )
+                        events_pushed += 1
+                    except Exception as evt_err:
+                        _case_es_logger.warning(
+                            "Failed to push alert %s as timeline event: %s", alert.id, evt_err
+                        )
+            except Exception as es_err:
+                _case_es_logger.warning("Failed to fetch alerts from ES for timeline: %s", es_err)
+
+        # Add escalation summary event
+        try:
+            await iris_service.add_event(
+                case_id=iris_case_id,
+                title=f"Case escalated from IXION ({case.case_number})",
+                date=now_iso,
+                content=f"Escalated by {current_user.username}. {iocs_pushed} IOCs, {notes_pushed} notes, and {events_pushed} alert timeline events transferred.",
+                source="IXION",
+                tags=["escalation", "ixion"],
+                category_id=1,
+            )
+        except Exception as evt_err:
+            _case_es_logger.warning("Failed to add escalation event to IRIS: %s", evt_err)
+
+        # 5. Store link back on the IXION case
+        case.dfir_iris_case_id = iris_case_id
+        session.commit()
+
+        # 6. Log integration event
+        try:
+            event = IntegrationEvent(
+                event_type=IntegrationEventType.ACTIVITY,
+                integration_type=IntegrationType.DFIR_IRIS,
+                action="escalate_case",
+                level=LogLevel.INFO,
+                message=f"Case {case.case_number} escalated to DFIR-IRIS (IRIS case #{iris_case_id})",
+                details={
+                    "ixion_case_id": case.id,
+                    "iris_case_id": iris_case_id,
+                    "iocs_pushed": iocs_pushed,
+                    "notes_pushed": notes_pushed,
+                    "events_pushed": events_pushed,
+                },
+                user_id=current_user.id,
+            )
+            session.add(event)
+            session.commit()
+        except Exception:
+            pass
+
+        return {
+            "status": "escalated",
+            "iris_case_id": iris_case_id,
+            "iris_url": iris_service.get_case_url(iris_case_id),
+            "iocs_pushed": iocs_pushed,
+            "notes_pushed": notes_pushed,
+            "events_pushed": events_pushed,
+        }
+
+    except HTTPException:
+        raise
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"DFIR-IRIS API error: HTTP {e.response.status_code} - {e.response.text[:200]}",
+        )
+    except httpx.ConnectError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Cannot connect to DFIR-IRIS: {e}",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Escalation failed: {str(e)}",
+        )
 
 
 class BatchTriageRequest(BaseModel):
@@ -5601,8 +5860,6 @@ async def execute_saved_search(
 
     if saved_search.search_type == SearchType.DISCOVER.value:
         # Execute discover search
-        from ixion.services.elasticsearch_service import ElasticsearchService, get_elasticsearch_service
-
         config = get_elasticsearch_config()
         if not config.get("enabled"):
             raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
@@ -5721,6 +5978,12 @@ class PlaybookUpdate(BaseModel):
 class StepStatusUpdate(BaseModel):
     status: str  # 'completed', 'skipped', 'pending'
     notes: Optional[str] = None
+    action_data: Optional[dict] = None  # {action_taken, findings, evidence_collected, risk_assessment}
+
+
+class ExecutionCompleteRequest(BaseModel):
+    outcome: Optional[str] = None
+    outcome_notes: Optional[str] = None
 
 
 @router.get("/playbooks")
@@ -5889,8 +6152,6 @@ async def get_recommended_playbooks(
 ):
     """Get playbooks that match the given alert's characteristics."""
     # First get the alert to extract its characteristics
-    from ixion.services.elasticsearch_service import get_elasticsearch_service
-
     config = get_elasticsearch_config()
     if not config.get("enabled"):
         raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
@@ -5927,10 +6188,39 @@ async def get_recommended_playbooks(
     }
 
     result = []
+    seen_ids = set()
     for playbook in matching_playbooks:
         pb_dict = playbook.to_dict(include_steps=True)
         pb_dict["has_active_execution"] = playbook.id in active_playbook_ids
+        pb_dict["match_source"] = "alert"
         result.append(pb_dict)
+        seen_ids.add(playbook.id)
+
+    # Also include pattern-based recommendations for this alert's host/user
+    from ixion.services.pattern_detection_service import PatternDetectionService
+
+    try:
+        host = alert.host if hasattr(alert, "host") else None
+        user = alert.user if hasattr(alert, "user") else None
+        if host or user:
+            context_alerts = await service.get_alerts(hours=24, limit=200)
+            if context_alerts:
+                detector = PatternDetectionService()
+                patterns = detector.detect_patterns(context_alerts)
+                for p in patterns:
+                    if (p.group_by == "host" and p.group_key == host) or \
+                       (p.group_by == "user" and p.group_key == user):
+                        pb = repo.find_playbook_for_pattern(p.pattern_id)
+                        if pb and pb.id not in seen_ids:
+                            pb_dict = pb.to_dict(include_steps=True)
+                            pb_dict["has_active_execution"] = pb.id in active_playbook_ids
+                            pb_dict["match_source"] = "pattern"
+                            pb_dict["pattern_id"] = p.pattern_id
+                            pb_dict["pattern_name"] = p.pattern_name
+                            result.append(pb_dict)
+                            seen_ids.add(pb.id)
+    except Exception:
+        pass  # pattern enrichment is best-effort
 
     return {
         "playbooks": result,
@@ -5971,11 +6261,19 @@ async def start_playbook_execution(
             "already_started": True,
         }
 
+    # Auto-detect case link via alert triage
+    from ixion.models.alert_triage import AlertTriage
+    case_id = None
+    triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+    if triage and triage.case_id:
+        case_id = triage.case_id
+
     # Start new execution
     execution = repo.start_execution(
         playbook=playbook,
         es_alert_id=alert_id,
         executed_by_id=current_user.id,
+        case_id=case_id,
     )
     session.commit()
 
@@ -5985,6 +6283,24 @@ async def start_playbook_execution(
     return {
         "execution": execution.to_dict(include_playbook=True),
         "message": "Playbook execution started",
+    }
+
+
+@router.get("/playbook-executions/summary")
+async def playbook_executions_summary(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Get summary counts of playbook executions by status."""
+    repo = PlaybookRepository(session)
+    counts = repo.get_execution_counts_by_status()
+
+    return {
+        "in_progress": counts.get("in_progress", 0),
+        "pending": counts.get("pending", 0),
+        "completed": counts.get("completed", 0),
+        "failed": counts.get("failed", 0),
+        "total": sum(counts.values()),
     }
 
 
@@ -6055,6 +6371,7 @@ async def update_step_status(
         completed_by_id=current_user.id,
         completed_by_username=current_user.username,
         notes=data.notes,
+        action_data=data.action_data,
     )
     session.commit()
 
@@ -6068,10 +6385,14 @@ async def update_step_status(
 @router.post("/playbook-executions/{execution_id}/complete")
 async def complete_playbook_execution(
     execution_id: int,
+    data: ExecutionCompleteRequest = ExecutionCompleteRequest(),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
-    """Manually mark a playbook execution as completed."""
+    """Manually mark a playbook execution as completed with optional outcome."""
+    from ixion.models.playbook import ExecutionOutcome
+    from ixion.services.execution_report_service import ExecutionReportService
+
     repo = PlaybookRepository(session)
     execution = repo.get_execution(execution_id)
 
@@ -6081,12 +6402,73 @@ async def complete_playbook_execution(
     if execution.status != ExecutionStatus.IN_PROGRESS.value:
         raise HTTPException(status_code=400, detail="Execution is not in progress")
 
-    execution = repo.complete_execution(execution)
+    outcome = data.outcome
+    outcome_notes = data.outcome_notes
+
+    # Validate outcome value
+    if outcome:
+        valid_outcomes = [e.value for e in ExecutionOutcome]
+        if outcome not in valid_outcomes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid outcome. Must be one of: {valid_outcomes}",
+            )
+
+    execution = repo.complete_execution(
+        execution, outcome=outcome, outcome_notes=outcome_notes
+    )
+
+    # Auto-generate investigation report
+    report_document_id = None
+    try:
+        report_service = ExecutionReportService(session)
+        document = report_service.generate_report(
+            execution, analyst_username=current_user.username
+        )
+        report_document_id = document.id
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "Failed to generate report for execution %d", execution_id
+        )
+
     session.commit()
 
     return {
         "execution": execution.to_dict(include_playbook=True),
+        "report_document_id": report_document_id,
         "message": "Execution completed",
+    }
+
+
+@router.post("/playbook-executions/{execution_id}/regenerate-report")
+async def regenerate_playbook_report(
+    execution_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Regenerate the investigation report for a completed execution."""
+    from ixion.services.execution_report_service import ExecutionReportService
+
+    repo = PlaybookRepository(session)
+    execution = repo.get_execution(execution_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    if execution.status != ExecutionStatus.COMPLETED.value:
+        raise HTTPException(status_code=400, detail="Execution is not completed")
+
+    report_service = ExecutionReportService(session)
+    document = report_service.regenerate_report(
+        execution, analyst_username=current_user.username
+    )
+    session.commit()
+
+    return {
+        "execution": execution.to_dict(include_playbook=True),
+        "report_document_id": document.id,
+        "report_version": document.current_version,
+        "message": "Report regenerated",
     }
 
 
@@ -6113,4 +6495,229 @@ async def fail_playbook_execution(
     return {
         "execution": execution.to_dict(include_playbook=True),
         "message": "Execution marked as failed",
+    }
+
+
+# ============================================================================
+# Playbook Execution Dashboard & Case Integration
+# ============================================================================
+
+
+@router.get("/playbook-executions")
+async def list_playbook_executions(
+    status: Optional[str] = None,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Dashboard listing of playbook executions with progress info."""
+    repo = PlaybookRepository(session)
+    executions = repo.get_executions_dashboard(status=status, limit=limit)
+
+    results = []
+    for e in executions:
+        data = e.to_dict(include_playbook=True)
+        # Calculate progress
+        steps = e.playbook.steps if e.playbook else []
+        step_statuses = e.step_statuses or {}
+        total_steps = len(steps)
+        completed_steps = sum(
+            1 for s in step_statuses.values()
+            if isinstance(s, dict) and s.get("status") in ("completed", "skipped")
+        )
+        data["total_steps"] = total_steps
+        data["completed_steps"] = completed_steps
+        data["progress_pct"] = round((completed_steps / total_steps) * 100) if total_steps > 0 else 0
+        results.append(data)
+
+    return {"executions": results, "total": len(results)}
+
+
+@router.get("/elasticsearch/alerts/cases/{case_id}/playbook-executions")
+async def get_case_playbook_executions(
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Get playbook executions linked to a case, auto-backfilling from alert triage."""
+    from ixion.models.alert_triage import AlertTriage, AlertCase
+
+    # Verify case exists
+    case = session.query(AlertCase).filter_by(id=case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    repo = PlaybookRepository(session)
+
+    # Get directly linked executions
+    linked = repo.get_executions_for_case(case_id)
+    linked_ids = {e.id for e in linked}
+
+    # Discover unlinked executions via alert triage entries
+    triage_entries = session.query(AlertTriage).filter_by(case_id=case_id).all()
+    alert_ids = [t.es_alert_id for t in triage_entries]
+
+    discovered = []
+    for alert_id in alert_ids:
+        execs = repo.get_executions_for_alert(alert_id)
+        for e in execs:
+            if e.id not in linked_ids:
+                # Auto-backfill case_id
+                e.case_id = case_id
+                linked_ids.add(e.id)
+                discovered.append(e)
+
+    if discovered:
+        session.commit()
+
+    all_executions = linked + discovered
+
+    results = []
+    for e in all_executions:
+        data = e.to_dict(include_playbook=True)
+        steps = e.playbook.steps if e.playbook else []
+        step_statuses = e.step_statuses or {}
+        total_steps = len(steps)
+        completed_steps = sum(
+            1 for s in step_statuses.values()
+            if isinstance(s, dict) and s.get("status") in ("completed", "skipped")
+        )
+        data["total_steps"] = total_steps
+        data["completed_steps"] = completed_steps
+        data["progress_pct"] = round((completed_steps / total_steps) * 100) if total_steps > 0 else 0
+        results.append(data)
+
+    return {"executions": results, "total": len(results)}
+
+
+@router.post("/elasticsearch/alerts/cases/{case_id}/playbook/{playbook_id}/start")
+async def start_playbook_from_case(
+    case_id: int,
+    playbook_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Start a playbook execution from a case context."""
+    from ixion.models.alert_triage import AlertTriage, AlertCase
+
+    # Verify case exists
+    case = session.query(AlertCase).filter_by(id=case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    repo = PlaybookRepository(session)
+    playbook = repo.get_playbook_by_id(playbook_id)
+    if not playbook:
+        raise HTTPException(status_code=404, detail="Playbook not found")
+    if not playbook.is_active:
+        raise HTTPException(status_code=400, detail="Playbook is not active")
+
+    # Find first alert in the case to use as target
+    triage_entry = session.query(AlertTriage).filter_by(case_id=case_id).first()
+    if not triage_entry:
+        raise HTTPException(status_code=400, detail="Case has no linked alerts")
+
+    alert_id = triage_entry.es_alert_id
+
+    # Check for existing active execution
+    existing = repo.get_active_execution_for_alert(alert_id, playbook_id)
+    if existing:
+        # Link to case if not already
+        if not existing.case_id:
+            existing.case_id = case_id
+            session.commit()
+        return {
+            "execution": existing.to_dict(include_playbook=True),
+            "message": "Execution already in progress",
+            "already_started": True,
+        }
+
+    execution = repo.start_execution(
+        playbook=playbook,
+        es_alert_id=alert_id,
+        executed_by_id=current_user.id,
+        case_id=case_id,
+    )
+    session.commit()
+
+    execution = repo.get_execution(execution.id)
+    return {
+        "execution": execution.to_dict(include_playbook=True),
+        "message": "Playbook execution started from case",
+    }
+
+
+# ============================================================================
+# Multi-Alert Pattern Detection
+# ============================================================================
+
+@router.get("/alerts/host-patterns")
+async def get_host_patterns(
+    hours: int = 24,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Detect multi-alert attack patterns grouped by host/user.
+
+    Fetches alerts from Elasticsearch, runs pattern detection, matches to
+    playbooks, and auto-starts executions for auto_execute patterns.
+    """
+    from ixion.services.pattern_detection_service import PatternDetectionService
+
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        return {"patterns": [], "total": 0, "message": "Elasticsearch is not enabled"}
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        return {"patterns": [], "total": 0, "message": "Elasticsearch is not configured"}
+
+    try:
+        alerts = await service.get_alerts(hours=hours, limit=500)
+    except ElasticsearchError as e:
+        return {"patterns": [], "total": 0, "error": str(e)}
+
+    if not alerts:
+        return {"patterns": [], "total": 0}
+
+    detector = PatternDetectionService()
+    detected = detector.detect_patterns(alerts)
+
+    repo = PlaybookRepository(session)
+    results = []
+
+    for pattern in detected:
+        playbook = repo.find_playbook_for_pattern(pattern.pattern_id)
+
+        pattern_data = pattern.to_dict()
+        pattern_data["playbook"] = playbook.to_dict(include_steps=True) if playbook else None
+        pattern_data["execution"] = None
+        pattern_data["auto_started"] = False
+
+        if playbook and pattern.auto_execute:
+            # Auto-start: pick the first matched alert as the representative
+            representative_alert_id = pattern.matched_alerts[0].id if pattern.matched_alerts else None
+            if representative_alert_id:
+                existing = repo.get_active_execution_for_alert(
+                    representative_alert_id, playbook.id
+                )
+                if existing:
+                    pattern_data["execution"] = existing.to_dict(include_playbook=True)
+                else:
+                    execution = repo.start_execution(
+                        playbook=playbook,
+                        es_alert_id=representative_alert_id,
+                        executed_by_id=current_user.id,
+                    )
+                    pattern_data["execution"] = execution.to_dict(include_playbook=True)
+                    pattern_data["auto_started"] = True
+
+        results.append(pattern_data)
+
+    if any(r.get("auto_started") for r in results):
+        session.commit()
+
+    return {
+        "patterns": results,
+        "total": len(results),
     }

@@ -8,6 +8,9 @@ This guide covers deploying IXION in environments without internet access.
 
 - Full NLP processing (NLTK data pre-downloaded)
 - SOC entity detection (18 pattern types: IPs, CVEs, hashes, etc.)
+- AI-assisted alert triage (observable extraction, MITRE mapping, analysis, contextual chat)
+- Multi-alert pattern detection with auto-triggered investigation playbooks
+- Playbook execution: action recording, outcome classification, and auto-generated investigation reports
 - Spell checking with technical term awareness
 - Rewrite suggestions (professional, concise, formal, technical styles)
 - Table detection (Markdown, CSV, TSV)
@@ -218,6 +221,9 @@ Configure in `docker-compose.yml` or `docker-compose.https.yml`:
 | `IXION_OIDC_REALM` | - | Keycloak realm |
 | `IXION_OIDC_CLIENT_ID` | - | OIDC client ID |
 | `IXION_OIDC_CLIENT_SECRET` | - | OIDC client secret |
+| `IXION_OLLAMA_ENABLED` | `true` | Enable Ollama AI integration |
+| `IXION_OLLAMA_URL` | `http://ollama:11434` | Ollama service URL |
+| `IXION_OLLAMA_MODEL` | `qwen2.5:0.5b` | Default AI model |
 | `IXION_GITLAB_ENABLED` | `false` | Enable GitLab integration |
 | `IXION_GITLAB_URL` | - | GitLab server URL |
 | `IXION_GITLAB_TOKEN` | - | GitLab Personal Access Token |
@@ -278,7 +284,20 @@ environment:
    - **Editor**: Create/edit templates and documents
    - **Viewer**: Read-only access
 
-### 3. Configure Roles (Optional)
+### 3. Set Up AI Model (If Using Ollama)
+
+```bash
+# Pull an AI model into the Ollama sidecar (first time only)
+docker exec -it ixion-ollama ollama pull qwen2.5:0.5b
+
+# Verify AI is available
+curl http://localhost:8000/api/ai/status
+# Should return: {"available": true, "default_model": "qwen2.5:0.5b", ...}
+```
+
+Once available, AI assist buttons (Analyze, Extract, Suggest, Discuss) will appear automatically in the alert investigation UI.
+
+### 4. Configure Roles (Optional)
 
 Default roles and permissions are pre-configured. Customize via the admin interface if needed.
 

@@ -31,6 +31,7 @@ class IntegrationType(str, Enum):
     GITLAB = "gitlab"
     OPENCTI = "opencti"
     ELASTICSEARCH = "elasticsearch"
+    DFIR_IRIS = "dfir_iris"
     SLACK = "slack"      # Future
     JIRA = "jira"        # Future
     CUSTOM = "custom"

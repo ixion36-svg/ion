@@ -79,6 +79,9 @@ class AlertCase(Base, TimestampMixin):
     kibana_case_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     kibana_case_version: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
+    # DFIR-IRIS integration
+    dfir_iris_case_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
     # Relationships
     created_by: Mapped["User"] = relationship(
         "User", foreign_keys=[created_by_id]
@@ -93,10 +96,13 @@ class AlertCase(Base, TimestampMixin):
     @property
     def notes(self) -> List["Note"]:
         """Get notes for this case (compatibility property)."""
+        from sqlalchemy.orm import joinedload
         from ixion.storage.database import get_session_factory
         session_factory = get_session_factory()
         with session_factory() as session:
-            return session.query(Note).filter(
+            return session.query(Note).options(
+                joinedload(Note.user)
+            ).filter(
                 Note.entity_type == NoteEntityType.CASE,
                 Note.entity_id == str(self.id)
             ).order_by(Note.created_at).all()
