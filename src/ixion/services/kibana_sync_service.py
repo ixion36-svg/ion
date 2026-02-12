@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ixion.services.kibana_cases_service import get_kibana_cases_service
 from ixion.services.elasticsearch_service import ElasticsearchService
+from ixion.services.case_description import build_case_description
 from ixion.models.alert_triage import AlertCase, Note, NoteEntityType
 from ixion.models.user import User
 from ixion.storage.database import get_session_factory, get_engine
@@ -407,27 +408,58 @@ class KibanaSyncService:
                         except Exception as e:
                             logger.warning(f"Could not fetch alerts from ES for case {kibana_id}: {e}")
 
+                    # Build standardized description from alert data
+                    hosts_list = list(affected_hosts) if affected_hosts else None
+                    users_list = list(affected_users) if affected_users else None
+                    rules_list = list(triggered_rules) if triggered_rules else None
+                    evidence = " ".join(evidence_parts) if evidence_parts else None
+
+                    formatted_description = build_case_description(
+                        description=kibana_case.get("description", ""),
+                        affected_hosts=hosts_list,
+                        affected_users=users_list,
+                        evidence_summary=evidence,
+                        observables=observables if observables else None,
+                        alert_ids=source_alert_ids if source_alert_ids else None,
+                        triggered_rules=rules_list,
+                    )
+
                     # Create IXION case with full data
                     case_number = f"CASE-{next_num:04d}"
                     new_case = AlertCase(
                         case_number=case_number,
                         title=f"[Kibana] {title}",
-                        description=kibana_case.get("description", ""),
+                        description=formatted_description,
                         status=status,
                         severity=severity,
                         created_by_id=admin_user.id,
                         kibana_case_id=kibana_id,
                         kibana_case_version=kibana_case.get("version"),
                         source_alert_ids=source_alert_ids if source_alert_ids else None,
-                        evidence_summary=" ".join(evidence_parts) if evidence_parts else None,
-                        affected_hosts=list(affected_hosts) if affected_hosts else None,
-                        affected_users=list(affected_users) if affected_users else None,
-                        triggered_rules=list(triggered_rules) if triggered_rules else None,
+                        evidence_summary=evidence,
+                        affected_hosts=hosts_list,
+                        affected_users=users_list,
+                        triggered_rules=rules_list,
                         observables=observables if observables else None,
                     )
 
                     session.add(new_case)
                     session.flush()  # Get the ID
+
+                    # Push standardized description back to Kibana
+                    kibana_version = kibana_case.get("version")
+                    if kibana_version:
+                        try:
+                            updated = self.kibana_service.update_case(
+                                case_id=kibana_id,
+                                version=kibana_version,
+                                title=f"[{case_number}] {title}",
+                                description=formatted_description,
+                            )
+                            if updated:
+                                new_case.kibana_case_version = updated.get("version")
+                        except Exception as e:
+                            logger.warning(f"Failed to push formatted description back to Kibana case {kibana_id}: {e}")
 
                     # Import user comments from Kibana (not alert attachments)
                     comments = self.kibana_service.get_case_comments(kibana_id)

@@ -317,40 +317,41 @@ class KibanaCasesService:
             return []
 
         try:
-            # Alerts are stored as comments with type "alert"
+            # First try the _find endpoint for comments
             path = self._get_api_path(f"/api/cases/{case_id}/comments/_find")
-            response = self.client.get(path, params={"perPage": 1000})
+            response = self.client.get(path, params={"perPage": 100})
 
+            comments = []
             if response.status_code == 200:
-                data = response.json()
-                comments = data.get("comments", [])
-                alerts = []
+                comments = response.json().get("comments", [])
 
-                for comment in comments:
-                    if comment.get("type") == "alert":
-                        # Alert comments contain alertId (string or list) and index
-                        alert_ids = comment.get("alertId", [])
-                        index = comment.get("index", ".alerts-security.alerts-default")
+            # Fall back to embedded comments from the case itself
+            if not comments:
+                case_data = self.get_case(case_id)
+                if case_data:
+                    comments = case_data.get("comments", [])
 
-                        # alertId can be a single string or a list
-                        if isinstance(alert_ids, str):
-                            alert_ids = [alert_ids]
+            alerts = []
+            for comment in comments:
+                if comment.get("type") == "alert":
+                    # Alert comments contain alertId (string or list) and index
+                    alert_ids = comment.get("alertId", [])
+                    index = comment.get("index", ".alerts-security.alerts-default")
 
-                        for alert_id in alert_ids:
-                            alerts.append({
-                                "id": alert_id,
-                                "index": index,
-                            })
+                    # alertId can be a single string or a list
+                    if isinstance(alert_ids, str):
+                        alert_ids = [alert_ids]
+                    # index can also be a list parallel to alertId
+                    if isinstance(index, str):
+                        index = [index] * len(alert_ids)
 
-                return alerts
-            else:
-                # Log detailed error for debugging
-                try:
-                    error_body = response.text
-                except Exception:
-                    error_body = "Unable to read response body"
-                logger.error(f"Failed to get case alerts: {response.status_code} - {error_body}")
-                return []
+                    for i, alert_id in enumerate(alert_ids):
+                        alerts.append({
+                            "id": alert_id,
+                            "index": index[i] if i < len(index) else index[0],
+                        })
+
+            return alerts
         except Exception as e:
             logger.error(f"Error getting Kibana case alerts: {e}")
             return []

@@ -22,6 +22,7 @@ from ixion.core.config import get_config, get_oidc_config, get_gitlab_config, ge
 from ixion.services.kibana_cases_service import get_kibana_cases_service
 from ixion.services.kibana_sync_service import get_kibana_sync_service
 from ixion.services.dfir_iris_service import get_dfir_iris_service
+from ixion.services.case_description import build_case_description
 
 # Rate limiter - uses IP address as key
 limiter = Limiter(key_func=get_remote_address)
@@ -3171,37 +3172,16 @@ async def create_case(
     try:
         kibana_service = get_kibana_cases_service()
         if kibana_service.enabled:
-            # Build description with case context
-            kibana_desc = data.description or ""
-            if data.affected_hosts:
-                kibana_desc += f"\n\n**Affected Hosts:** {', '.join(data.affected_hosts)}"
-            if data.affected_users:
-                kibana_desc += f"\n\n**Affected Users:** {', '.join(data.affected_users)}"
-            if data.evidence_summary:
-                kibana_desc += f"\n\n**Evidence Summary:**\n{data.evidence_summary}"
-
-            # Add observables to description
-            if case_observables:
-                kibana_desc += "\n\n**Observables:**\n"
-                # Group observables by type for cleaner display
-                obs_by_type = {}
-                for obs in case_observables:
-                    obs_type = obs["type"]
-                    if obs_type not in obs_by_type:
-                        obs_by_type[obs_type] = []
-                    obs_by_type[obs_type].append(obs["value"])
-                for obs_type, values in sorted(obs_by_type.items()):
-                    kibana_desc += f"- **{obs_type}:** {', '.join(values[:5])}"
-                    if len(values) > 5:
-                        kibana_desc += f" (+{len(values) - 5} more)"
-                    kibana_desc += "\n"
-
-            # Add linked alert IDs to description for reference
-            if data.alert_ids:
-                kibana_desc += f"\n**Linked Alert IDs ({len(data.alert_ids)}):**\n"
-                kibana_desc += "\n".join(f"- `{aid}`" for aid in data.alert_ids[:10])
-                if len(data.alert_ids) > 10:
-                    kibana_desc += f"\n- ... and {len(data.alert_ids) - 10} more"
+            # Build standardized description with case context
+            kibana_desc = build_case_description(
+                description=data.description or "",
+                affected_hosts=data.affected_hosts,
+                affected_users=data.affected_users,
+                evidence_summary=data.evidence_summary,
+                observables=case_observables,
+                alert_ids=data.alert_ids,
+                triggered_rules=data.triggered_rules,
+            )
 
             kibana_case = kibana_service.create_case(
                 title=f"[{case_number}] {data.title}",
