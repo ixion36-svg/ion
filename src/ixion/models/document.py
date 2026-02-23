@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ixion.models.base import Base
 
 if TYPE_CHECKING:
-    from ixion.models.template import Template, Collection
+    from ixion.models.template import Template, Collection, Tag
 
 
 class Document(Base):
@@ -44,6 +44,9 @@ class Document(Base):
     )
     collection: Mapped[Optional["Collection"]] = relationship(
         "Collection", back_populates="documents"
+    )
+    tags: Mapped[List["Tag"]] = relationship(
+        "Tag", secondary="document_tags", back_populates="documents"
     )
     versions: Mapped[List["DocumentVersion"]] = relationship(
         "DocumentVersion", back_populates="document", cascade="all, delete-orphan",

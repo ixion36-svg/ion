@@ -6,6 +6,7 @@
 <div class="page-header">
     <h1>Documents</h1>
     <div class="header-actions">
+        <button class="btn btn-primary" onclick="showUploadModal()">Upload Document</button>
         <button class="btn" onclick="showFoldersModal()">Manage Folders</button>
     </div>
 </div>
@@ -44,6 +45,9 @@
                 <option value="">All Status</option>
                 <option value="active">Active</option>
                 <option value="archived">Archived</option>
+            </select>
+            <select id="tag-filter" class="filter-select">
+                <option value="">All Tags</option>
             </select>
         </div>
 
@@ -108,6 +112,17 @@
         </div>
         <div class="modal-body">
             <div id="modal-doc-meta" class="meta-bar"></div>
+
+            <div id="modal-doc-tags" class="tags-section" style="display: none;">
+                <h4>Tags</h4>
+                <div class="tags-display">
+                    <span id="modal-tags-list"></span>
+                    <span class="tag-add-inline">
+                        <input type="text" id="modal-tag-input" placeholder="Add tag..." onkeydown="if(event.key==='Enter'){addDocTag();event.preventDefault();}">
+                        <button class="btn btn-sm" onclick="addDocTag()">+</button>
+                    </span>
+                </div>
+            </div>
 
             <div class="content-tabs">
                 <button type="button" class="content-tab-btn active" data-view="rendered">Rendered</button>
@@ -208,6 +223,51 @@
         <div class="modal-footer">
             <button id="revert-version-btn" class="btn btn-warning">Revert to This Version</button>
             <button class="btn" onclick="closeVersionModal()">Close</button>
+        </div>
+    </div>
+</div>
+<!-- Upload Document Modal -->
+<div id="upload-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Upload Document</h2>
+            <button class="modal-close" onclick="closeUploadModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="upload-file">File</label>
+                <input type="file" id="upload-file" accept=".txt,.md,.html,.htm,.csv">
+            </div>
+            <div class="form-group">
+                <label for="upload-name">Document Name <small>(optional, defaults to filename)</small></label>
+                <input type="text" id="upload-name" class="form-control" placeholder="My Document">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="upload-format">Format</label>
+                    <select id="upload-format" class="form-control">
+                        <option value="">Auto-detect</option>
+                        <option value="markdown">Markdown</option>
+                        <option value="html">HTML</option>
+                        <option value="csv">CSV</option>
+                        <option value="text">Plain Text</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="upload-folder">Folder</label>
+                    <select id="upload-folder" class="form-control">
+                        <option value="">No Folder</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="upload-tags">Tags <small>(comma-separated)</small></label>
+                <input type="text" id="upload-tags" class="form-control" placeholder="e.g. incident-response, soc, network">
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeUploadModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="uploadDocument()">Upload</button>
+            </div>
         </div>
     </div>
 </div>
@@ -340,6 +400,76 @@
     font-size: 0.75rem;
     padding: 2px 6px;
 }
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+.tag-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    margin-left: 4px;
+}
+.tags-section {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+.tags-section h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+.tags-display {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    align-items: center;
+}
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    background: var(--primary-color);
+    color: white;
+}
+.tag-chip .tag-remove {
+    cursor: pointer;
+    opacity: 0.7;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+.tag-chip .tag-remove:hover {
+    opacity: 1;
+}
+.tag-add-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.tag-add-inline input {
+    width: 120px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+.tag-add-inline button {
+    padding: 2px 8px;
+    font-size: 0.75rem;
+}
 .doc-type-badge {
     padding: 2px 8px;
     border-radius: 3px;
@@ -453,10 +583,12 @@ let currentDocVersion = 1;
 let currentDocInputData = null;
 let allDocuments = [];
 let allCollections = [];
+let allTags = [];
 let selectedFolderId = null;
 let moveDocumentId = null;
 let pendingAmendmentContent = '';
 let previewVersionNumber = null;
+let currentDocTags = [];
 
 async function loadDocuments() {
     try {
@@ -572,11 +704,13 @@ function filterDocuments() {
     const search = document.getElementById('search-input').value.toLowerCase();
     const format = document.getElementById('format-filter').value;
     const status = document.getElementById('status-filter').value;
+    const tagFilter = document.getElementById('tag-filter').value;
 
     return allDocuments.filter(d => {
         const matchesSearch = !search || d.name.toLowerCase().includes(search);
         const matchesFormat = !format || d.output_format === format;
         const matchesStatus = !status || d.status === status;
+        const matchesTag = !tagFilter || (d.tags && d.tags.includes(tagFilter));
 
         let matchesFolder = true;
         if (selectedFolderId === 'uncategorized') {
@@ -585,7 +719,7 @@ function filterDocuments() {
             matchesFolder = isInFolderOrSubfolder(d.collection_id, selectedFolderId);
         }
 
-        return matchesSearch && matchesFormat && matchesStatus && matchesFolder;
+        return matchesSearch && matchesFormat && matchesStatus && matchesFolder && matchesTag;
     });
 }
 
@@ -610,7 +744,14 @@ function renderDocuments(documents) {
 
         html += '<div class="list-item' + (isArchived ? ' archived' : '') + '">';
         html += '<div class="list-item-content">';
-        html += '<span class="list-item-title">' + escapeHtml(d.name) + docTypeBadge + folderBadge + '</span>';
+        let tagBadges = '';
+        if (d.tags && d.tags.length > 0) {
+            d.tags.forEach(function(tag) {
+                tagBadges += '<span class="tag-badge">' + escapeHtml(tag) + '</span>';
+            });
+        }
+
+        html += '<span class="list-item-title">' + escapeHtml(d.name) + docTypeBadge + folderBadge + tagBadges + '</span>';
         html += '<div class="list-item-meta">';
         html += '<span class="badge">' + d.output_format + '</span>';
         html += '<span class="badge badge-version">v' + (d.current_version || 1) + '</span>';
@@ -738,6 +879,10 @@ async function viewDocument(id) {
             metaHtml += '<span>Updated: ' + formatDate(doc.updated_at) + '</span>';
         }
         document.getElementById('modal-doc-meta').innerHTML = metaHtml;
+
+        // Show tags section
+        currentDocTags = doc.tags || [];
+        renderDocumentTags();
 
         // Render content based on format
         document.getElementById('rendered-view').innerHTML = renderContent(doc.rendered_content, doc.output_format);
@@ -1192,12 +1337,189 @@ document.getElementById('revert-version-btn').addEventListener('click', function
     }
 });
 
+// Upload Document Modal
+function showUploadModal() {
+    // Populate folder select
+    const folderSelect = document.getElementById('upload-folder');
+    folderSelect.innerHTML = '<option value="">No Folder</option>';
+    const tree = buildFolderTree(allCollections);
+    function addFolderOptions(folders, prefix) {
+        folders.forEach(function(f) {
+            const opt = document.createElement('option');
+            opt.value = f.id;
+            opt.textContent = prefix + f.name;
+            folderSelect.appendChild(opt);
+            if (f.children.length > 0) {
+                addFolderOptions(f.children, prefix + '  ');
+            }
+        });
+    }
+    addFolderOptions(tree, '');
+
+    // Pre-select current folder if one is selected
+    if (selectedFolderId && selectedFolderId !== 'uncategorized') {
+        folderSelect.value = selectedFolderId;
+    }
+
+    document.getElementById('upload-file').value = '';
+    document.getElementById('upload-name').value = '';
+    document.getElementById('upload-format').value = '';
+    document.getElementById('upload-tags').value = '';
+    document.getElementById('upload-modal').style.display = 'flex';
+}
+
+function closeUploadModal() {
+    document.getElementById('upload-modal').style.display = 'none';
+}
+
+async function uploadDocument() {
+    const fileInput = document.getElementById('upload-file');
+    if (!fileInput.files.length) {
+        showToast('Please select a file', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    const name = document.getElementById('upload-name').value.trim();
+    if (name) formData.append('name', name);
+
+    const format = document.getElementById('upload-format').value;
+    if (format) formData.append('output_format', format);
+
+    const folderId = document.getElementById('upload-folder').value;
+    if (folderId) formData.append('collection_id', folderId);
+
+    const tags = document.getElementById('upload-tags').value.trim();
+    if (tags) formData.append('tags', tags);
+
+    try {
+        const response = await fetch('/api/documents/upload', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Upload failed');
+        }
+
+        const result = await response.json();
+        showToast('Document uploaded: ' + result.name, 'success');
+        closeUploadModal();
+        await loadCollections();
+        await loadDocuments();
+        updateTagFilter();
+    } catch (e) {
+        showToast(e.message || 'Failed to upload document', 'error');
+    }
+}
+
+// Document Tags Management
+function renderDocumentTags() {
+    const tagsSection = document.getElementById('modal-doc-tags');
+    const tagsList = document.getElementById('modal-tags-list');
+
+    tagsSection.style.display = 'block';
+
+    if (currentDocTags.length === 0) {
+        tagsList.innerHTML = '<span class="muted" style="font-size:0.8rem">No tags</span> ';
+    } else {
+        let html = '';
+        currentDocTags.forEach(function(tag) {
+            html += '<span class="tag-chip">' + escapeHtml(tag);
+            html += ' <span class="tag-remove" onclick="removeDocTag(\'' + escapeHtml(tag).replace(/'/g, "\\'") + '\')">&times;</span>';
+            html += '</span> ';
+        });
+        tagsList.innerHTML = html;
+    }
+}
+
+async function addDocTag() {
+    const input = document.getElementById('modal-tag-input');
+    const tagName = input.value.trim();
+    if (!tagName || !currentDocId) return;
+
+    // Add to local tags list
+    if (!currentDocTags.includes(tagName)) {
+        currentDocTags.push(tagName);
+    }
+
+    try {
+        await api.put('/api/documents/' + currentDocId + '/tags', {
+            tags: currentDocTags
+        });
+        input.value = '';
+        renderDocumentTags();
+        // Update the list view
+        const doc = allDocuments.find(function(d) { return d.id === currentDocId; });
+        if (doc) doc.tags = [...currentDocTags];
+        renderDocuments(filterDocuments());
+        updateTagFilter();
+    } catch (e) {
+        // Revert on error
+        currentDocTags = currentDocTags.filter(function(t) { return t !== tagName; });
+        showToast('Failed to add tag', 'error');
+    }
+}
+
+async function removeDocTag(tagName) {
+    if (!currentDocId) return;
+
+    currentDocTags = currentDocTags.filter(function(t) { return t !== tagName; });
+
+    try {
+        await api.put('/api/documents/' + currentDocId + '/tags', {
+            tags: currentDocTags
+        });
+        renderDocumentTags();
+        // Update the list view
+        const doc = allDocuments.find(function(d) { return d.id === currentDocId; });
+        if (doc) doc.tags = [...currentDocTags];
+        renderDocuments(filterDocuments());
+        updateTagFilter();
+    } catch (e) {
+        showToast('Failed to remove tag', 'error');
+    }
+}
+
+function updateTagFilter() {
+    const select = document.getElementById('tag-filter');
+    const currentValue = select.value;
+
+    // Collect all unique tags from documents
+    const tagSet = new Set();
+    allDocuments.forEach(function(d) {
+        if (d.tags) {
+            d.tags.forEach(function(t) { tagSet.add(t); });
+        }
+    });
+
+    allTags = Array.from(tagSet).sort();
+
+    select.innerHTML = '<option value="">All Tags</option>';
+    allTags.forEach(function(tag) {
+        const opt = document.createElement('option');
+        opt.value = tag;
+        opt.textContent = tag;
+        select.appendChild(opt);
+    });
+
+    // Restore previous selection if still valid
+    if (currentValue && allTags.includes(currentValue)) {
+        select.value = currentValue;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
     await loadCollections();
     await loadDocuments();
+    updateTagFilter();
     document.getElementById('search-input').addEventListener('input', applyFilters);
     document.getElementById('format-filter').addEventListener('change', applyFilters);
     document.getElementById('status-filter').addEventListener('change', applyFilters);
+    document.getElementById('tag-filter').addEventListener('change', applyFilters);
 });
 
 // Close modal on outside click

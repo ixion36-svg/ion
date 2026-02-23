@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from ixion.models.document import Document, DocumentVersion
+from ixion.models.template import Tag
 
 
 class DocumentRepository:
@@ -54,8 +55,12 @@ class DocumentRepository:
 
     def get_by_id(self, document_id: int) -> Optional[Document]:
         """Get a document by ID."""
-        stmt = select(Document).where(Document.id == document_id)
-        return self.session.execute(stmt).scalar_one_or_none()
+        stmt = (
+            select(Document)
+            .options(joinedload(Document.tags))
+            .where(Document.id == document_id)
+        )
+        return self.session.execute(stmt).unique().scalar_one_or_none()
 
     def get_by_name(self, name: str) -> Optional[Document]:
         """Get a document by name."""
@@ -69,7 +74,10 @@ class DocumentRepository:
         include_archived: bool = False,
     ) -> List[Document]:
         """List all documents with optional filters."""
-        stmt = select(Document).options(joinedload(Document.source_template))
+        stmt = select(Document).options(
+            joinedload(Document.source_template),
+            joinedload(Document.tags),
+        )
 
         if not include_archived:
             stmt = stmt.where(Document.status == "active")
@@ -182,6 +190,24 @@ class DocumentRepository:
             amendment_reason=f"Reverted to version {version_number}",
             amended_by=amended_by,
         )
+
+    def set_tags(self, document: Document, tag_names: List[str]) -> List[Tag]:
+        """Set tags on a document (replaces existing tags, creates new tags as needed)."""
+        tags = []
+        for tag_name in tag_names:
+            tag_name = tag_name.strip()
+            if not tag_name:
+                continue
+            tag = self.session.execute(
+                select(Tag).where(Tag.name == tag_name)
+            ).scalar_one_or_none()
+            if tag is None:
+                tag = Tag(name=tag_name)
+                self.session.add(tag)
+            tags.append(tag)
+        document.tags = tags
+        self.session.flush()
+        return tags
 
     def delete(self, document: Document) -> None:
         """Delete a document and all its versions."""

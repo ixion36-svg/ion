@@ -100,6 +100,10 @@ class DocumentAmendment(BaseModel):
     amended_by: Optional[str] = None
 
 
+class DocumentTagsUpdate(BaseModel):
+    tags: List[str]
+
+
 # Collection request/response models
 class CollectionCreate(BaseModel):
     name: str
@@ -1420,6 +1424,87 @@ async def get_template_variables(template_id: int, services: Services = Depends(
 
 
 # Document endpoints
+@router.post("/documents/upload", dependencies=[Depends(require_permission("document:create"))])
+async def upload_document(
+    file: UploadFile = File(...),
+    name: Optional[str] = Form(None),
+    output_format: Optional[str] = Form(None),
+    tags: Optional[str] = Form(None),
+    collection_id: Optional[int] = Form(None),
+    services: Services = Depends(get_services),
+):
+    """Upload a file as a new document.
+
+    Args:
+        file: The file to upload.
+        name: Optional document name (defaults to filename).
+        output_format: Format (markdown, html, text). Auto-detected from extension if not provided.
+        tags: Comma-separated tag names.
+        collection_id: Optional collection/folder ID.
+    """
+    content = await file.read()
+    text = content.decode("utf-8", errors="ignore")
+
+    # Determine document name
+    doc_name = name or (file.filename or "Untitled Document")
+
+    # Auto-detect format from file extension
+    if not output_format and file.filename:
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+        format_map = {"md": "markdown", "html": "html", "htm": "html", "csv": "csv", "txt": "text"}
+        output_format = format_map.get(ext, "text")
+    output_format = output_format or "text"
+
+    document = services.document_repo.create(
+        name=doc_name,
+        rendered_content=text,
+        output_format=output_format,
+    )
+
+    if collection_id:
+        document.collection_id = collection_id
+        services.session.flush()
+
+    # Handle tags
+    tag_names = []
+    if tags:
+        tag_names = [t.strip() for t in tags.split(",") if t.strip()]
+    if tag_names:
+        services.document_repo.set_tags(document, tag_names)
+
+    services.session.commit()
+
+    return {
+        "id": document.id,
+        "name": document.name,
+        "output_format": document.output_format,
+        "collection_id": document.collection_id,
+        "tags": [t.name for t in document.tags],
+        "current_version": document.current_version,
+        "created_at": document.created_at.isoformat() if document.created_at else None,
+    }
+
+
+@router.put("/documents/{document_id}/tags", dependencies=[Depends(require_permission("document:update"))])
+async def update_document_tags(
+    document_id: int,
+    body: DocumentTagsUpdate,
+    services: Services = Depends(get_services),
+):
+    """Set tags on a document (replaces existing tags)."""
+    document = services.document_repo.get_by_id(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    tags = services.document_repo.set_tags(document, body.tags)
+    services.session.commit()
+
+    return {
+        "id": document.id,
+        "tags": [t.name for t in tags],
+    }
+
+
 @router.get("/documents", dependencies=[Depends(require_permission("document:read"))])
 async def list_documents(
     template_id: Optional[int] = None,
@@ -1450,6 +1535,7 @@ async def list_documents(
             "status": d.status,
             "collection_id": d.collection_id,
             "collection_name": d.collection.name if d.collection else None,
+            "tags": [t.name for t in d.tags] if d.tags else [],
             "created_at": d.created_at.isoformat() if d.created_at else None,
         }
         for d in documents
@@ -1514,6 +1600,7 @@ async def get_document(document_id: int, services: Services = Depends(get_servic
         "input_data": json.loads(document.input_data) if document.input_data else None,
         "current_version": document.current_version,
         "status": document.status,
+        "tags": [t.name for t in document.tags] if document.tags else [],
         "created_at": document.created_at.isoformat() if document.created_at else None,
         "updated_at": document.updated_at.isoformat() if document.updated_at else None,
     }
@@ -1779,6 +1866,7 @@ async def analyze_file(
 
     return {
         "filename": file.filename,
+        "original_text": text,
         "patterns": [
             {
                 "pattern_type": m.pattern_type,
@@ -1828,6 +1916,7 @@ async def generate_template_from_file(
 
     response = {
         "template_content": result.content,
+        "original_text": result.original_text,
         "variables": [
             {
                 "name": v.name,

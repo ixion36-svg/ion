@@ -26,6 +26,14 @@ template_tags = Table(
     Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
 )
 
+# Many-to-many association table for Document <-> Tag
+document_tags = Table(
+    "document_tags",
+    Base.metadata,
+    Column("document_id", Integer, ForeignKey("documents.id"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
+)
+
 
 class Collection(Base, TimestampMixin):
     """Collection/Folder model for grouping templates and documents.
@@ -110,7 +118,7 @@ class Template(Base, TimestampMixin):
 
 
 class Tag(Base):
-    """Tag model for categorizing templates."""
+    """Tag model for categorizing templates and documents."""
 
     __tablename__ = "tags"
 
@@ -120,6 +128,9 @@ class Tag(Base):
     # Relationships
     templates: Mapped[List["Template"]] = relationship(
         "Template", secondary=template_tags, back_populates="tags"
+    )
+    documents: Mapped[List["Document"]] = relationship(
+        "Document", secondary=document_tags, back_populates="tags"
     )
 
     def __repr__(self) -> str:

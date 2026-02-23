@@ -86,11 +86,45 @@
             <pre id="generated-template" class="code-block">Upload a document and click "Generate Template" to extract a template.</pre>
 
             <div id="save-section" style="display: none;">
-                <div class="form-group">
-                    <label for="template-name">Template Name</label>
-                    <input type="text" id="template-name" placeholder="my_template">
+                <div class="save-template-form">
+                    <div class="form-group">
+                        <label for="template-name">Template Name</label>
+                        <input type="text" id="template-name" placeholder="my_template">
+                    </div>
+                    <div class="form-group">
+                        <label for="template-description">Description</label>
+                        <textarea id="template-description" rows="2" placeholder="Auto-populated from extraction stats"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="template-doc-type">Document Type</label>
+                            <select id="template-doc-type" class="form-control">
+                                <option value="">None</option>
+                                <option value="SOP">SOP</option>
+                                <option value="WI">WI</option>
+                                <option value="KB">KB</option>
+                                <option value="RUNBOOK">RUNBOOK</option>
+                                <option value="IRP">IRP</option>
+                                <option value="AAR">AAR</option>
+                                <option value="THREAT_ADVISORY">THREAT_ADVISORY</option>
+                                <option value="DETECTION_RULE">DETECTION_RULE</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="template-format">Format</label>
+                            <select id="template-format" class="form-control">
+                                <option value="markdown">Markdown</option>
+                                <option value="html">HTML</option>
+                                <option value="text">Plain Text</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="template-tags">Tags <small>(comma-separated)</small></label>
+                        <input type="text" id="template-tags" placeholder="e.g. incident-response, network, soc">
+                    </div>
+                    <button id="save-btn" class="btn btn-primary">Save as Template</button>
                 </div>
-                <button id="save-btn" class="btn btn-primary">Save as Template</button>
             </div>
         </div>
 
@@ -407,6 +441,29 @@
     max-height: 400px;
     overflow-y: auto;
 }
+.save-template-form {
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+    margin-top: 1rem;
+}
+.save-template-form .form-group {
+    margin-bottom: 0.75rem;
+}
+.save-template-form textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    resize: vertical;
+    font-family: inherit;
+}
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
 </style>
 <script>
 {% raw %}
@@ -688,6 +745,17 @@ document.getElementById('generate-btn').addEventListener('click', async () => {
         const filename = fileInput.files[0].name.replace(/\.[^/.]+$/, '');
         document.getElementById('template-name').value = filename + '_template';
 
+        // Auto-populate description from extraction stats
+        let descParts = ['Generated from ' + fileInput.files[0].name];
+        descParts.push(result.replacements_made + ' replacements');
+        if (result.variables && result.variables.length > 0) {
+            descParts.push(result.variables.length + ' variables');
+        }
+        if (result.nlp_used) {
+            descParts.push('AI-assisted');
+        }
+        document.getElementById('template-description').value = descParts.join(' | ');
+
         // Show stats
         if (result.detection_stats) {
             showDetectionStats(result.detection_stats);
@@ -918,13 +986,27 @@ document.getElementById('save-btn').addEventListener('click', async () => {
         return;
     }
 
+    const description = document.getElementById('template-description').value.trim();
+    const docType = document.getElementById('template-doc-type').value;
+    const format = document.getElementById('template-format').value;
+    const tagsRaw = document.getElementById('template-tags').value.trim();
+    const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(t => t) : [];
+
     try {
-        const result = await api.post('/api/templates', {
+        const payload = {
             name: name,
             content: generatedContent,
-            format: 'markdown',
-            description: 'Generated from document extraction',
-        });
+            format: format,
+            description: description || 'Generated from document extraction',
+        };
+        if (docType) {
+            payload.document_type = docType;
+        }
+        if (tags.length > 0) {
+            payload.tags = tags;
+        }
+
+        const result = await api.post('/api/templates', payload);
 
         showToast('Template saved', 'success');
         window.location.href = '/templates/' + result.id;
