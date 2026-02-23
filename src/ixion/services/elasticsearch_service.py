@@ -135,6 +135,11 @@ class ElasticsearchService:
 
         url = f"{self.url}/{endpoint.lstrip('/')}"
 
+        # For search requests on multi-index patterns, skip missing indices
+        if "/_search" in endpoint:
+            sep = "&" if "?" in url else "?"
+            url += f"{sep}ignore_unavailable=true&allow_no_indices=true"
+
         try:
             async with httpx.AsyncClient(
                 headers=self._get_headers(),
