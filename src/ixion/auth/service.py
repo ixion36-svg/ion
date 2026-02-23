@@ -83,16 +83,15 @@ class AuthService:
             self._log_failed_login(username, ip_address, "Invalid password")
             return None, None, "Invalid username or password"
 
-        # Session rotation: invalidate all existing sessions for this user
-        # This prevents session fixation attacks and ensures only one active session
-        old_session_count = self.session_repo.delete_all_for_user(user.id)
-        if old_session_count > 0:
+        # Clean up expired sessions for this user (but keep valid ones)
+        expired_count = self.session_repo.delete_expired_for_user(user.id)
+        if expired_count > 0:
             self.audit_repo.create(
                 user_id=user.id,
-                action="session_rotation",
+                action="session_cleanup",
                 resource_type="user",
                 resource_id=user.id,
-                details={"old_sessions_invalidated": old_session_count},
+                details={"expired_sessions_cleaned": expired_count},
                 ip_address=ip_address,
             )
 
@@ -182,6 +181,8 @@ class AuthService:
     def validate_session(self, session_token: str) -> Optional[User]:
         """Validate a session token and return the user.
 
+        Extends session expiry on each validated request (sliding window).
+
         Args:
             session_token: Session token to validate
 
@@ -194,6 +195,18 @@ class AuthService:
 
         if not user_session.user.is_active:
             return None
+
+        # Sliding session: extend expiry when less than half the lifetime remains
+        # This avoids writing to the DB on every single request (SQLite lock contention)
+        now = datetime.utcnow()
+        remaining = (user_session.expires_at - now).total_seconds()
+        half_lifetime = (self.session_lifetime_hours * 3600) / 2
+        if remaining < half_lifetime:
+            user_session.expires_at = now + timedelta(hours=self.session_lifetime_hours)
+            try:
+                self.session_repo.session.commit()
+            except Exception:
+                self.session_repo.session.rollback()
 
         return user_session.user
 
@@ -510,11 +523,15 @@ class AuthService:
         email: str = "admin@localhost",
     ) -> Optional[User]:
         """Create default admin user."""
+        admin_role = self.role_repo.get_by_name("admin")
+
         existing = self.user_repo.get_by_username(username)
         if existing:
+            # Ensure admin role is assigned even on existing users
+            if admin_role and not existing.has_role("admin"):
+                self.user_repo.add_role(existing, admin_role)
             return existing
 
-        admin_role = self.role_repo.get_by_name("admin")
         password_hash = password_hasher.hash(password)
 
         user = self.user_repo.create(

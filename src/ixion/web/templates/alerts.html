@@ -6384,7 +6384,7 @@ async function linkToCurrentCase(alertId) {
         if (!resp.ok) throw new Error('Failed to link alert');
 
         showNotification('Alert linked to case', 'success');
-        await loadTriageData();
+        await loadTriageBatch();
 
         // Refresh the related alerts view
         if (currentDetailAlert) {
@@ -6433,7 +6433,7 @@ async function linkAllToCase(matchType, caseId) {
 
         const result = await resp.json();
         showNotification(`Linked ${result.updated} alerts to case`, 'success');
-        await loadTriageData();
+        await loadTriageBatch();
 
         // Refresh the related alerts view
         loadRelatedAlerts(currentAlert);
@@ -6916,7 +6916,7 @@ async function quickAssignToMe(alertId) {
         if (!resp.ok) throw new Error('Failed to assign alert');
 
         showNotification('Alert assigned to you', 'success');
-        await loadTriageData();
+        await loadTriageBatch();
         renderAlerts();
     } catch (err) {
         console.error('Assign error:', err);
@@ -6935,7 +6935,7 @@ async function quickStatusChange(alertId, status) {
         if (!resp.ok) throw new Error('Failed to update status');
 
         showNotification(`Status changed to ${status}`, 'success');
-        await loadTriageData();
+        await loadTriageBatch();
         renderAlerts();
     } catch (err) {
         console.error('Status change error:', err);
@@ -6954,7 +6954,7 @@ async function quickPriorityChange(alertId, priority) {
         if (!resp.ok) throw new Error('Failed to update priority');
 
         showNotification(`Priority set to ${priority}`, 'success');
-        await loadTriageData();
+        await loadTriageBatch();
         renderAlerts();
     } catch (err) {
         console.error('Priority change error:', err);
@@ -7068,7 +7068,7 @@ async function applyBulkAction() {
         document.getElementById('bulk-priority').value = '';
 
         // Reload triage data
-        await loadTriageData();
+        await loadTriageBatch();
         renderAlerts();
 
     } catch (err) {
@@ -7213,7 +7213,7 @@ async function submitBulkCreateCase() {
         // Clear selection and reload
         clearSelection();
         await loadCases();
-        await loadTriageData();
+        await loadTriageBatch();
         renderAlerts();
 
     } catch (e) {
@@ -7311,7 +7311,7 @@ async function confirmAddToCase() {
 
         closeAddToCaseModal();
         clearSelection();
-        await loadTriageData();
+        await loadTriageBatch();
         renderAlerts();
 
     } catch (err) {

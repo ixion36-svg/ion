@@ -23,6 +23,7 @@ from ixion.services.kibana_cases_service import get_kibana_cases_service
 from ixion.services.kibana_sync_service import get_kibana_sync_service
 from ixion.services.dfir_iris_service import get_dfir_iris_service
 from ixion.services.case_description import build_case_description
+from ixion.services.observable_extractor import extract_observables_from_raw
 
 # Rate limiter - uses IP address as key
 limiter = Limiter(key_func=get_remote_address)
@@ -3242,7 +3243,7 @@ async def create_case(
 
             # Extract observables from raw_data for case-level aggregation
             if ctx.raw_data:
-                for obs in _extract_observables_from_raw(ctx.raw_data):
+                for obs in extract_observables_from_raw(ctx.raw_data):
                     key = (obs["type"], obs["value"])
                     if key not in seen_observables:
                         seen_observables.add(key)
@@ -4287,129 +4288,6 @@ async def update_alert_triage(
     }
 
 
-def _extract_observables_from_raw(raw_data: dict) -> list:
-    """Extract observables from ECS-style and Kibana Security alert data."""
-    observables = []
-    seen = set()
-
-    def _add(obs_type: str, value: str):
-        value = str(value).strip()
-        if value and (obs_type, value) not in seen:
-            seen.add((obs_type, value))
-            observables.append({"type": obs_type, "value": value})
-
-    def _get_nested(data: dict, dotted_key: str):
-        """Retrieve a nested value using dot notation.
-
-        Handles both formats:
-        - Flattened dot notation keys: data["source.ip"]
-        - Nested objects: data["source"]["ip"]
-        """
-        # First try flattened dot notation (Kibana Security alerts)
-        if dotted_key in data:
-            return data[dotted_key]
-
-        # Then try nested object traversal (ECS standard)
-        keys = dotted_key.split(".")
-        current = data
-        for k in keys:
-            if isinstance(current, dict):
-                current = current.get(k)
-            else:
-                return None
-        return current
-
-    def _extract_field(fields: list, obs_type: str):
-        """Extract value from multiple possible field paths."""
-        for field in fields:
-            val = _get_nested(raw_data, field)
-            if val:
-                if isinstance(val, list):
-                    for v in val:
-                        if v:
-                            _add(obs_type, str(v))
-                else:
-                    _add(obs_type, str(val))
-
-    ip_pattern = re.compile(
-        r"^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$"
-    )
-
-    # === IP Addresses ===
-    # source.ip → source_ip
-    _extract_field(["source.ip", "client.ip"], "source_ip")
-
-    # destination.ip → destination_ip
-    _extract_field(["destination.ip", "server.ip"], "destination_ip")
-
-    # host.ip → host_ip
-    _extract_field(["host.ip"], "host_ip")
-
-    # === Hostnames ===
-    _extract_field(["host.name", "host.hostname", "agent.hostname"], "hostname")
-
-    # === User Accounts ===
-    _extract_field(["user.name", "user.id", "winlog.event_data.TargetUserName"], "user_account")
-
-    # === URLs and Domains ===
-    _extract_field(["url.full", "url.original"], "url")
-    _extract_field(["url.domain", "dns.question.name", "destination.domain"], "domain")
-
-    # === File Information ===
-    _extract_field(["file.path", "process.executable", "file.name"], "file_path")
-    _extract_field(["file.hash.sha256", "process.hash.sha256"], "sha256")
-    _extract_field(["file.hash.md5", "process.hash.md5"], "md5")
-    _extract_field(["file.hash.sha1", "process.hash.sha1"], "sha1")
-
-    # === Process Information ===
-    _extract_field(["process.name", "process.executable"], "process_name")
-    _extract_field(["process.command_line", "process.args"], "command_line")
-    _extract_field(["process.pid"], "process_id")
-    _extract_field(["process.parent.name"], "parent_process")
-
-    # === Network ===
-    _extract_field(["destination.port", "server.port"], "port")
-    _extract_field(["network.protocol", "network.transport"], "protocol")
-
-    # === Email ===
-    _extract_field(["email.from.address", "email.sender.address"], "email")
-    _extract_field(["email.subject"], "email_subject")
-
-    # === Registry (Windows) ===
-    _extract_field(["registry.path", "registry.key"], "registry_key")
-    _extract_field(["registry.value"], "registry_value")
-
-    # === MITRE ATT&CK ===
-    _extract_field(["threat.technique.id", "kibana.alert.rule.threat.technique.id"], "mitre_technique")
-    _extract_field(["threat.technique.name", "kibana.alert.rule.threat.technique.name"], "mitre_technique_name")
-    _extract_field(["threat.tactic.name", "kibana.alert.rule.threat.tactic.name"], "mitre_tactic")
-
-    # === Event Context ===
-    _extract_field(["event.action", "kibana.alert.original_event.action"], "event_action")
-    _extract_field(["event.category", "kibana.alert.original_event.category"], "event_category")
-    _extract_field(["event.outcome", "kibana.alert.original_event.outcome"], "event_outcome")
-    _extract_field(["message"], "message")
-
-    # === Kibana Security Alert specific fields ===
-    _extract_field(["kibana.alert.rule.name", "rule.name"], "rule_name")
-    _extract_field(["kibana.alert.rule.description", "rule.description"], "rule_description")
-    _extract_field(["kibana.alert.reason"], "alert_reason")
-    _extract_field(["kibana.alert.severity", "severity"], "severity")
-    _extract_field(["kibana.alert.risk_score"], "risk_score")
-
-    # source.address / destination.address → source_ip / destination_ip (if IP-shaped)
-    for field, obs_type in (("source.address", "source_ip"), ("destination.address", "destination_ip")):
-        val = _get_nested(raw_data, field)
-        if val:
-            vals = val if isinstance(val, list) else [val]
-            for v in vals:
-                v_str = str(v).strip()
-                if ip_pattern.match(v_str):
-                    _add(obs_type, v_str)
-
-    return observables
-
-
 def _populate_triage_observables(triage, host=None, user=None, raw_data=None) -> bool:
     """Populate observables on a triage record from alert context.
 
@@ -4433,7 +4311,7 @@ def _populate_triage_observables(triage, host=None, user=None, raw_data=None) ->
     if user:
         _add("user_account", user)
     if raw_data:
-        for obs in _extract_observables_from_raw(raw_data):
+        for obs in extract_observables_from_raw(raw_data):
             _add(obs["type"], obs["value"])
 
     triage.observables = observables if observables else None

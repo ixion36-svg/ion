@@ -143,6 +143,28 @@ async def startup_event():
     # Always run create_all to ensure new tables are created
     init_db(config.db_path)
 
+    # Seed roles, permissions, and ensure admin user has admin role
+    try:
+        from ixion.storage.database import get_engine, get_session_factory
+        from ixion.auth.service import AuthService
+        import os
+
+        engine = get_engine(config.db_path)
+        factory = get_session_factory(engine)
+        session = factory()
+        try:
+            auth_service = AuthService(session)
+            auth_service.seed_permissions()
+            auth_service.seed_roles()
+            admin_password = os.environ.get("IXION_ADMIN_PASSWORD", "changeme")
+            auth_service.seed_admin_user(password=admin_password)
+            session.commit()
+        finally:
+            session.close()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to seed auth data: {e}")
+
     # Seed default pattern-based playbooks
     try:
         from ixion.services.pattern_detection_service import seed_default_playbooks

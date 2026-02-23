@@ -84,6 +84,16 @@ class SessionRepository:
         self.session.flush()
         return result.rowcount
 
+    def delete_expired_for_user(self, user_id: int) -> int:
+        """Delete only expired sessions for a user (keep valid ones)."""
+        stmt = delete(UserSession).where(
+            UserSession.user_id == user_id,
+            UserSession.expires_at <= datetime.utcnow(),
+        )
+        result = self.session.execute(stmt)
+        self.session.flush()
+        return result.rowcount
+
     def delete_expired(self) -> int:
         """Delete all expired sessions."""
         stmt = delete(UserSession).where(UserSession.expires_at <= datetime.utcnow())
