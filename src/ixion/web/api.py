@@ -1950,6 +1950,13 @@ async def generate_template_from_file(
     return response
 
 
+# Health check endpoint (no auth required)
+@router.get("/health")
+async def health_check():
+    """Simple health check for Docker/load balancers."""
+    return {"status": "ok"}
+
+
 # Stats endpoint
 @router.get("/stats")
 async def get_stats(
