@@ -71,8 +71,12 @@ class IntegrationLogService:
         if session:
             return _log(session)
 
+        # Don't return inside the for loop — that short-circuits the generator
+        # and skips session.commit() in get_session()
+        result = None
         for sess in get_session():
-            return _log(sess)
+            result = _log(sess)
+        return result
 
     def log_debug(
         self,
@@ -278,8 +282,10 @@ class IntegrationLogService:
         if session:
             return _record(session)
 
+        result = None
         for sess in get_session():
-            return _record(sess)
+            result = _record(sess)
+        return result
 
     def get_latest_health_checks(
         self,

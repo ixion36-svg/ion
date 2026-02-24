@@ -18,7 +18,7 @@ import random
 from datetime import datetime, timedelta
 
 ES_URL = "http://127.0.0.1:9200"
-AUTH = ("elastic", "DocforgeTest123!")
+AUTH = ("elastic", "DocforgeTest2025")
 IXION_INDEX = "alerts-ixion"
 SECURITY_INDEX = ".alerts-security.alerts-default"
 
@@ -727,7 +727,7 @@ def _build_security_alert(alert_def, now):
         "kibana.alert.depth": 1,
         "kibana.alert.ancestors": [],
         "kibana.space_ids": ["default"],
-        "kibana.version": "8.11.0",
+        "kibana.version": "9.3.0",
         "event.kind": "signal",
         "event.action": evt_action,
         "event.category": [evt_cat],

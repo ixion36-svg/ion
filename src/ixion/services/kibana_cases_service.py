@@ -312,12 +312,24 @@ class KibanaCasesService:
         """Get all alerts attached to a case.
 
         Returns a list of alert references with 'id' and 'index' fields.
+        Supports both Kibana 9.x (dedicated alerts endpoint) and 8.x (comment-based).
         """
         if not self.enabled:
             return []
 
         try:
-            # First try the _find endpoint for comments
+            # Kibana 9.x: dedicated alerts endpoint
+            alerts_path = self._get_api_path(f"/api/cases/{case_id}/alerts")
+            alerts_response = self.client.get(alerts_path)
+            if alerts_response.status_code == 200:
+                alerts_data = alerts_response.json()
+                if isinstance(alerts_data, list) and alerts_data:
+                    return [
+                        {"id": a["id"], "index": a.get("index", ".alerts-security.alerts-default")}
+                        for a in alerts_data
+                    ]
+
+            # Kibana 8.x fallback: alerts stored as comment type "alert"
             path = self._get_api_path(f"/api/cases/{case_id}/comments/_find")
             response = self.client.get(path, params={"perPage": 100})
 
@@ -325,7 +337,6 @@ class KibanaCasesService:
             if response.status_code == 200:
                 comments = response.json().get("comments", [])
 
-            # Fall back to embedded comments from the case itself
             if not comments:
                 case_data = self.get_case(case_id)
                 if case_data:
@@ -334,14 +345,11 @@ class KibanaCasesService:
             alerts = []
             for comment in comments:
                 if comment.get("type") == "alert":
-                    # Alert comments contain alertId (string or list) and index
                     alert_ids = comment.get("alertId", [])
                     index = comment.get("index", ".alerts-security.alerts-default")
 
-                    # alertId can be a single string or a list
                     if isinstance(alert_ids, str):
                         alert_ids = [alert_ids]
-                    # index can also be a list parallel to alertId
                     if isinstance(index, str):
                         index = [index] * len(alert_ids)
 

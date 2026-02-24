@@ -12,7 +12,7 @@ from ixion.services.kibana_cases_service import get_kibana_cases_service
 from ixion.services.elasticsearch_service import ElasticsearchService
 from ixion.services.case_description import build_case_description
 from ixion.services.observable_extractor import extract_observables_from_raw
-from ixion.models.alert_triage import AlertCase, Note, NoteEntityType
+from ixion.models.alert_triage import AlertCase, AlertTriage, AlertTriageStatus, Note, NoteEntityType
 from ixion.models.user import User
 from ixion.storage.database import get_session_factory, get_engine
 
@@ -447,6 +447,18 @@ class KibanaSyncService:
 
                     session.add(new_case)
                     session.flush()  # Get the ID
+
+                    # Link alerts to case via AlertTriage (matches native case creation)
+                    for alert_id in source_alert_ids:
+                        triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+                        if not triage:
+                            triage = AlertTriage(
+                                es_alert_id=alert_id,
+                                status=AlertTriageStatus.INVESTIGATING,
+                            )
+                            session.add(triage)
+                            session.flush()
+                        triage.case_id = new_case.id
 
                     # Push standardized description back to Kibana
                     kibana_version = kibana_case.get("version")

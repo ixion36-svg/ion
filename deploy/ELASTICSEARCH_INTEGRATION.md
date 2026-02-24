@@ -285,8 +285,8 @@ For environments without internet access:
 
 On a machine with internet:
 ```bash
-docker pull docker.elastic.co/beats/filebeat:8.11.0
-docker save docker.elastic.co/beats/filebeat:8.11.0 | gzip > filebeat.tar.gz
+docker pull docker.elastic.co/beats/filebeat:9.3.0
+docker save docker.elastic.co/beats/filebeat:9.3.0 | gzip > filebeat.tar.gz
 ```
 
 ### 2. Transfer and Load
@@ -413,7 +413,7 @@ If logs aren't parsing correctly:
     "id": "abc123"
   },
   "ecs": {
-    "version": "8.11.0"
+    "version": "9.3.0"
   }
 }
 ```

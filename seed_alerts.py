@@ -6,7 +6,7 @@ import random
 from datetime import datetime, timedelta
 
 ES_URL = "http://127.0.0.1:9200"
-AUTH = ("elastic", "DocforgeTest123!")
+AUTH = ("elastic", "DocforgeTest2025")
 INDEX = "alerts-ixion"
 
 def main():

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import random
 
 ES_URL = "http://127.0.0.1:9200"
-AUTH = ("elastic", "DocforgeTest123!")
+AUTH = ("elastic", "DocforgeTest2025")
 INDEX = ".alerts-security.alerts-default"
 
 def main():
@@ -162,7 +162,7 @@ def main():
             "kibana.alert.depth": 1,
             "kibana.alert.ancestors": [],
             "kibana.space_ids": ["default"],
-            "kibana.version": "8.11.0",
+            "kibana.version": "9.3.0",
             "event.kind": "signal",
             "event.action": "alert",
             "event.category": ["intrusion_detection"],

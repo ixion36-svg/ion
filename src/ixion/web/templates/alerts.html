@@ -236,6 +236,17 @@
     </div>
     <div class="context-menu-submenu">
         <div class="context-menu-item">
+            <span class="context-icon">&#128683;</span> Close As...
+            <span class="submenu-arrow">&#9656;</span>
+        </div>
+        <div class="context-submenu">
+            <div class="context-menu-item" onclick="contextMenuAction('close-as', 'benign')" style="color:#10b981;">&#10003; Benign</div>
+            <div class="context-menu-item" onclick="contextMenuAction('close-as', 'escalated')" style="color:#fbbf24;">&#9650; Escalated</div>
+            <div class="context-menu-item" onclick="contextMenuAction('close-as', 'false_positive')" style="color:#ef4444;">&#10007; False Positive</div>
+        </div>
+    </div>
+    <div class="context-menu-submenu">
+        <div class="context-menu-item">
             <span class="context-icon">&#9733;</span> Set Priority
             <span class="submenu-arrow">&#9656;</span>
         </div>
@@ -2554,6 +2565,26 @@ kbd {
     border-top: 1px solid var(--border);
 }
 
+/* Alert closure action buttons */
+.alert-closure-actions {
+    display: flex; gap: 0.5rem; margin-top: 0.5rem; padding-top: 0.5rem;
+    border-top: 1px solid var(--border);
+}
+.alert-closure-btn {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.375rem 0.75rem; border: 1px solid var(--border);
+    border-radius: 4px; font-size: 0.75rem; font-weight: 600;
+    cursor: pointer; background: transparent; color: var(--text-primary);
+    transition: all 0.15s ease;
+}
+.alert-closure-btn:hover { filter: brightness(1.2); }
+.alert-closure-btn.benign { border-color: #10b981; color: #10b981; }
+.alert-closure-btn.benign:hover { background: rgba(16,185,129,0.12); }
+.alert-closure-btn.escalated { border-color: #fbbf24; color: #fbbf24; }
+.alert-closure-btn.escalated:hover { background: rgba(251,191,36,0.12); }
+.alert-closure-btn.false-positive { border-color: #ef4444; color: #ef4444; }
+.alert-closure-btn.false-positive:hover { background: rgba(239,68,68,0.12); }
+
 /* Closure info block in case detail */
 .closure-info-block {
     background: rgba(156,163,175,0.08); border: 1px solid var(--border);
@@ -3055,7 +3086,7 @@ function renderCaseManagementModal(caseData) {
 
     // Description
     const descHtml = caseData.description
-        ? `<div class="case-mgmt-section"><h5>Description</h5><p style="font-size:0.8125rem;line-height:1.5;margin:0;">${escapeHtml(caseData.description)}</p></div>`
+        ? `<div class="case-mgmt-section"><h5>Description</h5><div style="font-size:0.8125rem;line-height:1.5;margin:0;" class="case-description-md">${marked.parse(caseData.description)}</div></div>`
         : '';
 
     // Linked alerts
@@ -3188,6 +3219,177 @@ function handleCaseStatusChange(caseId, selectEl, oldStatus) {
     } else {
         // For reopening or other status changes, update directly
         updateCaseField(caseId, 'status', newStatus);
+    }
+}
+
+function showAlertClosureModal(alertId, closureType) {
+    const existing = document.getElementById('alert-closure-modal-overlay');
+    if (existing) existing.remove();
+
+    const labels = { benign: 'Benign', escalated: 'Escalated', false_positive: 'False Positive' };
+    const colors = { benign: '#10b981', escalated: '#fbbf24', false_positive: '#ef4444' };
+    const label = labels[closureType] || closureType;
+    const color = colors[closureType] || 'var(--text-primary)';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'closure-modal-overlay';
+    overlay.id = 'alert-closure-modal-overlay';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+    const isFP = closureType === 'false_positive';
+
+    overlay.innerHTML = `
+        <div class="closure-modal">
+            <h4 style="color:${color};">Close Alert as ${label}</h4>
+            <label>Reason / Notes</label>
+            <textarea id="alert-closure-notes" placeholder="Why is this alert being closed as ${label.toLowerCase()}?"></textarea>
+
+            ${isFP ? `
+            <div class="kfp-section" style="margin-top:0.75rem;">
+                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-top:0;">
+                    <input type="checkbox" id="alert-kfp-checkbox" checked onchange="toggleAlertKFPFields()">
+                    <span>Add to Known False Positives Registry</span>
+                </label>
+                <div id="alert-kfp-fields">
+                    <label>KFP Title</label>
+                    <input type="text" id="alert-kfp-title" value="">
+
+                    <label>Description / Reasoning</label>
+                    <textarea id="alert-kfp-description" placeholder="Why is this a false positive?"></textarea>
+
+                    <label>Match Hosts</label>
+                    <div class="tag-input-group" id="alert-kfp-hosts-tags"></div>
+
+                    <label>Match Users</label>
+                    <div class="tag-input-group" id="alert-kfp-users-tags"></div>
+
+                    <label>Match IPs</label>
+                    <div class="tag-input-group" id="alert-kfp-ips-tags"></div>
+
+                    <label>Match Rules</label>
+                    <div class="tag-input-group" id="alert-kfp-rules-tags"></div>
+                </div>
+            </div>
+            ` : ''}
+
+            <div class="closure-actions">
+                <button class="btn btn-secondary" onclick="document.getElementById('alert-closure-modal-overlay').remove()">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmAlertClosure('${escapeHtml(alertId)}', '${closureType}')">Confirm Close</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    if (isFP) {
+        _prepopulateAlertKFPFields(alertId);
+    }
+}
+
+function _prepopulateAlertKFPFields(alertId) {
+    // Try to get data from triage cache
+    const triage = triageCache[alertId];
+    const alertData = allAlerts.find(a => a.id === alertId);
+
+    let hosts = [], users = [], ips = [], rules = [];
+
+    if (triage && triage.observables) {
+        for (const obs of triage.observables) {
+            if (obs.type === 'hostname') hosts.push(obs.value);
+            else if (obs.type === 'user_account') users.push(obs.value);
+            else if (obs.type === 'source_ip' || obs.type === 'destination_ip') ips.push(obs.value);
+        }
+    }
+
+    // Fallback to alert data
+    if (alertData) {
+        if (!hosts.length && alertData.host) hosts.push(alertData.host);
+        if (!users.length && alertData.user) users.push(alertData.user);
+        if (alertData.rule_name) rules.push(alertData.rule_name);
+    }
+
+    const titleEl = document.getElementById('alert-kfp-title');
+    if (titleEl) {
+        titleEl.value = alertData ? `FP: ${alertData.rule_name || alertId}` : `FP: ${alertId}`;
+    }
+
+    _initTagInput('alert-kfp-hosts-tags', hosts);
+    _initTagInput('alert-kfp-users-tags', users);
+    _initTagInput('alert-kfp-ips-tags', ips);
+    _initTagInput('alert-kfp-rules-tags', rules);
+}
+
+function toggleAlertKFPFields() {
+    const checked = document.getElementById('alert-kfp-checkbox').checked;
+    const fields = document.getElementById('alert-kfp-fields');
+    if (fields) fields.style.display = checked ? 'block' : 'none';
+}
+
+async function confirmAlertClosure(alertId, closureType) {
+    const notes = document.getElementById('alert-closure-notes')?.value || '';
+
+    const body = {
+        closure_type: closureType,
+        notes: notes || null,
+    };
+
+    // For false positive, include KFP fields if checkbox is checked
+    if (closureType === 'false_positive') {
+        const kfpCheckbox = document.getElementById('alert-kfp-checkbox');
+        if (kfpCheckbox && kfpCheckbox.checked) {
+            body.create_kfp = true;
+            body.kfp_title = document.getElementById('alert-kfp-title')?.value || null;
+            body.kfp_description = document.getElementById('alert-kfp-description')?.value || null;
+            body.match_hosts = _getTagValues('alert-kfp-hosts-tags');
+            body.match_users = _getTagValues('alert-kfp-users-tags');
+            body.match_ips = _getTagValues('alert-kfp-ips-tags');
+            body.match_rules = _getTagValues('alert-kfp-rules-tags');
+        }
+    }
+
+    try {
+        const response = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/close`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to close alert');
+        }
+
+        const result = await response.json();
+
+        // Remove modal
+        const overlay = document.getElementById('alert-closure-modal-overlay');
+        if (overlay) overlay.remove();
+
+        // Update triage cache
+        if (triageCache[alertId]) {
+            triageCache[alertId].status = result.status;
+        }
+
+        // Show notification
+        let msg = result.message;
+        if (result.note_added_to_case) msg += ' — note added to case';
+        if (result.kfp_created) msg += ` — KFP "${result.kfp_created.title}" created`;
+        showNotification(msg, 'success');
+
+        // Re-render
+        renderAlerts();
+        await loadCases();
+        if (currentDetailAlert && currentDetailAlert.id === alertId) {
+            await loadTriage(alertId);
+        }
+        // Re-render case tab if the alert was linked to a case
+        const triage = triageCache[alertId];
+        if (triage && triage.case_id) {
+            renderCaseTab(triage.case_id);
+        }
+    } catch (e) {
+        console.error('Error closing alert:', e);
+        showNotification(e.message || 'Failed to close alert', 'error');
     }
 }
 
@@ -3884,8 +4086,11 @@ async function submitCreateCase(alertId) {
             await loadTriage(currentDetailAlert.id);
         }
 
-        // Check for FP suggestions
-        if (result.fp_suggestions && result.fp_suggestions.length > 0) {
+        // Check for auto-close or FP suggestions
+        if (result.auto_closed && result.auto_closed_kfp) {
+            const kfp = result.auto_closed_kfp;
+            showNotification(`Case ${result.case_number} created and AUTO-CLOSED as known FP "${kfp.title}" (${kfp.matched_fields.join(', ')})`, 'warning');
+        } else if (result.fp_suggestions && result.fp_suggestions.length > 0) {
             const fp = result.fp_suggestions[0];
             showNotification(`Case ${result.case_number} created. Note: Matches known FP "${fp.title}" (${fp.matched_fields.join(', ')}) — open the case to review.`, 'warning');
         }
@@ -4038,6 +4243,12 @@ function renderTriageBar(alertId, triage) {
             <div class="triage-group" style="margin-left:auto;">
                 ${caseHtml}
             </div>
+        </div>
+        <div class="alert-closure-actions">
+            <span style="font-size:0.75rem;font-weight:600;color:var(--text-muted);align-self:center;">Close as:</span>
+            <button class="alert-closure-btn benign" onclick="showAlertClosureModal('${escapeHtml(alertId)}', 'benign')">&#10003; Benign</button>
+            <button class="alert-closure-btn escalated" onclick="showAlertClosureModal('${escapeHtml(alertId)}', 'escalated')">&#9650; Escalated</button>
+            <button class="alert-closure-btn false-positive" onclick="showAlertClosureModal('${escapeHtml(alertId)}', 'false_positive')">&#10007; False Positive</button>
         </div>
         <div class="triage-notes-row" style="margin-top:0.5rem;">
             <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.25rem;">Analyst Notes</label>
@@ -5266,10 +5477,15 @@ async function renderCaseTab(caseId) {
                 <div class="case-alerts-list">
                     <h5>Linked Alerts (${c.alerts.length})</h5>
                     ${c.alerts.length > 0 ? c.alerts.map(a => `
-                        <div class="related-alert-item">
+                        <div class="related-alert-item" style="flex-wrap:wrap;">
                             <span class="triage-dot triage-${a.status}"></span>
-                            <span style="font-size:0.8125rem;flex:1;">${escapeHtml(a.es_alert_id)}</span>
+                            <span style="font-size:0.8125rem;flex:1;cursor:pointer;" onclick="showAlertDetail('${escapeHtml(a.es_alert_id)}')">${escapeHtml(a.es_alert_id)}</span>
                             <span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(a.priority || '')}</span>
+                            <div style="display:flex;gap:0.25rem;margin-left:auto;">
+                                <button class="alert-closure-btn benign" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" onclick="showAlertClosureModal('${escapeHtml(a.es_alert_id)}','benign')">&#10003;</button>
+                                <button class="alert-closure-btn escalated" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" onclick="showAlertClosureModal('${escapeHtml(a.es_alert_id)}','escalated')">&#9650;</button>
+                                <button class="alert-closure-btn false-positive" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" onclick="showAlertClosureModal('${escapeHtml(a.es_alert_id)}','false_positive')">&#10007;</button>
+                            </div>
                         </div>
                     `).join('') : '<div class="empty-state">No other alerts linked</div>'}
                 </div>
@@ -6861,6 +7077,10 @@ async function contextMenuAction(action, value) {
             await quickPriorityChange(alertId, value);
             break;
 
+        case 'close-as':
+            showAlertClosureModal(alertId, value);
+            break;
+
         case 'create-case':
             showCreateCaseForm(alertId);
             break;
@@ -7202,8 +7422,11 @@ async function submitBulkCreateCase() {
         const result = await response.json();
         document.getElementById('bulk-case-create-overlay').remove();
 
-        // Check for FP suggestions
-        if (result.fp_suggestions && result.fp_suggestions.length > 0) {
+        // Check for auto-close or FP suggestions
+        if (result.auto_closed && result.auto_closed_kfp) {
+            const kfp = result.auto_closed_kfp;
+            showNotification(`Case ${result.case_number} created with ${alertIds.length} alerts and AUTO-CLOSED as known FP "${kfp.title}" (${kfp.matched_fields.join(', ')})`, 'warning');
+        } else if (result.fp_suggestions && result.fp_suggestions.length > 0) {
             const fp = result.fp_suggestions[0];
             showNotification(`Case ${result.case_number} created with ${alertIds.length} alerts. Matches known FP "${fp.title}" (${fp.matched_fields.join(', ')}) — open the case to review.`, 'warning');
         } else {

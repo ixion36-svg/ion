@@ -100,6 +100,7 @@ class ElasticsearchService:
         self.password = password or config.get("password", "")
         self.alert_index = alert_index or config.get("alert_index", ".alerts-*,.watcher-history-*,alerts-*")
         self.case_index = case_index or config.get("case_index", "ixion-cases")
+        self.kfp_index = config.get("kfp_index", "ixion-kfp")
         self.verify_ssl = verify_ssl if verify_ssl is not None else config.get("verify_ssl", True)
 
     @property
@@ -718,6 +719,50 @@ class ElasticsearchService:
             return True
         except Exception as e:
             logger.warning("Failed to delete case %s from Elasticsearch: %s", case_id, e)
+            return False
+
+    async def index_kfp(self, kfp_doc: dict) -> bool:
+        """Index (upsert) a known false positive document into Elasticsearch.
+
+        Args:
+            kfp_doc: Full KFP document dict. Must contain an 'id' key.
+
+        Returns:
+            True on success, False on failure (logs warning, does not raise).
+        """
+        kfp_id = kfp_doc.get("id")
+        if kfp_id is None:
+            logger.warning("index_kfp called without 'id' in kfp_doc")
+            return False
+
+        try:
+            await self._request(
+                "PUT",
+                f"/{self.kfp_index}/_doc/{kfp_id}",
+                json=kfp_doc,
+            )
+            return True
+        except Exception as e:
+            logger.warning("Failed to index KFP %s to Elasticsearch: %s", kfp_id, e)
+            return False
+
+    async def delete_kfp(self, kfp_id: int) -> bool:
+        """Delete a KFP document from Elasticsearch.
+
+        Args:
+            kfp_id: The KFP ID (used as the ES document ID).
+
+        Returns:
+            True on success, False on failure (logs warning, does not raise).
+        """
+        try:
+            await self._request(
+                "DELETE",
+                f"/{self.kfp_index}/_doc/{kfp_id}",
+            )
+            return True
+        except Exception as e:
+            logger.warning("Failed to delete KFP %s from Elasticsearch: %s", kfp_id, e)
             return False
 
     async def get_cluster_health(self) -> Dict[str, Any]:

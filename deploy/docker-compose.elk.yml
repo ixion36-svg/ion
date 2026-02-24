@@ -59,7 +59,7 @@ services:
   # Filebeat - Log Shipper
   # ===========================================================================
   filebeat:
-    image: docker.elastic.co/beats/filebeat:8.11.0
+    image: docker.elastic.co/beats/filebeat:9.3.0
     container_name: docforge-filebeat
     restart: unless-stopped
     user: root

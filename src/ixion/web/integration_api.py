@@ -166,7 +166,7 @@ async def get_integration_status(
         )
 
         if latest_check:
-            response.status = latest_check.status.value if hasattr(latest_check.status, 'value') else str(latest_check.status)
+            response.status = latest_check.health_status.value if hasattr(latest_check.health_status, 'value') else str(latest_check.health_status)
             response.response_time_ms = latest_check.response_time_ms
             response.last_check = latest_check.checked_at.isoformat() if latest_check.checked_at else None
             response.error = latest_check.error_message

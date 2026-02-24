@@ -42,7 +42,7 @@
     {
       "set": {
         "field": "ecs.version",
-        "value": "8.11.0",
+        "value": "9.3.0",
         "override": false
       }
     },

@@ -1029,7 +1029,9 @@ body::before {
 }
 
 .modal-large {
-    max-width: 900px;
+    max-width: 90vw;
+    width: fit-content;
+    min-width: 600px;
 }
 
 .modal-header {
@@ -1772,17 +1774,30 @@ select option {
     text-shadow: var(--glow-sm);
 }
 
-.rendered-content table {
-    width: 100%;
-    border-collapse: collapse;
+.rendered-content .table-wrapper {
+    overflow-x: auto;
     margin: 1rem 0;
+    -webkit-overflow-scrolling: touch;
+}
+
+.rendered-content table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
 }
 
 .rendered-content th,
 .rendered-content td {
     border: 1px solid var(--border);
-    padding: 0.75rem;
+    padding: 0.5rem 0.75rem;
     text-align: left;
+    white-space: nowrap;
+}
+
+.rendered-content td:nth-child(2),
+.rendered-content td:nth-child(3) {
+    white-space: normal;
+    min-width: 120px;
 }
 
 .rendered-content th {

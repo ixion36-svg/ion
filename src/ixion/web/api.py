@@ -3022,6 +3022,19 @@ class TriageUpdate(BaseModel):
     mitre_techniques: Optional[List[dict]] = None
 
 
+class AlertClosureRequest(BaseModel):
+    """Request body for closing an alert with a specific closure type."""
+    closure_type: str  # "benign", "escalated", "false_positive"
+    notes: Optional[str] = None
+    create_kfp: Optional[bool] = False
+    kfp_title: Optional[str] = None
+    kfp_description: Optional[str] = None
+    match_rules: Optional[List[str]] = None
+    match_hosts: Optional[List[str]] = None
+    match_users: Optional[List[str]] = None
+    match_ips: Optional[List[str]] = None
+
+
 class BulkTriageUpdate(BaseModel):
     """Bulk update multiple alerts at once."""
     alert_ids: List[str]
@@ -3180,6 +3193,201 @@ async def _sync_case_to_es(case, session):
         _case_es_logger.warning("Failed to sync case %s to ES: %s", getattr(case, "id", "?"), e)
 
 
+def _build_kfp_es_doc(kfp) -> dict:
+    """Build the Elasticsearch document from a KnownFalsePositive ORM object."""
+    now = datetime.now(timezone.utc).isoformat()
+    return {
+        "id": kfp.id,
+        "@timestamp": now,
+        "title": kfp.title,
+        "description": kfp.description,
+        "match_hosts": kfp.match_hosts or [],
+        "match_users": kfp.match_users or [],
+        "match_ips": kfp.match_ips or [],
+        "match_rules": kfp.match_rules or [],
+        "is_active": kfp.is_active,
+        "source_case_id": kfp.source_case_id,
+        "created_by": kfp.created_by.username if kfp.created_by else None,
+        "created_at": kfp.created_at.isoformat() if kfp.created_at else None,
+        "updated_at": kfp.updated_at.isoformat() if kfp.updated_at else None,
+    }
+
+
+async def _sync_kfp_to_es(kfp):
+    """Sync a KFP entry to Elasticsearch. Logs warnings on failure, never raises."""
+    try:
+        es_config = get_elasticsearch_config()
+        if not es_config.get("enabled"):
+            return
+        es_service = get_elasticsearch_service()
+        if not es_service.is_configured:
+            return
+        doc = _build_kfp_es_doc(kfp)
+        await es_service.index_kfp(doc)
+    except Exception as e:
+        _case_es_logger.warning("Failed to sync KFP %s to ES: %s", getattr(kfp, "id", "?"), e)
+
+
+_RULE_CATEGORY_KEYWORDS = {
+    "Credential Access": ["brute force", "credential", "kerberoast", "kerberos", "lsass", "mimikatz", "password", "ntlm"],
+    "Execution": ["powershell", "script", "command", "wmi", "macro", "malware", "trojan"],
+    "Lateral Movement": ["lateral", "psexec", "rdp", "remote", "smb", "wmi"],
+    "Exfiltration": ["exfiltration", "upload", "data loss", "transfer"],
+    "Persistence": ["persistence", "scheduled task", "registry", "service", "startup"],
+    "Privilege Escalation": ["privilege", "escalation", "uac", "bypass", "admin"],
+    "Command and Control": ["c2", "beacon", "dns tunnel", "dga", "cobalt", "ssl"],
+    "Defense Evasion": ["evasion", "log clear", "firewall", "disable", "tamper"],
+    "Network Security": ["port scan", "scan", "firewall rule"],
+    "Initial Access": ["phishing", "email", "login", "geo"],
+    "Impact": ["ransomware", "encrypt", "wiper", "destroy"],
+}
+
+
+def _classify_rule_category(rules: list[str] | None) -> str:
+    """Classify rules into a security domain category based on keywords."""
+    if not rules:
+        return "General"
+    combined = " ".join(rules).lower()
+    for category, keywords in _RULE_CATEGORY_KEYWORDS.items():
+        if any(kw in combined for kw in keywords):
+            return category
+    return "General"
+
+
+def _build_kfp_registry_content(category: str, kfps: list) -> str:
+    """Build the full markdown content for a KFP registry document."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    active = [k for k in kfps if k.is_active]
+    inactive = [k for k in kfps if not k.is_active]
+
+    lines = [
+        f"# Known False Positives Registry — {category}",
+        "",
+        f"> **Last updated:** {now} | **Active entries:** {len(active)} | **Total:** {len(kfps)}",
+        "",
+        "## Active Entries",
+        "",
+    ]
+
+    if active:
+        lines.append("| ID | Title | Rules | Hosts | Users | IPs | Source Case | Created |")
+        lines.append("|---:|-------|-------|-------|-------|-----|------------|---------|")
+        for k in active:
+            rules = ", ".join(k.match_rules) if k.match_rules else "—"
+            hosts = ", ".join(k.match_hosts) if k.match_hosts else "—"
+            users = ", ".join(k.match_users) if k.match_users else "—"
+            ips = ", ".join(k.match_ips) if k.match_ips else "—"
+            case = f"Case #{k.source_case_id}" if k.source_case_id else "—"
+            created = k.created_at.strftime("%Y-%m-%d") if k.created_at else "—"
+            lines.append(f"| {k.id} | {k.title} | {rules} | {hosts} | {users} | {ips} | {case} | {created} |")
+    else:
+        lines.append("*No active entries.*")
+
+    lines.append("")
+
+    # Details for each active entry
+    for k in active:
+        lines.append(f"### KFP-{k.id:04d}: {k.title}")
+        lines.append("")
+        lines.append(k.description or "*No description.*")
+        lines.append("")
+        by = k.created_by.username if k.created_by else "Unknown"
+        lines.append(f"*Created by {by} on {k.created_at.strftime('%Y-%m-%d %H:%M UTC') if k.created_at else 'N/A'}*")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    if inactive:
+        lines.append("## Inactive / Retired Entries")
+        lines.append("")
+        lines.append("| ID | Title | Deactivated |")
+        lines.append("|---:|-------|-------------|")
+        for k in inactive:
+            updated = k.updated_at.strftime("%Y-%m-%d") if k.updated_at else "—"
+            lines.append(f"| {k.id} | {k.title} | {updated} |")
+        lines.append("")
+
+    lines.append("---")
+    lines.append("*Auto-generated by IXION Known False Positive Registry*")
+
+    return "\n".join(lines)
+
+
+def _create_kfp_document(session: Session, kfp, username: str) -> int | None:
+    """Create or update the consolidated KFP registry document for this KFP's rule category.
+
+    Each rule category gets its own collection and a single registry document
+    listing all KFP entries in that category.
+
+    Returns the document ID, or None on failure.
+    """
+    try:
+        from ixion.models.template import Collection
+        from ixion.models.document import Document
+
+        category = _classify_rule_category(kfp.match_rules)
+        collection_name = f"Known False Positives — {category}"
+        doc_name = f"KFP Registry — {category}"
+
+        # Get or create collection for this category
+        collection = session.query(Collection).filter_by(name=collection_name).first()
+        if not collection:
+            collection = Collection(
+                name=collection_name,
+                description=f"Known False Positive registry for {category} detection rules",
+            )
+            session.add(collection)
+            session.flush()
+
+        # Get all KFPs in this category to rebuild the full document
+        all_kfps = session.query(KnownFalsePositive).all()
+        category_kfps = [
+            k for k in all_kfps
+            if _classify_rule_category(k.match_rules) == category
+        ]
+
+        content = _build_kfp_registry_content(category, category_kfps)
+        input_data = json.dumps({
+            "category": category,
+            "kfp_ids": [k.id for k in category_kfps],
+        })
+
+        doc_repo = DocumentRepository(session)
+
+        # Find existing registry document for this category (by name — unique per category)
+        existing = session.query(Document).filter(
+            Document.name == doc_name,
+            Document.status == "active",
+        ).first()
+
+        if existing:
+            # Amend the existing document with updated content
+            existing.collection_id = collection.id
+            doc_repo.amend(
+                document=existing,
+                rendered_content=content,
+                input_data=input_data,
+                amendment_reason=f"Added KFP-{kfp.id:04d}: {kfp.title}",
+                amended_by=username,
+            )
+            session.flush()
+            return existing.id
+        else:
+            # Create new registry document
+            document = doc_repo.create(
+                name=doc_name,
+                rendered_content=content,
+                output_format="markdown",
+                input_data=input_data,
+            )
+            document.collection_id = collection.id
+            session.flush()
+            return document.id
+    except Exception as e:
+        _case_es_logger.warning("Failed to create KFP document for KFP %s: %s", getattr(kfp, "id", "?"), e)
+        return None
+
+
 @router.post("/elasticsearch/alerts/cases")
 async def create_case(
     data: CaseCreate,
@@ -3288,6 +3496,39 @@ async def create_case(
         rules=data.triggered_rules,
     )
 
+    # Auto-close case if strong KFP match (rules + at least one other field)
+    auto_closed = False
+    auto_closed_kfp = None
+    for fp in fp_suggestions:
+        matched = fp.get("matched_fields", [])
+        if "rules" in matched and len(matched) >= 2:
+            # Strong match — auto-close the case
+            new_case.status = AlertCaseStatus.CLOSED
+            new_case.closure_reason = "false_positive"
+            new_case.closed_by_id = current_user.id
+            new_case.closed_at = datetime.utcnow()
+
+            # Set all linked triage entries to FALSE_POSITIVE
+            for triage_entry in new_case.triage_entries:
+                triage_entry.status = AlertTriageStatus.FALSE_POSITIVE
+
+            # Add auto-closure note
+            auto_note = Note(
+                entity_type=NoteEntityType.CASE,
+                entity_id=str(new_case.id),
+                user_id=current_user.id,
+                content=f"**Auto-closed as Known False Positive**\n\nMatched KFP: {fp['title']} (ID: {fp['id']})\nMatched fields: {', '.join(matched)}",
+            )
+            session.add(auto_note)
+            session.commit()
+
+            if new_case.kibana_case_id:
+                sync_note_to_kibana(new_case.kibana_case_id, current_user.username, auto_note.content)
+
+            auto_closed = True
+            auto_closed_kfp = fp
+            break
+
     return {
         "id": new_case.id,
         "case_number": new_case.case_number,
@@ -3300,6 +3541,8 @@ async def create_case(
         "dfir_iris_case_id": new_case.dfir_iris_case_id,
         "dfir_iris_url": None,
         "fp_suggestions": fp_suggestions,
+        "auto_closed": auto_closed,
+        "auto_closed_kfp": auto_closed_kfp,
     }
 
 
@@ -3447,6 +3690,18 @@ async def update_case(
             case.closure_notes = data.closure_notes
             case.closed_by_id = current_user.id
             case.closed_at = datetime.utcnow()
+
+            # Add closure note to the case journal and sync to Kibana
+            reason_label = data.closure_reason.replace("_", " ").title()
+            closure_note = Note(
+                entity_type=NoteEntityType.CASE,
+                entity_id=str(case_id),
+                user_id=current_user.id,
+                content=f"**Case closed as {reason_label}**\n\nNotes: {data.closure_notes or 'N/A'}",
+            )
+            session.add(closure_note)
+            if case.kibana_case_id:
+                sync_note_to_kibana(case.kibana_case_id, current_user.username, closure_note.content)
         # Reopening: clear closure fields
         elif new_status not in ("closed", "resolved") and old_status in ("closed", "resolved"):
             case.closure_reason = None
@@ -3853,6 +4108,9 @@ async def create_known_false_positive(
     session.add(kfp)
     session.commit()
     session.refresh(kfp)
+    await _sync_kfp_to_es(kfp)
+    doc_id = _create_kfp_document(session, kfp, current_user.username)
+    session.commit()
     return {
         "id": kfp.id,
         "title": kfp.title,
@@ -3865,6 +4123,7 @@ async def create_known_false_positive(
         "source_case_id": kfp.source_case_id,
         "created_by": kfp.created_by.username if kfp.created_by else None,
         "created_at": kfp.created_at.isoformat() if kfp.created_at else None,
+        "document_id": doc_id,
     }
 
 
@@ -3921,6 +4180,7 @@ async def update_known_false_positive(
         kfp.is_active = data.is_active
     session.commit()
     session.refresh(kfp)
+    await _sync_kfp_to_es(kfp)
     return {
         "id": kfp.id,
         "title": kfp.title,
@@ -3946,6 +4206,8 @@ async def delete_known_false_positive(
         raise HTTPException(status_code=404, detail="Known false positive not found")
     kfp.is_active = False
     session.commit()
+    session.refresh(kfp)
+    await _sync_kfp_to_es(kfp)
     return {"message": "Known false positive deactivated"}
 
 
@@ -4229,6 +4491,119 @@ async def update_alert_triage(
         "observables": triage.observables,
         "mitre_techniques": triage.mitre_techniques,
         "message": "Triage updated",
+    }
+
+
+@router.post("/elasticsearch/alerts/{alert_id}/close")
+async def close_alert(
+    alert_id: str,
+    data: AlertClosureRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Close an alert as benign, escalated, or false positive.
+
+    Propagates a note to the parent case (IXION + Kibana) and optionally
+    creates a KFP registry entry for false positives.
+    """
+    # Map closure_type to AlertTriageStatus
+    closure_map = {
+        "benign": AlertTriageStatus.RESOLVED,
+        "escalated": AlertTriageStatus.ESCALATED,
+        "false_positive": AlertTriageStatus.FALSE_POSITIVE,
+    }
+    if data.closure_type not in closure_map:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid closure_type. Must be one of: {', '.join(closure_map.keys())}",
+        )
+    new_status = closure_map[data.closure_type]
+    label = data.closure_type.replace("_", " ").title()
+
+    # Get or create triage record
+    triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+    if not triage:
+        triage = AlertTriage(es_alert_id=alert_id)
+        session.add(triage)
+        session.flush()
+
+    triage.status = new_status
+
+    note_added_to_case = False
+    kfp_created = None
+
+    # If triage has a parent case, add a closure note
+    if triage.case_id:
+        case = session.query(AlertCase).filter_by(id=triage.case_id).first()
+        if case:
+            note_content = f"**Alert closed as {label}**\nAlert: `{alert_id}`\nReason: {data.notes or 'N/A'}"
+            note = Note(
+                entity_type=NoteEntityType.CASE,
+                entity_id=str(case.id),
+                user_id=current_user.id,
+                content=note_content,
+            )
+            session.add(note)
+            note_added_to_case = True
+
+            # Sync note to Kibana
+            if case.kibana_case_id:
+                sync_note_to_kibana(case.kibana_case_id, current_user.username, note_content)
+
+    # For false positives, optionally create KFP entry
+    if data.closure_type == "false_positive" and data.create_kfp:
+        # Fall back to extracting from triage observables if not provided
+        match_hosts = data.match_hosts or []
+        match_users = data.match_users or []
+        match_ips = data.match_ips or []
+        match_rules = data.match_rules or []
+
+        if triage.observables and (not match_hosts or not match_users or not match_ips):
+            for obs in triage.observables:
+                obs_type = obs.get("type", "")
+                obs_value = obs.get("value", "")
+                if not obs_value:
+                    continue
+                if obs_type == "hostname" and not match_hosts:
+                    match_hosts.append(obs_value)
+                elif obs_type == "user_account" and not match_users:
+                    match_users.append(obs_value)
+                elif obs_type in ("source_ip", "destination_ip") and not match_ips:
+                    match_ips.append(obs_value)
+
+        kfp = KnownFalsePositive(
+            title=data.kfp_title or f"FP: Alert {alert_id}",
+            description=data.kfp_description or data.notes or "",
+            match_hosts=match_hosts if match_hosts else None,
+            match_users=match_users if match_users else None,
+            match_ips=match_ips if match_ips else None,
+            match_rules=match_rules if match_rules else None,
+            source_case_id=triage.case_id,
+            created_by_id=current_user.id,
+        )
+        session.add(kfp)
+        session.flush()
+        kfp_created = {
+            "id": kfp.id,
+            "title": kfp.title,
+        }
+
+    session.commit()
+
+    # Sync KFP to ES and create document if one was created
+    if kfp_created:
+        session.refresh(kfp)
+        await _sync_kfp_to_es(kfp)
+        _create_kfp_document(session, kfp, current_user.username)
+        session.commit()
+
+    return {
+        "status": new_status.value if hasattr(new_status, "value") else new_status,
+        "closure_type": data.closure_type,
+        "alert_id": alert_id,
+        "note_added_to_case": note_added_to_case,
+        "kfp_created": kfp_created,
+        "message": f"Alert closed as {label}",
     }
 
 

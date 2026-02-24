@@ -352,7 +352,9 @@
     margin-left: 0.5rem;
 }
 .modal-large {
-    max-width: 700px;
+    max-width: 90vw;
+    width: fit-content;
+    min-width: 600px;
 }
 .modal-small {
     max-width: 400px;
@@ -803,7 +805,10 @@ function renderMarkdown(content) {
             breaks: true,
             gfm: true
         });
-        return marked.parse(content);
+        let html = marked.parse(content);
+        // Wrap tables in scrollable container
+        html = html.replace(/<table>/g, '<div class="table-wrapper"><table>').replace(/<\/table>/g, '</table></div>');
+        return html;
     }
     // Fallback: basic markdown rendering
     return '<pre>' + escapeHtml(content) + '</pre>';
