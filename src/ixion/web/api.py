@@ -2115,6 +2115,129 @@ async def get_dashboard(
     }
 
 
+@router.get("/dashboard/team-metrics", dependencies=[Depends(require_permission("alert:read"))])
+async def get_team_metrics(
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Team performance metrics for Lead dashboard."""
+    from sqlalchemy import func as sqlfunc
+    from ixion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage, AlertTriageStatus
+
+    now = datetime.utcnow()
+
+    # Open cases count
+    open_cases = session.query(sqlfunc.count(AlertCase.id)).filter(
+        AlertCase.status != AlertCaseStatus.CLOSED
+    ).scalar() or 0
+
+    # Unassigned open alerts count
+    unassigned_alerts = session.query(sqlfunc.count(AlertTriage.id)).filter(
+        AlertTriage.case_id.is_(None),
+        AlertTriage.status == AlertTriageStatus.OPEN,
+    ).scalar() or 0
+
+    # MTTR - mean time to resolution (last 30 days)
+    thirty_days_ago = now - timedelta(days=30)
+    closed_cases_30d = session.query(AlertCase).filter(
+        AlertCase.closed_at >= thirty_days_ago,
+        AlertCase.closed_at.isnot(None),
+    ).all()
+
+    mttr = None
+    if closed_cases_30d:
+        durations = [(c.closed_at - c.created_at).total_seconds() / 3600 for c in closed_cases_30d]
+        mttr = round(sum(durations) / len(durations), 1)
+
+    # Closure rate (7 days)
+    seven_days_ago = now - timedelta(days=7)
+    created_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
+        AlertCase.created_at >= seven_days_ago
+    ).scalar() or 0
+    closed_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
+        AlertCase.closed_at >= seven_days_ago
+    ).scalar() or 0
+
+    # Cases by severity (open only)
+    severity_rows = session.query(
+        AlertCase.severity, sqlfunc.count(AlertCase.id)
+    ).filter(
+        AlertCase.status != AlertCaseStatus.CLOSED
+    ).group_by(AlertCase.severity).all()
+    severity_counts = dict(severity_rows)
+
+    # Cases by assignee
+    from ixion.auth.models import User as AuthUser
+    assignee_rows = session.query(
+        AlertCase.assigned_to_id,
+        sqlfunc.count(AlertCase.id),
+    ).filter(
+        AlertCase.status != AlertCaseStatus.CLOSED
+    ).group_by(AlertCase.assigned_to_id).all()
+
+    # Closed in 7d per assignee
+    closed_by_assignee_rows = session.query(
+        AlertCase.assigned_to_id,
+        sqlfunc.count(AlertCase.id),
+    ).filter(
+        AlertCase.closed_at >= seven_days_ago,
+    ).group_by(AlertCase.assigned_to_id).all()
+    closed_by_assignee = dict(closed_by_assignee_rows)
+
+    cases_by_assignee = []
+    for user_id, open_count in assignee_rows:
+        if user_id is None:
+            cases_by_assignee.append({
+                "username": "Unassigned",
+                "display_name": "Unassigned",
+                "open_count": open_count,
+                "closed_7d": closed_by_assignee.get(None, 0),
+            })
+        else:
+            user = session.query(AuthUser).filter_by(id=user_id).first()
+            cases_by_assignee.append({
+                "username": user.username if user else "Unknown",
+                "display_name": user.display_name if user else "Unknown",
+                "open_count": open_count,
+                "closed_7d": closed_by_assignee.get(user_id, 0),
+            })
+
+    # Recent closures (last 10)
+    recent_closures_q = session.query(AlertCase).filter(
+        AlertCase.closed_at.isnot(None)
+    ).order_by(AlertCase.closed_at.desc()).limit(10).all()
+
+    recent_closures = []
+    for c in recent_closures_q:
+        closed_by_user = session.query(AuthUser).filter_by(id=c.closed_by_id).first() if c.closed_by_id else None
+        recent_closures.append({
+            "id": c.id,
+            "case_number": c.case_number,
+            "title": c.title,
+            "severity": c.severity,
+            "closure_reason": c.closure_reason,
+            "closed_by": closed_by_user.display_name if closed_by_user else "Unknown",
+            "closed_at": c.closed_at.isoformat() if c.closed_at else None,
+        })
+
+    return {
+        "open_cases": open_cases,
+        "unassigned_alerts": unassigned_alerts,
+        "mttr_hours": mttr,
+        "closure_rate_7d": round(closed_7d / created_7d * 100, 1) if created_7d > 0 else None,
+        "created_7d": created_7d,
+        "closed_7d": closed_7d,
+        "cases_by_severity": {
+            "critical": severity_counts.get("critical", 0),
+            "high": severity_counts.get("high", 0),
+            "medium": severity_counts.get("medium", 0),
+            "low": severity_counts.get("low", 0),
+        },
+        "cases_by_assignee": cases_by_assignee,
+        "recent_closures": recent_closures,
+    }
+
+
 # Sample templates endpoint
 @router.post("/samples/create", dependencies=[Depends(require_permission("template:create"))])
 async def create_sample_templates(services: Services = Depends(get_services)):
@@ -2902,7 +3025,7 @@ async def get_es_alerts(
     severity: Optional[str] = None,
     status: Optional[str] = None,
     limit: int = 50,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
 ):
     """Fetch alerts from Elasticsearch.
 
@@ -2941,7 +3064,7 @@ async def get_es_alerts(
 @router.get("/elasticsearch/alerts/mitre-stats")
 async def get_mitre_stats(
     hours: int = 24,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
 ):
     """Get MITRE ATT&CK technique/tactic statistics from alerts.
 
@@ -3094,7 +3217,7 @@ class CaseUpdate(BaseModel):
 @router.get("/elasticsearch/alerts/cases")
 async def list_cases(
     status: Optional[str] = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("case:read")),
     session: Session = Depends(get_db_session),
 ):
     """List all investigation cases."""
@@ -3391,7 +3514,7 @@ def _create_kfp_document(session: Session, kfp, username: str) -> int | None:
 @router.post("/elasticsearch/alerts/cases")
 async def create_case(
     data: CaseCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("case:create")),
     session: Session = Depends(get_db_session),
 ):
     """Create a new investigation case, optionally linking alert IDs."""
@@ -3550,7 +3673,7 @@ async def create_case(
 async def add_case_note(
     case_id: int,
     data: CaseNoteCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("case:update")),
     session: Session = Depends(get_db_session),
 ):
     """Add an investigation note to a case."""
@@ -3584,7 +3707,7 @@ async def add_case_note(
 @router.get("/elasticsearch/alerts/cases/{case_id}")
 async def get_case_detail(
     case_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("case:read")),
     session: Session = Depends(get_db_session),
 ):
     """Get case detail with linked alerts."""
@@ -3654,7 +3777,7 @@ async def get_case_detail(
 async def update_case(
     case_id: int,
     data: CaseUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("case:update")),
     session: Session = Depends(get_db_session),
 ):
     """Update case status, assignee, title, etc."""
@@ -3755,7 +3878,7 @@ async def update_case(
 @router.post("/elasticsearch/alerts/cases/{case_id}/escalate/dfir-iris")
 async def escalate_case_to_dfir_iris(
     case_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("case:update")),
     session: Session = Depends(get_db_session),
 ):
     """Escalate an IXION case to DFIR-IRIS for incident response."""
@@ -4059,7 +4182,7 @@ class CloseAsFPRequest(BaseModel):
 @router.get("/known-false-positives")
 async def list_known_false_positives(
     active_only: bool = True,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """List all known false positive entries."""
@@ -4091,7 +4214,7 @@ async def list_known_false_positives(
 @router.post("/known-false-positives")
 async def create_known_false_positive(
     data: KFPCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),
 ):
     """Create a new known false positive entry."""
@@ -4130,7 +4253,7 @@ async def create_known_false_positive(
 @router.get("/known-false-positives/{kfp_id}")
 async def get_known_false_positive(
     kfp_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Get a single known false positive entry."""
@@ -4157,7 +4280,7 @@ async def get_known_false_positive(
 async def update_known_false_positive(
     kfp_id: int,
     data: KFPUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),
 ):
     """Update a known false positive entry."""
@@ -4197,7 +4320,7 @@ async def update_known_false_positive(
 @router.delete("/known-false-positives/{kfp_id}")
 async def delete_known_false_positive(
     kfp_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),
 ):
     """Soft-delete a known false positive entry (set is_active=false)."""
@@ -4214,7 +4337,7 @@ async def delete_known_false_positive(
 @router.post("/known-false-positives/match")
 async def match_known_false_positives(
     data: KFPMatchRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Check if given observables match any known false positive entries."""
@@ -4232,7 +4355,7 @@ async def match_known_false_positives(
 async def close_case_as_known_fp(
     case_id: int,
     data: CloseAsFPRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),
 ):
     """Close a case as a known false positive, setting all linked alerts to false_positive."""
@@ -4279,7 +4402,7 @@ class BatchTriageRequest(BaseModel):
 @router.post("/elasticsearch/alerts-triage/batch")
 async def get_batch_triage(
     data: BatchTriageRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Get triage data (including case info) for multiple alerts at once."""
@@ -4308,7 +4431,7 @@ async def get_batch_triage(
 @router.post("/elasticsearch/alerts-triage/bulk-update")
 async def bulk_update_triage(
     data: BulkTriageUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),
 ):
     """Bulk update triage status, assignee, priority for multiple alerts."""
@@ -4376,7 +4499,7 @@ async def bulk_update_triage(
 @router.get("/elasticsearch/alerts/{alert_id}/triage")
 async def get_alert_triage(
     alert_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Get triage state and comments for an alert."""
@@ -4422,7 +4545,7 @@ async def get_alert_triage(
 async def update_alert_triage(
     alert_id: str,
     data: TriageUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),
 ):
     """Update triage status, assignee, priority for an alert."""
@@ -4498,7 +4621,7 @@ async def update_alert_triage(
 async def close_alert(
     alert_id: str,
     data: AlertClosureRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),
 ):
     """Close an alert as benign, escalated, or false positive.
@@ -4532,7 +4655,8 @@ async def close_alert(
     note_added_to_case = False
     kfp_created = None
 
-    # If triage has a parent case, add a closure note
+    # If triage has a parent case, add a closure note and close the case
+    case_closed = False
     if triage.case_id:
         case = session.query(AlertCase).filter_by(id=triage.case_id).first()
         if case:
@@ -4545,6 +4669,33 @@ async def close_alert(
             )
             session.add(note)
             note_added_to_case = True
+
+            # Close the parent case with mapped closure reason
+            closure_reason_map = {
+                "benign": "benign_true_positive",
+                "escalated": "true_positive",
+                "false_positive": "false_positive",
+            }
+            if case.status != AlertCaseStatus.CLOSED:
+                case.status = AlertCaseStatus.CLOSED
+                case.closure_reason = closure_reason_map.get(data.closure_type, "not_applicable")
+                case.closure_notes = data.notes or f"Closed via alert closure ({label})"
+                case.closed_by_id = current_user.id
+                case.closed_at = datetime.utcnow()
+                case_closed = True
+
+                # Close all other linked alerts in the same case
+                other_triages = session.query(AlertTriage).filter(
+                    AlertTriage.case_id == case.id,
+                    AlertTriage.es_alert_id != alert_id,
+                    AlertTriage.status.notin_([
+                        AlertTriageStatus.RESOLVED,
+                        AlertTriageStatus.ESCALATED,
+                        AlertTriageStatus.FALSE_POSITIVE,
+                    ]),
+                ).all()
+                for ot in other_triages:
+                    ot.status = new_status
 
             # Sync note to Kibana
             if case.kibana_case_id:
@@ -4602,6 +4753,7 @@ async def close_alert(
         "closure_type": data.closure_type,
         "alert_id": alert_id,
         "note_added_to_case": note_added_to_case,
+        "case_closed": case_closed,
         "kfp_created": kfp_created,
         "message": f"Alert closed as {label}",
     }
@@ -4641,7 +4793,7 @@ def _populate_triage_observables(triage, host=None, user=None, raw_data=None) ->
 async def auto_populate_observables(
     alert_id: str,
     data: AutoPopulateRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),
 ):
     """Auto-populate observables from alert context. Idempotent - won't overwrite existing."""
@@ -4661,7 +4813,7 @@ async def auto_populate_observables(
 async def add_alert_comment(
     alert_id: str,
     data: CommentCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),
 ):
     """Add a comment to an alert."""
@@ -4689,7 +4841,7 @@ async def get_es_related_alerts(
     user: Optional[str] = None,
     rule_name: Optional[str] = None,
     hours: int = 72,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
 ):
     """Get alerts related to a specific alert by host, user, or rule."""
     config = get_elasticsearch_config()
@@ -4722,7 +4874,7 @@ async def get_es_related_alerts(
 @router.get("/elasticsearch/alerts/stats")
 async def get_es_alert_stats(
     hours: int = 24,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
 ):
     """Get alert statistics from Elasticsearch."""
     config = get_elasticsearch_config()
@@ -6236,7 +6388,7 @@ class ExecutionCompleteRequest(BaseModel):
 @router.get("/playbooks")
 async def list_playbooks(
     active_only: bool = False,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:read")),
     session: Session = Depends(get_db_session),
 ):
     """List all playbooks."""
@@ -6252,7 +6404,7 @@ async def list_playbooks(
 @router.post("/playbooks")
 async def create_playbook(
     data: PlaybookCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:create")),
     session: Session = Depends(get_db_session),
 ):
     """Create a new playbook with steps."""
@@ -6305,7 +6457,7 @@ async def create_playbook(
 @router.get("/playbooks/{playbook_id}")
 async def get_playbook(
     playbook_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:read")),
     session: Session = Depends(get_db_session),
 ):
     """Get a playbook by ID."""
@@ -6322,7 +6474,7 @@ async def get_playbook(
 async def update_playbook(
     playbook_id: int,
     data: PlaybookUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:update")),
     session: Session = Depends(get_db_session),
 ):
     """Update a playbook."""
@@ -6375,7 +6527,7 @@ async def update_playbook(
 @router.delete("/playbooks/{playbook_id}")
 async def delete_playbook(
     playbook_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:delete")),
     session: Session = Depends(get_db_session),
 ):
     """Delete a playbook."""
@@ -6394,7 +6546,7 @@ async def delete_playbook(
 @router.get("/elasticsearch/alerts/{alert_id}/recommended-playbooks")
 async def get_recommended_playbooks(
     alert_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:read")),
     session: Session = Depends(get_db_session),
 ):
     """Get playbooks that match the given alert's characteristics."""
@@ -6486,7 +6638,7 @@ async def get_recommended_playbooks(
 async def start_playbook_execution(
     alert_id: str,
     playbook_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
 ):
     """Start a playbook execution for an alert."""
@@ -6535,7 +6687,7 @@ async def start_playbook_execution(
 
 @router.get("/playbook-executions/summary")
 async def playbook_executions_summary(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
 ):
     """Get summary counts of playbook executions by status."""
@@ -6554,7 +6706,7 @@ async def playbook_executions_summary(
 @router.get("/playbook-executions/{execution_id}")
 async def get_playbook_execution(
     execution_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
 ):
     """Get a playbook execution by ID."""
@@ -6570,7 +6722,7 @@ async def get_playbook_execution(
 @router.get("/elasticsearch/alerts/{alert_id}/playbook-executions")
 async def get_alert_playbook_executions(
     alert_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
 ):
     """Get all playbook executions for an alert."""
@@ -6588,7 +6740,7 @@ async def update_step_status(
     execution_id: int,
     step_id: int,
     data: StepStatusUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
 ):
     """Update the status of a step in a playbook execution."""
@@ -6633,7 +6785,7 @@ async def update_step_status(
 async def complete_playbook_execution(
     execution_id: int,
     data: ExecutionCompleteRequest = ExecutionCompleteRequest(),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
 ):
     """Manually mark a playbook execution as completed with optional outcome."""
@@ -6690,7 +6842,7 @@ async def complete_playbook_execution(
 @router.post("/playbook-executions/{execution_id}/regenerate-report")
 async def regenerate_playbook_report(
     execution_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
 ):
     """Regenerate the investigation report for a completed execution."""
@@ -6723,7 +6875,7 @@ async def regenerate_playbook_report(
 async def fail_playbook_execution(
     execution_id: int,
     reason: Optional[str] = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
 ):
     """Mark a playbook execution as failed."""
@@ -6754,7 +6906,7 @@ async def fail_playbook_execution(
 async def list_playbook_executions(
     status: Optional[str] = None,
     limit: int = 50,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
 ):
     """Dashboard listing of playbook executions with progress info."""
@@ -6783,7 +6935,7 @@ async def list_playbook_executions(
 @router.get("/elasticsearch/alerts/cases/{case_id}/playbook-executions")
 async def get_case_playbook_executions(
     case_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
 ):
     """Get playbook executions linked to a case, auto-backfilling from alert triage."""
@@ -6841,7 +6993,7 @@ async def get_case_playbook_executions(
 async def start_playbook_from_case(
     case_id: int,
     playbook_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
 ):
     """Start a playbook execution from a case context."""
@@ -6901,7 +7053,7 @@ async def start_playbook_from_case(
 @router.get("/alerts/host-patterns")
 async def get_host_patterns(
     hours: int = 24,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Detect multi-alert attack patterns grouped by host/user.

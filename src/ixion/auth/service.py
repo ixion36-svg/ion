@@ -440,6 +440,31 @@ class AuthService:
             # Integration permissions
             ("integration:read", "integration", "read", "View integrations"),
             ("integration:manage", "integration", "manage", "Manage integrations and webhooks"),
+            # Alert & Case permissions
+            ("alert:read", "alert", "read", "View and search alerts"),
+            ("alert:triage", "alert", "triage", "Triage, update, and close alerts"),
+            ("case:read", "case", "read", "View cases"),
+            ("case:create", "case", "create", "Create cases"),
+            ("case:update", "case", "update", "Update cases and add notes"),
+            ("case:close", "case", "close", "Close cases"),
+            # Observable permissions
+            ("observable:read", "observable", "read", "View and search observables"),
+            ("observable:create", "observable", "create", "Create and import observables"),
+            ("observable:update", "observable", "update", "Update observables and watchlist"),
+            ("observable:delete", "observable", "delete", "Delete observables"),
+            ("observable:enrich", "observable", "enrich", "Trigger enrichment"),
+            # Playbook permissions
+            ("playbook:read", "playbook", "read", "View playbooks"),
+            ("playbook:execute", "playbook", "execute", "Execute playbooks"),
+            ("playbook:create", "playbook", "create", "Create playbooks"),
+            ("playbook:update", "playbook", "update", "Update playbooks"),
+            ("playbook:delete", "playbook", "delete", "Delete playbooks"),
+            # Security dashboard permissions
+            ("security:read", "security", "read", "View security events"),
+            ("security:manage", "security", "manage", "Manage security events, block IPs"),
+            # Other permissions
+            ("discover:read", "discover", "read", "Use discover and hunting tools"),
+            ("ai:chat", "ai", "chat", "Use AI chat"),
         ]
 
         permissions = []
@@ -485,14 +510,49 @@ class AuthService:
                 ["template:read", "document:read"],
             ),
             (
-                "engineering",
-                "Engineering role with document access and server administration",
+                "analyst",
+                "SOC Analyst with alert triage and case management",
                 True,
                 [
+                    "alert:read", "alert:triage",
+                    "case:read", "case:create", "case:update", "case:close",
+                    "observable:read", "observable:create", "observable:update", "observable:enrich",
+                    "playbook:read", "playbook:execute",
+                    "discover:read", "ai:chat",
+                    "template:read", "template:create", "template:update",
+                    "document:read", "document:create", "document:update",
+                ],
+            ),
+            (
+                "lead",
+                "SOC Lead with team oversight and operational management",
+                True,
+                [
+                    "alert:read", "alert:triage",
+                    "case:read", "case:create", "case:update", "case:close",
+                    "observable:read", "observable:create", "observable:update", "observable:enrich",
+                    "playbook:read", "playbook:execute", "playbook:create", "playbook:update", "playbook:delete",
+                    "discover:read", "ai:chat",
+                    "template:read", "template:create", "template:update",
+                    "document:read", "document:create", "document:update",
+                    "security:read",
+                ],
+            ),
+            (
+                "engineering",
+                "SOC Engineer with system management and full operational access",
+                True,
+                [
+                    "alert:read", "alert:triage",
+                    "case:read", "case:create", "case:update", "case:close",
+                    "observable:read", "observable:create", "observable:update", "observable:delete", "observable:enrich",
+                    "playbook:read", "playbook:execute", "playbook:create", "playbook:update", "playbook:delete",
+                    "discover:read", "ai:chat",
                     "template:read", "template:create", "template:update", "template:delete",
                     "document:read", "document:create", "document:update", "document:delete",
-                    "system:audit_view", "system:settings",
                     "integration:read", "integration:manage",
+                    "security:read", "security:manage",
+                    "system:settings",
                 ],
             ),
         ]
@@ -501,6 +561,11 @@ class AuthService:
         for name, description, is_system, permission_names in roles_data:
             existing = self.role_repo.get_by_name(name)
             if existing:
+                if is_system:
+                    role_permissions = [
+                        all_permissions[pn] for pn in permission_names if pn in all_permissions
+                    ]
+                    self.role_repo.set_permissions(existing, role_permissions)
                 roles.append(existing)
             else:
                 role = self.role_repo.create(

@@ -23,7 +23,7 @@
             <div class="stat-label">Users</div>
         </div>
 
-        <!-- Alert stats for admin/analyst -->
+        <!-- Alert stats for analyst+ -->
         <div class="stat-card stat-card-danger analyst-visible" id="alerts-critical-card" style="display: none;">
             <div class="stat-value" id="alerts-critical-count">-</div>
             <div class="stat-label">Critical Alerts</div>
@@ -60,7 +60,7 @@
         </div>
     </div>
 
-    <!-- ANALYST DASHBOARD LAYOUT -->
+    <!-- ==================== ANALYST DASHBOARD ==================== -->
     <div class="dashboard-grid analyst-dashboard" id="analyst-dashboard" style="display: none;">
         <!-- Left Column - Alerts & Cases Priority -->
         <div class="dashboard-column">
@@ -132,17 +132,6 @@
                 </div>
             </section>
 
-            <!-- GitLab Tasks -->
-            <section class="section gitlab-section" id="analyst-gitlab-section" style="display: none;">
-                <div class="section-header">
-                    <h2>Assigned Tasks</h2>
-                    <a href="/gitlab" class="btn btn-sm">View All</a>
-                </div>
-                <div id="analyst-gitlab-tasks" class="task-list">
-                    <p class="loading">Loading...</p>
-                </div>
-            </section>
-
             <!-- Recent Templates -->
             <section class="section">
                 <div class="section-header">
@@ -156,7 +145,196 @@
         </div>
     </div>
 
-    <!-- ADMIN DASHBOARD LAYOUT -->
+    <!-- ==================== LEAD DASHBOARD ==================== -->
+    <div class="dashboard-grid lead-dashboard" id="lead-dashboard" style="display: none;">
+        <!-- KPI Row - Full Width -->
+        <div class="kpi-row" style="grid-column: 1 / -1;">
+            <div class="kpi-card">
+                <div class="kpi-value" id="lead-mttr">-</div>
+                <div class="kpi-label">MTTR (hours)</div>
+                <div class="kpi-sublabel">Last 30 days</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-value" id="lead-closure-rate">-</div>
+                <div class="kpi-label">Closure Rate</div>
+                <div class="kpi-sublabel">Last 7 days</div>
+            </div>
+            <div class="kpi-card kpi-card-warning">
+                <div class="kpi-value" id="lead-open-cases">-</div>
+                <div class="kpi-label">Open Cases</div>
+            </div>
+            <div class="kpi-card kpi-card-danger">
+                <div class="kpi-value" id="lead-unassigned">-</div>
+                <div class="kpi-label">Unassigned Alerts</div>
+            </div>
+        </div>
+
+        <!-- Left Column -->
+        <div class="dashboard-column">
+            <!-- Team Workload Table -->
+            <section class="section team-section">
+                <div class="section-header"><h2>Team Workload</h2></div>
+                <table class="team-table" id="lead-team-table">
+                    <thead><tr><th>Analyst</th><th>Open</th><th>Closed (7d)</th></tr></thead>
+                    <tbody id="lead-team-tbody"><tr><td colspan="3" class="empty-message">Loading...</td></tr></tbody>
+                </table>
+            </section>
+
+            <!-- Alert Queue -->
+            <section class="section alerts-section" id="lead-alerts-section">
+                <div class="section-header">
+                    <h2>Alert Queue</h2>
+                    <div class="section-actions">
+                        <span class="alerts-badge" id="lead-alerts-badge">0</span>
+                        <a href="/alerts" class="btn btn-sm btn-primary">View All</a>
+                    </div>
+                </div>
+                <div id="lead-alerts-list" class="alerts-list">
+                    <p class="loading">Loading alerts...</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Right Column -->
+        <div class="dashboard-column">
+            <!-- Recent Closures -->
+            <section class="section closures-section">
+                <div class="section-header">
+                    <h2>Recent Closures</h2>
+                    <a href="/alerts" class="btn btn-sm">View All</a>
+                </div>
+                <div id="lead-recent-closures" class="cases-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+
+            <!-- Severity Breakdown -->
+            <section class="section severity-section">
+                <div class="section-header"><h2>Open Cases by Severity</h2></div>
+                <div class="severity-bars" id="lead-severity-bars">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+
+            <!-- Active Playbooks -->
+            <section class="section playbooks-section" id="lead-playbooks-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Active Playbooks</h2>
+                    <a href="/playbooks?tab=executions" class="btn btn-sm">View All</a>
+                </div>
+                <div id="lead-playbooks-list" class="playbooks-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ==================== ENGINEER DASHBOARD ==================== -->
+    <div class="dashboard-grid engineer-dashboard" id="engineer-dashboard" style="display: none;">
+        <!-- Left Column -->
+        <div class="dashboard-column">
+            <!-- System Status -->
+            <section class="section system-section">
+                <div class="section-header">
+                    <h2>System Status</h2>
+                </div>
+                <div class="system-status-grid" id="eng-system-status">
+                    <div class="system-status-item">
+                        <span class="status-indicator" id="eng-es-status-indicator"></span>
+                        <span>Elasticsearch</span>
+                        <span class="status-text" id="eng-es-status-text">Checking...</span>
+                    </div>
+                    <div class="system-status-item">
+                        <span class="status-indicator" id="eng-gitlab-status-indicator"></span>
+                        <span>GitLab</span>
+                        <span class="status-text" id="eng-gitlab-status-text">Checking...</span>
+                    </div>
+                    <div class="system-status-item">
+                        <span class="status-indicator" id="eng-opencti-status-indicator"></span>
+                        <span>OpenCTI</span>
+                        <span class="status-text" id="eng-opencti-status-text">Checking...</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Security Alerts -->
+            <section class="section alerts-section" id="eng-alerts-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Security Alerts</h2>
+                    <div class="section-actions">
+                        <span class="alerts-badge" id="eng-alerts-badge">0</span>
+                        <a href="/alerts" class="btn btn-sm">View All</a>
+                    </div>
+                </div>
+                <div id="eng-alerts-list" class="alerts-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+
+            <!-- Recent Documents -->
+            <section class="section">
+                <div class="section-header">
+                    <h2>Recent Documents</h2>
+                    <a href="/documents" class="btn btn-sm">View All</a>
+                </div>
+                <div id="eng-recent-documents" class="card-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Right Column -->
+        <div class="dashboard-column">
+            <!-- Engineer Quick Actions -->
+            <section class="section">
+                <div class="section-header">
+                    <h2>Quick Actions</h2>
+                </div>
+                <div class="action-grid">
+                    <a href="/settings" class="action-card">
+                        <div class="action-icon">&#x2699;</div>
+                        <div class="action-label">Settings</div>
+                    </a>
+                    <a href="/integrations" class="action-card action-card-primary">
+                        <div class="action-icon">&#x1F517;</div>
+                        <div class="action-label">Integrations</div>
+                    </a>
+                    <a href="/security" class="action-card">
+                        <div class="action-icon">&#x1F512;</div>
+                        <div class="action-label">Security</div>
+                    </a>
+                    <a href="/playbooks" class="action-card">
+                        <div class="action-icon">&#x1F4D6;</div>
+                        <div class="action-label">Playbooks</div>
+                    </a>
+                </div>
+            </section>
+
+            <!-- Active Playbooks -->
+            <section class="section playbooks-section" id="eng-playbooks-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Active Playbooks</h2>
+                    <a href="/playbooks?tab=executions" class="btn btn-sm">View All</a>
+                </div>
+                <div id="eng-playbooks-list" class="playbooks-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+
+            <!-- Recent Templates -->
+            <section class="section">
+                <div class="section-header">
+                    <h2>Recent Templates</h2>
+                    <a href="/templates" class="btn btn-sm">View All</a>
+                </div>
+                <div id="eng-recent-templates" class="card-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ==================== ADMIN DASHBOARD ==================== -->
     <div class="dashboard-grid admin-dashboard" id="admin-dashboard" style="display: none;">
         <!-- Left Column -->
         <div class="dashboard-column">
@@ -237,7 +415,7 @@
                 </div>
             </section>
 
-            <!-- Recent Activity -->
+            <!-- Recent Documents -->
             <section class="section">
                 <div class="section-header">
                     <h2>Recent Documents</h2>
@@ -261,7 +439,7 @@
         </div>
     </div>
 
-    <!-- USER/VIEWER DASHBOARD LAYOUT (Default) -->
+    <!-- ==================== USER/VIEWER DASHBOARD (Default) ==================== -->
     <div class="dashboard-grid user-dashboard" id="user-dashboard">
         <!-- Left Column -->
         <div class="dashboard-column">
@@ -382,6 +560,15 @@
 @media (max-width: 1024px) {
     .dashboard-grid {
         grid-template-columns: 1fr;
+    }
+    .kpi-row {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+@media (max-width: 600px) {
+    .kpi-row {
+        grid-template-columns: 1fr !important;
     }
 }
 
@@ -898,6 +1085,188 @@
     min-width: 32px;
     text-align: right;
 }
+
+/* ==================== LEAD DASHBOARD STYLES ==================== */
+.kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.25rem;
+    text-align: center;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.kpi-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.kpi-sublabel {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+.kpi-card-warning .kpi-value {
+    color: #fd7e14;
+}
+
+.kpi-card-danger .kpi-value {
+    color: #dc3545;
+}
+
+.team-section {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--primary);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.team-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.team-table th {
+    text-align: left;
+    padding: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.team-table td {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.closures-section {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid #28a745;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.closure-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--background);
+    border-radius: 6px;
+}
+
+.closure-item + .closure-item {
+    margin-top: 0.5rem;
+}
+
+.closure-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.closure-title {
+    font-weight: 500;
+    margin: 0;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.closure-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.closure-reason {
+    font-size: 0.625rem;
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.closure-reason.true_positive { background: #dc354520; color: #dc3545; }
+.closure-reason.false_positive { background: #ffc10720; color: #856404; }
+.closure-reason.benign_true_positive { background: #17a2b820; color: #17a2b8; }
+.closure-reason.duplicate { background: #6c757d20; color: #6c757d; }
+.closure-reason.insufficient_data { background: #6c757d20; color: #6c757d; }
+.closure-reason.not_applicable { background: #6c757d20; color: #6c757d; }
+
+.severity-section {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.severity-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.severity-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.severity-bar-label {
+    width: 60px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.severity-bar-label.critical { color: #dc3545; }
+.severity-bar-label.high { color: #fd7e14; }
+.severity-bar-label.medium { color: #856404; }
+.severity-bar-label.low { color: #17a2b8; }
+
+.severity-bar-track {
+    flex: 1;
+    height: 20px;
+    background: var(--background);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.severity-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s;
+}
+
+.severity-bar-fill.critical { background: #dc3545; }
+.severity-bar-fill.high { background: #fd7e14; }
+.severity-bar-fill.medium { background: #ffc107; }
+.severity-bar-fill.low { background: #17a2b8; }
+
+.severity-bar-count {
+    font-size: 0.875rem;
+    font-weight: 600;
+    min-width: 24px;
+}
 </style>
 {% endblock %}
 
@@ -923,10 +1292,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Show role-specific dashboard
         const isAdmin = userRoles.includes('admin');
+        const isEngineer = userRoles.includes('engineering');
+        const isLead = userRoles.includes('lead');
         const isAnalyst = userRoles.includes('analyst');
 
         if (isAdmin) {
             setupAdminDashboard(data);
+        } else if (isEngineer) {
+            setupEngineerDashboard(data);
+        } else if (isLead) {
+            setupLeadDashboard(data);
         } else if (isAnalyst) {
             setupAnalystDashboard(data);
         } else {
@@ -1021,18 +1396,164 @@ async function setupAnalystDashboard(data) {
     loadCases('analyst-cases-list');
 
     // Active Playbooks
-    loadActivePlaybooks();
-
-    // GitLab
-    if (data.gitlab.enabled && data.gitlab.connected) {
-        document.getElementById('analyst-gitlab-section').style.display = 'block';
-        document.getElementById('gitlab-stat-card').style.display = 'block';
-        document.getElementById('gitlab-issues-count').textContent = data.gitlab.total_open;
-        renderGitLabTasks('analyst-gitlab-tasks', data.gitlab.open_issues);
-    }
+    loadActivePlaybooks('analyst');
 
     // Recent templates
     renderTemplates('analyst-recent-templates', data.recent_templates);
+}
+
+// ==================== LEAD DASHBOARD ====================
+async function setupLeadDashboard(data) {
+    document.getElementById('user-dashboard').style.display = 'none';
+    document.getElementById('lead-dashboard').style.display = 'grid';
+
+    // Show analyst-level stat cards
+    document.querySelectorAll('.analyst-visible').forEach(el => el.style.display = '');
+
+    // Fetch team metrics in parallel with other data
+    const metricsPromise = api.get('/api/dashboard/team-metrics').catch(e => {
+        console.error('Failed to load team metrics:', e);
+        return null;
+    });
+
+    // Elasticsearch Alerts
+    if (data.elasticsearch && data.elasticsearch.enabled && data.elasticsearch.connected) {
+        document.getElementById('lead-alerts-badge').textContent = data.elasticsearch.total_alerts || 0;
+
+        if (data.elasticsearch.critical_count > 0) {
+            document.getElementById('alerts-critical-card').style.display = '';
+            document.getElementById('alerts-critical-count').textContent = data.elasticsearch.critical_count;
+        }
+        if (data.elasticsearch.high_count > 0) {
+            document.getElementById('alerts-high-card').style.display = '';
+            document.getElementById('alerts-high-count').textContent = data.elasticsearch.high_count;
+        }
+
+        const alertsContainer = document.getElementById('lead-alerts-list');
+        if (data.elasticsearch.alerts && data.elasticsearch.alerts.length > 0) {
+            alertsContainer.innerHTML = data.elasticsearch.alerts.map(alert => renderAlertItem(alert)).join('');
+        } else {
+            alertsContainer.innerHTML = '<p class="empty-message">No alerts in the last 24 hours</p>';
+        }
+    } else {
+        document.getElementById('lead-alerts-list').innerHTML = '<p class="empty-message">Elasticsearch not configured</p>';
+    }
+
+    // Active Playbooks
+    loadActivePlaybooks('lead');
+
+    // Populate team metrics once loaded
+    const metrics = await metricsPromise;
+    if (metrics) {
+        // KPI Cards
+        document.getElementById('lead-mttr').textContent = metrics.mttr_hours !== null ? metrics.mttr_hours : 'N/A';
+        document.getElementById('lead-closure-rate').textContent = metrics.closure_rate_7d !== null ? metrics.closure_rate_7d + '%' : 'N/A';
+        document.getElementById('lead-open-cases').textContent = metrics.open_cases;
+        document.getElementById('lead-unassigned').textContent = metrics.unassigned_alerts;
+
+        // Update stat card too
+        const openCasesCard = document.getElementById('open-cases-card');
+        if (openCasesCard) {
+            openCasesCard.style.display = '';
+            document.getElementById('open-cases-count').textContent = metrics.open_cases;
+        }
+
+        // Team Workload Table
+        const tbody = document.getElementById('lead-team-tbody');
+        if (metrics.cases_by_assignee && metrics.cases_by_assignee.length > 0) {
+            tbody.innerHTML = metrics.cases_by_assignee.map(a => `
+                <tr>
+                    <td>${escapeHtml(a.display_name)}</td>
+                    <td>${a.open_count}</td>
+                    <td>${a.closed_7d}</td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="3" class="empty-message">No case assignments</td></tr>';
+        }
+
+        // Recent Closures
+        const closuresContainer = document.getElementById('lead-recent-closures');
+        if (metrics.recent_closures && metrics.recent_closures.length > 0) {
+            closuresContainer.innerHTML = metrics.recent_closures.map(c => `
+                <div class="closure-item">
+                    <span class="case-severity ${c.severity || 'medium'}">${c.severity || '-'}</span>
+                    <div class="closure-content">
+                        <p class="closure-title">${escapeHtml(c.title)}</p>
+                        <div class="closure-meta">
+                            ${escapeHtml(c.case_number)} &bull; ${escapeHtml(c.closed_by)} &bull; ${formatDate(c.closed_at)}
+                        </div>
+                    </div>
+                    <span class="closure-reason ${c.closure_reason || ''}">${(c.closure_reason || 'unknown').replace(/_/g, ' ')}</span>
+                </div>
+            `).join('');
+        } else {
+            closuresContainer.innerHTML = '<p class="empty-message">No recent closures</p>';
+        }
+
+        // Severity Breakdown
+        const severityContainer = document.getElementById('lead-severity-bars');
+        const sev = metrics.cases_by_severity;
+        const maxSev = Math.max(sev.critical, sev.high, sev.medium, sev.low, 1);
+        severityContainer.innerHTML = ['critical', 'high', 'medium', 'low'].map(level => `
+            <div class="severity-bar-row">
+                <span class="severity-bar-label ${level}">${level}</span>
+                <div class="severity-bar-track">
+                    <div class="severity-bar-fill ${level}" style="width: ${(sev[level] / maxSev * 100)}%"></div>
+                </div>
+                <span class="severity-bar-count">${sev[level]}</span>
+            </div>
+        `).join('');
+    } else {
+        document.getElementById('lead-mttr').textContent = '-';
+        document.getElementById('lead-closure-rate').textContent = '-';
+        document.getElementById('lead-open-cases').textContent = '-';
+        document.getElementById('lead-unassigned').textContent = '-';
+        document.getElementById('lead-team-tbody').innerHTML = '<tr><td colspan="3" class="empty-message">Could not load metrics</td></tr>';
+        document.getElementById('lead-recent-closures').innerHTML = '<p class="empty-message">Could not load data</p>';
+        document.getElementById('lead-severity-bars').innerHTML = '<p class="empty-message">Could not load data</p>';
+    }
+}
+
+// ==================== ENGINEER DASHBOARD ====================
+async function setupEngineerDashboard(data) {
+    document.getElementById('user-dashboard').style.display = 'none';
+    document.getElementById('engineer-dashboard').style.display = 'grid';
+
+    // Show analyst-level stat cards
+    document.querySelectorAll('.analyst-visible').forEach(el => el.style.display = '');
+
+    // System status checks
+    checkSystemStatus(data, 'eng-');
+
+    // Elasticsearch Alerts
+    if (data.elasticsearch && data.elasticsearch.enabled && data.elasticsearch.connected) {
+        document.getElementById('eng-alerts-section').style.display = 'block';
+        document.getElementById('eng-alerts-badge').textContent = data.elasticsearch.total_alerts || 0;
+
+        if (data.elasticsearch.critical_count > 0) {
+            document.getElementById('alerts-critical-card').style.display = '';
+            document.getElementById('alerts-critical-count').textContent = data.elasticsearch.critical_count;
+        }
+        if (data.elasticsearch.high_count > 0) {
+            document.getElementById('alerts-high-card').style.display = '';
+            document.getElementById('alerts-high-count').textContent = data.elasticsearch.high_count;
+        }
+
+        const alertsContainer = document.getElementById('eng-alerts-list');
+        if (data.elasticsearch.alerts && data.elasticsearch.alerts.length > 0) {
+            alertsContainer.innerHTML = data.elasticsearch.alerts.slice(0, 5).map(alert => renderAlertItem(alert)).join('');
+        } else {
+            alertsContainer.innerHTML = '<p class="empty-message">No alerts in the last 24 hours</p>';
+        }
+    }
+
+    // Active Playbooks
+    loadActivePlaybooks('eng');
+
+    // Recent documents and templates
+    renderDocuments('eng-recent-documents', data.recent_documents);
+    renderTemplates('eng-recent-templates', data.recent_templates);
 }
 
 // ==================== ADMIN DASHBOARD ====================
@@ -1052,7 +1573,7 @@ async function setupAdminDashboard(data) {
     }
 
     // System status checks
-    checkSystemStatus(data);
+    checkSystemStatus(data, '');
 
     // Elasticsearch Alerts
     if (data.elasticsearch && data.elasticsearch.enabled && data.elasticsearch.connected) {
@@ -1090,10 +1611,10 @@ async function setupAdminDashboard(data) {
     renderTemplates('admin-recent-templates', data.recent_templates);
 }
 
-async function checkSystemStatus(data) {
+async function checkSystemStatus(data, prefix) {
     // Elasticsearch
-    const esIndicator = document.getElementById('es-status-indicator');
-    const esText = document.getElementById('es-status-text');
+    const esIndicator = document.getElementById(prefix + 'es-status-indicator');
+    const esText = document.getElementById(prefix + 'es-status-text');
     if (data.elasticsearch && data.elasticsearch.connected) {
         esIndicator.classList.add('connected');
         esText.textContent = data.elasticsearch.cluster_name || 'Connected';
@@ -1104,8 +1625,8 @@ async function checkSystemStatus(data) {
     }
 
     // GitLab
-    const gitlabIndicator = document.getElementById('gitlab-status-indicator');
-    const gitlabText = document.getElementById('gitlab-status-text');
+    const gitlabIndicator = document.getElementById(prefix + 'gitlab-status-indicator');
+    const gitlabText = document.getElementById(prefix + 'gitlab-status-text');
     if (data.gitlab && data.gitlab.connected) {
         gitlabIndicator.classList.add('connected');
         gitlabText.textContent = data.gitlab.project_name || 'Connected';
@@ -1116,8 +1637,8 @@ async function checkSystemStatus(data) {
     }
 
     // OpenCTI
-    const openctiIndicator = document.getElementById('opencti-status-indicator');
-    const openctiText = document.getElementById('opencti-status-text');
+    const openctiIndicator = document.getElementById(prefix + 'opencti-status-indicator');
+    const openctiText = document.getElementById(prefix + 'opencti-status-text');
     try {
         const opencti = await api.get('/api/opencti/config');
         if (opencti.enabled) {
@@ -1237,7 +1758,7 @@ function renderTemplates(containerId, templates) {
     `).join('');
 }
 
-async function loadActivePlaybooks() {
+async function loadActivePlaybooks(dashboardPrefix) {
     try {
         // Load summary for stat card
         const summaryResp = await api.get('/api/playbook-executions/summary');
@@ -1251,12 +1772,13 @@ async function loadActivePlaybooks() {
         // Load top 5 in-progress executions for the list
         const execResp = await api.get('/api/playbook-executions?status=in_progress&limit=5');
         const executions = execResp.executions || [];
-        const section = document.getElementById('analyst-playbooks-section');
-        const container = document.getElementById('analyst-playbooks-list');
+        const section = document.getElementById(dashboardPrefix + '-playbooks-section');
+        const container = document.getElementById(dashboardPrefix + '-playbooks-list');
+
+        if (!section || !container) return;
 
         if (executions.length === 0) {
             if (activeCount === 0) {
-                // Don't show the section at all if no active playbooks
                 return;
             }
             section.style.display = 'block';
@@ -1284,7 +1806,6 @@ async function loadActivePlaybooks() {
             `;
         }).join('');
     } catch (e) {
-        // Silently fail - playbooks section just won't appear
         console.error('Failed to load active playbooks:', e);
     }
 }

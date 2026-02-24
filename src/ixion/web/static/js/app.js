@@ -131,39 +131,34 @@ function updateUserMenu() {
         `;
     }
 
-    // Show admin links if user has admin role
-    if (currentUserData.roles.includes('admin')) {
-        const adminLinks = document.getElementById('nav-admin-links');
-        const auditLink = document.getElementById('nav-audit-link');
-        const securityLink = document.getElementById('nav-security-link');
-        const integrationsLink = document.getElementById('nav-integrations-link');
-        const settingsLink = document.getElementById('nav-settings-link');
-        if (adminLinks) adminLinks.style.display = 'block';
-        if (auditLink) auditLink.style.display = 'block';
-        if (securityLink) securityLink.style.display = 'block';
-        if (integrationsLink) integrationsLink.style.display = 'block';
-        if (settingsLink) settingsLink.style.display = 'block';
-    }
+    // Role-based nav visibility: 4-tier hierarchy
+    const roles = currentUserData.roles;
+    const isAnalyst = ['analyst', 'lead', 'engineering', 'admin'].some(r => roles.includes(r));
+    const isLead = ['lead', 'engineering', 'admin'].some(r => roles.includes(r));
+    const isEngineer = ['engineering', 'admin'].some(r => roles.includes(r));
+    const isAdmin = roles.includes('admin');
 
-    // Show integrations/settings link for engineering role
-    if (currentUserData.roles.includes('engineering')) {
-        const integrationsLink = document.getElementById('nav-integrations-link');
-        const settingsLink = document.getElementById('nav-settings-link');
-        const auditLink = document.getElementById('nav-audit-link');
-        if (integrationsLink) integrationsLink.style.display = 'block';
-        if (settingsLink) settingsLink.style.display = 'block';
-        if (auditLink) auditLink.style.display = 'block';
-    }
+    // Analyst+ links (analyst/lead/engineering/admin)
+    ['nav-alerts-link', 'nav-observables-link', 'nav-playbooks-link'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = isAnalyst ? 'block' : 'none';
+    });
 
-    // Show alerts link for admin or analyst roles
-    if (currentUserData.roles.includes('admin') || currentUserData.roles.includes('analyst')) {
-        const alertsLink = document.getElementById('nav-alerts-link');
-        if (alertsLink) alertsLink.style.display = 'block';
-        const observablesLink = document.getElementById('nav-observables-link');
-        if (observablesLink) observablesLink.style.display = 'block';
-        const playbooksLink = document.getElementById('nav-playbooks-link');
-        if (playbooksLink) playbooksLink.style.display = 'block';
-    }
+    // Lead+ links (lead/engineering/admin) - security read access
+    const securityLink = document.getElementById('nav-security-link');
+    if (securityLink) securityLink.style.display = isLead ? 'block' : 'none';
+
+    // Engineer+ links (engineering/admin)
+    ['nav-integrations-link', 'nav-settings-link'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = isEngineer ? 'block' : 'none';
+    });
+
+    // Admin only links
+    ['nav-admin-links', 'nav-audit-link'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = isAdmin ? 'block' : 'none';
+    });
 }
 
 function toggleUserDropdown() {
