@@ -765,3 +765,11 @@ def get_kibana_sync_service() -> KibanaSyncService:
     if _sync_service is None:
         _sync_service = KibanaSyncService()
     return _sync_service
+
+
+def reset_kibana_sync_service():
+    """Reset the singleton Kibana sync service instance."""
+    global _sync_service
+    if _sync_service is not None:
+        _sync_service.stop_background_sync()
+        _sync_service = None

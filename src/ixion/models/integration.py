@@ -32,6 +32,7 @@ class IntegrationType(str, Enum):
     OPENCTI = "opencti"
     ELASTICSEARCH = "elasticsearch"
     DFIR_IRIS = "dfir_iris"
+    KIBANA_CASES = "kibana_cases"
     SLACK = "slack"      # Future
     JIRA = "jira"        # Future
     CUSTOM = "custom"

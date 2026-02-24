@@ -442,3 +442,11 @@ def get_kibana_cases_service() -> KibanaCasesService:
     if _kibana_service is None:
         _kibana_service = KibanaCasesService()
     return _kibana_service
+
+
+def reset_kibana_cases_service():
+    """Reset the singleton Kibana Cases service instance."""
+    global _kibana_service
+    if _kibana_service is not None:
+        _kibana_service.close()
+        _kibana_service = None

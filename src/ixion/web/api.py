@@ -18,11 +18,15 @@ import httpx
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from ixion.core.config import get_config, get_oidc_config, get_gitlab_config, get_kibana_config, get_dfir_iris_config
-from ixion.services.kibana_cases_service import get_kibana_cases_service
-from ixion.services.kibana_sync_service import get_kibana_sync_service
+from ixion.core.config import get_config, get_oidc_config, get_gitlab_config, get_dfir_iris_config
 from ixion.services.dfir_iris_service import get_dfir_iris_service
 from ixion.services.case_description import build_case_description
+from ixion.services.kibana_sync_helpers import (
+    sync_new_case_to_kibana,
+    sync_note_to_kibana,
+    sync_case_update_to_kibana,
+    get_kibana_case_url,
+)
 from ixion.services.observable_extractor import extract_observables_from_raw
 
 # Rate limiter - uses IP address as key
@@ -3086,15 +3090,6 @@ async def list_cases(
         query = query.filter(AlertCase.status == status)
     cases = query.order_by(AlertCase.created_at.desc()).all()
 
-    # Get Kibana service for URL generation
-    kibana_service = get_kibana_cases_service()
-    kibana_enabled = kibana_service.enabled
-
-    def get_kibana_url(case):
-        if kibana_enabled and case.kibana_case_id:
-            return kibana_service.get_case_url(case.kibana_case_id)
-        return None
-
     # Get DFIR-IRIS service for URL generation
     iris_service = get_dfir_iris_service()
 
@@ -3123,7 +3118,7 @@ async def list_cases(
                 "source_alert_ids": c.source_alert_ids,
                 "observables_count": len(c.observables) if c.observables else 0,
                 "kibana_case_id": c.kibana_case_id,
-                "kibana_url": get_kibana_url(c),
+                "kibana_url": get_kibana_case_url(c.kibana_case_id),
                 "dfir_iris_case_id": c.dfir_iris_case_id,
                 "dfir_iris_url": get_iris_url(c),
                 "closure_reason": c.closure_reason,
@@ -3266,44 +3261,23 @@ async def create_case(
 
     # Sync to Kibana Cases if enabled
     kibana_url = None
-    try:
-        kibana_service = get_kibana_cases_service()
-        if kibana_service.enabled:
-            # Build standardized description with case context
-            kibana_desc = build_case_description(
-                description=data.description or "",
-                affected_hosts=data.affected_hosts,
-                affected_users=data.affected_users,
-                evidence_summary=data.evidence_summary,
-                observables=case_observables,
-                alert_ids=data.alert_ids,
-                triggered_rules=data.triggered_rules,
-            )
-
-            kibana_case = kibana_service.create_case(
-                title=f"[{case_number}] {data.title}",
-                description=kibana_desc.strip(),
-                severity=data.severity or "low",
-                tags=[case_number, "ixion"],
-            )
-            if kibana_case:
-                new_case.kibana_case_id = kibana_case.get("id")
-                new_case.kibana_case_version = kibana_case.get("version")
-                session.commit()
-                kibana_url = kibana_service.get_case_url(new_case.kibana_case_id)
-
-                # Attach alerts to Kibana case if using securitySolution owner
-                if data.alert_ids and kibana_service.config.get("case_owner") == "securitySolution":
-                    try:
-                        kibana_service.attach_alerts_to_case(
-                            case_id=new_case.kibana_case_id,
-                            alert_ids=data.alert_ids,
-                            alert_index=".alerts-security.alerts-default",
-                        )
-                    except Exception as attach_err:
-                        _case_es_logger.warning("Failed to attach alerts to Kibana case: %s", attach_err)
-    except Exception as e:
-        _case_es_logger.warning("Failed to sync case to Kibana: %s", e)
+    kibana_result = sync_new_case_to_kibana(
+        case_number=case_number,
+        title=data.title,
+        description=data.description,
+        severity=data.severity,
+        affected_hosts=data.affected_hosts,
+        affected_users=data.affected_users,
+        evidence_summary=data.evidence_summary,
+        observables=case_observables,
+        alert_ids=data.alert_ids,
+        triggered_rules=data.triggered_rules,
+    )
+    if kibana_result:
+        new_case.kibana_case_id = kibana_result["kibana_case_id"]
+        new_case.kibana_case_version = kibana_result["kibana_case_version"]
+        kibana_url = kibana_result["kibana_url"]
+        session.commit()
 
     # Auto-check KFP registry for matches
     fp_suggestions = _match_known_false_positives(
@@ -3353,14 +3327,7 @@ async def add_case_note(
     await _sync_case_to_es(case, session)
 
     # Sync note to Kibana as comment
-    if case.kibana_case_id:
-        try:
-            kibana_service = get_kibana_cases_service()
-            if kibana_service.enabled:
-                comment_text = f"**{current_user.username}:** {data.content}"
-                kibana_service.add_comment(case.kibana_case_id, comment_text)
-        except Exception as e:
-            _case_es_logger.warning("Failed to sync note to Kibana: %s", e)
+    sync_note_to_kibana(case.kibana_case_id, current_user.username, data.content)
 
     return {
         "id": note.id,
@@ -3383,14 +3350,7 @@ async def get_case_detail(
         raise HTTPException(status_code=404, detail="Case not found")
 
     # Get Kibana URL if available
-    kibana_url = None
-    if case.kibana_case_id:
-        try:
-            kibana_service = get_kibana_cases_service()
-            if kibana_service.enabled:
-                kibana_url = kibana_service.get_case_url(case.kibana_case_id)
-        except Exception:
-            pass
+    kibana_url = get_kibana_case_url(case.kibana_case_id)
 
     # Get DFIR-IRIS URL if available
     dfir_iris_url = None
@@ -3500,40 +3460,17 @@ async def update_case(
     await _sync_case_to_es(case, session)
 
     # Sync updates to Kibana
-    kibana_url = None
-    if case.kibana_case_id:
-        try:
-            kibana_service = get_kibana_cases_service()
-            if kibana_service.enabled:
-                # Map IXION status to Kibana status
-                kibana_status = None
-                if data.status:
-                    status_map = {
-                        "open": "open",
-                        "in_progress": "in-progress",
-                        "resolved": "closed",
-                        "closed": "closed",
-                    }
-                    kibana_status = status_map.get(data.status)
-
-                # Get current version from Kibana
-                kibana_case = kibana_service.get_case(case.kibana_case_id)
-                if kibana_case:
-                    version = kibana_case.get("version")
-                    updated = kibana_service.update_case(
-                        case_id=case.kibana_case_id,
-                        version=version,
-                        title=f"[{case.case_number}] {case.title}" if data.title else None,
-                        description=data.description,
-                        status=kibana_status,
-                        severity=data.severity,
-                    )
-                    if updated:
-                        case.kibana_case_version = updated.get("version")
-                        session.commit()
-                kibana_url = kibana_service.get_case_url(case.kibana_case_id)
-        except Exception as e:
-            _case_es_logger.warning("Failed to sync case update to Kibana: %s", e)
+    new_version, kibana_url = sync_case_update_to_kibana(
+        kibana_case_id=case.kibana_case_id,
+        case_number=case.case_number,
+        title=data.title,
+        description=data.description,
+        status=data.status,
+        severity=data.severity,
+    )
+    if new_version:
+        case.kibana_case_version = new_version
+        session.commit()
 
     # Get DFIR-IRIS URL if available
     dfir_iris_url = None
@@ -5616,378 +5553,6 @@ async def search_chat_users(
             }
             for u in users
         ]
-    }
-
-
-# ============================================================================
-# Kibana Cases Integration Endpoints
-# ============================================================================
-
-
-class KibanaCaseCreate(BaseModel):
-    title: str
-    description: Optional[str] = ""
-    severity: Optional[str] = "low"
-    tags: Optional[List[str]] = None
-    alert_ids: Optional[List[str]] = None
-    alert_index: Optional[str] = "alerts-ixion"
-
-
-class KibanaCaseUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    status: Optional[str] = None
-    severity: Optional[str] = None
-    tags: Optional[List[str]] = None
-
-
-class KibanaCaseComment(BaseModel):
-    comment: str
-
-
-@router.get("/kibana/config")
-async def get_kibana_config_endpoint(
-    current_user: User = Depends(get_current_user),
-):
-    """Get Kibana Cases configuration status."""
-    config = get_kibana_config()
-    return {
-        "enabled": config.get("enabled", False),
-        "url": config.get("url", ""),
-        "has_credentials": bool(config.get("username") and config.get("password")),
-        "space_id": config.get("space_id", "default"),
-        "case_owner": config.get("case_owner", "securitySolution"),
-    }
-
-
-@router.get("/kibana/status")
-async def get_kibana_status(
-    current_user: User = Depends(get_current_user),
-):
-    """Test Kibana connectivity and return status."""
-    service = get_kibana_cases_service()
-    if not service.enabled:
-        return {
-            "connected": False,
-            "error": "Kibana Cases integration not enabled",
-        }
-
-    result = service.test_connection()
-    return {
-        "connected": result.get("success", False),
-        "version": result.get("version"),
-        "status": result.get("status"),
-        "error": result.get("error"),
-    }
-
-
-@router.get("/kibana/cases")
-async def list_kibana_cases(
-    status: Optional[str] = None,
-    page: int = 1,
-    per_page: int = 20,
-    current_user: User = Depends(get_current_user),
-):
-    """List cases from Kibana."""
-    service = get_kibana_cases_service()
-    if not service.enabled:
-        raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
-
-    result = service.list_cases(status=status, page=page, per_page=per_page)
-    if "error" in result and result.get("error"):
-        raise HTTPException(status_code=502, detail=result["error"])
-
-    # Transform to consistent format
-    cases = []
-    for c in result.get("cases", []):
-        cases.append({
-            "id": c.get("id"),
-            "title": c.get("title"),
-            "description": c.get("description"),
-            "status": c.get("status"),
-            "severity": c.get("severity"),
-            "tags": c.get("tags", []),
-            "created_by": c.get("created_by", {}).get("username"),
-            "created_at": c.get("created_at"),
-            "updated_at": c.get("updated_at"),
-            "kibana_url": service.get_case_url(c.get("id")),
-            "comments_count": c.get("totalComment", 0),
-            "alerts_count": c.get("totalAlerts", 0),
-        })
-
-    return {
-        "cases": cases,
-        "total": result.get("total", 0),
-        "page": result.get("page", page),
-        "per_page": result.get("per_page", per_page),
-    }
-
-
-@router.post("/kibana/cases")
-async def create_kibana_case(
-    data: KibanaCaseCreate,
-    current_user: User = Depends(get_current_user),
-):
-    """Create a new case in Kibana."""
-    service = get_kibana_cases_service()
-    if not service.enabled:
-        raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
-
-    # Map severity
-    severity_map = {
-        "critical": "critical",
-        "high": "high",
-        "medium": "medium",
-        "low": "low",
-    }
-    severity = severity_map.get(data.severity, "low")
-
-    result = service.create_case(
-        title=data.title,
-        description=data.description or "",
-        severity=severity,
-        tags=data.tags,
-    )
-
-    if not result:
-        raise HTTPException(status_code=502, detail="Failed to create case in Kibana")
-
-    case_id = result.get("id")
-
-    # Attach alerts if provided
-    if data.alert_ids and case_id:
-        service.attach_alerts_to_case(
-            case_id=case_id,
-            alert_ids=data.alert_ids,
-            alert_index=data.alert_index or "alerts-ixion",
-        )
-
-    return {
-        "id": case_id,
-        "title": result.get("title"),
-        "status": result.get("status"),
-        "severity": result.get("severity"),
-        "kibana_url": service.get_case_url(case_id),
-        "message": "Case created in Kibana",
-    }
-
-
-@router.get("/kibana/cases/unimported")
-async def get_unimported_kibana_cases(
-    current_user: User = Depends(get_current_user),
-):
-    """Get list of cases created in Kibana that haven't been imported to IXION."""
-    sync_service = get_kibana_sync_service()
-
-    unimported = await sync_service.get_unimported_kibana_cases()
-
-    return {
-        "cases": unimported,
-        "count": len(unimported),
-    }
-
-
-@router.post("/kibana/cases/import")
-async def import_kibana_cases(
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Import all cases created in Kibana that don't exist in IXION."""
-    sync_service = get_kibana_sync_service()
-
-    result = await sync_service.import_cases_from_kibana(session)
-
-    return {
-        "message": "Import completed",
-        "imported": result.get("imported", 0),
-        "skipped": result.get("skipped", 0),
-        "errors": result.get("errors"),
-        "error": result.get("error"),
-    }
-
-
-@router.get("/kibana/cases/{case_id}")
-async def get_kibana_case(
-    case_id: str,
-    current_user: User = Depends(get_current_user),
-):
-    """Get a case from Kibana by ID."""
-    service = get_kibana_cases_service()
-    if not service.enabled:
-        raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
-
-    result = service.get_case(case_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Case not found in Kibana")
-
-    comments = service.get_case_comments(case_id)
-
-    return {
-        "id": result.get("id"),
-        "title": result.get("title"),
-        "description": result.get("description"),
-        "status": result.get("status"),
-        "severity": result.get("severity"),
-        "tags": result.get("tags", []),
-        "created_by": result.get("created_by", {}).get("username"),
-        "created_at": result.get("created_at"),
-        "updated_at": result.get("updated_at"),
-        "version": result.get("version"),
-        "kibana_url": service.get_case_url(case_id),
-        "comments": [
-            {
-                "id": c.get("id"),
-                "comment": c.get("comment"),
-                "created_by": c.get("created_by", {}).get("username"),
-                "created_at": c.get("created_at"),
-            }
-            for c in comments
-            if c.get("type") == "user"
-        ],
-    }
-
-
-@router.patch("/kibana/cases/{case_id}")
-async def update_kibana_case(
-    case_id: str,
-    data: KibanaCaseUpdate,
-    current_user: User = Depends(get_current_user),
-):
-    """Update a case in Kibana."""
-    service = get_kibana_cases_service()
-    if not service.enabled:
-        raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
-
-    # Get current case to get version
-    current = service.get_case(case_id)
-    if not current:
-        raise HTTPException(status_code=404, detail="Case not found in Kibana")
-
-    version = current.get("version")
-
-    # Map status
-    status_map = {
-        "open": "open",
-        "in_progress": "in-progress",
-        "in-progress": "in-progress",
-        "resolved": "closed",
-        "closed": "closed",
-    }
-
-    result = service.update_case(
-        case_id=case_id,
-        version=version,
-        title=data.title,
-        description=data.description,
-        status=status_map.get(data.status) if data.status else None,
-        severity=data.severity,
-        tags=data.tags,
-    )
-
-    if not result:
-        raise HTTPException(status_code=502, detail="Failed to update case in Kibana")
-
-    return {
-        "id": result.get("id"),
-        "title": result.get("title"),
-        "status": result.get("status"),
-        "kibana_url": service.get_case_url(case_id),
-        "message": "Case updated in Kibana",
-    }
-
-
-@router.post("/kibana/cases/{case_id}/comments")
-async def add_kibana_case_comment(
-    case_id: str,
-    data: KibanaCaseComment,
-    current_user: User = Depends(get_current_user),
-):
-    """Add a comment to a Kibana case."""
-    service = get_kibana_cases_service()
-    if not service.enabled:
-        raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
-
-    result = service.add_comment(
-        case_id=case_id,
-        comment=data.comment,
-    )
-
-    if not result:
-        raise HTTPException(status_code=502, detail="Failed to add comment to Kibana case")
-
-    return {
-        "case_id": case_id,
-        "comment": data.comment,
-        "message": "Comment added to Kibana case",
-    }
-
-
-@router.delete("/kibana/cases/{case_id}")
-async def delete_kibana_case(
-    case_id: str,
-    current_user: User = Depends(get_current_user),
-):
-    """Delete a case from Kibana."""
-    service = get_kibana_cases_service()
-    if not service.enabled:
-        raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
-
-    success = service.delete_case(case_id)
-    if not success:
-        raise HTTPException(status_code=502, detail="Failed to delete case from Kibana")
-
-    return {
-        "message": "Case deleted from Kibana",
-    }
-
-
-# ============================================================================
-# Kibana Bidirectional Sync Endpoints
-# ============================================================================
-
-
-@router.post("/kibana/sync")
-async def sync_from_kibana(
-    current_user: User = Depends(get_current_user),
-):
-    """Manually trigger sync of comments from Kibana to IXION."""
-    sync_service = get_kibana_sync_service()
-
-    result = await sync_service.sync_all_cases()
-
-    return {
-        "message": "Sync completed",
-        "comments_synced": result.get("synced", 0),
-        "cases_processed": result.get("cases", 0),
-        "error": result.get("error"),
-    }
-
-
-@router.post("/kibana/sync/case/{case_id}")
-async def sync_case_from_kibana(
-    case_id: int,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Sync comments from Kibana for a specific case."""
-    case = session.query(AlertCase).filter_by(id=case_id).first()
-    if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
-
-    if not case.kibana_case_id:
-        raise HTTPException(status_code=400, detail="Case not linked to Kibana")
-
-    sync_service = get_kibana_sync_service()
-    synced = await sync_service.sync_case_comments(session, case)
-
-    # Also sync status
-    status_updated = await sync_service.sync_case_status_from_kibana(session, case)
-
-    return {
-        "message": "Case sync completed",
-        "comments_synced": synced,
-        "status_updated": status_updated,
-        "case_number": case.case_number,
     }
 
 

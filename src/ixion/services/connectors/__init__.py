@@ -17,6 +17,7 @@ from ixion.services.connectors.registry import (
 from ixion.services.connectors.gitlab_connector import GitLabConnector
 from ixion.services.connectors.opencti_connector import OpenCTIConnector
 from ixion.services.connectors.elasticsearch_connector import ElasticsearchConnector
+from ixion.services.connectors.kibana_cases_connector import KibanaCasesConnector
 
 
 def register_default_connectors() -> None:
@@ -25,6 +26,7 @@ def register_default_connectors() -> None:
     registry.register_class("gitlab", GitLabConnector)
     registry.register_class("opencti", OpenCTIConnector)
     registry.register_class("elasticsearch", ElasticsearchConnector)
+    registry.register_class("kibana_cases", KibanaCasesConnector)
 
 
 # Auto-register connectors on import
@@ -44,6 +46,7 @@ __all__ = [
     "GitLabConnector",
     "OpenCTIConnector",
     "ElasticsearchConnector",
+    "KibanaCasesConnector",
     # Registration
     "register_default_connectors",
 ]

@@ -18,6 +18,7 @@ from ixion.web.integration_api import router as integration_router
 from ixion.web.admin_api import router as admin_router
 from ixion.web.observable_api import router as observable_router
 from ixion.web.ai_api import router as ai_router
+from ixion.web.kibana_api import router as kibana_router
 from ixion.core.config import get_config, get_elasticsearch_config
 from ixion.core.logging import setup_logging, get_logger
 from ixion.storage.database import init_db
@@ -132,6 +133,7 @@ app.include_router(integration_router, prefix="/api/integrations")
 app.include_router(admin_router, prefix="/api/admin")
 app.include_router(observable_router, prefix="/api")
 app.include_router(ai_router)
+app.include_router(kibana_router, prefix="/api/kibana")
 
 
 @app.on_event("startup")
@@ -181,15 +183,14 @@ async def startup_event():
         import logging
         logging.getLogger(__name__).warning(f"Failed to seed SOC templates: {e}")
 
-    # Start Kibana bidirectional sync if enabled
+    # Start Kibana bidirectional sync if enabled (via connector)
     try:
-        from ixion.services.kibana_sync_service import get_kibana_sync_service
-        from ixion.core.config import get_kibana_config
+        from ixion.services.connectors import get_connector_registry
 
-        kibana_config = get_kibana_config()
-        if kibana_config.get("enabled"):
-            sync_service = get_kibana_sync_service()
-            sync_service.start_background_sync(interval_seconds=60)
+        registry = get_connector_registry()
+        kibana = registry.get("kibana_cases")
+        if kibana and kibana.is_configured:
+            kibana.start_background_sync(interval_seconds=60)
             import logging
             logging.getLogger(__name__).info("Kibana bidirectional sync started (60s interval)")
     except Exception as e:
