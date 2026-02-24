@@ -586,6 +586,34 @@
 .log-level-warning { color: #f59e0b; }
 .log-level-error { color: #ef4444; }
 
+/* Version Badges */
+.version-badge {
+    display: inline-block;
+    padding: 0.15rem 0.45rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+.version-badge.compatible {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.version-badge.incompatible {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.version-warning {
+    color: #92400e;
+    font-style: italic;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
 /* Loading State */
 .loading {
     text-align: center;
@@ -719,11 +747,29 @@ async function loadIntegrationStatus() {
             const statusClass = getStatusClass(integration.status || (integration.is_configured ? 'healthy' : 'not_configured'));
             const statusText = integration.status || (integration.is_configured ? 'Configured' : 'Not Configured');
 
+            // Version badge
+            const meta = integration.metadata || {};
+            const version = meta.version || null;
+            const compat = meta.version_compatibility || null;
+            let versionBadgeHtml = '';
+            let versionWarningHtml = '';
+
+            if (version && compat) {
+                const badgeClass = compat.in_range ? 'compatible' : 'incompatible';
+                versionBadgeHtml = `<span class="version-badge ${badgeClass}">v${escapeHtml(version)}</span>`;
+                if (!compat.in_range) {
+                    versionWarningHtml = `<div class="version-warning">${escapeHtml(compat.message)}</div>`;
+                }
+            } else if (version) {
+                versionBadgeHtml = `<span class="version-badge compatible">v${escapeHtml(version)}</span>`;
+            }
+
             return `
                 <div class="integration-card">
                     <div class="integration-card-header">
                         <div class="integration-icon ${iconClass}">${integration.display_name.charAt(0)}</div>
                         <div class="integration-card-title">${escapeHtml(integration.display_name)}</div>
+                        ${versionBadgeHtml}
                     </div>
                     <div class="integration-card-status">
                         <span class="status-indicator ${statusClass}"></span>
@@ -732,6 +778,7 @@ async function loadIntegrationStatus() {
                     <div class="integration-card-details">
                         ${integration.is_enabled ? 'Enabled' : 'Disabled'}
                         ${integration.response_time_ms ? ` | ${integration.response_time_ms.toFixed(0)}ms` : ''}
+                        ${versionWarningHtml}
                     </div>
                     <div class="integration-card-actions">
                         <button class="btn btn-sm" onclick="testConnection('${integration.type}')">Test</button>

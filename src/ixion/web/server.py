@@ -197,6 +197,38 @@ async def startup_event():
         import logging
         logging.getLogger(__name__).warning(f"Failed to start Kibana sync: {e}")
 
+    # Version compatibility checks for connectors that declare supported ranges
+    try:
+        from ixion.services.connectors import get_connector_registry
+        from ixion.services.connectors.version_compat import check_version_compatibility
+
+        registry = get_connector_registry()
+        for connector in registry.get_all():
+            if connector.SUPPORTED_VERSIONS is None:
+                continue
+            if not connector.is_configured:
+                continue
+            try:
+                result = await connector.test_connection()
+                detected = result.get(connector.VERSION_KEY)
+                if detected:
+                    compat = check_version_compatibility(detected, connector.SUPPORTED_VERSIONS)
+                    if compat["in_range"]:
+                        logger.info(
+                            "%s version %s OK (tested range: %s)",
+                            connector.DISPLAY_NAME, detected, compat["tested_range"],
+                        )
+                    else:
+                        logger.warning(
+                            "VERSION COMPATIBILITY [%s]: %s",
+                            connector.DISPLAY_NAME, compat["message"],
+                        )
+            except Exception as conn_err:
+                logger.warning("Could not check %s version: %s", connector.DISPLAY_NAME, conn_err)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed version compatibility checks: {e}")
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):

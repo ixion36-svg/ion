@@ -6,6 +6,7 @@ Wraps KibanaCasesService and KibanaSyncService to provide a unified connector in
 from typing import Dict, Any, Optional
 
 from ixion.services.connectors.base import BaseConnector
+from ixion.services.connectors.version_compat import KIBANA_VERSIONS
 from ixion.services.kibana_cases_service import (
     KibanaCasesService,
     get_kibana_cases_service,
@@ -23,6 +24,8 @@ class KibanaCasesConnector(BaseConnector):
 
     CONNECTOR_TYPE = "kibana_cases"
     DISPLAY_NAME = "Kibana Cases"
+    SUPPORTED_VERSIONS = KIBANA_VERSIONS
+    VERSION_KEY = "version"
 
     def __init__(self):
         self._cases_service: KibanaCasesService = get_kibana_cases_service()

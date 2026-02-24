@@ -170,6 +170,9 @@ async def get_integration_status(
             response.response_time_ms = latest_check.response_time_ms
             response.last_check = latest_check.checked_at.isoformat() if latest_check.checked_at else None
             response.error = latest_check.error_message
+            # Merge health check metadata (includes version_compatibility) into response
+            if latest_check.check_metadata:
+                response.metadata = {**(response.metadata or {}), **latest_check.check_metadata}
 
         results.append(response)
 

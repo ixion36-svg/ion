@@ -6,6 +6,7 @@ Wraps the ElasticsearchService to provide a unified connector interface.
 from typing import Dict, Any, Optional
 
 from ixion.services.connectors.base import BaseConnector
+from ixion.services.connectors.version_compat import ELASTICSEARCH_VERSIONS
 from ixion.services.elasticsearch_service import ElasticsearchService
 
 
@@ -32,6 +33,8 @@ class ElasticsearchConnector(BaseConnector):
 
     CONNECTOR_TYPE = "elasticsearch"
     DISPLAY_NAME = "Elasticsearch"
+    SUPPORTED_VERSIONS = ELASTICSEARCH_VERSIONS
+    VERSION_KEY = "version"
 
     def __init__(self):
         self._service: ElasticsearchService = get_elasticsearch_service()

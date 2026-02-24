@@ -5,8 +5,11 @@ Defines the abstract interface that all integration connectors must implement.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from enum import Enum
+
+if TYPE_CHECKING:
+    from ixion.services.connectors.version_compat import VersionRange
 
 
 class ConnectorStatus(str, Enum):
@@ -48,6 +51,8 @@ class BaseConnector(ABC):
     # Must be overridden by subclasses
     CONNECTOR_TYPE: str = "base"
     DISPLAY_NAME: str = "Base Connector"
+    SUPPORTED_VERSIONS: Optional["VersionRange"] = None  # Override in subclasses
+    VERSION_KEY: str = "version"  # Key in test_connection() result holding version string
 
     @property
     @abstractmethod
@@ -106,11 +111,26 @@ class BaseConnector(ABC):
             elapsed_ms = (time.perf_counter() - start_time) * 1000
 
             if result.get("connected"):
+                status = ConnectorStatus.HEALTHY
+                message = "Connection successful"
+                metadata = dict(result)
+
+                # Version compatibility check (if connector declares a range)
+                if self.SUPPORTED_VERSIONS is not None:
+                    from ixion.services.connectors.version_compat import check_version_compatibility
+                    detected = result.get(self.VERSION_KEY)
+                    if detected:
+                        compat = check_version_compatibility(detected, self.SUPPORTED_VERSIONS)
+                        metadata["version_compatibility"] = compat
+                        if not compat["in_range"]:
+                            status = ConnectorStatus.DEGRADED
+                            message = compat["message"]
+
                 return HealthCheckResult(
-                    status=ConnectorStatus.HEALTHY,
+                    status=status,
                     response_time_ms=elapsed_ms,
-                    message="Connection successful",
-                    metadata=result,
+                    message=message,
+                    metadata=metadata,
                 )
             else:
                 return HealthCheckResult(
