@@ -2167,7 +2167,6 @@ async def get_team_metrics(
     severity_counts = dict(severity_rows)
 
     # Cases by assignee
-    from ixion.auth.models import User as AuthUser
     assignee_rows = session.query(
         AlertCase.assigned_to_id,
         sqlfunc.count(AlertCase.id),
@@ -2194,7 +2193,7 @@ async def get_team_metrics(
                 "closed_7d": closed_by_assignee.get(None, 0),
             })
         else:
-            user = session.query(AuthUser).filter_by(id=user_id).first()
+            user = session.query(User).filter_by(id=user_id).first()
             cases_by_assignee.append({
                 "username": user.username if user else "Unknown",
                 "display_name": user.display_name if user else "Unknown",
@@ -2209,7 +2208,7 @@ async def get_team_metrics(
 
     recent_closures = []
     for c in recent_closures_q:
-        closed_by_user = session.query(AuthUser).filter_by(id=c.closed_by_id).first() if c.closed_by_id else None
+        closed_by_user = session.query(User).filter_by(id=c.closed_by_id).first() if c.closed_by_id else None
         recent_closures.append({
             "id": c.id,
             "case_number": c.case_number,
