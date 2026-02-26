@@ -78,6 +78,15 @@ from ixion.models.playbook import (
     StepType,
     ExecutionStatus,
 )
+from ixion.models.skills import (
+    SkillAssessment,
+    UserCareerGoal,
+    AssessmentSnapshot,
+    TeamScheduleEntry,
+    TeamCertification,
+    SOCCMMAssessment,
+    KnowledgeArticle,
+)
 
 __all__ = [
     "Base",
@@ -150,4 +159,13 @@ __all__ = [
     "PlaybookExecution",
     "StepType",
     "ExecutionStatus",
+    # Skills assessment models
+    "SkillAssessment",
+    "UserCareerGoal",
+    "AssessmentSnapshot",
+    "TeamScheduleEntry",
+    # SOC-CMM alignment models
+    "TeamCertification",
+    "SOCCMMAssessment",
+    "KnowledgeArticle",
 ]

@@ -19,6 +19,7 @@ from ixion.web.admin_api import router as admin_router
 from ixion.web.observable_api import router as observable_router
 from ixion.web.ai_api import router as ai_router
 from ixion.web.kibana_api import router as kibana_router
+from ixion.web.skills_api import router as skills_router
 from ixion.core.config import get_config, get_elasticsearch_config
 from ixion.core.logging import setup_logging, get_logger
 from ixion.storage.database import init_db
@@ -134,6 +135,7 @@ app.include_router(admin_router, prefix="/api/admin")
 app.include_router(observable_router, prefix="/api")
 app.include_router(ai_router)
 app.include_router(kibana_router, prefix="/api/kibana")
+app.include_router(skills_router, prefix="/api/skills")
 
 
 @app.on_event("startup")
@@ -196,6 +198,22 @@ async def startup_event():
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"Failed to start Kibana sync: {e}")
+
+    # Create daily skills assessment snapshot
+    try:
+        from ixion.services.skills_snapshot_service import create_daily_snapshot
+        from ixion.storage.database import get_engine, get_session_factory
+
+        engine = get_engine(config.db_path)
+        factory = get_session_factory(engine)
+        session = factory()
+        try:
+            create_daily_snapshot(session)
+        finally:
+            session.close()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to create skills snapshot: {e}")
 
     # Version compatibility checks for connectors that declare supported ranges
     try:
@@ -373,6 +391,12 @@ async def playbooks_page(request: Request):
 async def chat_page(request: Request):
     """Render the AI chat page."""
     return templates.TemplateResponse("chat.html", {"request": request})
+
+
+@app.get("/training", response_class=HTMLResponse)
+async def training_page(request: Request):
+    """Render the training pathways page."""
+    return templates.TemplateResponse("training.html", {"request": request})
 
 
 def main():
