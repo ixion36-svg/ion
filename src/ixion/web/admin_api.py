@@ -10,7 +10,7 @@ import sys
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ixion.auth.dependencies import require_admin
+from ixion.auth.dependencies import require_admin, require_permission
 from ixion.models.user import User
 from ixion.core.config import get_config, set_config, Config
 from ixion.core.url_validator import validate_integration_url
@@ -101,7 +101,7 @@ def reload_config() -> Config:
 # =============================================================================
 
 @router.get("/config")
-async def get_configuration(current_user: User = Depends(require_admin)):
+async def get_configuration(current_user: User = Depends(require_permission("system:settings"))):
     """Get all configuration settings (secrets are masked)."""
     config = get_config()
 
@@ -156,7 +156,7 @@ async def get_configuration(current_user: User = Depends(require_admin)):
 @router.put("/config/general")
 async def update_general_settings(
     settings: GeneralSettingsUpdate,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update general application settings."""
     config = get_config()
@@ -184,7 +184,7 @@ async def update_general_settings(
 @router.put("/config/gitlab")
 async def update_gitlab_settings(
     settings: GitLabSettingsUpdate,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update GitLab integration settings."""
     config = get_config()
@@ -209,7 +209,7 @@ async def update_gitlab_settings(
 @router.put("/config/opencti")
 async def update_opencti_settings(
     settings: OpenCTISettingsUpdate,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update OpenCTI integration settings."""
     config = get_config()
@@ -234,7 +234,7 @@ async def update_opencti_settings(
 @router.put("/config/elasticsearch")
 async def update_elasticsearch_settings(
     settings: ElasticsearchSettingsUpdate,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update Elasticsearch integration settings."""
     config = get_config()
@@ -271,7 +271,7 @@ async def update_elasticsearch_settings(
 @router.put("/config/oidc")
 async def update_oidc_settings(
     settings: OIDCSettingsUpdate,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update OIDC/Keycloak settings."""
     config = get_config()
@@ -305,7 +305,7 @@ async def update_oidc_settings(
 @router.post("/config/test/{integration}")
 async def test_integration_connection(
     integration: str,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("system:settings")),
 ):
     """Test connection to an integration."""
     if integration == "gitlab":
@@ -844,7 +844,7 @@ ACTIONABLE: [List any fixes that can be auto-applied, comma-separated. Valid opt
 
 
 @router.get("/wizard/integrations")
-async def get_wizard_integrations(current_user: User = Depends(require_admin)):
+async def get_wizard_integrations(current_user: User = Depends(require_permission("integration:manage"))):
     """Get all integrations with their current status for the wizard."""
     config = get_config()
 
@@ -959,7 +959,7 @@ async def get_wizard_integrations(current_user: User = Depends(require_admin)):
 async def test_wizard_integration(
     integration: str,
     config_data: WizardIntegrationConfig,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("integration:manage")),
 ):
     """Test connection for an integration without saving configuration."""
     import httpx
@@ -1277,7 +1277,7 @@ async def test_wizard_integration(
 @router.post("/wizard/diagnose")
 async def diagnose_integration_error(
     request: WizardDiagnoseRequest,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("integration:manage")),
 ):
     """Use AI to diagnose integration configuration errors."""
     config = get_config()
@@ -1407,7 +1407,7 @@ def _parse_diagnosis_response(text: str) -> dict:
 async def save_wizard_integration(
     integration: str,
     config_data: WizardIntegrationConfig,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("integration:manage")),
 ):
     """Save configuration for a single integration."""
     config = get_config()
@@ -1510,7 +1510,7 @@ async def save_wizard_integration(
 @router.post("/wizard/save-all")
 async def save_all_wizard_integrations(
     request: WizardSaveAllRequest,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("integration:manage")),
 ):
     """Save all integration configurations at once."""
     config = get_config()
@@ -1634,7 +1634,7 @@ async def save_all_wizard_integrations(
 
 
 @router.get("/wizard/ollama/models")
-async def get_ollama_models(current_user: User = Depends(require_admin)):
+async def get_ollama_models(current_user: User = Depends(require_permission("integration:manage"))):
     """Get available Ollama models for selection."""
     config = get_config()
 

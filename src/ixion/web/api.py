@@ -7119,3 +7119,129 @@ async def get_host_patterns(
         "patterns": results,
         "total": len(results),
     }
+
+
+# ============================================================
+# ANALYST WORKSPACE — Knowledge Base Integration
+# ============================================================
+
+@router.get("/analyst/knowledge-base")
+async def get_analyst_knowledge_base(
+    current_user: User = Depends(require_permission("document:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Get SOC analyst knowledge base articles organized by collection.
+
+    Returns articles from the 'Analyst Knowledge Base' collection,
+    organized by topic for easy reference during alert triage and
+    case investigation.
+    """
+    from ixion.models.document import Document, DocumentTag
+    from ixion.models.template import Collection
+
+    # Find Knowledge Base parent collection
+    analyst_kb = session.query(Collection).filter_by(
+        name="Knowledge Base"
+    ).first()
+
+    if not analyst_kb:
+        return {
+            "status": "not_found",
+            "message": "Knowledge Base not configured",
+            "collections": []
+        }
+
+    # Get all child collections
+    child_collections = session.query(Collection).filter_by(
+        parent_id=analyst_kb.id
+    ).order_by(Collection.name).all()
+
+    result = {
+        "status": "success",
+        "parent": {
+            "id": analyst_kb.id,
+            "name": analyst_kb.name,
+            "description": analyst_kb.description,
+        },
+        "collections": []
+    }
+
+    # For each collection, get its documents
+    for collection in child_collections:
+        docs = session.query(Document).filter_by(
+            collection_id=collection.id
+        ).order_by(Document.name).all()
+
+        collection_data = {
+            "id": collection.id,
+            "name": collection.name,
+            "description": collection.description,
+            "article_count": len(docs),
+            "articles": [
+                {
+                    "id": doc.id,
+                    "name": doc.name,
+                    "format": doc.output_format,
+                    "tags": [t.name for t in doc.tags] if doc.tags else [],
+                    "created_at": doc.created_at.isoformat() if doc.created_at else None,
+                }
+                for doc in docs
+            ]
+        }
+        result["collections"].append(collection_data)
+
+    return result
+
+
+@router.get("/analyst/knowledge-base/search")
+async def search_analyst_knowledge_base(
+    q: str,
+    current_user: User = Depends(require_permission("document:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Search analyst knowledge base by article title or content.
+
+    Parameters:
+        q: Search query string
+
+    Returns: Matching articles with collection context
+    """
+    from ixion.models.document import Document
+    from ixion.models.template import Collection
+
+    # Find Knowledge Base parent
+    analyst_kb = session.query(Collection).filter_by(
+        name="Knowledge Base"
+    ).first()
+
+    if not analyst_kb:
+        return {"results": [], "total": 0}
+
+    # Get child collection IDs
+    child_ids = [
+        c.id for c in session.query(Collection).filter_by(
+            parent_id=analyst_kb.id
+        ).all()
+    ]
+
+    # Search documents in those collections
+    search_term = f"%{q.lower()}%"
+    docs = session.query(Document).filter(
+        Document.collection_id.in_(child_ids),
+        Document.name.ilike(search_term)
+    ).order_by(Document.name).all()
+
+    results = [
+        {
+            "id": doc.id,
+            "name": doc.name,
+            "collection_id": doc.collection_id,
+            "collection_name": doc.collection.name if doc.collection else "Unknown",
+            "format": doc.output_format,
+            "tags": [t.name for t in doc.tags] if doc.tags else [],
+            "created_at": doc.created_at.isoformat() if doc.created_at else None,
+        }
+        for doc in docs
+    ]
+
+    return {"results": results, "total": len(results)}

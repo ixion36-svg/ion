@@ -139,7 +139,7 @@ function updateUserMenu() {
     const isAdmin = roles.includes('admin');
 
     // Analyst+ links (analyst/lead/engineering/admin)
-    ['nav-alerts-link', 'nav-observables-link', 'nav-playbooks-link'].forEach(id => {
+    ['nav-alerts-link', 'nav-observables-link', 'nav-playbooks-link', 'nav-training-link'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = isAnalyst ? 'block' : 'none';
     });

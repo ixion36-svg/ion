@@ -1,6 +1,6 @@
 """Seed realistic SOC alerts into Elasticsearch for testing."""
 
-import httpx
+import requests
 import json
 import random
 from datetime import datetime, timedelta
@@ -14,7 +14,7 @@ def main():
 
     # Delete existing index
     try:
-        r = httpx.delete(f"{ES_URL}/{INDEX}", auth=AUTH, timeout=10)
+        r = requests.delete(f"{ES_URL}/{INDEX}", auth=AUTH, timeout=10)
         print(f"Delete index: {r.status_code}")
     except Exception as e:
         print(f"Delete: {e}")
@@ -70,7 +70,7 @@ def main():
         }
     }
 
-    r = httpx.put(f"{ES_URL}/{INDEX}", json=mapping, auth=AUTH, timeout=10)
+    r = requests.put(f"{ES_URL}/{INDEX}", json=mapping, auth=AUTH, timeout=10)
     print(f"Create index: {r.status_code}")
 
     # --- Reference data ---
@@ -299,9 +299,9 @@ def main():
         bulk_body += json.dumps(doc) + "\n"
 
     # Bulk index
-    r = httpx.post(
+    r = requests.post(
         f"{ES_URL}/_bulk",
-        content=bulk_body,
+        data=bulk_body,
         headers={"Content-Type": "application/x-ndjson"},
         auth=AUTH,
         timeout=30,
@@ -313,11 +313,11 @@ def main():
     print(f"Bulk index: {success}/{len(items)} alerts indexed, errors={errors}")
 
     # Refresh index
-    r = httpx.post(f"{ES_URL}/{INDEX}/_refresh", auth=AUTH, timeout=10)
+    r = requests.post(f"{ES_URL}/{INDEX}/_refresh", auth=AUTH, timeout=10)
     print(f"Refresh: {r.status_code}")
 
     # Verify count
-    r = httpx.get(f"{ES_URL}/{INDEX}/_count", auth=AUTH, timeout=10)
+    r = requests.get(f"{ES_URL}/{INDEX}/_count", auth=AUTH, timeout=10)
     print(f"Total alerts in index: {r.json().get('count', 0)}")
 
 

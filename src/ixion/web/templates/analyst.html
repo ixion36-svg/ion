@@ -40,142 +40,177 @@
     </div>
 </div>
 
-<!-- Main Tools Grid -->
-<div class="analyst-tools-grid">
-    <!-- Investigation Tools Section -->
-    <div class="tools-section">
-        <h2 class="section-title">Investigation</h2>
-        <div class="tools-cards">
-            <div class="tool-card" onclick="navigateTo('alerts')">
-                <div class="tool-icon">&#9888;</div>
-                <h3>Alert Triage</h3>
-                <p>Review, investigate, and escalate security alerts from Elasticsearch</p>
-                <div class="tool-actions">
-                    <span class="badge" id="badge-new-alerts">0 new</span>
+<!-- Tab Navigation -->
+<div class="analyst-tabs">
+    <button class="analyst-tab active" data-tab="workspace" onclick="switchAnalystTab('workspace')">Workspace</button>
+    <button class="analyst-tab" data-tab="kb" onclick="switchAnalystTab('kb')">Knowledge Base <span class="kb-count" id="kb-tab-count"></span></button>
+</div>
+
+<!-- Workspace Tab -->
+<div id="tab-workspace" class="analyst-tab-content">
+    <div class="analyst-tools-grid">
+        <!-- Investigation Tools Section -->
+        <div class="tools-section">
+            <h2 class="section-title">Investigation</h2>
+            <div class="tools-cards">
+                <div class="tool-card" onclick="navigateTo('alerts')">
+                    <div class="tool-icon">&#9888;</div>
+                    <h3>Alert Triage</h3>
+                    <p>Review, investigate, and escalate security alerts from Elasticsearch</p>
+                    <div class="tool-actions">
+                        <span class="badge" id="badge-new-alerts">0 new</span>
+                    </div>
+                </div>
+
+                <div class="tool-card" onclick="navigateTo('alerts')">
+                    <div class="tool-icon">&#128193;</div>
+                    <h3>Case Management</h3>
+                    <p>Create and manage investigation cases, link alerts, and track progress</p>
+                    <div class="tool-actions">
+                        <span class="badge badge-info" id="badge-active-cases">0 active</span>
+                    </div>
+                </div>
+
+                <div class="tool-card" onclick="navigateTo('observables')">
+                    <div class="tool-icon">&#128269;</div>
+                    <h3>Observables</h3>
+                    <p>Track and enrich IOCs - IPs, domains, hashes, URLs, and more</p>
+                    <div class="tool-actions">
+                        <span class="badge badge-warning" id="badge-high-threat">0 high threat</span>
+                    </div>
+                </div>
+
+                <div class="tool-card" onclick="navigateTo('playbooks')">
+                    <div class="tool-icon">&#128214;</div>
+                    <h3>Playbooks</h3>
+                    <p>Create and execute investigation playbooks with automated steps</p>
+                    <div class="tool-actions">
+                        <span class="badge badge-success" id="badge-playbooks">0 available</span>
+                    </div>
                 </div>
             </div>
+        </div>
 
-            <div class="tool-card" onclick="navigateTo('alerts')">
-                <div class="tool-icon">&#128193;</div>
-                <h3>Case Management</h3>
-                <p>Create and manage investigation cases, link alerts, and track progress</p>
-                <div class="tool-actions">
-                    <span class="badge badge-info" id="badge-active-cases">0 active</span>
+        <!-- Search & Discovery Section -->
+        <div class="tools-section">
+            <h2 class="section-title">Search & Discovery</h2>
+            <div class="tools-cards">
+                <div class="tool-card" onclick="navigateTo('discover')">
+                    <div class="tool-icon">&#128270;</div>
+                    <h3>Discover</h3>
+                    <p>Search and explore Elasticsearch data with saved queries</p>
+                    <div class="tool-actions">
+                        <span class="badge" id="badge-saved-searches">0 saved</span>
+                    </div>
+                </div>
+
+                <div class="tool-card" onclick="navigateTo('tools', 'lookup')">
+                    <div class="tool-icon">&#127760;</div>
+                    <h3>IOC Lookup</h3>
+                    <p>Query threat intelligence via OpenCTI for IPs, domains, and hashes</p>
+                </div>
+
+                <div class="tool-card" onclick="navigateTo('tools', 'ioc')">
+                    <div class="tool-icon">&#128196;</div>
+                    <h3>IOC Processor</h3>
+                    <p>Extract, defang, and process IOCs from text and logs</p>
                 </div>
             </div>
+        </div>
 
-            <div class="tool-card" onclick="navigateTo('observables')">
-                <div class="tool-icon">&#128269;</div>
-                <h3>Observables</h3>
-                <p>Track and enrich IOCs - IPs, domains, hashes, URLs, and more</p>
-                <div class="tool-actions">
-                    <span class="badge badge-warning" id="badge-high-threat">0 high threat</span>
+        <!-- SOC Utilities Section -->
+        <div class="tools-section">
+            <h2 class="section-title">SOC Utilities</h2>
+            <div class="tools-cards tools-cards-compact">
+                <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'timestamp')">
+                    <div class="tool-icon-sm">&#128339;</div>
+                    <h4>Timestamp</h4>
+                    <p>Convert between timestamp formats</p>
                 </div>
-            </div>
 
-            <div class="tool-card" onclick="navigateTo('playbooks')">
-                <div class="tool-icon">&#128214;</div>
-                <h3>Playbooks</h3>
-                <p>Create and execute investigation playbooks with automated steps</p>
-                <div class="tool-actions">
-                    <span class="badge badge-success" id="badge-playbooks">0 available</span>
+                <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'hash')">
+                    <div class="tool-icon-sm">&#128273;</div>
+                    <h4>Hash Identifier</h4>
+                    <p>Identify hash types (MD5, SHA, etc.)</p>
+                </div>
+
+                <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'url')">
+                    <div class="tool-icon-sm">&#128279;</div>
+                    <h4>URL Parser</h4>
+                    <p>Parse and analyze URL components</p>
+                </div>
+
+                <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'regex')">
+                    <div class="tool-icon-sm">&#10024;</div>
+                    <h4>Regex Tester</h4>
+                    <p>Test regular expressions</p>
+                </div>
+
+                <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'email')">
+                    <div class="tool-icon-sm">&#128231;</div>
+                    <h4>Email Headers</h4>
+                    <p>Analyze email header information</p>
+                </div>
+
+                <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'log')">
+                    <div class="tool-icon-sm">&#128220;</div>
+                    <h4>Log Parser</h4>
+                    <p>Parse various log formats</p>
+                </div>
+
+                <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'encoding')">
+                    <div class="tool-icon-sm">&#128259;</div>
+                    <h4>Encoding</h4>
+                    <p>Encode/decode Base64, Hex, URL</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Search & Discovery Section -->
-    <div class="tools-section">
-        <h2 class="section-title">Search & Discovery</h2>
-        <div class="tools-cards">
-            <div class="tool-card" onclick="navigateTo('discover')">
-                <div class="tool-icon">&#128270;</div>
-                <h3>Discover</h3>
-                <p>Search and explore Elasticsearch data with saved queries</p>
-                <div class="tool-actions">
-                    <span class="badge" id="badge-saved-searches">0 saved</span>
-                </div>
-            </div>
-
-            <div class="tool-card" onclick="navigateTo('tools', 'lookup')">
-                <div class="tool-icon">&#127760;</div>
-                <h3>IOC Lookup</h3>
-                <p>Query threat intelligence via OpenCTI for IPs, domains, and hashes</p>
-            </div>
-
-            <div class="tool-card" onclick="navigateTo('tools', 'ioc')">
-                <div class="tool-icon">&#128196;</div>
-                <h3>IOC Processor</h3>
-                <p>Extract, defang, and process IOCs from text and logs</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- SOC Utilities Section -->
-    <div class="tools-section">
-        <h2 class="section-title">SOC Utilities</h2>
-        <div class="tools-cards tools-cards-compact">
-            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'timestamp')">
-                <div class="tool-icon-sm">&#128339;</div>
-                <h4>Timestamp</h4>
-                <p>Convert between timestamp formats</p>
-            </div>
-
-            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'hash')">
-                <div class="tool-icon-sm">&#128273;</div>
-                <h4>Hash Identifier</h4>
-                <p>Identify hash types (MD5, SHA, etc.)</p>
-            </div>
-
-            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'url')">
-                <div class="tool-icon-sm">&#128279;</div>
-                <h4>URL Parser</h4>
-                <p>Parse and analyze URL components</p>
-            </div>
-
-            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'regex')">
-                <div class="tool-icon-sm">&#10024;</div>
-                <h4>Regex Tester</h4>
-                <p>Test regular expressions</p>
-            </div>
-
-            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'email')">
-                <div class="tool-icon-sm">&#128231;</div>
-                <h4>Email Headers</h4>
-                <p>Analyze email header information</p>
-            </div>
-
-            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'log')">
-                <div class="tool-icon-sm">&#128220;</div>
-                <h4>Log Parser</h4>
-                <p>Parse various log formats</p>
-            </div>
-
-            <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'encoding')">
-                <div class="tool-icon-sm">&#128259;</div>
-                <h4>Encoding</h4>
-                <p>Encode/decode Base64, Hex, URL</p>
-            </div>
+    <!-- Quick Actions Panel -->
+    <div class="quick-actions-panel">
+        <h3>Quick Actions</h3>
+        <div class="quick-action-buttons">
+            <button class="btn btn-primary" onclick="navigateTo('alerts')">
+                <span>&#9888;</span> Triage Alerts
+            </button>
+            <button class="btn" onclick="navigateTo('discover')">
+                <span>&#128270;</span> Search Logs
+            </button>
+            <button class="btn" onclick="navigateTo('observables')">
+                <span>&#128269;</span> Lookup IOC
+            </button>
+            <button class="btn" onclick="openQuickIOCLookup()">
+                <span>&#127760;</span> Quick Lookup
+            </button>
         </div>
     </div>
 </div>
 
-<!-- Quick Actions Panel -->
-<div class="quick-actions-panel">
-    <h3>Quick Actions</h3>
-    <div class="quick-action-buttons">
-        <button class="btn btn-primary" onclick="navigateTo('alerts')">
-            <span>&#9888;</span> Triage Alerts
-        </button>
-        <button class="btn" onclick="navigateTo('discover')">
-            <span>&#128270;</span> Search Logs
-        </button>
-        <button class="btn" onclick="navigateTo('observables')">
-            <span>&#128269;</span> Lookup IOC
-        </button>
-        <button class="btn" onclick="openQuickIOCLookup()">
-            <span>&#127760;</span> Quick Lookup
-        </button>
+<!-- Knowledge Base Tab -->
+<div id="tab-kb" class="analyst-tab-content" style="display:none;">
+    <div class="kb-search-bar">
+        <input type="text" id="kb-search-input" class="form-control" placeholder="Search articles across all collections..." oninput="searchKBDebounced()">
+    </div>
+    <div class="kb-layout">
+        <div class="kb-sidebar">
+            <div class="kb-sidebar-title">Collections</div>
+            <div id="kb-collections-list" class="kb-sidebar-list">
+                <p class="muted">Loading...</p>
+            </div>
+        </div>
+        <div class="kb-main">
+            <div id="kb-list-view">
+                <div class="kb-list-header" id="kb-list-header">All Articles</div>
+                <div id="kb-articles-list" class="kb-articles-list">
+                    <p class="muted">Select a collection or search for articles</p>
+                </div>
+            </div>
+            <div id="kb-reader-view" style="display:none;">
+                <div class="kb-breadcrumb" id="kb-breadcrumb"></div>
+                <div class="kb-reader-body rendered-content" id="kb-reader-body"></div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -201,16 +236,21 @@
 </div>
 
 <style>
+/* =============================================================================
+   Analyst Workspace — Consistent full-width layout
+   ============================================================================= */
+
 .page-subtitle {
     color: var(--text-secondary);
     margin-top: 0.25rem;
 }
 
+/* ── Stats Bar ─────────────────────────────────────────── */
 .analyst-stats-bar {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 1rem;
-    margin-bottom: 2rem;
-    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
 }
 
 .stat-card {
@@ -220,11 +260,9 @@
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 1rem 1.5rem;
+    padding: 1rem 1.25rem;
     cursor: pointer;
     transition: all 0.2s;
-    flex: 1;
-    min-width: 180px;
 }
 
 .stat-card:hover {
@@ -232,35 +270,58 @@
     transform: translateY(-2px);
 }
 
-.stat-icon {
-    font-size: 1.5rem;
-}
-
-.stat-content {
-    display: flex;
-    flex-direction: column;
-}
-
-.stat-value {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.stat-label {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-
+.stat-icon { font-size: 1.5rem; }
+.stat-content { display: flex; flex-direction: column; }
+.stat-value { font-size: 1.5rem; font-weight: 600; color: var(--text-primary); }
+.stat-label { font-size: 0.85rem; color: var(--text-secondary); }
 .stat-alerts .stat-value { color: #ef4444; }
 .stat-cases .stat-value { color: #3b82f6; }
 .stat-observables .stat-value { color: #f59e0b; }
 .stat-playbooks .stat-value { color: #10b981; }
 
+/* ── Tab Navigation ────────────────────────────────────── */
+.analyst-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.analyst-tab {
+    padding: 0.75rem 1.5rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+}
+
+.analyst-tab:hover { color: var(--text-primary); }
+
+.analyst-tab.active {
+    color: var(--accent-color);
+    border-bottom-color: var(--accent-color);
+}
+
+.kb-count {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    font-size: 0.7rem;
+    border-radius: 8px;
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent-color);
+    margin-left: 0.25rem;
+}
+
+/* ── Workspace Tab — Tools Grid ────────────────────────── */
 .analyst-tools-grid {
     display: flex;
     flex-direction: column;
-    gap: 2rem;
+    gap: 1.5rem;
 }
 
 .tools-section {
@@ -281,7 +342,7 @@
 
 .tools-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 1rem;
 }
 
@@ -296,6 +357,8 @@
     padding: 1.25rem;
     cursor: pointer;
     transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
 }
 
 .tool-card:hover {
@@ -303,47 +366,14 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.tool-card-sm {
-    padding: 1rem;
-}
-
-.tool-icon {
-    font-size: 2rem;
-    margin-bottom: 0.5rem;
-}
-
-.tool-icon-sm {
-    font-size: 1.5rem;
-    margin-bottom: 0.25rem;
-}
-
-.tool-card h3 {
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
-    color: var(--text-primary);
-}
-
-.tool-card h4 {
-    font-size: 0.9rem;
-    margin-bottom: 0.25rem;
-    color: var(--text-primary);
-}
-
-.tool-card p {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    margin-bottom: 0.75rem;
-    line-height: 1.4;
-}
-
-.tool-card-sm p {
-    font-size: 0.8rem;
-    margin-bottom: 0;
-}
-
-.tool-actions {
-    margin-top: auto;
-}
+.tool-card-sm { padding: 1rem; }
+.tool-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+.tool-icon-sm { font-size: 1.5rem; margin-bottom: 0.25rem; }
+.tool-card h3 { font-size: 1rem; margin-bottom: 0.5rem; color: var(--text-primary); }
+.tool-card h4 { font-size: 0.9rem; margin-bottom: 0.25rem; color: var(--text-primary); }
+.tool-card p { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.4; flex: 1; }
+.tool-card-sm p { font-size: 0.8rem; margin-bottom: 0; }
+.tool-actions { margin-top: auto; }
 
 .badge {
     display: inline-block;
@@ -359,19 +389,16 @@
 .badge-success { background: rgba(16, 185, 129, 0.2); color: #10b981; }
 .badge-danger { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
 
+/* ── Quick Actions ─────────────────────────────────────── */
 .quick-actions-panel {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    padding: 1.5rem;
-    margin-top: 2rem;
+    padding: 1.25rem 1.5rem;
+    margin-top: 1.5rem;
 }
 
-.quick-actions-panel h3 {
-    font-size: 1rem;
-    margin-bottom: 1rem;
-    color: var(--text-primary);
-}
+.quick-actions-panel h3 { font-size: 1rem; margin-bottom: 1rem; color: var(--text-primary); }
 
 .quick-action-buttons {
     display: flex;
@@ -379,11 +406,9 @@
     flex-wrap: wrap;
 }
 
-.quick-action-buttons .btn span {
-    margin-right: 0.5rem;
-}
+.quick-action-buttons .btn span { margin-right: 0.5rem; }
 
-/* Modal styles */
+/* ── Modal ─────────────────────────────────────────────── */
 .modal {
     position: fixed;
     top: 0;
@@ -407,9 +432,7 @@
     overflow: auto;
 }
 
-.modal-sm {
-    max-width: 450px;
-}
+.modal-sm { max-width: 450px; }
 
 .modal-header {
     display: flex;
@@ -419,10 +442,7 @@
     border-bottom: 1px solid var(--border-color);
 }
 
-.modal-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-}
+.modal-header h3 { margin: 0; font-size: 1.1rem; }
 
 .modal-close {
     background: none;
@@ -432,9 +452,7 @@
     color: var(--text-secondary);
 }
 
-.modal-body {
-    padding: 1.5rem;
-}
+.modal-body { padding: 1.5rem; }
 
 .modal-footer {
     display: flex;
@@ -443,19 +461,358 @@
     padding: 1rem 1.5rem;
     border-top: 1px solid var(--border-color);
 }
+
+/* =============================================================================
+   Knowledge Base Tab — Notion-style layout
+   ============================================================================= */
+
+.kb-search-bar {
+    margin-bottom: 1rem;
+}
+
+.kb-search-bar input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.kb-search-bar input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.kb-layout {
+    display: flex;
+    gap: 1.5rem;
+    /* Fill remaining viewport — nav ~60px, container padding 2rem x2,
+       page-header ~60px, stats ~70px, tabs ~50px, search ~55px, footer ~40px */
+    height: calc(100vh - 370px);
+    min-height: 450px;
+}
+
+.kb-sidebar {
+    width: 250px;
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.kb-sidebar-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.kb-sidebar-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.kb-sidebar-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    transition: all 0.15s;
+}
+
+.kb-sidebar-item:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.kb-sidebar-item.active {
+    background: var(--accent-color);
+    color: white;
+}
+
+.kb-sidebar-item.active .kb-sidebar-count { color: rgba(255, 255, 255, 0.8); }
+
+.kb-sidebar-count {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.kb-main {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+.kb-list-header {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.kb-articles-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.kb-article-item {
+    padding: 0.75rem 1rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.kb-article-item:hover {
+    border-color: var(--accent-color);
+    background: var(--bg-tertiary);
+}
+
+.kb-article-title {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.kb-article-meta {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.15rem;
+}
+
+.kb-article-tags {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+    margin-top: 0.3rem;
+}
+
+.kb-article-tag {
+    font-size: 0.7rem;
+    background: var(--bg-tertiary, var(--border-color));
+    color: var(--text-secondary);
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+}
+
+/* ── KB Reader ─────────────────────────────────────────── */
+.kb-breadcrumb {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.kb-breadcrumb a {
+    color: var(--accent-color);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.kb-breadcrumb a:hover { text-decoration: underline; }
+
+.kb-breadcrumb-sep {
+    margin: 0 0.35rem;
+    color: var(--text-secondary);
+    opacity: 0.5;
+}
+
+.kb-reader-body h1:first-child {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.kb-reader-tags {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.kb-reader-body pre {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.kb-reader-body code {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 0.15rem 0.3rem;
+    font-family: 'Monaco', 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: #d4a574;
+}
+
+.kb-reader-body pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+}
+
+.kb-reader-body h1 { font-size: 1.5rem; font-weight: 700; margin: 1.5rem 0 0.75rem 0; color: var(--text-primary); }
+.kb-reader-body h2 { font-size: 1.25rem; font-weight: 600; margin: 1.25rem 0 0.5rem 0; color: var(--text-primary); }
+.kb-reader-body h3 { font-size: 1.1rem; font-weight: 600; margin: 1rem 0 0.4rem 0; color: var(--text-primary); }
+.kb-reader-body strong { font-weight: 600; color: var(--text-primary); }
+.kb-reader-body ul, .kb-reader-body ol { margin-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; }
+.kb-reader-body li { margin-bottom: 0.25rem; line-height: 1.6; }
+.kb-reader-body p { line-height: 1.7; margin-bottom: 0.75rem; }
+.kb-reader-body table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+.kb-reader-body th, .kb-reader-body td { border: 1px solid var(--border-color); padding: 0.5rem 0.75rem; text-align: left; font-size: 0.85rem; }
+.kb-reader-body th { background: var(--bg-primary); font-weight: 600; color: var(--text-primary); }
+.kb-reader-body blockquote { border-left: 3px solid var(--accent-color); margin: 1rem 0; padding: 0.5rem 1rem; color: var(--text-secondary); background: var(--bg-primary); border-radius: 0 4px 4px 0; }
+.kb-reader-body .table-wrapper { overflow-x: auto; margin: 1rem 0; }
+
+/* =============================================================================
+   Responsive
+   ============================================================================= */
+
+@media (max-width: 1200px) {
+    .analyst-stats-bar {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .tools-cards {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .analyst-stats-bar {
+        grid-template-columns: 1fr;
+    }
+    .kb-layout {
+        flex-direction: column;
+        height: auto;
+        min-height: 0;
+    }
+    .kb-sidebar {
+        width: 100%;
+        max-height: 200px;
+    }
+    .kb-main {
+        min-height: 400px;
+    }
+    .tools-cards {
+        grid-template-columns: 1fr;
+    }
+    .tools-cards-compact {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+}
 </style>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
+// ── Helpers ──────────────────────────────────────────────
+function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+let _kbSearchTimer = null;
+
+// ── Knowledge Base State ─────────────────────────────────
+const kb = {
+    loaded: false,
+    collections: [],
+    articles: [],
+    collectionNames: {},
+    selectedCollectionId: null,
+    view: 'list'
+};
+
+// ── Page Init ────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     loadAnalystStats();
+    loadKBArticleCount();
+
+    // Handle URL hash
+    const hash = window.location.hash;
+    if (hash.startsWith('#kb')) {
+        switchAnalystTab('kb');
+    }
+
+    // Escape key handler
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('quick-lookup-modal').style.display === 'flex') {
+            closeQuickLookup();
+        }
+    });
+
+    // Backdrop click
+    document.getElementById('quick-lookup-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'quick-lookup-modal') closeQuickLookup();
+    });
 });
 
+// ── Tab Switching ────────────────────────────────────────
+async function switchAnalystTab(tab) {
+    document.querySelectorAll('.analyst-tab').forEach(b => b.classList.remove('active'));
+    const tabBtn = document.querySelector('.analyst-tab[data-tab="' + tab + '"]');
+    if (tabBtn) tabBtn.classList.add('active');
+
+    document.getElementById('tab-workspace').style.display = tab === 'workspace' ? '' : 'none';
+    document.getElementById('tab-kb').style.display = tab === 'kb' ? '' : 'none';
+
+    if (tab === 'kb' && !kb.loaded) {
+        await loadKB();
+        // Handle hash-based collection selection
+        const hash = window.location.hash;
+        if (hash.startsWith('#kb-')) {
+            const colId = parseInt(hash.substring(4));
+            if (!isNaN(colId)) selectKBCollection(colId);
+        }
+    }
+
+    if (tab === 'kb') {
+        history.replaceState(null, '', '#kb');
+    } else {
+        history.replaceState(null, '', window.location.pathname);
+    }
+}
+
+// ── Analyst Stats ────────────────────────────────────────
 async function loadAnalystStats() {
     try {
-        // Load alert stats
         const alertsResp = await fetch('/api/elasticsearch/alerts?size=0');
         if (alertsResp.ok) {
             const alertsData = await alertsResp.json();
@@ -466,7 +823,6 @@ async function loadAnalystStats() {
     } catch(e) { console.log('Could not load alert stats'); }
 
     try {
-        // Load case stats
         const casesResp = await fetch('/api/cases?status=open&status=investigating');
         if (casesResp.ok) {
             const casesData = await casesResp.json();
@@ -477,7 +833,6 @@ async function loadAnalystStats() {
     } catch(e) { console.log('Could not load case stats'); }
 
     try {
-        // Load observable stats
         const obsResp = await fetch('/api/observables/stats');
         if (obsResp.ok) {
             const obsData = await obsResp.json();
@@ -489,7 +844,6 @@ async function loadAnalystStats() {
     } catch(e) { console.log('Could not load observable stats'); }
 
     try {
-        // Load playbook stats
         const pbResp = await fetch('/api/playbooks?is_active=true');
         if (pbResp.ok) {
             const pbData = await pbResp.json();
@@ -500,7 +854,6 @@ async function loadAnalystStats() {
     } catch(e) { console.log('Could not load playbook stats'); }
 
     try {
-        // Load saved searches stats
         const ssResp = await fetch('/api/saved-searches');
         if (ssResp.ok) {
             const ssData = await ssResp.json();
@@ -513,12 +866,12 @@ function navigateTo(page, tab) {
     let url = '/' + page;
     if (tab) {
         url = '/tools#' + tab;
-        // Store the tab to switch to
         sessionStorage.setItem('tools_tab', tab);
     }
     window.location.href = url;
 }
 
+// ── Quick IOC Lookup ─────────────────────────────────────
 function openQuickIOCLookup() {
     document.getElementById('quick-lookup-modal').style.display = 'flex';
     document.getElementById('quick-ioc-input').focus();
@@ -532,10 +885,7 @@ function closeQuickLookup() {
 
 async function quickLookup() {
     const ioc = document.getElementById('quick-ioc-input').value.trim();
-    if (!ioc) {
-        showToast('Enter an IOC to lookup', 'warning');
-        return;
-    }
+    if (!ioc) { showToast('Enter an IOC to lookup', 'warning'); return; }
 
     const resultsDiv = document.getElementById('quick-lookup-results');
     resultsDiv.innerHTML = '<p>Looking up...</p>';
@@ -546,46 +896,273 @@ async function quickLookup() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ value: ioc })
         });
-
         const data = await response.json();
 
         if (data.error) {
-            resultsDiv.innerHTML = `<p class="error">${data.error}</p>`;
+            resultsDiv.innerHTML = '<p class="error">' + esc(data.error) + '</p>';
         } else if (data.found === false) {
             resultsDiv.innerHTML = '<p class="muted">No threat intelligence found.</p>';
         } else {
             let html = '<div class="lookup-result">';
             if (data.score !== undefined) {
                 const scoreClass = data.score > 70 ? 'badge-danger' : data.score > 40 ? 'badge-warning' : 'badge-success';
-                html += `<p><strong>Risk Score:</strong> <span class="badge ${scoreClass}">${data.score}</span></p>`;
+                html += '<p><strong>Risk Score:</strong> <span class="badge ' + scoreClass + '">' + data.score + '</span></p>';
             }
             if (data.labels && data.labels.length) {
-                html += `<p><strong>Labels:</strong> ${data.labels.join(', ')}</p>`;
+                html += '<p><strong>Labels:</strong> ' + esc(data.labels.join(', ')) + '</p>';
             }
             if (data.description) {
-                html += `<p><strong>Description:</strong> ${data.description}</p>`;
+                html += '<p><strong>Description:</strong> ' + esc(data.description) + '</p>';
             }
-            html += `<p><a href="/observables?search=${encodeURIComponent(ioc)}" class="btn btn-sm">View in Observables</a></p>`;
+            html += '<p><a href="/observables?search=' + encodeURIComponent(ioc) + '" class="btn btn-sm">View in Observables</a></p>';
             html += '</div>';
             resultsDiv.innerHTML = html;
         }
     } catch(e) {
-        resultsDiv.innerHTML = `<p class="error">Lookup failed: ${e.message}</p>`;
+        resultsDiv.innerHTML = '<p class="error">Lookup failed: ' + esc(e.message) + '</p>';
     }
 }
 
-// Close modal on escape key
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        closeQuickLookup();
-    }
-});
+// ── Knowledge Base ───────────────────────────────────────
+async function loadKBArticleCount() {
+    try {
+        const colResp = await fetch('/api/collections');
+        if (!colResp.ok) return;
+        const cols = await colResp.json();
+        const colArray = Array.isArray(cols) ? cols : cols.collections || [];
 
-// Close modal on backdrop click
-document.getElementById('quick-lookup-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'quick-lookup-modal') {
-        closeQuickLookup();
+        const kbParent = colArray.find(c => c.name === 'Knowledge Base');
+        if (!kbParent) {
+            document.getElementById('kb-tab-count').textContent = '0';
+            return;
+        }
+
+        const childIds = new Set();
+        (kbParent.children || []).forEach(c => childIds.add(c.id));
+        colArray.filter(c => c.parent_id === kbParent.id).forEach(c => childIds.add(c.id));
+
+        const docResp = await fetch('/api/documents');
+        if (!docResp.ok) return;
+        const docs = await docResp.json();
+        const allDocs = Array.isArray(docs) ? docs : docs.documents || [];
+
+        const count = allDocs.filter(d => childIds.has(d.collection_id)).length;
+        document.getElementById('kb-tab-count').textContent = count;
+    } catch(e) { console.log('Could not load KB count'); }
+}
+
+async function loadKB() {
+    const sidebarEl = document.getElementById('kb-collections-list');
+    sidebarEl.innerHTML = '<p class="muted">Loading...</p>';
+
+    try {
+        const colResp = await fetch('/api/collections');
+        if (!colResp.ok) throw new Error('Failed to load collections');
+        const cols = await colResp.json();
+        const colArray = Array.isArray(cols) ? cols : cols.collections || [];
+
+        const kbParent = colArray.find(c => c.name === 'Knowledge Base');
+        const kbChildren = [];  // flat list of child collection objects
+        const kbChildIds = new Set();
+        if (kbParent) {
+            (kbParent.children || []).forEach(c => { kbChildIds.add(c.id); kbChildren.push(c); });
+            // Also check flat list in case API returns flat format
+            colArray.filter(c => c.parent_id === kbParent.id && !kbChildIds.has(c.id))
+                .forEach(c => { kbChildIds.add(c.id); kbChildren.push(c); });
+        }
+
+        const docResp = await fetch('/api/documents');
+        if (!docResp.ok) throw new Error('Failed to load documents');
+        const docs = await docResp.json();
+        const allDocs = Array.isArray(docs) ? docs : docs.documents || [];
+
+        kb.articles = kbChildIds.size > 0
+            ? allDocs.filter(d => kbChildIds.has(d.collection_id))
+            : [];
+
+        // Build collection info with article counts
+        const countMap = {};
+        kb.articles.forEach(d => {
+            countMap[d.collection_id] = (countMap[d.collection_id] || 0) + 1;
+        });
+
+        kb.collections = kbChildren
+            .filter(c => countMap[c.id])
+            .map(c => ({ id: c.id, name: c.name, count: countMap[c.id] || 0 }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        kb.collectionNames = {};
+        kb.collections.forEach(c => { kb.collectionNames[c.id] = c.name; });
+
+        kb.loaded = true;
+        document.getElementById('kb-tab-count').textContent = kb.articles.length;
+
+        renderKBSidebar();
+        renderKBArticles();
+    } catch (e) {
+        console.error('KB load error:', e);
+        sidebarEl.innerHTML = '<p class="error">Failed to load knowledge base</p>';
     }
-});
+}
+
+function renderKBSidebar() {
+    const el = document.getElementById('kb-collections-list');
+    let html = '';
+
+    // "All Articles" option
+    const allActive = kb.selectedCollectionId === null;
+    html += '<div class="kb-sidebar-item' + (allActive ? ' active' : '') + '" onclick="selectKBCollection(null)">';
+    html += '<span>All Articles</span>';
+    html += '<span class="kb-sidebar-count">' + kb.articles.length + '</span>';
+    html += '</div>';
+
+    kb.collections.forEach(col => {
+        const active = kb.selectedCollectionId === col.id;
+        html += '<div class="kb-sidebar-item' + (active ? ' active' : '') + '" onclick="selectKBCollection(' + col.id + ')">';
+        html += '<span>' + esc(col.name) + '</span>';
+        html += '<span class="kb-sidebar-count">' + col.count + '</span>';
+        html += '</div>';
+    });
+
+    el.innerHTML = html;
+}
+
+function selectKBCollection(id) {
+    kb.selectedCollectionId = id;
+    kb.view = 'list';
+
+    // Clear search
+    document.getElementById('kb-search-input').value = '';
+
+    // Update URL hash
+    if (id !== null) {
+        history.replaceState(null, '', '#kb-' + id);
+    } else {
+        history.replaceState(null, '', '#kb');
+    }
+
+    renderKBSidebar();
+    renderKBArticles();
+
+    // Ensure list view is shown
+    document.getElementById('kb-list-view').style.display = '';
+    document.getElementById('kb-reader-view').style.display = 'none';
+}
+
+function renderKBArticles() {
+    const headerEl = document.getElementById('kb-list-header');
+    const listEl = document.getElementById('kb-articles-list');
+    const query = document.getElementById('kb-search-input').value.trim().toLowerCase();
+
+    let articles;
+    let showCollection = false;
+
+    if (query) {
+        // Search across all collections
+        articles = kb.articles.filter(a => {
+            const nameMatch = a.name && a.name.toLowerCase().includes(query);
+            const tagMatch = a.tags && a.tags.some(t => t.toLowerCase().includes(query));
+            return nameMatch || tagMatch;
+        });
+        headerEl.textContent = articles.length + ' result' + (articles.length !== 1 ? 's' : '') + ' for "' + document.getElementById('kb-search-input').value.trim() + '"';
+        showCollection = true;
+    } else if (kb.selectedCollectionId !== null) {
+        const col = kb.collections.find(c => c.id === kb.selectedCollectionId);
+        articles = kb.articles.filter(a => a.collection_id === kb.selectedCollectionId);
+        headerEl.textContent = (col ? col.name : 'Articles') + ' (' + articles.length + ')';
+    } else {
+        articles = [...kb.articles];
+        headerEl.textContent = 'All Articles (' + articles.length + ')';
+        showCollection = true;
+    }
+
+    if (!articles.length) {
+        listEl.innerHTML = '<p class="muted">' + (query ? 'No articles matching your search' : 'No articles in this collection') + '</p>';
+        return;
+    }
+
+    articles.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+    listEl.innerHTML = articles.map(doc => {
+        const tags = (doc.tags && doc.tags.length)
+            ? '<div class="kb-article-tags">' + doc.tags.map(t => '<span class="kb-article-tag">' + esc(t) + '</span>').join('') + '</div>'
+            : '';
+        const colLabel = showCollection && kb.collectionNames[doc.collection_id]
+            ? '<div class="kb-article-meta">' + esc(kb.collectionNames[doc.collection_id]) + '</div>'
+            : '';
+        return '<div class="kb-article-item" onclick="viewKBArticle(' + doc.id + ')">'
+            + '<div class="kb-article-title">' + esc(doc.name) + '</div>'
+            + colLabel
+            + tags
+            + '</div>';
+    }).join('');
+}
+
+async function viewKBArticle(docId) {
+    const readerEl = document.getElementById('kb-reader-body');
+    const breadcrumbEl = document.getElementById('kb-breadcrumb');
+
+    // Switch to reader view
+    document.getElementById('kb-list-view').style.display = 'none';
+    document.getElementById('kb-reader-view').style.display = '';
+    kb.view = 'reader';
+
+    readerEl.innerHTML = '<p class="muted">Loading article...</p>';
+
+    try {
+        const response = await fetch('/api/documents/' + docId);
+        if (!response.ok) throw new Error('Failed to load article');
+        const doc = await response.json();
+
+        const colName = kb.collectionNames[doc.collection_id] || 'Unknown';
+        const colId = doc.collection_id;
+
+        // Build breadcrumb
+        breadcrumbEl.innerHTML = '<a onclick="backToKBList()">&#8592; Back to articles</a>'
+            + '<span class="kb-breadcrumb-sep">/</span>'
+            + '<a onclick="selectKBCollection(' + colId + ')">' + esc(colName) + '</a>'
+            + '<span class="kb-breadcrumb-sep">/</span>'
+            + '<span>' + esc(doc.name) + '</span>';
+
+        // Render markdown content
+        let content = doc.rendered_content || doc.content || '';
+
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({ breaks: true, gfm: true });
+            let rendered = marked.parse(content);
+            rendered = rendered.replace(/<table>/g, '<div class="table-wrapper"><table>').replace(/<\/table>/g, '</table></div>');
+            content = rendered;
+        } else {
+            content = '<pre>' + esc(content) + '</pre>';
+        }
+
+        const tags = (doc.tags && doc.tags.length)
+            ? '<div class="kb-reader-tags">' + doc.tags.map(t => '<span class="kb-article-tag">' + esc(t) + '</span>').join('') + '</div>'
+            : '';
+
+        readerEl.innerHTML = '<h1>' + esc(doc.name) + '</h1>'
+            + tags
+            + '<div class="kb-reader-article">' + content + '</div>';
+    } catch (e) {
+        console.error('Error loading article:', e);
+        readerEl.innerHTML = '<p class="error">Failed to load article</p>';
+    }
+}
+
+function backToKBList() {
+    kb.view = 'list';
+    document.getElementById('kb-list-view').style.display = '';
+    document.getElementById('kb-reader-view').style.display = 'none';
+}
+
+function searchKBDebounced() {
+    clearTimeout(_kbSearchTimer);
+    _kbSearchTimer = setTimeout(() => {
+        if (kb.view === 'reader') {
+            backToKBList();
+        }
+        renderKBArticles();
+    }, 200);
+}
 </script>
 {% endblock %}

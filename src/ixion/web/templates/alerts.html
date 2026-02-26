@@ -3095,10 +3095,15 @@ function renderCaseManagementModal(caseData) {
         <div class="case-mgmt-section">
             <h5>Linked Alerts (${alerts.length})</h5>
             ${alerts.length > 0 ? alerts.map(a => `
-                <div class="related-alert-item">
+                <div class="related-alert-item" style="flex-wrap:wrap;">
                     <span class="triage-dot triage-${a.status}"></span>
-                    <span style="font-size:0.8125rem;flex:1;">${escapeHtml(a.es_alert_id)}</span>
+                    <span style="font-size:0.8125rem;flex:1;cursor:pointer;" onclick="showAlertDetail('${escapeHtml(a.es_alert_id)}')">${escapeHtml(a.es_alert_id)}</span>
                     <span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(a.priority || '')}</span>
+                    <div style="display:flex;gap:0.25rem;margin-left:auto;">
+                        <button class="alert-closure-btn benign" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" onclick="showAlertClosureModal('${escapeHtml(a.es_alert_id)}','benign')">&#10003;</button>
+                        <button class="alert-closure-btn escalated" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" onclick="showAlertClosureModal('${escapeHtml(a.es_alert_id)}','escalated')">&#9650;</button>
+                        <button class="alert-closure-btn false-positive" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" onclick="showAlertClosureModal('${escapeHtml(a.es_alert_id)}','false_positive')">&#10007;</button>
+                    </div>
                 </div>
             `).join('') : '<div class="empty-state">No linked alerts</div>'}
         </div>
@@ -3152,6 +3157,14 @@ function renderCaseManagementModal(caseData) {
                 </div>
             </h3>
             <div class="ai-case-summary" id="ai-case-summary-${caseData.id}"></div>
+            ${caseData.status !== 'closed' && caseData.status !== 'resolved' ? `
+            <div class="alert-closure-actions" style="margin:0.75rem 0;padding:0.75rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;">
+                <span style="font-size:0.75rem;color:var(--text-muted);margin-right:0.5rem;">Close Case As:</span>
+                <button class="alert-closure-btn benign" onclick="closeCaseWithAlerts(${caseData.id}, 'benign')">&#10003; Benign</button>
+                <button class="alert-closure-btn escalated" onclick="closeCaseWithAlerts(${caseData.id}, 'escalated')">&#9650; Escalated</button>
+                <button class="alert-closure-btn false-positive" onclick="closeCaseWithAlerts(${caseData.id}, 'false_positive')">&#10007; False Positive</button>
+            </div>
+            ` : ''}
             ${closureInfoHtml}
             <div id="case-fp-banner-${caseData.id}"></div>
             <div class="case-meta-editable">
@@ -3207,6 +3220,99 @@ function renderCaseManagementModal(caseData) {
     // Check for known false positive matches (only for non-closed cases)
     if (caseData.status !== 'closed' && caseData.status !== 'resolved') {
         checkKFPMatches(caseData);
+    }
+}
+
+function closeCaseWithAlerts(caseId, closureType) {
+    const labels = { benign: 'Benign', escalated: 'Escalated', false_positive: 'False Positive' };
+    const label = labels[closureType] || closureType;
+
+    // Build a simple closure modal
+    const existing = document.getElementById('case-closure-quick-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'case-closure-quick-overlay';
+    overlay.className = 'closure-modal-overlay';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+    overlay.innerHTML = `
+        <div class="closure-modal">
+            <h4>Close Case as ${label}</h4>
+            <p style="font-size:0.8125rem;color:var(--text-muted);margin:0.5rem 0;">This will close the case and all linked alerts.</p>
+            <div class="form-group" style="margin:0.75rem 0;">
+                <label style="font-size:0.8125rem;">Reason / Notes</label>
+                <textarea id="case-closure-quick-notes" rows="3" style="width:100%;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);padding:0.5rem;font-size:0.8125rem;" placeholder="Enter closure reason..."></textarea>
+            </div>
+            <div class="closure-actions">
+                <button class="btn btn-secondary" onclick="document.getElementById('case-closure-quick-overlay').remove()">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmCloseCaseWithAlerts(${caseId}, '${closureType}')">Close Case</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('case-closure-quick-notes').focus();
+}
+
+async function confirmCloseCaseWithAlerts(caseId, closureType) {
+    const notes = document.getElementById('case-closure-quick-notes')?.value || '';
+
+    try {
+        // Get case details to find linked alerts
+        const caseResp = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        if (!caseResp.ok) throw new Error('Failed to load case');
+        const caseData = await caseResp.json();
+
+        const alerts = caseData.alerts || [];
+        if (alerts.length > 0) {
+            // Close the first alert — backend will close the case + all linked alerts
+            const firstAlertId = alerts[0].es_alert_id;
+            const resp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(firstAlertId)}/close`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ closure_type: closureType, notes: notes || null }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.detail || 'Failed to close');
+            }
+            const result = await resp.json();
+
+            // Update triage cache for all alerts
+            for (const a of alerts) {
+                if (triageCache[a.es_alert_id]) {
+                    triageCache[a.es_alert_id].status = result.status;
+                }
+            }
+        } else {
+            // No alerts — close case directly via PATCH
+            const closureReasonMap = { benign: 'benign_true_positive', escalated: 'true_positive', false_positive: 'false_positive' };
+            await fetch(`/api/elasticsearch/alerts/cases/${caseId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: 'closed',
+                    closure_reason: closureReasonMap[closureType] || 'not_applicable',
+                    closure_notes: notes || null,
+                }),
+            });
+        }
+
+        // Remove modal
+        const overlay = document.getElementById('case-closure-quick-overlay');
+        if (overlay) overlay.remove();
+        // Also close the case management modal if open
+        const mgmtOverlay = document.getElementById('case-mgmt-overlay');
+        if (mgmtOverlay) mgmtOverlay.remove();
+
+        const labels = { benign: 'Benign', escalated: 'Escalated', false_positive: 'False Positive' };
+        showNotification(`Case closed as ${labels[closureType]} — all alerts closed`, 'success');
+
+        renderAlerts();
+        await loadCases();
+    } catch (e) {
+        console.error('Error closing case:', e);
+        showNotification(e.message || 'Failed to close case', 'error');
     }
 }
 
@@ -3372,7 +3478,8 @@ async function confirmAlertClosure(alertId, closureType) {
 
         // Show notification
         let msg = result.message;
-        if (result.note_added_to_case) msg += ' — note added to case';
+        if (result.case_closed) msg += ' — case closed';
+        else if (result.note_added_to_case) msg += ' — note added to case';
         if (result.kfp_created) msg += ` — KFP "${result.kfp_created.title}" created`;
         showNotification(msg, 'success');
 
@@ -5451,6 +5558,14 @@ async function renderCaseTab(caseId) {
                     </div>
                 </h4>
                 <div class="ai-case-summary" id="ai-case-summary-${c.id}"></div>
+                ${c.status !== 'closed' && c.status !== 'resolved' ? `
+                <div class="alert-closure-actions" style="margin:0.5rem 0;padding:0.5rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;">
+                    <span style="font-size:0.75rem;color:var(--text-muted);margin-right:0.5rem;">Close Case As:</span>
+                    <button class="alert-closure-btn benign" onclick="closeCaseWithAlerts(${c.id}, 'benign')">&#10003; Benign</button>
+                    <button class="alert-closure-btn escalated" onclick="closeCaseWithAlerts(${c.id}, 'escalated')">&#9650; Escalated</button>
+                    <button class="alert-closure-btn false-positive" onclick="closeCaseWithAlerts(${c.id}, 'false_positive')">&#10007; False Positive</button>
+                </div>
+                ` : ''}
                 ${closureInfoHtml}
                 <div id="case-tab-fp-banner-${c.id}"></div>
                 <div class="case-meta">

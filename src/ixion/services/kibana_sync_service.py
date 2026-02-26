@@ -416,8 +416,9 @@ class KibanaSyncService:
                     rules_list = list(triggered_rules) if triggered_rules else None
                     evidence = " ".join(evidence_parts) if evidence_parts else None
 
+                    # Overwrite with standardized format (drop original Kibana description)
                     formatted_description = build_case_description(
-                        description=kibana_case.get("description", ""),
+                        description="",
                         affected_hosts=hosts_list,
                         affected_users=users_list,
                         evidence_summary=evidence,
@@ -426,11 +427,20 @@ class KibanaSyncService:
                         triggered_rules=rules_list,
                     )
 
-                    # Create IXION case with full data
+                    # Build title from alert data (rule name or alert title), matching IXION native style
+                    standardized_title = title  # fallback to Kibana title
+                    if triggered_rules:
+                        standardized_title = next(iter(triggered_rules))
+                    elif source_alert_ids and es_alerts:
+                        first_alert = es_alerts[0]
+                        if first_alert.title:
+                            standardized_title = first_alert.title
+
+                    # Create IXION case with standardized title and description
                     case_number = f"CASE-{next_num:04d}"
                     new_case = AlertCase(
                         case_number=case_number,
-                        title=f"[Kibana] {title}",
+                        title=standardized_title,
                         description=formatted_description,
                         status=status,
                         severity=severity,
@@ -467,7 +477,7 @@ class KibanaSyncService:
                             updated = self.kibana_service.update_case(
                                 case_id=kibana_id,
                                 version=kibana_version,
-                                title=f"[{case_number}] {title}",
+                                title=f"[{case_number}] {standardized_title}",
                                 description=formatted_description,
                             )
                             if updated:

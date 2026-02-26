@@ -587,6 +587,7 @@ let allDocuments = [];
 let allCollections = [];
 let allTags = [];
 let selectedFolderId = null;
+let kbCollectionIds = new Set();
 let moveDocumentId = null;
 let pendingAmendmentContent = '';
 let previewVersionNumber = null;
@@ -595,6 +596,10 @@ let currentDocTags = [];
 async function loadDocuments() {
     try {
         allDocuments = await api.get('/api/documents');
+        // Filter out KB documents
+        if (kbCollectionIds.size > 0) {
+            allDocuments = allDocuments.filter(d => !kbCollectionIds.has(d.collection_id));
+        }
         renderDocuments(filterDocuments());
     } catch (e) {
         document.getElementById('documents-list').innerHTML = '<p class="error">Failed to load documents</p>';
@@ -604,6 +609,13 @@ async function loadDocuments() {
 async function loadCollections() {
     try {
         allCollections = await api.get('/api/collections?flat=true');
+        // Filter out Knowledge Base collections
+        const kbParent = allCollections.find(c => c.name === 'Knowledge Base');
+        if (kbParent) {
+            kbCollectionIds = new Set([kbParent.id]);
+            allCollections.filter(c => c.parent_id === kbParent.id).forEach(c => kbCollectionIds.add(c.id));
+            allCollections = allCollections.filter(c => !kbCollectionIds.has(c.id));
+        }
         renderFolderTree();
         updateFolderSelects();
     } catch (e) {

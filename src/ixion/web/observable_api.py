@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ixion.auth.dependencies import get_db_session, get_current_user
+from ixion.auth.dependencies import get_db_session, get_current_user, require_permission
 from ixion.models.user import User
 from ixion.models.observable import Observable, ObservableType, ThreatLevel
 from ixion.services.observable_service import ObservableService
@@ -201,7 +201,7 @@ async def search_observables(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Search observables with filters."""
     service = ObservableService(session)
@@ -228,7 +228,7 @@ async def search_observables(
 @router.get("/observables/stats")
 async def get_observable_stats(
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> StatsResponse:
     """Get observable statistics for dashboard."""
     service = ObservableService(session)
@@ -241,7 +241,7 @@ async def get_top_observables(
     type: Optional[str] = Query(None, description="Filter by type"),
     limit: int = Query(10, ge=1, le=50),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Get most frequently seen observables."""
     service = ObservableService(session)
@@ -257,7 +257,7 @@ async def get_relationship_graph(
     limit: int = Query(100, ge=10, le=500),
     min_co_occurrence: int = Query(2, ge=1, le=100),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Get relationship graph data for visualization."""
     service = ObservableService(session)
@@ -275,7 +275,7 @@ async def detect_patterns(
     min_occurrences: int = Query(3, ge=2, le=100),
     limit: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Detect patterns of observables that appear together."""
     service = ObservableService(session)
@@ -292,7 +292,7 @@ async def get_time_clusters(
     hours: int = Query(24, ge=1, le=168),
     interval_minutes: int = Query(30, ge=5, le=360),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Get time-based activity clusters."""
     service = ObservableService(session)
@@ -329,7 +329,7 @@ async def get_watchlist(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Get all watched observables."""
     service = ObservableService(session)
@@ -348,7 +348,7 @@ async def get_watchlist_alerts(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Get watchlist alerts."""
     service = ObservableService(session)
@@ -404,7 +404,7 @@ class STIXImportRequest(BaseModel):
 async def import_from_csv(
     data: CSVImportRequest,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:create")),
 ) -> dict:
     """Import observables from CSV data."""
     service = ObservableService(session)
@@ -422,7 +422,7 @@ async def import_from_csv(
 async def import_from_stix(
     data: STIXImportRequest,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:create")),
 ) -> dict:
     """Import observables from STIX 2.1 bundle."""
     service = ObservableService(session)
@@ -438,7 +438,7 @@ async def import_from_stix(
 async def export_to_csv(
     types: Optional[str] = Query(None, description="Comma-separated types to export"),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ):
     """Export observables to CSV format."""
     from fastapi.responses import Response
@@ -475,7 +475,7 @@ class RetentionPolicyRequest(BaseModel):
 async def preview_retention_policy(
     data: RetentionPolicyRequest,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:update")),
 ) -> dict:
     """Preview what would be deleted by retention policy."""
     service = ObservableService(session)
@@ -492,7 +492,7 @@ async def preview_retention_policy(
 async def apply_retention_policy(
     data: RetentionPolicyRequest,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:delete")),
 ) -> dict:
     """Apply retention policy to delete old observables."""
     # Only admins can actually delete
@@ -516,7 +516,7 @@ async def run_scheduled_enrichment(
     max_age_hours: int = Query(168, ge=1, le=720),
     limit: int = Query(100, ge=1, le=500),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:enrich")),
 ) -> dict:
     """Run scheduled enrichment for stale observables."""
     service = ObservableService(session)
@@ -536,7 +536,7 @@ async def run_scheduled_enrichment(
 async def get_observable(
     observable_id: int,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> ObservableDetailResponse:
     """Get observable detail including enrichment data."""
     service = ObservableService(session)
@@ -551,7 +551,7 @@ async def update_observable(
     observable_id: int,
     data: ObservableUpdate,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:update")),
 ) -> ObservableDetailResponse:
     """Update observable tags, notes, or whitelist status."""
     service = ObservableService(session)
@@ -572,7 +572,7 @@ async def update_observable(
 async def delete_observable(
     observable_id: int,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:delete")),
 ) -> dict:
     """Delete an observable."""
     service = ObservableService(session)
@@ -591,7 +591,7 @@ async def get_observable_alerts(
     observable_id: int,
     limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Get all alerts containing this observable."""
     service = ObservableService(session)
@@ -620,7 +620,7 @@ async def get_observable_cases(
     observable_id: int,
     limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Get all cases containing this observable."""
     service = ObservableService(session)
@@ -650,7 +650,7 @@ async def get_co_occurring_observables(
     observable_id: int,
     limit: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Get observables that appear alongside this one."""
     service = ObservableService(session)
@@ -682,7 +682,7 @@ async def enrich_observable(
     observable_id: int,
     source: str = Query("opencti", description="Enrichment source"),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:enrich")),
 ) -> dict:
     """Trigger enrichment for an observable."""
     service = ObservableService(session)
@@ -718,7 +718,7 @@ async def enrich_observable(
 async def get_observable_enrichment(
     observable_id: int,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Get latest enrichment data for an observable."""
     service = ObservableService(session)
@@ -750,7 +750,7 @@ async def get_observable_enrichment(
 async def get_enrichment_history(
     observable_id: int,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Get all enrichment attempts for an observable."""
     service = ObservableService(session)
@@ -781,7 +781,7 @@ async def get_enrichment_history(
 async def enrich_batch(
     data: EnrichBatchRequest,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:enrich")),
 ) -> dict:
     """Enrich multiple observables."""
     service = ObservableService(session)
@@ -804,7 +804,7 @@ async def enrich_batch(
 async def bulk_search(
     data: ObservableSearchRequest,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Search for multiple values at once."""
     service = ObservableService(session)
@@ -818,7 +818,7 @@ async def bulk_search(
 @router.post("/observables/migrate")
 async def migrate_observables(
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:create")),
 ) -> MigrationResponse:
     """Migrate legacy JSON observables to normalized table."""
     service = ObservableService(session)
@@ -831,7 +831,7 @@ async def migrate_observables(
 async def extract_from_alert(
     alert_triage_id: int,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:create")),
 ) -> dict:
     """Extract and link observables from an alert."""
     service = ObservableService(session)
@@ -847,7 +847,7 @@ async def extract_from_alert(
 async def extract_from_case(
     case_id: int,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:create")),
 ) -> dict:
     """Extract and link observables from all alerts in a case."""
     service = ObservableService(session)
@@ -868,7 +868,7 @@ async def add_to_watchlist(
     observable_id: int,
     data: WatchlistAddRequest,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:update")),
 ) -> dict:
     """Add an observable to the watchlist."""
     service = ObservableService(session)
@@ -891,7 +891,7 @@ async def add_to_watchlist(
 async def remove_from_watchlist(
     observable_id: int,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:update")),
 ) -> dict:
     """Remove an observable from the watchlist."""
     service = ObservableService(session)
@@ -910,7 +910,7 @@ async def remove_from_watchlist(
 async def mark_watchlist_alert_read(
     alert_id: int,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:update")),
 ) -> dict:
     """Mark a watchlist alert as read."""
     service = ObservableService(session)
@@ -931,7 +931,7 @@ async def get_observable_timeline(
     observable_id: int,
     limit: int = Query(100, ge=1, le=500),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Get timeline of events for an observable."""
     service = ObservableService(session)
@@ -954,7 +954,7 @@ async def get_observable_heatmap(
     observable_id: int,
     days: int = Query(30, ge=1, le=365),
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:read")),
 ) -> dict:
     """Get activity heatmap for an observable."""
     service = ObservableService(session)
@@ -980,7 +980,7 @@ async def get_observable_heatmap(
 async def enable_auto_enrich(
     observable_id: int,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:update")),
 ) -> dict:
     """Enable auto-enrichment for an observable."""
     service = ObservableService(session)
@@ -996,7 +996,7 @@ async def enable_auto_enrich(
 async def disable_auto_enrich(
     observable_id: int,
     session: Session = Depends(get_db_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("observable:update")),
 ) -> dict:
     """Disable auto-enrichment for an observable."""
     service = ObservableService(session)

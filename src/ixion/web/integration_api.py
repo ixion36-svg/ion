@@ -10,22 +10,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ixion.auth.dependencies import get_db_session, require_admin, get_current_user, get_client_ip
+from ixion.auth.dependencies import get_db_session, require_admin, get_current_user, get_client_ip, require_permission
 from ixion.models.user import User
 
 
-def require_integration_access(user: User = Depends(get_current_user)) -> User:
-    """Require user to have admin or engineering role for integration access."""
-    if user.is_admin:
-        return user
-    # Check for engineering role
-    user_roles = [r.name for r in user.roles]
-    if "engineering" in user_roles:
-        return user
-    raise HTTPException(
-        status_code=403,
-        detail="Integration access requires admin or engineering role",
-    )
+def require_integration_access(user: User = Depends(require_permission("integration:read"))) -> User:
+    """Require user to have integration:read permission."""
+    return user
 from ixion.models.integration import (
     IntegrationType,
     IntegrationStatus,

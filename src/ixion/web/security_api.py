@@ -162,7 +162,7 @@ async def get_security_events(
     event_type: Optional[str] = Query(None, description="Filter by event type"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum events to return"),
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_permission("audit:read")),
+    current_user: User = Depends(require_permission("security:read")),
 ):
     """Get recent security events."""
     security_service = SecurityDetectionService(session)
@@ -191,7 +191,7 @@ async def get_security_events(
 async def get_security_event(
     event_id: int,
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_permission("audit:read")),
+    current_user: User = Depends(require_permission("security:read")),
 ):
     """Get a specific security event."""
     from ixion.storage.security_repository import SecurityEventRepository
@@ -210,7 +210,7 @@ async def update_event_status(
     event_id: int,
     request: UpdateEventStatusRequest,
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_permission("audit:write")),
+    current_user: User = Depends(require_permission("security:manage")),
 ):
     """Update security event status."""
     security_service = SecurityDetectionService(session)
@@ -243,7 +243,7 @@ async def update_event_status(
 async def get_security_statistics(
     hours: int = Query(24, ge=1, le=168, description="Time period in hours"),
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_permission("audit:read")),
+    current_user: User = Depends(require_permission("security:read")),
 ):
     """Get security event statistics."""
     security_service = SecurityDetectionService(session)
@@ -255,7 +255,7 @@ async def get_security_statistics(
 async def get_security_timeline(
     hours: int = Query(24, ge=1, le=168, description="Time period in hours"),
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_permission("audit:read")),
+    current_user: User = Depends(require_permission("security:read")),
 ):
     """Get security event timeline for charts."""
     security_service = SecurityDetectionService(session)
@@ -266,7 +266,7 @@ async def get_security_timeline(
 @router.get("/blocked-ips", response_model=List[BlockedIPResponse])
 async def get_blocked_ips(
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_permission("audit:read")),
+    current_user: User = Depends(require_permission("security:read")),
 ):
     """Get list of blocked IP addresses."""
     security_service = SecurityDetectionService(session)
@@ -289,7 +289,7 @@ async def get_blocked_ips(
 async def block_ip(
     request: BlockIPRequest,
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_permission("audit:write")),
+    current_user: User = Depends(require_permission("security:manage")),
 ):
     """Block an IP address."""
     security_service = SecurityDetectionService(session)
@@ -324,7 +324,7 @@ async def block_ip(
 async def unblock_ip(
     ip_address: str,
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_permission("audit:write")),
+    current_user: User = Depends(require_permission("security:manage")),
 ):
     """Unblock an IP address."""
     security_service = SecurityDetectionService(session)
@@ -352,7 +352,7 @@ async def export_to_siem(
     limit: int = Query(1000, ge=1, le=10000, description="Maximum events to export"),
     mark_exported: bool = Query(True, description="Mark events as exported"),
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_permission("audit:read")),
+    current_user: User = Depends(require_permission("security:read")),
 ):
     """Export security events for SIEM ingestion."""
     siem_service = SIEMExportService(session)
@@ -388,7 +388,7 @@ async def download_events(
     hours: int = Query(24, ge=1, le=720, description="Time period in hours"),
     format: str = Query("json", description="Export format: json or csv"),
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_permission("audit:read")),
+    current_user: User = Depends(require_permission("security:read")),
 ):
     """Download security events as a file."""
     from fastapi.responses import Response
@@ -451,7 +451,7 @@ async def download_events(
 @router.get("/threat-summary")
 async def get_threat_summary(
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_permission("audit:read")),
+    current_user: User = Depends(require_permission("security:read")),
 ):
     """Get a summary of current threats and security posture."""
     security_service = SecurityDetectionService(session)
@@ -509,7 +509,7 @@ async def get_threat_summary(
 
 @router.get("/event-types")
 async def get_event_types(
-    current_user: User = Depends(require_permission("audit:read")),
+    current_user: User = Depends(require_permission("security:read")),
 ):
     """Get available security event types."""
     return {
