@@ -87,6 +87,8 @@ from ixion.models.skills import (
     SOCCMMAssessment,
     KnowledgeArticle,
 )
+from ixion.models.analyst_note import AnalystNote
+from ixion.models.note_folder import NoteFolder
 
 __all__ = [
     "Base",
@@ -168,4 +170,7 @@ __all__ = [
     "TeamCertification",
     "SOCCMMAssessment",
     "KnowledgeArticle",
+    # Analyst notepad
+    "AnalystNote",
+    "NoteFolder",
 ]

@@ -20,6 +20,7 @@ from ixion.web.observable_api import router as observable_router
 from ixion.web.ai_api import router as ai_router
 from ixion.web.kibana_api import router as kibana_router
 from ixion.web.skills_api import router as skills_router
+from ixion.web.notes_api import router as notes_router
 from ixion.core.config import get_config, get_elasticsearch_config
 from ixion.core.logging import setup_logging, get_logger
 from ixion.storage.database import init_db
@@ -136,6 +137,7 @@ app.include_router(observable_router, prefix="/api")
 app.include_router(ai_router)
 app.include_router(kibana_router, prefix="/api/kibana")
 app.include_router(skills_router, prefix="/api/skills")
+app.include_router(notes_router, prefix="/api/notes")
 
 
 @app.on_event("startup")
@@ -397,6 +399,12 @@ async def chat_page(request: Request):
 async def training_page(request: Request):
     """Render the training pathways page."""
     return templates.TemplateResponse("training.html", {"request": request})
+
+
+@app.get("/notes", response_class=HTMLResponse)
+async def notes_page(request: Request):
+    """Render the full-page notes view."""
+    return templates.TemplateResponse("notes.html", {"request": request})
 
 
 def main():

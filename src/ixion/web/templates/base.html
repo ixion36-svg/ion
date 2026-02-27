@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/static/css/style.css?v=0.7.0">
     <link rel="stylesheet" href="/static/css/chat.css?v=0.7.0">
     <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.7.0">
+    <link rel="stylesheet" href="/static/css/quill.snow.css">
     <script>
         // Load theme and mode immediately to prevent flash
         (function() {
@@ -29,6 +30,7 @@
             <li><a href="/extract" class="{% if '/extract' in request.url.path %}active{% endif %}">Extract</a></li>
             <li><a href="/analyst" class="{% if '/analyst' in request.url.path or '/tools' in request.url.path or '/discover' in request.url.path %}active{% endif %}">Analyst</a></li>
             <li><a href="/chat" class="{% if '/chat' in request.url.path %}active{% endif %}">AI Chat</a></li>
+            <li><a href="/notes" class="{% if '/notes' in request.url.path %}active{% endif %}">Notes</a></li>
             <li><a href="/gitlab" class="{% if '/gitlab' in request.url.path %}active{% endif %}">GitLab</a></li>
             <!-- Analyst+ (analyst/lead/engineering/admin) -->
             <li id="nav-alerts-link" style="display: none;">
@@ -69,6 +71,12 @@
             </svg>
             <span class="chat-unread-badge" id="chat-unread-badge" style="display: none;">0</span>
         </button>
+        <!-- Notepad toggle button -->
+        <button class="chat-toggle-btn" id="notepad-toggle-btn" onclick="toggleNotepad()" title="Notepad (Ctrl+Shift+N)">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+        </button>
         <div class="user-menu" id="user-menu">
             <button class="user-menu-btn" onclick="toggleUserDropdown()">
                 <span class="user-avatar" id="user-avatar">?</span>
@@ -87,6 +95,129 @@
         </div>
     </nav>
 
+    <!-- Notepad overlay -->
+    <div id="notepad-overlay" class="np-overlay"></div>
+
+    <!-- Notepad slide-out panel -->
+    <div id="notepad-panel" class="np-panel">
+        <!-- Tabs -->
+        <div class="np-tabs">
+            <button id="np-tab-notes" class="np-tab active">Notes</button>
+            <button id="np-tab-clipboard" class="np-tab">Clipboard</button>
+        </div>
+
+        <!-- Notes content -->
+        <div id="np-content-notes" class="np-content active">
+            <!-- List header -->
+            <div class="np-list-header">
+                <input type="text" id="np-search" class="np-search" placeholder="Search notes...">
+                <button id="np-btn-new" class="np-btn-primary" title="New note">+ New</button>
+            </div>
+            <!-- Note list -->
+            <div id="np-note-list" class="np-note-list">
+                <div class="np-empty">No notes yet</div>
+            </div>
+            <!-- Editor (hidden by default) -->
+            <div id="np-note-editor" class="np-editor" style="display:none;">
+                <div class="np-editor-toolbar">
+                    <button id="np-btn-back" class="np-btn-sm" title="Back to list">&#8592; Back</button>
+                    <span id="np-save-status" class="np-save-status"></span>
+                    <button id="np-btn-pin" class="np-btn-sm" title="Toggle pin">&#128204;</button>
+                    <button id="np-btn-delete" class="np-btn-sm np-btn-danger" title="Delete note">&#128465;</button>
+                </div>
+                <input type="text" id="np-note-title" class="np-title-input" placeholder="Note title...">
+                <div id="notepad-editor" class="np-quill-wrap"></div>
+            </div>
+        </div>
+
+        <!-- Clipboard content -->
+        <div id="np-content-clipboard" class="np-content">
+            <div class="np-clip-header">
+                <input type="text" id="np-clip-input" class="np-search" placeholder="Add text to clipboard...">
+                <button id="np-btn-add-clip" class="np-btn-primary">Add</button>
+                <button id="np-btn-clear-clip" class="np-btn-sm np-btn-danger" title="Clear all">Clear</button>
+            </div>
+            <div id="np-clip-list" class="np-clip-list">
+                <div class="np-empty">Clipboard is empty</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notepad inline styles -->
+    <style>
+    /* ── Overlay ─────────────────────────────────── */
+    .np-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1049;opacity:0;pointer-events:none;transition:opacity .25s}
+    .np-overlay.open{opacity:1;pointer-events:auto}
+
+    /* ── Panel ───────────────────────────────────── */
+    .np-panel{position:fixed;top:0;right:0;width:420px;max-width:95vw;height:100vh;background:var(--bg-primary);border-left:1px solid var(--border-color,#30363d);z-index:1050;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease}
+    .np-panel.open{transform:translateX(0)}
+
+    /* ── Tabs ────────────────────────────────────── */
+    .np-tabs{display:flex;border-bottom:1px solid var(--border-color,#30363d);flex-shrink:0}
+    .np-tab{flex:1;padding:10px;background:transparent;border:none;color:var(--text-secondary,#8b949e);cursor:pointer;font-size:.85rem;font-weight:600;transition:color .15s,border-color .15s;border-bottom:2px solid transparent}
+    .np-tab.active{color:var(--accent,#00e5ff);border-bottom-color:var(--accent,#00e5ff)}
+    .np-tab:hover{color:var(--text-primary,#f0f6fc)}
+
+    /* ── Content panels ─────────────────────────── */
+    .np-content{display:none;flex:1;flex-direction:column;overflow:hidden}
+    .np-content.active{display:flex}
+
+    /* ── List header / search ────────────────────── */
+    .np-list-header,.np-clip-header{display:flex;gap:6px;padding:10px;flex-shrink:0}
+    .np-search{flex:1;padding:6px 10px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:4px;color:var(--text-primary,#f0f6fc);font-size:.82rem}
+    .np-search::placeholder{color:var(--text-secondary,#8b949e)}
+
+    /* ── Buttons ─────────────────────────────────── */
+    .np-btn-primary{padding:6px 12px;background:var(--accent,#00e5ff);color:#000;border:none;border-radius:4px;cursor:pointer;font-size:.82rem;font-weight:600;white-space:nowrap}
+    .np-btn-primary:hover{opacity:.85}
+    .np-btn-sm{padding:4px 8px;background:transparent;border:1px solid var(--border-color,#30363d);border-radius:4px;color:var(--text-secondary,#8b949e);cursor:pointer;font-size:.8rem}
+    .np-btn-sm:hover{color:var(--text-primary,#f0f6fc);border-color:var(--text-secondary,#8b949e)}
+    .np-btn-danger{color:#f85149!important}
+    .np-btn-danger:hover{border-color:#f85149!important}
+    .np-btn-xs{padding:2px 6px;background:transparent;border:1px solid var(--border-color,#30363d);border-radius:3px;color:var(--text-secondary,#8b949e);cursor:pointer;font-size:.75rem}
+    .np-btn-xs:hover{color:var(--text-primary,#f0f6fc)}
+
+    /* ── Note list ───────────────────────────────── */
+    .np-note-list{flex:1;overflow-y:auto;padding:4px 10px}
+    .np-note-item{padding:10px;border-radius:6px;cursor:pointer;margin-bottom:4px;transition:background .15s}
+    .np-note-item:hover{background:var(--bg-secondary,#161b22)}
+    .np-note-item.active{background:var(--bg-secondary,#161b22);border-left:3px solid var(--accent,#00e5ff)}
+    .np-note-item-header{display:flex;align-items:center;gap:6px}
+    .np-note-title{font-size:.85rem;font-weight:600;color:var(--text-primary,#f0f6fc);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .np-pin-icon{font-size:.7rem}
+    .np-note-time{font-size:.72rem;color:var(--text-secondary,#8b949e)}
+    .np-empty{padding:30px 10px;text-align:center;color:var(--text-secondary,#8b949e);font-size:.85rem}
+
+    /* ── Editor ──────────────────────────────────── */
+    .np-editor{display:flex;flex-direction:column;flex:1;overflow:hidden}
+    .np-editor-toolbar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border-color,#30363d);flex-shrink:0}
+    .np-save-status{flex:1;text-align:right;font-size:.72rem;color:var(--text-secondary,#8b949e)}
+    .np-title-input{width:100%;padding:8px 10px;background:transparent;border:none;border-bottom:1px solid var(--border-color,#30363d);color:var(--text-primary,#f0f6fc);font-size:1rem;font-weight:700;flex-shrink:0}
+    .np-title-input:focus{outline:none;border-bottom-color:var(--accent,#00e5ff)}
+
+    /* Quill overrides for dark theme */
+    .np-quill-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column}
+    .np-quill-wrap .ql-toolbar.ql-snow{border:none;border-bottom:1px solid var(--border-color,#30363d);background:var(--bg-secondary,#161b22);flex-shrink:0}
+    .np-quill-wrap .ql-container.ql-snow{border:none;flex:1;overflow-y:auto}
+    .np-quill-wrap .ql-editor{color:var(--text-primary,#f0f6fc);font-size:.85rem;line-height:1.6;min-height:100px}
+    .np-quill-wrap .ql-editor.ql-blank::before{color:var(--text-secondary,#8b949e);font-style:normal}
+    .np-quill-wrap .ql-snow .ql-stroke{stroke:var(--text-secondary,#8b949e)}
+    .np-quill-wrap .ql-snow .ql-fill{fill:var(--text-secondary,#8b949e)}
+    .np-quill-wrap .ql-snow .ql-picker-label{color:var(--text-secondary,#8b949e)}
+    .np-quill-wrap .ql-snow .ql-picker-options{background:var(--bg-primary,#0d1117);border-color:var(--border-color,#30363d)}
+    .np-quill-wrap .ql-snow .ql-picker-item{color:var(--text-primary,#f0f6fc)}
+    .np-quill-wrap .ql-snow button:hover .ql-stroke,
+    .np-quill-wrap .ql-snow .ql-picker-label:hover{color:var(--accent,#00e5ff)}
+    .np-quill-wrap .ql-snow button:hover .ql-stroke{stroke:var(--accent,#00e5ff)}
+
+    /* ── Clipboard ───────────────────────────────── */
+    .np-clip-list{flex:1;overflow-y:auto;padding:4px 10px}
+    .np-clip-item{display:flex;align-items:flex-start;gap:8px;padding:8px;border-radius:6px;margin-bottom:4px;background:var(--bg-secondary,#161b22)}
+    .np-clip-text{flex:1;font-size:.82rem;color:var(--text-primary,#f0f6fc);white-space:pre-wrap;word-break:break-all}
+    .np-clip-actions{display:flex;gap:4px;flex-shrink:0}
+    </style>
+
     <main class="container">
         {% block content %}{% endblock %}
     </main>
@@ -102,6 +233,8 @@
     <script src="/static/js/app.js?v=0.7.0"></script>
     <script src="/static/js/chat.js?v=0.7.0"></script>
     <script src="/static/js/ai-chat.js?v=0.7.0"></script>
+    <script src="/static/js/quill.js"></script>
+    <script src="/static/js/notepad.js?v=0.7.0"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

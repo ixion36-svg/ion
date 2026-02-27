@@ -145,6 +145,16 @@ def _run_migrations(engine: Engine) -> None:
                 conn.execute(text("ALTER TABLE templates ADD COLUMN document_type VARCHAR(50)"))
                 logger.info("Migrated: templates.document_type")
 
+    # Migration for analyst_notes.folder_id
+    if insp.has_table("analyst_notes"):
+        existing = {col["name"] for col in insp.get_columns("analyst_notes")}
+        if "folder_id" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE analyst_notes ADD COLUMN folder_id INTEGER REFERENCES note_folders(id)")
+                )
+                logger.info("Migrated: analyst_notes.folder_id")
+
 
 def init_db(db_path: Optional[Path] = None) -> Engine:
     """Initialize the database, creating all tables."""
