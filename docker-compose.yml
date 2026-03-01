@@ -45,6 +45,10 @@ services:
           cpus: '0.5'
           memory: 256M
 
+    networks:
+      - default
+      - ixion-dev
+
     depends_on:
       - ollama
 
@@ -92,6 +96,11 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
+
+networks:
+  ixion-dev:
+    external: true
+    name: ixion_ixion-net
 
 volumes:
   ixion-data:

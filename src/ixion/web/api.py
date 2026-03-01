@@ -4,6 +4,8 @@ import asyncio
 import json
 import logging
 import re
+
+logger = logging.getLogger(__name__)
 import secrets
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -3057,7 +3059,16 @@ async def get_es_alerts(
             "configured": True,
         }
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning("Elasticsearch connection error fetching alerts: %s", e)
+        return {
+            "alerts": [],
+            "total": 0,
+            "hours": hours,
+            "enabled": True,
+            "configured": True,
+            "connection_error": True,
+            "message": str(e),
+        }
 
 
 @router.get("/elasticsearch/alerts/mitre-stats")
@@ -3112,7 +3123,15 @@ async def get_mitre_stats(
             "time_range_hours": hours,
         }
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning("Elasticsearch connection error fetching MITRE stats: %s", e)
+        return {
+            "techniques": {},
+            "tactics": {},
+            "total_alerts_with_mitre": 0,
+            "time_range_hours": hours,
+            "connection_error": True,
+            "message": str(e),
+        }
 
 
 # ============================================================================

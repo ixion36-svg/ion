@@ -2804,6 +2804,19 @@ async function loadAlerts() {
         }
 
         const data = await response.json();
+
+        // Handle graceful error responses (ES not enabled, not configured, or unreachable)
+        if (data.message) {
+            const friendlyMsg = data.connection_error
+                ? 'Unable to connect to Elasticsearch. Verify the service is running and the connection settings are correct.'
+                : data.message;
+            tbody.innerHTML = `<tr><td colspan="11" class="error">${friendlyMsg}</td></tr>`;
+            document.getElementById('top-hosts-list').innerHTML = '<div class="empty-state">-</div>';
+            document.getElementById('top-rules-list').innerHTML = '<div class="empty-state">-</div>';
+            document.getElementById('top-users-list').innerHTML = '<div class="empty-state">-</div>';
+            return;
+        }
+
         allAlerts = data.alerts || [];
         applyFilters();
         renderThreatBanner();

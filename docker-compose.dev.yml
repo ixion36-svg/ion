@@ -1,0 +1,280 @@
+# Combined development/testing stack for Ixion
+# Start with: docker compose -f docker-compose.dev.yml up -d
+#
+# Services:
+#   Elasticsearch  -> http://localhost:9200  (elastic / testpassword123)
+#   Kibana         -> http://localhost:5601  (elastic / testpassword123)
+#   GitLab CE      -> http://localhost:8929  (root / auto-generated, check logs)
+#   OpenCTI        -> http://localhost:8080  (admin@opencti.local / OpenCTI123!)
+#   DFIR-IRIS      -> http://localhost:8100  (administrator / auto-generated, check logs)
+#   RabbitMQ Mgmt  -> http://localhost:15672 (guest / guest)
+#   MinIO Console  -> http://localhost:9001  (minioadmin / minioadmin123)
+
+services:
+  # ===========================================================================
+  # Elasticsearch - Search and Analytics
+  # ===========================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.0
+    container_name: ixion-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - ELASTIC_PASSWORD=testpassword123
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:testpassword123 http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - ixion-net
+
+  # ===========================================================================
+  # Kibana - Elasticsearch Visualization
+  # ===========================================================================
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.3.0
+    container_name: ixion-kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=testpassword123
+      - XPACK_SECURITY_ENABLED=true
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=a]3Mz9Pq!kL2wXn5vB8cR1tY4uI7oP0sD6fG9hJ2kL5nM8qW1eR4tY7uI0oP3aS6d
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - ixion-net
+
+  # ===========================================================================
+  # GitLab CE - Source Code Management
+  # ===========================================================================
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    container_name: ixion-gitlab
+    restart: unless-stopped
+    hostname: gitlab.local
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://localhost:8929'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2224
+        puma['worker_processes'] = 0
+        sidekiq['max_concurrency'] = 5
+        prometheus_monitoring['enable'] = false
+        gitlab_rails['env'] = {'MALLOC_CONF' => 'dirty_decay_ms:1000,muzzy_decay_ms:1000'}
+    ports:
+      - "8929:8929"
+      - "2224:22"
+    volumes:
+      - gitlab-config:/etc/gitlab
+      - gitlab-logs:/var/log/gitlab
+      - gitlab-data:/var/opt/gitlab
+    shm_size: '256m'
+    networks:
+      - ixion-net
+
+  # ===========================================================================
+  # OpenCTI Dependencies
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: ixion-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - ixion-net
+
+  minio:
+    image: minio/minio:latest
+    container_name: ixion-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - ixion-net
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ixion-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - ixion-net
+
+  # ===========================================================================
+  # OpenCTI Platform
+  # ===========================================================================
+  opencti:
+    image: opencti/platform:6.0.10
+    container_name: ixion-opencti
+    restart: unless-stopped
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=8096
+      - APP__PORT=8080
+      - APP__BASE_URL=http://localhost:8080
+      - APP__ADMIN__EMAIL=admin@opencti.local
+      - APP__ADMIN__PASSWORD=OpenCTI123!
+      - APP__ADMIN__TOKEN=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+      - APP__APP_LOGS__LOGS_LEVEL=info
+      - REDIS__HOSTNAME=redis
+      - REDIS__PORT=6379
+      - ELASTICSEARCH__URL=http://elasticsearch:9200
+      - ELASTICSEARCH__USERNAME=elastic
+      - ELASTICSEARCH__PASSWORD=testpassword123
+      - MINIO__ENDPOINT=minio
+      - MINIO__PORT=9000
+      - MINIO__USE_SSL=false
+      - MINIO__ACCESS_KEY=minioadmin
+      - MINIO__SECRET_KEY=minioadmin123
+      - RABBITMQ__HOSTNAME=rabbitmq
+      - RABBITMQ__PORT=5672
+      - RABBITMQ__USERNAME=guest
+      - RABBITMQ__PASSWORD=guest
+      - SMTP__HOSTNAME=localhost
+      - SMTP__PORT=25
+    ports:
+      - "8080:8080"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    networks:
+      - ixion-net
+
+  opencti-worker:
+    image: opencti/worker:6.0.10
+    container_name: ixion-opencti-worker
+    restart: unless-stopped
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+      - WORKER_LOG_LEVEL=info
+    depends_on:
+      - opencti
+    networks:
+      - ixion-net
+
+  # ===========================================================================
+  # DFIR-IRIS - Incident Response Platform
+  # ===========================================================================
+  iris-db:
+    image: ghcr.io/dfir-iris/iriswebapp_db:v2.4.20
+    container_name: iris-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_ADMIN_USER: iris
+      POSTGRES_ADMIN_PASSWORD: iris_password
+      POSTGRES_DB: iris_db
+    volumes:
+      - iris-pgdata:/var/lib/postgresql/data
+    networks:
+      - ixion-net
+
+  iris-app:
+    image: ghcr.io/dfir-iris/iriswebapp_app:v2.4.20
+    container_name: iris-app
+    restart: unless-stopped
+    command: ["./iris-entrypoint.sh", "iriswebapp"]
+    depends_on:
+      - rabbitmq
+      - iris-db
+    ports:
+      - "8100:8000"
+    environment:
+      DOCKERIZED: 1
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_ADMIN_USER: iris
+      POSTGRES_ADMIN_PASSWORD: iris_password
+      POSTGRES_SERVER: iris-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: iris_db
+      IRIS_SECRET_KEY: iris-secret-key-change-me
+      IRIS_SECURITY_PASSWORD_SALT: iris-salt-change-me
+      CELERY_BROKER: amqp://guest:guest@rabbitmq
+      IRIS_AUTHENTICATION_TYPE: local
+    volumes:
+      - iris-downloads:/home/iris/downloads
+      - iris-templates:/home/iris/user_templates
+      - iris-server-data:/home/iris/server_data
+    networks:
+      - ixion-net
+
+  iris-worker:
+    image: ghcr.io/dfir-iris/iriswebapp_app:v2.4.20
+    container_name: iris-worker
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
+      - iris-db
+      - iris-app
+    command: ["./wait-for-iriswebapp.sh", "iris-app:8000", "./iris-entrypoint.sh", "iris-worker"]
+    environment:
+      DOCKERIZED: 1
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_ADMIN_USER: iris
+      POSTGRES_ADMIN_PASSWORD: iris_password
+      POSTGRES_SERVER: iris-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: iris_db
+      IRIS_SECRET_KEY: iris-secret-key-change-me
+      IRIS_SECURITY_PASSWORD_SALT: iris-salt-change-me
+      CELERY_BROKER: amqp://guest:guest@rabbitmq
+      IRIS_WORKER: 1
+    volumes:
+      - iris-downloads:/home/iris/downloads
+      - iris-templates:/home/iris/user_templates
+      - iris-server-data:/home/iris/server_data
+    networks:
+      - ixion-net
+
+volumes:
+  elasticsearch-data:
+  gitlab-config:
+  gitlab-logs:
+  gitlab-data:
+  redis-data:
+  minio-data:
+  rabbitmq-data:
+  iris-pgdata:
+  iris-downloads:
+  iris-templates:
+  iris-server-data:
+
+networks:
+  ixion-net:
+    driver: bridge
