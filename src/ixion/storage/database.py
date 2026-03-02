@@ -144,6 +144,10 @@ def _run_migrations(engine: Engine) -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE templates ADD COLUMN document_type VARCHAR(50)"))
                 logger.info("Migrated: templates.document_type")
+        if "sections_json" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE templates ADD COLUMN sections_json TEXT"))
+                logger.info("Migrated: templates.sections_json")
 
     # Migration for analyst_notes.folder_id
     if insp.has_table("analyst_notes"):

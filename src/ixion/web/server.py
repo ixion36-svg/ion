@@ -342,6 +342,12 @@ async def alerts_page(request: Request):
     return templates.TemplateResponse("alerts.html", {"request": request})
 
 
+@app.get("/cases", response_class=HTMLResponse)
+async def cases_page(request: Request):
+    """Render the cases management page."""
+    return templates.TemplateResponse("cases.html", {"request": request})
+
+
 @app.get("/observables", response_class=HTMLResponse)
 async def observables_page(request: Request):
     """Render the observables tracking page."""

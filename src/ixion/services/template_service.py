@@ -1,5 +1,6 @@
 """Business logic for template operations."""
 
+import json
 from typing import Optional, List
 from sqlalchemy.orm import Session
 
@@ -8,6 +9,7 @@ from ixion.storage.template_repository import TemplateRepository
 from ixion.storage.version_repository import VersionRepository
 from ixion.storage.collection_repository import CollectionRepository
 from ixion.core.exceptions import TemplateNotFoundError, ValidationError
+from ixion.services.section_types import assemble_jinja2
 
 
 class CollectionNotFoundError(Exception):
@@ -37,6 +39,7 @@ class TemplateService:
         tags: list[str] | None = None,
         collection_id: int | None = None,
         document_type: str | None = None,
+        sections: list[dict] | None = None,
     ) -> Template:
         """Create a new template with initial version."""
         # Validate name
@@ -54,6 +57,10 @@ class TemplateService:
             if not collection:
                 raise CollectionNotFoundError(collection_id)
 
+        # If sections provided, auto-generate content from them
+        if sections is not None:
+            content = assemble_jinja2(sections)
+
         # Create template
         template = self.template_repo.create(
             name=name,
@@ -62,6 +69,10 @@ class TemplateService:
             description=description,
             folder_path=folder_path,
         )
+
+        # Set sections_json if provided
+        if sections is not None:
+            template.sections_json = json.dumps(sections)
 
         # Set document type if specified
         if document_type is not None:
@@ -127,6 +138,7 @@ class TemplateService:
         version_message: str | None = None,
         version_author: str | None = None,
         document_type: str | None = None,
+        sections: list[dict] | None = None,
     ) -> Template:
         """Update a template, optionally creating a new version."""
         template = self.get_template(template_id)
@@ -139,6 +151,11 @@ class TemplateService:
 
         # Store old content for diff
         old_content = template.content
+
+        # If sections provided, auto-generate content from them
+        if sections is not None:
+            content = assemble_jinja2(sections)
+            template.sections_json = json.dumps(sections)
 
         # Update document type if provided
         if document_type is not None:

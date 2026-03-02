@@ -35,6 +35,9 @@
             <li id="nav-alerts-link" style="display: none;">
                 <a href="/alerts" class="{% if '/alerts' in request.url.path and '/audit' not in request.url.path %}active{% endif %}">Alerts</a>
             </li>
+            <li id="nav-cases-link" style="display: none;">
+                <a href="/cases" class="{% if '/cases' in request.url.path %}active{% endif %}">Cases</a>
+            </li>
             <li id="nav-observables-link" style="display: none;">
                 <a href="/observables" class="{% if '/observables' in request.url.path %}active{% endif %}">Observables</a>
             </li>

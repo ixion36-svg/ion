@@ -33,7 +33,13 @@
             <h3>Description</h3>
             <p id="template-description" class="description">-</p>
         </div>
-        <div class="section">
+        <!-- Section cards view (shown when template has sections) -->
+        <div id="sections-view" class="section" style="display:none;">
+            <h3>Sections <span class="badge" id="section-count-badge">0</span></h3>
+            <div id="section-cards-container"></div>
+        </div>
+        <!-- Raw content view (shown for legacy templates) -->
+        <div id="raw-content-view" class="section">
             <h3>Template Content</h3>
             <pre id="template-content" class="code-block">Loading...</pre>
         </div>
@@ -176,6 +182,67 @@
     background: #f8d7da;
     color: #721c24;
 }
+/* Section view cards */
+.sv-card {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    background: var(--bg-secondary);
+    padding: 0.6rem 0.75rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+}
+.sv-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+    background: var(--primary-color);
+    color: white;
+    font-weight: 700;
+    font-size: 0.55rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+.sv-card-body { flex: 1; min-width: 0; }
+.sv-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+.sv-card-type {
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+.sv-card-title {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sv-card-details {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.sv-card-details code {
+    font-size: 0.7rem;
+    background: var(--bg-primary);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+}
+.sv-var-badge {
+    font-size: 0.65rem;
+    background: var(--primary-color);
+    color: white;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-family: monospace;
+}
 </style>
 <script>
 {% raw %}
@@ -205,7 +272,18 @@ async function loadTemplate() {
         currentVersion = currentTemplate.current_version;
         document.getElementById('template-updated').textContent = 'Updated: ' + formatDate(currentTemplate.updated_at);
         document.getElementById('template-description').textContent = currentTemplate.description || 'No description';
-        document.getElementById('template-content').textContent = currentTemplate.content || '(empty)';
+
+        // Show sections or raw content
+        if (currentTemplate.has_sections && currentTemplate.sections) {
+            document.getElementById('sections-view').style.display = 'block';
+            document.getElementById('raw-content-view').style.display = 'none';
+            document.getElementById('section-count-badge').textContent = currentTemplate.sections.length;
+            renderSectionCards(currentTemplate.sections);
+        } else {
+            document.getElementById('sections-view').style.display = 'none';
+            document.getElementById('raw-content-view').style.display = 'block';
+            document.getElementById('template-content').textContent = currentTemplate.content || '(empty)';
+        }
 
         // Tags
         const tagsContainer = document.getElementById('template-tags');
@@ -419,6 +497,102 @@ document.getElementById('rollback-btn').addEventListener('click', function() {
 document.getElementById('version-modal').addEventListener('click', function(e) {
     if (e.target.id === 'version-modal') closeVersionModal();
 });
+
+// Section type labels and icons (subset for display)
+const sectionMeta = {
+    heading: { icon: 'H', label: 'Heading' },
+    text: { icon: 'T', label: 'Text' },
+    table: { icon: 'TBL', label: 'Table' },
+    list: { icon: 'LI', label: 'List' },
+    key_value: { icon: 'KV', label: 'Key-Value' },
+    divider: { icon: '---', label: 'Divider' },
+    metadata_block: { icon: 'META', label: 'Metadata' },
+    signature_block: { icon: 'SIG', label: 'Signatures' },
+    image_placeholder: { icon: 'IMG', label: 'Image' },
+    severity_badge: { icon: 'SEV', label: 'Severity Badge' },
+    ioc_table: { icon: 'IOC', label: 'IOC Table' },
+    timeline: { icon: 'TIME', label: 'Timeline' },
+    mitre_table: { icon: 'ATT', label: 'MITRE ATT&CK' },
+    checklist: { icon: 'CHK', label: 'Checklist' },
+    evidence_block: { icon: 'EVD', label: 'Evidence' },
+};
+
+function renderSectionCards(sections) {
+    const container = document.getElementById('section-cards-container');
+    container.innerHTML = '';
+    sections.forEach(function(s) {
+        const meta = sectionMeta[s.type] || { icon: '?', label: s.type };
+        const c = s.config || {};
+        const card = document.createElement('div');
+        card.className = 'sv-card';
+
+        let title = '';
+        let details = '';
+        switch (s.type) {
+            case 'heading':
+                title = c.text || '';
+                details = 'Level: H' + (c.level || 2);
+                break;
+            case 'text':
+                if (c.variable) {
+                    title = '';
+                    details = '<span class="sv-var-badge">{{ ' + escapeHtml(c.variable_name || '') + ' }}</span>';
+                } else {
+                    title = (c.content || '').substring(0, 80);
+                }
+                break;
+            case 'table':
+                title = (c.columns || []).map(function(col) { return col.name; }).join(', ');
+                if (c.variable) details = '<span class="sv-var-badge">{{ ' + escapeHtml(c.variable_name || '') + ' }}</span>';
+                break;
+            case 'list':
+                title = (c.ordered ? 'Ordered' : 'Unordered') + ' - ' + (c.items || []).length + ' items';
+                if (c.variable) details = '<span class="sv-var-badge">{{ ' + escapeHtml(c.variable_name || '') + ' }}</span>';
+                break;
+            case 'key_value':
+                title = (c.pairs || []).length + ' pairs';
+                if (c.variable) details = '<span class="sv-var-badge">{{ ' + escapeHtml(c.variable_name || '') + ' }}</span>';
+                break;
+            case 'divider':
+                title = 'Horizontal Rule';
+                break;
+            case 'metadata_block':
+                title = (c.fields || []).map(function(f) { return f.label; }).join(', ');
+                break;
+            case 'signature_block':
+                title = (c.roles || []).map(function(r) { return r.role_name; }).join(', ');
+                break;
+            case 'image_placeholder':
+                title = c.caption || '';
+                details = '<code>{{ ' + escapeHtml(c.variable_name || '') + ' }}</code>';
+                break;
+            case 'severity_badge':
+            case 'ioc_table':
+            case 'timeline':
+            case 'mitre_table':
+                details = '<span class="sv-var-badge">{{ ' + escapeHtml(c.variable_name || '') + ' }}</span>';
+                break;
+            case 'checklist':
+                title = (c.items || []).length + ' items';
+                break;
+            case 'evidence_block':
+                title = c.source || '';
+                details = '<code>{{ ' + escapeHtml(c.chain_of_custody_var || 'chain_of_custody') + ' }}</code>';
+                break;
+        }
+
+        card.innerHTML =
+            '<div class="sv-card-icon">' + escapeHtml(meta.icon) + '</div>' +
+            '<div class="sv-card-body">' +
+                '<div class="sv-card-header">' +
+                    '<span class="sv-card-type">' + escapeHtml(meta.label) + '</span>' +
+                    (title ? '<span class="sv-card-title">' + escapeHtml(title) + '</span>' : '') +
+                '</div>' +
+                (details ? '<div class="sv-card-details">' + details + '</div>' : '') +
+            '</div>';
+        container.appendChild(card);
+    });
+}
 {% endraw %}
 </script>
 {% endblock %}
