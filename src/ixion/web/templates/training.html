@@ -1715,175 +1715,6 @@
     padding: 0.4rem 0.3rem; flex-direction: column;
 }
 
-/* =========================================================================
-   SOC-CMM People Domain — Maturity, Certifications, Knowledge Mgmt
-   ========================================================================= */
-
-/* Section divider */
-.cmm-divider {
-    margin: 2.5rem 0 1.5rem 0; padding-top: 1.5rem;
-    border-top: 2px solid var(--border);
-}
-.cmm-divider h2 {
-    font-size: 1.1rem; font-weight: 800; color: var(--text-bright);
-    margin: 0 0 0.25rem 0; display: flex; align-items: center; gap: 0.5rem;
-}
-.cmm-divider p {
-    font-size: 0.78rem; color: var(--text-muted); margin: 0;
-}
-
-/* --- Maturity Assessment --- */
-.cmm-maturity-grid {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 0.75rem; margin: 1rem 0 1.5rem 0;
-}
-@media (max-width: 700px) { .cmm-maturity-grid { grid-template-columns: 1fr; } }
-.cmm-aspect-card {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 0.85rem 1rem;
-}
-.cmm-aspect-header {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 0.5rem;
-}
-.cmm-aspect-name {
-    font-weight: 700; font-size: 0.82rem; color: var(--text-bright);
-}
-.cmm-aspect-level {
-    font-size: 0.62rem; font-weight: 700; padding: 0.15rem 0.5rem;
-    border-radius: 3px; text-transform: uppercase;
-}
-.cmm-lvl-0 { background: rgba(100,100,100,0.15); color: var(--text-muted); }
-.cmm-lvl-1 { background: rgba(239,68,68,0.15); color: #ef4444; }
-.cmm-lvl-2 { background: rgba(249,115,22,0.15); color: #f97316; }
-.cmm-lvl-3 { background: rgba(234,179,8,0.15); color: #eab308; }
-.cmm-lvl-4 { background: rgba(34,197,94,0.12); color: #22c55e; }
-.cmm-lvl-5 { background: rgba(6,182,212,0.12); color: #06b6d4; }
-.cmm-bar-track {
-    height: 8px; background: var(--bg-secondary); border-radius: 4px;
-    overflow: hidden; margin-bottom: 0.35rem; position: relative;
-}
-.cmm-bar-fill {
-    height: 100%; border-radius: 4px; transition: width 0.3s;
-}
-.cmm-bar-target {
-    position: absolute; top: 0; height: 100%; width: 2px;
-    background: var(--text-bright); opacity: 0.5;
-}
-.cmm-aspect-meta {
-    display: flex; gap: 1rem; font-size: 0.68rem; color: var(--text-muted);
-    margin-bottom: 0.3rem;
-}
-.cmm-aspect-notes {
-    font-size: 0.7rem; color: var(--text-secondary); line-height: 1.4;
-    font-style: italic;
-}
-/* Maturity edit controls */
-.cmm-edit-row {
-    display: flex; align-items: center; gap: 0.5rem;
-    margin-top: 0.5rem; flex-wrap: wrap;
-}
-.cmm-rating-btns {
-    display: flex; gap: 2px;
-}
-.cmm-rating-btn {
-    width: 28px; height: 24px; border: 1px solid var(--border);
-    border-radius: 3px; background: var(--bg-secondary);
-    color: var(--text-muted); font-size: 0.68rem; font-weight: 700;
-    cursor: pointer; text-align: center; line-height: 22px;
-    transition: all 0.15s;
-}
-.cmm-rating-btn:hover { border-color: var(--primary); color: var(--primary); }
-.cmm-rating-btn.active {
-    background: var(--primary); color: var(--bg-primary);
-    border-color: var(--primary);
-}
-.cmm-save-btn {
-    padding: 0.35rem 0.8rem; border-radius: var(--radius);
-    background: var(--primary); color: var(--bg-primary); border: none;
-    font-size: 0.72rem; font-weight: 600; cursor: pointer;
-    transition: all 0.15s;
-}
-.cmm-save-btn:hover { filter: brightness(1.15); }
-.cmm-save-btn:disabled { opacity: 0.5; cursor: default; }
-/* Maturity legend */
-.cmm-legend {
-    display: flex; gap: 0.6rem; flex-wrap: wrap;
-    font-size: 0.68rem; color: var(--text-muted); margin-bottom: 0.75rem;
-}
-.cmm-legend-item { display: flex; align-items: center; gap: 0.25rem; }
-.cmm-legend-dot {
-    width: 10px; height: 10px; border-radius: 2px; display: inline-block;
-}
-
-/* --- Certification Table --- */
-.cert-section { margin: 1.5rem 0; }
-.cert-section h3 {
-    font-size: 0.88rem; font-weight: 700; color: var(--text-bright);
-    margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;
-}
-.cert-table-wrap { overflow-x: auto; }
-.cert-table {
-    width: 100%; border-collapse: collapse; font-size: 0.75rem;
-}
-.cert-table th {
-    text-align: left; padding: 0.5rem 0.6rem; font-weight: 700;
-    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;
-    color: var(--text-muted); border-bottom: 2px solid var(--border);
-    background: var(--bg-secondary);
-}
-.cert-table td {
-    padding: 0.45rem 0.6rem; border-bottom: 1px solid rgba(100,100,100,0.12);
-    color: var(--text-secondary);
-}
-.cert-table tr:hover td { background: rgba(100,100,100,0.05); }
-.cert-status {
-    display: inline-block; padding: 0.1rem 0.45rem; border-radius: 3px;
-    font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
-}
-.cert-status.active { background: rgba(34,197,94,0.12); color: #22c55e; }
-.cert-status.expired { background: rgba(239,68,68,0.12); color: #ef4444; }
-.cert-status.planned { background: rgba(59,130,246,0.12); color: #3b82f6; }
-.cert-delete-btn {
-    background: none; border: none; color: var(--text-muted);
-    cursor: pointer; font-size: 0.82rem; padding: 0.15rem 0.35rem;
-}
-.cert-delete-btn:hover { color: #ef4444; }
-/* Cert add form */
-.cert-add-form {
-    display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;
-    margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-secondary);
-    border: 1px solid var(--border); border-radius: var(--radius);
-}
-.cert-field { display: flex; flex-direction: column; gap: 0.2rem; }
-.cert-field label {
-    font-size: 0.62rem; font-weight: 600; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: 0.04em;
-}
-.cert-field select, .cert-field input {
-    padding: 0.35rem 0.5rem; background: var(--bg-card);
-    border: 1px solid var(--border); border-radius: 4px;
-    color: var(--text-bright); font-size: 0.72rem;
-}
-.cert-field input { width: 130px; }
-.cert-add-btn {
-    padding: 0.38rem 0.75rem; background: var(--primary);
-    color: var(--bg-primary); border: none; border-radius: var(--radius);
-    font-size: 0.72rem; font-weight: 600; cursor: pointer;
-}
-.cert-add-btn:hover { filter: brightness(1.15); }
-/* Cert summary cards */
-.cert-summary {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 0.5rem; margin-bottom: 0.75rem;
-}
-.cert-summary-card {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 0.5rem 0.6rem; text-align: center;
-}
-.cert-summary-num { font-size: 1.3rem; font-weight: 800; }
-.cert-summary-label { font-size: 0.62rem; color: var(--text-muted); text-transform: uppercase; }
-
 /* --- Knowledge Management Grid --- */
 .km-section { margin: 1.5rem 0; }
 .km-section h3 {
@@ -2230,7 +2061,7 @@
 
 <div class="training-header">
     <h1>Training &amp; Skills</h1>
-    <p>SOC-CMM aligned career pathways, skills assessment, and team competency management</p>
+    <p>Career pathways, skills assessment, and team competency management</p>
 </div>
 
 <!-- Tab Navigation -->
@@ -2538,9 +2369,7 @@
 <div class="tab-content" id="tab-team">
     <div class="team-subtabs">
         <button class="team-subtab active" onclick="switchTeamSubTab('overview')">Overview</button>
-        <button class="team-subtab" onclick="switchTeamSubTab('cmm')">SOC-CMM</button>
-        <button class="team-subtab" onclick="switchTeamSubTab('certs')">Certifications</button>
-        <button class="team-subtab" onclick="switchTeamSubTab('knowledge')">Knowledge</button>
+        <button class="team-subtab" onclick="switchTeamSubTab('knowledge')">Document Registry</button>
     </div>
 
     <div class="team-sub-content active" id="sub-overview">
@@ -2577,77 +2406,11 @@
         </div>
     </div>
 
-    <div class="team-sub-content" id="sub-cmm">
-        <!-- SOC-CMM People Domain -->
-        <div class="cmm-divider" id="cmm-section">
-            <h2>SOC-CMM People Domain</h2>
-            <p>Maturity assessment aligned to the SOC Capability Maturity Model — People domain (Employees, Roles, People Management, Knowledge Management, Training &amp; Education)</p>
-        </div>
-        <!-- Maturity Assessment -->
-        <div class="cmm-legend" id="cmm-legend">
-            <span class="cmm-legend-item"><span class="cmm-legend-dot cmm-lvl-0" style="background:rgba(100,100,100,0.4);"></span> 0 Non-existent</span>
-            <span class="cmm-legend-item"><span class="cmm-legend-dot cmm-lvl-1" style="background:#ef4444;"></span> 1 Initial</span>
-            <span class="cmm-legend-item"><span class="cmm-legend-dot cmm-lvl-2" style="background:#f97316;"></span> 2 Managed</span>
-            <span class="cmm-legend-item"><span class="cmm-legend-dot cmm-lvl-3" style="background:#eab308;"></span> 3 Defined</span>
-            <span class="cmm-legend-item"><span class="cmm-legend-dot cmm-lvl-4" style="background:#22c55e;"></span> 4 Quantitatively Managed</span>
-            <span class="cmm-legend-item"><span class="cmm-legend-dot cmm-lvl-5" style="background:#06b6d4;"></span> 5 Optimising</span>
-        </div>
-        <div class="cmm-maturity-grid" id="cmm-maturity-grid"></div>
-    </div>
-
-    <div class="team-sub-content" id="sub-certs">
-        <!-- Certifications -->
-        <div class="cert-section" id="cert-section">
-            <h3>Team Certifications (Training &amp; Education)</h3>
-            <div class="cert-summary" id="cert-summary"></div>
-            <div class="cert-table-wrap">
-                <table class="cert-table" id="cert-table">
-                    <thead><tr>
-                        <th>Member</th><th>Certification</th><th>Issuing Body</th>
-                        <th>Obtained</th><th>Expires</th><th>Status</th><th></th>
-                    </tr></thead>
-                    <tbody id="cert-tbody"></tbody>
-                </table>
-            </div>
-            <div class="cert-add-form" id="cert-add-form">
-                <div class="cert-field">
-                    <label>Member</label>
-                    <select id="cert-user-select"></select>
-                </div>
-                <div class="cert-field">
-                    <label>Certification</label>
-                    <input type="text" id="cert-name-input" placeholder="e.g. CISSP">
-                </div>
-                <div class="cert-field">
-                    <label>Issuing Body</label>
-                    <input type="text" id="cert-body-input" placeholder="e.g. ISC2">
-                </div>
-                <div class="cert-field">
-                    <label>Obtained</label>
-                    <input type="date" id="cert-obtained-input">
-                </div>
-                <div class="cert-field">
-                    <label>Expires</label>
-                    <input type="date" id="cert-expiry-input">
-                </div>
-                <div class="cert-field">
-                    <label>Status</label>
-                    <select id="cert-status-select">
-                        <option value="active">Active</option>
-                        <option value="planned">Planned</option>
-                        <option value="expired">Expired</option>
-                    </select>
-                </div>
-                <button class="cert-add-btn" onclick="addCertification()">Add</button>
-            </div>
-        </div>
-    </div>
-
     <div class="team-sub-content" id="sub-knowledge">
         <!-- Knowledge Management — SOC Document Registry -->
         <div class="km-section" id="km-section">
             <h3>SOC Document Registry <span class="km-saved-indicator" id="km-saved-indicator">Saved</span></h3>
-            <p style="font-size:0.72rem;color:var(--text-muted);margin:-0.5rem 0 1rem;">SOC-CMM Knowledge Management — expected documentation, runbooks, and process artefacts</p>
+            <p style="font-size:0.72rem;color:var(--text-muted);margin:-0.5rem 0 1rem;">Expected documentation, runbooks, and process artefacts for your SOC</p>
             <div class="km-progress-wrap" id="km-progress"></div>
             <div class="km-grid" id="km-grid"></div>
         </div>
@@ -4196,21 +3959,19 @@ async function saveAssessment() {
 // Team Skills Tab
 // =========================================================================
 let teamData = null;
-const teamSubLoaded = { overview: false, cmm: false, certs: false, knowledge: false };
+const teamSubLoaded = { overview: false, knowledge: false };
 
 function switchTeamSubTab(subId) {
     document.querySelectorAll('.team-sub-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.team-subtab').forEach(el => el.classList.remove('active'));
     const panel = document.getElementById('sub-' + subId);
     if (panel) panel.classList.add('active');
-    const labelMap = { overview: 'Overview', cmm: 'SOC-CMM', certs: 'Certifications', knowledge: 'Knowledge' };
+    const labelMap = { overview: 'Overview', knowledge: 'Document Registry' };
     document.querySelectorAll('.team-subtab').forEach(b => { if (b.textContent === labelMap[subId]) b.classList.add('active'); });
     // Lazy-load data for this sub-tab
     if (teamData && !teamSubLoaded[subId]) {
         teamSubLoaded[subId] = true;
-        if (subId === 'cmm') loadCMMData();
-        else if (subId === 'certs') loadCertData();
-        else if (subId === 'knowledge') loadKnowledgeData();
+        if (subId === 'knowledge') loadKnowledgeData();
     }
 }
 
@@ -4220,9 +3981,7 @@ async function loadTeamData() {
         // Reload active sub-tab data
         const activeSub = document.querySelector('.team-sub-content.active');
         const subId = activeSub ? activeSub.id.replace('sub-','') : 'overview';
-        if (subId === 'cmm') loadCMMData();
-        else if (subId === 'certs') loadCertData();
-        else if (subId === 'knowledge') loadKnowledgeData();
+        if (subId === 'knowledge') loadKnowledgeData();
         return;
     }
     try {
@@ -4238,7 +3997,6 @@ async function loadTeamData() {
         renderSparklines();
         populateDepartureDropdown();
         teamSubLoaded.overview = true;
-        // Don't load CMM/certs/knowledge until their sub-tab is shown
     } catch (e) {
         console.warn('Team data load failed:', e);
     }
@@ -4545,262 +4303,10 @@ function renderSparklines() {
 }
 
 // =========================================================================
-// SOC-CMM People Domain — Maturity, Certifications, Knowledge Mgmt
+// Document Registry — Knowledge Management
 // =========================================================================
 
-const CMM_ASPECTS = {
-    employees:      { label: 'Employees',           desc: 'Staffing levels, recruitment, retention' },
-    roles:          { label: 'Roles & Hierarchy',    desc: 'Job descriptions, career paths, org structure' },
-    people_mgmt:    { label: 'People Management',    desc: 'Performance reviews, 1-on-1s, wellbeing' },
-    knowledge_mgmt: { label: 'Knowledge Management', desc: 'Documentation, runbooks, knowledge sharing' },
-    training:       { label: 'Training & Education',  desc: 'Skills development, certifications, training plans' },
-};
-
-const CMM_LEVELS = [
-    'Non-existent', 'Initial', 'Managed', 'Defined', 'Quantitatively Managed', 'Optimising'
-];
-
-const CMM_COLORS = ['#666', '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4'];
-
-let cmmData = null;
-let certData = null;
 let knowledgeData = null;
-
-// --- Maturity Assessment ---
-async function loadCMMData() {
-    try {
-        const resp = await fetch('/api/skills/cmm-assessment');
-        if (!resp.ok) return;
-        cmmData = await resp.json();
-        renderCMMMaturity();
-    } catch (e) { console.warn('CMM load failed:', e); }
-}
-
-function renderCMMMaturity() {
-    const container = document.getElementById('cmm-maturity-grid');
-    if (!container || !cmmData) return;
-
-    const assessments = cmmData.assessments || [];
-    const aspectMap = {};
-    assessments.forEach(a => { aspectMap[a.aspect] = a; });
-
-    let html = '';
-    Object.entries(CMM_ASPECTS).forEach(([key, def]) => {
-        const a = aspectMap[key] || { rating: 0, target_rating: 3, notes: '' };
-        const pct = (a.rating / 5) * 100;
-        const targetPct = (a.target_rating / 5) * 100;
-        const color = CMM_COLORS[a.rating] || '#666';
-        const levelLabel = CMM_LEVELS[a.rating] || 'Unknown';
-
-        html += `
-        <div class="cmm-aspect-card" data-aspect="${key}">
-            <div class="cmm-aspect-header">
-                <div>
-                    <div class="cmm-aspect-name">${esc(def.label)}</div>
-                    <div style="font-size:0.65rem;color:var(--text-muted);">${esc(def.desc)}</div>
-                </div>
-                <span class="cmm-aspect-level cmm-lvl-${a.rating}">${a.rating} — ${levelLabel}</span>
-            </div>
-            <div class="cmm-bar-track">
-                <div class="cmm-bar-fill" style="width:${pct}%;background:${color};"></div>
-                <div class="cmm-bar-target" style="left:${targetPct}%;" title="Target: ${a.target_rating}"></div>
-            </div>
-            <div class="cmm-aspect-meta">
-                <span>Current: <strong>${a.rating}</strong>/5</span>
-                <span>Target: <strong>${a.target_rating}</strong>/5</span>
-                <span>Gap: <strong>${Math.max(0, a.target_rating - a.rating)}</strong></span>
-                ${a.assessed_date ? `<span>Assessed: ${a.assessed_date}</span>` : ''}
-            </div>
-            ${a.notes ? `<div class="cmm-aspect-notes">${esc(a.notes)}</div>` : ''}
-            <div class="cmm-edit-row">
-                <span style="font-size:0.65rem;color:var(--text-muted);font-weight:600;">Rate:</span>
-                <div class="cmm-rating-btns">
-                    ${[0,1,2,3,4,5].map(n => `<button class="cmm-rating-btn ${n === a.rating ? 'active' : ''}" onclick="setCMMRating('${key}', ${n}, this)">${n}</button>`).join('')}
-                </div>
-                <span style="font-size:0.65rem;color:var(--text-muted);font-weight:600;margin-left:0.5rem;">Target:</span>
-                <div class="cmm-rating-btns">
-                    ${[0,1,2,3,4,5].map(n => `<button class="cmm-rating-btn ${n === a.target_rating ? 'active' : ''}" onclick="setCMMTarget('${key}', ${n}, this)">${n}</button>`).join('')}
-                </div>
-            </div>
-        </div>`;
-    });
-
-    container.innerHTML = html;
-}
-
-// Temporary store for unsaved changes
-let cmmEdits = {};
-
-function setCMMRating(aspect, rating, btn) {
-    // Visual update
-    const card = btn.closest('.cmm-aspect-card');
-    const ratingBtns = card.querySelector('.cmm-edit-row').querySelectorAll('.cmm-rating-btns')[0].querySelectorAll('.cmm-rating-btn');
-    ratingBtns.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    if (!cmmEdits[aspect]) cmmEdits[aspect] = {};
-    cmmEdits[aspect].rating = rating;
-    saveCMMDebounced();
-}
-
-function setCMMTarget(aspect, target, btn) {
-    const card = btn.closest('.cmm-aspect-card');
-    const targetBtns = card.querySelector('.cmm-edit-row').querySelectorAll('.cmm-rating-btns')[1].querySelectorAll('.cmm-rating-btn');
-    targetBtns.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    if (!cmmEdits[aspect]) cmmEdits[aspect] = {};
-    cmmEdits[aspect].target_rating = target;
-    saveCMMDebounced();
-}
-
-let cmmSaveTimer = null;
-function saveCMMDebounced() {
-    if (cmmSaveTimer) clearTimeout(cmmSaveTimer);
-    cmmSaveTimer = setTimeout(saveCMMData, 800);
-}
-
-async function saveCMMData() {
-    const assessments = [];
-    // Merge current data with edits
-    const currentMap = {};
-    if (cmmData && cmmData.assessments) {
-        cmmData.assessments.forEach(a => { currentMap[a.aspect] = a; });
-    }
-    Object.entries(CMM_ASPECTS).forEach(([key]) => {
-        const current = currentMap[key] || { rating: 0, target_rating: 3 };
-        const edits = cmmEdits[key] || {};
-        assessments.push({
-            aspect: key,
-            rating: edits.rating !== undefined ? edits.rating : current.rating,
-            target_rating: edits.target_rating !== undefined ? edits.target_rating : current.target_rating,
-            notes: current.notes || '',
-        });
-    });
-
-    try {
-        const resp = await fetch('/api/skills/cmm-assessment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assessments }),
-        });
-        if (resp.ok) {
-            cmmEdits = {};
-            // Reload to get fresh data
-            const r2 = await fetch('/api/skills/cmm-assessment');
-            if (r2.ok) { cmmData = await r2.json(); renderCMMMaturity(); }
-        }
-    } catch (e) { console.warn('CMM save failed:', e); }
-}
-
-// --- Certifications ---
-async function loadCertData() {
-    try {
-        const resp = await fetch('/api/skills/certifications');
-        if (!resp.ok) return;
-        certData = await resp.json();
-        renderCertifications();
-    } catch (e) { console.warn('Cert load failed:', e); }
-}
-
-function renderCertifications() {
-    if (!certData || !teamData) return;
-    const certs = certData.certifications || [];
-    const members = teamData.members || [];
-    const memberMap = {};
-    members.forEach(m => { memberMap[m.user_id] = m; });
-
-    // Summary cards
-    const summaryEl = document.getElementById('cert-summary');
-    if (summaryEl) {
-        const active = certs.filter(c => c.status === 'active').length;
-        const expired = certs.filter(c => c.status === 'expired').length;
-        const planned = certs.filter(c => c.status === 'planned').length;
-        const expiringSoon = certs.filter(c => {
-            if (!c.expiry_date || c.status !== 'active') return false;
-            const exp = new Date(c.expiry_date);
-            const soon = new Date(); soon.setDate(soon.getDate() + 90);
-            return exp <= soon;
-        }).length;
-        summaryEl.innerHTML = `
-            <div class="cert-summary-card"><div class="cert-summary-num" style="color:#22c55e;">${active}</div><div class="cert-summary-label">Active</div></div>
-            <div class="cert-summary-card"><div class="cert-summary-num" style="color:#f97316;">${expiringSoon}</div><div class="cert-summary-label">Expiring (90d)</div></div>
-            <div class="cert-summary-card"><div class="cert-summary-num" style="color:#ef4444;">${expired}</div><div class="cert-summary-label">Expired</div></div>
-            <div class="cert-summary-card"><div class="cert-summary-num" style="color:#3b82f6;">${planned}</div><div class="cert-summary-label">Planned</div></div>
-            <div class="cert-summary-card"><div class="cert-summary-num" style="color:var(--text-bright);">${certs.length}</div><div class="cert-summary-label">Total</div></div>
-        `;
-    }
-
-    // Table body
-    const tbody = document.getElementById('cert-tbody');
-    if (tbody) {
-        if (certs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-muted);font-style:italic;text-align:center;">No certifications recorded yet.</td></tr>';
-        } else {
-            tbody.innerHTML = certs.map(c => {
-                const m = memberMap[c.user_id];
-                const name = m ? (m.display_name || m.username) : `User #${c.user_id}`;
-                return `<tr>
-                    <td style="font-weight:600;color:var(--text-bright);">${esc(name)}</td>
-                    <td>${esc(c.cert_name)}</td>
-                    <td>${esc(c.issuing_body || '-')}</td>
-                    <td>${c.obtained_date || '-'}</td>
-                    <td>${c.expiry_date || '-'}</td>
-                    <td><span class="cert-status ${c.status}">${c.status}</span></td>
-                    <td><button class="cert-delete-btn" onclick="deleteCert(${c.id})" title="Delete">&times;</button></td>
-                </tr>`;
-            }).join('');
-        }
-    }
-
-    // Populate user dropdown for add form
-    const sel = document.getElementById('cert-user-select');
-    if (sel && sel.options.length <= 1) {
-        sel.innerHTML = '<option value="">Select...</option>';
-        members.forEach(m => {
-            sel.innerHTML += `<option value="${m.user_id}">${esc(m.display_name || m.username)}</option>`;
-        });
-    }
-}
-
-async function addCertification() {
-    const userId = document.getElementById('cert-user-select').value;
-    const certName = document.getElementById('cert-name-input').value.trim();
-    const body = document.getElementById('cert-body-input').value.trim();
-    const obtained = document.getElementById('cert-obtained-input').value;
-    const expiry = document.getElementById('cert-expiry-input').value;
-    const status = document.getElementById('cert-status-select').value;
-
-    if (!userId || !certName) return;
-
-    try {
-        const resp = await fetch('/api/skills/certifications', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                user_id: parseInt(userId),
-                cert_name: certName,
-                issuing_body: body || null,
-                obtained_date: obtained || null,
-                expiry_date: expiry || null,
-                status: status,
-            }),
-        });
-        if (resp.ok) {
-            // Clear form
-            document.getElementById('cert-name-input').value = '';
-            document.getElementById('cert-body-input').value = '';
-            document.getElementById('cert-obtained-input').value = '';
-            document.getElementById('cert-expiry-input').value = '';
-            loadCertData();
-        }
-    } catch (e) { console.warn('Cert add failed:', e); }
-}
-
-async function deleteCert(certId) {
-    try {
-        await fetch(`/api/skills/certifications/${certId}`, { method: 'DELETE' });
-        loadCertData();
-    } catch (e) { console.warn('Cert delete failed:', e); }
-}
 
 // --- Knowledge Management ---
 let kmTemplateMap = {}; // { templateName: templateId }
@@ -4828,7 +4334,7 @@ async function loadKnowledgeData() {
 
 let kmSaveTimer = null;
 
-// SOC-CMM expected document registry — categorised artefacts
+// SOC document registry — categorised artefacts
 const SOC_DOCUMENTS = {
     'Governance & Charter': [
         { key: 'doc:soc_charter',       name: 'SOC Charter',               desc: 'Mission, scope, authority, and objectives' },
