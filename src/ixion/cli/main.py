@@ -6,7 +6,6 @@ from rich.console import Console
 from ixion.cli.template_commands import template_app
 from ixion.cli.version_commands import version_app
 from ixion.cli.render_commands import render_app
-from ixion.cli.extract_commands import extract_app
 from ixion.cli.document_commands import document_app
 from ixion.cli.collection_commands import collection_app
 
@@ -23,7 +22,6 @@ app.add_typer(template_app, name="template", help="Template management commands"
 app.add_typer(collection_app, name="collection", help="Collection management commands")
 app.add_typer(version_app, name="version", help="Version control commands")
 app.add_typer(render_app, name="render", help="Template rendering commands")
-app.add_typer(extract_app, name="extract", help="Template extraction commands")
 app.add_typer(document_app, name="document", help="Document management commands")
 
 

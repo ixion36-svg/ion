@@ -27,7 +27,6 @@
             <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>
             <li><a href="/templates" class="{% if '/templates' in request.url.path %}active{% endif %}">Templates</a></li>
             <li><a href="/documents" class="{% if '/documents' in request.url.path %}active{% endif %}">Documents</a></li>
-            <li><a href="/extract" class="{% if '/extract' in request.url.path %}active{% endif %}">Extract</a></li>
             <li><a href="/analyst" class="{% if '/analyst' in request.url.path or '/tools' in request.url.path or '/discover' in request.url.path %}active{% endif %}">Analyst</a></li>
             <li><a href="/chat" class="{% if '/chat' in request.url.path %}active{% endif %}">AI Chat</a></li>
             <li><a href="/notes" class="{% if '/notes' in request.url.path %}active{% endif %}">Notes</a></li>

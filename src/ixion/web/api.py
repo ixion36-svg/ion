@@ -46,7 +46,6 @@ from ixion.storage.database import get_session_factory, get_engine
 from ixion.services.template_service import TemplateService
 from ixion.services.version_service import VersionService
 from ixion.services.render_service import RenderService
-from ixion.extraction.template_generator import TemplateGenerator
 from ixion.storage.document_repository import DocumentRepository
 from ixion.models.user import User
 from ixion.auth.service import AuthService
@@ -73,6 +72,7 @@ class TemplateCreate(BaseModel):
     description: Optional[str] = None
     tags: Optional[List[str]] = None
     document_type: Optional[str] = None
+    sections: Optional[List[dict]] = None
 
 
 class TemplateUpdate(BaseModel):
@@ -83,6 +83,7 @@ class TemplateUpdate(BaseModel):
     message: Optional[str] = None
     author: Optional[str] = None
     document_type: Optional[str] = None
+    sections: Optional[List[dict]] = None
 
 
 class RenderRequest(BaseModel):
@@ -1111,6 +1112,7 @@ async def create_template(template: TemplateCreate, services: Services = Depends
             description=template.description,
             tags=template.tags,
             document_type=template.document_type,
+            sections=template.sections,
         )
         services.session.commit()
         return {"id": t.id, "name": t.name, "message": "Template created successfully"}
@@ -1118,11 +1120,26 @@ async def create_template(template: TemplateCreate, services: Services = Depends
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/templates/section-types", dependencies=[Depends(require_permission("template:read"))])
+async def get_section_types():
+    """Return all available section type definitions for the visual editor."""
+    from ixion.services.section_types import SECTION_TYPES
+    return SECTION_TYPES
+
+
 @router.get("/templates/{template_id}", dependencies=[Depends(require_permission("template:read"))])
 async def get_template(template_id: int, services: Services = Depends(get_services)):
     """Get a template by ID."""
     try:
         t = services.template.get_template(template_id)
+        sections_json = None
+        has_sections = False
+        if t.sections_json:
+            try:
+                sections_json = json.loads(t.sections_json)
+                has_sections = True
+            except (json.JSONDecodeError, TypeError):
+                pass
         return {
             "id": t.id,
             "name": t.name,
@@ -1142,6 +1159,8 @@ async def get_template(template_id: int, services: Services = Depends(get_servic
                 }
                 for v in t.variables
             ],
+            "sections": sections_json,
+            "has_sections": has_sections,
             "created_at": t.created_at.isoformat() if t.created_at else None,
             "updated_at": t.updated_at.isoformat() if t.updated_at else None,
         }
@@ -1162,6 +1181,7 @@ async def update_template(template_id: int, template: TemplateUpdate, services: 
             version_message=template.message,
             version_author=template.author,
             document_type=template.document_type,
+            sections=template.sections,
         )
         services.session.commit()
         return {"id": t.id, "name": t.name, "current_version": t.current_version}
@@ -1762,198 +1782,6 @@ async def revert_document_to_version(
         }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-
-# Extract endpoints
-@router.get("/extract/nlp-status")
-async def get_nlp_status():
-    """Check if AI document analysis is available."""
-    from ixion.services.ai_document_service import get_ai_document_service
-
-    service = get_ai_document_service()
-    info = service.get_service_info()
-    ai_available = await service.is_ai_available()
-
-    return {
-        "nlp_available": ai_available,  # Kept for backward compatibility
-        "ai_available": ai_available,
-        "model_name": info.get("backend", "ollama"),
-        "features": info.get("features", []),
-        "soc_patterns": info.get("soc_patterns", []),
-        "soc_pattern_count": info.get("soc_pattern_count", 0),
-        "spellcheck_available": ai_available,
-    }
-
-
-class SpellCheckRequest(BaseModel):
-    text: str
-    ignore_patterns: Optional[List[str]] = None
-
-
-class RewriteRequest(BaseModel):
-    text: str
-    style: str = "professional"
-
-
-class ApplyRewriteRequest(BaseModel):
-    text: str
-    style: str = "professional"
-    apply_all: bool = True
-    selected_indices: Optional[List[int]] = None
-
-
-@router.post("/extract/spell-check", dependencies=[Depends(require_permission("template:create"))])
-async def spell_check_text(request: SpellCheckRequest):
-    """Perform spell checking on text using AI."""
-    from ixion.services.ai_document_service import get_ai_document_service
-
-    service = get_ai_document_service()
-    result = await service.spell_check(request.text)
-
-    return {
-        "original": result.original,
-        "corrected": result.corrected,
-        "misspelled": result.misspelled,
-        "suggestion_count": result.suggestion_count,
-        "spellcheck_available": await service.is_ai_available(),
-    }
-
-
-@router.post("/extract/rewrite-suggestions", dependencies=[Depends(require_permission("template:create"))])
-async def get_rewrite_suggestions(request: RewriteRequest):
-    """Get rewrite suggestions for text using AI."""
-    from ixion.services.ai_document_service import get_ai_document_service
-
-    service = get_ai_document_service()
-    suggestions = await service.suggest_rewrites(request.text, request.style)
-
-    return {
-        "suggestions": suggestions,
-        "suggestion_count": len(suggestions),
-        "style": request.style,
-        "available_styles": ["professional", "concise", "formal", "technical"],
-    }
-
-
-@router.post("/extract/apply-rewrites", dependencies=[Depends(require_permission("template:create"))])
-async def apply_rewrites(request: ApplyRewriteRequest):
-    """Apply rewrite suggestions to text using AI."""
-    from ixion.services.ai_document_service import get_ai_document_service
-
-    service = get_ai_document_service()
-    result = await service.apply_rewrites(request.text, request.style)
-
-    return {
-        "original": result.original,
-        "rewritten": result.rewritten,
-        "changes_applied": result.changes_applied,
-        "changes": result.changes,
-        "style": result.style,
-    }
-
-
-@router.post("/extract/analyze", dependencies=[Depends(require_permission("template:create"))])
-async def analyze_file(
-    file: UploadFile = File(...),
-    confidence: float = 0.5,
-    use_nlp: bool = True,
-):
-    """Analyze a file for patterns using regex and optionally NLP.
-
-    Args:
-        file: The file to analyze.
-        confidence: Minimum confidence threshold (0-1).
-        use_nlp: Whether to use NLP-based entity recognition (requires spaCy).
-    """
-    content = await file.read()
-    text = content.decode("utf-8", errors="ignore")
-
-    generator = TemplateGenerator(use_nlp=use_nlp)
-    matches, variables, stats = generator.analyze(text, confidence)
-
-    return {
-        "filename": file.filename,
-        "original_text": text,
-        "patterns": [
-            {
-                "pattern_type": m.pattern_type,
-                "value": m.value,
-                "confidence": m.confidence,
-                "suggested_name": m.suggested_name,
-            }
-            for m in matches
-        ],
-        "variables": [
-            {
-                "name": v.name,
-                "var_type": v.var_type,
-                "occurrences": v.occurrences,
-                "confidence": v.confidence,
-                "sample_values": v.sample_values,
-            }
-            for v in variables
-        ],
-        "stats": stats,
-    }
-
-
-@router.post("/extract/generate", dependencies=[Depends(require_permission("template:create"))])
-async def generate_template_from_file(
-    file: UploadFile = File(...),
-    confidence: float = 0.7,
-    use_nlp: bool = True,
-    name: Optional[str] = None,
-    save: bool = False,
-    services: Services = Depends(get_services),
-):
-    """Generate a template from a file using regex and optionally NLP.
-
-    Args:
-        file: The file to generate a template from.
-        confidence: Minimum confidence threshold (0-1).
-        use_nlp: Whether to use NLP-based entity recognition.
-        name: Optional name for saving the template.
-        save: Whether to save the template to the database.
-    """
-    content = await file.read()
-    text = content.decode("utf-8", errors="ignore")
-
-    generator = TemplateGenerator(use_nlp=use_nlp)
-    result = generator.generate(text, confidence)
-
-    response = {
-        "template_content": result.content,
-        "original_text": result.original_text,
-        "variables": [
-            {
-                "name": v.name,
-                "var_type": v.var_type,
-                "occurrences": v.occurrences,
-                "confidence": v.confidence,
-            }
-            for v in result.variables
-        ],
-        "replacements_made": result.replacements_made,
-        "nlp_used": result.nlp_used,
-        "detection_stats": result.detection_stats,
-    }
-
-    if save:
-        template_name = name or (file.filename.rsplit(".", 1)[0] + "_template" if file.filename else "generated_template")
-
-        try:
-            t = services.template.create_template(
-                name=template_name,
-                content=result.content,
-                format="markdown",
-            )
-            services.session.commit()
-            response["saved_template_id"] = t.id
-            response["saved_template_name"] = t.name
-        except ValidationError as e:
-            response["save_error"] = str(e)
-
-    return response
 
 
 # Health check endpoint (no auth required)

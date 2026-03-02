@@ -298,11 +298,6 @@ async def documents_page(request: Request):
     return templates.TemplateResponse("documents.html", {"request": request})
 
 
-@app.get("/extract", response_class=HTMLResponse)
-async def extract_page(request: Request):
-    """Render the extraction page."""
-    return templates.TemplateResponse("extract.html", {"request": request})
-
 
 @app.get("/gitlab", response_class=HTMLResponse)
 async def gitlab_page(request: Request):
