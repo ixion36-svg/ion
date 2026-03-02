@@ -6406,15 +6406,16 @@ async def get_recommended_playbooks(
         raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
 
     # Try to get alert details
-    alert = await service.get_alert_by_id(alert_id)
-    if not alert:
+    alerts = await service.get_alerts_by_ids([alert_id])
+    if not alerts:
         raise HTTPException(status_code=404, detail="Alert not found")
+    alert = alerts[0]
 
     # Extract characteristics for matching
     rule_name = alert.rule_name
     severity = alert.severity
-    mitre_techniques = alert.mitre_techniques or []
-    mitre_tactics = alert.mitre_tactics or []
+    mitre_techniques = [alert.mitre_technique_id] if alert.mitre_technique_id else []
+    mitre_tactics = [alert.mitre_tactic_name] if alert.mitre_tactic_name else []
 
     # Find matching playbooks
     repo = PlaybookRepository(session)
@@ -6495,14 +6496,15 @@ async def get_suggested_playbooks(
     if not service.is_configured:
         raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
 
-    alert = await service.get_alert_by_id(alert_id)
-    if not alert:
+    alerts = await service.get_alerts_by_ids([alert_id])
+    if not alerts:
         raise HTTPException(status_code=404, detail="Alert not found")
+    alert = alerts[0]
 
     rule_name = alert.rule_name
     severity = alert.severity
-    mitre_techniques = alert.mitre_techniques or []
-    mitre_tactics = alert.mitre_tactics or []
+    mitre_techniques = [alert.mitre_technique_id] if alert.mitre_technique_id else []
+    mitre_tactics = [alert.mitre_tactic_name] if alert.mitre_tactic_name else []
 
     repo = PlaybookRepository(session)
     suggested = repo.find_suggested_playbooks(

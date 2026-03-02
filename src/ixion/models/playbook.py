@@ -154,16 +154,29 @@ class Playbook(Base, TimestampMixin):
             if severity.lower() not in [s.lower() for s in severities]:
                 return False
 
-        # Check MITRE techniques (any must match)
+        # Check MITRE techniques (any must match, supports sub-technique matching)
         techniques = conditions.get("mitre_techniques", [])
         if techniques and mitre_techniques:
-            if not any(t in techniques for t in mitre_techniques):
+            technique_matched = False
+            for alert_tech in mitre_techniques:
+                for trigger_tech in techniques:
+                    # Exact match or sub-technique match (T1566.002 matches T1566)
+                    if alert_tech == trigger_tech or alert_tech.startswith(trigger_tech + "."):
+                        technique_matched = True
+                        break
+                if technique_matched:
+                    break
+            if not technique_matched:
                 return False
 
-        # Check MITRE tactics (any must match)
+        # Check MITRE tactics (any must match, normalized comparison)
         tactics = conditions.get("mitre_tactics", [])
         if tactics and mitre_tactics:
-            if not any(t in tactics for t in mitre_tactics):
+            # Normalize: "Initial Access" -> "initial-access", "initial-access" unchanged
+            def norm_tactic(t):
+                return t.lower().replace(" ", "-").replace("_", "-")
+            norm_tactics = [norm_tactic(t) for t in tactics]
+            if not any(norm_tactic(t) in norm_tactics for t in mitre_tactics):
                 return False
 
         return True
