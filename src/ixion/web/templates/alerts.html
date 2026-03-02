@@ -24,6 +24,14 @@
     <div class="threat-stats" id="alerts-threat-stats"></div>
 </div>
 
+<!-- Attention Banner -->
+<div class="alert-attn-banner" id="alert-attn-banner" style="display:none;">
+    <span class="alert-attn-icon">&#9888;</span>
+    <span class="alert-attn-label">Needs attention:</span>
+    <div class="alert-attn-chips" id="alert-attn-chips"></div>
+    <button class="alert-attn-dismiss" onclick="dismissAlertAttention()">&times;</button>
+</div>
+
 <!-- Quick Stats Bar -->
 <div class="alert-stats-bar" id="alert-stats-bar">
     <div class="stats-group">
@@ -92,6 +100,20 @@
             <div id="chart-mitre-heatmap" class="mitre-heatmap"></div>
         </div>
     </div>
+    <div class="analytics-row-globe">
+        <div class="analytics-card globe-card">
+            <h4>Attack Origin Map</h4>
+            <div class="globe-container">
+                <img id="globe-map-img" src="/static/img/earth_night.jpg" alt="" draggable="false">
+                <canvas id="globe-canvas"></canvas>
+                <div class="globe-tooltip" id="globe-tooltip" style="display:none;"></div>
+            </div>
+        </div>
+        <div class="analytics-card metrics-card">
+            <h4>Key Metrics</h4>
+            <div class="key-metrics-grid" id="key-metrics-grid"></div>
+        </div>
+    </div>
     <div class="analytics-row">
         <div class="analytics-card">
             <h4>Alert Trend</h4>
@@ -102,14 +124,14 @@
             <div id="chart-severity" class="chart-container chart-container-sm"></div>
         </div>
         <div class="analytics-card">
-            <h4>Status Overview</h4>
-            <div id="chart-status" class="chart-container chart-container-sm"></div>
+            <h4>Triage Status</h4>
+            <div id="chart-triage-status" class="chart-container chart-container-sm"></div>
         </div>
     </div>
-    <div class="analytics-row">
-        <div class="analytics-card analytics-card-wide">
-            <h4>Geographic Origin</h4>
-            <div id="chart-geo" class="chart-container chart-container-geo"></div>
+    <div class="analytics-row-even">
+        <div class="analytics-card">
+            <h4>Top Source Countries</h4>
+            <div id="chart-top-countries" class="chart-container"></div>
         </div>
         <div class="analytics-card">
             <h4>Top Hosts</h4>
@@ -917,12 +939,88 @@
 .donut-segment:hover { opacity: 0.8; }
 .donut-legend { font-size: 11px; fill: currentColor; }
 .donut-legend-value { font-size: 11px; fill: var(--text-muted); }
-/* Geo map */
-.geo-dot { transition: r 0.15s; }
-.geo-dot:hover { r: 5; }
-.geo-land { fill: var(--border); stroke: var(--bg-card); stroke-width: 0.5; opacity: 0.4; }
-.geo-grid-line { stroke: var(--border); stroke-width: 0.3; opacity: 0.2; }
-.geo-empty { font-size: 12px; fill: var(--text-muted); text-anchor: middle; }
+/* Globe & new analytics rows */
+.analytics-row-globe {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+.analytics-row-even {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+.globe-card { padding: 1rem 1rem 0.5rem 1rem; }
+.globe-container {
+    position: relative;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #050d1a;
+    line-height: 0;
+}
+#globe-map-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    pointer-events: none;
+    user-select: none;
+}
+#globe-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+}
+.globe-tooltip {
+    position: absolute;
+    background: rgba(10,20,40,0.92);
+    border: 1px solid rgba(100,180,255,0.3);
+    color: #e0e8f0;
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 10;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+.key-metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    height: 100%;
+}
+.key-metric-tile {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.key-metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.key-metric-label {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+.metric-warn { color: #ff9800; }
+.metric-danger { color: #f44336; }
+.metric-good { color: #4caf50; }
+.metric-info { color: #4fc3f7; }
+.metrics-card { padding: 1rem 1.25rem; }
 /* Horizontal bar chart */
 .hbar-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
 .hbar-label { font-size: 0.75rem; width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
@@ -2600,6 +2698,38 @@ kbd {
 .closure-info-block .closure-info-meta {
     font-size: 0.75rem; color: var(--text-muted); margin-top: 0.375rem;
 }
+
+/* Attention Banner */
+.alert-attn-banner {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 1rem; margin-bottom: 0.75rem;
+    background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 8px; font-size: 0.8125rem;
+}
+.alert-attn-icon { font-size: 1rem; color: #f59e0b; flex-shrink: 0; }
+.alert-attn-label { color: var(--text-secondary); white-space: nowrap; font-weight: 500; }
+.alert-attn-chips { display: flex; gap: 0.375rem; flex-wrap: wrap; flex: 1; }
+.alert-attn-chip {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.2rem 0.625rem; border-radius: 999px; border: none;
+    font-size: 0.75rem; font-weight: 600; cursor: pointer;
+    color: #fff; transition: filter 0.15s;
+}
+.alert-attn-chip:hover { filter: brightness(1.2); }
+.alert-attn-chip-critical { background: #ef4444; }
+.alert-attn-chip-high { background: #f97316; }
+.alert-attn-chip-unassigned { background: #8b5cf6; }
+.alert-attn-chip .chip-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 1.25rem; height: 1.25rem; border-radius: 50%;
+    background: rgba(255,255,255,0.25); font-size: 0.6875rem;
+}
+.alert-attn-dismiss {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 1.125rem; cursor: pointer; padding: 0 0.25rem;
+    line-height: 1; flex-shrink: 0;
+}
+.alert-attn-dismiss:hover { color: var(--text-primary); }
 </style>
 
 {% raw %}
@@ -2617,6 +2747,7 @@ let currentDetailAlert = null;
 let triageCache = {}; // { es_alert_id: { status, priority, case_id, ... } }
 let casesData = []; // cached list of cases
 let selectedAlertIds = new Set(); // for bulk operations
+let alertAttentionDismissed = false;
 
 // Investigation timer state
 let investigationTimerInterval = null;
@@ -2624,6 +2755,13 @@ let investigationStartTime = null;
 let investigationElapsedTime = 0; // in seconds
 let investigationTimerPaused = false;
 let investigationTimerAlertId = null;
+
+// Attack map state
+let mapAnimating = false;
+let mapAnimFrameId = null;
+let mapAttackArcs = [];
+let mapTargetLatLon = null;
+let cachedGeoPoints = null;
 
 const SEVERITY_ORDER = { critical: 1, high: 2, medium: 3, low: 4, info: 5 };
 const TRIAGE_STATUSES = ['open', 'investigating', 'escalated', 'resolved', 'closed', 'false_positive'];
@@ -2981,9 +3119,127 @@ async function loadTriageBatch() {
         // Re-render table with case info
         renderAlerts();
         updateStatsBar();
+        computeAlertAttention();
+        // Refresh triage-dependent analytics panels
+        if (document.getElementById('analytics-dashboard').style.display !== 'none') {
+            renderKeyMetrics();
+            renderTriageStatusDonut();
+        }
     } catch (e) {
         console.error('Error loading batch triage:', e);
     }
+}
+
+// =========================================================================
+// Attention Banner
+// =========================================================================
+function computeAlertAttention() {
+    if (alertAttentionDismissed) return;
+    const now = Date.now();
+    let critStale = 0, highStale = 0, unassigned = 0;
+    const critStaleIds = [], highStaleIds = [], unassignedIds = [];
+
+    for (const a of allAlerts) {
+        const triage = triageCache[a.id];
+        const status = triage?.status || 'open';
+        const isOpen = !status || status === 'open' || status === 'investigating';
+        const ageMs = now - new Date(a.timestamp).getTime();
+
+        if (a.severity === 'critical' && isOpen && ageMs > 2 * 3600000) {
+            critStale++;
+            critStaleIds.push(a.id);
+        }
+        if (a.severity === 'high' && isOpen && ageMs > 4 * 3600000) {
+            highStale++;
+            highStaleIds.push(a.id);
+        }
+        if ((a.severity === 'critical' || a.severity === 'high') && !triage?.assigned_to_id) {
+            const resolved = status === 'resolved' || status === 'closed' || status === 'false_positive';
+            if (!resolved) {
+                unassigned++;
+                unassignedIds.push(a.id);
+            }
+        }
+    }
+
+    const banner = document.getElementById('alert-attn-banner');
+    const chips = document.getElementById('alert-attn-chips');
+
+    if (critStale === 0 && highStale === 0 && unassigned === 0) {
+        banner.style.display = 'none';
+        return;
+    }
+
+    let html = '';
+    if (critStale > 0)
+        html += `<button class="alert-attn-chip alert-attn-chip-critical" onclick="filterToAttention('critical',2)" title="Critical alerts open >2h"><span class="chip-count">${critStale}</span> Critical Stale</button>`;
+    if (highStale > 0)
+        html += `<button class="alert-attn-chip alert-attn-chip-high" onclick="filterToAttention('high',4)" title="High alerts open >4h"><span class="chip-count">${highStale}</span> High Stale</button>`;
+    if (unassigned > 0)
+        html += `<button class="alert-attn-chip alert-attn-chip-unassigned" onclick="filterToAttentionUnassigned()" title="Critical/High with no assignee"><span class="chip-count">${unassigned}</span> Unassigned</button>`;
+
+    chips.innerHTML = html;
+    banner.style.display = 'flex';
+}
+
+function filterToAttention(severity, maxAgeHours) {
+    // Clear existing filters
+    document.getElementById('alert-severity-filter').value = '';
+    document.getElementById('alert-status-filter').value = '';
+    document.getElementById('alert-search').value = '';
+    entityFilter = null;
+    document.getElementById('active-filter-banner').style.display = 'none';
+
+    const now = Date.now();
+    const cutoff = maxAgeHours * 3600000;
+    filteredAlerts = allAlerts.filter(a => {
+        if (a.severity !== severity) return false;
+        const triage = triageCache[a.id];
+        const status = triage?.status || 'open';
+        const isOpen = !status || status === 'open' || status === 'investigating';
+        if (!isOpen) return false;
+        return (now - new Date(a.timestamp).getTime()) > cutoff;
+    });
+
+    applySorting();
+    renderAlerts();
+    renderSidePanels();
+    updateStatsBar();
+    // Show active-filter banner so user can clear
+    const banner = document.getElementById('active-filter-banner');
+    document.getElementById('active-filter-text').textContent =
+        `Showing ${severity} alerts open > ${maxAgeHours}h`;
+    banner.style.display = 'flex';
+}
+
+function filterToAttentionUnassigned() {
+    document.getElementById('alert-severity-filter').value = '';
+    document.getElementById('alert-status-filter').value = '';
+    document.getElementById('alert-search').value = '';
+    entityFilter = null;
+    document.getElementById('active-filter-banner').style.display = 'none';
+
+    filteredAlerts = allAlerts.filter(a => {
+        if (a.severity !== 'critical' && a.severity !== 'high') return false;
+        const triage = triageCache[a.id];
+        const status = triage?.status || 'open';
+        if (status === 'resolved' || status === 'closed' || status === 'false_positive') return false;
+        return !triage?.assigned_to_id;
+    });
+
+    applySorting();
+    renderAlerts();
+    renderSidePanels();
+    updateStatsBar();
+    const banner = document.getElementById('active-filter-banner');
+    document.getElementById('active-filter-text').textContent =
+        'Showing unassigned critical/high alerts';
+    banner.style.display = 'flex';
+}
+
+function dismissAlertAttention() {
+    alertAttentionDismissed = true;
+    document.getElementById('alert-attn-banner').style.display = 'none';
 }
 
 // =========================================================================
@@ -5948,16 +6204,20 @@ function toggleAnalytics() {
     } else {
         dash.style.display = 'none';
         icon.innerHTML = '&#9654;';
+        stopMap();
     }
 }
 
 function renderAnalytics() {
     if (document.getElementById('analytics-dashboard').style.display === 'none') return;
     renderMitreHeatmap();
+    startMap();
+    initMapInteraction();
+    renderKeyMetrics();
     renderTrendChart();
     renderSeverityDonut();
-    renderStatusDonut();
-    renderGeoMap();
+    renderTriageStatusDonut();
+    renderTopCountries();
     renderHBarChart('chart-top-hosts', allAlerts, 'host', '#4fc3f7');
     renderHBarChart('chart-top-rules', allAlerts, 'rule_name', '#ba68c8');
 }
@@ -6213,30 +6473,30 @@ function renderSeverityDonut() {
     ], ['#f44336', '#ff9800', '#ffc107', '#4caf50', '#2196f3']);
 }
 
-function renderStatusDonut() {
-    const counts = { open: 0, acknowledged: 0, resolved: 0 };
+function renderTriageStatusDonut() {
+    const counts = { open: 0, investigating: 0, escalated: 0, resolved: 0, closed: 0, false_positive: 0 };
     allAlerts.forEach(a => {
-        const s = a.status || 'open';
-        if (counts.hasOwnProperty(s)) counts[s]++;
-        else counts.open++;
+        const triage = triageCache[a.id];
+        const status = triage?.status || 'open';
+        if (counts.hasOwnProperty(status)) counts[status]++;
     });
-    renderDonut('chart-status', [
+    renderDonut('chart-triage-status', [
         { label: 'Open', value: counts.open },
-        { label: 'Acknowledged', value: counts.acknowledged },
+        { label: 'Investigating', value: counts.investigating },
+        { label: 'Escalated', value: counts.escalated },
         { label: 'Resolved', value: counts.resolved },
-    ], ['#1976d2', '#f57c00', '#616161']);
+        { label: 'Closed', value: counts.closed },
+        { label: 'False Positive', value: counts.false_positive },
+    ], ['#1976d2', '#ff9800', '#f44336', '#4caf50', '#78909c', '#9e9e9e']);
 }
 
-// --- Geo map: extract lat/lon from raw_data ECS geo fields ---
+// --- Geo points extraction (cached) ---
 function extractGeoPoints() {
     const points = [];
     const seen = new Set();
     allAlerts.forEach(a => {
         if (!a.raw_data) return;
-        // Try multiple ECS geo field paths
-        const geoPaths = [
-            'source.geo', 'destination.geo', 'client.geo', 'server.geo', 'host.geo'
-        ];
+        const geoPaths = ['source.geo', 'destination.geo', 'client.geo', 'server.geo', 'host.geo'];
         geoPaths.forEach(path => {
             const parts = path.split('.');
             let obj = a.raw_data;
@@ -6245,24 +6505,18 @@ function extractGeoPoints() {
                 else { obj = null; break; }
             }
             if (!obj) return;
-
             let lat, lon, country, city;
-            // location can be { lat, lon } or "lat,lon" string
             if (obj.location) {
                 if (typeof obj.location === 'object') {
                     lat = parseFloat(obj.location.lat);
                     lon = parseFloat(obj.location.lon);
                 } else if (typeof obj.location === 'string') {
-                    const parts = obj.location.split(',');
-                    if (parts.length === 2) {
-                        lat = parseFloat(parts[0]);
-                        lon = parseFloat(parts[1]);
-                    }
+                    const lparts = obj.location.split(',');
+                    if (lparts.length === 2) { lat = parseFloat(lparts[0]); lon = parseFloat(lparts[1]); }
                 }
             }
             country = obj.country_name || obj.country_iso_code || '';
             city = obj.city_name || '';
-
             if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) {
                 const key = `${lat.toFixed(1)},${lon.toFixed(1)}`;
                 if (!seen.has(key)) {
@@ -6278,81 +6532,375 @@ function extractGeoPoints() {
     return points;
 }
 
-function renderGeoMap() {
-    const container = document.getElementById('chart-geo');
-    if (!container) return;
+// =========================================================================
+// Attack Origin Map (flat equirectangular + NASA night texture)
+// =========================================================================
+function latLonToMap(lat, lon, w, h) {
+    return { x: ((lon + 180) / 360) * w, y: ((90 - lat) / 180) * h };
+}
 
-    const points = extractGeoPoints();
-    const w = container.clientWidth || 500;
-    const h = container.clientHeight || 230;
+function quadBezierPt(x0, y0, cx, cy, x1, y1, t) {
+    const mt = 1 - t;
+    return { x: mt * mt * x0 + 2 * mt * t * cx + t * t * x1, y: mt * mt * y0 + 2 * mt * t * cy + t * t * y1 };
+}
 
-    let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">`;
-
-    // Simple equirectangular projection background
-    // Draw grid lines for reference
-    const mapPad = { left: 10, right: 10, top: 5, bottom: 5 };
-    const mapW = w - mapPad.left - mapPad.right;
-    const mapH = h - mapPad.top - mapPad.bottom;
-
-    // Background rect
-    svg += `<rect x="${mapPad.left}" y="${mapPad.top}" width="${mapW}" height="${mapH}" fill="rgba(128,128,128,0.03)" rx="4"/>`;
-
-    // Grid lines (every 60 degrees longitude, 30 degrees latitude)
-    for (let lon = -180; lon <= 180; lon += 60) {
-        const x = mapPad.left + ((lon + 180) / 360) * mapW;
-        svg += `<line x1="${x}" y1="${mapPad.top}" x2="${x}" y2="${mapPad.top + mapH}" class="geo-grid-line"/>`;
-    }
-    for (let lat = -60; lat <= 90; lat += 30) {
-        const y = mapPad.top + ((90 - lat) / 180) * mapH;
-        svg += `<line x1="${mapPad.left}" y1="${y}" x2="${mapPad.left + mapW}" y2="${y}" class="geo-grid-line"/>`;
-    }
-
-    // Simplified continent outlines (rough polygons for visual context)
-    const continents = [
-        // North America (simplified)
-        [[-130,50],[-125,60],[-100,65],[-80,60],[-60,48],[-75,30],[-95,18],[-105,20],[-120,35],[-130,50]],
-        // South America
-        [[-80,10],[-60,5],[-35,-5],[-35,-25],[-50,-35],[-70,-55],[-75,-45],[-70,-15],[-80,10]],
-        // Europe
-        [[-10,36],[0,43],[5,48],[10,55],[30,60],[40,55],[30,42],[25,36],[10,38],[-10,36]],
-        // Africa
-        [[-15,15],[-15,30],[10,37],[30,32],[40,12],[50,0],[40,-15],[30,-35],[18,-35],[10,-5],[-15,5],[-15,15]],
-        // Asia
-        [[30,42],[40,55],[60,55],[75,45],[90,28],[100,22],[105,35],[120,40],[130,45],[140,50],[145,45],[130,30],[120,20],[105,10],[95,18],[80,28],[60,40],[30,42]],
-        // Australia
-        [[115,-15],[130,-12],[150,-15],[153,-25],[148,-35],[135,-35],[115,-30],[115,-15]],
-    ];
-
-    continents.forEach(poly => {
-        const pts = poly.map(([lon, lat]) => {
-            const x = mapPad.left + ((lon + 180) / 360) * mapW;
-            const y = mapPad.top + ((90 - lat) / 180) * mapH;
-            return `${x},${y}`;
-        }).join(' ');
-        svg += `<polygon points="${pts}" class="geo-land"/>`;
+function computeArcTarget() {
+    const destCounts = {};
+    allAlerts.forEach(a => {
+        if (!a.raw_data?.destination?.geo?.location) return;
+        const loc = a.raw_data.destination.geo.location;
+        const lat = typeof loc === 'object' ? loc.lat : parseFloat(loc.split(',')[0]);
+        const lon = typeof loc === 'object' ? loc.lon : parseFloat(loc.split(',')[1]);
+        if (isNaN(lat) || isNaN(lon)) return;
+        const key = `${lat.toFixed(0)},${lon.toFixed(0)}`;
+        destCounts[key] = (destCounts[key] || 0) + 1;
     });
+    let bestKey = null, bestCount = 0;
+    for (const [k, c] of Object.entries(destCounts)) {
+        if (c > bestCount) { bestCount = c; bestKey = k; }
+    }
+    if (bestKey) {
+        const [lat, lon] = bestKey.split(',').map(Number);
+        return { lat, lon };
+    }
+    // Default: UK (London)
+    return { lat: 51.5, lon: -0.1 };
+}
 
-    if (points.length === 0) {
-        svg += `<text x="${w / 2}" y="${h / 2}" class="geo-empty">No geo data in alerts</text>`;
-        svg += `<text x="${w / 2}" y="${h / 2 + 16}" class="geo-empty" style="font-size:10px;opacity:0.6;">Geo fields (source.geo, destination.geo) are extracted from ECS alert data</text>`;
-    } else {
-        // Plot points
-        const maxCount = Math.max(1, ...points.map(p => p.count));
-        points.forEach(p => {
-            const x = mapPad.left + ((p.lon + 180) / 360) * mapW;
-            const y = mapPad.top + ((90 - p.lat) / 180) * mapH;
-            const r = 3 + (p.count / maxCount) * 5;
-            const color = p.severity === 'critical' ? '#f44336' : p.severity === 'high' ? '#ff9800' : '#4fc3f7';
-            svg += `<circle cx="${x}" cy="${y}" r="${r}" fill="${color}" opacity="0.7" class="geo-dot"><title>${p.city ? p.city + ', ' : ''}${p.country} (${p.count} alert${p.count > 1 ? 's' : ''})</title></circle>`;
+function buildMapArcs() {
+    mapAttackArcs = [];
+    const pts = cachedGeoPoints || [];
+    if (pts.length === 0) return;
+    const target = computeArcTarget();
+    mapTargetLatLon = target;
+    pts.forEach((p, i) => {
+        const dist = Math.sqrt((p.lat - target.lat) ** 2 + (p.lon - target.lon) ** 2);
+        if (dist < 2) return;
+        mapAttackArcs.push({
+            srcLat: p.lat, srcLon: p.lon,
+            severity: p.severity, count: p.count,
+            city: p.city, country: p.country,
+            phase: (i * 0.17) % 1,
+        });
+    });
+}
+
+function renderMap() {
+    const canvas = document.getElementById('globe-canvas');
+    const img = document.getElementById('globe-map-img');
+    if (!canvas || !img || !img.clientWidth) return;
+
+    const w = img.clientWidth;
+    const h = img.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const now = performance.now();
+    const target = mapTargetLatLon;
+
+    // Draw arcs
+    if (target) {
+        const tp = latLonToMap(target.lat, target.lon, w, h);
+        mapAttackArcs.forEach(arc => {
+            const sp = latLonToMap(arc.srcLat, arc.srcLon, w, h);
+            const color = arc.severity === 'critical' ? '#f44336' : arc.severity === 'high' ? '#ff9800' : '#4fc3f7';
+
+            // Bezier control point arched above midpoint
+            const mx = (sp.x + tp.x) / 2;
+            const my = (sp.y + tp.y) / 2;
+            const dist = Math.sqrt((sp.x - tp.x) ** 2 + (sp.y - tp.y) ** 2);
+            const cpx = mx;
+            const cpy = my - dist * 0.35;
+
+            // Arc trail (static, subtle)
+            ctx.beginPath();
+            ctx.moveTo(sp.x, sp.y);
+            ctx.quadraticCurveTo(cpx, cpy, tp.x, tp.y);
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.12;
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            // Bright near-pulse section
+            const t = ((now * 0.0004 + arc.phase) % 1);
+            ctx.beginPath();
+            const segLen = 0.12;
+            const tStart = Math.max(0, t - segLen);
+            for (let s = tStart; s <= t; s += 0.01) {
+                const pt = quadBezierPt(sp.x, sp.y, cpx, cpy, tp.x, tp.y, s);
+                s === tStart ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.5;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Pulse dot
+            const pp = quadBezierPt(sp.x, sp.y, cpx, cpy, tp.x, tp.y, t);
+            ctx.globalAlpha = 1;
+            ctx.save();
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 6;
+            ctx.beginPath();
+            ctx.arc(pp.x, pp.y, 2, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.restore();
         });
 
-        // Summary
-        const countries = [...new Set(points.map(p => p.country).filter(Boolean))];
-        svg += `<text x="${w - mapPad.right - 4}" y="${h - 4}" class="chart-value" text-anchor="end">${points.length} locations, ${countries.length} countries</text>`;
+        // Target marker (green diamond)
+        ctx.globalAlpha = 1;
+        ctx.save();
+        ctx.shadowColor = '#4caf50';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#4caf50';
+        const sz = 6;
+        ctx.beginPath();
+        ctx.moveTo(tp.x, tp.y - sz);
+        ctx.lineTo(tp.x + sz * 0.6, tp.y);
+        ctx.lineTo(tp.x, tp.y + sz);
+        ctx.lineTo(tp.x - sz * 0.6, tp.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(76,175,80,0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(tp.x, tp.y, sz + 5, 0, Math.PI * 2);
+        ctx.stroke();
     }
 
-    svg += '</svg>';
-    container.innerHTML = svg;
+    // Source dots
+    const pts = cachedGeoPoints || [];
+    pts.forEach(p => {
+        const mp = latLonToMap(p.lat, p.lon, w, h);
+        const color = p.severity === 'critical' ? '#f44336' : p.severity === 'high' ? '#ff9800' : '#4fc3f7';
+        const pulse = 1 + 0.25 * Math.sin(now * 0.003 + p.lat * 3);
+        const r = (2.5 + Math.min(p.count, 10) * 0.5) * pulse;
+
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(mp.x, mp.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.85;
+        ctx.fill();
+        ctx.restore();
+
+        // Bright core
+        ctx.beginPath();
+        ctx.arc(mp.x, mp.y, r * 0.35, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = 0.7;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    });
+
+    // Legend (bottom-left)
+    if (pts.length > 0) {
+        const countries = [...new Set(pts.map(p => p.country).filter(Boolean))];
+        ctx.font = '10px monospace';
+        ctx.fillStyle = 'rgba(200,220,240,0.6)';
+        ctx.fillText(`${pts.length} sources, ${countries.length} countries`, 8, h - 6);
+    }
+}
+
+function mapAnimLoop() {
+    if (!mapAnimating) return;
+    renderMap();
+    mapAnimFrameId = requestAnimationFrame(mapAnimLoop);
+}
+
+function startMap() {
+    cachedGeoPoints = extractGeoPoints();
+    buildMapArcs();
+    if (!mapAnimating) {
+        mapAnimating = true;
+        mapAnimLoop();
+    }
+}
+
+function stopMap() {
+    mapAnimating = false;
+    if (mapAnimFrameId) {
+        cancelAnimationFrame(mapAnimFrameId);
+        mapAnimFrameId = null;
+    }
+}
+
+function initMapInteraction() {
+    const canvas = document.getElementById('globe-canvas');
+    if (!canvas || canvas._mapInited) return;
+    canvas._mapInited = true;
+
+    canvas.addEventListener('mousemove', handleMapHover);
+    canvas.addEventListener('mouseleave', () => {
+        document.getElementById('globe-tooltip').style.display = 'none';
+    });
+}
+
+function handleMapHover(e) {
+    const canvas = document.getElementById('globe-canvas');
+    const tooltip = document.getElementById('globe-tooltip');
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const w = rect.width;
+    const h = rect.height;
+
+    let closest = null, closestDist = 15;
+    const pts = cachedGeoPoints || [];
+    pts.forEach(p => {
+        const mp = latLonToMap(p.lat, p.lon, w, h);
+        const dist = Math.sqrt((mp.x - mx) ** 2 + (mp.y - my) ** 2);
+        if (dist < closestDist) { closestDist = dist; closest = p; }
+    });
+
+    if (closest) {
+        const loc = closest.city ? `${closest.city}, ${closest.country}` : closest.country || 'Unknown';
+        const sevColor = closest.severity === 'critical' ? '#f44336' : closest.severity === 'high' ? '#ff9800' : '#4fc3f7';
+        tooltip.innerHTML = `<strong>${escapeHtml(loc)}</strong><br>${closest.count} alert${closest.count > 1 ? 's' : ''} <span style="color:${sevColor};">${closest.severity}</span>`;
+        tooltip.style.display = 'block';
+        tooltip.style.left = (mx + 14) + 'px';
+        tooltip.style.top = (my - 10) + 'px';
+    } else {
+        tooltip.style.display = 'none';
+    }
+}
+
+// =========================================================================
+// Key Metrics Panel
+// =========================================================================
+function formatDuration(ms) {
+    if (ms < 0 || !isFinite(ms)) return '-';
+    const mins = Math.floor(ms / 60000);
+    const hrs = Math.floor(mins / 60);
+    const days = Math.floor(hrs / 24);
+    if (days > 0) return `${days}d ${hrs % 24}h`;
+    if (hrs > 0) return `${hrs}h ${mins % 60}m`;
+    return `${mins}m`;
+}
+
+function renderKeyMetrics() {
+    const container = document.getElementById('key-metrics-grid');
+    if (!container) return;
+
+    const now = Date.now();
+    const hours = parseInt(document.getElementById('alert-time-range')?.value) || 24;
+    const windowMs = hours * 3600000;
+
+    // MTTR: mean time to resolve (from alert timestamp to triage resolved/closed timestamp)
+    let resolvedTimes = [];
+    allAlerts.forEach(a => {
+        const triage = triageCache[a.id];
+        if (triage && (triage.status === 'resolved' || triage.status === 'closed') && triage.updated_at) {
+            const alertTime = new Date(a.timestamp).getTime();
+            const resolveTime = new Date(triage.updated_at).getTime();
+            if (resolveTime > alertTime) resolvedTimes.push(resolveTime - alertTime);
+        }
+    });
+    const mttr = resolvedTimes.length > 0 ? resolvedTimes.reduce((a, b) => a + b, 0) / resolvedTimes.length : -1;
+    const mttrStr = mttr >= 0 ? formatDuration(mttr) : '-';
+    const mttrClass = mttr < 0 ? 'metric-info' : mttr < 3600000 ? 'metric-good' : mttr < 14400000 ? 'metric-warn' : 'metric-danger';
+
+    // Alerts per hour
+    const velocity = hours > 0 ? (allAlerts.length / hours).toFixed(1) : '0';
+    const velClass = parseFloat(velocity) > 20 ? 'metric-danger' : parseFloat(velocity) > 10 ? 'metric-warn' : 'metric-info';
+
+    // Unassigned critical/high
+    let unassignedCritHigh = 0;
+    allAlerts.forEach(a => {
+        if (a.severity !== 'critical' && a.severity !== 'high') return;
+        const triage = triageCache[a.id];
+        const status = triage?.status || 'open';
+        if (status === 'resolved' || status === 'closed' || status === 'false_positive') return;
+        if (!triage?.assigned_to_id) unassignedCritHigh++;
+    });
+    const unassClass = unassignedCritHigh > 5 ? 'metric-danger' : unassignedCritHigh > 0 ? 'metric-warn' : 'metric-good';
+
+    // Case conversion rate
+    const triaged = Object.keys(triageCache).length;
+    const withCase = Object.values(triageCache).filter(t => t.case_id).length;
+    const caseRate = triaged > 0 ? ((withCase / triaged) * 100).toFixed(0) : '0';
+    const caseClass = 'metric-info';
+
+    // False positive rate
+    const fpCount = Object.values(triageCache).filter(t => t.status === 'false_positive').length;
+    const fpRate = triaged > 0 ? ((fpCount / triaged) * 100).toFixed(0) : '0';
+    const fpClass = parseFloat(fpRate) > 50 ? 'metric-warn' : 'metric-info';
+
+    // Escalation rate
+    const escCount = Object.values(triageCache).filter(t => t.status === 'escalated').length;
+    const escRate = triaged > 0 ? ((escCount / triaged) * 100).toFixed(0) : '0';
+    const escClass = parseFloat(escRate) > 30 ? 'metric-danger' : parseFloat(escRate) > 15 ? 'metric-warn' : 'metric-info';
+
+    container.innerHTML = `
+        <div class="key-metric-tile">
+            <div class="key-metric-value ${mttrClass}">${mttrStr}</div>
+            <div class="key-metric-label">MTTR</div>
+        </div>
+        <div class="key-metric-tile">
+            <div class="key-metric-value ${velClass}">${velocity}</div>
+            <div class="key-metric-label">Alerts / Hour</div>
+        </div>
+        <div class="key-metric-tile">
+            <div class="key-metric-value ${unassClass}">${unassignedCritHigh}</div>
+            <div class="key-metric-label">Unassigned Crit/High</div>
+        </div>
+        <div class="key-metric-tile">
+            <div class="key-metric-value ${caseClass}">${caseRate}%</div>
+            <div class="key-metric-label">Case Conversion</div>
+        </div>
+        <div class="key-metric-tile">
+            <div class="key-metric-value ${fpClass}">${fpRate}%</div>
+            <div class="key-metric-label">False Positive Rate</div>
+        </div>
+        <div class="key-metric-tile">
+            <div class="key-metric-value ${escClass}">${escRate}%</div>
+            <div class="key-metric-label">Escalation Rate</div>
+        </div>
+    `;
+}
+
+// =========================================================================
+// Top Source Countries
+// =========================================================================
+function renderTopCountries() {
+    const container = document.getElementById('chart-top-countries');
+    if (!container) return;
+
+    const countryCounts = {};
+    allAlerts.forEach(a => {
+        if (!a.raw_data) return;
+        const geo = a.raw_data.source?.geo;
+        if (!geo) return;
+        const country = geo.country_name || geo.country_iso_code;
+        if (country) countryCounts[country] = (countryCounts[country] || 0) + 1;
+    });
+
+    const entries = Object.entries(countryCounts).sort((a, b) => b[1] - a[1]).slice(0, 7);
+    if (entries.length === 0) {
+        container.innerHTML = '<div class="empty-state">No country data</div>';
+        return;
+    }
+
+    const maxVal = entries[0][1];
+    container.innerHTML = entries.map(([name, count], i) => {
+        const pct = (count / maxVal * 100).toFixed(0);
+        const hue = 200 + i * 25;
+        return `
+            <div class="hbar-row">
+                <span class="hbar-label" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+                <span class="hbar-track"><span class="hbar-fill" style="width:${pct}%;background:hsl(${hue},65%,55%);"></span></span>
+                <span class="hbar-count">${count}</span>
+            </div>
+        `;
+    }).join('');
 }
 
 // --- Horizontal bar chart ---
