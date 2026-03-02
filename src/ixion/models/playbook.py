@@ -119,17 +119,14 @@ class Playbook(Base, TimestampMixin):
             return True
         return False
 
-    def matches_alert(
+    def _matches_alert_conditions(
         self,
         rule_name: Optional[str] = None,
         severity: Optional[str] = None,
         mitre_techniques: Optional[List[str]] = None,
         mitre_tactics: Optional[List[str]] = None,
     ) -> bool:
-        """Check if this playbook matches the given alert characteristics."""
-        if not self.is_active:
-            return False
-
+        """Core matching logic for alert characteristics (ignores is_active)."""
         conditions = self.trigger_conditions or {}
 
         # Check rule patterns (any pattern must match)
@@ -170,6 +167,38 @@ class Playbook(Base, TimestampMixin):
                 return False
 
         return True
+
+    def matches_alert(
+        self,
+        rule_name: Optional[str] = None,
+        severity: Optional[str] = None,
+        mitre_techniques: Optional[List[str]] = None,
+        mitre_tactics: Optional[List[str]] = None,
+    ) -> bool:
+        """Check if this playbook matches the given alert characteristics (active only)."""
+        if not self.is_active:
+            return False
+        return self._matches_alert_conditions(
+            rule_name=rule_name,
+            severity=severity,
+            mitre_techniques=mitre_techniques,
+            mitre_tactics=mitre_tactics,
+        )
+
+    def matches_alert_relaxed(
+        self,
+        rule_name: Optional[str] = None,
+        severity: Optional[str] = None,
+        mitre_techniques: Optional[List[str]] = None,
+        mitre_tactics: Optional[List[str]] = None,
+    ) -> bool:
+        """Match alert characteristics regardless of is_active flag."""
+        return self._matches_alert_conditions(
+            rule_name=rule_name,
+            severity=severity,
+            mitre_techniques=mitre_techniques,
+            mitre_tactics=mitre_tactics,
+        )
 
 
 class PlaybookStep(Base):

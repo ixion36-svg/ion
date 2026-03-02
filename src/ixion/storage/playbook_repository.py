@@ -273,6 +273,32 @@ class PlaybookRepository:
         # Already sorted by priority from list_playbooks
         return matching
 
+    def find_suggested_playbooks(
+        self,
+        rule_name: str | None = None,
+        severity: str | None = None,
+        mitre_techniques: List[str] | None = None,
+        mitre_tactics: List[str] | None = None,
+    ) -> List[Playbook]:
+        """
+        Find ALL playbooks (active + inactive) that match alert characteristics.
+        Returns active playbooks first, then inactive, both sorted by priority.
+        """
+        playbooks = self.list_playbooks(active_only=False, include_steps=True)
+
+        matching = [
+            p for p in playbooks
+            if p.matches_alert_relaxed(
+                rule_name=rule_name,
+                severity=severity,
+                mitre_techniques=mitre_techniques,
+                mitre_tactics=mitre_tactics,
+            )
+        ]
+
+        # Sort: active first, then by priority descending
+        return sorted(matching, key=lambda p: (-int(p.is_active), -p.priority))
+
     # =========================================================================
     # Execution
     # =========================================================================

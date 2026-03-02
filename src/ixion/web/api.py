@@ -6480,6 +6480,65 @@ async def get_recommended_playbooks(
     }
 
 
+@router.get("/elasticsearch/alerts/{alert_id}/suggested-playbooks")
+async def get_suggested_playbooks(
+    alert_id: str,
+    current_user: User = Depends(require_permission("playbook:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Get all playbooks (active + inactive) that match the given alert's characteristics."""
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
+
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    alert = await service.get_alert_by_id(alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    rule_name = alert.rule_name
+    severity = alert.severity
+    mitre_techniques = alert.mitre_techniques or []
+    mitre_tactics = alert.mitre_tactics or []
+
+    repo = PlaybookRepository(session)
+    suggested = repo.find_suggested_playbooks(
+        rule_name=rule_name,
+        severity=severity,
+        mitre_techniques=mitre_techniques,
+        mitre_tactics=mitre_tactics,
+    )
+
+    # Check for active executions
+    active_executions = repo.get_executions_for_alert(alert_id)
+    active_playbook_ids = {
+        e.playbook_id for e in active_executions
+        if e.status == ExecutionStatus.IN_PROGRESS.value
+    }
+
+    result = []
+    for playbook in suggested:
+        pb_dict = playbook.to_dict(include_steps=True)
+        pb_dict["suggestion_type"] = "recommended" if playbook.is_active else "library"
+        pb_dict["has_active_execution"] = playbook.id in active_playbook_ids
+        result.append(pb_dict)
+
+    return {
+        "playbooks": result,
+        "total": len(result),
+        "alert": {
+            "id": alert_id,
+            "rule_name": rule_name,
+            "severity": severity,
+            "mitre_techniques": mitre_techniques,
+            "mitre_tactics": mitre_tactics,
+        },
+    }
+
+
 @router.post("/elasticsearch/alerts/{alert_id}/playbook/{playbook_id}/start")
 async def start_playbook_execution(
     alert_id: str,
