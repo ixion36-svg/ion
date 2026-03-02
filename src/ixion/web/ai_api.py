@@ -503,7 +503,7 @@ async def create_session(
 
 
 @router.get("/history/sessions/{session_id}")
-async def get_session(
+async def get_chat_session(
     session_id: int,
     current_user: User = Depends(get_current_user),
 ):

@@ -7155,7 +7155,7 @@ async def get_analyst_knowledge_base(
     organized by topic for easy reference during alert triage and
     case investigation.
     """
-    from ixion.models.document import Document, DocumentTag
+    from ixion.models.document import Document
     from ixion.models.template import Collection
 
     # Find Knowledge Base parent collection
