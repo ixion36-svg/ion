@@ -87,58 +87,9 @@ print('Authentication configured')
 "
 fi
 
-# Update config from environment variables (in case they changed)
-python -c "
-from pathlib import Path
-from ixion.core.config import Config
-import os
-
-config_path = Path('${CONFIG_PATH}')
-if config_path.exists():
-    config = Config.from_file(config_path)
-else:
-    config = Config(db_path=Path('${DB_PATH}'))
-
-# Update from environment
-if os.environ.get('IXION_COOKIE_SECURE'):
-    config.cookie_secure = os.environ.get('IXION_COOKIE_SECURE', 'false').lower() == 'true'
-if os.environ.get('IXION_OIDC_ENABLED'):
-    config.oidc_enabled = os.environ.get('IXION_OIDC_ENABLED', 'false').lower() == 'true'
-if os.environ.get('IXION_OIDC_KEYCLOAK_URL'):
-    config.oidc_keycloak_url = os.environ.get('IXION_OIDC_KEYCLOAK_URL', '')
-if os.environ.get('IXION_OIDC_REALM'):
-    config.oidc_realm = os.environ.get('IXION_OIDC_REALM', '')
-if os.environ.get('IXION_OIDC_CLIENT_ID'):
-    config.oidc_client_id = os.environ.get('IXION_OIDC_CLIENT_ID', '')
-if os.environ.get('IXION_OIDC_CLIENT_SECRET'):
-    config.oidc_client_secret = os.environ.get('IXION_OIDC_CLIENT_SECRET', '')
-if os.environ.get('IXION_GITLAB_ENABLED'):
-    config.gitlab_enabled = os.environ.get('IXION_GITLAB_ENABLED', 'false').lower() == 'true'
-if os.environ.get('IXION_GITLAB_URL'):
-    config.gitlab_url = os.environ.get('IXION_GITLAB_URL', '')
-if os.environ.get('IXION_GITLAB_TOKEN'):
-    config.gitlab_token = os.environ.get('IXION_GITLAB_TOKEN', '')
-if os.environ.get('IXION_GITLAB_PROJECT_ID'):
-    config.gitlab_project_id = os.environ.get('IXION_GITLAB_PROJECT_ID', '')
-if os.environ.get('IXION_OPENCTI_ENABLED'):
-    config.opencti_enabled = os.environ.get('IXION_OPENCTI_ENABLED', 'false').lower() == 'true'
-if os.environ.get('IXION_OPENCTI_URL'):
-    config.opencti_url = os.environ.get('IXION_OPENCTI_URL', '')
-if os.environ.get('IXION_OPENCTI_TOKEN'):
-    config.opencti_token = os.environ.get('IXION_OPENCTI_TOKEN', '')
-if os.environ.get('IXION_ELASTICSEARCH_ENABLED'):
-    config.elasticsearch_enabled = os.environ.get('IXION_ELASTICSEARCH_ENABLED', 'false').lower() == 'true'
-if os.environ.get('IXION_ELASTICSEARCH_URL'):
-    config.elasticsearch_url = os.environ.get('IXION_ELASTICSEARCH_URL', '')
-if os.environ.get('IXION_ELASTICSEARCH_USERNAME'):
-    config.elasticsearch_username = os.environ.get('IXION_ELASTICSEARCH_USERNAME', '')
-if os.environ.get('IXION_ELASTICSEARCH_PASSWORD'):
-    config.elasticsearch_password = os.environ.get('IXION_ELASTICSEARCH_PASSWORD', '')
-if os.environ.get('IXION_ELASTICSEARCH_API_KEY'):
-    config.elasticsearch_api_key = os.environ.get('IXION_ELASTICSEARCH_API_KEY', '')
-
-config.to_file(config_path)
-"
+# config.json is only written on first run (above). Subsequent changes
+# are made via the admin UI and persisted in config.json on the volume.
+# To re-initialize from .env, delete /data/.ixion/config.json and restart.
 
 echo "Starting web server on ${HOST}:${PORT}..."
 
