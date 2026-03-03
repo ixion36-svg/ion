@@ -17,7 +17,7 @@ class Config:
     max_versions_to_keep: int = 100
 
     # OIDC/Keycloak configuration
-    oidc_enabled: bool = False
+    oidc_enabled: bool = True
     oidc_keycloak_url: str = ""
     oidc_realm: str = ""
     oidc_client_id: str = ""
@@ -32,19 +32,19 @@ class Config:
     account_lockout_enabled: bool = False  # Lock accounts after repeated failed logins
 
     # GitLab integration
-    gitlab_enabled: bool = False
+    gitlab_enabled: bool = True
     gitlab_url: str = ""  # e.g., https://gitlab.example.com or http://localhost:8929
     gitlab_token: str = ""  # Personal access token with api scope
     gitlab_project_id: str = ""  # Project ID or path (e.g., "group/project" or "123")
 
     # OpenCTI integration
-    opencti_enabled: bool = False
+    opencti_enabled: bool = True
     opencti_url: str = ""  # e.g., http://localhost:8888
     opencti_token: str = ""  # API bearer token (UUID)
     opencti_verify_ssl: bool = True
 
     # Elasticsearch integration
-    elasticsearch_enabled: bool = False
+    elasticsearch_enabled: bool = True
     elasticsearch_url: str = ""  # e.g., https://localhost:9200
     elasticsearch_api_key: str = ""  # API key (preferred over username/password)
     elasticsearch_username: str = ""  # Basic auth username
@@ -54,13 +54,13 @@ class Config:
     elasticsearch_verify_ssl: bool = True
 
     # Ollama AI integration
-    ollama_enabled: bool = False
+    ollama_enabled: bool = True
     ollama_url: str = "http://localhost:11434"  # Ollama API URL
-    ollama_model: str = "qwen2.5:0.5b"  # Default model (use small for testing)
+    ollama_model: str = "qwen2.5:7b"  # Default model
     ollama_timeout: int = 120  # Request timeout in seconds
 
     # Kibana Cases integration
-    kibana_cases_enabled: bool = False
+    kibana_cases_enabled: bool = True
     kibana_url: str = ""  # e.g., http://localhost:5601
     kibana_username: str = ""  # Kibana username (uses ES credentials if not set)
     kibana_password: str = ""  # Kibana password
@@ -101,7 +101,7 @@ class Config:
             auto_save=data.get("auto_save", True),
             max_versions_to_keep=data.get("max_versions_to_keep", 100),
             # OIDC configuration
-            oidc_enabled=data.get("oidc_enabled", False),
+            oidc_enabled=data.get("oidc_enabled", True),
             oidc_keycloak_url=data.get("oidc_keycloak_url", ""),
             oidc_realm=data.get("oidc_realm", ""),
             oidc_client_id=data.get("oidc_client_id", ""),
@@ -114,17 +114,17 @@ class Config:
             debug_mode=data.get("debug_mode", False),
             account_lockout_enabled=data.get("account_lockout_enabled", False),
             # GitLab integration
-            gitlab_enabled=data.get("gitlab_enabled", False),
+            gitlab_enabled=data.get("gitlab_enabled", True),
             gitlab_url=data.get("gitlab_url", ""),
             gitlab_token=data.get("gitlab_token", ""),
             gitlab_project_id=data.get("gitlab_project_id", ""),
             # OpenCTI integration
-            opencti_enabled=data.get("opencti_enabled", False),
+            opencti_enabled=data.get("opencti_enabled", True),
             opencti_url=data.get("opencti_url", ""),
             opencti_token=data.get("opencti_token", ""),
             opencti_verify_ssl=data.get("opencti_verify_ssl", True),
             # Elasticsearch integration
-            elasticsearch_enabled=data.get("elasticsearch_enabled", False),
+            elasticsearch_enabled=data.get("elasticsearch_enabled", True),
             elasticsearch_url=data.get("elasticsearch_url", ""),
             elasticsearch_api_key=data.get("elasticsearch_api_key", ""),
             elasticsearch_username=data.get("elasticsearch_username", ""),
@@ -133,12 +133,12 @@ class Config:
             elasticsearch_case_index=data.get("elasticsearch_case_index", "ixion-cases"),
             elasticsearch_verify_ssl=data.get("elasticsearch_verify_ssl", True),
             # Ollama AI integration
-            ollama_enabled=data.get("ollama_enabled", False),
+            ollama_enabled=data.get("ollama_enabled", True),
             ollama_url=data.get("ollama_url", "http://localhost:11434"),
-            ollama_model=data.get("ollama_model", "qwen2.5:0.5b"),
+            ollama_model=data.get("ollama_model", "qwen2.5:7b"),
             ollama_timeout=data.get("ollama_timeout", 120),
             # Kibana Cases integration
-            kibana_cases_enabled=data.get("kibana_cases_enabled", False),
+            kibana_cases_enabled=data.get("kibana_cases_enabled", True),
             kibana_url=data.get("kibana_url", ""),
             kibana_username=data.get("kibana_username", ""),
             kibana_password=data.get("kibana_password", ""),
@@ -274,7 +274,7 @@ def get_config() -> Config:
         if os.environ.get("IXION_ACCOUNT_LOCKOUT_ENABLED"):
             _config.account_lockout_enabled = _get_env_bool("IXION_ACCOUNT_LOCKOUT_ENABLED")
         if os.environ.get("IXION_OIDC_ENABLED"):
-            _config.oidc_enabled = _get_env_bool("IXION_OIDC_ENABLED")
+            _config.oidc_enabled = _get_env_bool("IXION_OIDC_ENABLED", True)
         if os.environ.get("IXION_OIDC_KEYCLOAK_URL"):
             _config.oidc_keycloak_url = os.environ.get("IXION_OIDC_KEYCLOAK_URL", "")
         if os.environ.get("IXION_OIDC_REALM"):
@@ -286,7 +286,7 @@ def get_config() -> Config:
 
         # GitLab environment variable overrides
         if os.environ.get("IXION_GITLAB_ENABLED"):
-            _config.gitlab_enabled = _get_env_bool("IXION_GITLAB_ENABLED")
+            _config.gitlab_enabled = _get_env_bool("IXION_GITLAB_ENABLED", True)
         if os.environ.get("IXION_GITLAB_URL"):
             _config.gitlab_url = os.environ.get("IXION_GITLAB_URL", "")
         if os.environ.get("IXION_GITLAB_TOKEN"):
@@ -296,7 +296,7 @@ def get_config() -> Config:
 
         # OpenCTI environment variable overrides
         if os.environ.get("IXION_OPENCTI_ENABLED"):
-            _config.opencti_enabled = _get_env_bool("IXION_OPENCTI_ENABLED")
+            _config.opencti_enabled = _get_env_bool("IXION_OPENCTI_ENABLED", True)
         if os.environ.get("IXION_OPENCTI_URL"):
             _config.opencti_url = os.environ.get("IXION_OPENCTI_URL", "")
         if os.environ.get("IXION_OPENCTI_TOKEN"):
@@ -306,7 +306,7 @@ def get_config() -> Config:
 
         # Elasticsearch environment variable overrides
         if os.environ.get("IXION_ELASTICSEARCH_ENABLED"):
-            _config.elasticsearch_enabled = _get_env_bool("IXION_ELASTICSEARCH_ENABLED")
+            _config.elasticsearch_enabled = _get_env_bool("IXION_ELASTICSEARCH_ENABLED", True)
         if os.environ.get("IXION_ELASTICSEARCH_URL"):
             _config.elasticsearch_url = os.environ.get("IXION_ELASTICSEARCH_URL", "")
         if os.environ.get("IXION_ELASTICSEARCH_API_KEY"):
@@ -324,17 +324,17 @@ def get_config() -> Config:
 
         # Ollama environment overrides
         if os.environ.get("IXION_OLLAMA_ENABLED"):
-            _config.ollama_enabled = _get_env_bool("IXION_OLLAMA_ENABLED", False)
+            _config.ollama_enabled = _get_env_bool("IXION_OLLAMA_ENABLED", True)
         if os.environ.get("IXION_OLLAMA_URL") or os.environ.get("OLLAMA_URL"):
             _config.ollama_url = os.environ.get("IXION_OLLAMA_URL") or os.environ.get("OLLAMA_URL", "http://localhost:11434")
         if os.environ.get("IXION_OLLAMA_MODEL"):
-            _config.ollama_model = os.environ.get("IXION_OLLAMA_MODEL", "qwen2.5:0.5b")
+            _config.ollama_model = os.environ.get("IXION_OLLAMA_MODEL", "qwen2.5:7b")
         if os.environ.get("IXION_OLLAMA_TIMEOUT"):
             _config.ollama_timeout = int(os.environ.get("IXION_OLLAMA_TIMEOUT", "120"))
 
         # Kibana Cases environment overrides
         if os.environ.get("IXION_KIBANA_CASES_ENABLED"):
-            _config.kibana_cases_enabled = _get_env_bool("IXION_KIBANA_CASES_ENABLED", False)
+            _config.kibana_cases_enabled = _get_env_bool("IXION_KIBANA_CASES_ENABLED", True)
         if os.environ.get("IXION_KIBANA_URL"):
             _config.kibana_url = os.environ.get("IXION_KIBANA_URL", "")
         if os.environ.get("IXION_KIBANA_USERNAME"):
@@ -360,13 +360,13 @@ def get_config() -> Config:
 
         # VirusTotal environment overrides
         if os.environ.get("IXION_VIRUSTOTAL_ENABLED"):
-            _config.virustotal_enabled = _get_env_bool("IXION_VIRUSTOTAL_ENABLED", False)
+            _config.virustotal_enabled = _get_env_bool("IXION_VIRUSTOTAL_ENABLED")
         if os.environ.get("IXION_VIRUSTOTAL_API_KEY"):
             _config.virustotal_api_key = os.environ.get("IXION_VIRUSTOTAL_API_KEY", "")
 
         # AbuseIPDB environment overrides
         if os.environ.get("IXION_ABUSEIPDB_ENABLED"):
-            _config.abuseipdb_enabled = _get_env_bool("IXION_ABUSEIPDB_ENABLED", False)
+            _config.abuseipdb_enabled = _get_env_bool("IXION_ABUSEIPDB_ENABLED")
         if os.environ.get("IXION_ABUSEIPDB_API_KEY"):
             _config.abuseipdb_api_key = os.environ.get("IXION_ABUSEIPDB_API_KEY", "")
 
