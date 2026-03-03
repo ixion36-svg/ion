@@ -216,15 +216,15 @@ Configure in `docker-compose.yml` or `docker-compose.https.yml`:
 | `IXION_PORT` | `8000` | Application port |
 | `IXION_COOKIE_SECURE` | `false` | Set `true` for HTTPS |
 | `IXION_ADMIN_PASSWORD` | `changeme` | Initial admin password |
-| `IXION_OIDC_ENABLED` | `false` | Enable Keycloak SSO |
+| `IXION_OIDC_ENABLED` | `true` | Enable Keycloak SSO |
 | `IXION_OIDC_KEYCLOAK_URL` | - | Keycloak server URL |
 | `IXION_OIDC_REALM` | - | Keycloak realm |
 | `IXION_OIDC_CLIENT_ID` | - | OIDC client ID |
 | `IXION_OIDC_CLIENT_SECRET` | - | OIDC client secret |
 | `IXION_OLLAMA_ENABLED` | `true` | Enable Ollama AI integration |
 | `IXION_OLLAMA_URL` | `http://ollama:11434` | Ollama service URL |
-| `IXION_OLLAMA_MODEL` | `qwen2.5:0.5b` | Default AI model |
-| `IXION_GITLAB_ENABLED` | `false` | Enable GitLab integration |
+| `IXION_OLLAMA_MODEL` | `qwen2.5:7b` | Default AI model |
+| `IXION_GITLAB_ENABLED` | `true` | Enable GitLab integration |
 | `IXION_GITLAB_URL` | - | GitLab server URL |
 | `IXION_GITLAB_TOKEN` | - | GitLab Personal Access Token |
 | `IXION_GITLAB_PROJECT_ID` | - | GitLab project ID or path |
@@ -280,19 +280,20 @@ environment:
 1. Login as admin
 2. Navigate to Users
 3. Create users with appropriate roles:
+   - **Analyst**: Alerts, cases, playbooks, templates, documents, AI chat
+   - **Lead**: Analyst + topology, security dashboards
+   - **Engineering**: Lead + integrations, system settings
    - **Admin**: Full system access
-   - **Editor**: Create/edit templates and documents
-   - **Viewer**: Read-only access
 
 ### 3. Set Up AI Model (If Using Ollama)
 
 ```bash
-# Pull an AI model into the Ollama sidecar (first time only)
-docker exec -it ixion-ollama ollama pull qwen2.5:0.5b
+# Pull the default AI model into the Ollama sidecar (first time only)
+docker exec -it ixion-ollama ollama pull qwen2.5:7b
 
 # Verify AI is available
 curl http://localhost:8000/api/ai/status
-# Should return: {"available": true, "default_model": "qwen2.5:0.5b", ...}
+# Should return: {"available": true, "default_model": "qwen2.5:7b", ...}
 ```
 
 Once available, AI assist buttons (Analyze, Extract, Suggest, Discuss) will appear automatically in the alert investigation UI.

@@ -19,7 +19,7 @@ A Security Operations Center (SOC) platform with AI-powered analysis, alert tria
 - **SOC Documentation Templates**: 19 pre-built templates (SOP, SOI, WI, KB, IRP, AAR, Runbook, Threat Advisory, Detection Rule) aligned with NIST 800-61, NIST CSF 2.0, ISO 27035, SANS IR, SOC-CMM, and MITRE ATT&CK
 - **SOC Tools**: Client-side document processing tools for security analysts
 - **Real-time Chat**: Team collaboration with chat rooms and expandable AI chat panel
-- **Role-based Access**: Web UI with authentication and RBAC
+- **Role-based Access**: Server-side enforced RBAC with 4-tier role hierarchy (analyst, lead, engineering, admin)
 - **GitLab Integration**: Issue tracking directly from IXION
 
 ---
@@ -75,8 +75,8 @@ docker build -t ixion:latest .
 # Start IXION + Ollama
 docker-compose up -d
 
-# Pull an AI model (first time only)
-docker exec -it ixion-ollama ollama pull qwen2.5:0.5b
+# Pull the default AI model (first time only)
+docker exec -it ixion-ollama ollama pull qwen2.5:7b
 
 # Access at http://localhost:8000
 ```
@@ -97,8 +97,8 @@ pip install -e .
 # Windows: Download from https://ollama.ai
 # Linux: curl -fsSL https://ollama.ai/install.sh | sh
 
-# Pull a model
-ollama pull qwen2.5:0.5b
+# Pull the default model
+ollama pull qwen2.5:7b
 
 # Start Ollama service
 ollama serve
@@ -126,7 +126,7 @@ IXION_DEBUG_MODE=false             # Disable API docs in production (default)
 # AI Features (Ollama)
 IXION_OLLAMA_ENABLED=true
 IXION_OLLAMA_URL=http://ollama:11434    # Docker service name
-IXION_OLLAMA_MODEL=qwen2.5:0.5b         # or qwen2.5-coder:7b for better results
+IXION_OLLAMA_MODEL=qwen2.5:7b            # default model
 
 # Elasticsearch (your existing cluster)
 IXION_ELASTICSEARCH_ENABLED=true
@@ -165,12 +165,13 @@ Recommended models for Ollama:
 |-------|------|----------|
 | `qwen2.5:0.5b` | ~400MB | Testing, low resources |
 | `qwen2.5:3b` | ~2GB | Balanced performance |
+| `qwen2.5:7b` | ~4GB | Default — recommended for SOC analysis |
 | `qwen2.5-coder:7b` | ~4GB | Best for code/security analysis |
 | `llama3.2:3b` | ~2GB | General purpose |
 
 Pull models with:
 ```bash
-ollama pull qwen2.5-coder:7b
+ollama pull qwen2.5:7b
 ```
 
 ---

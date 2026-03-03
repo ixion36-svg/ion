@@ -17,8 +17,8 @@ cp .env.example .env
 docker build -t ixion:latest .
 docker-compose up -d
 
-# Pull AI model (first time)
-docker exec -it ixion-ollama ollama pull qwen2.5:0.5b
+# Pull the default AI model (first time)
+docker exec -it ixion-ollama ollama pull qwen2.5:7b
 
 # Access at http://localhost:8000
 ```
@@ -70,18 +70,19 @@ IXION integrates with your existing infrastructure:
 | `IXION_COOKIE_SECURE` | `false` | Set `true` for HTTPS |
 | `IXION_DEBUG_MODE` | `false` | Enable API docs (disable in prod) |
 | `IXION_ADMIN_PASSWORD` | `changeme` | Initial admin password |
-| `IXION_ELASTICSEARCH_ENABLED` | `false` | Enable ES integration |
+| `IXION_ELASTICSEARCH_ENABLED` | `true` | Enable ES integration |
 | `IXION_ELASTICSEARCH_URL` | - | Elasticsearch URL |
 | `IXION_ELASTICSEARCH_API_KEY` | - | ES API key |
-| `IXION_OPENCTI_ENABLED` | `false` | Enable OpenCTI |
+| `IXION_OPENCTI_ENABLED` | `true` | Enable OpenCTI |
 | `IXION_OPENCTI_URL` | - | OpenCTI URL |
 | `IXION_OPENCTI_TOKEN` | - | OpenCTI API token |
-| `IXION_OLLAMA_ENABLED` | `false` | Enable AI features |
+| `IXION_OLLAMA_ENABLED` | `true` | Enable AI features |
 | `IXION_OLLAMA_URL` | `http://ollama:11434` | Ollama service URL |
-| `IXION_OLLAMA_MODEL` | `qwen2.5:0.5b` | Default AI model |
-| `IXION_KIBANA_CASES_ENABLED` | `false` | Enable Kibana sync |
+| `IXION_OLLAMA_MODEL` | `qwen2.5:7b` | Default AI model |
+| `IXION_KIBANA_CASES_ENABLED` | `true` | Enable Kibana sync |
 | `IXION_KIBANA_URL` | - | Kibana URL |
-| `IXION_OIDC_ENABLED` | `false` | Enable Keycloak SSO |
+| `IXION_OIDC_ENABLED` | `true` | Enable Keycloak SSO |
+| `IXION_ACCOUNT_LOCKOUT_ENABLED` | `false` | Lock accounts after failed logins |
 
 ### Config File
 
@@ -170,23 +171,29 @@ These playbooks are created idempotently (safe to restart). They contain realist
 
 ## Default Roles
 
+IXION uses a 4-tier role hierarchy. All page routes are enforced server-side (unauthenticated requests redirect to `/login`, insufficient permissions return 403).
+
 | Role | Permissions |
 |------|-------------|
-| **Admin** | Full access to all resources |
-| **Editor** | Create/edit templates and documents |
-| **Viewer** | Read-only access |
-| **Engineering** | Editor + system settings + integrations |
+| **Analyst** | Alerts, cases, observables, playbooks, training, templates, documents, AI chat, notes |
+| **Lead** | Analyst + topology, security dashboards |
+| **Engineering** | Lead + integrations, system settings |
+| **Admin** | Full access — user management, audit logs, all resources |
 
 ---
 
 ## Security Features
 
+- **Server-side route enforcement**: All page routes require authentication; permission checks enforced via FastAPI dependencies
 - Session-based authentication with secure cookies
 - Session rotation on login (invalidates previous sessions)
 - OIDC/Keycloak SSO support
-- Role-based access control (RBAC)
-- Rate limiting on authentication endpoints
-- Security headers (CSP, HSTS, X-Frame-Options, Permissions-Policy)
+- Role-based access control (RBAC) with 4-tier hierarchy
+- **Global rate limiting** (120 req/min default, stricter on admin DB ops and AI chat)
+- **Account lockout** (opt-in, disabled by default — 5 failed attempts → 15-min lock)
+- **XSS sanitization**: DOMPurify on all Markdown rendering
+- **Hardened CSP**: object-src, base-uri, form-action directives
+- Security headers (HSTS, X-Frame-Options, Permissions-Policy)
 - Timing-attack resistant login
 - Sandboxed Jinja2 template rendering (SSTI protection)
 - SSRF protection on integration endpoints
@@ -240,7 +247,7 @@ docker-compose logs ixion
 
 1. Check Ollama is running: `docker-compose logs ollama`
 2. Verify model is pulled: `docker exec ixion-ollama ollama list`
-3. Pull model: `docker exec ixion-ollama ollama pull qwen2.5:0.5b`
+3. Pull model: `docker exec ixion-ollama ollama pull qwen2.5:7b`
 
 ### API docs not accessible
 
