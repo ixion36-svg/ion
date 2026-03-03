@@ -1,22 +1,22 @@
-# IXION Elasticsearch Integration Guide
+# ION Elasticsearch Integration Guide
 
-This guide explains how to configure IXION to send ECS-compliant logs to Elasticsearch using Filebeat.
+This guide explains how to configure ION to send ECS-compliant logs to Elasticsearch using Filebeat.
 
 ## Overview
 
-IXION produces structured JSON logs that comply with the [Elastic Common Schema (ECS)](https://www.elastic.co/guide/en/ecs/current/index.html). These logs can be shipped to Elasticsearch using Filebeat for centralized log management, searching, and visualization in Kibana.
+ION produces structured JSON logs that comply with the [Elastic Common Schema (ECS)](https://www.elastic.co/guide/en/ecs/current/index.html). These logs can be shipped to Elasticsearch using Filebeat for centralized log management, searching, and visualization in Kibana.
 
 ### Architecture
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│    IXION     │────▶│    Filebeat     │────▶│  Elasticsearch  │
+│    ION     │────▶│    Filebeat     │────▶│  Elasticsearch  │
 │  (Application)  │     │  (Log Shipper)  │     │    (Storage)    │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
         │                                               │
         │ JSON logs                                     │
         ▼                                               ▼
-  /var/log/ixion/                            ┌─────────────────┐
+  /var/log/ion/                            ┌─────────────────┐
      app.log                                    │     Kibana      │
                                                 │ (Visualization) │
                                                 └─────────────────┘
@@ -24,7 +24,7 @@ IXION produces structured JSON logs that comply with the [Elastic Common Schema 
 
 ## ECS Log Fields
 
-IXION logs include the following ECS-compliant fields:
+ION logs include the following ECS-compliant fields:
 
 ### Core Fields
 
@@ -33,13 +33,13 @@ IXION logs include the following ECS-compliant fields:
 | `@timestamp` | Event timestamp (ISO 8601) | `2024-01-15T10:30:00.000Z` |
 | `message` | Log message | `Authentication login: success` |
 | `log.level` | Log level | `info`, `warning`, `error` |
-| `log.logger` | Logger name | `ixion.auth.service` |
+| `log.logger` | Logger name | `ion.auth.service` |
 
 ### Service Fields
 
 | Field | Description | Example |
 |-------|-------------|---------|
-| `service.name` | Application name | `ixion` |
+| `service.name` | Application name | `ion` |
 | `service.version` | Application version | `1.0.0` |
 | `service.environment` | Deployment environment | `production` |
 
@@ -84,27 +84,27 @@ IXION logs include the following ECS-compliant fields:
 
 ## Quick Start
 
-### 1. Configure IXION Logging
+### 1. Configure ION Logging
 
 Set environment variables in your deployment:
 
 ```bash
 # Enable JSON logging (required for Elasticsearch)
-IXION_LOG_JSON=true
+ION_LOG_JSON=true
 
 # Use full ECS format
-IXION_LOG_ECS=true
+ION_LOG_ECS=true
 
 # Set log level
-IXION_LOG_LEVEL=INFO
+ION_LOG_LEVEL=INFO
 
 # Write logs to file (for Filebeat)
-IXION_LOG_FILE=/var/log/ixion/app.log
+ION_LOG_FILE=/var/log/ion/app.log
 
 # Service identification
-IXION_SERVICE_NAME=ixion
-IXION_VERSION=1.0.0
-IXION_ENVIRONMENT=production
+ION_SERVICE_NAME=ion
+ION_VERSION=1.0.0
+ION_ENVIRONMENT=production
 ```
 
 ### 2. Deploy with Filebeat
@@ -119,7 +119,7 @@ export ELASTICSEARCH_HOSTS='["http://elasticsearch:9200"]'
 export ELASTICSEARCH_USERNAME=elastic
 export ELASTICSEARCH_PASSWORD=changeme
 
-# Start IXION with Filebeat
+# Start ION with Filebeat
 docker-compose -f docker-compose.elk.yml up -d
 ```
 
@@ -137,21 +137,21 @@ chmod +x setup-elasticsearch.sh
 
 ### Filebeat Configuration
 
-The Filebeat configuration (`deploy/filebeat/filebeat.yml`) is pre-configured for IXION:
+The Filebeat configuration (`deploy/filebeat/filebeat.yml`) is pre-configured for ION:
 
 ```yaml
 filebeat.inputs:
   - type: log
     paths:
-      - /var/log/ixion/*.log
+      - /var/log/ion/*.log
     json.keys_under_root: true
     json.overwrite_keys: true
 
 output.elasticsearch:
   hosts: ${ELASTICSEARCH_HOSTS}
-  index: "ixion-%{[environment]}-%{+yyyy.MM.dd}"
+  index: "ion-%{[environment]}-%{+yyyy.MM.dd}"
   ilm.enabled: true
-  ilm.policy_name: "ixion-policy"
+  ilm.policy_name: "ion-policy"
 ```
 
 ### Index Lifecycle Management (ILM)
@@ -210,13 +210,13 @@ export ELASTICSEARCH_PASSWORD=your-password
 1. Create API key in Elasticsearch:
 ```bash
 curl -X POST "localhost:9200/_security/api_key" -H "Content-Type: application/json" -d '{
-  "name": "ixion-filebeat",
+  "name": "ion-filebeat",
   "role_descriptors": {
-    "ixion_writer": {
+    "ion_writer": {
       "cluster": ["monitor", "manage_index_templates", "manage_ilm"],
       "index": [
         {
-          "names": ["ixion-*"],
+          "names": ["ion-*"],
           "privileges": ["write", "create_index", "manage"]
         }
       ]
@@ -252,7 +252,7 @@ export ELASTICSEARCH_SSL_VERIFY=full  # or 'none' for self-signed
 ### Create Index Pattern
 
 1. Go to **Stack Management** → **Index Patterns**
-2. Create pattern: `ixion-*`
+2. Create pattern: `ion-*`
 3. Select `@timestamp` as the time field
 
 ### Useful Queries
@@ -308,22 +308,22 @@ docker-compose -f docker-compose.elk.yml up -d
 
 1. **Check Filebeat status:**
    ```bash
-   docker logs ixion-filebeat
+   docker logs ion-filebeat
    ```
 
 2. **Verify log file exists:**
    ```bash
-   docker exec ixion ls -la /var/log/ixion/
+   docker exec ion ls -la /var/log/ion/
    ```
 
 3. **Test Elasticsearch connectivity:**
    ```bash
-   docker exec ixion-filebeat filebeat test output
+   docker exec ion-filebeat filebeat test output
    ```
 
 4. **Check Filebeat registry:**
    ```bash
-   docker exec ixion-filebeat cat /usr/share/filebeat/data/registry/filebeat/log.json
+   docker exec ion-filebeat cat /usr/share/filebeat/data/registry/filebeat/log.json
    ```
 
 ### Invalid JSON Logs
@@ -332,7 +332,7 @@ If logs aren't parsing correctly:
 
 1. **Verify JSON format:**
    ```bash
-   docker exec ixion tail -1 /var/log/ixion/app.log | jq .
+   docker exec ion tail -1 /var/log/ion/app.log | jq .
    ```
 
 2. **Check for multiline issues:**
@@ -342,12 +342,12 @@ If logs aren't parsing correctly:
 
 1. **Check ILM policy:**
    ```bash
-   curl -X GET "localhost:9200/_ilm/policy/ixion-policy"
+   curl -X GET "localhost:9200/_ilm/policy/ion-policy"
    ```
 
 2. **Check index template:**
    ```bash
-   curl -X GET "localhost:9200/_index_template/ixion"
+   curl -X GET "localhost:9200/_index_template/ion"
    ```
 
 3. **Re-run setup:**
@@ -357,17 +357,17 @@ If logs aren't parsing correctly:
 
 ## Environment Variables Reference
 
-### IXION Logging
+### ION Logging
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `IXION_LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR) |
-| `IXION_LOG_JSON` | `true` | Output JSON format |
-| `IXION_LOG_ECS` | `true` | Use full ECS schema |
-| `IXION_LOG_FILE` | - | File path for log output |
-| `IXION_SERVICE_NAME` | `ixion` | Service name in logs |
-| `IXION_VERSION` | `1.0.0` | Version in logs |
-| `IXION_ENVIRONMENT` | `production` | Environment tag |
+| `ION_LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR) |
+| `ION_LOG_JSON` | `true` | Output JSON format |
+| `ION_LOG_ECS` | `true` | Use full ECS schema |
+| `ION_LOG_FILE` | - | File path for log output |
+| `ION_SERVICE_NAME` | `ion` | Service name in logs |
+| `ION_VERSION` | `1.0.0` | Version in logs |
+| `ION_ENVIRONMENT` | `production` | Environment tag |
 
 ### Filebeat
 
@@ -390,11 +390,11 @@ If logs aren't parsing correctly:
   "@timestamp": "2024-01-15T10:30:00.000Z",
   "log": {
     "level": "info",
-    "logger": "ixion.auth.service"
+    "logger": "ion.auth.service"
   },
   "message": "Authentication login: success",
   "service": {
-    "name": "ixion",
+    "name": "ion",
     "version": "1.0.0",
     "environment": "production"
   },
@@ -424,7 +424,7 @@ If logs aren't parsing correctly:
   "@timestamp": "2024-01-15T10:30:01.000Z",
   "log": {
     "level": "info",
-    "logger": "ixion.web.logging_middleware"
+    "logger": "ion.web.logging_middleware"
   },
   "message": "GET /api/templates 200 45ms",
   "http": {
@@ -453,7 +453,7 @@ If logs aren't parsing correctly:
 
 ## Alert Investigation Integration
 
-IXION includes a built-in alert investigation page (`/alerts`) that queries Elasticsearch for security alerts and provides triage, case management, and analytics.
+ION includes a built-in alert investigation page (`/alerts`) that queries Elasticsearch for security alerts and provides triage, case management, and analytics.
 
 ### Supported Alert Indices
 
@@ -501,13 +501,13 @@ If no geo data is present in alerts, the map displays an informational message i
 
 ```bash
 # Required environment variables
-IXION_ELASTICSEARCH_ENABLED=true
-IXION_ELASTICSEARCH_HOSTS=https://elasticsearch:9200
-IXION_ELASTICSEARCH_USERNAME=elastic
-IXION_ELASTICSEARCH_PASSWORD=changeme
+ION_ELASTICSEARCH_ENABLED=true
+ION_ELASTICSEARCH_HOSTS=https://elasticsearch:9200
+ION_ELASTICSEARCH_USERNAME=elastic
+ION_ELASTICSEARCH_PASSWORD=changeme
 
 # Optional: Custom alert index pattern
-IXION_ELASTICSEARCH_ALERT_INDEX=.alerts-*
+ION_ELASTICSEARCH_ALERT_INDEX=.alerts-*
 ```
 
 ## Security Considerations
@@ -521,6 +521,6 @@ IXION_ELASTICSEARCH_ALERT_INDEX=.alerts-*
 ## Support
 
 For issues with:
-- **IXION logging**: Check application logs and configuration
+- **ION logging**: Check application logs and configuration
 - **Filebeat**: See [Filebeat documentation](https://www.elastic.co/guide/en/beats/filebeat/current/index.html)
 - **Elasticsearch**: See [Elasticsearch documentation](https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html)

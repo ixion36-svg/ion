@@ -1,5 +1,5 @@
 # =============================================================================
-# DocForge - Docker Compose with Elasticsearch Logging
+# ION - Docker Compose with Elasticsearch Logging
 # =============================================================================
 # Includes Filebeat sidecar for shipping logs to Elasticsearch.
 #
@@ -15,32 +15,32 @@ version: '3.8'
 
 services:
   # ===========================================================================
-  # DocForge Application
+  # ION Application
   # ===========================================================================
-  docforge:
-    image: docforge:latest
-    container_name: docforge
+  ion:
+    image: ion:latest
+    container_name: ion
     restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
       # Application settings
-      - DOCFORGE_DB_PATH=/data/.docforge/docforge.db
-      - DOCFORGE_COOKIE_SECURE=false
-      - DOCFORGE_ADMIN_PASSWORD=${DOCFORGE_ADMIN_PASSWORD:-changeme}
+      - ION_DB_PATH=/data/.ion/ion.db
+      - ION_COOKIE_SECURE=false
+      - ION_ADMIN_PASSWORD=${ION_ADMIN_PASSWORD:-changeme}
 
       # Logging settings
-      - DOCFORGE_LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - DOCFORGE_LOG_JSON=true
-      - DOCFORGE_LOG_FILE=/var/log/docforge/app.log
+      - ION_LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ION_LOG_JSON=true
+      - ION_LOG_FILE=/var/log/ion/app.log
 
       # Environment identifier for logs
       - ENVIRONMENT=${ENVIRONMENT:-production}
     volumes:
       # Persistent data
-      - docforge-data:/data
+      - ion-data:/data
       # Shared log volume with Filebeat
-      - docforge-logs:/var/log/docforge
+      - ion-logs:/var/log/ion
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
@@ -48,7 +48,7 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - docforge-net
+      - ion-net
     logging:
       driver: "json-file"
       options:
@@ -60,7 +60,7 @@ services:
   # ===========================================================================
   filebeat:
     image: docker.elastic.co/beats/filebeat:9.3.0
-    container_name: docforge-filebeat
+    container_name: ion-filebeat
     restart: unless-stopped
     user: root
     environment:
@@ -81,18 +81,18 @@ services:
     volumes:
       # Filebeat configuration
       - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-      # DocForge logs
-      - docforge-logs:/var/log/docforge:ro
+      # ION logs
+      - ion-logs:/var/log/ion:ro
       # Filebeat data (registry, etc.)
       - filebeat-data:/usr/share/filebeat/data
       # Docker socket for container metadata
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: ["--strict.perms=false"]
     depends_on:
-      docforge:
+      ion:
         condition: service_healthy
     networks:
-      - docforge-net
+      - ion-net
     healthcheck:
       test: ["CMD", "filebeat", "test", "config"]
       interval: 30s
@@ -103,16 +103,16 @@ services:
 # Networks
 # =============================================================================
 networks:
-  docforge-net:
+  ion-net:
     driver: bridge
 
 # =============================================================================
 # Volumes
 # =============================================================================
 volumes:
-  docforge-data:
-    name: docforge-data
-  docforge-logs:
-    name: docforge-logs
+  ion-data:
+    name: ion-data
+  ion-logs:
+    name: ion-logs
   filebeat-data:
-    name: docforge-filebeat-data
+    name: ion-filebeat-data

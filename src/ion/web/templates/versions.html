@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Version History - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Version History: <span id="template-name">Loading...</span></h1>
+    <div class="header-actions">
+        <button id="checkpoint-btn" class="btn btn-primary">Create Checkpoint</button>
+        <a href="/templates/{{ template_id }}" class="btn">Back to Template</a>
+    </div>
+</div>
+
+<div id="versions-list" class="versions-container">
+    <p class="loading">Loading...</p>
+</div>
+
+<!-- Version Detail Modal -->
+<div id="version-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Version <span id="modal-version-num"></span></h2>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="modal-meta" class="meta-bar"></div>
+            <h4>Content</h4>
+            <pre id="modal-content" class="code-block"></pre>
+            <div id="modal-diff-section" style="display: none;">
+                <h4>Changes (Diff)</h4>
+                <pre id="modal-diff" class="code-block diff"></pre>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="rollback-btn" class="btn btn-danger">Rollback to This Version</button>
+            <button class="btn" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% raw %}
+const templateId = {% endraw %}{{ template_id }}{% raw %};
+let currentVersionNum = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const template = await api.get('/api/templates/' + templateId);
+        document.getElementById('template-name').textContent = template.name;
+        loadVersions();
+    } catch (e) {
+        showToast('Failed to load template', 'error');
+    }
+});
+
+async function loadVersions() {
+    try {
+        const versions = await api.get('/api/templates/' + templateId + '/versions');
+        const container = document.getElementById('versions-list');
+
+        if (versions.length === 0) {
+            container.innerHTML = '<p class="empty-state">No versions found</p>';
+            return;
+        }
+
+        let html = '';
+        versions.forEach(function(v) {
+            html += '<div class="version-item ' + (v.is_checkpoint ? 'checkpoint' : '') + '">';
+            html += '<div class="version-header">';
+            html += '<span class="version-number">v' + v.version_number + '</span>';
+            if (v.is_checkpoint) {
+                html += '<span class="checkpoint-badge">' + escapeHtml(v.checkpoint_name) + '</span>';
+            }
+            html += '</div>';
+            html += '<div class="version-meta">';
+            html += '<span>' + (v.message || 'No message') + '</span>';
+            html += '<span>' + formatDate(v.created_at) + '</span>';
+            html += '</div>';
+            html += '<div class="version-actions">';
+            html += '<button class="btn btn-sm" onclick="viewVersion(' + v.version_number + ')">View</button>';
+            if (v.version_number > 1) {
+                html += '<button class="btn btn-sm" onclick="showDiff(' + (v.version_number - 1) + ', ' + v.version_number + ')">Diff</button>';
+            }
+            html += '</div>';
+            html += '</div>';
+        });
+        container.innerHTML = html;
+    } catch (e) {
+        document.getElementById('versions-list').innerHTML = '<p class="error">Failed to load versions</p>';
+    }
+}
+
+async function viewVersion(versionNum) {
+    try {
+        const version = await api.get('/api/templates/' + templateId + '/versions/' + versionNum);
+        currentVersionNum = versionNum;
+
+        document.getElementById('modal-version-num').textContent = versionNum;
+        let metaHtml = '';
+        if (version.is_checkpoint) {
+            metaHtml += '<span class="checkpoint-badge">' + escapeHtml(version.checkpoint_name) + '</span>';
+        }
+        metaHtml += '<span>' + (version.message || 'No message') + '</span>';
+        metaHtml += '<span>' + formatDate(version.created_at) + '</span>';
+        document.getElementById('modal-meta').innerHTML = metaHtml;
+        document.getElementById('modal-content').textContent = version.content;
+        document.getElementById('modal-diff-section').style.display = 'none';
+        document.getElementById('version-modal').style.display = 'flex';
+    } catch (e) {
+        showToast('Failed to load version', 'error');
+    }
+}
+
+async function showDiff(fromVersion, toVersion) {
+    try {
+        const diff = await api.get('/api/templates/' + templateId + '/diff/' + fromVersion + '/' + toVersion);
+        currentVersionNum = toVersion;
+
+        document.getElementById('modal-version-num').textContent = fromVersion + ' -> ' + toVersion;
+        document.getElementById('modal-meta').innerHTML = '<span>Comparing versions</span>';
+        document.getElementById('modal-content').textContent = '';
+        document.getElementById('modal-diff').textContent = diff.diff || 'No changes';
+        document.getElementById('modal-diff-section').style.display = 'block';
+        document.getElementById('version-modal').style.display = 'flex';
+    } catch (e) {
+        showToast('Failed to load diff', 'error');
+    }
+}
+
+function closeModal() {
+    document.getElementById('version-modal').style.display = 'none';
+}
+
+document.getElementById('checkpoint-btn').addEventListener('click', async () => {
+    const name = prompt('Checkpoint name (e.g., v1.0):');
+    if (!name) return;
+
+    const message = prompt('Checkpoint message (optional):');
+
+    try {
+        await api.post('/api/templates/' + templateId + '/checkpoint', { name: name, message: message });
+        showToast('Checkpoint created', 'success');
+        loadVersions();
+    } catch (e) {
+        showToast(e.message || 'Failed to create checkpoint', 'error');
+    }
+});
+
+document.getElementById('rollback-btn').addEventListener('click', async () => {
+    if (!currentVersionNum) return;
+    if (!confirm('Rollback to version ' + currentVersionNum + '? This will create a new version with that content.')) return;
+
+    try {
+        await api.post('/api/templates/' + templateId + '/rollback/' + currentVersionNum);
+        showToast('Rollback successful', 'success');
+        closeModal();
+        loadVersions();
+    } catch (e) {
+        showToast(e.message || 'Rollback failed', 'error');
+    }
+});
+
+// Close modal on outside click
+document.getElementById('version-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'version-modal') closeModal();
+});
+{% endraw %}
+</script>
+{% endblock %}

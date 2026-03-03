@@ -2,8 +2,8 @@
 
 import pytest
 
-from docforge.engine.renderer import TemplateRenderer
-from docforge.core.exceptions import RenderError
+from ion.engine.renderer import TemplateRenderer
+from ion.core.exceptions import RenderError
 
 
 class TestTemplateRenderer:

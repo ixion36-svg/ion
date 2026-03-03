@@ -1,12 +1,12 @@
 #!/bin/bash
 # =============================================================================
-# Generate Self-Signed TLS Certificates for DocForge
+# Generate Self-Signed TLS Certificates for ION
 # =============================================================================
 # This script generates self-signed certificates for testing/development.
 # For production, use certificates from your organization's CA or Let's Encrypt.
 #
 # Usage: ./generate-certs.sh [hostname]
-# Example: ./generate-certs.sh docforge.local
+# Example: ./generate-certs.sh ion.local
 # =============================================================================
 
 set -e
@@ -34,7 +34,7 @@ echo "[2/3] Generating certificate signing request..."
 openssl req -new \
     -key "${SSL_DIR}/server.key" \
     -out "${SSL_DIR}/server.csr" \
-    -subj "/C=US/ST=State/L=City/O=Organization/OU=DocForge/CN=${HOSTNAME}"
+    -subj "/C=US/ST=State/L=City/O=Organization/OU=ION/CN=${HOSTNAME}"
 
 # Generate self-signed certificate
 echo "[3/3] Generating self-signed certificate..."

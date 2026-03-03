@@ -1,0 +1,1386 @@
+{% extends "base.html" %}
+
+{% block title %}Discover - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Discover & Hunt</h1>
+    <p class="page-subtitle">Search across Elasticsearch indices, browse data, and hunt for IOCs</p>
+</div>
+
+<!-- Tool Tabs -->
+<div class="tools-tabs">
+    <button class="tool-tab active" onclick="switchDiscoverTab('search')">Discover Search</button>
+    <button class="tool-tab" onclick="switchDiscoverTab('indices')">Index Browser</button>
+    <button class="tool-tab" onclick="switchDiscoverTab('ioc-hunt')">IOC Hunt</button>
+</div>
+
+<!-- ==================== DISCOVER SEARCH TAB ==================== -->
+<div id="tab-search" class="tool-tab-content active">
+    <div class="tools-panel section-panel">
+        <div class="panel-header">
+            <h3>Search Query</h3>
+        </div>
+        <div class="discover-search-form">
+            <div class="form-row">
+                <div class="form-group" style="flex: 2;">
+                    <label for="search-index">Index Pattern</label>
+                    <input type="text" id="search-index" class="form-control" value="*,-.*" placeholder="e.g., logs-*, filebeat-*">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label for="search-time-field">Time Field</label>
+                    <input type="text" id="search-time-field" class="form-control" value="@timestamp">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label for="search-time-from">From</label>
+                    <select id="search-time-from" class="form-control">
+                        <option value="now-15m">Last 15 minutes</option>
+                        <option value="now-1h">Last 1 hour</option>
+                        <option value="now-4h">Last 4 hours</option>
+                        <option value="now-24h" selected>Last 24 hours</option>
+                        <option value="now-7d">Last 7 days</option>
+                        <option value="now-30d">Last 30 days</option>
+                        <option value="now-90d">Last 90 days</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label for="search-size">Results</label>
+                    <select id="search-size" class="form-control">
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100" selected>100</option>
+                        <option value="500">500</option>
+                        <option value="1000">1000</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="search-query">Query (Lucene/KQL syntax)</label>
+                <input type="text" id="search-query" class="form-control" value="*" placeholder="e.g., error AND host.name:SRV* OR source.ip:192.168.*">
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeDiscoverSearch()">Search</button>
+                <button class="btn" onclick="getHistogram()">Show Histogram</button>
+                <button class="btn" onclick="exportSearchResults()">Export CSV</button>
+                <div class="saved-searches-actions">
+                    <button class="btn" onclick="openSaveSearchModal()">Save Search</button>
+                    <button class="btn" onclick="toggleSavedSearchesPanel()">Saved Searches</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Saved Searches Panel -->
+    <div class="tools-panel section-panel saved-searches-panel" id="saved-searches-panel" style="display: none;">
+        <div class="panel-header">
+            <h3>Saved Searches</h3>
+            <button class="btn btn-sm" onclick="loadSavedSearches()">Refresh</button>
+        </div>
+        <div class="saved-searches-container">
+            <div class="saved-searches-section" id="saved-searches-favorites">
+                <h4>Favorites</h4>
+                <div class="saved-searches-list" id="favorites-list"></div>
+            </div>
+            <div class="saved-searches-section" id="saved-searches-mine">
+                <h4>My Searches</h4>
+                <div class="saved-searches-list" id="my-searches-list"></div>
+            </div>
+            <div class="saved-searches-section" id="saved-searches-shared">
+                <h4>Shared Searches</h4>
+                <div class="saved-searches-list" id="shared-searches-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Search Modal -->
+    <div class="modal-overlay" id="save-search-modal" style="display: none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="save-search-modal-title">Save Search</h3>
+                <button class="modal-close" onclick="closeSaveSearchModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="save-search-name">Name</label>
+                    <input type="text" id="save-search-name" class="form-control" placeholder="Enter a name for this search">
+                </div>
+                <div class="form-group">
+                    <label for="save-search-description">Description (optional)</label>
+                    <textarea id="save-search-description" class="form-control" rows="2" placeholder="Describe what this search does"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="save-search-shared">
+                        Share with team
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeSaveSearchModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSearch()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Histogram -->
+    <div class="tools-panel section-panel" id="histogram-panel" style="display: none;">
+        <div class="panel-header">
+            <h3>Event Timeline</h3>
+            <span id="histogram-total" class="badge"></span>
+        </div>
+        <div class="histogram-container" id="histogram-container"></div>
+    </div>
+
+    <!-- Search Results -->
+    <div class="tools-panel section-panel">
+        <div class="panel-header">
+            <h3>Results</h3>
+            <span id="search-result-count" class="badge">0 hits</span>
+        </div>
+        <div class="search-results-container">
+            <table class="data-table" id="search-results-table">
+                <thead>
+                    <tr id="search-results-header">
+                        <th>@timestamp</th>
+                        <th>_index</th>
+                        <th>message</th>
+                    </tr>
+                </thead>
+                <tbody id="search-results-body">
+                    <tr><td colspan="3" class="empty-state">Enter a query and click Search</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== INDEX BROWSER TAB ==================== -->
+<div id="tab-indices" class="tool-tab-content" style="display: none;">
+    <div class="tools-panel section-panel">
+        <div class="panel-header">
+            <h3>Available Indices</h3>
+            <div class="panel-actions">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="include-system-indices" onchange="loadIndices()">
+                    Include system indices
+                </label>
+                <button class="btn btn-sm" onclick="loadIndices()">Refresh</button>
+            </div>
+        </div>
+        <div class="indices-container">
+            <table class="data-table" id="indices-table">
+                <thead>
+                    <tr>
+                        <th>Index Name</th>
+                        <th>Health</th>
+                        <th>Documents</th>
+                        <th>Size</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="indices-body">
+                    <tr><td colspan="5" class="empty-state">Loading indices...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Field Mappings Panel -->
+    <div class="tools-panel section-panel" id="mappings-panel" style="display: none;">
+        <div class="panel-header">
+            <h3>Field Mappings: <span id="mappings-index-name"></span></h3>
+            <span id="mappings-field-count" class="badge"></span>
+        </div>
+        <div class="mappings-container">
+            <table class="data-table" id="mappings-table">
+                <thead>
+                    <tr>
+                        <th>Field Name</th>
+                        <th>Type</th>
+                        <th>Searchable</th>
+                        <th>Aggregatable</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="mappings-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Field Stats Panel -->
+    <div class="tools-panel section-panel" id="field-stats-panel" style="display: none;">
+        <div class="panel-header">
+            <h3>Field Statistics: <span id="field-stats-name"></span></h3>
+        </div>
+        <div class="field-stats-container">
+            <div class="stats-summary" id="field-stats-summary"></div>
+            <table class="data-table" id="field-stats-table">
+                <thead>
+                    <tr>
+                        <th>Value</th>
+                        <th>Count</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="field-stats-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== IOC HUNT TAB ==================== -->
+<div id="tab-ioc-hunt" class="tool-tab-content" style="display: none;">
+    <div class="tools-panel section-panel">
+        <div class="panel-header">
+            <h3>IOC Hunt</h3>
+        </div>
+        <div class="ioc-hunt-form">
+            <div class="form-row">
+                <div class="form-group" style="flex: 2;">
+                    <label for="ioc-value">IOC Value</label>
+                    <input type="text" id="ioc-value" class="form-control" placeholder="Enter IP, hash, domain, URL, or email...">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label for="ioc-type">Type (auto-detected)</label>
+                    <select id="ioc-type" class="form-control">
+                        <option value="">Auto-detect</option>
+                        <option value="ip">IP Address</option>
+                        <option value="hash">Hash (MD5/SHA1/SHA256)</option>
+                        <option value="domain">Domain</option>
+                        <option value="url">URL</option>
+                        <option value="email">Email</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label for="ioc-time-from">Time Range</label>
+                    <select id="ioc-time-from" class="form-control">
+                        <option value="now-24h">Last 24 hours</option>
+                        <option value="now-7d">Last 7 days</option>
+                        <option value="now-30d" selected>Last 30 days</option>
+                        <option value="now-90d">Last 90 days</option>
+                        <option value="">All time</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label for="ioc-index">Index Pattern</label>
+                    <input type="text" id="ioc-index" class="form-control" value="*,-.*">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeIOCHunt()">Hunt</button>
+                <button class="btn" onclick="clearIOCHunt()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk IOC Hunt -->
+    <div class="tools-panel section-panel">
+        <div class="panel-header">
+            <h3>Bulk IOC Hunt</h3>
+        </div>
+        <div class="bulk-ioc-form">
+            <div class="form-group">
+                <label for="bulk-iocs">IOC Values (one per line)</label>
+                <textarea id="bulk-iocs" class="form-control" rows="5" placeholder="185.220.101.32&#10;evil.com&#10;d41d8cd98f00b204e9800998ecf8427e"></textarea>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeBulkIOCHunt()">Hunt All</button>
+                <button class="btn" onclick="document.getElementById('bulk-iocs').value = ''">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hunt Results -->
+    <div class="tools-panel section-panel">
+        <div class="panel-header">
+            <h3>Hunt Results</h3>
+            <span id="ioc-hunt-result-count" class="badge"></span>
+        </div>
+
+        <!-- Single IOC Results -->
+        <div id="ioc-single-results" style="display: none;">
+            <div class="ioc-hunt-summary" id="ioc-hunt-summary"></div>
+            <div class="ioc-indices-found" id="ioc-indices-found"></div>
+            <table class="data-table" id="ioc-hunt-table">
+                <thead>
+                    <tr>
+                        <th>@timestamp</th>
+                        <th>Index</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="ioc-hunt-body"></tbody>
+            </table>
+        </div>
+
+        <!-- Bulk IOC Results -->
+        <div id="ioc-bulk-results" style="display: none;">
+            <div class="bulk-summary" id="bulk-summary"></div>
+            <table class="data-table" id="bulk-results-table">
+                <thead>
+                    <tr>
+                        <th>IOC Value</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Hits</th>
+                        <th>Indices</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="bulk-results-body"></tbody>
+            </table>
+        </div>
+
+        <div id="ioc-empty-state" class="empty-state">
+            Enter an IOC value and click Hunt to search across all indices
+        </div>
+    </div>
+</div>
+
+<style>
+/* Discover page specific styles */
+.page-subtitle {
+    color: var(--text-secondary);
+    margin-top: 0.5rem;
+}
+
+.discover-search-form,
+.ioc-hunt-form,
+.bulk-ioc-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.form-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.form-group label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.form-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.search-results-container,
+.indices-container,
+.mappings-container,
+.field-stats-container {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.data-table th {
+    background: var(--bg-secondary);
+    position: sticky;
+    top: 0;
+}
+
+.data-table tr:hover {
+    background: var(--bg-hover);
+}
+
+.empty-state {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem;
+}
+
+.badge {
+    background: var(--accent-color);
+    color: var(--bg-primary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.health-green { color: #4caf50; }
+.health-yellow { color: #ff9800; }
+.health-red { color: #f44336; }
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.ioc-hunt-summary {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.ioc-hunt-summary .stat {
+    display: flex;
+    flex-direction: column;
+}
+
+.ioc-hunt-summary .stat-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.ioc-hunt-summary .stat-value {
+    font-size: 1.25rem;
+    font-weight: bold;
+}
+
+.ioc-indices-found {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.ioc-indices-found .index-badge {
+    background: var(--bg-tertiary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.bulk-summary {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.found-badge { color: #4caf50; }
+.not-found-badge { color: var(--text-secondary); }
+
+.histogram-container {
+    height: 150px;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    padding: 1rem;
+}
+
+.histogram-bar {
+    flex: 1;
+    background: var(--accent-color);
+    min-width: 8px;
+    transition: height 0.3s ease;
+}
+
+.histogram-bar:hover {
+    opacity: 0.8;
+}
+
+.stats-summary {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.clickable {
+    cursor: pointer;
+    color: var(--accent-color);
+}
+
+.clickable:hover {
+    text-decoration: underline;
+}
+
+/* Saved Searches styles */
+.saved-searches-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.saved-searches-panel {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.saved-searches-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.saved-searches-section h4 {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.saved-searches-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.saved-search-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.saved-search-item:hover {
+    background: var(--bg-hover);
+}
+
+.saved-search-favorite {
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.saved-search-favorite.active {
+    color: #f1c40f;
+}
+
+.saved-search-info {
+    flex: 1;
+}
+
+.saved-search-name {
+    font-weight: 500;
+}
+
+.saved-search-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.saved-search-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.saved-search-actions .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+/* Modal styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-dialog {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.modal-close:hover {
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.empty-searches {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    padding: 0.5rem;
+}
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Tab switching
+function switchDiscoverTab(tabName) {
+    document.querySelectorAll('.tool-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tool-tab-content').forEach(t => t.style.display = 'none');
+
+    event.target.classList.add('active');
+    document.getElementById('tab-' + tabName).style.display = 'block';
+
+    // Load data for the tab
+    if (tabName === 'indices') {
+        loadIndices();
+    }
+}
+
+// ==================== DISCOVER SEARCH ====================
+
+async function executeDiscoverSearch() {
+    const indexPattern = document.getElementById('search-index').value;
+    const query = document.getElementById('search-query').value;
+    const timeField = document.getElementById('search-time-field').value;
+    const timeFrom = document.getElementById('search-time-from').value;
+    const size = parseInt(document.getElementById('search-size').value);
+
+    try {
+        const response = await fetch('/api/elasticsearch/discover/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                index_pattern: indexPattern,
+                query: query,
+                time_field: timeField,
+                time_from: timeFrom,
+                time_to: 'now',
+                size: size
+            })
+        });
+
+        if (!response.ok) throw new Error('Search failed');
+
+        const data = await response.json();
+        displaySearchResults(data);
+    } catch (error) {
+        showToast('Search failed: ' + error.message, 'error');
+    }
+}
+
+function displaySearchResults(data) {
+    const tbody = document.getElementById('search-results-body');
+    const countBadge = document.getElementById('search-result-count');
+
+    countBadge.textContent = `${data.total} hits (${data.took_ms}ms)`;
+
+    if (!data.hits || data.hits.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No results found</td></tr>';
+        return;
+    }
+
+    // Get all unique keys from results
+    const allKeys = new Set();
+    data.hits.forEach(hit => {
+        Object.keys(hit).forEach(k => {
+            if (!k.startsWith('_')) allKeys.add(k);
+        });
+    });
+
+    // Build table
+    const priorityFields = ['@timestamp', '_index', 'message', 'host.name', 'source.ip', 'user.name', 'event.action'];
+    const displayFields = priorityFields.filter(f => allKeys.has(f));
+    if (displayFields.length < 5) {
+        [...allKeys].filter(k => !displayFields.includes(k)).slice(0, 5 - displayFields.length).forEach(k => displayFields.push(k));
+    }
+
+    // Update header
+    const header = document.getElementById('search-results-header');
+    header.innerHTML = displayFields.map(f => `<th>${f}</th>`).join('');
+
+    // Update body
+    tbody.innerHTML = data.hits.map(hit => {
+        const cells = displayFields.map(f => {
+            let val = hit[f];
+            if (val === undefined || val === null) val = '-';
+            if (typeof val === 'object') val = JSON.stringify(val);
+            if (typeof val === 'string' && val.length > 100) val = val.substring(0, 100) + '...';
+            return `<td>${escapeHtml(String(val))}</td>`;
+        }).join('');
+        return `<tr>${cells}</tr>`;
+    }).join('');
+}
+
+async function getHistogram() {
+    const indexPattern = document.getElementById('search-index').value;
+    const query = document.getElementById('search-query').value;
+    const timeField = document.getElementById('search-time-field').value;
+    const timeFrom = document.getElementById('search-time-from').value;
+
+    try {
+        const response = await fetch('/api/elasticsearch/discover/histogram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                index_pattern: indexPattern,
+                query: query,
+                time_field: timeField,
+                time_from: timeFrom,
+                time_to: 'now',
+                interval: '1h'
+            })
+        });
+
+        if (!response.ok) throw new Error('Histogram failed');
+
+        const data = await response.json();
+        displayHistogram(data);
+    } catch (error) {
+        showToast('Histogram failed: ' + error.message, 'error');
+    }
+}
+
+function displayHistogram(data) {
+    const panel = document.getElementById('histogram-panel');
+    const container = document.getElementById('histogram-container');
+    const total = document.getElementById('histogram-total');
+
+    panel.style.display = 'block';
+    total.textContent = `${data.total} total events`;
+
+    if (!data.buckets || data.buckets.length === 0) {
+        container.innerHTML = '<div class="empty-state">No data for histogram</div>';
+        return;
+    }
+
+    const maxCount = Math.max(...data.buckets.map(b => b.count));
+    container.innerHTML = data.buckets.map(b => {
+        const height = maxCount > 0 ? (b.count / maxCount * 100) : 0;
+        return `<div class="histogram-bar" style="height: ${height}%" title="${b.timestamp}: ${b.count} events"></div>`;
+    }).join('');
+}
+
+function exportSearchResults() {
+    showToast('Export functionality coming soon', 'info');
+}
+
+// ==================== INDEX BROWSER ====================
+
+async function loadIndices() {
+    const includeSystem = document.getElementById('include-system-indices').checked;
+
+    try {
+        const response = await fetch(`/api/elasticsearch/indices?include_system=${includeSystem}&include_stats=true`);
+        if (!response.ok) throw new Error('Failed to load indices');
+
+        const data = await response.json();
+        displayIndices(data);
+    } catch (error) {
+        showToast('Failed to load indices: ' + error.message, 'error');
+    }
+}
+
+function displayIndices(data) {
+    const tbody = document.getElementById('indices-body');
+
+    if (!data.indices || data.indices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No indices found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = data.indices.map(idx => `
+        <tr>
+            <td class="clickable" onclick="loadMappings('${idx.name}')">${idx.name}</td>
+            <td><span class="health-${idx.health}">${idx.health}</span></td>
+            <td>${idx.doc_count.toLocaleString()}</td>
+            <td>${idx.size}</td>
+            <td>
+                <button class="btn btn-sm" onclick="loadMappings('${idx.name}')">Fields</button>
+                <button class="btn btn-sm" onclick="searchIndex('${idx.name}')">Search</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function loadMappings(indexName) {
+    try {
+        const response = await fetch(`/api/elasticsearch/indices/${encodeURIComponent(indexName)}/mappings`);
+        if (!response.ok) throw new Error('Failed to load mappings');
+
+        const data = await response.json();
+        displayMappings(indexName, data);
+    } catch (error) {
+        showToast('Failed to load mappings: ' + error.message, 'error');
+    }
+}
+
+function displayMappings(indexName, data) {
+    const panel = document.getElementById('mappings-panel');
+    const indexNameSpan = document.getElementById('mappings-index-name');
+    const countBadge = document.getElementById('mappings-field-count');
+    const tbody = document.getElementById('mappings-body');
+
+    panel.style.display = 'block';
+    indexNameSpan.textContent = indexName;
+    countBadge.textContent = `${data.total} fields`;
+
+    tbody.innerHTML = data.fields.map(f => `
+        <tr>
+            <td>${f.name}</td>
+            <td>${f.type}</td>
+            <td>${f.searchable ? 'Yes' : 'No'}</td>
+            <td>${f.aggregatable ? 'Yes' : 'No'}</td>
+            <td>
+                ${f.aggregatable ? `<button class="btn btn-sm" onclick="loadFieldStats('${indexName}', '${f.name}')">Stats</button>` : ''}
+                <button class="btn btn-sm" onclick="searchField('${indexName}', '${f.name}')">Search</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function loadFieldStats(indexName, fieldName) {
+    try {
+        const response = await fetch('/api/elasticsearch/indices/field-stats', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                index_pattern: indexName,
+                field: fieldName,
+                size: 20,
+                time_from: null
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to load field stats');
+
+        const data = await response.json();
+        displayFieldStats(fieldName, data);
+    } catch (error) {
+        showToast('Failed to load field stats: ' + error.message, 'error');
+    }
+}
+
+function displayFieldStats(fieldName, data) {
+    const panel = document.getElementById('field-stats-panel');
+    const nameSpan = document.getElementById('field-stats-name');
+    const summary = document.getElementById('field-stats-summary');
+    const tbody = document.getElementById('field-stats-body');
+
+    panel.style.display = 'block';
+    nameSpan.textContent = fieldName;
+
+    summary.innerHTML = `
+        <div class="stat"><span class="stat-label">Unique Values</span><span class="stat-value">${data.unique_count.toLocaleString()}</span></div>
+        <div class="stat"><span class="stat-label">Total Count</span><span class="stat-value">${data.total_count.toLocaleString()}</span></div>
+        <div class="stat"><span class="stat-label">Documents</span><span class="stat-value">${data.doc_count.toLocaleString()}</span></div>
+    `;
+
+    tbody.innerHTML = data.top_values.map(v => `
+        <tr>
+            <td>${v.value !== null ? escapeHtml(String(v.value)) : '<em>null</em>'}</td>
+            <td>${v.count.toLocaleString()}</td>
+            <td><button class="btn btn-sm" onclick="huntIOC('${escapeHtml(String(v.value))}')">Hunt</button></td>
+        </tr>
+    `).join('');
+}
+
+function searchIndex(indexName) {
+    document.getElementById('search-index').value = indexName;
+    switchDiscoverTab('search');
+    document.querySelector('.tool-tab').click();
+}
+
+function searchField(indexName, fieldName) {
+    document.getElementById('search-index').value = indexName;
+    document.getElementById('search-query').value = `${fieldName}:*`;
+    switchDiscoverTab('search');
+    document.querySelector('.tool-tab').click();
+}
+
+// ==================== IOC HUNT ====================
+
+async function executeIOCHunt() {
+    const iocValue = document.getElementById('ioc-value').value.trim();
+    if (!iocValue) {
+        showToast('Please enter an IOC value', 'warning');
+        return;
+    }
+
+    const iocType = document.getElementById('ioc-type').value || null;
+    const timeFrom = document.getElementById('ioc-time-from').value || null;
+    const indexPattern = document.getElementById('ioc-index').value;
+
+    try {
+        const response = await fetch('/api/elasticsearch/ioc-hunt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ioc_value: iocValue,
+                ioc_type: iocType,
+                index_pattern: indexPattern,
+                time_from: timeFrom,
+                time_to: 'now',
+                size: 100
+            })
+        });
+
+        if (!response.ok) throw new Error('IOC hunt failed');
+
+        const data = await response.json();
+        displayIOCHuntResults(data);
+    } catch (error) {
+        showToast('IOC hunt failed: ' + error.message, 'error');
+    }
+}
+
+function displayIOCHuntResults(data) {
+    document.getElementById('ioc-empty-state').style.display = 'none';
+    document.getElementById('ioc-bulk-results').style.display = 'none';
+    document.getElementById('ioc-single-results').style.display = 'block';
+
+    const countBadge = document.getElementById('ioc-hunt-result-count');
+    const summary = document.getElementById('ioc-hunt-summary');
+    const indices = document.getElementById('ioc-indices-found');
+    const tbody = document.getElementById('ioc-hunt-body');
+
+    countBadge.textContent = `${data.total} hits`;
+
+    summary.innerHTML = `
+        <div class="stat"><span class="stat-label">IOC Value</span><span class="stat-value">${escapeHtml(data.ioc_value)}</span></div>
+        <div class="stat"><span class="stat-label">Type</span><span class="stat-value">${data.ioc_type}</span></div>
+        <div class="stat"><span class="stat-label">Hits</span><span class="stat-value">${data.total}</span></div>
+        <div class="stat"><span class="stat-label">Time</span><span class="stat-value">${data.took_ms}ms</span></div>
+    `;
+
+    indices.innerHTML = data.indices_found.map(i =>
+        `<span class="index-badge">${i.index}: ${i.count}</span>`
+    ).join('');
+
+    if (data.hits.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No hits found for this IOC</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = data.hits.map(hit => {
+        const details = Object.entries(hit)
+            .filter(([k]) => !k.startsWith('_') && k !== '@timestamp')
+            .slice(0, 5)
+            .map(([k, v]) => `<strong>${k}:</strong> ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+            .join(' | ');
+        return `
+            <tr>
+                <td>${hit['@timestamp'] || '-'}</td>
+                <td>${hit._index}</td>
+                <td>${escapeHtml(details.substring(0, 200))}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+async function executeBulkIOCHunt() {
+    const iocs = document.getElementById('bulk-iocs').value.trim().split('\n').filter(l => l.trim());
+    if (iocs.length === 0) {
+        showToast('Please enter at least one IOC', 'warning');
+        return;
+    }
+
+    const timeFrom = document.getElementById('ioc-time-from').value || null;
+    const indexPattern = document.getElementById('ioc-index').value;
+
+    try {
+        const response = await fetch('/api/elasticsearch/ioc-hunt/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ioc_values: iocs,
+                index_pattern: indexPattern,
+                time_from: timeFrom,
+                time_to: 'now'
+            })
+        });
+
+        if (!response.ok) throw new Error('Bulk IOC hunt failed');
+
+        const data = await response.json();
+        displayBulkIOCResults(data);
+    } catch (error) {
+        showToast('Bulk IOC hunt failed: ' + error.message, 'error');
+    }
+}
+
+function displayBulkIOCResults(data) {
+    document.getElementById('ioc-empty-state').style.display = 'none';
+    document.getElementById('ioc-single-results').style.display = 'none';
+    document.getElementById('ioc-bulk-results').style.display = 'block';
+
+    const countBadge = document.getElementById('ioc-hunt-result-count');
+    const summary = document.getElementById('bulk-summary');
+    const tbody = document.getElementById('bulk-results-body');
+
+    countBadge.textContent = `${data.found_count}/${data.total_searched} found`;
+
+    summary.innerHTML = `
+        <div class="stat"><span class="stat-label">Total Searched</span><span class="stat-value">${data.total_searched}</span></div>
+        <div class="stat"><span class="stat-label">Found</span><span class="stat-value found-badge">${data.found_count}</span></div>
+        <div class="stat"><span class="stat-label">Not Found</span><span class="stat-value not-found-badge">${data.not_found_count}</span></div>
+    `;
+
+    tbody.innerHTML = data.results.map(r => `
+        <tr>
+            <td>${escapeHtml(r.ioc_value)}</td>
+            <td>${r.ioc_type}</td>
+            <td><span class="${r.found ? 'found-badge' : 'not-found-badge'}">${r.found ? 'Found' : 'Not Found'}</span></td>
+            <td>${r.hit_count}</td>
+            <td>${r.indices.slice(0, 3).join(', ')}${r.indices.length > 3 ? '...' : ''}</td>
+            <td>${r.found ? `<button class="btn btn-sm" onclick="huntIOC('${escapeHtml(r.ioc_value)}')">Details</button>` : ''}</td>
+        </tr>
+    `).join('');
+}
+
+function huntIOC(value) {
+    document.getElementById('ioc-value').value = value;
+    switchDiscoverTab('ioc-hunt');
+    document.querySelectorAll('.tool-tab')[2].click();
+    executeIOCHunt();
+}
+
+function clearIOCHunt() {
+    document.getElementById('ioc-value').value = '';
+    document.getElementById('ioc-empty-state').style.display = 'block';
+    document.getElementById('ioc-single-results').style.display = 'none';
+    document.getElementById('ioc-bulk-results').style.display = 'none';
+}
+
+// Utility functions
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showToast(message, type = 'info') {
+    // Use existing toast function if available
+    if (typeof window.showToast === 'function') {
+        window.showToast(message, type);
+    } else {
+        alert(message);
+    }
+}
+
+// ==================== SAVED SEARCHES ====================
+
+let savedSearchesData = [];
+let editingSearchId = null;
+
+async function loadSavedSearches() {
+    try {
+        const response = await fetch('/api/saved-searches?search_type=discover');
+        if (!response.ok) throw new Error('Failed to load saved searches');
+
+        const data = await response.json();
+        savedSearchesData = data.saved_searches || [];
+        displaySavedSearches();
+    } catch (error) {
+        showToast('Failed to load saved searches: ' + error.message, 'error');
+    }
+}
+
+function displaySavedSearches() {
+    const favoritesList = document.getElementById('favorites-list');
+    const myList = document.getElementById('my-searches-list');
+    const sharedList = document.getElementById('shared-searches-list');
+
+    // Get current user ID from somewhere (we'll approximate by checking created_by)
+    const favorites = savedSearchesData.filter(s => s.is_favorite);
+    const mine = savedSearchesData.filter(s => !s.is_shared || s.created_by_id === getCurrentUserId());
+    const shared = savedSearchesData.filter(s => s.is_shared && s.created_by_id !== getCurrentUserId());
+
+    favoritesList.innerHTML = favorites.length > 0
+        ? favorites.map(s => renderSavedSearchItem(s)).join('')
+        : '<div class="empty-searches">No favorites yet</div>';
+
+    myList.innerHTML = mine.length > 0
+        ? mine.map(s => renderSavedSearchItem(s)).join('')
+        : '<div class="empty-searches">No saved searches</div>';
+
+    sharedList.innerHTML = shared.length > 0
+        ? shared.map(s => renderSavedSearchItem(s)).join('')
+        : '<div class="empty-searches">No shared searches</div>';
+}
+
+function renderSavedSearchItem(search) {
+    const isOwner = search.created_by_id === getCurrentUserId();
+    const lastRun = search.last_executed_at ? new Date(search.last_executed_at).toLocaleDateString() : 'Never';
+
+    return `
+        <div class="saved-search-item" data-id="${search.id}">
+            <span class="saved-search-favorite ${search.is_favorite ? 'active' : ''}"
+                  onclick="event.stopPropagation(); toggleFavorite(${search.id})"
+                  title="${search.is_favorite ? 'Remove from favorites' : 'Add to favorites'}">
+                ${search.is_favorite ? '★' : '☆'}
+            </span>
+            <div class="saved-search-info" onclick="loadSavedSearch(${search.id})">
+                <div class="saved-search-name">${escapeHtml(search.name)}</div>
+                <div class="saved-search-meta">
+                    ${search.is_shared ? '🔗 Shared' : ''}
+                    ${search.execution_count} runs | Last: ${lastRun}
+                    ${!isOwner ? ` | By: ${search.created_by_username || 'Unknown'}` : ''}
+                </div>
+            </div>
+            <div class="saved-search-actions">
+                <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); executeSavedSearch(${search.id})">Run</button>
+                ${isOwner ? `
+                    <button class="btn btn-sm" onclick="event.stopPropagation(); editSavedSearch(${search.id})">Edit</button>
+                    <button class="btn btn-sm" onclick="event.stopPropagation(); deleteSavedSearch(${search.id})">Delete</button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function getCurrentUserId() {
+    // Get from session or global - for now check if window has currentUser
+    if (window.currentUser && window.currentUser.id) {
+        return window.currentUser.id;
+    }
+    return null;
+}
+
+function toggleSavedSearchesPanel() {
+    const panel = document.getElementById('saved-searches-panel');
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        loadSavedSearches();
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function openSaveSearchModal() {
+    editingSearchId = null;
+    document.getElementById('save-search-modal-title').textContent = 'Save Search';
+    document.getElementById('save-search-name').value = '';
+    document.getElementById('save-search-description').value = '';
+    document.getElementById('save-search-shared').checked = false;
+    document.getElementById('save-search-modal').style.display = 'flex';
+}
+
+function closeSaveSearchModal() {
+    document.getElementById('save-search-modal').style.display = 'none';
+    editingSearchId = null;
+}
+
+async function saveSearch() {
+    const name = document.getElementById('save-search-name').value.trim();
+    const description = document.getElementById('save-search-description').value.trim();
+    const isShared = document.getElementById('save-search-shared').checked;
+
+    if (!name) {
+        showToast('Please enter a name for the search', 'warning');
+        return;
+    }
+
+    // Gather current search params
+    const searchParams = {
+        index_pattern: document.getElementById('search-index').value,
+        query: document.getElementById('search-query').value,
+        time_field: document.getElementById('search-time-field').value,
+        time_from: document.getElementById('search-time-from').value,
+        time_to: 'now',
+        size: parseInt(document.getElementById('search-size').value),
+    };
+
+    try {
+        const url = editingSearchId
+            ? `/api/saved-searches/${editingSearchId}`
+            : '/api/saved-searches';
+        const method = editingSearchId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: name,
+                description: description || null,
+                search_type: 'discover',
+                search_params: searchParams,
+                is_shared: isShared,
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.detail || 'Failed to save search');
+        }
+
+        showToast(editingSearchId ? 'Search updated' : 'Search saved', 'success');
+        closeSaveSearchModal();
+        loadSavedSearches();
+    } catch (error) {
+        showToast('Failed to save search: ' + error.message, 'error');
+    }
+}
+
+function loadSavedSearch(searchId) {
+    const search = savedSearchesData.find(s => s.id === searchId);
+    if (!search) return;
+
+    const params = search.search_params;
+
+    // Load params into form
+    if (params.index_pattern) document.getElementById('search-index').value = params.index_pattern;
+    if (params.query) document.getElementById('search-query').value = params.query;
+    if (params.time_field) document.getElementById('search-time-field').value = params.time_field;
+    if (params.time_from) document.getElementById('search-time-from').value = params.time_from;
+    if (params.size) document.getElementById('search-size').value = params.size;
+
+    showToast(`Loaded: ${search.name}`, 'success');
+}
+
+async function executeSavedSearch(searchId) {
+    try {
+        const response = await fetch(`/api/saved-searches/${searchId}/execute`, {
+            method: 'POST',
+        });
+
+        if (!response.ok) throw new Error('Failed to execute search');
+
+        const data = await response.json();
+
+        // Load params into form first
+        const params = data.saved_search.search_params;
+        if (params.index_pattern) document.getElementById('search-index').value = params.index_pattern;
+        if (params.query) document.getElementById('search-query').value = params.query;
+        if (params.time_field) document.getElementById('search-time-field').value = params.time_field;
+        if (params.time_from) document.getElementById('search-time-from').value = params.time_from;
+        if (params.size) document.getElementById('search-size').value = params.size;
+
+        // Display results
+        displaySearchResults(data.results);
+
+        showToast(`Executed: ${data.saved_search.name}`, 'success');
+    } catch (error) {
+        showToast('Failed to execute search: ' + error.message, 'error');
+    }
+}
+
+function editSavedSearch(searchId) {
+    const search = savedSearchesData.find(s => s.id === searchId);
+    if (!search) return;
+
+    editingSearchId = searchId;
+    document.getElementById('save-search-modal-title').textContent = 'Edit Search';
+    document.getElementById('save-search-name').value = search.name;
+    document.getElementById('save-search-description').value = search.description || '';
+    document.getElementById('save-search-shared').checked = search.is_shared;
+
+    // Load the search params into the form first
+    loadSavedSearch(searchId);
+
+    document.getElementById('save-search-modal').style.display = 'flex';
+}
+
+async function deleteSavedSearch(searchId) {
+    const search = savedSearchesData.find(s => s.id === searchId);
+    if (!search) return;
+
+    if (!confirm(`Delete saved search "${search.name}"?`)) return;
+
+    try {
+        const response = await fetch(`/api/saved-searches/${searchId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) throw new Error('Failed to delete search');
+
+        showToast('Search deleted', 'success');
+        loadSavedSearches();
+    } catch (error) {
+        showToast('Failed to delete search: ' + error.message, 'error');
+    }
+}
+
+async function toggleFavorite(searchId) {
+    try {
+        const response = await fetch(`/api/saved-searches/${searchId}/favorite`, {
+            method: 'POST',
+        });
+
+        if (!response.ok) throw new Error('Failed to toggle favorite');
+
+        const data = await response.json();
+
+        // Update local data
+        const search = savedSearchesData.find(s => s.id === searchId);
+        if (search) {
+            search.is_favorite = data.is_favorite;
+        }
+
+        displaySavedSearches();
+    } catch (error) {
+        showToast('Failed to toggle favorite: ' + error.message, 'error');
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    // Tab is already on search by default
+    // Load current user info
+    fetch('/api/auth/me')
+        .then(r => r.json())
+        .then(data => { window.currentUser = data; })
+        .catch(() => {});
+});
+</script>
+{% endblock %}

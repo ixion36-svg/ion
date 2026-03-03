@@ -1,16 +1,16 @@
-# IXION OpenCTI Integration Guide
+# ION OpenCTI Integration Guide
 
-This guide explains how to configure IXION to enrich alert observables (IPs, domains, hashes, URLs) against an OpenCTI threat intelligence platform.
+This guide explains how to configure ION to enrich alert observables (IPs, domains, hashes, URLs) against an OpenCTI threat intelligence platform.
 
 ## Overview
 
-IXION integrates with [OpenCTI](https://www.opencti.io/) via its GraphQL API to provide IOC enrichment directly from the alert investigation page. When an analyst clicks "Enrich via OpenCTI", IXION queries OpenCTI for matching observables, indicators, threat actors, and labels, displaying results inline alongside the alert.
+ION integrates with [OpenCTI](https://www.opencti.io/) via its GraphQL API to provide IOC enrichment directly from the alert investigation page. When an analyst clicks "Enrich via OpenCTI", ION queries OpenCTI for matching observables, indicators, threat actors, and labels, displaying results inline alongside the alert.
 
 ### Architecture
 
 ```
 +-----------------+     GraphQL API     +-----------------+
-|    IXION     |-------------------->|     OpenCTI     |
+|    ION     |-------------------->|     OpenCTI     |
 |  Alert Triage   |<--------------------|   Platform      |
 +-----------------+    Enrichment       +-----------------+
         |              Results                  |
@@ -36,7 +36,7 @@ IXION integrates with [OpenCTI](https://www.opencti.io/) via its GraphQL API to 
 
 ### Enrichment Results
 
-For each matched observable, IXION returns:
+For each matched observable, ION returns:
 
 - **Score**: OpenCTI threat score (0-100)
 - **Indicators**: Linked STIX indicators with names, descriptions, patterns, and scores
@@ -52,7 +52,7 @@ For each matched observable, IXION returns:
 
 ### Via Config File
 
-Add to `.ixion/config.json`:
+Add to `.ion/config.json`:
 
 ```json
 {
@@ -66,10 +66,10 @@ Add to `.ixion/config.json`:
 ### Via Environment Variables
 
 ```bash
-IXION_OPENCTI_ENABLED=true
-IXION_OPENCTI_URL=https://opencti.example.com
-IXION_OPENCTI_TOKEN=5b3d8e6f-2a1c-4b9d-8e7f-3c6a9d4b2e1f
-IXION_OPENCTI_VERIFY_SSL=true
+ION_OPENCTI_ENABLED=true
+ION_OPENCTI_URL=https://opencti.example.com
+ION_OPENCTI_TOKEN=5b3d8e6f-2a1c-4b9d-8e7f-3c6a9d4b2e1f
+ION_OPENCTI_VERIFY_SSL=true
 ```
 
 ### Via API
@@ -182,7 +182,7 @@ This starts 6 services:
 |---------|------|---------|
 | OpenCTI Platform | 8888 | GraphQL API + Web UI |
 | OpenCTI Worker | -- | Background processing |
-| Elasticsearch | 9201 | OpenCTI data store (9201 to avoid clash with IXION ES on 9200) |
+| Elasticsearch | 9201 | OpenCTI data store (9201 to avoid clash with ION ES on 9200) |
 | Redis | 6379 | Cache and event stream |
 | MinIO | 9002 | S3-compatible object storage |
 | RabbitMQ | 5672 / 15672 | Message broker |
@@ -224,7 +224,7 @@ curl -X POST http://localhost:8888/graphql \
   -H "Content-Type: application/json" \
   -d '{"query": "{ me { name } }"}'
 
-# Test IXION enrichment
+# Test ION enrichment
 curl -X POST http://localhost:8000/api/opencti/enrich \
   -H "Content-Type: application/json" \
   -d '{"type": "ipv4-addr", "value": "37.120.198.100"}'
@@ -275,7 +275,7 @@ OpenCTI is not configured. Set `opencti_enabled: true` in config.json or via the
 
 - Verify OpenCTI is running: `curl http://localhost:8888/graphql`
 - Check the URL in config matches the OpenCTI address
-- For Docker setups, ensure network connectivity between IXION and OpenCTI
+- For Docker setups, ensure network connectivity between ION and OpenCTI
 
 ### Enrichment returns "found: false" for known indicators
 
@@ -286,4 +286,4 @@ OpenCTI is not configured. Set `opencti_enabled: true` in config.json or via the
 ### Test connection succeeds but enrichment fails
 
 - The API token may have insufficient permissions. Ensure the user has read access to `stixCyberObservables`, `indicators`, and `stixCoreRelationships`
-- Check IXION server logs for detailed GraphQL error messages
+- Check ION server logs for detailed GraphQL error messages

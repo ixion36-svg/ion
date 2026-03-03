@@ -151,7 +151,7 @@ def main():
             "kibana.alert.rule.consumer": "siem",
             "kibana.alert.rule.producer": "siem",
             "kibana.alert.rule.rule_type_id": "siem.queryRule",
-            "kibana.alert.rule.tags": ["ixion", alert["tactic"]],
+            "kibana.alert.rule.tags": ["ion", alert["tactic"]],
             "kibana.alert.severity": alert["severity"],
             "kibana.alert.risk_score": alert["risk_score"],
             "kibana.alert.workflow_status": random.choice(["open", "open", "open", "acknowledged"]),
@@ -178,7 +178,7 @@ def main():
             "threat.technique.id": [alert["technique"]],
             "threat.technique.name": [alert["technique_name"]],
             "message": alert["description"],
-            "tags": ["ixion", "test-alert"],
+            "tags": ["ion", "test-alert"],
         }
 
         # Add to bulk request

@@ -1,24 +1,24 @@
-# IXION Docker Compose Configuration
-# Intelligence eXchange & Integration Operations Network
+# ION Docker Compose Configuration
+# Intelligent Operating Network
 # For air-gapped/secure environment deployment
 
 version: '3.8'
 
 services:
-  ixion:
-    image: ixion:${IXION_VERSION:-latest}
-    container_name: ixion
+  ion:
+    image: ion:${ION_VERSION:-latest}
+    container_name: ion
     restart: unless-stopped
 
     ports:
-      - "${IXION_PORT:-8000}:8000"
+      - "${ION_PORT:-8000}:8000"
 
     volumes:
       # Persist database and configuration
-      - ixion-data:/data
+      - ion-data:/data
 
       # Optional: Mount custom config file
-      # - ./config.json:/data/.ixion/config.json:ro
+      # - ./config.json:/data/.ion/config.json:ro
 
     # Load environment variables from .env file
     env_file:
@@ -34,7 +34,7 @@ services:
     tmpfs:
       - /tmp
 
-    # Health check — used by seeder to know when IXION is ready
+    # Health check — used by seeder to know when ION is ready
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 10s
@@ -54,7 +54,7 @@ services:
 
     networks:
       - default
-      - ixion-dev
+      - ion-dev
 
     # Logging — override with a Docker logging driver if desired
     # Default: json-file (docker logs). Alternatives: syslog, fluentd, gelf
@@ -63,17 +63,17 @@ services:
     #   options:
     #     syslog-address: "udp://syslog-host:514"
     #     syslog-facility: "local0"
-    #     tag: "ixion"
+    #     tag: "ion"
     # logging:
     #   driver: fluentd
     #   options:
     #     fluentd-address: "fluentd-host:24224"
-    #     tag: "ixion"
+    #     tag: "ion"
     # logging:
     #   driver: gelf
     #   options:
     #     gelf-address: "udp://graylog-host:12201"
-    #     tag: "ixion"
+    #     tag: "ion"
 
     depends_on:
       - ollama
@@ -83,10 +83,10 @@ services:
   # =============================================================================
   ollama:
     image: ollama/ollama:latest
-    container_name: ixion-ollama
+    container_name: ion-ollama
     restart: unless-stopped
 
-    # No ports exposed - Ollama is only accessible via IXION's chat interface
+    # No ports exposed - Ollama is only accessible via ION's chat interface
     # Uncomment below if direct API access is needed for debugging
     # ports:
     #   - "${OLLAMA_PORT:-11434}:11434"
@@ -127,32 +127,32 @@ services:
   # Seeder - One-shot data population
   # =============================================================================
   # Seeds KB articles and playbooks on first run, then exits.
-  # Shares ixion-data volume for .seeded marker persistence.
+  # Shares ion-data volume for .seeded marker persistence.
   # Skips automatically on subsequent starts.
   seeder:
-    image: ixion:${IXION_VERSION:-latest}
-    container_name: ixion-seeder
+    image: ion:${ION_VERSION:-latest}
+    container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]
     volumes:
-      - ixion-data:/data
+      - ion-data:/data
     env_file:
       - .env
     environment:
-      - IXION_SEED_URL=http://ixion:8000
+      - ION_SEED_URL=http://ion:8000
     depends_on:
-      ixion:
+      ion:
         condition: service_healthy
     restart: "no"
     networks:
       - default
 
 networks:
-  ixion-dev:
+  ion-dev:
     external: true
-    name: ixion_ixion-net
+    name: ion_ion-net
 
 volumes:
-  ixion-data:
+  ion-data:
     driver: local
   ollama-models:
     driver: local

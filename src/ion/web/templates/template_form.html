@@ -1,0 +1,1084 @@
+{% extends "base.html" %}
+
+{% block title %}{% if template_id %}Edit Template{% else %}New Template{% endif %} - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{% if template_id %}Edit Template{% else %}New Template{% endif %}</h1>
+</div>
+
+<form id="template-form" class="form">
+    <div class="form-group">
+        <label for="name">Name *</label>
+        <input type="text" id="name" name="name" required placeholder="Enter template name">
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label for="format">Format</label>
+            <select id="format" name="format">
+                <option value="markdown">Markdown</option>
+                <option value="html">HTML</option>
+                <option value="text">Plain Text</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="document_type">Document Type</label>
+            <select id="document_type" name="document_type">
+                <option value="">None</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="tags">Tags (comma-separated)</label>
+            <input type="text" id="tags" name="tags" placeholder="e.g., work, formal, invoice">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="2" placeholder="Brief description of the template"></textarea>
+    </div>
+
+    <!-- Legacy template notice (shown when editing raw templates) -->
+    <div id="legacy-notice" class="se-legacy-notice" style="display:none;">
+        <p>This template was created with the raw editor. To use the section editor, the existing content will be placed in a single Text section.</p>
+        <button type="button" class="btn btn-sm" onclick="convertToSections()">Convert to Sections</button>
+    </div>
+
+    <!-- Section Builder -->
+    <div class="se-builder">
+        <div class="se-header">
+            <label>Template Sections</label>
+            <button type="button" class="btn btn-sm btn-primary" onclick="openLibrary(-1)">+ Add Section</button>
+        </div>
+
+        <div id="sections-container" class="se-sections">
+            <div class="se-empty" id="sections-empty">
+                <p>No sections yet. Click "Add Section" to get started.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section Library Panel -->
+    <div id="section-library-overlay" class="se-library-overlay" style="display:none;" onclick="closeLibrary()"></div>
+    <div id="section-library" class="se-library" style="display:none;">
+        <div class="se-library-header">
+            <h3>Section Library</h3>
+            <button type="button" class="se-library-close" onclick="closeLibrary()">&times;</button>
+        </div>
+        <div class="se-library-body">
+            <h4>Generic</h4>
+            <div class="se-library-grid" id="library-generic"></div>
+            <h4>SOC-Specific</h4>
+            <div class="se-library-grid" id="library-soc"></div>
+        </div>
+    </div>
+
+    {% if template_id %}
+    <div class="form-row">
+        <div class="form-group">
+            <label for="message">Version Message</label>
+            <input type="text" id="message" name="message" placeholder="Describe your changes">
+        </div>
+        <div class="form-group">
+            <label for="author">Author</label>
+            <input type="text" id="author" name="author" placeholder="Your name">
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">{% if template_id %}Save Changes{% else %}Create Template{% endif %}</button>
+        <button type="button" class="btn btn-secondary" onclick="previewTemplate()">Preview</button>
+        <a href="/templates" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+
+<!-- Preview Modal -->
+<div id="preview-modal" class="modal" style="display:none;">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2>Template Preview (Generated Jinja2)</h2>
+            <button class="modal-close" onclick="closePreview()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <pre id="preview-content" class="code-block"></pre>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closePreview()">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* Section Editor styles */
+.se-builder { margin: 1rem 0; }
+.se-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+.se-header label { font-weight: 600; font-size: 1rem; }
+.se-sections { min-height: 60px; }
+.se-empty {
+    text-align: center;
+    padding: 2rem;
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    color: var(--text-muted);
+}
+
+/* Section card */
+.se-card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    background: var(--bg-secondary);
+    transition: box-shadow 0.15s;
+}
+.se-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.se-card-header {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    gap: 0.5rem;
+    user-select: none;
+}
+.se-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--primary-color);
+    color: white;
+    font-weight: 700;
+    font-size: 0.65rem;
+    flex-shrink: 0;
+}
+.se-card-title { flex: 1; font-weight: 600; font-size: 0.9rem; }
+.se-card-type { color: var(--text-muted); font-size: 0.75rem; }
+.se-card-actions {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+.se-card-actions button {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    line-height: 1;
+}
+.se-card-actions button:hover {
+    background: var(--bg-hover);
+    color: var(--text-color);
+}
+.se-card-actions button.se-delete:hover {
+    background: var(--danger-color, #ef4444);
+    color: white;
+    border-color: var(--danger-color, #ef4444);
+}
+.se-card-body {
+    padding: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+.se-card-body.collapsed { display: none; }
+
+/* Inline add section button */
+.se-add-inline {
+    text-align: center;
+    padding: 0.25rem 0;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.se-card:hover + .se-add-inline,
+.se-add-inline:hover { opacity: 1; }
+.se-add-inline button {
+    background: none;
+    border: 1px dashed var(--border-color);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.15rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+.se-add-inline button:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+/* Section fields */
+.se-field { margin-bottom: 0.5rem; }
+.se-field label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-bottom: 0.2rem;
+    color: var(--text-muted);
+}
+.se-field input[type="text"],
+.se-field textarea,
+.se-field select {
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-color);
+    font-size: 0.85rem;
+    font-family: inherit;
+}
+.se-field textarea { min-height: 60px; resize: vertical; }
+
+/* Variable toggle */
+.se-variable-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+.se-variable-toggle label {
+    font-size: 0.8rem;
+    margin: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.se-variable-toggle input[type="text"] {
+    flex: 1;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.8rem;
+    font-family: monospace;
+}
+
+/* Dynamic list fields (items, pairs, columns, etc.) */
+.se-list-field { margin-bottom: 0.5rem; }
+.se-list-item {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.25rem;
+    align-items: center;
+}
+.se-list-item input {
+    flex: 1;
+    padding: 0.3rem 0.4rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-color);
+    font-size: 0.8rem;
+}
+.se-list-item button {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.2rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+.se-list-item button:hover { color: var(--danger-color, #ef4444); }
+.se-list-add {
+    background: none;
+    border: 1px dashed var(--border-color);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+.se-list-add:hover { border-color: var(--primary-color); color: var(--primary-color); }
+
+/* Checkbox field */
+.se-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+}
+.se-checkbox label { font-size: 0.8rem; cursor: pointer; margin: 0; }
+
+/* Section library */
+.se-library-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 999;
+}
+.se-library {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 360px;
+    height: 100vh;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border-color);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.2);
+}
+.se-library-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+.se-library-header h3 { margin: 0; }
+.se-library-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    line-height: 1;
+}
+.se-library-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}
+.se-library-body h4 {
+    margin: 0.75rem 0 0.5rem;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+.se-library-body h4:first-child { margin-top: 0; }
+.se-library-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+.se-library-item {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.6rem;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    background: var(--bg-primary);
+}
+.se-library-item:hover {
+    border-color: var(--primary-color);
+    background: var(--bg-hover);
+}
+.se-library-item-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--primary-color);
+    color: white;
+    font-weight: 700;
+    font-size: 0.65rem;
+    margin-bottom: 0.35rem;
+}
+.se-library-item-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    display: block;
+}
+.se-library-item-desc {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    display: block;
+    margin-top: 0.15rem;
+}
+
+/* Legacy notice */
+.se-legacy-notice {
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--warning-color, #f59e0b);
+    border-radius: 6px;
+    margin-bottom: 1rem;
+}
+.se-legacy-notice p { margin: 0 0 0.5rem; font-size: 0.85rem; }
+</style>
+
+<script>
+{% raw %}
+const templateId = {% endraw %}{{ template_id|default('null') }}{% raw %};
+
+let sectionTypes = {};
+let sections = [];
+let insertAtIndex = -1; // -1 = append at end
+
+// =========================================================================
+// Initialize
+// =========================================================================
+document.addEventListener('DOMContentLoaded', async () => {
+    // Load document types
+    try {
+        const resp = await api.get('/api/document-types');
+        const dtSelect = document.getElementById('document_type');
+        Object.entries(resp.types || {}).forEach(([key, label]) => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = key + ' - ' + label;
+            dtSelect.appendChild(opt);
+        });
+    } catch (e) {
+        console.error('Failed to load document types:', e);
+    }
+
+    // Load section types
+    try {
+        sectionTypes = await api.get('/api/templates/section-types');
+        buildLibrary();
+    } catch (e) {
+        console.error('Failed to load section types:', e);
+    }
+
+    // If editing, load template
+    if (templateId) {
+        try {
+            const template = await api.get('/api/templates/' + templateId);
+            document.getElementById('name').value = template.name;
+            document.getElementById('format').value = template.format;
+            document.getElementById('document_type').value = template.document_type || '';
+            document.getElementById('description').value = template.description || '';
+            document.getElementById('tags').value = template.tags.join(', ');
+
+            if (template.has_sections && template.sections) {
+                sections = template.sections;
+                renderSections();
+            } else if (template.content) {
+                // Legacy template
+                document.getElementById('legacy-notice').style.display = 'block';
+            }
+
+            const prefs = JSON.parse(localStorage.getItem('ion_prefs') || '{}');
+            if (prefs.author) {
+                document.getElementById('author').value = prefs.author;
+            }
+        } catch (e) {
+            showToast('Failed to load template', 'error');
+        }
+    }
+});
+
+// =========================================================================
+// Section Library
+// =========================================================================
+function buildLibrary() {
+    const genericGrid = document.getElementById('library-generic');
+    const socGrid = document.getElementById('library-soc');
+    genericGrid.innerHTML = '';
+    socGrid.innerHTML = '';
+
+    Object.entries(sectionTypes).forEach(([key, st]) => {
+        const item = document.createElement('div');
+        item.className = 'se-library-item';
+        item.onclick = () => addSection(key);
+        item.innerHTML =
+            '<div class="se-library-item-icon">' + escapeHtml(st.icon) + '</div>' +
+            '<span class="se-library-item-label">' + escapeHtml(st.label) + '</span>' +
+            '<span class="se-library-item-desc">' + escapeHtml(st.description || '') + '</span>';
+
+        if (st.category === 'soc') {
+            socGrid.appendChild(item);
+        } else {
+            genericGrid.appendChild(item);
+        }
+    });
+}
+
+function openLibrary(index) {
+    insertAtIndex = index;
+    document.getElementById('section-library').style.display = 'flex';
+    document.getElementById('section-library-overlay').style.display = 'block';
+}
+
+function closeLibrary() {
+    document.getElementById('section-library').style.display = 'none';
+    document.getElementById('section-library-overlay').style.display = 'none';
+}
+
+// =========================================================================
+// Section CRUD
+// =========================================================================
+function addSection(type) {
+    const st = sectionTypes[type];
+    if (!st) return;
+
+    const section = { type: type, config: buildDefaultConfig(type, st) };
+
+    if (insertAtIndex >= 0 && insertAtIndex < sections.length) {
+        sections.splice(insertAtIndex + 1, 0, section);
+    } else {
+        sections.push(section);
+    }
+
+    closeLibrary();
+    renderSections();
+}
+
+function buildDefaultConfig(type, st) {
+    const config = {};
+    (st.fields || []).forEach(f => {
+        if (f.default !== undefined) {
+            config[f.name] = f.default;
+        } else if (f.type === 'text') {
+            config[f.name] = '';
+        } else if (f.type === 'textarea') {
+            config[f.name] = '';
+        } else if (f.type === 'select' && f.options && f.options.length) {
+            config[f.name] = f.default || f.options[0].value;
+        } else if (f.type === 'checkbox') {
+            config[f.name] = f.default || false;
+        } else if (f.type === 'items' || f.type === 'checklist_items') {
+            config[f.name] = [];
+        } else if (f.type === 'pairs') {
+            config[f.name] = [];
+        } else if (f.type === 'columns') {
+            config[f.name] = [{ name: 'Column 1' }];
+        } else if (f.type === 'metadata_fields') {
+            config[f.name] = [{ label: 'Date', variable_name: 'date' }];
+        } else if (f.type === 'signature_roles') {
+            config[f.name] = [{ role_name: 'Prepared By', variable_name: 'prepared_by' }];
+        }
+    });
+    return config;
+}
+
+function removeSection(idx) {
+    sections.splice(idx, 1);
+    renderSections();
+}
+
+function moveSection(idx, direction) {
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= sections.length) return;
+    const temp = sections[idx];
+    sections[idx] = sections[newIdx];
+    sections[newIdx] = temp;
+    renderSections();
+}
+
+// =========================================================================
+// Render Sections
+// =========================================================================
+function renderSections() {
+    const container = document.getElementById('sections-container');
+    const emptyEl = document.getElementById('sections-empty');
+
+    if (sections.length === 0) {
+        emptyEl.style.display = 'block';
+        // Remove all cards and inline buttons
+        container.querySelectorAll('.se-card, .se-add-inline').forEach(el => el.remove());
+        return;
+    }
+
+    emptyEl.style.display = 'none';
+    // Rebuild all section cards
+    container.querySelectorAll('.se-card, .se-add-inline').forEach(el => el.remove());
+
+    sections.forEach((section, idx) => {
+        const st = sectionTypes[section.type] || { label: section.type, icon: '?', fields: [] };
+        const card = document.createElement('div');
+        card.className = 'se-card';
+        card.dataset.idx = idx;
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'se-card-header';
+        header.onclick = (e) => {
+            if (e.target.closest('.se-card-actions')) return;
+            toggleCardBody(idx);
+        };
+
+        const titleText = getSectionTitle(section, st);
+        header.innerHTML =
+            '<div class="se-card-icon">' + escapeHtml(st.icon) + '</div>' +
+            '<span class="se-card-title">' + escapeHtml(titleText) + '</span>' +
+            '<span class="se-card-type">' + escapeHtml(st.label) + '</span>' +
+            '<div class="se-card-actions">' +
+                '<button type="button" title="Move up" onclick="moveSection(' + idx + ', -1)"><i class="icon-chevron-up"></i></button>' +
+                '<button type="button" title="Move down" onclick="moveSection(' + idx + ', 1)"><i class="icon-chevron-down"></i></button>' +
+                '<button type="button" class="se-delete" title="Delete" onclick="removeSection(' + idx + ')"><i class="icon-x"></i></button>' +
+            '</div>';
+        card.appendChild(header);
+
+        // Body
+        const body = document.createElement('div');
+        body.className = 'se-card-body';
+        body.id = 'se-body-' + idx;
+        body.innerHTML = buildFieldsHTML(section, idx, st);
+        card.appendChild(body);
+
+        container.appendChild(card);
+
+        // Inline add button after each card
+        const inlineAdd = document.createElement('div');
+        inlineAdd.className = 'se-add-inline';
+        inlineAdd.innerHTML = '<button type="button" onclick="openLibrary(' + idx + ')">+ Add Section</button>';
+        container.appendChild(inlineAdd);
+    });
+
+    // Attach event listeners for all fields
+    attachFieldListeners();
+}
+
+function getSectionTitle(section, st) {
+    const c = section.config || {};
+    switch (section.type) {
+        case 'heading': return c.text || 'Heading';
+        case 'text': return c.variable ? ('{{ ' + (c.variable_name || '...') + ' }}') : (c.content || 'Text').substring(0, 50);
+        case 'table': return 'Table (' + (c.columns || []).length + ' cols)';
+        case 'list': return (c.ordered ? 'Ordered' : 'Unordered') + ' List';
+        case 'key_value': return 'Key-Value (' + (c.pairs || []).length + ' pairs)';
+        case 'divider': return 'Horizontal Rule';
+        case 'metadata_block': return 'Metadata (' + (c.fields || []).length + ' fields)';
+        case 'signature_block': return 'Signatures (' + (c.roles || []).length + ' roles)';
+        case 'image_placeholder': return c.caption || 'Image';
+        case 'severity_badge': return 'Severity: {{ ' + (c.variable_name || 'severity') + ' }}';
+        case 'ioc_table': return 'IOC Table: {{ ' + (c.variable_name || 'ioc_list') + ' }}';
+        case 'timeline': return 'Timeline: {{ ' + (c.variable_name || 'timeline_entries') + ' }}';
+        case 'mitre_table': return 'MITRE: {{ ' + (c.variable_name || 'mitre_techniques') + ' }}';
+        case 'checklist': return 'Checklist (' + (c.items || []).length + ' items)';
+        case 'evidence_block': return 'Evidence: ' + (c.source || '...');
+        default: return st.label;
+    }
+}
+
+function toggleCardBody(idx) {
+    const body = document.getElementById('se-body-' + idx);
+    if (body) body.classList.toggle('collapsed');
+}
+
+// =========================================================================
+// Field HTML Builders
+// =========================================================================
+function buildFieldsHTML(section, idx, st) {
+    const c = section.config || {};
+    let html = '';
+
+    (st.fields || []).forEach(f => {
+        html += buildSingleField(f, c, idx);
+    });
+
+    // Variable toggle (for types that support it)
+    if (st.supports_variable) {
+        const isVar = c.variable || false;
+        const varName = c.variable_name || suggestVarName(section, st);
+        html += '<div class="se-variable-toggle">';
+        html += '<label><input type="checkbox" data-idx="' + idx + '" data-field="variable" ' + (isVar ? 'checked' : '') + '> Make variable</label>';
+        html += '<input type="text" data-idx="' + idx + '" data-field="variable_name" value="' + escapeHtml(varName) + '" placeholder="variable_name" style="' + (isVar ? '' : 'display:none') + '">';
+        html += '</div>';
+    }
+
+    return html;
+}
+
+function buildSingleField(f, config, idx) {
+    const val = config[f.name] !== undefined ? config[f.name] : (f.default || '');
+
+    if (f.type === 'text') {
+        return '<div class="se-field"><label>' + escapeHtml(f.label) + '</label>' +
+            '<input type="text" data-idx="' + idx + '" data-field="' + f.name + '" value="' + escapeHtml(String(val)) + '" placeholder="' + escapeHtml(f.label) + '"></div>';
+    }
+    if (f.type === 'textarea') {
+        return '<div class="se-field"><label>' + escapeHtml(f.label) + '</label>' +
+            '<textarea data-idx="' + idx + '" data-field="' + f.name + '" placeholder="' + escapeHtml(f.label) + '">' + escapeHtml(String(val)) + '</textarea></div>';
+    }
+    if (f.type === 'select') {
+        let opts = '';
+        (f.options || []).forEach(o => {
+            opts += '<option value="' + escapeHtml(o.value) + '"' + (String(val) === String(o.value) ? ' selected' : '') + '>' + escapeHtml(o.label) + '</option>';
+        });
+        return '<div class="se-field"><label>' + escapeHtml(f.label) + '</label>' +
+            '<select data-idx="' + idx + '" data-field="' + f.name + '">' + opts + '</select></div>';
+    }
+    if (f.type === 'checkbox') {
+        return '<div class="se-checkbox"><label><input type="checkbox" data-idx="' + idx + '" data-field="' + f.name + '"' + (val ? ' checked' : '') + '> ' + escapeHtml(f.label) + '</label></div>';
+    }
+    if (f.type === 'items') {
+        return buildListField(f, config[f.name] || [], idx, 'text');
+    }
+    if (f.type === 'checklist_items') {
+        return buildChecklistField(f, config[f.name] || [], idx);
+    }
+    if (f.type === 'pairs') {
+        return buildPairsField(f, config[f.name] || [], idx);
+    }
+    if (f.type === 'columns') {
+        return buildColumnsField(f, config[f.name] || [], idx);
+    }
+    if (f.type === 'metadata_fields') {
+        return buildMetadataFieldsField(f, config[f.name] || [], idx);
+    }
+    if (f.type === 'signature_roles') {
+        return buildSignatureRolesField(f, config[f.name] || [], idx);
+    }
+    return '';
+}
+
+function buildListField(f, items, idx, itemType) {
+    let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="items">';
+    items.forEach((item, i) => {
+        const text = typeof item === 'string' ? item : (item.text || '');
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(text) + '" data-list-idx="' + i + '"><button type="button" onclick="removeListItem(' + idx + ', \'' + f.name + '\', ' + i + ')">&#10005;</button></div>';
+    });
+    html += '<button type="button" class="se-list-add" onclick="addListItem(' + idx + ', \'' + f.name + '\', \'items\')">+ Add Item</button>';
+    html += '</div></div>';
+    return html;
+}
+
+function buildChecklistField(f, items, idx) {
+    let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="checklist">';
+    items.forEach((item, i) => {
+        const text = typeof item === 'string' ? item : (item.text || '');
+        const checked = typeof item === 'object' ? (item.checked || false) : false;
+        html += '<div class="se-list-item"><input type="checkbox" ' + (checked ? 'checked' : '') + ' data-list-idx="' + i + '" data-check="true"><input type="text" value="' + escapeHtml(text) + '" data-list-idx="' + i + '"><button type="button" onclick="removeListItem(' + idx + ', \'' + f.name + '\', ' + i + ')">&#10005;</button></div>';
+    });
+    html += '<button type="button" class="se-list-add" onclick="addListItem(' + idx + ', \'' + f.name + '\', \'checklist\')">+ Add Item</button>';
+    html += '</div></div>';
+    return html;
+}
+
+function buildPairsField(f, pairs, idx) {
+    let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="pairs">';
+    pairs.forEach((p, i) => {
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(p.label || '') + '" placeholder="Label" data-list-idx="' + i + '" data-pair="label"><input type="text" value="' + escapeHtml(p.value || '') + '" placeholder="Value" data-list-idx="' + i + '" data-pair="value"><button type="button" onclick="removeListItem(' + idx + ', \'' + f.name + '\', ' + i + ')">&#10005;</button></div>';
+    });
+    html += '<button type="button" class="se-list-add" onclick="addListItem(' + idx + ', \'' + f.name + '\', \'pairs\')">+ Add Pair</button>';
+    html += '</div></div>';
+    return html;
+}
+
+function buildColumnsField(f, columns, idx) {
+    let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="columns">';
+    columns.forEach((col, i) => {
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(col.name || '') + '" placeholder="Column name" data-list-idx="' + i + '"><button type="button" onclick="removeListItem(' + idx + ', \'' + f.name + '\', ' + i + ')">&#10005;</button></div>';
+    });
+    html += '<button type="button" class="se-list-add" onclick="addListItem(' + idx + ', \'' + f.name + '\', \'columns\')">+ Add Column</button>';
+    html += '</div></div>';
+    return html;
+}
+
+function buildMetadataFieldsField(f, fields, idx) {
+    let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="metadata">';
+    fields.forEach((fld, i) => {
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(fld.label || '') + '" placeholder="Label" data-list-idx="' + i + '" data-pair="label"><input type="text" value="' + escapeHtml(fld.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name" style="font-family:monospace;"><button type="button" onclick="removeListItem(' + idx + ', \'' + f.name + '\', ' + i + ')">&#10005;</button></div>';
+    });
+    html += '<button type="button" class="se-list-add" onclick="addListItem(' + idx + ', \'' + f.name + '\', \'metadata\')">+ Add Field</button>';
+    html += '</div></div>';
+    return html;
+}
+
+function buildSignatureRolesField(f, roles, idx) {
+    let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="signatures">';
+    roles.forEach((r, i) => {
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(r.role_name || '') + '" placeholder="Role" data-list-idx="' + i + '" data-pair="role_name"><input type="text" value="' + escapeHtml(r.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name" style="font-family:monospace;"><button type="button" onclick="removeListItem(' + idx + ', \'' + f.name + '\', ' + i + ')">&#10005;</button></div>';
+    });
+    html += '<button type="button" class="se-list-add" onclick="addListItem(' + idx + ', \'' + f.name + '\', \'signatures\')">+ Add Role</button>';
+    html += '</div></div>';
+    return html;
+}
+
+// =========================================================================
+// List item operations
+// =========================================================================
+function addListItem(sectionIdx, fieldName, listType) {
+    collectFieldData();
+    const items = sections[sectionIdx].config[fieldName] || [];
+    if (listType === 'pairs') {
+        items.push({ label: '', value: '' });
+    } else if (listType === 'columns') {
+        items.push({ name: '' });
+    } else if (listType === 'metadata') {
+        items.push({ label: '', variable_name: '' });
+    } else if (listType === 'signatures') {
+        items.push({ role_name: '', variable_name: '' });
+    } else if (listType === 'checklist') {
+        items.push({ text: '', checked: false });
+    } else {
+        items.push('');
+    }
+    sections[sectionIdx].config[fieldName] = items;
+    renderSections();
+}
+
+function removeListItem(sectionIdx, fieldName, itemIdx) {
+    collectFieldData();
+    const items = sections[sectionIdx].config[fieldName] || [];
+    items.splice(itemIdx, 1);
+    sections[sectionIdx].config[fieldName] = items;
+    renderSections();
+}
+
+// =========================================================================
+// Collect field data from DOM back into sections array
+// =========================================================================
+function collectFieldData() {
+    document.querySelectorAll('.se-card').forEach(card => {
+        const idx = parseInt(card.dataset.idx);
+        if (isNaN(idx) || !sections[idx]) return;
+        const config = sections[idx].config;
+
+        // Simple fields
+        card.querySelectorAll('[data-field]').forEach(el => {
+            const field = el.dataset.field;
+            if (el.closest('.se-list-field')) return; // handled below
+            if (el.type === 'checkbox') {
+                config[field] = el.checked;
+            } else {
+                config[field] = el.value;
+            }
+        });
+
+        // List fields
+        card.querySelectorAll('.se-list-field').forEach(listEl => {
+            const field = listEl.dataset.field;
+            const listType = listEl.dataset.listType;
+            const items = [];
+
+            listEl.querySelectorAll('.se-list-item').forEach(itemEl => {
+                if (listType === 'pairs') {
+                    const labelInput = itemEl.querySelector('[data-pair="label"]');
+                    const valueInput = itemEl.querySelector('[data-pair="value"]');
+                    items.push({ label: labelInput ? labelInput.value : '', value: valueInput ? valueInput.value : '' });
+                } else if (listType === 'columns') {
+                    const nameInput = itemEl.querySelector('input[type="text"]');
+                    items.push({ name: nameInput ? nameInput.value : '' });
+                } else if (listType === 'metadata') {
+                    const labelInput = itemEl.querySelector('[data-pair="label"]');
+                    const varInput = itemEl.querySelector('[data-pair="variable_name"]');
+                    items.push({ label: labelInput ? labelInput.value : '', variable_name: varInput ? varInput.value : '' });
+                } else if (listType === 'signatures') {
+                    const roleInput = itemEl.querySelector('[data-pair="role_name"]');
+                    const varInput = itemEl.querySelector('[data-pair="variable_name"]');
+                    items.push({ role_name: roleInput ? roleInput.value : '', variable_name: varInput ? varInput.value : '' });
+                } else if (listType === 'checklist') {
+                    const checkEl = itemEl.querySelector('[data-check="true"]');
+                    const textInput = itemEl.querySelector('input[type="text"]');
+                    items.push({ text: textInput ? textInput.value : '', checked: checkEl ? checkEl.checked : false });
+                } else {
+                    const textInput = itemEl.querySelector('input[type="text"]');
+                    items.push(textInput ? textInput.value : '');
+                }
+            });
+
+            config[field] = items;
+        });
+
+        // Variable toggle
+        const varToggle = card.querySelector('.se-variable-toggle input[type="checkbox"]');
+        if (varToggle) {
+            config.variable = varToggle.checked;
+            const varNameInput = card.querySelector('.se-variable-toggle input[type="text"]');
+            if (varNameInput) config.variable_name = varNameInput.value;
+        }
+    });
+}
+
+function attachFieldListeners() {
+    // Toggle variable name visibility
+    document.querySelectorAll('.se-variable-toggle input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', function() {
+            const varInput = this.closest('.se-variable-toggle').querySelector('input[type="text"]');
+            if (varInput) varInput.style.display = this.checked ? '' : 'none';
+        });
+    });
+
+    // Auto-suggest variable name from text fields
+    document.querySelectorAll('.se-variable-toggle input[type="text"]').forEach(input => {
+        const idx = parseInt(input.dataset.idx);
+        if (isNaN(idx) || !sections[idx]) return;
+        // If empty, suggest from content
+        if (!input.value) {
+            input.value = suggestVarName(sections[idx], sectionTypes[sections[idx].type] || {});
+        }
+    });
+}
+
+function suggestVarName(section, st) {
+    const c = section.config || {};
+    let base = '';
+    if (section.type === 'text') base = (c.content || '').substring(0, 30);
+    else if (section.type === 'heading') base = c.text || '';
+    else base = st.label || section.type;
+    return base.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').substring(0, 30) || section.type;
+}
+
+// =========================================================================
+// Legacy conversion
+// =========================================================================
+function convertToSections() {
+    // Wrap existing content in a single text section
+    const templateData = api.get('/api/templates/' + templateId).then(t => {
+        sections = [{
+            type: 'text',
+            config: { content: t.content || '', variable: false, variable_name: '' }
+        }];
+        document.getElementById('legacy-notice').style.display = 'none';
+        renderSections();
+        showToast('Content converted to a Text section. You can now edit it with the section editor.', 'success');
+    }).catch(() => {
+        showToast('Failed to convert template', 'error');
+    });
+}
+
+// =========================================================================
+// Preview
+// =========================================================================
+function previewTemplate() {
+    collectFieldData();
+    // Build a simple preview by simulating assembly
+    // We'll show what the Jinja2 output looks like
+    const previewEl = document.getElementById('preview-content');
+    if (sections.length === 0) {
+        previewEl.textContent = '(No sections defined)';
+    } else {
+        // Show assembled content - we'll build a lightweight version client-side
+        const lines = [];
+        sections.forEach(s => {
+            lines.push(sectionToPreview(s));
+        });
+        previewEl.textContent = lines.join('\n\n');
+    }
+    document.getElementById('preview-modal').style.display = 'flex';
+}
+
+function sectionToPreview(section) {
+    const c = section.config || {};
+    const type = section.type;
+
+    if (type === 'heading') {
+        return '#'.repeat(parseInt(c.level) || 2) + ' ' + (c.text || '');
+    }
+    if (type === 'text') {
+        if (c.variable && c.variable_name) return '{{ ' + c.variable_name + ' }}';
+        return c.content || '';
+    }
+    if (type === 'divider') return '---';
+    if (type === 'table') {
+        const cols = c.columns || [];
+        if (cols.length === 0) return '(empty table)';
+        const header = '| ' + cols.map(col => col.name || 'Column').join(' | ') + ' |';
+        const sep = '| ' + cols.map(() => '---').join(' | ') + ' |';
+        if (c.variable && c.variable_name) {
+            const cells = '| ' + cols.map(col => '{{ row.' + (col.name || 'col').toLowerCase().replace(/[^a-z0-9]+/g, '_') + ' }}').join(' | ') + ' |';
+            return header + '\n' + sep + '\n{% for row in ' + c.variable_name + ' %}\n' + cells + '\n{% endfor %}';
+        }
+        return header + '\n' + sep + '\n| ' + cols.map(() => '').join(' | ') + ' |';
+    }
+    if (type === 'list') {
+        if (c.variable && c.variable_name) {
+            if (c.ordered) return '{% for item in ' + c.variable_name + ' %}\n{{ loop.index }}. {{ item }}\n{% endfor %}';
+            return '{% for item in ' + c.variable_name + ' %}\n- {{ item }}\n{% endfor %}';
+        }
+        return (c.items || []).map((item, i) => {
+            const text = typeof item === 'string' ? item : (item.text || '');
+            return c.ordered ? (i + 1) + '. ' + text : '- ' + text;
+        }).join('\n');
+    }
+    if (type === 'key_value') {
+        if (c.variable && c.variable_name) return '{% for kv in ' + c.variable_name + ' %}\n**{{ kv.label }}:** {{ kv.value }}\n{% endfor %}';
+        return (c.pairs || []).map(p => '**' + (p.label || '') + ':** ' + (p.value || '')).join('\n\n');
+    }
+    if (type === 'metadata_block') {
+        return (c.fields || []).map(f => '**' + (f.label || '') + ':** {{ ' + (f.variable_name || '') + ' }}').join('\n\n');
+    }
+    if (type === 'signature_block') {
+        const lines = ['', '---', '### Signatures', ''];
+        (c.roles || []).forEach(r => { lines.push('**' + (r.role_name || '') + ':** {{ ' + (r.variable_name || '') + ' }}'); lines.push(''); });
+        return lines.join('\n');
+    }
+    if (type === 'image_placeholder') return '![' + (c.caption || 'Image') + ']({{ ' + (c.variable_name || 'image_url') + ' }})';
+    if (type === 'severity_badge') return '**Severity:** {{ ' + (c.variable_name || 'severity') + ' }}';
+    if (type === 'ioc_table') return '| Type | Value | Context |\n| --- | --- | --- |\n{% for ioc in ' + (c.variable_name || 'ioc_list') + ' %}\n| {{ ioc.type }} | {{ ioc.value }} | {{ ioc.context }} |\n{% endfor %}';
+    if (type === 'timeline') return '| Timestamp | Event | Actor |\n| --- | --- | --- |\n{% for entry in ' + (c.variable_name || 'timeline_entries') + ' %}\n| {{ entry.timestamp }} | {{ entry.event }} | {{ entry.actor }} |\n{% endfor %}';
+    if (type === 'mitre_table') return '| Technique ID | Name | Tactic |\n| --- | --- | --- |\n{% for tech in ' + (c.variable_name || 'mitre_techniques') + ' %}\n| {{ tech.id }} | {{ tech.name }} | {{ tech.tactic }} |\n{% endfor %}';
+    if (type === 'checklist') return (c.items || []).map(item => {
+        const text = typeof item === 'object' ? (item.text || '') : String(item);
+        const checked = typeof item === 'object' ? (item.checked || false) : false;
+        return '- [' + (checked ? 'x' : ' ') + '] ' + text;
+    }).join('\n');
+    if (type === 'evidence_block') {
+        const lines = ['#### Evidence', '', '**Source:** ' + (c.source || '')];
+        if (c.hash) lines.push('**Hash:** ' + c.hash);
+        if (c.description) lines.push('**Description:** ' + c.description);
+        lines.push('', '**Chain of Custody:** {{ ' + (c.chain_of_custody_var || 'chain_of_custody') + ' }}');
+        return lines.join('\n');
+    }
+    return '';
+}
+
+function closePreview() {
+    document.getElementById('preview-modal').style.display = 'none';
+}
+document.getElementById('preview-modal').addEventListener('click', function(e) {
+    if (e.target.id === 'preview-modal') closePreview();
+});
+
+// =========================================================================
+// Save
+// =========================================================================
+document.getElementById('template-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    collectFieldData();
+
+    const data = {
+        name: document.getElementById('name').value,
+        format: document.getElementById('format').value,
+        document_type: document.getElementById('document_type').value || null,
+        description: document.getElementById('description').value || null,
+    };
+
+    // If we have sections, send them (content is auto-generated server-side)
+    if (sections.length > 0) {
+        data.sections = sections;
+    } else {
+        data.content = '';
+    }
+
+    const tagsInput = document.getElementById('tags').value;
+    if (!templateId && tagsInput) {
+        data.tags = tagsInput.split(',').map(t => t.trim()).filter(t => t);
+    }
+
+    if (templateId) {
+        data.message = document.getElementById('message').value || null;
+        data.author = document.getElementById('author').value || null;
+    }
+
+    try {
+        if (templateId) {
+            await api.put('/api/templates/' + templateId, data);
+            showToast('Template updated', 'success');
+        } else {
+            const result = await api.post('/api/templates', data);
+            showToast('Template created', 'success');
+            window.location.href = '/templates/' + result.id;
+            return;
+        }
+        window.location.href = '/templates/' + templateId;
+    } catch (e) {
+        showToast(e.message || 'Failed to save template', 'error');
+    }
+});
+{% endraw %}
+</script>
+{% endblock %}

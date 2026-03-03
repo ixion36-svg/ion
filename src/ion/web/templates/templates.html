@@ -1,0 +1,663 @@
+{% extends "base.html" %}
+
+{% block title %}Templates - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Templates</h1>
+    <div class="header-actions">
+        <button class="btn" onclick="showFoldersModal()">Manage Folders</button>
+        <a href="/templates/new" class="btn btn-primary">New Template</a>
+    </div>
+</div>
+
+<div class="templates-layout">
+    <!-- Folder Sidebar -->
+    <div class="folder-sidebar">
+        <div class="folder-header">
+            <h3>Folders</h3>
+        </div>
+        <div id="folder-tree" class="folder-tree">
+            <div class="folder-item active" data-id="" onclick="selectFolder(null)">
+                <span class="folder-icon"><i class="icon-folder"></i></span>
+                <span class="folder-name">All Templates</span>
+            </div>
+            <div class="folder-item" data-id="uncategorized" onclick="selectFolder('uncategorized')">
+                <span class="folder-icon"><i class="icon-file-text"></i></span>
+                <span class="folder-name">Uncategorized</span>
+            </div>
+            <div id="folder-list"></div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="templates-main">
+        <div class="toolbar">
+            <input type="text" id="search-input" placeholder="Search templates..." class="search-input">
+            <select id="format-filter" class="filter-select">
+                <option value="">All Formats</option>
+                <option value="markdown">Markdown</option>
+                <option value="html">HTML</option>
+                <option value="text">Plain Text</option>
+            </select>
+            <select id="doctype-filter" class="filter-select">
+                <option value="">All Types</option>
+            </select>
+        </div>
+
+        <div id="current-folder-path" class="folder-path"></div>
+
+        <div id="templates-list" class="card-list">
+            <p class="loading">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Folders Modal -->
+<div id="folders-modal" class="modal" style="display: none;">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2>Manage Folders</h2>
+            <button class="modal-close" onclick="closeFoldersModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Create New Folder</label>
+                <div class="folder-create-form">
+                    <select id="new-folder-parent" class="form-control">
+                        <option value="">Root Level</option>
+                    </select>
+                    <input type="text" id="new-folder-name" placeholder="Folder name (e.g., SOP, KB, WI)" class="form-control">
+                    <input type="text" id="new-folder-desc" placeholder="Description" class="form-control">
+                    <button class="btn btn-primary" onclick="createFolder()">Create</button>
+                </div>
+            </div>
+            <h3>Existing Folders</h3>
+            <div id="folders-tree-manage" class="folders-manage-tree"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Move Template Modal -->
+<div id="move-modal" class="modal" style="display: none;">
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h2>Move to Folder</h2>
+            <button class="modal-close" onclick="closeMoveModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <select id="move-folder-select" class="form-control">
+                <option value="">No Folder (Root)</option>
+            </select>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeMoveModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="moveTemplate()">Move</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.templates-layout {
+    display: flex;
+    gap: 1.5rem;
+}
+.folder-sidebar {
+    width: 250px;
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 1rem;
+}
+.folder-header h3 {
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.folder-tree {
+    font-size: 0.9rem;
+}
+.folder-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-bottom: 2px;
+}
+.folder-item:hover {
+    background: var(--bg-hover);
+}
+.folder-item.active {
+    background: var(--primary-color);
+    color: white;
+}
+.folder-icon {
+    margin-right: 0.5rem;
+}
+.folder-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.folder-children {
+    margin-left: 1.25rem;
+    border-left: 1px solid var(--border-color);
+    padding-left: 0.5rem;
+}
+.templates-main {
+    flex: 1;
+    min-width: 0;
+}
+.folder-path {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+.folder-path span {
+    cursor: pointer;
+}
+.folder-path span:hover {
+    color: var(--primary-color);
+}
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+.collection-badge {
+    background: var(--primary-color);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+}
+.modal-large {
+    max-width: 700px;
+}
+.modal-small {
+    max-width: 400px;
+}
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+.folder-create-form {
+    display: grid;
+    grid-template-columns: 150px 1fr 1fr auto;
+    gap: 0.5rem;
+    align-items: center;
+}
+.folders-manage-tree {
+    margin-top: 1rem;
+}
+.folder-manage-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+.folder-manage-item:hover {
+    background: var(--bg-secondary);
+}
+.folder-manage-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.folder-manage-path {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+.folder-manage-counts {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.folder-manage-children {
+    margin-left: 1.5rem;
+}
+.card-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.move-btn {
+    font-size: 0.75rem;
+    padding: 2px 6px;
+}
+.doc-type-badge {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: white;
+    margin-left: 0.5rem;
+}
+.doc-type-SOP { background: #3b82f6; }
+.doc-type-SOI { background: #14b8a6; }
+.doc-type-WI { background: #6366f1; }
+.doc-type-KB { background: #22c55e; }
+.doc-type-RUNBOOK { background: #a855f7; }
+.doc-type-IRP { background: #ef4444; }
+.doc-type-AAR { background: #f97316; }
+.doc-type-THREAT_ADVISORY { background: #eab308; color: #1a1a1a; }
+.doc-type-DETECTION_RULE { background: #06b6d4; }
+</style>
+<script>
+{% raw %}
+let allTemplates = [];
+let allCollections = [];
+let documentTypes = {};
+let selectedFolderId = null;
+let moveTemplateId = null;
+
+async function loadDocumentTypes() {
+    try {
+        const resp = await api.get('/api/document-types');
+        documentTypes = resp.types || {};
+        const select = document.getElementById('doctype-filter');
+        select.innerHTML = '<option value="">All Types</option>';
+        Object.entries(documentTypes).forEach(([key, label]) => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = key + ' - ' + label;
+            select.appendChild(opt);
+        });
+    } catch (e) {
+        console.error('Failed to load document types:', e);
+    }
+}
+
+async function loadTemplates() {
+    try {
+        allTemplates = await api.get('/api/templates');
+        renderTemplates(filterTemplates());
+    } catch (e) {
+        document.getElementById('templates-list').innerHTML = '<p class="error">Failed to load templates</p>';
+    }
+}
+
+async function loadCollections() {
+    try {
+        // Get flat list for easier processing
+        allCollections = await api.get('/api/collections?flat=true');
+        renderFolderTree();
+        updateFolderSelects();
+    } catch (e) {
+        console.error('Failed to load collections:', e);
+    }
+}
+
+function buildFolderTree(collections, parentId = null) {
+    return collections
+        .filter(c => c.parent_id === parentId)
+        .map(c => ({
+            ...c,
+            children: buildFolderTree(collections, c.id)
+        }));
+}
+
+function renderFolderTree() {
+    const container = document.getElementById('folder-list');
+    const tree = buildFolderTree(allCollections);
+    container.innerHTML = renderFolderItems(tree, 0);
+}
+
+function renderFolderItems(folders, depth) {
+    if (!folders.length) return '';
+
+    let html = '';
+    folders.forEach(f => {
+        const isActive = selectedFolderId === f.id;
+        const indent = depth > 0 ? 'folder-children' : '';
+
+        html += '<div class="' + indent + '">';
+        html += '<div class="folder-item' + (isActive ? ' active' : '') + '" data-id="' + f.id + '" onclick="selectFolder(' + f.id + ')">';
+        html += '<span class="folder-icon">' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
+        html += '<span class="folder-name">' + escapeHtml(f.name) + '</span>';
+        html += '<span class="folder-manage-counts">(' + f.template_count + ')</span>';
+        html += '</div>';
+
+        if (f.children.length > 0) {
+            html += renderFolderItems(f.children, depth + 1);
+        }
+        html += '</div>';
+    });
+    return html;
+}
+
+function selectFolder(folderId) {
+    selectedFolderId = folderId;
+
+    // Update active state
+    document.querySelectorAll('.folder-item').forEach(el => {
+        el.classList.remove('active');
+        if (el.dataset.id === String(folderId || '')) {
+            el.classList.add('active');
+        }
+    });
+
+    // Update path display
+    updateFolderPath();
+
+    // Re-render templates
+    renderTemplates(filterTemplates());
+}
+
+function updateFolderPath() {
+    const pathEl = document.getElementById('current-folder-path');
+
+    if (selectedFolderId === null) {
+        pathEl.innerHTML = '';
+        return;
+    }
+
+    if (selectedFolderId === 'uncategorized') {
+        pathEl.innerHTML = '<span onclick="selectFolder(null)">All</span> / <span>Uncategorized</span>';
+        return;
+    }
+
+    const folder = allCollections.find(c => c.id === selectedFolderId);
+    if (folder) {
+        pathEl.innerHTML = '<span onclick="selectFolder(null)">All</span> / <span>' + escapeHtml(folder.full_path) + '</span>';
+    }
+}
+
+function filterTemplates() {
+    const search = document.getElementById('search-input').value.toLowerCase();
+    const format = document.getElementById('format-filter').value;
+    const docType = document.getElementById('doctype-filter').value;
+
+    return allTemplates.filter(t => {
+        const matchesSearch = !search ||
+            t.name.toLowerCase().includes(search) ||
+            (t.description && t.description.toLowerCase().includes(search));
+        const matchesFormat = !format || t.format === format;
+        const matchesDocType = !docType || t.document_type === docType;
+
+        let matchesFolder = true;
+        if (selectedFolderId === 'uncategorized') {
+            matchesFolder = !t.collection_id;
+        } else if (selectedFolderId !== null) {
+            // Include templates in this folder or any subfolder
+            matchesFolder = isInFolderOrSubfolder(t.collection_id, selectedFolderId);
+        }
+
+        return matchesSearch && matchesFormat && matchesDocType && matchesFolder;
+    });
+}
+
+function isInFolderOrSubfolder(templateCollectionId, targetFolderId) {
+    if (templateCollectionId === targetFolderId) return true;
+    if (!templateCollectionId) return false;
+
+    // Check if template's folder is a descendant of target
+    const folder = allCollections.find(c => c.id === templateCollectionId);
+    if (!folder) return false;
+
+    let current = folder;
+    while (current.parent_id) {
+        if (current.parent_id === targetFolderId) return true;
+        current = allCollections.find(c => c.id === current.parent_id);
+        if (!current) break;
+    }
+    return false;
+}
+
+function renderTemplates(templates) {
+    const container = document.getElementById('templates-list');
+
+    if (templates.length === 0) {
+        container.innerHTML = '<p class="empty-state">No templates found. <a href="/templates/new">Create one!</a></p>';
+        return;
+    }
+
+    let html = '';
+    templates.forEach(function(t) {
+        const folder = allCollections.find(c => c.id === t.collection_id);
+        const folderBadge = folder
+            ? '<span class="collection-badge">' + escapeHtml(folder.name) + '</span>'
+            : '';
+        const docTypeBadge = t.document_type
+            ? '<span class="doc-type-badge doc-type-' + t.document_type + '">' + t.document_type + '</span>'
+            : '';
+
+        html += '<div class="card">';
+        html += '<div class="card-header">';
+        html += '<a href="/templates/' + t.id + '" class="card-title">' + escapeHtml(t.name) + '</a>';
+        html += docTypeBadge;
+        html += folderBadge;
+        html += '<span class="badge">' + t.format + '</span>';
+        html += '</div>';
+        html += '<div class="card-body">';
+        html += '<p class="card-description">' + escapeHtml(t.description || 'No description') + '</p>';
+        html += '<div class="card-meta">';
+        html += '<span>Version: ' + t.current_version + '</span>';
+        html += '<span>Updated: ' + formatDate(t.updated_at) + '</span>';
+        html += '</div>';
+        html += '<div class="card-tags">';
+        t.tags.forEach(function(tag) {
+            html += '<span class="tag">' + escapeHtml(tag) + '</span>';
+        });
+        html += '</div>';
+        html += '</div>';
+        html += '<div class="card-footer">';
+        html += '<a href="/templates/' + t.id + '/render" class="btn btn-sm btn-primary">Render</a>';
+        html += '<a href="/templates/' + t.id + '/edit" class="btn btn-sm">Edit</a>';
+        html += '<button class="btn btn-sm move-btn" onclick="showMoveModal(' + t.id + ', ' + (t.collection_id || 'null') + ')">Move</button>';
+        html += '<button class="btn btn-sm btn-danger" onclick="deleteTemplate(' + t.id + ', \'' + escapeHtml(t.name).replace(/'/g, "\\'") + '\')">Delete</button>';
+        html += '</div>';
+        html += '</div>';
+    });
+    container.innerHTML = html;
+}
+
+function applyFilters() {
+    renderTemplates(filterTemplates());
+}
+
+async function deleteTemplate(id, name) {
+    if (!confirm('Delete template "' + name + '"? This cannot be undone.')) return;
+
+    try {
+        await api.delete('/api/templates/' + id);
+        showToast('Template deleted', 'success');
+        loadTemplates();
+    } catch (e) {
+        showToast('Failed to delete template', 'error');
+    }
+}
+
+// Folder Management
+function showFoldersModal() {
+    document.getElementById('folders-modal').style.display = 'flex';
+    renderFoldersManageTree();
+    updateParentSelect();
+}
+
+function closeFoldersModal() {
+    document.getElementById('folders-modal').style.display = 'none';
+}
+
+function updateParentSelect() {
+    const select = document.getElementById('new-folder-parent');
+    select.innerHTML = '<option value="">Root Level</option>';
+
+    function addOptions(folders, prefix = '') {
+        folders.forEach(f => {
+            const option = document.createElement('option');
+            option.value = f.id;
+            option.textContent = prefix + f.name;
+            select.appendChild(option);
+            if (f.children.length > 0) {
+                addOptions(f.children, prefix + '  ');
+            }
+        });
+    }
+
+    const tree = buildFolderTree(allCollections);
+    addOptions(tree);
+}
+
+function updateFolderSelects() {
+    const moveSelect = document.getElementById('move-folder-select');
+    moveSelect.innerHTML = '<option value="">No Folder (Root)</option>';
+
+    function addOptions(folders, prefix = '') {
+        folders.forEach(f => {
+            const option = document.createElement('option');
+            option.value = f.id;
+            option.textContent = prefix + f.name;
+            moveSelect.appendChild(option);
+            if (f.children.length > 0) {
+                addOptions(f.children, prefix + '  ');
+            }
+        });
+    }
+
+    const tree = buildFolderTree(allCollections);
+    addOptions(tree);
+}
+
+function renderFoldersManageTree() {
+    const container = document.getElementById('folders-tree-manage');
+    const tree = buildFolderTree(allCollections);
+
+    if (tree.length === 0) {
+        container.innerHTML = '<p class="empty-state">No folders yet. Create one above!</p>';
+        return;
+    }
+
+    container.innerHTML = renderFolderManageItems(tree);
+}
+
+function renderFolderManageItems(folders, depth = 0) {
+    let html = '';
+    folders.forEach(f => {
+        const indent = depth > 0 ? 'folder-manage-children' : '';
+
+        html += '<div class="' + indent + '">';
+        html += '<div class="folder-manage-item">';
+        html += '<div class="folder-manage-info">';
+        html += '<span>' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
+        html += '<span>' + escapeHtml(f.name) + '</span>';
+        html += '<span class="folder-manage-counts">' + f.template_count + ' templates, ' + (f.document_count || 0) + ' docs</span>';
+        html += '</div>';
+        html += '<div>';
+        html += '<button class="btn btn-sm btn-danger" onclick="deleteFolder(' + f.id + ', \'' + escapeHtml(f.name).replace(/'/g, "\\'") + '\')">Delete</button>';
+        html += '</div>';
+        html += '</div>';
+
+        if (f.children.length > 0) {
+            html += renderFolderManageItems(f.children, depth + 1);
+        }
+        html += '</div>';
+    });
+    return html;
+}
+
+async function createFolder() {
+    const parentId = document.getElementById('new-folder-parent').value || null;
+    const name = document.getElementById('new-folder-name').value.trim();
+    const description = document.getElementById('new-folder-desc').value.trim();
+
+    if (!name) {
+        showToast('Please enter a folder name', 'error');
+        return;
+    }
+
+    try {
+        await api.post('/api/collections', {
+            name,
+            description: description || null,
+            parent_id: parentId ? parseInt(parentId) : null
+        });
+        showToast('Folder created', 'success');
+        document.getElementById('new-folder-name').value = '';
+        document.getElementById('new-folder-desc').value = '';
+        await loadCollections();
+        renderFoldersManageTree();
+        updateParentSelect();
+    } catch (e) {
+        showToast(e.message || 'Failed to create folder', 'error');
+    }
+}
+
+async function deleteFolder(id, name) {
+    const folder = allCollections.find(c => c.id === id);
+    const msg = folder && folder.template_count > 0
+        ? 'Delete folder "' + name + '"? ' + folder.template_count + ' templates will be moved to parent folder.'
+        : 'Delete folder "' + name + '"?';
+
+    if (!confirm(msg)) return;
+
+    try {
+        await api.delete('/api/collections/' + id);
+        showToast('Folder deleted', 'success');
+        await loadCollections();
+        await loadTemplates();
+        renderFoldersManageTree();
+        updateParentSelect();
+    } catch (e) {
+        showToast('Failed to delete folder', 'error');
+    }
+}
+
+// Move Template Modal
+function showMoveModal(templateId, currentCollectionId) {
+    moveTemplateId = templateId;
+    document.getElementById('move-folder-select').value = currentCollectionId || '';
+    document.getElementById('move-modal').style.display = 'flex';
+}
+
+function closeMoveModal() {
+    document.getElementById('move-modal').style.display = 'none';
+    moveTemplateId = null;
+}
+
+async function moveTemplate() {
+    const collectionId = document.getElementById('move-folder-select').value;
+
+    try {
+        if (collectionId) {
+            await api.post('/api/collections/' + collectionId + '/templates/' + moveTemplateId);
+        } else {
+            await api.put('/api/templates/' + moveTemplateId, { collection_id: null });
+        }
+        showToast('Template moved', 'success');
+        closeMoveModal();
+        await loadCollections();
+        await loadTemplates();
+    } catch (e) {
+        showToast(e.message || 'Failed to move template', 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadDocumentTypes();
+    await loadCollections();
+    await loadTemplates();
+    document.getElementById('search-input').addEventListener('input', applyFilters);
+    document.getElementById('format-filter').addEventListener('change', applyFilters);
+    document.getElementById('doctype-filter').addEventListener('change', applyFilters);
+});
+
+// Close modal on outside click
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal')) {
+        e.target.style.display = 'none';
+    }
+});
+{% endraw %}
+</script>
+{% endblock %}

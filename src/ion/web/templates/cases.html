@@ -1,0 +1,2254 @@
+{% extends "base.html" %}
+
+{% block title %}Cases - ION{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div>
+        <h1>Case Management</h1>
+        <p class="cases-subtitle">Visual workflow tracking for security investigations</p>
+    </div>
+    <button class="btn btn-primary" onclick="showCreateCaseModal()">+ New Case</button>
+</div>
+
+<!-- Attention Alerts Banner -->
+<div class="attn-banner" id="attn-banner" style="display:none;">
+    <div class="attn-banner-header">
+        <span><i class="icon-alert-triangle"></i> <span id="attn-count">0</span> cases need attention</span>
+        <button class="attn-banner-dismiss" onclick="dismissAttentionBanner()" title="Dismiss">&times;</button>
+    </div>
+    <div class="attn-banner-list" id="attn-list"></div>
+</div>
+
+<!-- Stats Bar -->
+<div class="cases-stats-bar" id="cases-stats">
+    <div class="cases-stat-card stat-open">
+        <span class="cases-stat-value" id="stat-open">0</span>
+        <span class="cases-stat-label">Open Cases</span>
+    </div>
+    <div class="cases-stat-card stat-inprogress">
+        <span class="cases-stat-value" id="stat-inprogress">0</span>
+        <span class="cases-stat-label">In Progress</span>
+    </div>
+    <div class="cases-stat-card stat-critical">
+        <span class="cases-stat-value" id="stat-critical">0</span>
+        <span class="cases-stat-label">Critical Active</span>
+    </div>
+    <div class="cases-stat-card stat-resolution">
+        <span class="cases-stat-value" id="stat-resolution">-</span>
+        <span class="cases-stat-label">Avg Resolution</span>
+    </div>
+    <div class="cases-stat-card stat-mttr">
+        <span class="cases-stat-value" id="stat-mttr">-</span>
+        <span class="cases-stat-label">MTTR (30d)</span>
+    </div>
+    <div class="cases-stat-card stat-closure-rate">
+        <span class="cases-stat-value" id="stat-closure-rate">-</span>
+        <span class="cases-stat-label">Closure Rate (7d)</span>
+    </div>
+    <div class="cases-stat-card stat-weekly">
+        <span class="cases-stat-value" id="stat-weekly">-</span>
+        <span class="cases-stat-label">Created / Closed (7d)</span>
+    </div>
+    <div class="cases-stat-card stat-unassigned">
+        <span class="cases-stat-value" id="stat-unassigned">0</span>
+        <span class="cases-stat-label">Unassigned Cases</span>
+    </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="cases-filters-bar">
+    <input type="text" id="filter-search" class="cases-filter-input" placeholder="Search case number or title..." oninput="debouncedFilter()">
+    <select id="filter-severity" class="cases-filter-select" onchange="filterCases()">
+        <option value="">All Severities</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+    </select>
+    <select id="filter-assignee" class="cases-filter-select" onchange="filterCases()">
+        <option value="">All Assignees</option>
+    </select>
+</div>
+
+<!-- Kanban Board -->
+<div class="kanban-board" id="kanban-board">
+    <div class="kanban-column" data-status="open"
+         ondragover="onDragOver(event)" ondrop="onDrop(event, 'open')">
+        <div class="kanban-col-header col-open">
+            <span class="kanban-col-title">Open</span>
+            <span class="kanban-col-count" id="col-count-open">0</span>
+        </div>
+        <div class="kanban-cards" id="col-open"></div>
+    </div>
+    <div class="kanban-column" data-status="in_progress"
+         ondragover="onDragOver(event)" ondrop="onDrop(event, 'in_progress')">
+        <div class="kanban-col-header col-inprogress">
+            <span class="kanban-col-title">In Progress</span>
+            <span class="kanban-col-count" id="col-count-in_progress">0</span>
+        </div>
+        <div class="kanban-cards" id="col-in_progress"></div>
+    </div>
+    <div class="kanban-column" data-status="resolved"
+         ondragover="onDragOver(event)" ondrop="onDrop(event, 'resolved')">
+        <div class="kanban-col-header col-resolved">
+            <span class="kanban-col-title">Resolved</span>
+            <span class="kanban-col-count" id="col-count-resolved">0</span>
+        </div>
+        <div class="kanban-cards" id="col-resolved"></div>
+    </div>
+    <div class="kanban-column" data-status="closed"
+         ondragover="onDragOver(event)" ondrop="onDrop(event, 'closed')">
+        <div class="kanban-col-header col-closed">
+            <span class="kanban-col-title">Closed</span>
+            <span class="kanban-col-count" id="col-count-closed">0</span>
+        </div>
+        <div class="kanban-cards" id="col-closed"></div>
+    </div>
+</div>
+
+<!-- Management Analytics Panel -->
+<div class="analytics-toggle" onclick="toggleAnalyticsPanel()">
+    <h3>Management Analytics</h3>
+    <span class="chevron" id="analytics-chevron"><i class="icon-chevron-down"></i></span>
+</div>
+<div class="analytics-panel" id="analytics-panel-body">
+    <div class="analytics-grid">
+        <div class="analytics-card">
+            <h4>Analyst Workload</h4>
+            <div id="analytics-workload"></div>
+        </div>
+        <div class="analytics-card">
+            <h4>Closure Reasons</h4>
+            <div id="analytics-closure"></div>
+        </div>
+        <div class="analytics-card">
+            <h4>Severity Distribution</h4>
+            <div id="analytics-severity"></div>
+        </div>
+        <div class="analytics-card">
+            <h4>SLA / Case Age</h4>
+            <div id="analytics-sla"></div>
+        </div>
+    </div>
+    <div class="analytics-card-full">
+        <h4>Recent Closures</h4>
+        <div id="analytics-recent"></div>
+    </div>
+</div>
+
+<!-- Case Detail Slide-out Panel -->
+<div class="case-panel-overlay" id="case-panel-overlay" onclick="closeCasePanel()"></div>
+<div class="case-panel" id="case-panel">
+    <div class="case-panel-header">
+        <div>
+            <span class="case-panel-number" id="panel-case-number"></span>
+            <span class="case-panel-title" id="panel-case-title"></span>
+        </div>
+        <button class="case-panel-close" onclick="closeCasePanel()">&times;</button>
+    </div>
+    <div class="case-panel-body" id="case-panel-body">
+        <!-- Populated dynamically -->
+    </div>
+</div>
+
+<!-- Create Case Modal -->
+<div class="cases-modal-overlay" id="create-case-overlay" style="display:none;" onclick="if(event.target===this)closeCreateCaseModal()">
+    <div class="cases-modal">
+        <div class="cases-modal-header">
+            <h3>Create New Case</h3>
+            <button class="cases-modal-close" onclick="closeCreateCaseModal()">&times;</button>
+        </div>
+        <div class="cases-modal-body">
+            <div class="form-group">
+                <label>Title *</label>
+                <input type="text" id="new-case-title" class="form-control" placeholder="Case title...">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="new-case-description" class="form-control" rows="3" placeholder="Describe the investigation..."></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Severity</label>
+                    <select id="new-case-severity" class="form-control">
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Assign To</label>
+                    <select id="new-case-assignee" class="form-control">
+                        <option value="">Unassigned</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="cases-modal-footer">
+            <button class="btn" onclick="closeCreateCaseModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="submitCreateCase()">Create Case</button>
+        </div>
+    </div>
+</div>
+
+<!-- Closure Modal -->
+<div class="cases-modal-overlay" id="closure-modal-overlay" style="display:none;" onclick="if(event.target===this)cancelClosure()">
+    <div class="cases-modal">
+        <div class="cases-modal-header">
+            <h3 id="closure-modal-title">Close Case</h3>
+            <button class="cases-modal-close" onclick="cancelClosure()">&times;</button>
+        </div>
+        <div class="cases-modal-body">
+            <div class="form-group">
+                <label>Closure Reason *</label>
+                <select id="closure-reason" class="form-control">
+                    <option value="">Select reason...</option>
+                    <option value="true_positive">True Positive</option>
+                    <option value="false_positive">False Positive</option>
+                    <option value="benign_true_positive">Benign True Positive</option>
+                    <option value="duplicate">Duplicate</option>
+                    <option value="insufficient_data">Insufficient Data</option>
+                    <option value="not_applicable">Not Applicable</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Closure Notes</label>
+                <textarea id="closure-notes" class="form-control" rows="3" placeholder="Closure details..."></textarea>
+            </div>
+        </div>
+        <div class="cases-modal-footer">
+            <button class="btn" onclick="cancelClosure()">Cancel</button>
+            <button class="btn btn-primary" onclick="confirmClosure()">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* =============================================================================
+   Cases Page — Kanban Board
+   ============================================================================= */
+
+.cases-subtitle {
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+/* ── Stats Bar ───────────────────────────────────────────── */
+.cases-stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.cases-stat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    border-top: 3px solid var(--border-color);
+}
+
+.cases-stat-card.stat-open { border-top-color: #3b82f6; }
+.cases-stat-card.stat-inprogress { border-top-color: #f59e0b; }
+.cases-stat-card.stat-critical { border-top-color: #ef4444; }
+.cases-stat-card.stat-resolution { border-top-color: #10b981; }
+
+.cases-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.stat-open .cases-stat-value { color: #3b82f6; }
+.stat-inprogress .cases-stat-value { color: #f59e0b; }
+.stat-critical .cases-stat-value { color: #ef4444; }
+.stat-resolution .cases-stat-value { color: #10b981; }
+
+.cases-stat-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.15rem;
+}
+
+/* ── Filters Bar ─────────────────────────────────────────── */
+.cases-filters-bar {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.cases-filter-input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.cases-filter-input::placeholder { color: var(--text-secondary); }
+.cases-filter-input:focus { outline: none; border-color: var(--accent-color); }
+
+.cases-filter-select {
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    min-width: 150px;
+}
+
+.cases-filter-select:focus { outline: none; border-color: var(--accent-color); }
+
+/* ── Kanban Board ────────────────────────────────────────── */
+.kanban-board {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    min-height: calc(100vh - 380px);
+}
+
+.kanban-column {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 300px;
+}
+
+.kanban-column.drag-over {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.kanban-col-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 2px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.col-open .kanban-col-title { color: #3b82f6; }
+.col-inprogress .kanban-col-title { color: #f59e0b; }
+.col-resolved .kanban-col-title { color: #8b5cf6; }
+.col-closed .kanban-col-title { color: #6b7280; }
+
+.col-open { border-bottom-color: #3b82f6; }
+.col-inprogress { border-bottom-color: #f59e0b; }
+.col-resolved { border-bottom-color: #8b5cf6; }
+.col-closed { border-bottom-color: #6b7280; }
+
+.kanban-col-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.kanban-col-count {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.kanban-cards {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* ── Kanban Card ─────────────────────────────────────────── */
+.kanban-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-left: 3px solid transparent;
+}
+
+.kanban-card:hover {
+    border-color: var(--accent-color);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.kanban-card.dragging {
+    opacity: 0.5;
+    transform: rotate(2deg);
+}
+
+.kanban-card.sev-critical { border-left-color: #ef4444; }
+.kanban-card.sev-high { border-left-color: #f59e0b; }
+.kanban-card.sev-medium { border-left-color: #3b82f6; }
+.kanban-card.sev-low { border-left-color: #6b7280; }
+
+.kcard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.35rem;
+}
+
+.kcard-number {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.kcard-severity {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+}
+
+.kcard-severity.sev-critical { background: rgba(239,68,68,0.2); color: #ef4444; }
+.kcard-severity.sev-high { background: rgba(245,158,11,0.2); color: #f59e0b; }
+.kcard-severity.sev-medium { background: rgba(59,130,246,0.2); color: #3b82f6; }
+.kcard-severity.sev-low { background: rgba(107,114,128,0.2); color: #9ca3af; }
+
+.kcard-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 0.4rem;
+}
+
+.kcard-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.kcard-assignee {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100px;
+}
+
+.kcard-footer {
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+    margin-top: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.kcard-alert-count {
+    font-size: 0.7rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    padding: 0.05rem 0.3rem;
+    color: var(--text-secondary);
+}
+
+.kcard-age {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.kcard-integration {
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 0.05rem 0.25rem;
+    border-radius: 2px;
+    background: rgba(59,130,246,0.15);
+    color: #3b82f6;
+}
+
+.kcard-closure {
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 0.05rem 0.25rem;
+    border-radius: 2px;
+}
+
+.kcard-closure.reason-true_positive { background: rgba(239,68,68,0.15); color: #ef4444; }
+.kcard-closure.reason-false_positive { background: rgba(107,114,128,0.15); color: #9ca3af; }
+.kcard-closure.reason-benign_true_positive { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.kcard-closure.reason-duplicate { background: rgba(139,92,246,0.15); color: #8b5cf6; }
+.kcard-closure.reason-insufficient_data { background: rgba(107,114,128,0.15); color: #6b7280; }
+.kcard-closure.reason-not_applicable { background: rgba(107,114,128,0.15); color: #6b7280; }
+
+/* ── Case Detail Panel ───────────────────────────────────── */
+.case-panel-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 1049;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+}
+
+.case-panel-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.case-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 560px;
+    max-width: 95vw;
+    height: 100vh;
+    background: var(--bg-primary);
+    border-left: 1px solid var(--border-color);
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+}
+
+.case-panel.open {
+    transform: translateX(0);
+}
+
+.case-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.case-panel-number {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent-color);
+    display: block;
+    margin-bottom: 0.15rem;
+}
+
+.case-panel-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: block;
+}
+
+.case-panel-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0;
+    line-height: 1;
+}
+
+.case-panel-close:hover { color: var(--text-primary); }
+
+.case-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.25rem;
+}
+
+/* Panel sections */
+.cpanel-section {
+    margin-bottom: 1.25rem;
+}
+
+.cpanel-section-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cpanel-meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.cpanel-meta-item label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.2rem;
+}
+
+.cpanel-meta-item select,
+.cpanel-meta-item input {
+    width: 100%;
+    padding: 0.35rem 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.cpanel-meta-item select:focus,
+.cpanel-meta-item input:focus { outline: none; border-color: var(--accent-color); }
+
+.cpanel-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.cpanel-tag {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 3px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.cpanel-description {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    line-height: 1.6;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+
+.cpanel-alert-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0.6rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-bottom: 0.35rem;
+}
+
+.cpanel-alert-id {
+    color: var(--accent-color);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.cpanel-alert-id:hover { text-decoration: underline; }
+
+/* Notes timeline */
+.cpanel-note {
+    padding: 0.6rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-bottom: 0.4rem;
+}
+
+.cpanel-note-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.cpanel-note-content {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.cpanel-add-note {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.cpanel-add-note textarea {
+    flex: 1;
+    padding: 0.4rem 0.6rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    resize: vertical;
+    min-height: 36px;
+}
+
+.cpanel-add-note textarea:focus { outline: none; border-color: var(--accent-color); }
+
+/* Action buttons */
+.cpanel-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.cpanel-actions .btn {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.75rem;
+}
+.cpanel-playbook-browser {
+    margin-top: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+.cpanel-playbook-browser-search {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.375rem 0.5rem;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+}
+.cpanel-playbook-browser-search input {
+    width: 100%;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+}
+.cpanel-pb-group-header {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.375rem 0.5rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 37px;
+    z-index: 1;
+}
+.cpanel-pb-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.8125rem;
+}
+.cpanel-pb-item:last-child { border-bottom: none; }
+.cpanel-pb-item-info { flex: 1; min-width: 0; }
+.cpanel-pb-item-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cpanel-pb-item-desc { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cpanel-pb-badge {
+    font-size: 0.625rem;
+    padding: 0.0625rem 0.3rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+.cpanel-pb-badge.active { background: rgba(76,175,80,0.2); color: #4caf50; }
+.cpanel-pb-badge.inactive { background: rgba(33,150,243,0.2); color: #2196f3; }
+
+/* ── Modal (Create + Closure) ────────────────────────────── */
+.cases-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cases-modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 480px;
+    max-height: 80vh;
+    overflow: auto;
+}
+
+.cases-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.cases-modal-header h3 { margin: 0; font-size: 1.05rem; }
+
+.cases-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.cases-modal-body { padding: 1.25rem; }
+
+.cases-modal-body .form-group { margin-bottom: 0.75rem; }
+
+.cases-modal-body label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.cases-modal-body .form-control {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    box-sizing: border-box;
+}
+
+.cases-modal-body .form-control:focus { outline: none; border-color: var(--accent-color); }
+
+.cases-modal-body textarea.form-control { resize: vertical; font-family: inherit; }
+
+.form-row { display: flex; gap: 0.75rem; }
+
+.cases-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* ── Empty state ─────────────────────────────────────────── */
+.kanban-empty {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    padding: 1.5rem 0.5rem;
+    opacity: 0.7;
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 1200px) {
+    .kanban-board {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .cases-stats-bar {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .kanban-board {
+        grid-template-columns: 1fr;
+    }
+    .cases-stats-bar {
+        grid-template-columns: 1fr;
+    }
+    .cases-filters-bar {
+        flex-direction: column;
+    }
+    .case-panel { width: 100vw; }
+}
+
+/* ── Attention Banner ───────────────────────────────────── */
+.attn-banner {
+    border: 1px solid #f59e0b;
+    border-left: 4px solid #f59e0b;
+    background: rgba(245, 158, 11, 0.08);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.attn-banner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #f59e0b;
+}
+
+.attn-banner-dismiss {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0;
+    line-height: 1;
+}
+
+.attn-banner-dismiss:hover { color: var(--text-primary); }
+
+.attn-banner-list {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 0 0.75rem 0.5rem;
+}
+
+.attn-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.attn-item:hover { background: rgba(255,255,255,0.05); }
+
+.attn-reason {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+
+.attn-reason-stale { background: rgba(245,158,11,0.2); color: #f59e0b; }
+.attn-reason-unassigned { background: rgba(139,92,246,0.2); color: #8b5cf6; }
+.attn-reason-not-picked-up { background: rgba(239,68,68,0.2); color: #ef4444; }
+.attn-reason-aged { background: rgba(107,114,128,0.2); color: #9ca3af; }
+
+.attn-case-num {
+    font-weight: 600;
+    color: var(--accent-color);
+    min-width: 65px;
+}
+
+.attn-case-title {
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+/* ── Stats Row 2 ────────────────────────────────────────── */
+.cases-stat-card.stat-mttr { border-top-color: #8b5cf6; }
+.cases-stat-card.stat-closure-rate { border-top-color: #10b981; }
+.cases-stat-card.stat-weekly { border-top-color: #3b82f6; }
+.cases-stat-card.stat-unassigned { border-top-color: #f59e0b; }
+
+.stat-mttr .cases-stat-value { color: #8b5cf6; }
+.stat-closure-rate .cases-stat-value { color: #10b981; }
+.stat-weekly .cases-stat-value { color: #3b82f6; }
+.stat-unassigned .cases-stat-value { color: #f59e0b; }
+
+/* ── Analytics Panel ────────────────────────────────────── */
+.analytics-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    margin-top: 1.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.analytics-toggle:hover { background: var(--bg-primary); }
+
+.analytics-toggle h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.analytics-toggle .chevron {
+    color: var(--text-secondary);
+    transition: transform 0.2s;
+    font-size: 0.85rem;
+}
+
+.analytics-toggle .chevron.collapsed { transform: rotate(-90deg); }
+
+.analytics-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.analytics-panel.collapsed { display: none; }
+
+.analytics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.analytics-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.analytics-card h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.analytics-card-full {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.analytics-card-full h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* ── Horizontal Bar Charts ──────────────────────────────── */
+.hbar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.hbar-label {
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    min-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hbar-track {
+    flex: 1;
+    height: 20px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.hbar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    min-width: 2px;
+}
+
+.hbar-value {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 28px;
+    text-align: right;
+}
+
+/* ── Closure Reason Chart ───────────────────────────────── */
+.closure-stacked {
+    display: flex;
+    height: 24px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.75rem;
+}
+
+.closure-stacked-seg {
+    height: 100%;
+    min-width: 3px;
+    transition: width 0.3s ease;
+}
+
+.closure-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.closure-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.closure-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+}
+
+/* ── SLA / Case Age ─────────────────────────────────────── */
+.sla-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.15s;
+}
+
+.sla-row:hover { background: rgba(255,255,255,0.05); }
+
+.sla-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.sla-green { background: #10b981; }
+.sla-yellow { background: #f59e0b; }
+.sla-orange { background: #f97316; }
+.sla-red { background: #ef4444; }
+
+.sla-case-num {
+    font-weight: 600;
+    color: var(--accent-color);
+    min-width: 65px;
+}
+
+.sla-case-title {
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.sla-age {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* ── Recent Closures ────────────────────────────────────── */
+.rclosure-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.8rem;
+}
+
+.rclosure-row:last-child { border-bottom: none; }
+
+.rclosure-num {
+    font-weight: 600;
+    color: var(--accent-color);
+    min-width: 65px;
+}
+
+.rclosure-title {
+    color: var(--text-primary);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rclosure-reason {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+}
+
+.rclosure-who {
+    color: var(--text-secondary);
+    min-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rclosure-when {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+/* ── Analytics Responsive ───────────────────────────────── */
+@media (max-width: 900px) {
+    .analytics-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// =============================================================================
+// Cases Kanban — State
+// =============================================================================
+let allCases = [];
+let filteredCases = [];
+let usersCache = [];
+let dragCaseId = null;
+let pendingClosure = null; // { caseId, targetStatus }
+let teamMetricsCache = null;
+let attentionDismissed = false;
+let casesLoaded = false;
+
+const closureReasonLabels = {
+    true_positive: 'TP',
+    false_positive: 'FP',
+    benign_true_positive: 'BTP',
+    duplicate: 'DUP',
+    insufficient_data: 'N/D',
+    not_applicable: 'N/A',
+};
+
+// =============================================================================
+// Helpers
+// =============================================================================
+function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function ageLabel(dateStr) {
+    if (!dateStr) return '';
+    const ms = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(ms / 60000);
+    if (mins < 60) return mins + 'm';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h';
+    const days = Math.floor(hrs / 24);
+    return days + 'd';
+}
+
+function fmtDate(dateStr) {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+const _filterDebounce = debounce(() => filterCases(), 200);
+function debouncedFilter() { _filterDebounce(); }
+
+// =============================================================================
+// Data Loading
+// =============================================================================
+async function loadAllCases() {
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases');
+        if (!resp.ok) throw new Error('Failed to load cases');
+        const data = await resp.json();
+        allCases = data.cases || [];
+        casesLoaded = true;
+    } catch (e) {
+        console.error('Error loading cases:', e);
+        allCases = [];
+        casesLoaded = true;
+    }
+    filterCases();
+}
+
+async function loadUsers() {
+    try {
+        const resp = await fetch('/api/users');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        usersCache = Array.isArray(data) ? data : data.users || [];
+    } catch (e) {
+        console.log('Could not load users');
+        usersCache = [];
+    }
+    populateAssigneeDropdowns();
+}
+
+function populateAssigneeDropdowns() {
+    const filterSelect = document.getElementById('filter-assignee');
+    const createSelect = document.getElementById('new-case-assignee');
+
+    const options = usersCache.map(u =>
+        '<option value="' + esc(u.username) + '">' + esc(u.display_name || u.username) + '</option>'
+    ).join('');
+
+    if (filterSelect) {
+        filterSelect.innerHTML = '<option value="">All Assignees</option>' + options;
+    }
+    if (createSelect) {
+        createSelect.innerHTML = '<option value="">Unassigned</option>' + options;
+    }
+}
+
+// =============================================================================
+// Filtering & Rendering
+// =============================================================================
+function filterCases() {
+    const search = (document.getElementById('filter-search').value || '').toLowerCase().trim();
+    const severity = document.getElementById('filter-severity').value;
+    const assignee = document.getElementById('filter-assignee').value;
+
+    filteredCases = allCases.filter(c => {
+        if (search) {
+            const matchNum = (c.case_number || '').toLowerCase().includes(search);
+            const matchTitle = (c.title || '').toLowerCase().includes(search);
+            if (!matchNum && !matchTitle) return false;
+        }
+        if (severity && c.severity !== severity) return false;
+        if (assignee && c.assigned_to !== assignee) return false;
+        return true;
+    });
+
+    renderBoard();
+    renderStats();
+    computeAttentionAlerts();
+    renderAnalyticsPanel();
+}
+
+function renderStats() {
+    const open = allCases.filter(c => c.status === 'open').length;
+    const inProg = allCases.filter(c => c.status === 'in_progress').length;
+    const critActive = allCases.filter(c => c.severity === 'critical' && (c.status === 'open' || c.status === 'in_progress')).length;
+
+    document.getElementById('stat-open').textContent = open;
+    document.getElementById('stat-inprogress').textContent = inProg;
+    document.getElementById('stat-critical').textContent = critActive;
+
+    // Avg resolution time
+    const resolved = allCases.filter(c => (c.status === 'resolved' || c.status === 'closed') && c.created_at && c.closed_at);
+    if (resolved.length > 0) {
+        const totalMs = resolved.reduce((sum, c) => sum + (new Date(c.closed_at) - new Date(c.created_at)), 0);
+        const avgMs = totalMs / resolved.length;
+        const avgHrs = Math.round(avgMs / 3600000);
+        if (avgHrs < 24) {
+            document.getElementById('stat-resolution').textContent = avgHrs + 'h';
+        } else {
+            document.getElementById('stat-resolution').textContent = Math.round(avgHrs / 24) + 'd';
+        }
+    } else {
+        document.getElementById('stat-resolution').textContent = '-';
+    }
+
+    // Update unassigned count (always available from client-side data)
+    const unassigned = allCases.filter(c => !c.assigned_to && (c.status === 'open' || c.status === 'in_progress')).length;
+    document.getElementById('stat-unassigned').textContent = unassigned;
+}
+
+function renderBoard() {
+    const columns = {
+        open: [],
+        in_progress: [],
+        resolved: [],
+        closed: [],
+    };
+
+    filteredCases.forEach(c => {
+        const status = c.status || 'open';
+        if (columns[status]) {
+            columns[status].push(c);
+        } else {
+            columns.open.push(c);
+        }
+    });
+
+    Object.keys(columns).forEach(status => {
+        const container = document.getElementById('col-' + status);
+        const countEl = document.getElementById('col-count-' + status);
+        const cards = columns[status];
+
+        if (countEl) countEl.textContent = cards.length;
+
+        if (!cards.length) {
+            container.innerHTML = '<div class="kanban-empty">No cases</div>';
+            return;
+        }
+
+        container.innerHTML = cards.map(c => renderCard(c)).join('');
+    });
+}
+
+function renderCard(c) {
+    const sev = c.severity || 'medium';
+    const integrations = [];
+    if (c.kibana_url) integrations.push('<span class="kcard-integration" title="Synced with Kibana">K</span>');
+    if (c.dfir_iris_case_id) integrations.push('<span class="kcard-integration" title="Escalated to DFIR-IRIS">I</span>');
+
+    let closureBadge = '';
+    if (c.closure_reason) {
+        const label = closureReasonLabels[c.closure_reason] || c.closure_reason;
+        closureBadge = '<span class="kcard-closure reason-' + esc(c.closure_reason) + '">' + esc(label) + '</span>';
+    }
+
+    return '<div class="kanban-card sev-' + esc(sev) + '" draggable="true"'
+        + ' ondragstart="onDragStart(event,' + c.id + ')"'
+        + ' ondragend="onDragEnd(event)"'
+        + ' onclick="openCaseDetail(' + c.id + ')"'
+        + ' data-case-id="' + c.id + '">'
+        + '<div class="kcard-header">'
+        +   '<span class="kcard-number">' + esc(c.case_number) + '</span>'
+        +   '<span class="kcard-severity sev-' + esc(sev) + '">' + esc(sev) + '</span>'
+        + '</div>'
+        + '<div class="kcard-title">' + esc(c.title) + '</div>'
+        + '<div class="kcard-meta">'
+        +   '<span class="kcard-assignee">' + esc(c.assigned_to || 'Unassigned') + '</span>'
+        +   '<span class="kcard-age">' + ageLabel(c.created_at) + '</span>'
+        + '</div>'
+        + '<div class="kcard-footer">'
+        +   '<span class="kcard-alert-count">' + (c.alert_count || 0) + ' alerts</span>'
+        +   integrations.join('')
+        +   closureBadge
+        + '</div>'
+        + '</div>';
+}
+
+// =============================================================================
+// Drag & Drop
+// =============================================================================
+function onDragStart(e, caseId) {
+    dragCaseId = caseId;
+    e.dataTransfer.effectAllowed = 'move';
+    e.target.classList.add('dragging');
+}
+
+function onDragEnd(e) {
+    e.target.classList.remove('dragging');
+    document.querySelectorAll('.kanban-column').forEach(col => col.classList.remove('drag-over'));
+}
+
+function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const col = e.target.closest('.kanban-column');
+    if (col) {
+        document.querySelectorAll('.kanban-column').forEach(c => c.classList.remove('drag-over'));
+        col.classList.add('drag-over');
+    }
+}
+
+function onDrop(e, targetStatus) {
+    e.preventDefault();
+    document.querySelectorAll('.kanban-column').forEach(col => col.classList.remove('drag-over'));
+
+    if (!dragCaseId) return;
+
+    const caseObj = allCases.find(c => c.id === dragCaseId);
+    if (!caseObj || caseObj.status === targetStatus) {
+        dragCaseId = null;
+        return;
+    }
+
+    // If dropping into resolved or closed, require closure reason
+    if (targetStatus === 'resolved' || targetStatus === 'closed') {
+        pendingClosure = { caseId: dragCaseId, targetStatus: targetStatus };
+        document.getElementById('closure-modal-title').textContent =
+            targetStatus === 'resolved' ? 'Resolve Case' : 'Close Case';
+        document.getElementById('closure-reason').value = '';
+        document.getElementById('closure-notes').value = '';
+        document.getElementById('closure-modal-overlay').style.display = 'flex';
+        dragCaseId = null;
+        return;
+    }
+
+    // Simple status transition (open / in_progress)
+    updateCaseStatus(dragCaseId, targetStatus, null, null);
+    dragCaseId = null;
+}
+
+// =============================================================================
+// Case Status Updates
+// =============================================================================
+async function updateCaseStatus(caseId, status, closureReason, closureNotes) {
+    try {
+        const body = { status: status };
+        if (closureReason) body.closure_reason = closureReason;
+        if (closureNotes) body.closure_notes = closureNotes;
+
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || 'Update failed');
+        }
+
+        showToast('Case status updated', 'success');
+        await loadAllCases();
+
+        // Refresh panel if open for this case
+        if (document.getElementById('case-panel').classList.contains('open')) {
+            const numEl = document.getElementById('panel-case-number');
+            const openCase = allCases.find(c => c.id === caseId);
+            if (openCase && numEl && numEl.textContent === openCase.case_number) {
+                openCaseDetail(caseId);
+            }
+        }
+    } catch (e) {
+        showToast('Failed to update case: ' + e.message, 'error');
+    }
+}
+
+function confirmClosure() {
+    if (!pendingClosure) return;
+
+    const reason = document.getElementById('closure-reason').value;
+    if (!reason) {
+        showToast('Closure reason is required', 'warning');
+        return;
+    }
+
+    const notes = document.getElementById('closure-notes').value.trim();
+
+    document.getElementById('closure-modal-overlay').style.display = 'none';
+    updateCaseStatus(pendingClosure.caseId, pendingClosure.targetStatus, reason, notes);
+    pendingClosure = null;
+}
+
+function cancelClosure() {
+    document.getElementById('closure-modal-overlay').style.display = 'none';
+    pendingClosure = null;
+}
+
+// =============================================================================
+// Case Detail Panel
+// =============================================================================
+async function openCaseDetail(caseId) {
+    const panel = document.getElementById('case-panel');
+    const overlay = document.getElementById('case-panel-overlay');
+    const body = document.getElementById('case-panel-body');
+
+    // Show panel with loading
+    panel.classList.add('open');
+    overlay.classList.add('open');
+    body.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:2rem;">Loading...</p>';
+
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId);
+        if (!resp.ok) throw new Error('Failed to load case');
+        const c = await resp.json();
+
+        document.getElementById('panel-case-number').textContent = c.case_number || '';
+        document.getElementById('panel-case-title').textContent = c.title || '';
+
+        body.innerHTML = renderPanelContent(c);
+    } catch (e) {
+        body.innerHTML = '<p style="color:#ef4444;text-align:center;padding:2rem;">Failed to load case details</p>';
+    }
+}
+
+function renderPanelContent(c) {
+    let html = '';
+
+    // Metadata
+    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section-title">Metadata</div>';
+    html += '<div class="cpanel-meta-grid">';
+    html += '<div class="cpanel-meta-item"><label>Status</label>'
+        + '<select onchange="panelUpdateField(' + c.id + ',\'status\',this.value)">'
+        + ['open','in_progress','resolved','closed'].map(s =>
+            '<option value="' + s + '"' + (c.status === s ? ' selected' : '') + '>' + s.replace('_',' ') + '</option>'
+        ).join('')
+        + '</select></div>';
+    html += '<div class="cpanel-meta-item"><label>Severity</label>'
+        + '<select onchange="panelUpdateField(' + c.id + ',\'severity\',this.value)">'
+        + ['critical','high','medium','low'].map(s =>
+            '<option value="' + s + '"' + (c.severity === s ? ' selected' : '') + '>' + s + '</option>'
+        ).join('')
+        + '</select></div>';
+    html += '<div class="cpanel-meta-item"><label>Assigned To</label>'
+        + '<select onchange="panelUpdateField(' + c.id + ',\'assigned_to\',this.value)">'
+        + '<option value=""' + (!c.assigned_to ? ' selected' : '') + '>Unassigned</option>'
+        + usersCache.map(u =>
+            '<option value="' + esc(u.username) + '"' + (c.assigned_to === u.username ? ' selected' : '') + '>'
+            + esc(u.display_name || u.username) + '</option>'
+        ).join('')
+        + '</select></div>';
+    html += '<div class="cpanel-meta-item"><label>Created</label>'
+        + '<input type="text" value="' + esc(fmtDate(c.created_at)) + '" disabled></div>';
+    html += '</div></div>';
+
+    // Context tags
+    const hosts = c.affected_hosts || [];
+    const users = c.affected_users || [];
+    const rules = c.triggered_rules || [];
+    if (hosts.length || users.length || rules.length) {
+        html += '<div class="cpanel-section">';
+        html += '<div class="cpanel-section-title">Context</div>';
+        html += '<div class="cpanel-tags">';
+        hosts.forEach(h => { html += '<span class="cpanel-tag" title="Host">' + esc(h) + '</span>'; });
+        users.forEach(u => { html += '<span class="cpanel-tag" title="User">' + esc(u) + '</span>'; });
+        rules.forEach(r => { html += '<span class="cpanel-tag" title="Rule">' + esc(r) + '</span>'; });
+        html += '</div></div>';
+    }
+
+    // Description
+    if (c.description || c.evidence_summary) {
+        html += '<div class="cpanel-section">';
+        html += '<div class="cpanel-section-title">Description</div>';
+        const desc = c.description || c.evidence_summary || '';
+        if (typeof marked !== 'undefined') {
+            html += '<div class="cpanel-description">' + safeMarkdown(desc) + '</div>';
+        } else {
+            html += '<div class="cpanel-description">' + esc(desc) + '</div>';
+        }
+        html += '</div>';
+    }
+
+    // Linked alerts
+    const alerts = c.alerts || [];
+    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section-title">Linked Alerts (' + alerts.length + ')</div>';
+    if (alerts.length) {
+        alerts.forEach(a => {
+            const alertId = a.es_alert_id || a.id || 'unknown';
+            html += '<div class="cpanel-alert-item">'
+                + '<a class="cpanel-alert-id" href="/alerts" title="View in Alerts page">' + esc(String(alertId).substring(0, 20)) + '</a>'
+                + '<span style="font-size:0.75rem;color:var(--text-secondary);">' + esc(a.status || '') + '</span>'
+                + '</div>';
+        });
+    } else {
+        html += '<p style="font-size:0.8rem;color:var(--text-secondary);">No linked alerts</p>';
+    }
+    html += '</div>';
+
+    // Investigation notes
+    const notes = c.notes || [];
+    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section-title">Investigation Notes (' + notes.length + ')</div>';
+    if (notes.length) {
+        notes.forEach(n => {
+            html += '<div class="cpanel-note">'
+                + '<div class="cpanel-note-header">'
+                +   '<span>' + esc(n.user || 'Unknown') + '</span>'
+                +   '<span>' + fmtDate(n.created_at) + '</span>'
+                + '</div>'
+                + '<div class="cpanel-note-content">' + esc(n.content) + '</div>'
+                + '</div>';
+        });
+    }
+    html += '<div class="cpanel-add-note">'
+        + '<textarea id="panel-note-input" placeholder="Add a note..." rows="2"></textarea>'
+        + '<button class="btn btn-primary" style="align-self:flex-end;font-size:0.8rem;padding:0.4rem 0.75rem;" onclick="addPanelNote(' + c.id + ')">Add</button>'
+        + '</div>';
+    html += '</div>';
+
+    // Action buttons
+    html += '<div class="cpanel-actions">';
+    if (c.dfir_iris_case_id) {
+        html += '<button class="btn" disabled title="Already escalated">Escalated to DFIR-IRIS</button>';
+    } else {
+        html += '<button class="btn" onclick="escalateCase(' + c.id + ')">Escalate to DFIR-IRIS</button>';
+    }
+    if (c.kibana_url) {
+        html += '<a class="btn" href="' + esc(c.kibana_url) + '" target="_blank" rel="noopener">View in Kibana</a>';
+    }
+    html += '<button class="btn" onclick="toggleCasePlaybookBrowser(' + c.id + ')">Start Playbook</button>';
+    html += '</div>';
+    html += '<div id="case-playbook-browser-' + c.id + '" style="display:none;"></div>';
+
+    return html;
+}
+
+function closeCasePanel() {
+    document.getElementById('case-panel').classList.remove('open');
+    document.getElementById('case-panel-overlay').classList.remove('open');
+}
+
+// =============================================================================
+// Panel Inline Updates
+// =============================================================================
+async function panelUpdateField(caseId, field, value) {
+    // If changing status to resolved/closed, require closure reason
+    if (field === 'status' && (value === 'resolved' || value === 'closed')) {
+        pendingClosure = { caseId: caseId, targetStatus: value };
+        document.getElementById('closure-modal-title').textContent =
+            value === 'resolved' ? 'Resolve Case' : 'Close Case';
+        document.getElementById('closure-reason').value = '';
+        document.getElementById('closure-notes').value = '';
+        document.getElementById('closure-modal-overlay').style.display = 'flex';
+        return;
+    }
+
+    try {
+        const body = {};
+        body[field] = value || null;
+
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || 'Update failed');
+        }
+
+        showToast('Case updated', 'success');
+        await loadAllCases();
+    } catch (e) {
+        showToast('Failed to update: ' + e.message, 'error');
+    }
+}
+
+// =============================================================================
+// Add Note from Panel
+// =============================================================================
+async function addPanelNote(caseId) {
+    const input = document.getElementById('panel-note-input');
+    const content = input ? input.value.trim() : '';
+    if (!content) {
+        showToast('Note content is required', 'warning');
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content }),
+        });
+
+        if (!resp.ok) throw new Error('Failed to add note');
+
+        showToast('Note added', 'success');
+        openCaseDetail(caseId); // refresh panel
+    } catch (e) {
+        showToast('Failed to add note: ' + e.message, 'error');
+    }
+}
+
+// =============================================================================
+// Escalate to DFIR-IRIS
+// =============================================================================
+async function escalateCase(caseId) {
+    if (!confirm('Escalate this case to DFIR-IRIS?')) return;
+
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/escalate-iris', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || 'Escalation failed');
+        }
+
+        showToast('Case escalated to DFIR-IRIS', 'success');
+        await loadAllCases();
+        openCaseDetail(caseId);
+    } catch (e) {
+        showToast('Escalation failed: ' + e.message, 'error');
+    }
+}
+
+// =============================================================================
+// Start Playbook (Browser Panel)
+// =============================================================================
+let casePlaybookData = {};  // caseId -> playbooks array
+
+async function toggleCasePlaybookBrowser(caseId) {
+    const panel = document.getElementById('case-playbook-browser-' + caseId);
+    if (!panel) return;
+
+    if (panel.style.display !== 'none') {
+        panel.style.display = 'none';
+        return;
+    }
+
+    panel.innerHTML = '<div style="padding:0.5rem;font-size:0.8125rem;color:var(--text-muted);">Loading playbooks...</div>';
+    panel.style.display = 'block';
+
+    try {
+        const resp = await fetch('/api/playbooks?active_only=false');
+        if (!resp.ok) throw new Error('Failed to load playbooks');
+        const data = await resp.json();
+        const playbooks = data.playbooks || [];
+        casePlaybookData[caseId] = playbooks;
+        renderCasePlaybookBrowser(caseId, playbooks);
+    } catch (e) {
+        panel.innerHTML = '<div style="padding:0.5rem;font-size:0.8125rem;color:#f44336;">Failed to load playbooks</div>';
+    }
+}
+
+function renderCasePlaybookBrowser(caseId, playbooks, filter) {
+    const panel = document.getElementById('case-playbook-browser-' + caseId);
+    if (!panel) return;
+
+    let filtered = playbooks;
+    if (filter) {
+        const q = filter.toLowerCase();
+        filtered = playbooks.filter(p => p.name.toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q));
+    }
+
+    const active = filtered.filter(p => p.is_active);
+    const inactive = filtered.filter(p => !p.is_active);
+
+    if (!filtered.length) {
+        panel.innerHTML = '<div class="cpanel-playbook-browser">'
+            + '<div class="cpanel-playbook-browser-search"><input type="text" placeholder="Filter playbooks..." oninput="filterCasePlaybooks(' + caseId + ', this.value)" value="' + (filter || '') + '"></div>'
+            + '<div style="padding:0.5rem;font-size:0.8125rem;color:var(--text-muted);">No matching playbooks</div></div>';
+        return;
+    }
+
+    let html = '<div class="cpanel-playbook-browser">';
+    html += '<div class="cpanel-playbook-browser-search"><input type="text" placeholder="Filter playbooks..." oninput="filterCasePlaybooks(' + caseId + ', this.value)" value="' + (filter || '') + '"></div>';
+
+    if (active.length > 0) {
+        html += '<div class="cpanel-pb-group-header">Active Playbooks</div>';
+        html += active.map(p => renderCasePlaybookItem(caseId, p, true)).join('');
+    }
+    if (inactive.length > 0) {
+        html += '<div class="cpanel-pb-group-header">Library Playbooks</div>';
+        html += inactive.map(p => renderCasePlaybookItem(caseId, p, false)).join('');
+    }
+
+    html += '</div>';
+    panel.innerHTML = html;
+}
+
+function renderCasePlaybookItem(caseId, p, isActive) {
+    const desc = p.description ? esc(p.description.substring(0, 80)) + (p.description.length > 80 ? '...' : '') : '';
+    return '<div class="cpanel-pb-item">'
+        + '<div class="cpanel-pb-item-info">'
+        + '<div class="cpanel-pb-item-name">' + esc(p.name) + '</div>'
+        + '<div class="cpanel-pb-item-desc">' + desc + ' &middot; ' + p.step_count + ' steps</div>'
+        + '</div>'
+        + '<span class="cpanel-pb-badge ' + (isActive ? 'active' : 'inactive') + '">' + (isActive ? 'Active' : 'Library') + '</span>'
+        + '<button class="btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;" onclick="startPlaybookForCase(' + caseId + ',' + p.id + ',\'' + esc(p.name) + '\')">Start</button>'
+        + '</div>';
+}
+
+function filterCasePlaybooks(caseId, query) {
+    const playbooks = casePlaybookData[caseId] || [];
+    renderCasePlaybookBrowser(caseId, playbooks, query);
+}
+
+async function startPlaybookForCase(caseId, playbookId, playbookName) {
+    try {
+        const execResp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/playbook/' + playbookId + '/start', {
+            method: 'POST',
+        });
+
+        if (!execResp.ok) {
+            const err = await execResp.json();
+            throw new Error(err.detail || 'Failed to start playbook');
+        }
+
+        showToast('Playbook "' + playbookName + '" started', 'success');
+        // Hide the browser panel
+        const panel = document.getElementById('case-playbook-browser-' + caseId);
+        if (panel) panel.style.display = 'none';
+    } catch (e) {
+        showToast('Playbook error: ' + e.message, 'error');
+    }
+}
+
+// =============================================================================
+// Create Case
+// =============================================================================
+function showCreateCaseModal() {
+    document.getElementById('new-case-title').value = '';
+    document.getElementById('new-case-description').value = '';
+    document.getElementById('new-case-severity').value = 'medium';
+    document.getElementById('new-case-assignee').value = '';
+    document.getElementById('create-case-overlay').style.display = 'flex';
+    document.getElementById('new-case-title').focus();
+}
+
+function closeCreateCaseModal() {
+    document.getElementById('create-case-overlay').style.display = 'none';
+}
+
+async function submitCreateCase() {
+    const title = document.getElementById('new-case-title').value.trim();
+    if (!title) {
+        showToast('Title is required', 'warning');
+        return;
+    }
+
+    const description = document.getElementById('new-case-description').value.trim();
+    const severity = document.getElementById('new-case-severity').value;
+    const assignee = document.getElementById('new-case-assignee').value;
+
+    try {
+        const body = {
+            title: title,
+            severity: severity,
+            alert_ids: [],
+        };
+        if (description) body.description = description;
+        if (assignee) body.assigned_to = assignee;
+
+        const resp = await fetch('/api/elasticsearch/alerts/cases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || 'Creation failed');
+        }
+
+        showToast('Case created', 'success');
+        closeCreateCaseModal();
+        await loadAllCases();
+    } catch (e) {
+        showToast('Failed to create case: ' + e.message, 'error');
+    }
+}
+
+// =============================================================================
+// Team Metrics & Management Analytics
+// =============================================================================
+async function loadTeamMetrics() {
+    try {
+        const resp = await fetch('/api/dashboard/team-metrics');
+        if (!resp.ok) throw new Error('Failed to load team metrics');
+        teamMetricsCache = await resp.json();
+    } catch (e) {
+        console.error('Error loading team metrics:', e);
+        teamMetricsCache = null;
+    }
+    renderRow2Stats();
+    renderAnalyticsPanel();
+}
+
+function renderRow2Stats() {
+    if (!teamMetricsCache) return;
+    const tm = teamMetricsCache;
+    document.getElementById('stat-mttr').textContent = tm.mttr_hours != null ? tm.mttr_hours + 'h' : '-';
+    document.getElementById('stat-closure-rate').textContent = tm.closure_rate_7d != null ? tm.closure_rate_7d + '%' : '-';
+    document.getElementById('stat-weekly').textContent = (tm.created_7d || 0) + ' / ' + (tm.closed_7d || 0);
+    const unassigned = allCases.filter(c => !c.assigned_to && (c.status === 'open' || c.status === 'in_progress')).length;
+    document.getElementById('stat-unassigned').textContent = unassigned;
+}
+
+function computeAttentionAlerts() {
+    const banner = document.getElementById('attn-banner');
+    if (!banner || attentionDismissed) return;
+
+    const now = Date.now();
+    const alerts = [];
+
+    allCases.forEach(c => {
+        if (c.status === 'closed' || c.status === 'resolved') return;
+
+        const updatedMs = c.updated_at ? new Date(c.updated_at).getTime() : 0;
+        const createdMs = c.created_at ? new Date(c.created_at).getTime() : 0;
+        const ageSinceUpdate = now - updatedMs;
+        const ageSinceCreate = now - createdMs;
+
+        if (updatedMs && ageSinceUpdate > 24 * 3600000) {
+            alerts.push({ type: 'stale', label: 'Stale', case: c });
+        }
+        if (!c.assigned_to && (c.status === 'open' || c.status === 'in_progress')) {
+            alerts.push({ type: 'unassigned', label: 'Unassigned', case: c });
+        }
+        if ((c.severity === 'critical' || c.severity === 'high') && c.status === 'open') {
+            alerts.push({ type: 'not-picked-up', label: 'Not Picked Up', case: c });
+        }
+        if (createdMs && ageSinceCreate > 7 * 24 * 3600000 && (c.status === 'open' || c.status === 'in_progress')) {
+            alerts.push({ type: 'aged', label: 'Aged >7d', case: c });
+        }
+    });
+
+    if (!alerts.length) {
+        banner.style.display = 'none';
+        return;
+    }
+
+    const seen = new Set();
+    const unique = alerts.filter(a => {
+        const key = a.case.id + '-' + a.type;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+
+    banner.style.display = '';
+    document.getElementById('attn-count').textContent = unique.length;
+
+    const list = document.getElementById('attn-list');
+    list.innerHTML = unique.map(a =>
+        '<div class="attn-item" onclick="openCaseDetail(' + a.case.id + ')">'
+        + '<span class="attn-reason attn-reason-' + a.type + '">' + esc(a.label) + '</span>'
+        + '<span class="attn-case-num">' + esc(a.case.case_number) + '</span>'
+        + '<span class="attn-case-title">' + esc(a.case.title) + '</span>'
+        + '</div>'
+    ).join('');
+}
+
+function dismissAttentionBanner() {
+    attentionDismissed = true;
+    const banner = document.getElementById('attn-banner');
+    if (banner) banner.style.display = 'none';
+}
+
+function renderAnalyticsPanel() {
+    if (!casesLoaded || !teamMetricsCache) return;
+
+    renderWorkloadBars();
+    renderClosureReasonBars();
+    renderSeverityBars();
+    renderSLAIndicators();
+    renderRecentClosures();
+}
+
+function renderWorkloadBars() {
+    const container = document.getElementById('analytics-workload');
+    if (!container) return;
+    const data = teamMetricsCache.cases_by_assignee || [];
+    if (!data.length) {
+        container.innerHTML = '<p style="font-size:0.8rem;color:var(--text-secondary);">No data</p>';
+        return;
+    }
+    const max = Math.max(...data.map(d => d.open_count), 1);
+    container.innerHTML = data.map(d => {
+        const pct = (d.open_count / max) * 100;
+        return '<div class="hbar-row">'
+            + '<span class="hbar-label" title="' + esc(d.display_name) + '">' + esc(d.display_name) + '</span>'
+            + '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;background:#3b82f6;"></div></div>'
+            + '<span class="hbar-value">' + d.open_count + '</span>'
+            + '</div>';
+    }).join('');
+}
+
+const closureReasonColors = {
+    true_positive: '#ef4444',
+    false_positive: '#9ca3af',
+    benign_true_positive: '#f59e0b',
+    duplicate: '#8b5cf6',
+    insufficient_data: '#6b7280',
+    not_applicable: '#64748b',
+};
+
+function computeClosureReasonCounts() {
+    const counts = {};
+    allCases.forEach(c => {
+        if (c.closure_reason) {
+            counts[c.closure_reason] = (counts[c.closure_reason] || 0) + 1;
+        }
+    });
+    return counts;
+}
+
+function renderClosureReasonBars() {
+    const container = document.getElementById('analytics-closure');
+    if (!container) return;
+    const counts = computeClosureReasonCounts();
+    const entries = Object.entries(counts);
+    if (!entries.length) {
+        container.innerHTML = '<p style="font-size:0.8rem;color:var(--text-secondary);">No closed cases</p>';
+        return;
+    }
+    const total = entries.reduce((s, [, v]) => s + v, 0);
+    const max = Math.max(...entries.map(([, v]) => v), 1);
+
+    let html = '<div class="closure-stacked">';
+    entries.forEach(([reason, count]) => {
+        const pct = (count / total) * 100;
+        const color = closureReasonColors[reason] || '#6b7280';
+        html += '<div class="closure-stacked-seg" style="width:' + pct + '%;background:' + color + ';" title="' + esc(reason) + ': ' + count + '"></div>';
+    });
+    html += '</div>';
+
+    html += '<div class="closure-legend">';
+    entries.forEach(([reason, count]) => {
+        const color = closureReasonColors[reason] || '#6b7280';
+        const label = closureReasonLabels[reason] || reason;
+        html += '<span class="closure-legend-item"><span class="closure-legend-dot" style="background:' + color + ';"></span>' + esc(label) + ' (' + count + ')</span>';
+    });
+    html += '</div>';
+
+    entries.forEach(([reason, count]) => {
+        const pct = (count / max) * 100;
+        const color = closureReasonColors[reason] || '#6b7280';
+        const label = closureReasonLabels[reason] || reason;
+        html += '<div class="hbar-row">'
+            + '<span class="hbar-label">' + esc(label) + '</span>'
+            + '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>'
+            + '<span class="hbar-value">' + count + '</span>'
+            + '</div>';
+    });
+
+    container.innerHTML = html;
+}
+
+function renderSeverityBars() {
+    const container = document.getElementById('analytics-severity');
+    if (!container) return;
+    const sev = teamMetricsCache.cases_by_severity || {};
+    const sevList = [
+        { key: 'critical', label: 'Critical', color: '#ef4444' },
+        { key: 'high', label: 'High', color: '#f59e0b' },
+        { key: 'medium', label: 'Medium', color: '#3b82f6' },
+        { key: 'low', label: 'Low', color: '#6b7280' },
+    ];
+    const max = Math.max(...sevList.map(s => sev[s.key] || 0), 1);
+    container.innerHTML = sevList.map(s => {
+        const count = sev[s.key] || 0;
+        const pct = (count / max) * 100;
+        return '<div class="hbar-row">'
+            + '<span class="hbar-label">' + s.label + '</span>'
+            + '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;background:' + s.color + ';"></div></div>'
+            + '<span class="hbar-value">' + count + '</span>'
+            + '</div>';
+    }).join('');
+}
+
+function getSLAColor(ageMs) {
+    const hours = ageMs / 3600000;
+    if (hours < 24) return 'sla-green';
+    if (hours < 72) return 'sla-yellow';
+    if (hours < 168) return 'sla-orange';
+    return 'sla-red';
+}
+
+function renderSLAIndicators() {
+    const container = document.getElementById('analytics-sla');
+    if (!container) return;
+    const active = allCases.filter(c => c.status === 'open' || c.status === 'in_progress');
+    active.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const top8 = active.slice(0, 8);
+
+    if (!top8.length) {
+        container.innerHTML = '<p style="font-size:0.8rem;color:var(--text-secondary);">No active cases</p>';
+        return;
+    }
+
+    const now = Date.now();
+    container.innerHTML = top8.map(c => {
+        const ageMs = now - new Date(c.created_at).getTime();
+        const colorClass = getSLAColor(ageMs);
+        return '<div class="sla-row" onclick="openCaseDetail(' + c.id + ')">'
+            + '<span class="sla-dot ' + colorClass + '"></span>'
+            + '<span class="sla-case-num">' + esc(c.case_number) + '</span>'
+            + '<span class="sla-case-title">' + esc(c.title) + '</span>'
+            + '<span class="sla-age">' + ageLabel(c.created_at) + '</span>'
+            + '</div>';
+    }).join('');
+}
+
+function renderRecentClosures() {
+    const container = document.getElementById('analytics-recent');
+    if (!container) return;
+    const closures = (teamMetricsCache.recent_closures || []).slice(0, 5);
+    if (!closures.length) {
+        container.innerHTML = '<p style="font-size:0.8rem;color:var(--text-secondary);">No recent closures</p>';
+        return;
+    }
+    container.innerHTML = closures.map(c => {
+        const reasonLabel = closureReasonLabels[c.closure_reason] || c.closure_reason || '-';
+        const reasonClass = c.closure_reason ? 'reason-' + c.closure_reason : '';
+        return '<div class="rclosure-row">'
+            + '<span class="rclosure-num">' + esc(c.case_number) + '</span>'
+            + '<span class="rclosure-title">' + esc(c.title) + '</span>'
+            + '<span class="rclosure-reason kcard-closure ' + esc(reasonClass) + '">' + esc(reasonLabel) + '</span>'
+            + '<span class="rclosure-who">' + esc(c.closed_by) + '</span>'
+            + '<span class="rclosure-when">' + ageLabel(c.closed_at) + ' ago</span>'
+            + '</div>';
+    }).join('');
+}
+
+function toggleAnalyticsPanel() {
+    const panel = document.getElementById('analytics-panel-body');
+    const chevron = document.getElementById('analytics-chevron');
+    if (!panel) return;
+    const collapsed = panel.classList.toggle('collapsed');
+    if (chevron) chevron.classList.toggle('collapsed', collapsed);
+    localStorage.setItem('ion-analytics-collapsed', collapsed ? '1' : '0');
+}
+
+// =============================================================================
+// Keyboard shortcuts
+// =============================================================================
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        if (document.getElementById('closure-modal-overlay').style.display === 'flex') {
+            cancelClosure();
+        } else if (document.getElementById('create-case-overlay').style.display === 'flex') {
+            closeCreateCaseModal();
+        } else if (document.getElementById('case-panel').classList.contains('open')) {
+            closeCasePanel();
+        }
+    }
+});
+
+// =============================================================================
+// Init
+// =============================================================================
+document.addEventListener('DOMContentLoaded', function() {
+    loadUsers();
+    loadAllCases();
+    loadTeamMetrics();
+
+    // Restore analytics panel collapse state
+    if (localStorage.getItem('ion-analytics-collapsed') === '1') {
+        const panel = document.getElementById('analytics-panel-body');
+        const chevron = document.getElementById('analytics-chevron');
+        if (panel) panel.classList.add('collapsed');
+        if (chevron) chevron.classList.add('collapsed');
+    }
+});
+</script>
+{% endblock %}

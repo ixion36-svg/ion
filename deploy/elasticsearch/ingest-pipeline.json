@@ -1,5 +1,5 @@
 {
-  "description": "DocForge log processing pipeline",
+  "description": "ION log processing pipeline",
   "processors": [
     {
       "date": {

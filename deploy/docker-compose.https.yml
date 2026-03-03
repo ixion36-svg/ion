@@ -1,9 +1,9 @@
 # =============================================================================
-# DocForge Docker Compose - HTTPS Production Deployment
+# ION Docker Compose - HTTPS Production Deployment
 # =============================================================================
 # This configuration includes:
 # - Nginx reverse proxy with TLS termination
-# - DocForge application
+# - ION application
 # - Persistent data volumes
 # - Security hardening
 #
@@ -23,7 +23,7 @@ services:
   # ===========================================================================
   nginx:
     image: nginx:1.25-alpine
-    container_name: docforge-nginx
+    container_name: ion-nginx
     restart: unless-stopped
 
     ports:
@@ -41,10 +41,10 @@ services:
       # - ./logs/nginx:/var/log/nginx
 
     depends_on:
-      - docforge
+      - ion
 
     networks:
-      - docforge-network
+      - ion-network
 
     # Security hardening
     security_opt:
@@ -72,11 +72,11 @@ services:
           memory: 32M
 
   # ===========================================================================
-  # DocForge Application
+  # ION Application
   # ===========================================================================
-  docforge:
-    image: docforge:latest
-    container_name: docforge-app
+  ion:
+    image: ion:latest
+    container_name: ion-app
     restart: unless-stopped
 
     # No port exposure - accessed only through nginx
@@ -85,28 +85,28 @@ services:
 
     volumes:
       # Persistent data
-      - docforge-data:/data
+      - ion-data:/data
 
     environment:
       # Server configuration
-      - DOCFORGE_HOST=0.0.0.0
-      - DOCFORGE_PORT=8000
+      - ION_HOST=0.0.0.0
+      - ION_PORT=8000
 
       # IMPORTANT: Set to true when using HTTPS
-      - DOCFORGE_COOKIE_SECURE=true
+      - ION_COOKIE_SECURE=true
 
       # Initial admin password (change after first login!)
-      # - DOCFORGE_ADMIN_PASSWORD=ChangeMe123!
+      # - ION_ADMIN_PASSWORD=ChangeMe123!
 
       # OIDC/Keycloak configuration (optional)
-      # - DOCFORGE_OIDC_ENABLED=true
-      # - DOCFORGE_OIDC_KEYCLOAK_URL=https://keycloak.example.com
-      # - DOCFORGE_OIDC_REALM=docforge
-      # - DOCFORGE_OIDC_CLIENT_ID=docforge-app
-      # - DOCFORGE_OIDC_CLIENT_SECRET=your-client-secret
+      # - ION_OIDC_ENABLED=true
+      # - ION_OIDC_KEYCLOAK_URL=https://keycloak.example.com
+      # - ION_OIDC_REALM=ion
+      # - ION_OIDC_CLIENT_ID=ion-app
+      # - ION_OIDC_CLIENT_SECRET=your-client-secret
 
     networks:
-      - docforge-network
+      - ion-network
 
     # Security hardening
     security_opt:
@@ -137,7 +137,7 @@ services:
 # Networks
 # =============================================================================
 networks:
-  docforge-network:
+  ion-network:
     driver: bridge
     internal: false
 
@@ -145,5 +145,5 @@ networks:
 # Volumes
 # =============================================================================
 volumes:
-  docforge-data:
+  ion-data:
     driver: local

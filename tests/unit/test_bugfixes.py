@@ -6,10 +6,10 @@ from unittest.mock import MagicMock, patch, AsyncMock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from ixion.models.base import Base
-from ixion.models.alert_triage import AlertCase, AlertCaseStatus
-from ixion.models.user import User
-from ixion.services.case_description import build_case_description
+from ion.models.base import Base
+from ion.models.alert_triage import AlertCase, AlertCaseStatus
+from ion.models.user import User
+from ion.services.case_description import build_case_description
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ def admin_user(session):
 def _make_case(session, admin_user, **overrides):
     """Helper to create an AlertCase with sensible defaults."""
     defaults = dict(
-        case_number="IXION-0001",
+        case_number="ION-0001",
         title="Test Case",
         description="Test description",
         status=AlertCaseStatus.OPEN,
@@ -76,7 +76,7 @@ class TestLoadTriageDataReplacement:
 
     def test_no_loadTriageData_references(self):
         import pathlib
-        html_path = pathlib.Path(__file__).resolve().parents[2] / "src" / "ixion" / "web" / "templates" / "alerts.html"
+        html_path = pathlib.Path(__file__).resolve().parents[2] / "src" / "ion" / "web" / "templates" / "alerts.html"
         content = html_path.read_text(encoding="utf-8")
         assert "loadTriageData()" not in content, (
             "alerts.html still contains loadTriageData() — should be loadTriageBatch()"
@@ -84,7 +84,7 @@ class TestLoadTriageDataReplacement:
 
     def test_loadTriageBatch_exists(self):
         import pathlib
-        html_path = pathlib.Path(__file__).resolve().parents[2] / "src" / "ixion" / "web" / "templates" / "alerts.html"
+        html_path = pathlib.Path(__file__).resolve().parents[2] / "src" / "ion" / "web" / "templates" / "alerts.html"
         content = html_path.read_text(encoding="utf-8")
         assert "async function loadTriageBatch()" in content, (
             "loadTriageBatch function definition not found in alerts.html"
@@ -143,7 +143,7 @@ class TestObservableExtractor:
     """Verify the shared extract_observables_from_raw covers all field types."""
 
     def test_extracts_ips(self):
-        from ixion.services.observable_extractor import extract_observables_from_raw
+        from ion.services.observable_extractor import extract_observables_from_raw
         raw = {"source": {"ip": "10.0.0.1"}, "destination": {"ip": "10.0.0.2"}}
         obs = extract_observables_from_raw(raw)
         types = {o["type"] for o in obs}
@@ -152,7 +152,7 @@ class TestObservableExtractor:
 
     def test_extracts_process_info(self):
         """This was missing from the old sync service extractor."""
-        from ixion.services.observable_extractor import extract_observables_from_raw
+        from ion.services.observable_extractor import extract_observables_from_raw
         raw = {
             "process": {
                 "name": "malware.exe",
@@ -170,7 +170,7 @@ class TestObservableExtractor:
 
     def test_extracts_mitre_attack(self):
         """This was missing from the old sync service extractor."""
-        from ixion.services.observable_extractor import extract_observables_from_raw
+        from ion.services.observable_extractor import extract_observables_from_raw
         raw = {
             "threat": {
                 "technique": {"id": "T1059", "name": "Command and Scripting Interpreter"},
@@ -185,7 +185,7 @@ class TestObservableExtractor:
 
     def test_extracts_network_ports(self):
         """This was missing from the old sync service extractor."""
-        from ixion.services.observable_extractor import extract_observables_from_raw
+        from ion.services.observable_extractor import extract_observables_from_raw
         raw = {"destination": {"port": "443"}, "network": {"protocol": "tcp"}}
         obs = extract_observables_from_raw(raw)
         types = {o["type"] for o in obs}
@@ -194,7 +194,7 @@ class TestObservableExtractor:
 
     def test_extracts_registry_keys(self):
         """This was missing from the old sync service extractor."""
-        from ixion.services.observable_extractor import extract_observables_from_raw
+        from ion.services.observable_extractor import extract_observables_from_raw
         raw = {"registry": {"path": r"HKLM\Software\Evil", "value": "payload"}}
         obs = extract_observables_from_raw(raw)
         types = {o["type"] for o in obs}
@@ -203,7 +203,7 @@ class TestObservableExtractor:
 
     def test_extracts_kibana_security_fields(self):
         """This was missing from the old sync service extractor."""
-        from ixion.services.observable_extractor import extract_observables_from_raw
+        from ion.services.observable_extractor import extract_observables_from_raw
         raw = {
             "kibana.alert.rule.name": "Brute Force Attempt",
             "kibana.alert.severity": "high",
@@ -217,20 +217,20 @@ class TestObservableExtractor:
 
     def test_handles_flattened_dot_notation(self):
         """Kibana Security uses flattened keys like 'source.ip' as a single key."""
-        from ixion.services.observable_extractor import extract_observables_from_raw
+        from ion.services.observable_extractor import extract_observables_from_raw
         raw = {"source.ip": "192.168.1.1"}  # Flattened, not nested
         obs = extract_observables_from_raw(raw)
         assert any(o["value"] == "192.168.1.1" for o in obs)
 
     def test_deduplicates(self):
-        from ixion.services.observable_extractor import extract_observables_from_raw
+        from ion.services.observable_extractor import extract_observables_from_raw
         raw = {"host": {"name": "srv01", "hostname": "srv01"}}
         obs = extract_observables_from_raw(raw)
         hostnames = [o for o in obs if o["type"] == "hostname"]
         assert len(hostnames) == 1
 
     def test_empty_input(self):
-        from ixion.services.observable_extractor import extract_observables_from_raw
+        from ion.services.observable_extractor import extract_observables_from_raw
         assert extract_observables_from_raw({}) == []
 
 
@@ -246,13 +246,13 @@ class TestExportRetryLogic:
         case = _make_case(session, admin_user, kibana_case_id=None, kibana_case_version=None)
         session.commit()
 
-        with patch("ixion.services.kibana_sync_service.get_kibana_cases_service") as mock_get:
+        with patch("ion.services.kibana_sync_service.get_kibana_cases_service") as mock_get:
             mock_kb = MagicMock()
             mock_kb.enabled = True
             mock_kb.create_case.return_value = {"id": "kb-1", "version": "v1"}
             mock_get.return_value = mock_kb
 
-            from ixion.services.kibana_sync_service import KibanaSyncService
+            from ion.services.kibana_sync_service import KibanaSyncService
             svc = KibanaSyncService()
             svc.kibana_service = mock_kb
             svc.sync_case_status_to_kibana = AsyncMock()
@@ -273,14 +273,14 @@ class TestExportRetryLogic:
         )
         session.commit()
 
-        with patch("ixion.services.kibana_sync_service.get_kibana_cases_service") as mock_get:
+        with patch("ion.services.kibana_sync_service.get_kibana_cases_service") as mock_get:
             mock_kb = MagicMock()
             mock_kb.enabled = True
             mock_kb.get_case.return_value = {"id": "kb-orphan", "version": "v5"}
             mock_kb.update_case.return_value = {"id": "kb-orphan", "version": "v6"}
             mock_get.return_value = mock_kb
 
-            from ixion.services.kibana_sync_service import KibanaSyncService
+            from ion.services.kibana_sync_service import KibanaSyncService
             svc = KibanaSyncService()
             svc.kibana_service = mock_kb
             svc.sync_case_status_to_kibana = AsyncMock()
@@ -301,14 +301,14 @@ class TestExportRetryLogic:
         )
         session.commit()
 
-        with patch("ixion.services.kibana_sync_service.get_kibana_cases_service") as mock_get:
+        with patch("ion.services.kibana_sync_service.get_kibana_cases_service") as mock_get:
             mock_kb = MagicMock()
             mock_kb.enabled = True
             mock_kb.get_case.return_value = None  # Kibana case deleted
             mock_kb.create_case.return_value = {"id": "kb-new", "version": "v1"}
             mock_get.return_value = mock_kb
 
-            from ixion.services.kibana_sync_service import KibanaSyncService
+            from ion.services.kibana_sync_service import KibanaSyncService
             svc = KibanaSyncService()
             svc.kibana_service = mock_kb
             svc.sync_case_status_to_kibana = AsyncMock()
@@ -328,12 +328,12 @@ class TestExportRetryLogic:
         )
         session.commit()
 
-        with patch("ixion.services.kibana_sync_service.get_kibana_cases_service") as mock_get:
+        with patch("ion.services.kibana_sync_service.get_kibana_cases_service") as mock_get:
             mock_kb = MagicMock()
             mock_kb.enabled = True
             mock_get.return_value = mock_kb
 
-            from ixion.services.kibana_sync_service import KibanaSyncService
+            from ion.services.kibana_sync_service import KibanaSyncService
             svc = KibanaSyncService()
             svc.kibana_service = mock_kb
             svc.sync_case_status_to_kibana = AsyncMock()
@@ -355,13 +355,13 @@ class TestExportRetryLogic:
         )
         session.commit()
 
-        with patch("ixion.services.kibana_sync_service.get_kibana_cases_service") as mock_get:
+        with patch("ion.services.kibana_sync_service.get_kibana_cases_service") as mock_get:
             mock_kb = MagicMock()
             mock_kb.enabled = True
             mock_kb.create_case.return_value = {"id": "kb-x", "version": "v1"}
             mock_get.return_value = mock_kb
 
-            from ixion.services.kibana_sync_service import KibanaSyncService
+            from ion.services.kibana_sync_service import KibanaSyncService
             svc = KibanaSyncService()
             svc.kibana_service = mock_kb
             svc.sync_case_status_to_kibana = AsyncMock()

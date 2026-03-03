@@ -1,8 +1,8 @@
 #!/bin/bash
 # =============================================================================
-# DocForge - Elasticsearch Setup Script
+# ION - Elasticsearch Setup Script
 # =============================================================================
-# Sets up ILM policy, ingest pipeline, and index template for DocForge logs.
+# Sets up ILM policy, ingest pipeline, and index template for ION logs.
 #
 # Usage: ./setup-elasticsearch.sh [ELASTICSEARCH_URL]
 # Example: ./setup-elasticsearch.sh http://localhost:9200
@@ -14,7 +14,7 @@ ELASTICSEARCH_URL="${1:-http://localhost:9200}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "=============================================="
-echo "DocForge Elasticsearch Setup"
+echo "ION Elasticsearch Setup"
 echo "=============================================="
 echo "Elasticsearch URL: ${ELASTICSEARCH_URL}"
 echo ""
@@ -30,7 +30,7 @@ echo "  Elasticsearch is ready!"
 # Create ILM policy
 echo ""
 echo "[2/5] Creating ILM policy..."
-curl -X PUT "${ELASTICSEARCH_URL}/_ilm/policy/docforge-policy" \
+curl -X PUT "${ELASTICSEARCH_URL}/_ilm/policy/ion-policy" \
     -H "Content-Type: application/json" \
     -d @"${SCRIPT_DIR}/ilm-policy.json"
 echo ""
@@ -38,7 +38,7 @@ echo ""
 # Create ingest pipeline
 echo ""
 echo "[3/5] Creating ingest pipeline..."
-curl -X PUT "${ELASTICSEARCH_URL}/_ingest/pipeline/docforge-pipeline" \
+curl -X PUT "${ELASTICSEARCH_URL}/_ingest/pipeline/ion-pipeline" \
     -H "Content-Type: application/json" \
     -d @"${SCRIPT_DIR}/ingest-pipeline.json"
 echo ""
@@ -46,17 +46,17 @@ echo ""
 # Create index template
 echo ""
 echo "[4/5] Creating index template..."
-curl -X PUT "${ELASTICSEARCH_URL}/_index_template/docforge" \
+curl -X PUT "${ELASTICSEARCH_URL}/_index_template/ion" \
     -H "Content-Type: application/json" \
     -d '{
-  "index_patterns": ["docforge-*"],
+  "index_patterns": ["ion-*"],
   "template": {
     "settings": {
       "number_of_shards": 1,
       "number_of_replicas": 0,
-      "index.lifecycle.name": "docforge-policy",
-      "index.lifecycle.rollover_alias": "docforge",
-      "index.default_pipeline": "docforge-pipeline",
+      "index.lifecycle.name": "ion-policy",
+      "index.lifecycle.rollover_alias": "ion",
+      "index.default_pipeline": "ion-pipeline",
       "index.codec": "best_compression"
     },
     "mappings": {
@@ -108,7 +108,7 @@ curl -X PUT "${ELASTICSEARCH_URL}/_index_template/docforge" \
   "composed_of": [],
   "version": 1,
   "_meta": {
-    "description": "DocForge ECS-compliant log template"
+    "description": "ION ECS-compliant log template"
   }
 }'
 echo ""
@@ -117,14 +117,14 @@ echo ""
 echo ""
 echo "[5/5] Creating initial index with rollover alias..."
 # Check if alias already exists
-if curl -s "${ELASTICSEARCH_URL}/_alias/docforge" | grep -q "docforge"; then
-    echo "  Alias 'docforge' already exists, skipping..."
+if curl -s "${ELASTICSEARCH_URL}/_alias/ion" | grep -q "ion"; then
+    echo "  Alias 'ion' already exists, skipping..."
 else
-    curl -X PUT "${ELASTICSEARCH_URL}/docforge-000001" \
+    curl -X PUT "${ELASTICSEARCH_URL}/ion-000001" \
         -H "Content-Type: application/json" \
         -d '{
       "aliases": {
-        "docforge": {
+        "ion": {
           "is_write_index": true
         }
       }
@@ -137,11 +137,11 @@ echo "=============================================="
 echo "Setup complete!"
 echo "=============================================="
 echo ""
-echo "Index template: docforge"
-echo "ILM policy: docforge-policy"
-echo "Ingest pipeline: docforge-pipeline"
-echo "Write alias: docforge"
+echo "Index template: ion"
+echo "ILM policy: ion-policy"
+echo "Ingest pipeline: ion-pipeline"
+echo "Write alias: ion"
 echo ""
-echo "Logs will be indexed to: docforge-*"
+echo "Logs will be indexed to: ion-*"
 echo "Retention policy: 90 days"
 echo ""

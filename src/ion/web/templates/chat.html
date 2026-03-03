@@ -1,0 +1,2224 @@
+{% extends "base.html" %}
+
+{% block title %}AI Assistant - ION{% endblock %}
+
+{% block content %}
+<div class="ai-chat-page">
+    <div class="ai-chat-container">
+        <!-- Sidebar -->
+        <div class="ai-chat-sidebar">
+            <div class="ai-chat-sidebar-header">
+                <h3>AI Assistant</h3>
+                <button class="ai-new-chat-btn" onclick="clearAIChat()" title="New Chat">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    New Chat
+                </button>
+            </div>
+
+            <!-- Context Selector -->
+            <div class="ai-context-section">
+                <label>Context Mode</label>
+                <div class="ai-context-buttons">
+                    <button class="ai-context-btn active" data-context="analyst" onclick="setAIContext('analyst')">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                        Analyst
+                    </button>
+                    <button class="ai-context-btn" data-context="engineering" onclick="setAIContext('engineering')">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="16 18 22 12 16 6"></polyline>
+                            <polyline points="8 6 2 12 8 18"></polyline>
+                        </svg>
+                        Engineering
+                    </button>
+                    <button class="ai-context-btn" data-context="default" onclick="setAIContext('default')">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        General
+                    </button>
+                </div>
+            </div>
+
+            <!-- Uploaded Files -->
+            <div class="ai-files-section">
+                <label>Uploaded Files</label>
+                <div class="ai-files-list" id="ai-files-list">
+                    <div class="ai-files-empty">No files uploaded</div>
+                </div>
+                <label class="ai-upload-btn">
+                    <input type="file" id="ai-file-input" style="display:none" accept=".txt,.log,.json,.yaml,.yml,.xml,.csv,.py,.js,.ts,.html,.css,.sh,.bash,.ps1,.conf,.cfg,.ini,.toml,.md,.rst,.sql,.kql,.spl,.yar,.yara,.sigma,.rule,.rules">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    Upload File
+                </label>
+            </div>
+
+            <!-- AI Knowledge Sources -->
+            <div class="ai-settings-section">
+                <div class="ai-settings-header" onclick="toggleSettingsPanel()">
+                    <label>AI Knowledge Sources</label>
+                    <svg class="ai-settings-chevron" id="ai-settings-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </div>
+                <div class="ai-settings-panel" id="ai-settings-panel" style="display: none;">
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="pref-rag-kb" onchange="saveAIPreferences()">
+                        <label for="pref-rag-kb">Knowledge Base articles</label>
+                    </div>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="pref-rag-notes" onchange="saveAIPreferences()">
+                        <label for="pref-rag-notes">Analyst Notes</label>
+                    </div>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="pref-rag-playbooks" onchange="saveAIPreferences()">
+                        <label for="pref-rag-playbooks">Playbooks</label>
+                    </div>
+
+                    <div class="ai-settings-divider"></div>
+
+                    <label class="ai-settings-sublabel">Response Settings</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="pref-show-citations" checked onchange="saveAIPreferences()">
+                        <label for="pref-show-citations">Show source citations</label>
+                    </div>
+                    <div class="ai-toggle">
+                        <label for="pref-max-refs" style="margin-right: 8px;">Max references:</label>
+                        <select id="pref-max-refs" onchange="saveAIPreferences()">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3" selected>3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                        </select>
+                    </div>
+
+                    <div class="ai-settings-divider"></div>
+
+                    <label class="ai-settings-sublabel">Custom Instructions</label>
+                    <textarea id="pref-custom-instructions"
+                        maxlength="500"
+                        placeholder="e.g. Always include MITRE ATT&CK technique IDs"
+                        onchange="saveAIPreferences()"
+                        oninput="updateCharCount()"
+                    ></textarea>
+                    <div class="ai-char-count" id="ai-char-count">0/500</div>
+                </div>
+            </div>
+
+            <!-- Chat History -->
+            <div class="ai-history-section">
+                <label>Recent Chats</label>
+                <div class="ai-history-list" id="ai-history-list">
+                    <!-- Populated by JavaScript -->
+                    <div class="ai-history-empty">No previous chats</div>
+                </div>
+            </div>
+
+            <!-- Quick Prompts -->
+            <div class="ai-prompts-section">
+                <label>Quick Prompts</label>
+                <div class="ai-quick-prompts" id="ai-quick-prompts">
+                    <!-- Populated by JavaScript based on context -->
+                </div>
+            </div>
+
+            <!-- Model Info -->
+            <div class="ai-model-section">
+                <label>Model</label>
+                <div class="ai-model-info" id="ai-model-info">
+                    <span class="ai-model-name">Loading...</span>
+                    <span class="ai-model-status" id="ai-model-status">Checking...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="ai-chat-main">
+            <div class="ai-chat-header">
+                <div class="ai-chat-title">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span id="ai-chat-context-title">Security Analyst Assistant</span>
+                </div>
+                <div class="ai-chat-actions">
+                    <button class="ai-action-btn" onclick="exportAIChat()" title="Export Chat">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="ai-chat-messages" id="ai-page-messages">
+                <div class="ai-welcome-message">
+                    <div class="ai-welcome-icon">
+                        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+                            <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
+                            <circle cx="15" cy="13" r="1.5" fill="currentColor"/>
+                            <path d="M9 17h6"/>
+                        </svg>
+                    </div>
+                    <h2>ION AI Assistant</h2>
+                    <p>I'm here to help with security analysis, threat investigation, and technical questions.</p>
+                    <div class="ai-welcome-hints">
+                        <div class="ai-hint" onclick="sendQuickPrompt('Explain common indicators of compromise for ransomware attacks')">
+                            <span class="ai-hint-icon">🔍</span>
+                            <span>Ask about threat indicators</span>
+                        </div>
+                        <div class="ai-hint" onclick="sendQuickPrompt('Help me write a Python script to parse Windows event logs')">
+                            <span class="ai-hint-icon">💻</span>
+                            <span>Get help with scripts</span>
+                        </div>
+                        <div class="ai-hint" onclick="sendQuickPrompt('What are the MITRE ATT&CK techniques for credential access?')">
+                            <span class="ai-hint-icon">📚</span>
+                            <span>Learn about MITRE ATT&CK</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ai-chat-input-area">
+                <div class="ai-typing-indicator" id="ai-page-typing" style="display: none;">
+                    <span></span><span></span><span></span>
+                    <span class="ai-typing-text">AI is thinking...</span>
+                </div>
+                <form class="ai-chat-form" onsubmit="sendAIMessage(event)">
+                    <div class="ai-input-wrapper">
+                        <textarea
+                            id="ai-page-input"
+                            placeholder="Ask me anything about security, threats, or technical topics..."
+                            rows="1"
+                            onkeydown="handleAIInputKeydown(event)"
+                            oninput="autoResizeTextarea(this)"
+                        ></textarea>
+                        <button type="submit" class="ai-send-btn" id="ai-send-btn">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="ai-input-hint">
+                        Press <kbd>Enter</kbd> to send, <kbd>Shift+Enter</kbd> for new line
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Full-page AI Chat Styles */
+.ai-chat-page {
+    height: calc(100vh - 120px);
+    margin: -20px;
+    padding: 20px;
+}
+
+.ai-chat-container {
+    display: flex;
+    height: 100%;
+    background: var(--surface);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* Sidebar */
+.ai-chat-sidebar {
+    width: 280px;
+    background: var(--surface-dark);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+}
+
+.ai-chat-sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.ai-chat-sidebar-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text);
+}
+
+.ai-new-chat-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--primary);
+    color: var(--bg);
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ai-new-chat-btn:hover {
+    background: var(--primary-light);
+    transform: translateY(-1px);
+}
+
+/* Context Section */
+.ai-context-section,
+.ai-prompts-section,
+.ai-model-section {
+    margin-bottom: 20px;
+}
+
+.ai-context-section label,
+.ai-prompts-section label,
+.ai-model-section label {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.ai-context-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ai-context-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.ai-context-btn:hover {
+    background: var(--surface-light);
+    color: var(--text);
+}
+
+.ai-context-btn.active {
+    background: var(--primary);
+    color: var(--bg);
+    border-color: var(--primary);
+}
+
+/* Quick Prompts */
+.ai-quick-prompts {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.ai-quick-prompt {
+    padding: 8px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    line-height: 1.3;
+}
+
+.ai-quick-prompt:hover {
+    background: var(--surface-light);
+    color: var(--text);
+    border-color: var(--primary);
+}
+
+/* Chat History */
+.ai-history-section {
+    margin-bottom: 20px;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.ai-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+    max-height: 200px;
+}
+
+.ai-history-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ai-history-item:hover {
+    background: var(--surface-light);
+    border-color: var(--primary);
+}
+
+.ai-history-item.active {
+    background: var(--primary);
+    color: var(--bg);
+    border-color: var(--primary);
+}
+
+.ai-history-item.active .ai-history-meta {
+    color: var(--bg);
+    opacity: 0.8;
+}
+
+.ai-history-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.ai-history-title {
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ai-history-meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.ai-history-delete {
+    padding: 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    opacity: 0;
+    transition: all 0.2s;
+}
+
+.ai-history-item:hover .ai-history-delete {
+    opacity: 1;
+}
+
+.ai-history-delete:hover {
+    background: var(--danger);
+    color: white;
+}
+
+.ai-history-empty {
+    padding: 12px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+/* Uploaded Files */
+.ai-files-section {
+    margin-bottom: 20px;
+}
+
+.ai-files-section label {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.ai-files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 150px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+}
+
+.ai-files-empty {
+    padding: 12px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.ai-file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ai-file-item:hover {
+    background: var(--surface-light);
+    border-color: var(--primary);
+}
+
+.ai-file-item.active {
+    border-color: var(--primary);
+    background: rgba(var(--primary-rgb), 0.1);
+}
+
+.ai-file-icon {
+    color: var(--primary);
+}
+
+.ai-file-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.ai-file-name {
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ai-file-meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.ai-file-delete {
+    padding: 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    opacity: 0;
+    transition: all 0.2s;
+}
+
+.ai-file-item:hover .ai-file-delete {
+    opacity: 1;
+}
+
+.ai-file-delete:hover {
+    background: var(--danger);
+    color: white;
+}
+
+.ai-upload-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--surface);
+    color: var(--text-muted);
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+}
+
+.ai-upload-btn:hover {
+    background: var(--surface-light);
+    color: var(--text);
+    border-color: var(--primary);
+}
+
+/* File Preview Modal */
+.ai-file-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+}
+
+.ai-file-modal-content {
+    background: var(--surface);
+    border-radius: 12px;
+    max-width: 900px;
+    width: 100%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.ai-file-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.ai-file-modal-header h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.ai-file-modal-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.ai-file-modal-body {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+}
+
+.ai-file-modal-body pre {
+    margin: 0;
+    padding: 16px;
+    background: var(--bg);
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.ai-file-modal-body textarea {
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+    padding: 16px;
+    background: var(--bg);
+    color: var(--text);
+    border: none;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    resize: none;
+}
+
+.ai-file-modal-body textarea:focus {
+    outline: none;
+}
+
+/* Model Info */
+.ai-model-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border-radius: 8px;
+}
+
+.ai-model-name {
+    font-size: 0.9rem;
+    color: var(--text);
+    font-family: monospace;
+}
+
+.ai-model-status {
+    font-size: 0.75rem;
+    color: var(--success);
+}
+
+.ai-model-status.offline {
+    color: var(--danger);
+}
+
+/* Main Chat Area */
+.ai-chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.ai-chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: var(--surface-dark);
+    border-bottom: 1px solid var(--border);
+}
+
+.ai-chat-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text);
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+.ai-chat-title svg {
+    color: var(--primary);
+}
+
+.ai-chat-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.ai-action-btn {
+    padding: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ai-action-btn:hover {
+    background: var(--surface-light);
+    color: var(--text);
+}
+
+/* Messages Area */
+.ai-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Welcome Message */
+.ai-welcome-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px;
+    margin: auto;
+    max-width: 500px;
+}
+
+.ai-welcome-icon {
+    color: var(--primary);
+    margin-bottom: 16px;
+    opacity: 0.8;
+}
+
+.ai-welcome-message h2 {
+    margin: 0 0 8px 0;
+    color: var(--text);
+    font-size: 1.5rem;
+}
+
+.ai-welcome-message p {
+    color: var(--text-muted);
+    margin: 0 0 24px 0;
+}
+
+.ai-welcome-hints {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+.ai-hint {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--surface-dark);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.ai-hint:hover {
+    background: var(--surface-light);
+    border-color: var(--primary);
+}
+
+.ai-hint-icon {
+    font-size: 1.2rem;
+}
+
+.ai-hint span:last-child {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* Message Bubbles */
+.ai-page-message {
+    display: flex;
+    gap: 12px;
+    max-width: 85%;
+    animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.ai-page-message.user {
+    margin-left: auto;
+    flex-direction: row-reverse;
+}
+
+.ai-message-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.9rem;
+}
+
+.ai-page-message.user .ai-message-avatar {
+    background: var(--primary);
+    color: var(--bg);
+}
+
+.ai-page-message.assistant .ai-message-avatar {
+    background: var(--surface-dark);
+    color: var(--primary);
+    border: 1px solid var(--border);
+}
+
+.ai-message-content {
+    padding: 12px 16px;
+    border-radius: 12px;
+    line-height: 1.5;
+}
+
+.ai-page-message.user .ai-message-content {
+    background: var(--primary);
+    color: var(--bg);
+    border-bottom-right-radius: 4px;
+}
+
+.ai-page-message.assistant .ai-message-content {
+    background: var(--surface-dark);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+}
+
+.ai-message-content pre {
+    background: var(--bg);
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.ai-message-content code {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.85rem;
+}
+
+.ai-message-content p:first-child {
+    margin-top: 0;
+}
+
+.ai-message-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* Input Area */
+.ai-chat-input-area {
+    padding: 16px 20px;
+    background: var(--surface-dark);
+    border-top: 1px solid var(--border);
+}
+
+.ai-typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    background: var(--surface);
+    border-radius: 8px;
+    width: fit-content;
+}
+
+.ai-typing-indicator span:not(.ai-typing-text) {
+    width: 8px;
+    height: 8px;
+    background: var(--primary);
+    border-radius: 50%;
+    animation: typingBounce 1.4s infinite ease-in-out;
+}
+
+.ai-typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.ai-typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes typingBounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+    40% { transform: scale(1); opacity: 1; }
+}
+
+.ai-typing-text {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
+.ai-chat-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ai-input-wrapper {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.ai-input-wrapper textarea {
+    flex: 1;
+    padding: 12px 16px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    resize: none;
+    min-height: 48px;
+    max-height: 200px;
+    line-height: 1.5;
+}
+
+.ai-input-wrapper textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
+}
+
+.ai-input-wrapper textarea::placeholder {
+    color: var(--text-muted);
+}
+
+.ai-send-btn {
+    width: 48px;
+    height: 48px;
+    background: var(--primary);
+    color: var(--bg);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.ai-send-btn:hover {
+    background: var(--primary-light);
+    transform: scale(1.05);
+}
+
+.ai-send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.ai-input-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.ai-input-hint kbd {
+    padding: 2px 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.7rem;
+}
+
+/* AI Settings Section */
+.ai-settings-section {
+    margin-bottom: 20px;
+}
+
+.ai-settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+.ai-settings-header label {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 0;
+    cursor: pointer;
+}
+
+.ai-settings-chevron {
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+
+.ai-settings-chevron.open {
+    transform: rotate(180deg);
+}
+
+.ai-settings-panel {
+    margin-top: 8px;
+    padding: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.ai-settings-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 10px 0;
+}
+
+.ai-settings-sublabel {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.ai-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.ai-toggle input[type="checkbox"] {
+    accent-color: var(--primary);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.ai-toggle label {
+    font-size: 0.82rem;
+    color: var(--text);
+    cursor: pointer;
+    margin: 0;
+}
+
+.ai-toggle select {
+    padding: 4px 8px;
+    background: var(--surface-dark);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.82rem;
+}
+
+#pref-custom-instructions {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px;
+    background: var(--surface-dark);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    resize: vertical;
+    line-height: 1.4;
+}
+
+#pref-custom-instructions:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+#pref-custom-instructions::placeholder {
+    color: var(--text-muted);
+}
+
+.ai-char-count {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-align: right;
+    margin-top: 2px;
+}
+
+/* Citation bar */
+.ai-citations-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 8px 0 0 0;
+}
+
+.ai-citations-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-right: 4px;
+    align-self: center;
+}
+
+.ai-citation-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: var(--surface);
+    border-left: 3px solid var(--primary);
+    border-radius: 0 4px 4px 0;
+    font-size: 0.75rem;
+    color: var(--text);
+}
+
+.ai-citation-chip .ai-cite-icon {
+    font-size: 0.8rem;
+}
+
+/* Feedback buttons */
+.ai-feedback-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.ai-feedback-btn {
+    padding: 4px 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.ai-feedback-btn:hover {
+    background: var(--surface-light);
+    color: var(--text);
+}
+
+.ai-feedback-btn.active-up {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: #22c55e;
+    color: #22c55e;
+}
+
+.ai-feedback-btn.active-down {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.ai-feedback-btn.used {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .ai-chat-sidebar {
+        display: none;
+    }
+
+    .ai-chat-page {
+        margin: -10px;
+        padding: 0;
+        height: calc(100vh - 100px);
+    }
+
+    .ai-chat-container {
+        border-radius: 0;
+    }
+}
+</style>
+
+<script>
+// AI Chat Page JavaScript - Wrapped in IIFE to avoid conflicts with ai-chat.js
+(function() {
+    'use strict';
+
+    let aiPageMessages = [];
+    let aiCurrentContext = 'analyst';
+    let aiIsStreaming = false;
+    let currentSessionId = null;
+    let chatSessions = [];
+    let uploadedFiles = [];
+    let aiPreferences = {};
+    let pendingCitations = null;
+
+    const AI_QUICK_PROMPTS = {
+        analyst: [
+            "What are common indicators of a phishing attack?",
+            "Explain the MITRE ATT&CK framework",
+            "How do I analyze suspicious network traffic?",
+            "What should I look for in Windows event logs?",
+            "Explain common malware persistence techniques"
+        ],
+        engineering: [
+            "Help me write a Python log parser",
+            "Create a PowerShell script for event collection",
+            "Write a YARA rule for detecting malware",
+            "Help me create a Sigma detection rule",
+            "Write a bash script for IOC extraction"
+        ],
+        default: [
+            "What can you help me with?",
+            "Explain how to investigate an incident",
+            "What are security best practices?",
+            "How do I document a security incident?",
+            "What tools are commonly used in SOC?"
+        ]
+    };
+
+    const AI_CONTEXT_TITLES = {
+        analyst: "Security Analyst Assistant",
+        engineering: "Engineering Assistant",
+        default: "General Assistant"
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        initChatPage();
+    });
+
+    function initChatPage() {
+        // Check AI status
+        checkPageAIStatus();
+        updatePageQuickPrompts();
+        loadChatHistory();
+        loadAIPreferences();
+
+        // Wire up event handlers
+        const form = document.querySelector('.ai-chat-form');
+        if (form) {
+            form.addEventListener('submit', handleFormSubmit);
+        }
+
+        const input = document.getElementById('ai-page-input');
+        if (input) {
+            input.addEventListener('keydown', handleInputKeydown);
+            input.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+            });
+        }
+
+        // Context buttons
+        document.querySelectorAll('.ai-context-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                setPageAIContext(this.dataset.context);
+            });
+        });
+
+        // New chat button
+        const newChatBtn = document.querySelector('.ai-new-chat-btn');
+        if (newChatBtn) {
+            newChatBtn.addEventListener('click', startNewChat);
+        }
+
+        // Export button
+        const exportBtn = document.querySelector('.ai-action-btn');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', exportPageAIChat);
+        }
+
+        // Welcome hints
+        document.querySelectorAll('.ai-hint').forEach(hint => {
+            hint.addEventListener('click', function() {
+                const prompt = this.querySelector('span:last-child').textContent;
+                sendPageQuickPrompt(prompt);
+            });
+        });
+
+        // File upload handler
+        const fileInput = document.getElementById('ai-file-input');
+        if (fileInput) {
+            fileInput.addEventListener('change', handleFileUpload);
+        }
+
+        // Load existing uploaded files
+        loadUploadedFiles();
+    }
+
+    async function checkPageAIStatus() {
+        try {
+            const response = await fetch('/api/ai/status', {
+                credentials: 'include'
+            });
+            const data = await response.json();
+
+            const modelName = document.querySelector('.ai-model-name');
+            const modelStatus = document.getElementById('ai-model-status');
+
+            if (data.available) {
+                modelName.textContent = data.default_model || 'Unknown';
+                modelStatus.textContent = 'Online';
+                modelStatus.classList.remove('offline');
+            } else {
+                modelName.textContent = 'Not configured';
+                modelStatus.textContent = data.error || 'Offline';
+                modelStatus.classList.add('offline');
+            }
+        } catch (error) {
+            console.error('Failed to check AI status:', error);
+            document.getElementById('ai-model-status').textContent = 'Error';
+            document.getElementById('ai-model-status').classList.add('offline');
+        }
+    }
+
+    function setPageAIContext(context) {
+        aiCurrentContext = context;
+
+        // Update button states
+        document.querySelectorAll('.ai-context-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.context === context);
+        });
+
+        // Update title
+        document.getElementById('ai-chat-context-title').textContent = AI_CONTEXT_TITLES[context];
+
+        // Update prompts
+        updatePageQuickPrompts();
+    }
+
+    function updatePageQuickPrompts() {
+        const container = document.getElementById('ai-quick-prompts');
+        const prompts = AI_QUICK_PROMPTS[aiCurrentContext] || AI_QUICK_PROMPTS.default;
+
+        container.innerHTML = prompts.map(prompt =>
+            `<button class="ai-quick-prompt">${prompt}</button>`
+        ).join('');
+
+        // Wire up click handlers
+        container.querySelectorAll('.ai-quick-prompt').forEach(btn => {
+            btn.addEventListener('click', function() {
+                sendPageQuickPrompt(this.textContent);
+            });
+        });
+    }
+
+    function sendPageQuickPrompt(prompt) {
+        document.getElementById('ai-page-input').value = prompt;
+        handleFormSubmit(new Event('submit'));
+    }
+
+    function handleInputKeydown(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            handleFormSubmit(event);
+        }
+    }
+
+    // =========================================================================
+    // Chat History Functions
+    // =========================================================================
+
+    async function loadChatHistory() {
+        // History feature disabled temporarily
+        const container = document.getElementById('ai-history-list');
+        if (container) {
+            container.innerHTML = '<div class="ai-history-empty">Chat history coming soon</div>';
+        }
+    }
+
+    function renderChatHistory() {
+        const container = document.getElementById('ai-history-list');
+        if (!chatSessions || chatSessions.length === 0) {
+            container.innerHTML = '<div class="ai-history-empty">No previous chats</div>';
+            return;
+        }
+
+        container.innerHTML = chatSessions.map(session => `
+            <div class="ai-history-item ${currentSessionId === session.id ? 'active' : ''}"
+                 data-session-id="${session.id}">
+                <div class="ai-history-content">
+                    <div class="ai-history-title">${escapeHtml(session.title || 'Untitled')}</div>
+                    <div class="ai-history-meta">${formatTimeAgo(session.updated_at)}</div>
+                </div>
+                <button class="ai-history-delete" title="Delete">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+
+        // Wire up click handlers
+        container.querySelectorAll('.ai-history-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                if (!e.target.closest('.ai-history-delete')) {
+                    loadSession(parseInt(this.dataset.sessionId));
+                }
+            });
+        });
+
+        container.querySelectorAll('.ai-history-delete').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const sessionId = parseInt(this.closest('.ai-history-item').dataset.sessionId);
+                deleteSession(sessionId);
+            });
+        });
+    }
+
+    async function loadSession(sessionId) {
+        try {
+            const response = await fetch(`/api/ai/history/sessions/${sessionId}`, {
+                credentials: 'include'
+            });
+            if (response.ok) {
+                const data = await response.json();
+                currentSessionId = sessionId;
+                aiCurrentContext = data.context_type || 'default';
+                aiPageMessages = data.messages.map(m => ({
+                    id: 'msg-' + m.id,
+                    role: m.role,
+                    content: m.content
+                }));
+
+                // Update UI
+                setPageAIContext(aiCurrentContext);
+                renderMessages();
+                renderChatHistory();
+            }
+        } catch (error) {
+            console.error('Failed to load session:', error);
+        }
+    }
+
+    async function deleteSession(sessionId) {
+        if (!confirm('Delete this conversation?')) return;
+
+        try {
+            const response = await fetch(`/api/ai/history/sessions/${sessionId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            if (response.ok) {
+                if (currentSessionId === sessionId) {
+                    startNewChat();
+                }
+                loadChatHistory();
+            }
+        } catch (error) {
+            console.error('Failed to delete session:', error);
+        }
+    }
+
+    function startNewChat() {
+        currentSessionId = null;
+        aiPageMessages = [];
+        renderMessages();
+        renderChatHistory();
+
+        // Show welcome message
+        const container = document.getElementById('ai-page-messages');
+        container.innerHTML = `
+            <div class="ai-welcome-message">
+                <div class="ai-welcome-icon">
+                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+                        <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
+                        <circle cx="15" cy="13" r="1.5" fill="currentColor"/>
+                        <path d="M9 17h6"/>
+                    </svg>
+                </div>
+                <h2>ION AI Assistant</h2>
+                <p>I'm here to help with security analysis, threat investigation, and technical questions.</p>
+            </div>
+        `;
+    }
+
+    function renderMessages() {
+        const container = document.getElementById('ai-page-messages');
+        if (aiPageMessages.length === 0) {
+            return;
+        }
+
+        container.innerHTML = aiPageMessages.map(msg => {
+            const avatar = msg.role === 'user' ? getPageUserInitial() : '🤖';
+            return `
+                <div class="ai-page-message ${msg.role}">
+                    <div class="ai-message-avatar">${avatar}</div>
+                    <div class="ai-message-content" id="${msg.id}">${formatPageMessage(msg.content)}</div>
+                </div>
+            `;
+        }).join('');
+        scrollPageToBottom();
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function formatTimeAgo(dateStr) {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diff = Math.floor((now - date) / 1000);
+
+        if (diff < 60) return 'just now';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+        return date.toLocaleDateString();
+    }
+
+    // =========================================================================
+    // File Upload Functions
+    // =========================================================================
+
+    async function loadUploadedFiles() {
+        try {
+            const response = await fetch('/api/ai/files', {
+                credentials: 'include'
+            });
+            if (response.ok) {
+                const data = await response.json();
+                uploadedFiles = data.files || [];
+                renderUploadedFiles();
+            }
+        } catch (error) {
+            console.error('Failed to load uploaded files:', error);
+        }
+    }
+
+    function renderUploadedFiles() {
+        const container = document.getElementById('ai-files-list');
+        if (!container) return;
+
+        if (!uploadedFiles || uploadedFiles.length === 0) {
+            container.innerHTML = '<div class="ai-files-empty">No files uploaded</div>';
+            return;
+        }
+
+        container.innerHTML = uploadedFiles.map(file => `
+            <div class="ai-file-item" data-file-id="${file.id}" title="Click to view/edit">
+                <svg class="ai-file-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                <div class="ai-file-info">
+                    <div class="ai-file-name">${escapeHtml(file.name)}</div>
+                    <div class="ai-file-meta">${formatFileSize(file.size)} | ${file.lines} lines</div>
+                </div>
+                <button class="ai-file-delete" title="Remove file" onclick="event.stopPropagation(); deleteUploadedFile('${file.id}')">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+
+        // Wire up click handlers for viewing files
+        container.querySelectorAll('.ai-file-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                if (!e.target.closest('.ai-file-delete')) {
+                    showFileModal(this.dataset.fileId);
+                }
+            });
+        });
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    }
+
+    async function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Reset input so same file can be uploaded again
+        event.target.value = '';
+
+        // Check file size (5MB limit)
+        if (file.size > 5 * 1024 * 1024) {
+            if (typeof showToast === 'function') {
+                showToast('File too large. Maximum size is 5MB.', 'error');
+            } else {
+                alert('File too large. Maximum size is 5MB.');
+            }
+            return;
+        }
+
+        // Upload file
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/api/ai/files/upload', {
+                method: 'POST',
+                credentials: 'include',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Upload failed');
+            }
+
+            const data = await response.json();
+            if (typeof showToast === 'function') {
+                showToast(`File "${file.name}" uploaded. AI can now read it.`, 'success');
+            }
+
+            // Reload files list
+            loadUploadedFiles();
+
+        } catch (error) {
+            console.error('File upload error:', error);
+            if (typeof showToast === 'function') {
+                showToast(error.message || 'Failed to upload file', 'error');
+            } else {
+                alert(error.message || 'Failed to upload file');
+            }
+        }
+    }
+
+    async function deleteUploadedFile(fileId) {
+        try {
+            const response = await fetch(`/api/ai/files/${fileId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                loadUploadedFiles();
+                if (typeof showToast === 'function') {
+                    showToast('File removed', 'success');
+                }
+            }
+        } catch (error) {
+            console.error('Failed to delete file:', error);
+        }
+    }
+
+    async function showFileModal(fileId) {
+        try {
+            const response = await fetch(`/api/ai/files/${fileId}`, {
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load file');
+            }
+
+            const file = await response.json();
+
+            // Create modal
+            const modal = document.createElement('div');
+            modal.className = 'ai-file-modal';
+            modal.innerHTML = `
+                <div class="ai-file-modal-content">
+                    <div class="ai-file-modal-header">
+                        <h3>${escapeHtml(file.name)}</h3>
+                        <div class="ai-file-modal-actions">
+                            <button class="btn btn-sm btn-secondary" onclick="toggleFileEdit(this)">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                Edit
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="saveFileEdit('${file.id}')" style="display:none" id="save-file-btn">
+                                Save
+                            </button>
+                            <button class="btn btn-sm btn-secondary" onclick="downloadFile('${file.id}')">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Download
+                            </button>
+                            <button class="btn btn-sm" onclick="closeFileModal()">Close</button>
+                        </div>
+                    </div>
+                    <div class="ai-file-modal-body">
+                        <pre id="file-content-view">${escapeHtml(file.content)}</pre>
+                        <textarea id="file-content-edit" style="display:none">${escapeHtml(file.content)}</textarea>
+                    </div>
+                </div>
+            `;
+
+            // Close on backdrop click
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeFileModal();
+                }
+            });
+
+            document.body.appendChild(modal);
+
+        } catch (error) {
+            console.error('Failed to show file:', error);
+            if (typeof showToast === 'function') {
+                showToast('Failed to load file', 'error');
+            }
+        }
+    }
+
+    // Make these functions global so onclick handlers work
+    window.toggleFileEdit = function(btn) {
+        const view = document.getElementById('file-content-view');
+        const edit = document.getElementById('file-content-edit');
+        const saveBtn = document.getElementById('save-file-btn');
+
+        if (view.style.display !== 'none') {
+            view.style.display = 'none';
+            edit.style.display = 'block';
+            saveBtn.style.display = 'inline-flex';
+            btn.innerHTML = `
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                Cancel
+            `;
+        } else {
+            view.style.display = 'block';
+            edit.style.display = 'none';
+            saveBtn.style.display = 'none';
+            btn.innerHTML = `
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+                Edit
+            `;
+        }
+    };
+
+    window.saveFileEdit = async function(fileId) {
+        const edit = document.getElementById('file-content-edit');
+        const newContent = edit.value;
+
+        try {
+            const response = await fetch(`/api/ai/files/${fileId}/edit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ content: newContent })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to save');
+            }
+
+            // Update view
+            const view = document.getElementById('file-content-view');
+            view.textContent = newContent;
+
+            // Switch back to view mode
+            document.querySelector('.ai-file-modal-actions button').click();
+
+            if (typeof showToast === 'function') {
+                showToast('File saved', 'success');
+            }
+
+            // Refresh files list
+            loadUploadedFiles();
+
+        } catch (error) {
+            console.error('Failed to save file:', error);
+            if (typeof showToast === 'function') {
+                showToast('Failed to save file', 'error');
+            }
+        }
+    };
+
+    window.downloadFile = async function(fileId) {
+        try {
+            const response = await fetch(`/api/ai/files/${fileId}/download`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Download failed');
+            }
+
+            // Get filename from header or use default
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'download.txt';
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="(.+)"/);
+                if (match) filename = match[1];
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+
+        } catch (error) {
+            console.error('Download failed:', error);
+            if (typeof showToast === 'function') {
+                showToast('Download failed', 'error');
+            }
+        }
+    };
+
+    window.closeFileModal = function() {
+        const modal = document.querySelector('.ai-file-modal');
+        if (modal) {
+            modal.remove();
+        }
+    };
+
+    window.deleteUploadedFile = deleteUploadedFile;
+
+    // =========================================================================
+    // Form Submit with History
+    // =========================================================================
+
+    async function handleFormSubmit(event) {
+        event.preventDefault();
+
+        const input = document.getElementById('ai-page-input');
+        const message = input.value.trim();
+
+        if (!message || aiIsStreaming) return;
+
+        // Hide welcome message
+        const welcome = document.querySelector('.ai-welcome-message');
+        if (welcome) welcome.style.display = 'none';
+
+        // Add user message to UI immediately
+        addPageMessage('user', message);
+        input.value = '';
+        input.style.height = 'auto';
+
+        // Show typing indicator
+        aiIsStreaming = true;
+        document.getElementById('ai-page-typing').style.display = 'flex';
+        document.getElementById('ai-send-btn').disabled = true;
+
+        try {
+            // Build messages array for context
+            const messages = aiPageMessages.map(m => ({
+                role: m.role,
+                content: m.content
+            }));
+
+            // Use direct chat API (history disabled for now)
+            const response = await fetch('/api/ai/chat/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    messages: messages,
+                    context_type: aiCurrentContext,
+                    stream: true
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            // Create assistant message container
+            const assistantMsgId = addPageMessage('assistant', '');
+            const contentEl = document.getElementById(assistantMsgId);
+            pendingCitations = null;
+
+            // Stream the response
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let fullResponse = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') continue;
+
+                        try {
+                            const parsed = JSON.parse(data);
+                            if (parsed.citations) {
+                                pendingCitations = parsed.citations;
+                            } else if (parsed.content) {
+                                fullResponse += parsed.content;
+                                contentEl.innerHTML = formatPageMessage(fullResponse);
+                                scrollPageToBottom();
+                            }
+                        } catch (e) {
+                            // Not JSON
+                        }
+                    }
+                }
+            }
+
+            // Update stored message
+            const msgIndex = aiPageMessages.findIndex(m => m.id === assistantMsgId);
+            if (msgIndex !== -1) {
+                aiPageMessages[msgIndex].content = fullResponse;
+            }
+
+            // Render citations and feedback below the message
+            const msgWrapper = contentEl.closest('.ai-page-message');
+            if (msgWrapper) {
+                if (pendingCitations && pendingCitations.length > 0 && aiPreferences.show_citations !== false) {
+                    msgWrapper.insertAdjacentHTML('beforeend', renderCitations(pendingCitations));
+                }
+                msgWrapper.insertAdjacentHTML('beforeend', renderFeedbackButtons(assistantMsgId));
+            }
+
+        } catch (error) {
+            console.error('AI chat error:', error);
+            addPageMessage('assistant', 'Sorry, I encountered an error. Please try again.');
+        } finally {
+            aiIsStreaming = false;
+            document.getElementById('ai-page-typing').style.display = 'none';
+            document.getElementById('ai-send-btn').disabled = false;
+        }
+    }
+
+    function addPageMessage(role, content) {
+        const container = document.getElementById('ai-page-messages');
+        const msgId = 'msg-' + Date.now();
+
+        aiPageMessages.push({ id: msgId, role, content });
+
+        const avatar = role === 'user' ? getPageUserInitial() : '🤖';
+
+        const messageHtml = `
+            <div class="ai-page-message ${role}">
+                <div class="ai-message-avatar">${avatar}</div>
+                <div class="ai-message-content" id="${msgId}">${formatPageMessage(content)}</div>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', messageHtml);
+        scrollPageToBottom();
+
+        return msgId;
+    }
+
+    function formatPageMessage(content) {
+        if (!content) return '<span class="ai-cursor"></span>';
+
+        // Use marked if available, otherwise basic formatting
+        if (typeof marked !== 'undefined') {
+            return safeMarkdown(content);
+        }
+
+        // Basic formatting fallback
+        return content
+            .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>');
+    }
+
+    function getPageUserInitial() {
+        const userName = document.getElementById('user-name')?.textContent || 'U';
+        return userName.charAt(0).toUpperCase();
+    }
+
+    function scrollPageToBottom() {
+        const container = document.getElementById('ai-page-messages');
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function clearPageAIChat() {
+        aiPageMessages = [];
+        const container = document.getElementById('ai-page-messages');
+        container.innerHTML = `
+            <div class="ai-welcome-message">
+                <div class="ai-welcome-icon">
+                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+                        <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
+                        <circle cx="15" cy="13" r="1.5" fill="currentColor"/>
+                        <path d="M9 17h6"/>
+                    </svg>
+                </div>
+                <h2>ION AI Assistant</h2>
+                <p>I'm here to help with security analysis, threat investigation, and technical questions.</p>
+                <div class="ai-welcome-hints">
+                    <div class="ai-hint">
+                        <span class="ai-hint-icon">🔍</span>
+                        <span>Ask about threat indicators</span>
+                    </div>
+                    <div class="ai-hint">
+                        <span class="ai-hint-icon">💻</span>
+                        <span>Get help with scripts</span>
+                    </div>
+                    <div class="ai-hint">
+                        <span class="ai-hint-icon">📚</span>
+                        <span>Learn about MITRE ATT&CK</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        // Re-wire hint handlers
+        document.querySelectorAll('.ai-hint').forEach(hint => {
+            hint.addEventListener('click', function() {
+                const prompt = this.querySelector('span:last-child').textContent;
+                sendPageQuickPrompt(prompt);
+            });
+        });
+    }
+
+    // =========================================================================
+    // AI Preferences, Citations, Feedback
+    // =========================================================================
+
+    async function loadAIPreferences() {
+        try {
+            const response = await fetch('/api/ai/preferences', {
+                credentials: 'include'
+            });
+            if (response.ok) {
+                aiPreferences = await response.json();
+                applyPreferencesToUI();
+            }
+        } catch (error) {
+            console.error('Failed to load AI preferences:', error);
+        }
+    }
+
+    function applyPreferencesToUI() {
+        const kb = document.getElementById('pref-rag-kb');
+        const notes = document.getElementById('pref-rag-notes');
+        const playbooks = document.getElementById('pref-rag-playbooks');
+        const citations = document.getElementById('pref-show-citations');
+        const maxRefs = document.getElementById('pref-max-refs');
+        const customInst = document.getElementById('pref-custom-instructions');
+
+        if (kb) kb.checked = !!aiPreferences.rag_knowledge_base;
+        if (notes) notes.checked = !!aiPreferences.rag_user_notes;
+        if (playbooks) playbooks.checked = !!aiPreferences.rag_playbooks;
+        if (citations) citations.checked = aiPreferences.show_citations !== false;
+        if (maxRefs) maxRefs.value = String(aiPreferences.max_context_snippets || 3);
+        if (customInst) {
+            customInst.value = aiPreferences.custom_instructions || '';
+            updateCharCount();
+        }
+    }
+
+    async function saveAIPreferences() {
+        const payload = {
+            rag_knowledge_base: document.getElementById('pref-rag-kb')?.checked || false,
+            rag_user_notes: document.getElementById('pref-rag-notes')?.checked || false,
+            rag_playbooks: document.getElementById('pref-rag-playbooks')?.checked || false,
+            show_citations: document.getElementById('pref-show-citations')?.checked ?? true,
+            max_context_snippets: parseInt(document.getElementById('pref-max-refs')?.value || '3', 10),
+            custom_instructions: document.getElementById('pref-custom-instructions')?.value || '',
+        };
+
+        try {
+            const response = await fetch('/api/ai/preferences', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) {
+                aiPreferences = await response.json();
+                if (typeof showToast === 'function') {
+                    showToast('AI preferences saved', 'success');
+                }
+            }
+        } catch (error) {
+            console.error('Failed to save AI preferences:', error);
+        }
+    }
+
+    function updateCharCount() {
+        const textarea = document.getElementById('pref-custom-instructions');
+        const counter = document.getElementById('ai-char-count');
+        if (textarea && counter) {
+            counter.textContent = textarea.value.length + '/500';
+        }
+    }
+
+    window.toggleSettingsPanel = function() {
+        const panel = document.getElementById('ai-settings-panel');
+        const chevron = document.getElementById('ai-settings-chevron');
+        if (panel) {
+            const isHidden = panel.style.display === 'none';
+            panel.style.display = isHidden ? 'block' : 'none';
+            if (chevron) chevron.classList.toggle('open', isHidden);
+        }
+    };
+
+    // Make save callable from inline handlers
+    window.saveAIPreferences = saveAIPreferences;
+    window.updateCharCount = updateCharCount;
+
+    function renderCitations(citations) {
+        if (!citations || citations.length === 0) return '';
+        const icons = {
+            knowledge_base: '<span class="ai-cite-icon">&#128196;</span>',
+            user_note: '<span class="ai-cite-icon">&#128221;</span>',  // Analyst Notes
+            playbook: '<span class="ai-cite-icon">&#128203;</span>',
+        };
+        const labels = {
+            knowledge_base: 'KB',
+            user_note: 'Note',
+            playbook: 'PB',
+        };
+        const chips = citations.map(c => {
+            const icon = icons[c.type] || '';
+            const label = labels[c.type] || c.type;
+            return `<span class="ai-citation-chip">${icon} ${escapeHtml(label)}: ${escapeHtml(c.title)}</span>`;
+        }).join('');
+        return `<div class="ai-citations-bar"><span class="ai-citations-label">Sources referenced:</span>${chips}</div>`;
+    }
+
+    function renderFeedbackButtons(msgId) {
+        return `<div class="ai-feedback-row" data-msg-id="${msgId}">
+            <button class="ai-feedback-btn" onclick="submitFeedback(this, 'up')" title="Good response">&#128077;</button>
+            <button class="ai-feedback-btn" onclick="submitFeedback(this, 'down')" title="Poor response">&#128078;</button>
+        </div>`;
+    }
+
+    window.submitFeedback = async function(btn, rating) {
+        const row = btn.closest('.ai-feedback-row');
+        if (!row || row.classList.contains('submitted')) return;
+        row.classList.add('submitted');
+
+        // Highlight selected
+        const buttons = row.querySelectorAll('.ai-feedback-btn');
+        buttons.forEach(b => b.classList.add('used'));
+        btn.classList.add(rating === 'up' ? 'active-up' : 'active-down');
+
+        const citationsJson = pendingCitations ? JSON.stringify(pendingCitations) : null;
+
+        try {
+            await fetch('/api/ai/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    rating: rating,
+                    context_type: aiCurrentContext,
+                    rag_sources_used: citationsJson,
+                })
+            });
+        } catch (error) {
+            console.error('Failed to submit feedback:', error);
+        }
+    };
+
+    function exportPageAIChat() {
+        if (aiPageMessages.length === 0) {
+            if (typeof showToast === 'function') {
+                showToast('No messages to export', 'warning');
+            }
+            return;
+        }
+
+        let exportText = `ION AI Chat Export\n`;
+        exportText += `Date: ${new Date().toISOString()}\n`;
+        exportText += `Context: ${AI_CONTEXT_TITLES[aiCurrentContext]}\n`;
+        exportText += `${'='.repeat(50)}\n\n`;
+
+        aiPageMessages.forEach(msg => {
+            const role = msg.role === 'user' ? 'You' : 'AI';
+            exportText += `[${role}]\n${msg.content}\n\n`;
+        });
+
+        const blob = new Blob([exportText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ion-ai-chat-${new Date().toISOString().slice(0,10)}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        if (typeof showToast === 'function') {
+            showToast('Chat exported successfully', 'success');
+        }
+    }
+
+})(); // End of IIFE
+</script>
+{% endblock %}

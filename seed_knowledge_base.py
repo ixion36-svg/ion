@@ -1,5 +1,5 @@
 """
-Seed SOC Analyst Knowledge Base reference library into IXION.
+Seed SOC Analyst Knowledge Base reference library into ION.
 
 Creates ~165 detailed markdown articles organized into 12 collections under
 a 'Knowledge Base' parent collection. Articles cover Windows internals,
@@ -7,7 +7,7 @@ networking, SIEM, malware analysis, incident response, threat intel, cloud
 security, penetration testing, detection engineering, cryptography, and more.
 
 Usage:
-    cd C:\\Users\\Tomo\\ixion
+    cd C:\\Users\\Tomo\\ion
     C:\\Python314\\python.exe seed_knowledge_base.py
 """
 import os
@@ -16,14 +16,14 @@ import sys
 import time
 from io import BytesIO
 
-BASE = os.environ.get("IXION_SEED_URL", "http://127.0.0.1:8000")
+BASE = os.environ.get("ION_SEED_URL", "http://127.0.0.1:8000")
 SESSION = requests.Session()
 
 
 def login():
     r = SESSION.post(
         f"{BASE}/api/auth/login",
-        json={"username": "admin", "password": os.environ.get("IXION_ADMIN_PASSWORD", "admin2025")},
+        json={"username": "admin", "password": os.environ.get("ION_ADMIN_PASSWORD", "admin2025")},
     )
     r.raise_for_status()
     print("[+] Logged in as admin")
@@ -102,7 +102,7 @@ def upload_article(title, content, tags, collection_id):
 
 
 """
-IXION Knowledge Base - Part 1
+ION Knowledge Base - Part 1
 SOC Analyst Reference Articles: Windows/AD and Linux/Bash
 """
 
@@ -9469,7 +9469,7 @@ This checklist provides a systematic approach to Linux hardening. Regular verifi
 """),
     ]
 
-"""IXION Knowledge Base Part 2 - Networking & SIEM/Log Analysis articles."""
+"""ION Knowledge Base Part 2 - Networking & SIEM/Log Analysis articles."""
 
 
 def networking_articles():
@@ -18080,7 +18080,7 @@ Last Reviewed: [Date]
     ]
 
 """
-IXION Knowledge Base - Part 3: Malware Analysis & IR/Forensics
+ION Knowledge Base - Part 3: Malware Analysis & IR/Forensics
 SOC Analyst reference articles with real, actionable content.
 """
 
@@ -26610,7 +26610,7 @@ DOCUMENTATION:
     ]
 
 """
-IXION Knowledge Base - Part 4
+ION Knowledge Base - Part 4
 Threat Intelligence and Cloud Security articles for SOC analysts.
 """
 
@@ -35101,7 +35101,7 @@ Cloud storage misconfiguration detection requires continuous monitoring at multi
 """),
     ]
 
-"""IXION Knowledge Base - Part 5: Penetration Testing & Detection Engineering."""
+"""ION Knowledge Base - Part 5: Penetration Testing & Detection Engineering."""
 
 
 def pentest_articles():
@@ -48854,7 +48854,7 @@ COLLECTIONS = [
 
 def main():
     print("=" * 60)
-    print("IXION Knowledge Base Seeder")
+    print("ION Knowledge Base Seeder")
     print("=" * 60)
 
     login()

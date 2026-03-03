@@ -3,7 +3,7 @@
 Usage:
     python seed_soc_cmm.py
 
-Requires IXION to be running at http://127.0.0.1:8000
+Requires ION to be running at http://127.0.0.1:8000
 Admin: admin / admin2025
 """
 
@@ -18,17 +18,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from ixion.models.base import Base
-from ixion.models.skills import (
+from ion.models.base import Base
+from ion.models.skills import (
     KnowledgeArticle, SOCCMMAssessment, SkillAssessment, TeamCertification,
 )
-from ixion.models.user import User
+from ion.models.user import User
 
 
 def main():
-    db_path = Path(os.path.dirname(os.path.abspath(__file__))) / ".ixion" / "ixion.db"
+    db_path = Path(os.path.dirname(os.path.abspath(__file__))) / ".ion" / "ion.db"
     if not db_path.exists():
-        db_path = Path.home() / ".ixion" / "ixion.db"
+        db_path = Path.home() / ".ion" / "ion.db"
     print(f"Using database: {db_path}")
     engine = create_engine(f"sqlite:///{db_path}", echo=False)
     Base.metadata.create_all(engine)

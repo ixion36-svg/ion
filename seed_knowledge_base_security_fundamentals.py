@@ -1,5 +1,5 @@
 """
-Seed Security Fundamentals Knowledge Base articles into IXION.
+Seed Security Fundamentals Knowledge Base articles into ION.
 
 Creates ~60 foundational "Security 101" articles covering core concepts every
 SOC analyst should know cold: CIA triad, OSI model, TCP/IP, authentication
@@ -12,7 +12,7 @@ Organized into 4 collections under the existing 'Knowledge Base' parent:
   - Risk, Compliance & Operations (~15 articles)
 
 Usage:
-    cd C:\\Users\\Tomo\\ixion
+    cd C:\\Users\\Tomo\\ion
     C:\\Python314\\python.exe seed_knowledge_base_security_fundamentals.py
 """
 import os
@@ -21,14 +21,14 @@ import sys
 import time
 from io import BytesIO
 
-BASE = os.environ.get("IXION_SEED_URL", "http://127.0.0.1:8000")
+BASE = os.environ.get("ION_SEED_URL", "http://127.0.0.1:8000")
 SESSION = requests.Session()
 
 
 def login():
     r = SESSION.post(
         f"{BASE}/api/auth/login",
-        json={"username": "admin", "password": os.environ.get("IXION_ADMIN_PASSWORD", "admin2025")},
+        json={"username": "admin", "password": os.environ.get("ION_ADMIN_PASSWORD", "admin2025")},
     )
     r.raise_for_status()
     print("[+] Logged in as admin")
@@ -1361,7 +1361,7 @@ AUTH_ACCESS = [
 |---|---|---|---|---|
 | DAC | Owner | Low | Low | File permissions |
 | MAC | System | High | High | SELinux labels |
-| RBAC | Admin (roles) | Medium | Medium | IXION roles |
+| RBAC | Admin (roles) | Medium | Medium | ION roles |
 | ABAC | Policy engine | Very high | High | AWS IAM |
 """,
     },

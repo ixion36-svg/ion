@@ -1,4 +1,4 @@
-# Combined development/testing stack for Ixion
+# Combined development/testing stack for Ion
 # Start with: docker compose -f docker-compose.dev.yml up -d
 #
 # Services:
@@ -16,7 +16,7 @@ services:
   # ===========================================================================
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:9.3.0
-    container_name: ixion-elasticsearch
+    container_name: ion-elasticsearch
     restart: unless-stopped
     environment:
       - discovery.type=single-node
@@ -34,14 +34,14 @@ services:
       timeout: 10s
       retries: 5
     networks:
-      - ixion-net
+      - ion-net
 
   # ===========================================================================
   # Kibana - Elasticsearch Visualization
   # ===========================================================================
   kibana:
     image: docker.elastic.co/kibana/kibana:9.3.0
-    container_name: ixion-kibana
+    container_name: ion-kibana
     restart: unless-stopped
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
@@ -55,14 +55,14 @@ services:
       elasticsearch:
         condition: service_healthy
     networks:
-      - ixion-net
+      - ion-net
 
   # ===========================================================================
   # GitLab CE - Source Code Management
   # ===========================================================================
   gitlab:
     image: gitlab/gitlab-ce:latest
-    container_name: ixion-gitlab
+    container_name: ion-gitlab
     restart: unless-stopped
     hostname: gitlab.local
     environment:
@@ -82,23 +82,23 @@ services:
       - gitlab-data:/var/opt/gitlab
     shm_size: '256m'
     networks:
-      - ixion-net
+      - ion-net
 
   # ===========================================================================
   # OpenCTI Dependencies
   # ===========================================================================
   redis:
     image: redis:7-alpine
-    container_name: ixion-redis
+    container_name: ion-redis
     restart: unless-stopped
     volumes:
       - redis-data:/data
     networks:
-      - ixion-net
+      - ion-net
 
   minio:
     image: minio/minio:latest
-    container_name: ixion-minio
+    container_name: ion-minio
     restart: unless-stopped
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -110,11 +110,11 @@ services:
     volumes:
       - minio-data:/data
     networks:
-      - ixion-net
+      - ion-net
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    container_name: ixion-rabbitmq
+    container_name: ion-rabbitmq
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: guest
@@ -125,14 +125,14 @@ services:
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     networks:
-      - ixion-net
+      - ion-net
 
   # ===========================================================================
   # OpenCTI Platform
   # ===========================================================================
   opencti:
     image: opencti/platform:6.0.10
-    container_name: ixion-opencti
+    container_name: ion-opencti
     restart: unless-stopped
     environment:
       - NODE_OPTIONS=--max-old-space-size=8096
@@ -170,11 +170,11 @@ services:
       rabbitmq:
         condition: service_started
     networks:
-      - ixion-net
+      - ion-net
 
   opencti-worker:
     image: opencti/worker:6.0.10
-    container_name: ixion-opencti-worker
+    container_name: ion-opencti-worker
     restart: unless-stopped
     environment:
       - OPENCTI_URL=http://opencti:8080
@@ -183,7 +183,7 @@ services:
     depends_on:
       - opencti
     networks:
-      - ixion-net
+      - ion-net
 
   # ===========================================================================
   # DFIR-IRIS - Incident Response Platform
@@ -201,7 +201,7 @@ services:
     volumes:
       - iris-pgdata:/var/lib/postgresql/data
     networks:
-      - ixion-net
+      - ion-net
 
   iris-app:
     image: ghcr.io/dfir-iris/iriswebapp_app:v2.4.20
@@ -231,7 +231,7 @@ services:
       - iris-templates:/home/iris/user_templates
       - iris-server-data:/home/iris/server_data
     networks:
-      - ixion-net
+      - ion-net
 
   iris-worker:
     image: ghcr.io/dfir-iris/iriswebapp_app:v2.4.20
@@ -260,7 +260,7 @@ services:
       - iris-templates:/home/iris/user_templates
       - iris-server-data:/home/iris/server_data
     networks:
-      - ixion-net
+      - ion-net
 
 volumes:
   elasticsearch-data:
@@ -276,5 +276,5 @@ volumes:
   iris-server-data:
 
 networks:
-  ixion-net:
+  ion-net:
     driver: bridge

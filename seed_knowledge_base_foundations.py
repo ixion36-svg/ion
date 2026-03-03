@@ -1,5 +1,5 @@
 """
-Seed Foundational Security Knowledge Base articles into IXION.
+Seed Foundational Security Knowledge Base articles into ION.
 
 Creates ~100 foundational security articles (Network+/Security+ level) organized
 into 6 collections under the existing 'Knowledge Base' parent collection. Articles
@@ -7,7 +7,7 @@ cover networking fundamentals, infrastructure/devices, cryptography/PKI, identit
 and access management, threats/attacks/vulnerabilities, and governance/risk/compliance.
 
 Usage:
-    cd C:\\Users\\Tomo\\ixion
+    cd C:\\Users\\Tomo\\ion
     C:\\Python314\\python.exe seed_knowledge_base_foundations.py
 """
 import os
@@ -16,14 +16,14 @@ import sys
 import time
 from io import BytesIO
 
-BASE = os.environ.get("IXION_SEED_URL", "http://127.0.0.1:8000")
+BASE = os.environ.get("ION_SEED_URL", "http://127.0.0.1:8000")
 SESSION = requests.Session()
 
 
 def login():
     r = SESSION.post(
         f"{BASE}/api/auth/login",
-        json={"username": "admin", "password": os.environ.get("IXION_ADMIN_PASSWORD", "admin2025")},
+        json={"username": "admin", "password": os.environ.get("ION_ADMIN_PASSWORD", "admin2025")},
     )
     r.raise_for_status()
     print("[+] Logged in as admin")
@@ -7338,7 +7338,7 @@ Normalized event:
 |---|---|---|
 | CEF (Common Event Format) | ArcSight format | ArcSight, many vendors |
 | LEEF (Log Event Extended Format) | IBM format | QRadar |
-| ECS (Elastic Common Schema) | Elastic format | Elasticsearch, IXION |
+| ECS (Elastic Common Schema) | Elastic format | Elasticsearch, ION |
 | OCSF (Open Cybersecurity Schema) | AWS-led standard | Amazon Security Lake |
 | CIM (Common Information Model) | Splunk format | Splunk |
 
@@ -12438,7 +12438,7 @@ Assessment Questions:
 
 
 """
-IXION Knowledge Base - Identity and Access Management
+ION Knowledge Base - Identity and Access Management
 SOC Analyst Reference Articles: IAM, Authentication, Authorization, PAM, Zero Trust
 16 articles covering CompTIA Security+ aligned content for security practitioners.
 """
@@ -24160,7 +24160,7 @@ COLLECTIONS = [
 
 def main():
     print("=" * 60)
-    print("IXION Foundational Security Knowledge Base Seeder")
+    print("ION Foundational Security Knowledge Base Seeder")
     print("=" * 60)
 
     login()

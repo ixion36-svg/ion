@@ -4,8 +4,8 @@ import pytest
 from pathlib import Path
 from typer.testing import CliRunner
 
-from docforge.cli.main import app
-from docforge.storage.database import init_db, reset_engine
+from ion.cli.main import app
+from ion.storage.database import init_db, reset_engine
 
 
 @pytest.fixture
@@ -15,19 +15,19 @@ def runner():
 
 @pytest.fixture
 def temp_project(tmp_path: Path):
-    """Create a temporary project directory with initialized DocForge."""
+    """Create a temporary project directory with initialized ION."""
     import os
     original_cwd = os.getcwd()
     os.chdir(tmp_path)
 
-    # Initialize DocForge
-    db_path = tmp_path / ".docforge" / "docforge.db"
+    # Initialize ION
+    db_path = tmp_path / ".ion" / "ion.db"
     init_db(db_path)
 
     # Create config
-    from docforge.core.config import Config, set_config
+    from ion.core.config import Config, set_config
     config = Config(db_path=db_path)
-    config.to_file(tmp_path / ".docforge" / "config.json")
+    config.to_file(tmp_path / ".ion" / "config.json")
     set_config(config)
 
     yield tmp_path
@@ -49,8 +49,8 @@ class TestInitCommand:
             reset_engine()
             result = runner.invoke(app, ["init"])
             assert result.exit_code == 0
-            assert "Initialized DocForge" in result.output
-            assert (tmp_path / ".docforge" / "docforge.db").exists()
+            assert "Initialized ION" in result.output
+            assert (tmp_path / ".ion" / "ion.db").exists()
         finally:
             os.chdir(original_cwd)
             reset_engine()

@@ -5,8 +5,8 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from docforge.models.base import Base
-from docforge.storage.database import reset_engine
+from ion.models.document import Base
+from ion.storage.database import reset_engine
 
 
 @pytest.fixture

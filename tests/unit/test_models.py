@@ -3,9 +3,9 @@
 import pytest
 from datetime import datetime
 
-from docforge.models.template import Template, Tag, Variable
-from docforge.models.version import TemplateVersion
-from docforge.models.document import Document
+from ion.models.template import Template, Tag, Variable
+from ion.models.version import TemplateVersion
+from ion.models.document import Document
 
 
 class TestTemplateModel:

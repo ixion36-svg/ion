@@ -1,5 +1,5 @@
-# IXION - Air-gapped Deployment Image
-# Intelligence eXchange & Integration Operations Network
+# ION - Air-gapped Deployment Image
+# Intelligent Operating Network
 # Part of Guarded Glass Security Toolkit
 # Multi-stage build for smaller final image
 
@@ -34,7 +34,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 FROM python:3.11-slim as runtime
 
 # Security: Run as non-root user
-RUN groupadd -r ixion && useradd -r -g ixion ixion
+RUN groupadd -r ion && useradd -r -g ion ion
 
 WORKDIR /app
 
@@ -49,14 +49,14 @@ COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Create data directory for database and config
-RUN mkdir -p /data/.ixion && chown -R ixion:ixion /data
+RUN mkdir -p /data/.ion && chown -R ion:ion /data
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-ENV IXION_DATA_DIR=/data
-ENV IXION_HOST=0.0.0.0
-ENV IXION_PORT=8000
+ENV ION_DATA_DIR=/data
+ENV ION_HOST=0.0.0.0
+ENV ION_PORT=8000
 
 # Expose port
 EXPOSE 8000
@@ -66,7 +66,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1
 
 # Switch to non-root user
-USER ixion
+USER ion
 
 # Entrypoint handles initialization
 ENTRYPOINT ["docker-entrypoint.sh"]

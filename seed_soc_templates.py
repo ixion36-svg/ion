@@ -1,4 +1,4 @@
-"""Seed SOC-CMM document templates into the IXION template library."""
+"""Seed SOC-CMM document templates into the ION template library."""
 import requests
 
 BASE = "http://127.0.0.1:8000"
@@ -1044,7 +1044,7 @@ Standardise the onboarding of new SOC team members and secure off-boarding of de
 ### Week 1 — Access & Orientation
 - [ ] IT accounts provisioned (AD, email, VPN)
 - [ ] SOC tool access granted (SIEM, EDR, ticketing, wiki)
-- [ ] Appropriate RBAC role assigned in IXION
+- [ ] Appropriate RBAC role assigned in ION
 - [ ] Security clearance/background check confirmed
 - [ ] NDA and acceptable use policy signed
 - [ ] Introduction to team and key stakeholders
@@ -1075,7 +1075,7 @@ Standardise the onboarding of new SOC team members and secure off-boarding of de
 ## 3. Off-boarding Checklist
 
 - [ ] Access revoked: SIEM, EDR, ticketing, wiki, VPN, email
-- [ ] RBAC role removed in IXION
+- [ ] RBAC role removed in ION
 - [ ] Shared credentials rotated (if applicable)
 - [ ] Knowledge transfer sessions completed
 - [ ] Open tickets reassigned
@@ -1652,7 +1652,7 @@ Define the SOC training and skills development program aligned to SOC-CMM requir
 
 ## 5. Skills Assessment
 
-Skills tracked in IXION Skills Matrix — self-assessment + lead validation quarterly.""")
+Skills tracked in ION Skills Matrix — self-assessment + lead validation quarterly.""")
 
 T("doc:cert_roadmap", "Certification Roadmap", "KB",
   "Target certifications per role and recommended timeline",

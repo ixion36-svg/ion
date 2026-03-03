@@ -1,11 +1,11 @@
 # =============================================================================
-# Filebeat Configuration for DocForge
+# Filebeat Configuration for ION
 # =============================================================================
 # Ships ECS-compliant JSON logs to Elasticsearch
 #
 # Usage:
 #   - Mount this file to /usr/share/filebeat/filebeat.yml
-#   - Mount DocForge log directory to /var/log/docforge
+#   - Mount ION log directory to /var/log/ion
 #   - Set ELASTICSEARCH_HOSTS environment variable
 # =============================================================================
 
@@ -14,13 +14,13 @@
 # =============================================================================
 filebeat.inputs:
 
-  # DocForge application logs (JSON/ECS format)
+  # ION application logs (JSON/ECS format)
   - type: log
-    id: docforge-app
+    id: ion-app
     enabled: true
     paths:
-      - /var/log/docforge/*.log
-      - /var/log/docforge/**/*.log
+      - /var/log/ion/*.log
+      - /var/log/ion/**/*.log
 
     # Parse as JSON (ECS-compliant)
     json.keys_under_root: true
@@ -30,7 +30,7 @@ filebeat.inputs:
 
     # Add metadata fields
     fields:
-      log.type: docforge
+      log.type: ion
       environment: ${ENVIRONMENT:production}
     fields_under_root: true
 
@@ -51,7 +51,7 @@ filebeat.inputs:
 
   # Docker container logs (alternative input)
   - type: container
-    id: docforge-container
+    id: ion-container
     enabled: ${FILEBEAT_CONTAINER_LOGS_ENABLED:false}
     paths:
       - /var/lib/docker/containers/*/*.log
@@ -61,7 +61,7 @@ filebeat.inputs:
     json.overwrite_keys: true
     json.add_error_key: true
 
-    # Filter to DocForge containers only
+    # Filter to ION containers only
     processors:
       - add_docker_metadata:
           host: "unix:///var/run/docker.sock"
@@ -69,7 +69,7 @@ filebeat.inputs:
           when:
             not:
               contains:
-                container.name: "docforge"
+                container.name: "ion"
 
 # =============================================================================
 # Processors - Transform and enrich events
@@ -126,16 +126,16 @@ output.elasticsearch:
   ssl.verification_mode: ${ELASTICSEARCH_SSL_VERIFY:full}
 
   # Index settings
-  index: "docforge-%{[environment]}-%{+yyyy.MM.dd}"
+  index: "ion-%{[environment]}-%{+yyyy.MM.dd}"
 
   # ILM (Index Lifecycle Management)
   ilm.enabled: true
-  ilm.rollover_alias: "docforge"
+  ilm.rollover_alias: "ion"
   ilm.pattern: "{now/d}-000001"
-  ilm.policy_name: "docforge-policy"
+  ilm.policy_name: "ion-policy"
 
   # Pipeline for additional processing
-  pipeline: "docforge-pipeline"
+  pipeline: "ion-pipeline"
 
   # Bulk settings
   bulk_max_size: 1000
@@ -181,8 +181,8 @@ monitoring.elasticsearch:
 # Setup Configuration
 # =============================================================================
 setup.template.enabled: true
-setup.template.name: "docforge"
-setup.template.pattern: "docforge-*"
+setup.template.name: "ion"
+setup.template.pattern: "ion-*"
 setup.template.settings:
   index.number_of_shards: 1
   index.number_of_replicas: 0
@@ -190,9 +190,9 @@ setup.template.settings:
 
 # ILM policy setup
 setup.ilm.enabled: true
-setup.ilm.rollover_alias: "docforge"
+setup.ilm.rollover_alias: "ion"
 setup.ilm.pattern: "{now/d}-000001"
-setup.ilm.policy_name: "docforge-policy"
+setup.ilm.policy_name: "ion-policy"
 setup.ilm.overwrite: false
 
 # Kibana setup (for dashboards)

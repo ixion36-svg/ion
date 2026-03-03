@@ -374,7 +374,7 @@ def main():
     parser.add_argument("--username", default="elastic", help="ES username")
     parser.add_argument("--password", default="testpassword123", help="ES password")
     parser.add_argument("--count", type=int, default=75, help="Number of alerts to generate")
-    parser.add_argument("--index", default="alerts-ixion", help="Target index name")
+    parser.add_argument("--index", default="alerts-ion", help="Target index name")
     args = parser.parse_args()
 
     seed_alerts(args.url, args.username, args.password, args.count, args.index)

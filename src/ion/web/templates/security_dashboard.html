@@ -1,0 +1,1030 @@
+{% extends "base.html" %}
+
+{% block title %}Security Dashboard - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Security Dashboard</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="refreshDashboard()">Refresh</button>
+        <button class="btn btn-secondary" onclick="exportEvents()">Export Events</button>
+    </div>
+</div>
+
+<!-- Threat Summary Banner -->
+<div class="security-banner" id="threat-banner">
+    <div class="threat-level" id="threat-level">
+        <span class="threat-icon"><i class="icon-shield-alert"></i></span>
+        <span class="threat-text">Loading threat assessment...</span>
+    </div>
+    <div class="threat-stats" id="threat-stats">
+        <!-- Populated by JS -->
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon stat-icon-total"><i class="icon-chart-bar"></i></div>
+        <div class="stat-content">
+            <div class="stat-value" id="stat-total">-</div>
+            <div class="stat-label">Events (24h)</div>
+        </div>
+    </div>
+    <div class="stat-card stat-card-critical">
+        <div class="stat-icon stat-icon-critical"><i class="icon-alert-triangle"></i></div>
+        <div class="stat-content">
+            <div class="stat-value" id="stat-critical">-</div>
+            <div class="stat-label">Critical</div>
+        </div>
+    </div>
+    <div class="stat-card stat-card-high">
+        <div class="stat-icon stat-icon-high"><i class="icon-alert-triangle"></i></div>
+        <div class="stat-content">
+            <div class="stat-value" id="stat-high">-</div>
+            <div class="stat-label">High</div>
+        </div>
+    </div>
+    <div class="stat-card stat-card-blocked">
+        <div class="stat-icon stat-icon-blocked"><i class="icon-ban"></i></div>
+        <div class="stat-content">
+            <div class="stat-value" id="stat-blocked">-</div>
+            <div class="stat-label">Blocked</div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="dashboard-grid">
+    <!-- Events Table -->
+    <div class="card card-wide">
+        <div class="card-header">
+            <h2>Recent Security Events</h2>
+            <div class="header-actions">
+                <select id="filter-severity" onchange="loadEvents()">
+                    <option value="">All Severities</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                    <option value="info">Info</option>
+                </select>
+                <select id="filter-hours" onchange="loadEvents()">
+                    <option value="1">Last Hour</option>
+                    <option value="24" selected>Last 24 Hours</option>
+                    <option value="72">Last 3 Days</option>
+                    <option value="168">Last 7 Days</option>
+                </select>
+            </div>
+        </div>
+        <div class="card-body">
+            <table class="data-table" id="events-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Severity</th>
+                        <th>Type</th>
+                        <th>Source IP</th>
+                        <th>Title</th>
+                        <th>Matched Content</th>
+                        <th>Count</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="events-tbody">
+                    <tr><td colspan="9" class="loading">Loading security events...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Side Panel -->
+    <div class="side-panel">
+        <!-- Top Attackers -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Top Source IPs</h3>
+            </div>
+            <div class="card-body">
+                <div id="top-ips-list" class="list-group">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Threats -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Threat Types</h3>
+            </div>
+            <div class="card-body">
+                <div id="threat-types-list" class="list-group">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Blocked IPs -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Blocked IPs</h3>
+                <button class="btn btn-sm btn-primary" onclick="showBlockIPModal()">+ Block IP</button>
+            </div>
+            <div class="card-body">
+                <div id="blocked-ips-list" class="list-group">
+                    <div class="loading">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Event Detail Modal -->
+<div class="modal" id="event-modal">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h2>Event Details</h2>
+            <button class="modal-close" onclick="closeModal('event-modal')">&times;</button>
+        </div>
+        <div class="modal-body" id="event-detail-content">
+            <!-- Populated by JS -->
+        </div>
+        <div class="modal-footer">
+            <select id="event-status-select" onchange="updateEventStatus()">
+                <option value="new">New</option>
+                <option value="investigating">Investigating</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="false_positive">False Positive</option>
+                <option value="mitigated">Mitigated</option>
+                <option value="resolved">Resolved</option>
+            </select>
+            <button class="btn btn-secondary" onclick="closeModal('event-modal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Block IP Modal -->
+<div class="modal" id="block-ip-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Block IP Address</h2>
+            <button class="modal-close" onclick="closeModal('block-ip-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="block-ip-form" onsubmit="blockIP(event)">
+                <div class="form-group">
+                    <label for="block-ip">IP Address</label>
+                    <input type="text" id="block-ip" name="ip_address" required
+                           pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
+                           placeholder="192.168.1.100">
+                </div>
+                <div class="form-group">
+                    <label for="block-reason">Reason</label>
+                    <textarea id="block-reason" name="reason" required
+                              placeholder="Reason for blocking this IP"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="block-duration">Duration (minutes)</label>
+                    <input type="number" id="block-duration" name="duration_minutes"
+                           value="60" min="1" max="525600">
+                    <small>Set to 0 for permanent block</small>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="block-permanent" name="permanent">
+                        Permanent Block
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('block-ip-modal')">Cancel</button>
+            <button class="btn btn-danger" type="submit" form="block-ip-form">Block IP</button>
+        </div>
+    </div>
+</div>
+
+<!-- SIEM Export Modal -->
+<div class="modal" id="export-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Export Security Events</h2>
+            <button class="modal-close" onclick="closeModal('export-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="export-hours">Time Period</label>
+                <select id="export-hours">
+                    <option value="24">Last 24 Hours</option>
+                    <option value="72">Last 3 Days</option>
+                    <option value="168">Last 7 Days</option>
+                    <option value="720">Last 30 Days</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="export-format">Format</label>
+                <select id="export-format">
+                    <option value="json">JSON (SIEM Compatible)</option>
+                    <option value="csv">CSV</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('export-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="downloadExport()">Download</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* Security Dashboard Specific Styles */
+.security-banner {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white;
+}
+
+.threat-level {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.threat-icon {
+    font-size: 2rem;
+}
+
+.threat-text {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.threat-level.critical { color: #ff4444; }
+.threat-level.high { color: #ff8800; }
+.threat-level.medium { color: #ffbb33; }
+.threat-level.low { color: #00C851; }
+.threat-level.normal { color: #33b5e5; }
+
+.threat-stats {
+    display: flex;
+    gap: 2rem;
+}
+
+.threat-stat {
+    text-align: center;
+}
+
+.threat-stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.threat-stat-label {
+    font-size: 0.875rem;
+    opacity: 0.8;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.stat-card-critical { border-left: 4px solid #ff4444; }
+.stat-card-high { border-left: 4px solid #ff8800; }
+.stat-card-blocked { border-left: 4px solid #9933cc; }
+
+.stat-icon {
+    font-size: 2rem;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: var(--bg-secondary);
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: bold;
+}
+
+.stat-label {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 1.5rem;
+}
+
+@media (max-width: 1200px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.card-wide {
+    min-width: 0;
+}
+
+.side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.list-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+.list-item-ip {
+    font-family: monospace;
+}
+
+.list-item-count {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.list-item-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.severity-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.severity-critical { background: #ff4444; color: white; }
+.severity-high { background: #ff8800; color: white; }
+.severity-medium { background: #ffbb33; color: #333; }
+.severity-low { background: #00C851; color: white; }
+.severity-info { background: #33b5e5; color: white; }
+
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.status-new { background: #e3f2fd; color: #1976d2; }
+.status-investigating { background: #fff3e0; color: #f57c00; }
+.status-confirmed { background: #ffebee; color: #d32f2f; }
+.status-false-positive { background: #f3e5f5; color: #7b1fa2; }
+.status-mitigated { background: #e8f5e9; color: #388e3c; }
+.status-resolved { background: #e0e0e0; color: #616161; }
+
+.event-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.event-detail-item {
+    padding: 0.5rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.event-detail-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.event-detail-value {
+    font-weight: 500;
+    word-break: break-all;
+}
+
+.event-patterns {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.event-patterns-title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.event-patterns-list {
+    font-family: monospace;
+    font-size: 0.875rem;
+    list-style: none;
+    padding: 0;
+}
+
+.event-patterns-list li {
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.event-payload {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #1a1a2e;
+    border-radius: 4px;
+    border-left: 4px solid #ff4444;
+}
+
+.event-payload-title {
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: #ff6b6b;
+}
+
+.event-payload-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.payload-section {
+    background: rgba(0,0,0,0.2);
+    padding: 0.75rem;
+    border-radius: 4px;
+}
+
+.payload-label {
+    font-size: 0.75rem;
+    color: #888;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+.payload-code {
+    background: #0d0d1a;
+    padding: 0.75rem;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.8rem;
+    color: #e0e0e0;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.payload-code.highlight-danger {
+    background: #2d1a1a;
+    border: 1px solid #ff4444;
+    color: #ff6b6b;
+}
+
+.modal-lg {
+    max-width: 800px;
+}
+
+.matched-content {
+    min-width: 150px;
+    max-width: 300px;
+}
+
+.matched-content code {
+    background: #2d1a1a;
+    color: #ff6b6b;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Make the events table scrollable */
+.card-wide .card-body {
+    overflow-x: auto;
+}
+
+#events-table {
+    min-width: 1100px;
+}
+
+#events-table th,
+#events-table td {
+    white-space: nowrap;
+    padding: 0.75rem 0.5rem;
+}
+
+#events-table th:nth-child(5),
+#events-table td:nth-child(5) {
+    /* Title column */
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#events-table th:nth-child(6),
+#events-table td:nth-child(6) {
+    /* Matched Content column */
+    min-width: 150px;
+    max-width: 300px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+</style>
+
+<script>
+let currentEventId = null;
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    refreshDashboard();
+    // Auto-refresh every 30 seconds
+    setInterval(refreshDashboard, 30000);
+});
+
+async function refreshDashboard() {
+    await Promise.all([
+        loadThreatSummary(),
+        loadStatistics(),
+        loadEvents(),
+        loadBlockedIPs()
+    ]);
+}
+
+async function loadThreatSummary() {
+    try {
+        const response = await fetch('/api/security/threat-summary');
+        if (!response.ok) {
+            if (response.status === 401) {
+                window.location.href = '/login?redirect=/security';
+                return;
+            }
+            throw new Error('Failed to load threat summary');
+        }
+
+        const data = await response.json();
+
+        // Update threat level banner
+        const banner = document.getElementById('threat-banner');
+        const levelEl = document.getElementById('threat-level');
+        levelEl.className = `threat-level ${data.threat_level}`;
+        levelEl.querySelector('.threat-text').textContent =
+            `Threat Level: ${data.threat_level.toUpperCase()}`;
+
+        // Update threat stats
+        document.getElementById('threat-stats').innerHTML = `
+            <div class="threat-stat">
+                <div class="threat-stat-value">${data.last_hour.total}</div>
+                <div class="threat-stat-label">Last Hour</div>
+            </div>
+            <div class="threat-stat">
+                <div class="threat-stat-value">${data.active_blocks}</div>
+                <div class="threat-stat-label">Active Blocks</div>
+            </div>
+        `;
+
+        // Update top threats
+        const threatsList = document.getElementById('threat-types-list');
+        if (data.top_threats.length === 0) {
+            threatsList.innerHTML = '<div class="empty-state">No threats detected</div>';
+        } else {
+            threatsList.innerHTML = data.top_threats.map(t => `
+                <div class="list-item">
+                    <span>${formatEventType(t.type)}</span>
+                    <span class="list-item-count">${t.count}</span>
+                </div>
+            `).join('');
+        }
+
+        // Update top IPs
+        const ipsList = document.getElementById('top-ips-list');
+        if (data.top_attackers.length === 0) {
+            ipsList.innerHTML = '<div class="empty-state">No source IPs</div>';
+        } else {
+            ipsList.innerHTML = data.top_attackers.map(ip => `
+                <div class="list-item">
+                    <span class="list-item-ip">${escapeHtml(ip.ip)}</span>
+                    <div class="list-item-actions">
+                        <span class="list-item-count">${ip.count}</span>
+                        <button class="btn btn-sm btn-danger" onclick="quickBlockIP('${escapeHtml(ip.ip)}')" title="Block IP"><i class="icon-ban"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+    } catch (error) {
+        console.error('Error loading threat summary:', error);
+    }
+}
+
+async function loadStatistics() {
+    try {
+        const response = await fetch('/api/security/statistics?hours=24');
+        if (!response.ok) return;
+
+        const stats = await response.json();
+
+        document.getElementById('stat-total').textContent = stats.total_events;
+        document.getElementById('stat-critical').textContent = stats.by_severity.critical || 0;
+        document.getElementById('stat-high').textContent = stats.by_severity.high || 0;
+        document.getElementById('stat-blocked').textContent = stats.blocked_count;
+
+    } catch (error) {
+        console.error('Error loading statistics:', error);
+    }
+}
+
+async function loadEvents() {
+    const severity = document.getElementById('filter-severity').value;
+    const hours = document.getElementById('filter-hours').value;
+    const tbody = document.getElementById('events-tbody');
+
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">Loading security events...</td></tr>';
+
+    try {
+        const params = new URLSearchParams({ hours, limit: 100 });
+        if (severity) params.append('severity', severity);
+
+        const response = await fetch(`/api/security/events?${params}`);
+        if (!response.ok) throw new Error('Failed to load events');
+
+        const events = await response.json();
+
+        if (events.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="empty">No security events found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = events.map(event => {
+            // Extract matched content from raw_data
+            let matchedContent = '-';
+            if (event.raw_data) {
+                if (event.raw_data.matched_content) {
+                    matchedContent = event.raw_data.matched_content;
+                } else if (event.raw_data.query_string) {
+                    try {
+                        matchedContent = decodeURIComponent(event.raw_data.query_string);
+                    } catch(e) {
+                        matchedContent = event.raw_data.query_string;
+                    }
+                    if (matchedContent.length > 100) matchedContent = matchedContent.substring(0, 100) + '...';
+                } else if (event.raw_data.body) {
+                    matchedContent = event.raw_data.body.substring(0, 100) + '...';
+                }
+            }
+            return `
+            <tr onclick="showEventDetail(${event.id})" style="cursor: pointer;">
+                <td>${formatDateTime(event.created_at)}</td>
+                <td><span class="severity-badge severity-${event.severity}">${event.severity}</span></td>
+                <td>${formatEventType(event.event_type)}</td>
+                <td class="list-item-ip">${escapeHtml(event.source_ip)}</td>
+                <td>${escapeHtml(event.title)}</td>
+                <td class="matched-content" title="${escapeHtml(matchedContent)}"><code>${escapeHtml(matchedContent)}</code></td>
+                <td>${event.event_count}</td>
+                <td><span class="status-badge status-${event.status.replace(/_/g, '-')}">${formatStatus(event.status)}</span></td>
+                <td>
+                    <button class="btn btn-sm" onclick="event.stopPropagation(); quickBlockIP('${escapeHtml(event.source_ip)}')" title="Block IP"><i class="icon-ban"></i></button>
+                </td>
+            </tr>
+        `}).join('');
+
+    } catch (error) {
+        tbody.innerHTML = '<tr><td colspan="9" class="error">Error loading security events</td></tr>';
+    }
+}
+
+async function loadBlockedIPs() {
+    const container = document.getElementById('blocked-ips-list');
+
+    try {
+        const response = await fetch('/api/security/blocked-ips');
+        if (!response.ok) throw new Error('Failed to load blocked IPs');
+
+        const blocked = await response.json();
+
+        if (blocked.length === 0) {
+            container.innerHTML = '<div class="empty-state">No blocked IPs</div>';
+            return;
+        }
+
+        container.innerHTML = blocked.map(b => `
+            <div class="list-item">
+                <div>
+                    <span class="list-item-ip">${escapeHtml(b.ip_address)}</span>
+                    <small style="display: block; color: var(--text-muted);">
+                        ${b.permanent ? 'Permanent' : (b.blocked_until ? 'Until ' + formatDateTime(b.blocked_until) : 'Indefinite')}
+                    </small>
+                </div>
+                <button class="btn btn-sm btn-secondary" onclick="unblockIP('${escapeHtml(b.ip_address)}')" title="Unblock">&#10006;</button>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        container.innerHTML = '<div class="error">Error loading blocked IPs</div>';
+    }
+}
+
+async function showEventDetail(eventId) {
+    currentEventId = eventId;
+
+    try {
+        const response = await fetch(`/api/security/events/${eventId}`);
+        if (!response.ok) throw new Error('Failed to load event');
+
+        const event = await response.json();
+
+        // Build raw_data section for modal
+        let rawDataHtml = '';
+        if (event.raw_data) {
+            let payloadSections = '';
+            if (event.raw_data.matched_content) {
+                payloadSections += `
+                    <div class="payload-section">
+                        <div class="payload-label">MATCHED MALICIOUS CONTENT:</div>
+                        <pre class="payload-code highlight-danger">${escapeHtml(event.raw_data.matched_content)}</pre>
+                    </div>`;
+            }
+            if (event.raw_data.query_string) {
+                let decoded = event.raw_data.query_string;
+                try { decoded = decodeURIComponent(decoded); } catch(e) {}
+                payloadSections += `
+                    <div class="payload-section">
+                        <div class="payload-label">Query String:</div>
+                        <pre class="payload-code">${escapeHtml(decoded)}</pre>
+                    </div>`;
+            }
+            if (event.raw_data.body) {
+                payloadSections += `
+                    <div class="payload-section">
+                        <div class="payload-label">Request Body:</div>
+                        <pre class="payload-code">${escapeHtml(event.raw_data.body)}</pre>
+                    </div>`;
+            }
+            if (event.raw_data.path) {
+                payloadSections += `
+                    <div class="payload-section">
+                        <div class="payload-label">Request Path:</div>
+                        <pre class="payload-code">${escapeHtml(event.raw_data.path)}</pre>
+                    </div>`;
+            }
+            if (payloadSections) {
+                rawDataHtml = `
+                <div class="event-payload">
+                    <div class="event-payload-title"><i class="icon-alert-triangle"></i> Detected Payload / Trigger Data</div>
+                    <div class="event-payload-content">${payloadSections}</div>
+                </div>`;
+            }
+        }
+
+        document.getElementById('event-detail-content').innerHTML = `
+            ${rawDataHtml}
+            <div class="event-detail-grid">
+                <div class="event-detail-item">
+                    <div class="event-detail-label">Event Type</div>
+                    <div class="event-detail-value">${formatEventType(event.event_type)}</div>
+                </div>
+                <div class="event-detail-item">
+                    <div class="event-detail-label">Severity</div>
+                    <div class="event-detail-value"><span class="severity-badge severity-${event.severity}">${event.severity}</span></div>
+                </div>
+                <div class="event-detail-item">
+                    <div class="event-detail-label">Source IP</div>
+                    <div class="event-detail-value list-item-ip">${escapeHtml(event.source_ip)}</div>
+                </div>
+                <div class="event-detail-item">
+                    <div class="event-detail-label">Username</div>
+                    <div class="event-detail-value">${event.username ? escapeHtml(event.username) : '-'}</div>
+                </div>
+                <div class="event-detail-item">
+                    <div class="event-detail-label">Request Path</div>
+                    <div class="event-detail-value">${event.request_path ? escapeHtml(event.request_path) : '-'}</div>
+                </div>
+                <div class="event-detail-item">
+                    <div class="event-detail-label">Request Method</div>
+                    <div class="event-detail-value">${event.request_method || '-'}</div>
+                </div>
+                <div class="event-detail-item">
+                    <div class="event-detail-label">First Seen</div>
+                    <div class="event-detail-value">${formatDateTime(event.first_seen)}</div>
+                </div>
+                <div class="event-detail-item">
+                    <div class="event-detail-label">Last Seen</div>
+                    <div class="event-detail-value">${formatDateTime(event.last_seen)}</div>
+                </div>
+                <div class="event-detail-item">
+                    <div class="event-detail-label">Event Count</div>
+                    <div class="event-detail-value">${event.event_count}</div>
+                </div>
+                <div class="event-detail-item">
+                    <div class="event-detail-label">Confidence Score</div>
+                    <div class="event-detail-value">${event.confidence_score}%</div>
+                </div>
+                <div class="event-detail-item" style="grid-column: span 2;">
+                    <div class="event-detail-label">User Agent</div>
+                    <div class="event-detail-value">${event.user_agent ? escapeHtml(event.user_agent) : '-'}</div>
+                </div>
+                <div class="event-detail-item" style="grid-column: span 2;">
+                    <div class="event-detail-label">Description</div>
+                    <div class="event-detail-value">${escapeHtml(event.description)}</div>
+                </div>
+            </div>
+            ${event.matched_patterns && event.matched_patterns.length > 0 ? `
+            <div class="event-patterns">
+                <div class="event-patterns-title">Matched Detection Patterns</div>
+                <ul class="event-patterns-list">
+                    ${event.matched_patterns.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+                </ul>
+            </div>
+            ` : ''}
+        `;
+
+        document.getElementById('event-status-select').value = event.status;
+        openModal('event-modal');
+
+    } catch (error) {
+        showToast('Error loading event details', 'error');
+    }
+}
+
+async function updateEventStatus() {
+    if (!currentEventId) return;
+
+    const status = document.getElementById('event-status-select').value;
+
+    try {
+        const response = await fetch(`/api/security/events/${currentEventId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+
+        if (!response.ok) throw new Error('Failed to update status');
+
+        showToast('Status updated', 'success');
+        loadEvents();
+
+    } catch (error) {
+        showToast('Error updating status', 'error');
+    }
+}
+
+function showBlockIPModal() {
+    document.getElementById('block-ip-form').reset();
+    openModal('block-ip-modal');
+}
+
+async function blockIP(e) {
+    e.preventDefault();
+
+    const form = document.getElementById('block-ip-form');
+    const data = {
+        ip_address: form.ip_address.value,
+        reason: form.reason.value,
+        duration_minutes: parseInt(form.duration_minutes.value) || 60,
+        permanent: form.permanent.checked
+    };
+
+    try {
+        const response = await fetch('/api/security/blocked-ips', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) throw new Error('Failed to block IP');
+
+        showToast('IP blocked successfully', 'success');
+        closeModal('block-ip-modal');
+        loadBlockedIPs();
+        loadThreatSummary();
+
+    } catch (error) {
+        showToast('Error blocking IP', 'error');
+    }
+}
+
+async function quickBlockIP(ip) {
+    if (!confirm(`Block IP address ${ip}?`)) return;
+
+    try {
+        const response = await fetch('/api/security/blocked-ips', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ip_address: ip,
+                reason: 'Manually blocked from security dashboard',
+                duration_minutes: 60,
+                permanent: false
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to block IP');
+
+        showToast('IP blocked for 1 hour', 'success');
+        loadBlockedIPs();
+        loadThreatSummary();
+
+    } catch (error) {
+        showToast('Error blocking IP', 'error');
+    }
+}
+
+async function unblockIP(ip) {
+    if (!confirm(`Unblock IP address ${ip}?`)) return;
+
+    try {
+        const response = await fetch(`/api/security/blocked-ips/${encodeURIComponent(ip)}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to unblock IP');
+
+        showToast('IP unblocked', 'success');
+        loadBlockedIPs();
+        loadThreatSummary();
+
+    } catch (error) {
+        showToast('Error unblocking IP', 'error');
+    }
+}
+
+function exportEvents() {
+    openModal('export-modal');
+}
+
+async function downloadExport() {
+    const hours = document.getElementById('export-hours').value;
+    const format = document.getElementById('export-format').value;
+
+    window.location.href = `/api/security/export/download?hours=${hours}&format=${format}`;
+    closeModal('export-modal');
+}
+
+// Utility functions
+function formatEventType(type) {
+    return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatStatus(status) {
+    return status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatDateTime(isoString) {
+    if (!isoString) return '-';
+    return new Date(isoString).toLocaleString();
+}
+
+function openModal(id) {
+    document.getElementById(id).classList.add('active');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+</script>
+{% endblock %}

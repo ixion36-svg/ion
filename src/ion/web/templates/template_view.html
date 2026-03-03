@@ -1,0 +1,598 @@
+{% extends "base.html" %}
+
+{% block title %}Template - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 id="template-name">Loading...</h1>
+    <div class="header-actions">
+        <a href="/templates/{{ template_id }}/render" class="btn btn-primary">Render</a>
+        <a href="/templates/{{ template_id }}/edit" class="btn">Edit</a>
+    </div>
+</div>
+
+<div class="template-details">
+    <div class="meta-bar">
+        <span class="badge" id="template-format">-</span>
+        <span id="template-doctype-badge" style="display:none"></span>
+        <span class="badge badge-version" id="template-version">v1</span>
+        <span id="template-updated">Updated: -</span>
+    </div>
+
+    <div id="template-tags" class="tags-container"></div>
+
+    <div class="content-tabs">
+        <button type="button" class="content-tab-btn active" data-view="content">Content</button>
+        <button type="button" class="content-tab-btn" data-view="variables">Variables</button>
+        <button type="button" class="content-tab-btn" data-view="versions">Version History</button>
+    </div>
+
+    <!-- Content View -->
+    <div id="content-view" class="tab-content">
+        <div class="section">
+            <h3>Description</h3>
+            <p id="template-description" class="description">-</p>
+        </div>
+        <!-- Section cards view (shown when template has sections) -->
+        <div id="sections-view" class="section" style="display:none;">
+            <h3>Sections <span class="badge" id="section-count-badge">0</span></h3>
+            <div id="section-cards-container"></div>
+        </div>
+        <!-- Raw content view (shown for legacy templates) -->
+        <div id="raw-content-view" class="section">
+            <h3>Template Content</h3>
+            <pre id="template-content" class="code-block">Loading...</pre>
+        </div>
+    </div>
+
+    <!-- Variables View -->
+    <div id="variables-view" class="tab-content" style="display: none;">
+        <div id="template-variables" class="variables-list">
+            <p class="loading">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Versions View -->
+    <div id="versions-view" class="tab-content" style="display: none;">
+        <div id="versions-list" class="versions-list">
+            <p class="loading">Loading versions...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Version Preview Modal -->
+<div id="version-modal" class="modal" style="display: none;">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2 id="version-modal-title">Version Preview</h2>
+            <button class="modal-close" onclick="closeVersionModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="version-meta" class="meta-bar"></div>
+            <div class="version-tabs">
+                <button type="button" class="version-tab-btn active" data-vtab="content">Content</button>
+                <button type="button" class="version-tab-btn" data-vtab="diff">Diff</button>
+            </div>
+            <div id="version-content-tab" class="version-tab-content">
+                <pre id="version-content" class="code-block"></pre>
+            </div>
+            <div id="version-diff-tab" class="version-tab-content" style="display: none;">
+                <pre id="version-diff" class="code-block diff-view"></pre>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="rollback-btn" class="btn btn-warning">Rollback to This Version</button>
+            <button class="btn" onclick="closeVersionModal()">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.doc-type-badge {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: white;
+}
+.doc-type-SOP { background: #3b82f6; }
+.doc-type-SOI { background: #14b8a6; }
+.doc-type-WI { background: #6366f1; }
+.doc-type-KB { background: #22c55e; }
+.doc-type-RUNBOOK { background: #a855f7; }
+.doc-type-IRP { background: #ef4444; }
+.doc-type-AAR { background: #f97316; }
+.doc-type-THREAT_ADVISORY { background: #eab308; color: #1a1a1a; }
+.doc-type-DETECTION_RULE { background: #06b6d4; }
+.content-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+.content-tab-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: 4px;
+}
+.content-tab-btn:hover {
+    background: var(--bg-hover);
+}
+.content-tab-btn.active {
+    background: var(--primary-color);
+    color: white;
+}
+.tab-content {
+    padding: 1rem 0;
+}
+.versions-table {
+    width: 100%;
+}
+.versions-table th, .versions-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+.versions-table tr:hover {
+    background: var(--bg-hover);
+}
+.current-version {
+    background: var(--bg-secondary);
+}
+.badge-current {
+    background: var(--success-color);
+    color: white;
+}
+.badge-checkpoint {
+    background: var(--warning-color);
+    color: black;
+}
+.version-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.version-tab-btn {
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    cursor: pointer;
+    border-radius: 4px;
+}
+.version-tab-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+.diff-view {
+    font-family: monospace;
+    white-space: pre-wrap;
+}
+.diff-view .diff-add {
+    background: #d4edda;
+    color: #155724;
+}
+.diff-view .diff-del {
+    background: #f8d7da;
+    color: #721c24;
+}
+/* Section view cards */
+.sv-card {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    background: var(--bg-secondary);
+    padding: 0.6rem 0.75rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+}
+.sv-card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+    background: var(--primary-color);
+    color: white;
+    font-weight: 700;
+    font-size: 0.55rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+.sv-card-body { flex: 1; min-width: 0; }
+.sv-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+.sv-card-type {
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+.sv-card-title {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sv-card-details {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.sv-card-details code {
+    font-size: 0.7rem;
+    background: var(--bg-primary);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+}
+.sv-var-badge {
+    font-size: 0.65rem;
+    background: var(--primary-color);
+    color: white;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-family: monospace;
+}
+</style>
+<script>
+{% raw %}
+const templateId = {% endraw %}{{ template_id }}{% raw %};
+let currentTemplate = null;
+let currentVersion = 1;
+let previewVersionNumber = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadTemplate();
+    setupTabs();
+});
+
+async function loadTemplate() {
+    try {
+        currentTemplate = await api.get('/api/templates/' + templateId);
+
+        document.getElementById('template-name').textContent = currentTemplate.name;
+        document.getElementById('template-format').textContent = currentTemplate.format;
+        const dtBadge = document.getElementById('template-doctype-badge');
+        if (currentTemplate.document_type) {
+            dtBadge.textContent = currentTemplate.document_type;
+            dtBadge.className = 'doc-type-badge doc-type-' + currentTemplate.document_type;
+            dtBadge.style.display = '';
+        }
+        document.getElementById('template-version').textContent = 'v' + currentTemplate.current_version;
+        currentVersion = currentTemplate.current_version;
+        document.getElementById('template-updated').textContent = 'Updated: ' + formatDate(currentTemplate.updated_at);
+        document.getElementById('template-description').textContent = currentTemplate.description || 'No description';
+
+        // Show sections or raw content
+        if (currentTemplate.has_sections && currentTemplate.sections) {
+            document.getElementById('sections-view').style.display = 'block';
+            document.getElementById('raw-content-view').style.display = 'none';
+            document.getElementById('section-count-badge').textContent = currentTemplate.sections.length;
+            renderSectionCards(currentTemplate.sections);
+        } else {
+            document.getElementById('sections-view').style.display = 'none';
+            document.getElementById('raw-content-view').style.display = 'block';
+            document.getElementById('template-content').textContent = currentTemplate.content || '(empty)';
+        }
+
+        // Tags
+        const tagsContainer = document.getElementById('template-tags');
+        if (currentTemplate.tags.length > 0) {
+            tagsContainer.innerHTML = currentTemplate.tags.map(t => '<span class="tag">' + escapeHtml(t) + '</span>').join('');
+        } else {
+            tagsContainer.innerHTML = '<span class="muted">No tags</span>';
+        }
+
+        // Load variables
+        await loadVariables();
+
+    } catch (e) {
+        showToast('Failed to load template', 'error');
+    }
+}
+
+async function loadVariables() {
+    const varsContainer = document.getElementById('template-variables');
+    try {
+        const varsData = await api.get('/api/templates/' + templateId + '/variables');
+
+        if (varsData.extracted.length === 0) {
+            varsContainer.innerHTML = '<p class="muted">No variables detected</p>';
+        } else {
+            let tableHtml = '<table class="table"><thead><tr><th>Variable</th><th>Type</th><th>Status</th></tr></thead><tbody>';
+            varsData.extracted.forEach(v => {
+                const defined = varsData.defined.find(d => d.name === v);
+                tableHtml += '<tr><td><code>{{ ' + v + ' }}</code></td>';
+                if (defined) {
+                    tableHtml += '<td>' + defined.var_type + '</td>';
+                    tableHtml += '<td><span class="badge badge-success">Defined</span></td>';
+                } else {
+                    tableHtml += '<td>-</td>';
+                    tableHtml += '<td><span class="muted">Not defined</span></td>';
+                }
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</tbody></table>';
+            varsContainer.innerHTML = tableHtml;
+        }
+    } catch (e) {
+        varsContainer.innerHTML = '<p class="error">Failed to load variables</p>';
+    }
+}
+
+async function loadVersions() {
+    const container = document.getElementById('versions-list');
+    container.innerHTML = '<p class="loading">Loading versions...</p>';
+
+    try {
+        const versions = await api.get('/api/templates/' + templateId + '/versions');
+
+        if (versions.length === 0) {
+            container.innerHTML = '<p class="empty-state">No version history available</p>';
+            return;
+        }
+
+        let html = '<table class="table versions-table">';
+        html += '<thead><tr><th>Version</th><th>Message</th><th>Author</th><th>Date</th><th>Actions</th></tr></thead>';
+        html += '<tbody>';
+        versions.forEach(function(v) {
+            const isCurrent = v.version_number === currentVersion;
+            html += '<tr' + (isCurrent ? ' class="current-version"' : '') + '>';
+            html += '<td>v' + v.version_number;
+            if (isCurrent) html += ' <span class="badge badge-current">Current</span>';
+            if (v.is_checkpoint) html += ' <span class="badge badge-checkpoint">' + escapeHtml(v.checkpoint_name) + '</span>';
+            html += '</td>';
+            html += '<td>' + escapeHtml(v.message || '-') + '</td>';
+            html += '<td>' + escapeHtml(v.author || '-') + '</td>';
+            html += '<td>' + formatDate(v.created_at) + '</td>';
+            html += '<td>';
+            html += '<button class="btn btn-sm" onclick="previewVersion(' + v.version_number + ')">View</button>';
+            if (!isCurrent) {
+                html += ' <button class="btn btn-sm btn-warning" onclick="confirmRollback(' + v.version_number + ')">Rollback</button>';
+            }
+            html += '</td>';
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<p class="error">Failed to load versions</p>';
+    }
+}
+
+function setupTabs() {
+    document.querySelectorAll('.content-tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const view = this.getAttribute('data-view');
+            switchTab(view);
+        });
+    });
+}
+
+function switchTab(view) {
+    document.querySelectorAll('.content-tab-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+    });
+    document.querySelector('.content-tab-btn[data-view="' + view + '"]').classList.add('active');
+
+    document.getElementById('content-view').style.display = view === 'content' ? 'block' : 'none';
+    document.getElementById('variables-view').style.display = view === 'variables' ? 'block' : 'none';
+    document.getElementById('versions-view').style.display = view === 'versions' ? 'block' : 'none';
+
+    if (view === 'versions') {
+        loadVersions();
+    }
+}
+
+async function previewVersion(versionNumber) {
+    try {
+        const version = await api.get('/api/templates/' + templateId + '/versions/' + versionNumber);
+        previewVersionNumber = versionNumber;
+
+        document.getElementById('version-modal-title').textContent = 'Version ' + versionNumber + ' Preview';
+
+        let metaHtml = '';
+        if (version.message) {
+            metaHtml += '<span><strong>Message:</strong> ' + escapeHtml(version.message) + '</span>';
+        }
+        if (version.author) {
+            metaHtml += '<span><strong>Author:</strong> ' + escapeHtml(version.author) + '</span>';
+        }
+        if (version.is_checkpoint) {
+            metaHtml += '<span class="badge badge-checkpoint">' + escapeHtml(version.checkpoint_name) + '</span>';
+        }
+        metaHtml += '<span><strong>Date:</strong> ' + formatDate(version.created_at) + '</span>';
+        document.getElementById('version-meta').innerHTML = metaHtml;
+
+        document.getElementById('version-content').textContent = version.content;
+
+        // Format diff if available
+        if (version.diff) {
+            document.getElementById('version-diff').innerHTML = formatDiff(version.diff);
+        } else {
+            document.getElementById('version-diff').textContent = '(No diff available for this version)';
+        }
+
+        // Show/hide rollback button
+        document.getElementById('rollback-btn').style.display =
+            versionNumber === currentVersion ? 'none' : 'inline-block';
+
+        // Reset to content tab
+        switchVersionTab('content');
+
+        document.getElementById('version-modal').style.display = 'flex';
+    } catch (e) {
+        showToast('Failed to load version', 'error');
+    }
+}
+
+function formatDiff(diff) {
+    if (!diff) return '';
+    return escapeHtml(diff)
+        .split('\n')
+        .map(line => {
+            if (line.startsWith('+') && !line.startsWith('+++')) {
+                return '<span class="diff-add">' + line + '</span>';
+            } else if (line.startsWith('-') && !line.startsWith('---')) {
+                return '<span class="diff-del">' + line + '</span>';
+            }
+            return line;
+        })
+        .join('\n');
+}
+
+function switchVersionTab(tab) {
+    document.querySelectorAll('.version-tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector('.version-tab-btn[data-vtab="' + tab + '"]').classList.add('active');
+
+    document.getElementById('version-content-tab').style.display = tab === 'content' ? 'block' : 'none';
+    document.getElementById('version-diff-tab').style.display = tab === 'diff' ? 'block' : 'none';
+}
+
+document.querySelectorAll('.version-tab-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        switchVersionTab(this.getAttribute('data-vtab'));
+    });
+});
+
+function closeVersionModal() {
+    document.getElementById('version-modal').style.display = 'none';
+}
+
+function confirmRollback(versionNumber) {
+    if (!confirm('Rollback to version ' + versionNumber + '? This will create a new version with the old content.')) {
+        return;
+    }
+    rollbackToVersion(versionNumber);
+}
+
+async function rollbackToVersion(versionNumber) {
+    try {
+        await api.post('/api/templates/' + templateId + '/rollback/' + versionNumber);
+        showToast('Template rolled back to version ' + versionNumber, 'success');
+        closeVersionModal();
+        await loadTemplate();
+        loadVersions();
+    } catch (e) {
+        showToast('Failed to rollback template', 'error');
+    }
+}
+
+document.getElementById('rollback-btn').addEventListener('click', function() {
+    if (previewVersionNumber !== null) {
+        confirmRollback(previewVersionNumber);
+    }
+});
+
+document.getElementById('version-modal').addEventListener('click', function(e) {
+    if (e.target.id === 'version-modal') closeVersionModal();
+});
+
+// Section type labels and icons (subset for display)
+const sectionMeta = {
+    heading: { icon: 'H', label: 'Heading' },
+    text: { icon: 'T', label: 'Text' },
+    table: { icon: 'TBL', label: 'Table' },
+    list: { icon: 'LI', label: 'List' },
+    key_value: { icon: 'KV', label: 'Key-Value' },
+    divider: { icon: '---', label: 'Divider' },
+    metadata_block: { icon: 'META', label: 'Metadata' },
+    signature_block: { icon: 'SIG', label: 'Signatures' },
+    image_placeholder: { icon: 'IMG', label: 'Image' },
+    severity_badge: { icon: 'SEV', label: 'Severity Badge' },
+    ioc_table: { icon: 'IOC', label: 'IOC Table' },
+    timeline: { icon: 'TIME', label: 'Timeline' },
+    mitre_table: { icon: 'ATT', label: 'MITRE ATT&CK' },
+    checklist: { icon: 'CHK', label: 'Checklist' },
+    evidence_block: { icon: 'EVD', label: 'Evidence' },
+};
+
+function renderSectionCards(sections) {
+    const container = document.getElementById('section-cards-container');
+    container.innerHTML = '';
+    sections.forEach(function(s) {
+        const meta = sectionMeta[s.type] || { icon: '?', label: s.type };
+        const c = s.config || {};
+        const card = document.createElement('div');
+        card.className = 'sv-card';
+
+        let title = '';
+        let details = '';
+        switch (s.type) {
+            case 'heading':
+                title = c.text || '';
+                details = 'Level: H' + (c.level || 2);
+                break;
+            case 'text':
+                if (c.variable) {
+                    title = '';
+                    details = '<span class="sv-var-badge">{{ ' + escapeHtml(c.variable_name || '') + ' }}</span>';
+                } else {
+                    title = (c.content || '').substring(0, 80);
+                }
+                break;
+            case 'table':
+                title = (c.columns || []).map(function(col) { return col.name; }).join(', ');
+                if (c.variable) details = '<span class="sv-var-badge">{{ ' + escapeHtml(c.variable_name || '') + ' }}</span>';
+                break;
+            case 'list':
+                title = (c.ordered ? 'Ordered' : 'Unordered') + ' - ' + (c.items || []).length + ' items';
+                if (c.variable) details = '<span class="sv-var-badge">{{ ' + escapeHtml(c.variable_name || '') + ' }}</span>';
+                break;
+            case 'key_value':
+                title = (c.pairs || []).length + ' pairs';
+                if (c.variable) details = '<span class="sv-var-badge">{{ ' + escapeHtml(c.variable_name || '') + ' }}</span>';
+                break;
+            case 'divider':
+                title = 'Horizontal Rule';
+                break;
+            case 'metadata_block':
+                title = (c.fields || []).map(function(f) { return f.label; }).join(', ');
+                break;
+            case 'signature_block':
+                title = (c.roles || []).map(function(r) { return r.role_name; }).join(', ');
+                break;
+            case 'image_placeholder':
+                title = c.caption || '';
+                details = '<code>{{ ' + escapeHtml(c.variable_name || '') + ' }}</code>';
+                break;
+            case 'severity_badge':
+            case 'ioc_table':
+            case 'timeline':
+            case 'mitre_table':
+                details = '<span class="sv-var-badge">{{ ' + escapeHtml(c.variable_name || '') + ' }}</span>';
+                break;
+            case 'checklist':
+                title = (c.items || []).length + ' items';
+                break;
+            case 'evidence_block':
+                title = c.source || '';
+                details = '<code>{{ ' + escapeHtml(c.chain_of_custody_var || 'chain_of_custody') + ' }}</code>';
+                break;
+        }
+
+        card.innerHTML =
+            '<div class="sv-card-icon">' + escapeHtml(meta.icon) + '</div>' +
+            '<div class="sv-card-body">' +
+                '<div class="sv-card-header">' +
+                    '<span class="sv-card-type">' + escapeHtml(meta.label) + '</span>' +
+                    (title ? '<span class="sv-card-title">' + escapeHtml(title) + '</span>' : '') +
+                '</div>' +
+                (details ? '<div class="sv-card-details">' + details + '</div>' : '') +
+            '</div>';
+        container.appendChild(card);
+    });
+}
+{% endraw %}
+</script>
+{% endblock %}

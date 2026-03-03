@@ -1,0 +1,61 @@
+# ION Full Integration Test Stack
+# ION + Elasticsearch + Kibana on the same network
+
+version: '3.8'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.0
+    container_name: elasticsearch-test
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - ELASTIC_PASSWORD=DocforgeTest123!
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:DocforgeTest123! http://localhost:9200/_cluster/health | grep -q 'green\\|yellow'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.3.0
+    container_name: kibana-test
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=DocforgeTest123!
+      - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=a7f3c9e1b5d2f8a4c6e0b3d7f9a1c5e2
+      - XPACK_SECURITY_ENCRYPTIONKEY=b8g4d0f2c6e3g9b5d7f1c4e8g0b2d6f3
+      - XPACK_REPORTING_ENCRYPTIONKEY=c9h5e1g3d7f4h0c6e8g2d5f9h1c3e7g4
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  ion:
+    build: .
+    image: ion:latest
+    container_name: ion
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ion-data:/data
+    env_file:
+      - .env
+    tmpfs:
+      - /tmp
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+volumes:
+  es-data:
+  ion-data:

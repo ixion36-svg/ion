@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ixion"
+name = "ion"
 version = "0.5.0"
-description = "Intelligence eXchange & Integration Operations Network - Security Operations Portal for Guarded Glass"
+description = "Intelligent Operating Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -43,14 +43,14 @@ dev = [
 ]
 
 [project.scripts]
-ixion = "ixion.cli.main:app"
-ixion-web = "ixion.web.server:main"
+ion = "ion.cli.main:app"
+ion-web = "ion.web.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-ixion = ["web/static/**/*", "web/templates/**/*"]
+ion = ["web/static/**/*", "web/templates/**/*"]
 
 [tool.ruff]
 line-length = 100

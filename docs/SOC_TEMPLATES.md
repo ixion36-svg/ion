@@ -2,13 +2,13 @@
 
 > **Version:** 0.6.0
 > **Date:** 2026-02-11
-> **Module:** `ixion.services.soc_template_service`
+> **Module:** `ion.services.soc_template_service`
 
 ---
 
 ## Overview
 
-IXION ships with **19 pre-built SOC documentation templates** covering all major operational document types used in Security Operations Centers. Templates are Jinja2-based, fully renderable with custom variables, and tagged with industry compliance frameworks.
+ION ships with **19 pre-built SOC documentation templates** covering all major operational document types used in Security Operations Centers. Templates are Jinja2-based, fully renderable with custom variables, and tagged with industry compliance frameworks.
 
 All templates are **auto-seeded on first startup** (idempotent) and organized into **9 collections** by document type.
 
@@ -287,7 +287,7 @@ Content-Type: application/json
 
 ## Seeding Behavior
 
-The `seed_soc_templates()` function runs automatically on IXION startup:
+The `seed_soc_templates()` function runs automatically on ION startup:
 
 1. **Idempotent**: Checks each collection and template by name before creating
 2. **Order**: Runs after `seed_default_playbooks()` in the startup sequence
@@ -300,7 +300,7 @@ The `seed_soc_templates()` function runs automatically on IXION startup:
 If templates need to be re-seeded (e.g., after database reset):
 
 ```python
-from ixion.services.soc_template_service import seed_soc_templates
+from ion.services.soc_template_service import seed_soc_templates
 seed_soc_templates()
 ```
 
@@ -348,4 +348,4 @@ Add a new entry to `TEMPLATE_DEFS` in `soc_template_service.py` following the ex
 }
 ```
 
-Restart IXION and the new template will be seeded automatically.
+Restart ION and the new template will be seeded automatically.

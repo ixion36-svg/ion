@@ -2,7 +2,7 @@
 Seed realistic threat intelligence alerts into Elasticsearch.
 
 Populates both:
-  - alerts-ixion       (ECS format, parsed by IXION's _parse_alert())
+  - alerts-ion       (ECS format, parsed by ION's _parse_alert())
   - .alerts-security.alerts-default  (Elastic Security format, visible in Kibana Security UI)
 
 Uses real-world threat actor names, known-bad IPs, MITRE ATT&CK techniques,
@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 
 ES_URL = "http://127.0.0.1:9200"
 AUTH = ("elastic", "DocforgeTest2025")
-IXION_INDEX = "alerts-ixion"
+ION_INDEX = "alerts-ion"
 SECURITY_INDEX = ".alerts-security.alerts-default"
 
 # ---------------------------------------------------------------------------
@@ -619,8 +619,8 @@ PROCS = ["procdump64.exe", "rundll32.exe", "cmd.exe", "powershell.exe", "svchost
 STATUSES = ["open", "open", "open", "open", "acknowledged", "acknowledged", "resolved"]
 
 
-def _build_ixion_alert(alert_def, now):
-    """Build an ECS-format alert for the alerts-ixion index."""
+def _build_ion_alert(alert_def, now):
+    """Build an ECS-format alert for the alerts-ion index."""
     (rule_name, severity, risk_score, msg_tpl, tags,
      tech_id, tech_name, tactic, evt_cat, evt_action,
      threat_actor, src_ip) = alert_def
@@ -716,7 +716,7 @@ def _build_security_alert(alert_def, now):
         "kibana.alert.rule.consumer": "siem",
         "kibana.alert.rule.producer": "siem",
         "kibana.alert.rule.rule_type_id": "siem.queryRule",
-        "kibana.alert.rule.tags": ["ixion", tactic, threat_actor],
+        "kibana.alert.rule.tags": ["ion", tactic, threat_actor],
         "kibana.alert.severity": severity,
         "kibana.alert.risk_score": risk_score,
         "kibana.alert.workflow_status": random.choice(["open", "open", "open", "acknowledged"]),
@@ -745,7 +745,7 @@ def _build_security_alert(alert_def, now):
         "threat.technique.id": [tech_id],
         "threat.technique.name": [tech_name],
         "message": msg,
-        "tags": ["ixion", "threat-intel"] + tags,
+        "tags": ["ion", "threat-intel"] + tags,
     }
 
 
@@ -753,7 +753,7 @@ def _build_security_alert(alert_def, now):
 # Index management
 # ---------------------------------------------------------------------------
 
-IXION_MAPPING = {
+ION_MAPPING = {
     "mappings": {
         "properties": {
             "@timestamp": {"type": "date"},
@@ -796,16 +796,16 @@ IXION_MAPPING = {
 }
 
 
-def ensure_ixion_index(session):
-    """Delete and recreate the alerts-ixion index with proper mapping."""
+def ensure_ion_index(session):
+    """Delete and recreate the alerts-ion index with proper mapping."""
     try:
-        r = session.delete(f"{ES_URL}/{IXION_INDEX}", timeout=10)
-        print(f"  Deleted existing {IXION_INDEX}: {r.status_code}")
+        r = session.delete(f"{ES_URL}/{ION_INDEX}", timeout=10)
+        print(f"  Deleted existing {ION_INDEX}: {r.status_code}")
     except Exception:
         pass
 
-    r = session.put(f"{ES_URL}/{IXION_INDEX}", json=IXION_MAPPING, timeout=10)
-    print(f"  Created {IXION_INDEX}: {r.status_code}")
+    r = session.put(f"{ES_URL}/{ION_INDEX}", json=ION_MAPPING, timeout=10)
+    print(f"  Created {ION_INDEX}: {r.status_code}")
 
 
 # ---------------------------------------------------------------------------
@@ -826,21 +826,21 @@ def main():
     health = r.json()
     print(f"  Cluster: {health['cluster_name']}, status: {health['status']}, nodes: {health['number_of_nodes']}")
 
-    # Recreate IXION index
-    print(f"\nSetting up {IXION_INDEX} index...")
-    ensure_ixion_index(session)
+    # Recreate ION index
+    print(f"\nSetting up {ION_INDEX} index...")
+    ensure_ion_index(session)
 
-    # --- Build alerts-ixion bulk body ---
-    print(f"\nGenerating {len(ALERT_DEFS)} alerts for {IXION_INDEX}...")
-    ixion_bulk = ""
+    # --- Build alerts-ion bulk body ---
+    print(f"\nGenerating {len(ALERT_DEFS)} alerts for {ION_INDEX}...")
+    ion_bulk = ""
     for alert_def in ALERT_DEFS:
-        doc = _build_ixion_alert(alert_def, now)
-        ixion_bulk += json.dumps({"index": {"_index": IXION_INDEX}}) + "\n"
-        ixion_bulk += json.dumps(doc) + "\n"
+        doc = _build_ion_alert(alert_def, now)
+        ion_bulk += json.dumps({"index": {"_index": ION_INDEX}}) + "\n"
+        ion_bulk += json.dumps(doc) + "\n"
 
     r = session.post(
         f"{ES_URL}/_bulk",
-        data=ixion_bulk,
+        data=ion_bulk,
         headers={"Content-Type": "application/x-ndjson"},
         timeout=30,
     )
@@ -881,7 +881,7 @@ def main():
                 print(f"    ERROR: {err.get('type')}: {err.get('reason', '')[:120]}")
 
     # Refresh both indices
-    for idx in [IXION_INDEX, SECURITY_INDEX]:
+    for idx in [ION_INDEX, SECURITY_INDEX]:
         r = session.post(f"{ES_URL}/{idx}/_refresh", timeout=10)
         count = session.get(f"{ES_URL}/{idx}/_count", timeout=10).json().get("count", 0)
         print(f"\n  {idx}: {count} alerts (refresh: {r.status_code})")
@@ -890,7 +890,7 @@ def main():
     print("\n" + "=" * 70)
     print("SEED COMPLETE")
     print("=" * 70)
-    print(f"  IXION index ({IXION_INDEX}):    {len(ALERT_DEFS)} alerts")
+    print(f"  ION index ({ION_INDEX}):    {len(ALERT_DEFS)} alerts")
     print(f"  Security index ({SECURITY_INDEX}): {len(ALERT_DEFS)} alerts")
     print(f"  Total: {len(ALERT_DEFS) * 2} alert documents")
     print()
@@ -907,9 +907,9 @@ def main():
         print(f"  - {t}: {count} alerts")
     print()
     print("Verify at:")
-    print("  IXION:   http://127.0.0.1:8000")
+    print("  ION:   http://127.0.0.1:8000")
     print("  Kibana:  http://127.0.0.1:5601 > Security > Alerts")
-    print("  ES API:  curl -u elastic:DocforgeTest123! http://127.0.0.1:9200/alerts-ixion/_count")
+    print("  ES API:  curl -u elastic:DocforgeTest123! http://127.0.0.1:9200/alerts-ion/_count")
 
 
 if __name__ == "__main__":

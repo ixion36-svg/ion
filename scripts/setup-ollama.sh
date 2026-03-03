@@ -1,8 +1,8 @@
 #!/bin/bash
 # =============================================================================
-# IXION - Ollama Model Setup Script
+# ION - Ollama Model Setup Script
 # =============================================================================
-# This script pulls the recommended models for IXION's AI assistant
+# This script pulls the recommended models for ION's AI assistant
 # Run this after starting the Docker containers
 # =============================================================================
 
@@ -19,7 +19,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo "=============================================="
-echo "IXION - Ollama Model Setup"
+echo "ION - Ollama Model Setup"
 echo "=============================================="
 echo ""
 
@@ -106,5 +106,5 @@ curl -s "${OLLAMA_URL}/api/tags" | grep -o '"name":"[^"]*"' | cut -d'"' -f4 | wh
     echo "  - $model"
 done
 echo ""
-echo "To use a different model, update IXION_OLLAMA_MODEL in your .env file"
+echo "To use a different model, update ION_OLLAMA_MODEL in your .env file"
 echo ""

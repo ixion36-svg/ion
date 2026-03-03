@@ -1,5 +1,5 @@
 """
-Seed Blue Team Knowledge Base articles into IXION.
+Seed Blue Team Knowledge Base articles into ION.
 
 Creates ~100 tactical blue team articles organized into 6 collections under
 the existing 'Knowledge Base' parent collection. Articles cover threat hunting
@@ -7,7 +7,7 @@ playbooks, alert investigation procedures, blue team tooling, active defense
 and hardening, log analysis deep dives, and SOC analyst tradecraft.
 
 Usage:
-    cd C:\\Users\\Tomo\\ixion
+    cd C:\\Users\\Tomo\\ion
     C:\\Python314\\python.exe seed_knowledge_base_blueteam.py
 """
 import os
@@ -16,14 +16,14 @@ import sys
 import time
 from io import BytesIO
 
-BASE = os.environ.get("IXION_SEED_URL", "http://127.0.0.1:8000")
+BASE = os.environ.get("ION_SEED_URL", "http://127.0.0.1:8000")
 SESSION = requests.Session()
 
 
 def login():
     r = SESSION.post(
         f"{BASE}/api/auth/login",
-        json={"username": "admin", "password": os.environ.get("IXION_ADMIN_PASSWORD", "admin2025")},
+        json={"username": "admin", "password": os.environ.get("ION_ADMIN_PASSWORD", "admin2025")},
     )
     r.raise_for_status()
     print("[+] Logged in as admin")
@@ -3396,7 +3396,7 @@ JA4 format example: `t13d1516h2_8daaf6152771_b186095e22b6`
 
 
 """
-IXION Knowledge Base - Alert Investigation Playbooks
+ION Knowledge Base - Alert Investigation Playbooks
 16 detailed tactical playbook articles for SOC analyst alert triage and investigation.
 Each article includes triage checklists, pivot queries (KQL/SPL), enrichment steps,
 escalation criteria, documentation templates, and MITRE ATT&CK references.
@@ -23425,7 +23425,7 @@ COLLECTIONS = [
 
 def main():
     print("=" * 60)
-    print("IXION Blue Team Knowledge Base Seeder")
+    print("ION Blue Team Knowledge Base Seeder")
     print("=" * 60)
 
     login()

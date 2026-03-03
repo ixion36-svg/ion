@@ -2,7 +2,7 @@
 
 import pytest
 
-from docforge.diff.differ import VersionDiffer
+from ion.diff.differ import VersionDiffer
 
 
 class TestVersionDiffer:

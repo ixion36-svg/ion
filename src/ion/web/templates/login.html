@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - ION</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=0.7.0">
+    <script>
+        // Load theme and mode immediately to prevent flash
+        (function() {
+            const theme = localStorage.getItem('ion-theme') || 'cyan';
+            const mode = localStorage.getItem('ion-mode') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+            document.documentElement.setAttribute('data-mode', mode);
+        })();
+    </script>
+    <style>
+        body {
+            background: var(--bg-deep);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 0%, var(--primary-dim) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .login-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-header h1 {
+            color: var(--primary);
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+            text-shadow: var(--glow-sm);
+        }
+
+        .login-header p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-dim);
+        }
+
+        .login-btn {
+            padding: 14px;
+            background: var(--primary);
+            color: var(--bg-deep);
+            border: none;
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: box-shadow 0.2s, transform 0.1s;
+        }
+
+        .login-btn:hover {
+            box-shadow: var(--glow-md);
+        }
+
+        .login-btn:active {
+            transform: scale(0.98);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--neon-red);
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .footer-text {
+            text-align: center;
+            margin-top: 24px;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        /* OIDC Login Styles */
+        .login-divider {
+            display: flex;
+            align-items: center;
+            margin: 24px 0;
+        }
+
+        .login-divider::before,
+        .login-divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .login-divider span {
+            padding: 0 16px;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .oidc-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+
+        .oidc-btn:hover {
+            border-color: var(--border-bright);
+            box-shadow: var(--glow-sm);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>ION</h1>
+            <p>Intelligence eXchange &amp; Integration Operations Network</p>
+        </div>
+
+        <form class="login-form" id="login-form">
+            <div id="error-message" class="error-message"></div>
+
+            <div class="form-group">
+                <label for="username">Username or Email</label>
+                <input type="text" id="username" name="username" required autocomplete="username" autofocus>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
+            </div>
+
+            <button type="submit" class="login-btn" id="login-btn">Sign In</button>
+        </form>
+
+        <!-- OIDC/Keycloak Login Section (hidden by default) -->
+        <div id="oidc-login" style="display: none;">
+            <div class="login-divider">
+                <span>or</span>
+            </div>
+            <button type="button" class="login-btn oidc-btn" id="keycloak-btn" onclick="loginWithKeycloak()">
+                Login with Keycloak
+            </button>
+        </div>
+
+        <p class="footer-text">Guarded Glass Security Toolkit</p>
+    </div>
+
+    <script>
+        const form = document.getElementById('login-form');
+        const errorMessage = document.getElementById('error-message');
+        const loginBtn = document.getElementById('login-btn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Signing in...';
+            errorMessage.classList.remove('show');
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Check if user needs to change password
+                    if (data.user && data.user.must_change_password) {
+                        window.location.href = '/profile?change_password=1';
+                    } else {
+                        // Redirect to dashboard or previous page
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const redirect = urlParams.get('redirect') || '/';
+                        window.location.href = redirect;
+                    }
+                } else {
+                    errorMessage.textContent = data.detail || 'Login failed. Please try again.';
+                    errorMessage.classList.add('show');
+                }
+            } catch (error) {
+                errorMessage.textContent = 'Unable to connect to server. Please try again.';
+                errorMessage.classList.add('show');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In';
+            }
+        });
+
+        // OIDC/Keycloak configuration
+        let oidcConfig = null;
+
+        // Check for OIDC configuration on page load
+        async function checkOIDCConfig() {
+            try {
+                const response = await fetch('/api/auth/oidc/config');
+                const config = await response.json();
+
+                if (config.enabled) {
+                    oidcConfig = config;
+                    document.getElementById('oidc-login').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Failed to check OIDC config:', error);
+            }
+        }
+
+        // Initiate Keycloak login
+        function loginWithKeycloak() {
+            if (!oidcConfig) {
+                errorMessage.textContent = 'Keycloak login is not available.';
+                errorMessage.classList.add('show');
+                return;
+            }
+
+            // Use server-provided state for CSRF protection
+            // The state is also stored in an httponly cookie server-side
+            const state = oidcConfig.state;
+
+            // Build authorization URL with required parameters
+            const params = new URLSearchParams({
+                client_id: oidcConfig.client_id,
+                redirect_uri: oidcConfig.redirect_uri,
+                response_type: 'code',
+                scope: 'openid email profile',
+                state: state,
+            });
+
+            // Redirect to Keycloak
+            window.location.href = oidcConfig.authorization_url + '?' + params.toString();
+        }
+
+        // Check for error in URL (from callback redirect)
+        function checkForError() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const error = urlParams.get('error');
+            if (error) {
+                errorMessage.textContent = decodeURIComponent(error);
+                errorMessage.classList.add('show');
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+
+        // Initialize on page load
+        checkForError();
+        checkOIDCConfig();
+    </script>
+</body>
+</html>

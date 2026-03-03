@@ -2,7 +2,7 @@
 
 import pytest
 
-from docforge.extraction.pattern_detector import PatternDetector
+from ion.extraction.pattern_detector import PatternDetector
 
 
 class TestPatternDetector:

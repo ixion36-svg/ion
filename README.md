@@ -1,6 +1,6 @@
-# IXION
+# ION
 
-**Intelligence eXchange & Integration Operations Network**
+**Intelligent Operating Network**
 
 A Security Operations Center (SOC) platform with AI-powered analysis, alert triage, observable tracking, and threat intelligence integration.
 
@@ -20,7 +20,7 @@ A Security Operations Center (SOC) platform with AI-powered analysis, alert tria
 - **SOC Tools**: Client-side document processing tools for security analysts
 - **Real-time Chat**: Team collaboration with chat rooms and expandable AI chat panel
 - **Role-based Access**: Server-side enforced RBAC with 4-tier role hierarchy (analyst, lead, engineering, admin)
-- **GitLab Integration**: Issue tracking directly from IXION
+- **GitLab Integration**: Issue tracking directly from ION
 
 ---
 
@@ -28,7 +28,7 @@ A Security Operations Center (SOC) platform with AI-powered analysis, alert tria
 
 ### Architecture
 
-IXION is designed to integrate with existing infrastructure:
+ION is designed to integrate with existing infrastructure:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -42,14 +42,14 @@ IXION is designed to integrate with existing infrastructure:
 │         └────────────────┼────────────────┘                  │
 │                          │                                   │
 │                    ┌─────▼─────┐                             │
-│                    │   IXION   │◄──── Docker Image           │
-│                    │  (+ Ollama)│     (ixion:latest)         │
+│                    │   ION   │◄──── Docker Image           │
+│                    │  (+ Ollama)│     (ion:latest)         │
 │                    └───────────┘                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**The IXION Docker image only contains:**
-- IXION web application
+**The ION Docker image only contains:**
+- ION web application
 - Ollama (local AI/LLM service)
 
 **External services (deployed separately):**
@@ -62,33 +62,33 @@ IXION is designed to integrate with existing infrastructure:
 
 ```bash
 # Clone the repository
-git clone https://github.com/ixion36-svg/ixion.git
-cd ixion
+git clone https://github.com/ion36-svg/ion.git
+cd ion
 
 # Copy and configure environment
 cp .env.example .env
 # Edit .env with your integration settings (ES, OpenCTI, etc.)
 
-# Build IXION image
-docker build -t ixion:latest .
+# Build ION image
+docker build -t ion:latest .
 
-# Start IXION + Ollama
+# Start ION + Ollama
 docker-compose up -d
 
 # Pull the default AI model (first time only)
-docker exec -it ixion-ollama ollama pull qwen2.5:7b
+docker exec -it ion-ollama ollama pull qwen2.5:7b
 
 # Access at http://localhost:8000
 ```
 
-**Note:** The `docker-compose.yml` only starts IXION and Ollama. Connect to your existing Elasticsearch/OpenCTI via environment variables.
+**Note:** The `docker-compose.yml` only starts ION and Ollama. Connect to your existing Elasticsearch/OpenCTI via environment variables.
 
 ### Option 2: Local Development
 
 ```bash
 # Clone the repository
-git clone https://github.com/ixion36-svg/ixion.git
-cd ixion
+git clone https://github.com/ion36-svg/ion.git
+cd ion
 
 # Install Python dependencies
 pip install -e .
@@ -103,8 +103,8 @@ ollama pull qwen2.5:7b
 # Start Ollama service
 ollama serve
 
-# In another terminal, start IXION
-python -m uvicorn src.ixion.web.server:app --host 0.0.0.0 --port 8000
+# In another terminal, start ION
+python -m uvicorn src.ion.web.server:app --host 0.0.0.0 --port 8000
 
 # Access at http://localhost:8000
 ```
@@ -117,33 +117,33 @@ Copy `.env.example` to `.env` and configure:
 
 ```bash
 # Required
-IXION_ADMIN_PASSWORD=your-secure-password
+ION_ADMIN_PASSWORD=your-secure-password
 
 # Security (Production)
-IXION_COOKIE_SECURE=true           # Enable for HTTPS deployments
-IXION_DEBUG_MODE=false             # Disable API docs in production (default)
+ION_COOKIE_SECURE=true           # Enable for HTTPS deployments
+ION_DEBUG_MODE=false             # Disable API docs in production (default)
 
 # AI Features (Ollama)
-IXION_OLLAMA_ENABLED=true
-IXION_OLLAMA_URL=http://ollama:11434    # Docker service name
-IXION_OLLAMA_MODEL=qwen2.5:7b            # default model
+ION_OLLAMA_ENABLED=true
+ION_OLLAMA_URL=http://ollama:11434    # Docker service name
+ION_OLLAMA_MODEL=qwen2.5:7b            # default model
 
 # Elasticsearch (your existing cluster)
-IXION_ELASTICSEARCH_ENABLED=true
-IXION_ELASTICSEARCH_URL=https://your-es-cluster:9200
-IXION_ELASTICSEARCH_API_KEY=your-api-key
+ION_ELASTICSEARCH_ENABLED=true
+ION_ELASTICSEARCH_URL=https://your-es-cluster:9200
+ION_ELASTICSEARCH_API_KEY=your-api-key
 # Or use username/password:
-# IXION_ELASTICSEARCH_USERNAME=elastic
-# IXION_ELASTICSEARCH_PASSWORD=your-password
+# ION_ELASTICSEARCH_USERNAME=elastic
+# ION_ELASTICSEARCH_PASSWORD=your-password
 
 # OpenCTI (your existing instance)
-IXION_OPENCTI_ENABLED=true
-IXION_OPENCTI_URL=https://your-opencti:8080
-IXION_OPENCTI_TOKEN=your-api-token
+ION_OPENCTI_ENABLED=true
+ION_OPENCTI_URL=https://your-opencti:8080
+ION_OPENCTI_TOKEN=your-api-token
 
 # Kibana Cases Sync (optional)
-IXION_KIBANA_CASES_ENABLED=true
-IXION_KIBANA_URL=https://your-kibana:5601
+ION_KIBANA_CASES_ENABLED=true
+ION_KIBANA_URL=https://your-kibana:5601
 ```
 
 ---
@@ -151,7 +151,7 @@ IXION_KIBANA_URL=https://your-kibana:5601
 ## Default Login
 
 - **Username:** `admin`
-- **Password:** `changeme` (or value of `IXION_ADMIN_PASSWORD`)
+- **Password:** `changeme` (or value of `ION_ADMIN_PASSWORD`)
 
 **Important:** Change the admin password after first login!
 
@@ -180,7 +180,7 @@ ollama pull qwen2.5:7b
 
 ### Entity Detection
 
-IXION automatically detects SOC-relevant entities in documents:
+ION automatically detects SOC-relevant entities in documents:
 
 | Category | Entities Detected |
 |----------|-------------------|
@@ -234,41 +234,41 @@ WI/
 ## CLI Commands
 
 ### Template Commands
-- `docforge template create` - Create a new template
-- `docforge template list` - List all templates
-- `docforge template show <id>` - Show template details
-- `docforge template edit <id>` - Edit a template
-- `docforge template delete <id>` - Delete a template
-- `docforge template search <query>` - Search templates
-- `docforge template import <file>` - Import from file
-- `docforge template export <id>` - Export to file
-- `docforge template tag <id>` - Manage tags
+- `ion template create` - Create a new template
+- `ion template list` - List all templates
+- `ion template show <id>` - Show template details
+- `ion template edit <id>` - Edit a template
+- `ion template delete <id>` - Delete a template
+- `ion template search <query>` - Search templates
+- `ion template import <file>` - Import from file
+- `ion template export <id>` - Export to file
+- `ion template tag <id>` - Manage tags
 
 ### Version Commands
-- `docforge version list <id>` - List versions
-- `docforge version show <id> <version>` - Show version details
-- `docforge version checkpoint <id>` - Create checkpoint
-- `docforge version diff <id> <from> <to>` - Show diff
-- `docforge version rollback <id> <to>` - Rollback to version
-- `docforge version prune <id>` - Delete old versions
+- `ion version list <id>` - List versions
+- `ion version show <id> <version>` - Show version details
+- `ion version checkpoint <id>` - Create checkpoint
+- `ion version diff <id> <from> <to>` - Show diff
+- `ion version rollback <id> <to>` - Rollback to version
+- `ion version prune <id>` - Delete old versions
 
 ### Render Commands
-- `docforge render preview <id>` - Preview rendered template
-- `docforge render run <id>` - Render and save
-- `docforge render variables <id>` - Show template variables
-- `docforge render validate <id>` - Validate template syntax
+- `ion render preview <id>` - Preview rendered template
+- `ion render run <id>` - Render and save
+- `ion render variables <id>` - Show template variables
+- `ion render validate <id>` - Validate template syntax
 
 ### Extract Commands
-- `docforge extract analyze <file>` - Analyze document patterns
-- `docforge extract generate <file>` - Generate template
-- `docforge extract schema <file>` - Generate JSON schema
+- `ion extract analyze <file>` - Analyze document patterns
+- `ion extract generate <file>` - Generate template
+- `ion extract schema <file>` - Generate JSON schema
 
 ### Document Commands
-- `docforge document list` - List rendered documents
-- `docforge document show <id>` - Show document details
-- `docforge document regenerate <id>` - Regenerate document
-- `docforge document delete <id>` - Delete document
-- `docforge document export <id>` - Export document
+- `ion document list` - List rendered documents
+- `ion document show <id>` - Show document details
+- `ion document regenerate <id>` - Regenerate document
+- `ion document delete <id>` - Delete document
+- `ion document export <id>` - Export document
 
 ## Template Syntax
 
@@ -312,14 +312,14 @@ Jane,jane@example.com,Marketing
 ### What's Included
 
 The `docker-compose.yml` deploys:
-- **ixion** - IXION web application (port 8000)
+- **ion** - ION web application (port 8000)
 - **ollama** - Local LLM service for AI features (internal only)
 
 ### Resource Requirements
 
 | Service | CPU | Memory | Storage |
 |---------|-----|--------|---------|
-| IXION | 0.5-2 cores | 256MB-1GB | ~100MB |
+| ION | 0.5-2 cores | 256MB-1GB | ~100MB |
 | Ollama | 1-4 cores | 2-8GB | ~5GB (per model) |
 
 ### Air-Gapped Deployment
@@ -421,19 +421,19 @@ See [DEPLOYMENT_GUIDE.md](deploy/DEPLOYMENT_GUIDE.md) for detailed instructions 
 
 ## OpenCTI Integration
 
-IXION integrates with [OpenCTI](https://www.opencti.io/) to enrich alert observables with threat intelligence. When investigating an alert, analysts can click "Enrich via OpenCTI" to look up IPs, domains, hashes, and URLs against the OpenCTI platform and see matching indicators, threat actors, and threat scores inline.
+ION integrates with [OpenCTI](https://www.opencti.io/) to enrich alert observables with threat intelligence. When investigating an alert, analysts can click "Enrich via OpenCTI" to look up IPs, domains, hashes, and URLs against the OpenCTI platform and see matching indicators, threat actors, and threat scores inline.
 
 ### Configuration
 
 ```bash
 # Environment variables
-IXION_OPENCTI_ENABLED=true
-IXION_OPENCTI_URL=https://opencti.example.com
-IXION_OPENCTI_TOKEN=your-api-token-uuid
-IXION_OPENCTI_VERIFY_SSL=true
+ION_OPENCTI_ENABLED=true
+ION_OPENCTI_URL=https://opencti.example.com
+ION_OPENCTI_TOKEN=your-api-token-uuid
+ION_OPENCTI_VERIFY_SSL=true
 ```
 
-Or in `.ixion/config.json`:
+Or in `.ion/config.json`:
 ```json
 {
     "opencti_enabled": true,
@@ -457,7 +457,7 @@ See [OPENCTI_INTEGRATION.md](deploy/OPENCTI_INTEGRATION.md) for full setup detai
 
 ## GitLab Integration
 
-IXION integrates with GitLab to manage issues directly from the UI.
+ION integrates with GitLab to manage issues directly from the UI.
 
 ### Configuration
 
@@ -465,13 +465,13 @@ Configure GitLab via the web UI (Settings → Integrations) or environment varia
 
 ```bash
 # Environment variables
-IXION_GITLAB_ENABLED=true
-IXION_GITLAB_URL=https://gitlab.example.com
-IXION_GITLAB_TOKEN=glpat-xxxxxxxxxxxx
-IXION_GITLAB_PROJECT_ID=group/project
+ION_GITLAB_ENABLED=true
+ION_GITLAB_URL=https://gitlab.example.com
+ION_GITLAB_TOKEN=glpat-xxxxxxxxxxxx
+ION_GITLAB_PROJECT_ID=group/project
 ```
 
-Or in `.ixion/config.json`:
+Or in `.ion/config.json`:
 ```json
 {
     "gitlab_enabled": true,
@@ -486,7 +486,7 @@ Or in `.ixion/config.json`:
 Create a Personal Access Token with the `api` scope:
 1. Go to GitLab > User Settings > Access Tokens
 2. Create a token with the `api` scope
-3. Copy the token and configure in IXION
+3. Copy the token and configure in ION
 
 ### Features
 
@@ -498,7 +498,7 @@ Create a Personal Access Token with the `api` scope:
 
 ## Alert Investigation
 
-IXION includes a built-in alert investigation page (`/alerts`) that connects to Elasticsearch to provide SOC analysts with triage, case management, and analytics capabilities.
+ION includes a built-in alert investigation page (`/alerts`) that connects to Elasticsearch to provide SOC analysts with triage, case management, and analytics capabilities.
 
 ### Triage & Observables
 
@@ -640,7 +640,7 @@ Step-based investigation workflows that guide analysts through alert triage.
 
 ## Multi-Alert Pattern Detection
 
-IXION automatically detects attack patterns when multiple alerts accumulate on the same host or user, recommending (or auto-starting) the appropriate investigation playbook.
+ION automatically detects attack patterns when multiple alerts accumulate on the same host or user, recommending (or auto-starting) the appropriate investigation playbook.
 
 ### How It Works
 
@@ -722,7 +722,7 @@ The Tools page (`/tools`) provides a suite of client-side document processing ut
 
 ```bash
 pytest tests/ -v
-pytest tests/ --cov=docforge --cov-report=term-missing
+pytest tests/ --cov=ion --cov-report=term-missing
 ```
 
 ## Dependencies

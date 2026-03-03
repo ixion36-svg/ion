@@ -1,6 +1,6 @@
 {
   "policy": {
-    "description": "DocForge log retention policy",
+    "description": "ION log retention policy",
     "phases": {
       "hot": {
         "min_age": "0ms",

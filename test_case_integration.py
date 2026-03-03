@@ -1,4 +1,4 @@
-"""End-to-end integration test for case management: DocForge <-> Elasticsearch."""
+"""End-to-end integration test for case management: ION <-> Elasticsearch."""
 
 import httpx
 import json
@@ -44,9 +44,9 @@ def main():
     print(f"    Cookies: {list(cookies.keys())}")
 
     # ------------------------------------------------------------------
-    # 2. Verify ES alerts are reachable via DocForge API
+    # 2. Verify ES alerts are reachable via ION API
     # ------------------------------------------------------------------
-    print("\n=== 2. Fetch Alerts via DocForge API ===")
+    print("\n=== 2. Fetch Alerts via ION API ===")
     r = client.get("/api/elasticsearch/alerts", params={"hours": 48, "limit": 50})
     report("GET /api/elasticsearch/alerts", r.status_code == 200, f"status={r.status_code}")
     alerts_data = r.json()
@@ -181,7 +181,7 @@ def main():
     if case_id:
         time.sleep(1)  # Allow ES to index
         es_client = httpx.Client(base_url=ES_URL, auth=ES_AUTH, timeout=10)
-        r = es_client.get(f"/docforge-cases/_doc/{case_id}")
+        r = es_client.get(f"/ion-cases/_doc/{case_id}")
         report("GET case from ES index", r.status_code == 200, f"status={r.status_code} body={r.text[:200]}")
         if r.status_code == 200:
             es_doc = r.json().get("_source", {})
@@ -233,7 +233,7 @@ def main():
     if case_id:
         time.sleep(1)  # Allow ES to index
         es_client = httpx.Client(base_url=ES_URL, auth=ES_AUTH, timeout=10)
-        r = es_client.get(f"/docforge-cases/_doc/{case_id}")
+        r = es_client.get(f"/ion-cases/_doc/{case_id}")
         report("GET updated case from ES", r.status_code == 200, f"status={r.status_code}")
         if r.status_code == 200:
             es_doc = r.json().get("_source", {})

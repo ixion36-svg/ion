@@ -6,7 +6,7 @@ assessments, career goals, and historical snapshots directly via DB.
 Usage:
     python seed_skills_team.py
 
-Requires IXION to be running at http://127.0.0.1:8000
+Requires ION to be running at http://127.0.0.1:8000
 Admin: admin / admin2025
 """
 
@@ -197,15 +197,15 @@ def main():
         from pathlib import Path
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
-        from ixion.models.base import Base
-        from ixion.models.skills import SkillAssessment, UserCareerGoal, AssessmentSnapshot
-        from ixion.models.user import User
+        from ion.models.base import Base
+        from ion.models.skills import SkillAssessment, UserCareerGoal, AssessmentSnapshot
+        from ion.models.user import User
 
-        # Use the project-local DB (start_ixion.ps1 runs from project dir so CWD=project)
-        db_path = Path(os.path.dirname(os.path.abspath(__file__))) / ".ixion" / "ixion.db"
+        # Use the project-local DB (start_ion.ps1 runs from project dir so CWD=project)
+        db_path = Path(os.path.dirname(os.path.abspath(__file__))) / ".ion" / "ion.db"
         if not db_path.exists():
             # Fallback to home dir
-            db_path = Path.home() / ".ixion" / "ixion.db"
+            db_path = Path.home() / ".ion" / "ion.db"
         print(f"Using database: {db_path}")
         engine = create_engine(f"sqlite:///{db_path}", echo=False)
 

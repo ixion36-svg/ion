@@ -1,0 +1,1708 @@
+{% extends "base.html" %}
+
+{% block title %}Playbooks - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Investigation Playbooks</h1>
+    <div class="header-actions">
+        <button class="btn btn-primary" id="btn-new-playbook" onclick="showCreatePlaybookModal()">+ New Playbook</button>
+    </div>
+</div>
+
+<!-- Tab Navigation -->
+<div class="tab-nav">
+    <button class="tab-btn active" data-tab="library" onclick="switchTab('library')">Playbook Library</button>
+    <button class="tab-btn" data-tab="executions" onclick="switchTab('executions')">
+        Active Executions <span class="tab-badge" id="executions-badge" style="display:none;">0</span>
+    </button>
+</div>
+
+<!-- TAB: Playbook Library -->
+<div class="tab-content" id="tab-library">
+    <section class="section">
+        <div class="section-header">
+            <h2>Playbooks</h2>
+            <div class="filter-controls">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="filter-active-only" checked onchange="loadPlaybooks()">
+                    Active only
+                </label>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="data-table" id="playbooks-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Triggers</th>
+                        <th>Steps</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="playbooks-body">
+                    <tr><td colspan="6" class="loading">Loading playbooks...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<!-- TAB: Active Executions -->
+<div class="tab-content" id="tab-executions" style="display:none;">
+    <section class="section">
+        <div class="section-header">
+            <h2>Playbook Executions</h2>
+            <div class="filter-controls">
+                <select id="exec-status-filter" class="form-control" style="width:auto;" onchange="loadExecutions()">
+                    <option value="">All Statuses</option>
+                    <option value="in_progress" selected>In Progress</option>
+                    <option value="pending">Pending</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+        </div>
+        <div class="table-container">
+            <table class="data-table" id="executions-table">
+                <thead>
+                    <tr>
+                        <th>Playbook</th>
+                        <th>Alert / Case</th>
+                        <th>Progress</th>
+                        <th>Status</th>
+                        <th>Analyst</th>
+                        <th>Started</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="executions-body">
+                    <tr><td colspan="7" class="loading">Loading executions...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <!-- Inline execution detail panel -->
+    <div class="exec-detail-panel" id="exec-detail-panel" style="display:none;">
+        <div class="exec-detail-header">
+            <h3 id="exec-detail-title">Execution Details</h3>
+            <button class="modal-close" onclick="closeExecDetail()">&times;</button>
+        </div>
+        <div class="exec-detail-body" id="exec-detail-body"></div>
+    </div>
+</div>
+
+<!-- Create/Edit Playbook Modal -->
+<div class="modal-overlay" id="playbook-modal" style="display: none;">
+    <div class="modal-dialog modal-large">
+        <div class="modal-header">
+            <h3 id="playbook-modal-title">Create Playbook</h3>
+            <button class="modal-close" onclick="closePlaybookModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="playbook-form">
+                <!-- Basic Info -->
+                <div class="form-section">
+                    <h4>Basic Information</h4>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label for="playbook-name">Name *</label>
+                            <input type="text" id="playbook-name" class="form-control" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="playbook-priority">Priority</label>
+                            <input type="number" id="playbook-priority" class="form-control" value="0" min="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="playbook-description">Description</label>
+                        <textarea id="playbook-description" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="playbook-active" checked>
+                            Active
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Trigger Conditions -->
+                <div class="form-section">
+                    <h4>Trigger Conditions</h4>
+                    <p class="form-help">Define when this playbook should be recommended for an alert. Leave empty to match all alerts.</p>
+
+                    <div class="form-group">
+                        <label for="trigger-rule-patterns">Rule Name Patterns (regex, one per line)</label>
+                        <textarea id="trigger-rule-patterns" class="form-control" rows="2" placeholder=".*Brute.*Force.*&#10;.*Suspicious.*Login.*"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Severities</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label"><input type="checkbox" class="trigger-severity" value="critical"> Critical</label>
+                            <label class="checkbox-label"><input type="checkbox" class="trigger-severity" value="high"> High</label>
+                            <label class="checkbox-label"><input type="checkbox" class="trigger-severity" value="medium"> Medium</label>
+                            <label class="checkbox-label"><input type="checkbox" class="trigger-severity" value="low"> Low</label>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="trigger-mitre-techniques">MITRE Techniques (comma-separated)</label>
+                            <input type="text" id="trigger-mitre-techniques" class="form-control" placeholder="T1078, T1110">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="trigger-mitre-tactics">MITRE Tactics (comma-separated)</label>
+                            <input type="text" id="trigger-mitre-tactics" class="form-control" placeholder="initial-access, persistence">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Steps -->
+                <div class="form-section">
+                    <h4>Steps</h4>
+                    <div id="steps-container"></div>
+                    <button type="button" class="btn btn-sm" onclick="addStep()">+ Add Step</button>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closePlaybookModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="savePlaybook()">Save Playbook</button>
+        </div>
+    </div>
+</div>
+
+<!-- View Playbook Modal -->
+<div class="modal-overlay" id="view-playbook-modal" style="display: none;">
+    <div class="modal-dialog modal-large">
+        <div class="modal-header">
+            <h3 id="view-playbook-title">Playbook Details</h3>
+            <button class="modal-close" onclick="closeViewModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="view-playbook-body">
+            <!-- Populated by JS -->
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeViewModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Playbooks page specific styles */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.section {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.section-header h2 {
+    margin: 0;
+}
+
+.filter-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.data-table th {
+    background: var(--bg-tertiary);
+    font-weight: 600;
+}
+
+.data-table tr:hover {
+    background: var(--bg-hover);
+}
+
+.loading {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem;
+}
+
+/* Status badges */
+.status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.status-active {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+
+.status-inactive {
+    background: rgba(158, 158, 158, 0.2);
+    color: #9e9e9e;
+}
+
+/* Trigger tags */
+.trigger-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.trigger-tag {
+    background: var(--bg-tertiary);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+/* Modal styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-dialog {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-dialog.modal-large {
+    max-width: 800px;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.modal-close:hover {
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Form styles */
+.form-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.form-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.form-section h4 {
+    margin: 0 0 1rem 0;
+    color: var(--accent-color);
+}
+
+.form-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.form-help {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.checkbox-group {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Step builder */
+.step-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    position: relative;
+}
+
+.step-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.step-number {
+    font-weight: bold;
+    color: var(--accent-color);
+}
+
+.step-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.step-actions .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.step-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.step-row .form-group {
+    margin-bottom: 0;
+}
+
+/* View modal */
+.view-section {
+    margin-bottom: 1.5rem;
+}
+
+.view-section h4 {
+    margin: 0 0 0.5rem 0;
+    color: var(--accent-color);
+}
+
+.view-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.view-step {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.view-step-number {
+    font-weight: bold;
+    color: var(--accent-color);
+    min-width: 30px;
+}
+
+.view-step-content {
+    flex: 1;
+}
+
+.view-step-title {
+    font-weight: 500;
+}
+
+.view-step-meta {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+/* Tab Navigation */
+.tab-nav {
+    display: flex;
+    gap: 0;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.tab-btn {
+    padding: 0.75rem 1.25rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.tab-btn.active {
+    color: var(--accent-color);
+    border-bottom-color: var(--accent-color);
+}
+
+.tab-badge {
+    background: var(--accent-color);
+    color: white;
+    padding: 0.125rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    margin-left: 0.25rem;
+}
+
+/* Progress bar */
+.progress-bar-container {
+    width: 100%;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+}
+
+.progress-bar-fill.status-in_progress { background: #ffc107; }
+.progress-bar-fill.status-completed { background: #4caf50; }
+.progress-bar-fill.status-failed { background: #f44336; }
+.progress-bar-fill.status-pending { background: #9e9e9e; }
+
+.progress-text {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+/* Execution status badges */
+.exec-status {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.exec-status.in_progress { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+.exec-status.completed { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+.exec-status.failed { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+.exec-status.pending { background: rgba(158, 158, 158, 0.2); color: #9e9e9e; }
+
+/* Outcome badges */
+.exec-outcome {
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.exec-outcome.true_positive { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+.exec-outcome.false_positive { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+.exec-outcome.benign_true_positive { background: rgba(33, 150, 243, 0.2); color: #2196f3; }
+.exec-outcome.risk_accepted { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+.exec-outcome.inconclusive { background: rgba(158, 158, 158, 0.2); color: #9e9e9e; }
+.exec-outcome.escalated { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+
+/* Step action data form */
+.step-action-form {
+    padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+}
+.step-action-form .form-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+    align-items: center;
+}
+.step-action-form label {
+    min-width: 110px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+.step-action-form input,
+.step-action-form textarea,
+.step-action-form select {
+    flex: 1;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    color: var(--text-primary);
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+.step-action-form textarea {
+    min-height: 40px;
+    resize: vertical;
+}
+
+/* Outcome picker modal overlay */
+.outcome-modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.outcome-modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    width: 480px;
+    max-width: 90vw;
+}
+.outcome-modal h3 {
+    margin: 0 0 1rem 0;
+}
+.outcome-modal .form-group {
+    margin-bottom: 1rem;
+}
+.outcome-modal .form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+.outcome-modal select,
+.outcome-modal textarea {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    padding: 0.5rem;
+    font-size: 0.875rem;
+}
+.outcome-modal textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+.outcome-modal .btn-row {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+
+/* Execution detail panel */
+.exec-detail-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-color);
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.exec-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.exec-detail-header h3 {
+    margin: 0;
+}
+
+.exec-detail-body {
+    padding: 1.5rem;
+}
+
+.exec-step-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.625rem 0.75rem;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.exec-step-item.done {
+    opacity: 0.7;
+}
+
+.exec-step-item.done .exec-step-title {
+    text-decoration: line-through;
+    color: var(--text-secondary);
+}
+
+.exec-step-checkbox {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.exec-step-title {
+    flex: 1;
+}
+
+.exec-step-required {
+    font-size: 0.625rem;
+    color: #f44336;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.exec-step-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.exec-actions-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.case-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--accent-color);
+    text-decoration: none;
+}
+
+.case-link:hover {
+    text-decoration: underline;
+}
+
+.alert-id-display {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let playbooks = [];
+let editingPlaybookId = null;
+let stepCounter = 0;
+let executionsList = [];
+let expandedExecutionId = null;
+
+// ==================== TAB MANAGEMENT ====================
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
+
+    document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
+    document.getElementById(`tab-${tab}`).style.display = 'block';
+
+    // Show/hide New Playbook button
+    document.getElementById('btn-new-playbook').style.display = tab === 'library' ? '' : 'none';
+
+    if (tab === 'executions') {
+        loadExecutions();
+    }
+}
+
+// ==================== EXECUTIONS DASHBOARD ====================
+
+async function loadExecutions() {
+    const status = document.getElementById('exec-status-filter').value;
+    const tbody = document.getElementById('executions-body');
+    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading executions...</td></tr>';
+
+    try {
+        const url = `/api/playbook-executions?limit=50${status ? '&status=' + status : ''}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to load executions');
+
+        const data = await response.json();
+        executionsList = data.executions || [];
+        displayExecutions();
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="7" class="loading">Error: ${escapeHtml(error.message)}</td></tr>`;
+    }
+
+    // Also load badge count
+    loadExecutionsBadge();
+}
+
+async function loadExecutionsBadge() {
+    try {
+        const response = await fetch('/api/playbook-executions/summary');
+        if (!response.ok) return;
+        const data = await response.json();
+        const badge = document.getElementById('executions-badge');
+        const activeCount = data.in_progress + data.pending;
+        if (activeCount > 0) {
+            badge.textContent = activeCount;
+            badge.style.display = '';
+        } else {
+            badge.style.display = 'none';
+        }
+    } catch (e) {
+        // Silently fail
+    }
+}
+
+function displayExecutions() {
+    const tbody = document.getElementById('executions-body');
+
+    if (executionsList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="loading">No executions found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = executionsList.map(e => {
+        const playbook = e.playbook || {};
+        const alertShort = e.es_alert_id ? e.es_alert_id.substring(0, 20) + (e.es_alert_id.length > 20 ? '...' : '') : '-';
+        const caseInfo = e.case_number ? `<a class="case-link" href="/alerts">${escapeHtml(e.case_number)}</a>` : '';
+        const startedAt = e.started_at ? new Date(e.started_at).toLocaleString() : '-';
+        const isExpanded = expandedExecutionId === e.id;
+
+        return `
+            <tr class="${isExpanded ? 'row-expanded' : ''}" data-exec-id="${e.id}">
+                <td><strong>${escapeHtml(playbook.name || 'Unknown')}</strong></td>
+                <td>
+                    <span class="alert-id-display" title="${escapeHtml(e.es_alert_id || '')}">${escapeHtml(alertShort)}</span>
+                    ${caseInfo ? `<br>${caseInfo}` : ''}
+                </td>
+                <td style="min-width:120px;">
+                    <div class="progress-bar-container">
+                        <div class="progress-bar-fill status-${e.status}" style="width:${e.progress_pct}%;"></div>
+                    </div>
+                    <div class="progress-text">${e.completed_steps}/${e.total_steps} steps (${e.progress_pct}%)</div>
+                </td>
+                <td>
+                    <span class="exec-status ${e.status}">${e.status.replace('_', ' ')}</span>
+                    ${e.outcome ? `<br><span class="exec-outcome ${e.outcome}">${e.outcome.replace(/_/g, ' ')}</span>` : ''}
+                    ${e.report_document_id ? `<br><a href="/documents" style="font-size:0.7rem;">View Report</a>` : ''}
+                </td>
+                <td>${escapeHtml(e.executed_by_username || '-')}</td>
+                <td style="font-size:0.8rem;">${startedAt}</td>
+                <td>
+                    <button class="btn btn-sm" onclick="toggleExecDetail(${e.id})">${isExpanded ? 'Close' : 'Work'}</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function toggleExecDetail(executionId) {
+    if (expandedExecutionId === executionId) {
+        closeExecDetail();
+        return;
+    }
+    expandedExecutionId = executionId;
+    const exec = executionsList.find(e => e.id === executionId);
+    if (!exec) return;
+
+    renderExecDetail(exec);
+    document.getElementById('exec-detail-panel').style.display = 'block';
+    displayExecutions(); // Re-render to update button text
+}
+
+function closeExecDetail() {
+    expandedExecutionId = null;
+    document.getElementById('exec-detail-panel').style.display = 'none';
+    displayExecutions();
+}
+
+function renderExecDetail(exec) {
+    const playbook = exec.playbook || {};
+    const steps = playbook.steps || [];
+    const stepStatuses = exec.step_statuses || {};
+
+    document.getElementById('exec-detail-title').textContent = playbook.name || 'Execution Details';
+
+    const stepsHtml = steps.map(step => {
+        const status = stepStatuses[step.id] || {};
+        const isDone = status.status === 'completed' || status.status === 'skipped';
+        const isActive = exec.status === 'in_progress';
+        const completedBy = status.completed_by_username ? ` by ${escapeHtml(status.completed_by_username)}` : '';
+        const completedAt = status.completed_at ? ` at ${new Date(status.completed_at).toLocaleString()}` : '';
+        const ad = status.action_data || {};
+
+        return `
+            <div class="exec-step-item ${isDone ? 'done' : ''}">
+                <input type="checkbox" class="exec-step-checkbox"
+                       ${isDone ? 'checked' : ''} ${!isActive ? 'disabled' : ''}
+                       onchange="execUpdateStepWithData(${exec.id}, ${step.id}, this.checked ? 'completed' : 'pending')">
+                <span class="exec-step-title">${escapeHtml(step.title)}</span>
+                ${step.is_required ? '<span class="exec-step-required">Required</span>' : ''}
+                ${isDone ? `<span class="exec-step-meta">${status.status === 'skipped' ? 'Skipped' : 'Done'}${completedBy}${completedAt}</span>` : ''}
+            </div>
+            <div class="step-action-form" id="step-action-${step.id}">
+                <div class="form-row">
+                    <label>Action Taken</label>
+                    <input type="text" data-field="action_taken" data-step="${step.id}"
+                           value="${escapeHtml(ad.action_taken || '')}" ${!isActive ? 'disabled' : ''}
+                           placeholder="What action was performed?">
+                </div>
+                <div class="form-row">
+                    <label>Findings</label>
+                    <textarea data-field="findings" data-step="${step.id}" ${!isActive ? 'disabled' : ''}
+                              placeholder="What was found?">${escapeHtml(ad.findings || '')}</textarea>
+                </div>
+                <div class="form-row">
+                    <label>Evidence</label>
+                    <input type="text" data-field="evidence_collected" data-step="${step.id}"
+                           value="${escapeHtml(ad.evidence_collected || '')}" ${!isActive ? 'disabled' : ''}
+                           placeholder="Evidence collected (URLs, hashes, etc.)">
+                </div>
+                <div class="form-row">
+                    <label>Risk Assessment</label>
+                    <select data-field="risk_assessment" data-step="${step.id}" ${!isActive ? 'disabled' : ''}>
+                        <option value="">—</option>
+                        <option value="low" ${ad.risk_assessment === 'low' ? 'selected' : ''}>Low</option>
+                        <option value="medium" ${ad.risk_assessment === 'medium' ? 'selected' : ''}>Medium</option>
+                        <option value="high" ${ad.risk_assessment === 'high' ? 'selected' : ''}>High</option>
+                        <option value="critical" ${ad.risk_assessment === 'critical' ? 'selected' : ''}>Critical</option>
+                    </select>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    const caseHtml = exec.case_number
+        ? `<div style="margin-bottom:1rem;"><strong>Case:</strong> <a class="case-link" href="/alerts">${escapeHtml(exec.case_number)} - ${escapeHtml(exec.case_title || '')}</a></div>`
+        : '';
+
+    const alertHtml = `<div style="margin-bottom:1rem;font-size:0.85rem;"><strong>Alert:</strong> <span class="text-secondary">${escapeHtml(exec.es_alert_id || '-')}</span></div>`;
+
+    const completedSteps = Object.values(stepStatuses).filter(s => s.status === 'completed' || s.status === 'skipped').length;
+    const progress = steps.length > 0 ? Math.round((completedSteps / steps.length) * 100) : 0;
+
+    const progressHtml = `
+        <div style="margin-bottom:1rem;">
+            <div class="progress-bar-container" style="height:12px;">
+                <div class="progress-bar-fill status-${exec.status}" style="width:${progress}%;"></div>
+            </div>
+            <div class="progress-text">${completedSteps}/${steps.length} steps completed (${progress}%)</div>
+        </div>
+    `;
+
+    let actionsHtml = '';
+    if (exec.status === 'in_progress') {
+        actionsHtml = `
+            <div class="exec-actions-bar">
+                <button class="btn btn-primary btn-sm" onclick="showOutcomeModal(${exec.id})">Complete &amp; Classify</button>
+                <button class="btn btn-sm" onclick="execFail(${exec.id})">Mark Failed</button>
+            </div>
+        `;
+    } else if (exec.status === 'completed') {
+        const outcomeLabel = exec.outcome ? exec.outcome.replace(/_/g, ' ') : '';
+        actionsHtml = `
+            <div class="exec-actions-bar" style="align-items:center;">
+                ${exec.outcome ? `<span class="exec-outcome ${exec.outcome}">${outcomeLabel}</span>` : ''}
+                ${exec.report_document_id ? `<a href="/documents" class="btn btn-sm">View Report</a>` : ''}
+                ${exec.report_document_id ? `<button class="btn btn-sm" onclick="execRegenerateReport(${exec.id})">Regenerate Report</button>` : ''}
+            </div>
+        `;
+    }
+
+    document.getElementById('exec-detail-body').innerHTML = `
+        ${caseHtml}
+        ${alertHtml}
+        ${progressHtml}
+        <div style="margin-bottom:0.5rem;font-weight:600;">Steps</div>
+        ${stepsHtml || '<div class="text-secondary">No steps defined</div>'}
+        ${actionsHtml}
+    `;
+}
+
+function getStepActionData(stepId) {
+    const form = document.getElementById(`step-action-${stepId}`);
+    if (!form) return null;
+    const data = {};
+    form.querySelectorAll('[data-field]').forEach(el => {
+        const val = el.value.trim();
+        if (val) data[el.dataset.field] = val;
+    });
+    return Object.keys(data).length > 0 ? data : null;
+}
+
+async function execUpdateStepWithData(executionId, stepId, status) {
+    try {
+        const actionData = getStepActionData(stepId);
+        const body = { status };
+        if (actionData) body.action_data = actionData;
+
+        const response = await fetch(`/api/playbook-executions/${executionId}/steps/${stepId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!response.ok) throw new Error('Failed to update step');
+
+        const data = await response.json();
+        const idx = executionsList.findIndex(e => e.id === executionId);
+        if (idx >= 0 && data.execution) {
+            const steps = data.execution.playbook?.steps || [];
+            const stepStatuses = data.execution.step_statuses || {};
+            const completedSteps = Object.values(stepStatuses).filter(s => s.status === 'completed' || s.status === 'skipped').length;
+            executionsList[idx] = {
+                ...executionsList[idx],
+                ...data.execution,
+                total_steps: steps.length,
+                completed_steps: completedSteps,
+                progress_pct: steps.length > 0 ? Math.round((completedSteps / steps.length) * 100) : 0,
+            };
+            displayExecutions();
+            renderExecDetail(executionsList[idx]);
+        }
+    } catch (error) {
+        showToast('Failed to update step: ' + error.message, 'error');
+    }
+}
+
+function showOutcomeModal(executionId) {
+    const overlay = document.createElement('div');
+    overlay.className = 'outcome-modal-overlay';
+    overlay.id = 'outcome-modal-overlay';
+    overlay.innerHTML = `
+        <div class="outcome-modal">
+            <h3>Complete Execution</h3>
+            <div class="form-group">
+                <label>Investigation Outcome</label>
+                <select id="outcome-select">
+                    <option value="">— Select outcome —</option>
+                    <option value="true_positive">True Positive</option>
+                    <option value="false_positive">False Positive</option>
+                    <option value="benign_true_positive">Benign True Positive</option>
+                    <option value="risk_accepted">Risk Accepted</option>
+                    <option value="inconclusive">Inconclusive</option>
+                    <option value="escalated">Escalated</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Outcome Notes</label>
+                <textarea id="outcome-notes" placeholder="Describe the reasoning and final determination..."></textarea>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-sm" onclick="closeOutcomeModal()">Cancel</button>
+                <button class="btn btn-primary btn-sm" onclick="execCompleteWithOutcome(${executionId})">Complete &amp; Generate Report</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeOutcomeModal();
+    });
+}
+
+function closeOutcomeModal() {
+    const overlay = document.getElementById('outcome-modal-overlay');
+    if (overlay) overlay.remove();
+}
+
+async function execCompleteWithOutcome(executionId) {
+    try {
+        const outcome = document.getElementById('outcome-select').value || null;
+        const outcomeNotes = document.getElementById('outcome-notes').value.trim() || null;
+
+        const response = await fetch(`/api/playbook-executions/${executionId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ outcome: outcome, outcome_notes: outcomeNotes })
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to complete execution');
+        }
+        const data = await response.json();
+        closeOutcomeModal();
+        showToast(`Execution completed${data.report_document_id ? ' — report generated' : ''}`, 'success');
+        closeExecDetail();
+        loadExecutions();
+    } catch (error) {
+        showToast('Failed to complete: ' + error.message, 'error');
+    }
+}
+
+async function execRegenerateReport(executionId) {
+    try {
+        const response = await fetch(`/api/playbook-executions/${executionId}/regenerate-report`, { method: 'POST' });
+        if (!response.ok) throw new Error('Failed to regenerate report');
+        const data = await response.json();
+        showToast(`Report regenerated (v${data.report_version || 'new'})`, 'success');
+        loadExecutions();
+    } catch (error) {
+        showToast('Failed to regenerate report: ' + error.message, 'error');
+    }
+}
+
+async function execFail(executionId) {
+    try {
+        const response = await fetch(`/api/playbook-executions/${executionId}/fail`, { method: 'POST' });
+        if (!response.ok) throw new Error('Failed');
+        showToast('Execution marked as failed', 'success');
+        closeExecDetail();
+        loadExecutions();
+    } catch (error) {
+        showToast('Failed: ' + error.message, 'error');
+    }
+}
+
+// ==================== DATA LOADING ====================
+
+async function loadPlaybooks() {
+    const activeOnly = document.getElementById('filter-active-only').checked;
+
+    try {
+        const response = await fetch(`/api/playbooks?active_only=${activeOnly}`);
+        if (!response.ok) throw new Error('Failed to load playbooks');
+
+        const data = await response.json();
+        playbooks = data.playbooks || [];
+        displayPlaybooks();
+    } catch (error) {
+        showToast('Failed to load playbooks: ' + error.message, 'error');
+    }
+}
+
+function displayPlaybooks() {
+    const tbody = document.getElementById('playbooks-body');
+
+    if (playbooks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">No playbooks found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = playbooks.map(p => {
+        const triggers = getTriggersSummary(p.trigger_conditions);
+        return `
+            <tr>
+                <td>
+                    <strong>${escapeHtml(p.name)}</strong>
+                    ${p.description ? `<br><small class="text-secondary">${escapeHtml(p.description.substring(0, 50))}${p.description.length > 50 ? '...' : ''}</small>` : ''}
+                </td>
+                <td>
+                    <div class="trigger-tags">
+                        ${triggers.map(t => `<span class="trigger-tag">${escapeHtml(t)}</span>`).join('')}
+                    </div>
+                </td>
+                <td>${p.step_count} steps</td>
+                <td>${p.priority}</td>
+                <td><span class="status-badge ${p.is_active ? 'status-active' : 'status-inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
+                <td>
+                    <button class="btn btn-sm" onclick="viewPlaybook(${p.id})">View</button>
+                    <button class="btn btn-sm" onclick="editPlaybook(${p.id})">Edit</button>
+                    <button class="btn btn-sm" onclick="deletePlaybook(${p.id})">Delete</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function getTriggersSummary(conditions) {
+    if (!conditions) return ['All alerts'];
+
+    const triggers = [];
+    if (conditions.severities && conditions.severities.length) {
+        triggers.push(`Sev: ${conditions.severities.join(', ')}`);
+    }
+    if (conditions.rule_patterns && conditions.rule_patterns.length) {
+        triggers.push(`${conditions.rule_patterns.length} rule pattern(s)`);
+    }
+    if (conditions.mitre_techniques && conditions.mitre_techniques.length) {
+        triggers.push(`${conditions.mitre_techniques.length} MITRE technique(s)`);
+    }
+    if (conditions.mitre_tactics && conditions.mitre_tactics.length) {
+        triggers.push(`${conditions.mitre_tactics.length} MITRE tactic(s)`);
+    }
+    return triggers.length > 0 ? triggers : ['All alerts'];
+}
+
+// ==================== MODAL MANAGEMENT ====================
+
+function showCreatePlaybookModal() {
+    editingPlaybookId = null;
+    document.getElementById('playbook-modal-title').textContent = 'Create Playbook';
+    resetPlaybookForm();
+    document.getElementById('playbook-modal').style.display = 'flex';
+}
+
+function closePlaybookModal() {
+    document.getElementById('playbook-modal').style.display = 'none';
+    editingPlaybookId = null;
+}
+
+function resetPlaybookForm() {
+    document.getElementById('playbook-name').value = '';
+    document.getElementById('playbook-description').value = '';
+    document.getElementById('playbook-priority').value = '0';
+    document.getElementById('playbook-active').checked = true;
+    document.getElementById('trigger-rule-patterns').value = '';
+    document.getElementById('trigger-mitre-techniques').value = '';
+    document.getElementById('trigger-mitre-tactics').value = '';
+
+    // Reset severity checkboxes
+    document.querySelectorAll('.trigger-severity').forEach(cb => cb.checked = false);
+
+    // Clear steps
+    document.getElementById('steps-container').innerHTML = '';
+    stepCounter = 0;
+}
+
+async function viewPlaybook(id) {
+    const playbook = playbooks.find(p => p.id === id);
+    if (!playbook) return;
+
+    document.getElementById('view-playbook-title').textContent = playbook.name;
+
+    const triggers = getTriggersSummary(playbook.trigger_conditions);
+    const stepsHtml = (playbook.steps || []).map((s, i) => `
+        <div class="view-step">
+            <span class="view-step-number">${i + 1}</span>
+            <div class="view-step-content">
+                <div class="view-step-title">${escapeHtml(s.title)}</div>
+                <div class="view-step-meta">
+                    Type: ${s.step_type}
+                    ${s.is_required ? ' | Required' : ''}
+                    ${s.description ? ` | ${escapeHtml(s.description)}` : ''}
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    document.getElementById('view-playbook-body').innerHTML = `
+        <div class="view-section">
+            <h4>Description</h4>
+            <p>${escapeHtml(playbook.description || 'No description')}</p>
+        </div>
+        <div class="view-section">
+            <h4>Status</h4>
+            <p>
+                <span class="status-badge ${playbook.is_active ? 'status-active' : 'status-inactive'}">
+                    ${playbook.is_active ? 'Active' : 'Inactive'}
+                </span>
+                | Priority: ${playbook.priority}
+            </p>
+        </div>
+        <div class="view-section">
+            <h4>Trigger Conditions</h4>
+            <div class="trigger-tags" style="gap: 0.5rem;">
+                ${triggers.map(t => `<span class="trigger-tag">${escapeHtml(t)}</span>`).join('')}
+            </div>
+        </div>
+        <div class="view-section">
+            <h4>Steps (${(playbook.steps || []).length})</h4>
+            <div class="view-steps-list">
+                ${stepsHtml || '<p class="text-secondary">No steps defined</p>'}
+            </div>
+        </div>
+        <div class="view-section">
+            <h4>Metadata</h4>
+            <p class="text-secondary">
+                Created by: ${playbook.created_by_username || 'Unknown'}<br>
+                Created: ${playbook.created_at ? new Date(playbook.created_at).toLocaleString() : 'Unknown'}<br>
+                Updated: ${playbook.updated_at ? new Date(playbook.updated_at).toLocaleString() : 'Unknown'}
+            </p>
+        </div>
+    `;
+
+    document.getElementById('view-playbook-modal').style.display = 'flex';
+}
+
+function closeViewModal() {
+    document.getElementById('view-playbook-modal').style.display = 'none';
+}
+
+async function editPlaybook(id) {
+    const playbook = playbooks.find(p => p.id === id);
+    if (!playbook) return;
+
+    editingPlaybookId = id;
+    document.getElementById('playbook-modal-title').textContent = 'Edit Playbook';
+
+    // Fill form
+    document.getElementById('playbook-name').value = playbook.name;
+    document.getElementById('playbook-description').value = playbook.description || '';
+    document.getElementById('playbook-priority').value = playbook.priority;
+    document.getElementById('playbook-active').checked = playbook.is_active;
+
+    // Fill trigger conditions
+    const conditions = playbook.trigger_conditions || {};
+    document.getElementById('trigger-rule-patterns').value = (conditions.rule_patterns || []).join('\n');
+    document.getElementById('trigger-mitre-techniques').value = (conditions.mitre_techniques || []).join(', ');
+    document.getElementById('trigger-mitre-tactics').value = (conditions.mitre_tactics || []).join(', ');
+
+    // Fill severity checkboxes
+    document.querySelectorAll('.trigger-severity').forEach(cb => {
+        cb.checked = (conditions.severities || []).includes(cb.value);
+    });
+
+    // Fill steps
+    const stepsContainer = document.getElementById('steps-container');
+    stepsContainer.innerHTML = '';
+    stepCounter = 0;
+
+    (playbook.steps || []).forEach(step => {
+        addStep(step);
+    });
+
+    document.getElementById('playbook-modal').style.display = 'flex';
+}
+
+// ==================== STEP MANAGEMENT ====================
+
+function addStep(stepData = null) {
+    stepCounter++;
+    const stepsContainer = document.getElementById('steps-container');
+
+    const stepTypes = [
+        { value: 'manual_checklist', label: 'Manual Checklist' },
+        { value: 'auto_enrich_observables', label: 'Auto: Enrich Observables' },
+        { value: 'auto_update_status', label: 'Auto: Update Status' },
+        { value: 'auto_create_case', label: 'Auto: Create Case' },
+    ];
+
+    const stepHtml = `
+        <div class="step-item" id="step-${stepCounter}" data-step="${stepCounter}">
+            <div class="step-header">
+                <span class="step-number">Step ${stepCounter}</span>
+                <div class="step-actions">
+                    <button type="button" class="btn btn-sm" onclick="moveStepUp(${stepCounter})">Up</button>
+                    <button type="button" class="btn btn-sm" onclick="moveStepDown(${stepCounter})">Down</button>
+                    <button type="button" class="btn btn-sm" onclick="removeStep(${stepCounter})">Remove</button>
+                </div>
+            </div>
+            <div class="step-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>Type *</label>
+                    <select class="form-control step-type" onchange="onStepTypeChange(${stepCounter})">
+                        ${stepTypes.map(t => `<option value="${t.value}" ${stepData && stepData.step_type === t.value ? 'selected' : ''}>${t.label}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 2;">
+                    <label>Title *</label>
+                    <input type="text" class="form-control step-title" value="${stepData ? escapeHtml(stepData.title) : ''}" required>
+                </div>
+            </div>
+            <div class="step-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>Description</label>
+                    <input type="text" class="form-control step-description" value="${stepData ? escapeHtml(stepData.description || '') : ''}">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="step-required" ${stepData && stepData.is_required ? 'checked' : ''}>
+                        Required
+                    </label>
+                </div>
+            </div>
+            <div class="step-params-container" id="step-params-${stepCounter}">
+                <!-- Dynamic params based on step type -->
+            </div>
+        </div>
+    `;
+
+    stepsContainer.insertAdjacentHTML('beforeend', stepHtml);
+
+    // Load step params if editing
+    if (stepData && stepData.step_params) {
+        loadStepParams(stepCounter, stepData.step_type, stepData.step_params);
+    } else {
+        onStepTypeChange(stepCounter);
+    }
+}
+
+function removeStep(stepNum) {
+    const stepEl = document.getElementById(`step-${stepNum}`);
+    if (stepEl) stepEl.remove();
+    renumberSteps();
+}
+
+function moveStepUp(stepNum) {
+    const stepEl = document.getElementById(`step-${stepNum}`);
+    const prev = stepEl.previousElementSibling;
+    if (prev) {
+        stepEl.parentNode.insertBefore(stepEl, prev);
+        renumberSteps();
+    }
+}
+
+function moveStepDown(stepNum) {
+    const stepEl = document.getElementById(`step-${stepNum}`);
+    const next = stepEl.nextElementSibling;
+    if (next) {
+        stepEl.parentNode.insertBefore(next, stepEl);
+        renumberSteps();
+    }
+}
+
+function renumberSteps() {
+    const steps = document.querySelectorAll('.step-item');
+    steps.forEach((step, i) => {
+        step.querySelector('.step-number').textContent = `Step ${i + 1}`;
+    });
+}
+
+function onStepTypeChange(stepNum) {
+    const stepEl = document.getElementById(`step-${stepNum}`);
+    const type = stepEl.querySelector('.step-type').value;
+    loadStepParams(stepNum, type);
+}
+
+function loadStepParams(stepNum, type, existingParams = null) {
+    const paramsContainer = document.getElementById(`step-params-${stepNum}`);
+
+    let paramsHtml = '';
+
+    switch (type) {
+        case 'manual_checklist':
+            const items = existingParams ? (existingParams.checklist_items || []).join('\n') : '';
+            paramsHtml = `
+                <div class="form-group">
+                    <label>Checklist Items (one per line)</label>
+                    <textarea class="form-control step-checklist-items" rows="3">${escapeHtml(items)}</textarea>
+                </div>
+            `;
+            break;
+
+        case 'auto_enrich_observables':
+            paramsHtml = `
+                <div class="form-group">
+                    <label>Sources</label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="step-source" value="opencti" ${existingParams && existingParams.sources?.includes('opencti') ? 'checked' : 'checked'}>
+                        OpenCTI
+                    </label>
+                </div>
+            `;
+            break;
+
+        case 'auto_update_status':
+            const statuses = ['investigating', 'escalated', 'contained', 'resolved'];
+            const priorities = ['low', 'medium', 'high', 'critical'];
+            paramsHtml = `
+                <div class="step-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label>New Status</label>
+                        <select class="form-control step-new-status">
+                            ${statuses.map(s => `<option value="${s}" ${existingParams && existingParams.new_status === s ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Priority</label>
+                        <select class="form-control step-new-priority">
+                            ${priorities.map(p => `<option value="${p}" ${existingParams && existingParams.priority === p ? 'selected' : ''}>${p}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+            `;
+            break;
+
+        case 'auto_create_case':
+            paramsHtml = `
+                <div class="step-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label>Title Template</label>
+                        <input type="text" class="form-control step-case-title" value="${existingParams ? escapeHtml(existingParams.title_template || '') : 'Case: {rule_name}'}" placeholder="Case: {rule_name}">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>Severity</label>
+                        <select class="form-control step-case-severity">
+                            <option value="low" ${existingParams && existingParams.severity === 'low' ? 'selected' : ''}>Low</option>
+                            <option value="medium" ${existingParams && existingParams.severity === 'medium' ? 'selected' : ''}>Medium</option>
+                            <option value="high" ${existingParams && existingParams.severity === 'high' ? 'selected' : ''}>High</option>
+                            <option value="critical" ${existingParams && existingParams.severity === 'critical' ? 'selected' : ''}>Critical</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+            break;
+    }
+
+    paramsContainer.innerHTML = paramsHtml;
+}
+
+function getStepParams(stepEl) {
+    const type = stepEl.querySelector('.step-type').value;
+    const params = {};
+
+    switch (type) {
+        case 'manual_checklist':
+            const itemsText = stepEl.querySelector('.step-checklist-items')?.value || '';
+            params.checklist_items = itemsText.split('\n').filter(i => i.trim());
+            break;
+
+        case 'auto_enrich_observables':
+            params.sources = [];
+            stepEl.querySelectorAll('.step-source:checked').forEach(cb => {
+                params.sources.push(cb.value);
+            });
+            break;
+
+        case 'auto_update_status':
+            params.new_status = stepEl.querySelector('.step-new-status')?.value;
+            params.priority = stepEl.querySelector('.step-new-priority')?.value;
+            break;
+
+        case 'auto_create_case':
+            params.title_template = stepEl.querySelector('.step-case-title')?.value || 'Case: {rule_name}';
+            params.severity = stepEl.querySelector('.step-case-severity')?.value || 'medium';
+            break;
+    }
+
+    return params;
+}
+
+// ==================== SAVE/DELETE ====================
+
+async function savePlaybook() {
+    const name = document.getElementById('playbook-name').value.trim();
+    if (!name) {
+        showToast('Please enter a name', 'warning');
+        return;
+    }
+
+    // Gather trigger conditions
+    const rulePatterns = document.getElementById('trigger-rule-patterns').value
+        .split('\n')
+        .map(p => p.trim())
+        .filter(p => p);
+
+    const severities = [];
+    document.querySelectorAll('.trigger-severity:checked').forEach(cb => {
+        severities.push(cb.value);
+    });
+
+    const mitreTechniques = document.getElementById('trigger-mitre-techniques').value
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t);
+
+    const mitreTactics = document.getElementById('trigger-mitre-tactics').value
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t);
+
+    const triggerConditions = {
+        rule_patterns: rulePatterns,
+        severities: severities,
+        mitre_techniques: mitreTechniques,
+        mitre_tactics: mitreTactics,
+    };
+
+    // Gather steps
+    const steps = [];
+    document.querySelectorAll('.step-item').forEach(stepEl => {
+        const type = stepEl.querySelector('.step-type').value;
+        const title = stepEl.querySelector('.step-title').value.trim();
+        const description = stepEl.querySelector('.step-description')?.value.trim() || null;
+        const isRequired = stepEl.querySelector('.step-required').checked;
+        const params = getStepParams(stepEl);
+
+        if (title) {
+            steps.push({
+                step_type: type,
+                title: title,
+                description: description,
+                step_params: params,
+                is_required: isRequired,
+            });
+        }
+    });
+
+    const payload = {
+        name: name,
+        description: document.getElementById('playbook-description').value.trim() || null,
+        priority: parseInt(document.getElementById('playbook-priority').value) || 0,
+        is_active: document.getElementById('playbook-active').checked,
+        trigger_conditions: triggerConditions,
+        steps: steps,
+    };
+
+    try {
+        const url = editingPlaybookId
+            ? `/api/playbooks/${editingPlaybookId}`
+            : '/api/playbooks';
+        const method = editingPlaybookId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.detail || 'Failed to save playbook');
+        }
+
+        showToast(editingPlaybookId ? 'Playbook updated' : 'Playbook created', 'success');
+        closePlaybookModal();
+        loadPlaybooks();
+    } catch (error) {
+        showToast('Failed to save playbook: ' + error.message, 'error');
+    }
+}
+
+async function deletePlaybook(id) {
+    const playbook = playbooks.find(p => p.id === id);
+    if (!playbook) return;
+
+    if (!confirm(`Delete playbook "${playbook.name}"?`)) return;
+
+    try {
+        const response = await fetch(`/api/playbooks/${id}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) throw new Error('Failed to delete playbook');
+
+        showToast('Playbook deleted', 'success');
+        loadPlaybooks();
+    } catch (error) {
+        showToast('Failed to delete playbook: ' + error.message, 'error');
+    }
+}
+
+// ==================== UTILITIES ====================
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showToast(message, type = 'info') {
+    if (typeof window.showToast === 'function') {
+        window.showToast(message, type);
+    } else {
+        alert(message);
+    }
+}
+
+// ==================== INIT ====================
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadPlaybooks();
+    loadExecutionsBadge();
+
+    // Deep-link support: ?execution=ID switches to executions tab and expands
+    const params = new URLSearchParams(window.location.search);
+    const execParam = params.get('execution');
+    if (execParam) {
+        switchTab('executions');
+        // After executions load, expand the specified one
+        const origLoad = loadExecutions;
+        loadExecutions = async function() {
+            await origLoad.call(this);
+            loadExecutions = origLoad; // Restore original
+            const execId = parseInt(execParam);
+            if (execId) {
+                toggleExecDetail(execId);
+            }
+        };
+        loadExecutions();
+    }
+});
+</script>
+{% endblock %}

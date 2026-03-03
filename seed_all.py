@@ -1,16 +1,16 @@
-"""Master seeder — runs all IXION seed scripts in order.
+"""Master seeder — runs all ION seed scripts in order.
 
 Used by:
   - Docker seeder container (entrypoint)
-  - start_ixion.ps1 (Windows local dev, first-run)
+  - start_ion.ps1 (Windows local dev, first-run)
 
 Checks for a .seeded marker so it only runs once per data volume.
 Pass --force to re-seed regardless.
 
 Environment variables:
-  IXION_SEED_URL          Base URL of IXION server (default: http://127.0.0.1:8000)
-  IXION_ADMIN_PASSWORD    Admin password (default: admin2025)
-  IXION_DATA_DIR          Data directory for .seeded marker (default: /data)
+  ION_SEED_URL          Base URL of ION server (default: http://127.0.0.1:8000)
+  ION_ADMIN_PASSWORD    Admin password (default: admin2025)
+  ION_DATA_DIR          Data directory for .seeded marker (default: /data)
 """
 
 import os
@@ -21,9 +21,9 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
-SEED_URL = os.environ.get("IXION_SEED_URL", "http://127.0.0.1:8000")
-DATA_DIR = os.environ.get("IXION_DATA_DIR", "/data")
-MARKER = Path(DATA_DIR) / ".ixion" / ".seeded"
+SEED_URL = os.environ.get("ION_SEED_URL", "http://127.0.0.1:8000")
+DATA_DIR = os.environ.get("ION_DATA_DIR", "/data")
+MARKER = Path(DATA_DIR) / ".ion" / ".seeded"
 
 # Ordered list of seed scripts (HTTP API only)
 SEEDS = [
@@ -40,15 +40,15 @@ HEALTH_INTERVAL = 5   # seconds between retries
 
 
 def wait_for_health():
-    """Wait until IXION health endpoint responds 200."""
-    print(f"Waiting for IXION at {HEALTH_URL} ...")
+    """Wait until ION health endpoint responds 200."""
+    print(f"Waiting for ION at {HEALTH_URL} ...")
     deadline = time.time() + HEALTH_TIMEOUT
     while time.time() < deadline:
         try:
             req = urllib.request.Request(HEALTH_URL)
             with urllib.request.urlopen(req, timeout=5) as resp:
                 if resp.status == 200:
-                    print("  IXION is healthy.")
+                    print("  ION is healthy.")
                     return True
         except (urllib.error.URLError, OSError):
             pass
@@ -56,7 +56,7 @@ def wait_for_health():
         print(f"  Not ready, retrying... ({remaining}s remaining)")
         time.sleep(HEALTH_INTERVAL)
 
-    print(f"ERROR: IXION did not become healthy within {HEALTH_TIMEOUT}s")
+    print(f"ERROR: ION did not become healthy within {HEALTH_TIMEOUT}s")
     return False
 
 
@@ -98,7 +98,7 @@ def main():
         print("Pass --force to re-seed.")
         return 0
 
-    # Wait for IXION
+    # Wait for ION
     if not wait_for_health():
         return 1
 

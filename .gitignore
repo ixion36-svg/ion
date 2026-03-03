@@ -71,7 +71,7 @@ venv.bak/
 *.sqlite3
 
 # Local config
-.ixion/
+.ion/
 docker-compose.local.yml
 
 # OS

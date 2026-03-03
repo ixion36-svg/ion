@@ -1,4 +1,4 @@
-# DocForge Security Assessment Report
+# ION Security Assessment Report
 
 **Assessment Date:** 2026-01-21
 **Scope:** Web application penetration testing (code review + analysis)
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The DocForge application demonstrates good security fundamentals with proper password hashing, parameterized queries, and RBAC implementation. However, several vulnerabilities and security improvements were identified that should be addressed before production deployment.
+The ION application demonstrates good security fundamentals with proper password hashing, parameterized queries, and RBAC implementation. However, several vulnerabilities and security improvements were identified that should be addressed before production deployment.
 
 | Severity | Count |
 |----------|-------|
@@ -23,7 +23,7 @@ The DocForge application demonstrates good security fundamentals with proper pas
 
 ### 1. Server-Side Template Injection (SSTI) - CRITICAL
 
-**Location:** `src/docforge/engine/renderer.py:21-26`
+**Location:** `src/ion/engine/renderer.py:21-26`
 
 **Issue:** The Jinja2 template engine is configured with `autoescape=False`, and user-controlled template content is rendered directly. This allows arbitrary code execution via SSTI payloads.
 
@@ -73,7 +73,7 @@ Template content: {{ ''.__class__.__mro__[1].__subclasses__() }}
 
 ### 3. OIDC State Parameter Not Validated - HIGH
 
-**Location:** `src/docforge/web/api.py:298-448` (oidc_callback)
+**Location:** `src/ion/web/api.py:298-448` (oidc_callback)
 
 **Issue:** The OIDC callback endpoint receives a `state` parameter but does not validate it against the state stored in the user's session. This makes the application vulnerable to CSRF attacks during the OAuth flow.
 
@@ -92,7 +92,7 @@ async def oidc_callback(
 
 ### 4. Open Redirect in OIDC Error Handling - HIGH
 
-**Location:** `src/docforge/web/api.py:315-320, 428-448`
+**Location:** `src/ion/web/api.py:315-320, 428-448`
 
 **Issue:** Error messages from Keycloak or internal errors are directly embedded in redirect URLs without URL encoding, potentially allowing XSS via the error parameter.
 
@@ -135,7 +135,7 @@ return RedirectResponse(
 
 ### 6. Timing Attack on User Enumeration - MEDIUM
 
-**Location:** `src/docforge/auth/service.py:59-74`
+**Location:** `src/ion/auth/service.py:59-74`
 
 **Issue:** The login function has different code paths for "user not found" vs "invalid password", potentially allowing timing-based user enumeration.
 
@@ -154,7 +154,7 @@ if not password_hasher.verify(password, user.password_hash):
 
 ### 7. Session Token Not Rotated After Login - MEDIUM
 
-**Location:** `src/docforge/auth/service.py:76-86`
+**Location:** `src/ion/auth/service.py:76-86`
 
 **Issue:** When using OIDC, if a user already has an active session and logs in again, the old session tokens remain valid. This can lead to session fixation-like issues.
 
@@ -183,7 +183,7 @@ raise HTTPException(status_code=400, detail=str(e))  # Exposes exception details
 
 ### 9. Cookie Secure Flag Hardcoded to False - LOW
 
-**Location:** `src/docforge/web/api.py:185, 422`
+**Location:** `src/ion/web/api.py:185, 422`
 
 **Issue:** The session cookie `secure` flag is hardcoded to `False`:
 
@@ -197,7 +197,7 @@ secure=False,  # Set to True in production with HTTPS
 
 ### 10. Default Admin Credentials - LOW
 
-**Location:** `src/docforge/auth/service.py:469-494`
+**Location:** `src/ion/auth/service.py:469-494`
 
 **Issue:** Default admin user is created with predictable credentials:
 - Username: `admin`
@@ -212,7 +212,7 @@ While `must_change_password` is set, this is a known-weak default.
 
 ### 11. Missing Security Headers - LOW
 
-**Location:** `src/docforge/web/server.py`
+**Location:** `src/ion/web/server.py`
 
 **Issue:** The application does not set security headers:
 - `X-Content-Type-Options`
@@ -287,7 +287,7 @@ curl "http://localhost:8000/api/auth/oidc/callback?error=<script>alert(1)</scrip
 
 ## Conclusion
 
-DocForge has a solid security foundation but requires remediation of the identified vulnerabilities before production deployment. The critical SSTI vulnerability should be addressed immediately, followed by the OIDC and CSRF issues. The codebase shows security-conscious development practices that can be built upon.
+ION has a solid security foundation but requires remediation of the identified vulnerabilities before production deployment. The critical SSTI vulnerability should be addressed immediately, followed by the OIDC and CSRF issues. The codebase shows security-conscious development practices that can be built upon.
 
 ---
 
