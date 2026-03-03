@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}IXION{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=0.7.0">
-    <link rel="stylesheet" href="/static/css/chat.css?v=0.7.0">
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.7.0">
+    <link rel="stylesheet" href="/static/css/lucide.css?v=0.7.1">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.7.1">
+    <link rel="stylesheet" href="/static/css/chat.css?v=0.7.1">
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.7.1">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
     <script>
         // Load theme and mode immediately to prevent flash
@@ -68,22 +69,18 @@
         </ul>
         <!-- Chat toggle button -->
         <button class="chat-toggle-btn" id="chat-toggle-btn" onclick="toggleChat()" title="Chat">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
+            <i class="icon-message-square"></i>
             <span class="chat-unread-badge" id="chat-unread-badge" style="display: none;">0</span>
         </button>
         <!-- Notepad toggle button -->
         <button class="chat-toggle-btn" id="notepad-toggle-btn" onclick="toggleNotepad()" title="Notepad (Ctrl+Shift+N)">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
+            <i class="icon-notebook-pen"></i>
         </button>
         <div class="user-menu" id="user-menu">
             <button class="user-menu-btn" onclick="toggleUserDropdown()">
                 <span class="user-avatar" id="user-avatar">?</span>
                 <span class="user-name" id="user-name">Loading...</span>
-                <span class="dropdown-arrow">&#9662;</span>
+                <span class="dropdown-arrow"><i class="icon-chevron-down"></i></span>
             </button>
             <div class="user-dropdown" id="user-dropdown">
                 <div class="user-dropdown-header" id="user-dropdown-header">
@@ -122,10 +119,10 @@
             <!-- Editor (hidden by default) -->
             <div id="np-note-editor" class="np-editor" style="display:none;">
                 <div class="np-editor-toolbar">
-                    <button id="np-btn-back" class="np-btn-sm" title="Back to list">&#8592; Back</button>
+                    <button id="np-btn-back" class="np-btn-sm" title="Back to list"><i class="icon-arrow-left"></i> Back</button>
                     <span id="np-save-status" class="np-save-status"></span>
-                    <button id="np-btn-pin" class="np-btn-sm" title="Toggle pin">&#128204;</button>
-                    <button id="np-btn-delete" class="np-btn-sm np-btn-danger" title="Delete note">&#128465;</button>
+                    <button id="np-btn-pin" class="np-btn-sm" title="Toggle pin"><i class="icon-pin"></i></button>
+                    <button id="np-btn-delete" class="np-btn-sm np-btn-danger" title="Delete note"><i class="icon-trash-2"></i></button>
                 </div>
                 <input type="text" id="np-note-title" class="np-title-input" placeholder="Note title...">
                 <div id="notepad-editor" class="np-quill-wrap"></div>

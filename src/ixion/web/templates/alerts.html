@@ -18,7 +18,7 @@
 <!-- Threat Banner -->
 <div class="security-banner" id="alerts-threat-banner">
     <div class="threat-level" id="alerts-threat-level">
-        <span class="threat-icon">&#9888;</span>
+        <span class="threat-icon"><i class="icon-shield-alert"></i></span>
         <span class="threat-text">Loading threat assessment...</span>
     </div>
     <div class="threat-stats" id="alerts-threat-stats"></div>
@@ -26,7 +26,7 @@
 
 <!-- Attention Banner -->
 <div class="alert-attn-banner" id="alert-attn-banner" style="display:none;">
-    <span class="alert-attn-icon">&#9888;</span>
+    <span class="alert-attn-icon"><i class="icon-alert-triangle"></i></span>
     <span class="alert-attn-label">Needs attention:</span>
     <div class="alert-attn-chips" id="alert-attn-chips"></div>
     <button class="alert-attn-dismiss" onclick="dismissAlertAttention()">&times;</button>
@@ -90,7 +90,7 @@
 <!-- Analytics Dashboard (collapsible) -->
 <div class="analytics-toggle">
     <button class="btn btn-secondary btn-sm" id="analytics-toggle-btn" onclick="toggleAnalytics()">
-        <span id="analytics-toggle-icon">&#9654;</span> Analytics Dashboard
+        <span id="analytics-toggle-icon"><i class="icon-chevron-right"></i></span> Analytics Dashboard
     </button>
 </div>
 <div class="analytics-dashboard" id="analytics-dashboard" style="display:none;">
@@ -148,7 +148,7 @@
 <div class="pattern-detections-panel" id="pattern-detections-panel" style="display:none;">
     <div class="pattern-panel-header" onclick="togglePatternPanel()">
         <div class="pattern-panel-title">
-            <span class="pattern-panel-icon" id="pattern-panel-icon">&#9654;</span>
+            <span class="pattern-panel-icon" id="pattern-panel-icon"><i class="icon-chevron-right"></i></span>
             <span>Pattern Detections</span>
             <span class="pattern-count-badge" id="pattern-count-badge">0</span>
         </div>
@@ -236,16 +236,16 @@
 <!-- Alert Context Menu -->
 <div id="alert-context-menu" class="context-menu" style="display: none;">
     <div class="context-menu-item" onclick="contextMenuAction('open')">
-        <span class="context-icon">&#128269;</span> View Details
+        <span class="context-icon"><i class="icon-eye"></i></span> View Details
     </div>
     <div class="context-menu-divider"></div>
     <div class="context-menu-item" onclick="contextMenuAction('assign-me')">
-        <span class="context-icon">&#128100;</span> Assign to Me
+        <span class="context-icon"><i class="icon-user-check"></i></span> Assign to Me
     </div>
     <div class="context-menu-submenu">
         <div class="context-menu-item">
-            <span class="context-icon">&#9654;</span> Set Status
-            <span class="submenu-arrow">&#9656;</span>
+            <span class="context-icon"><i class="icon-circle-dot"></i></span> Set Status
+            <span class="submenu-arrow"><i class="icon-chevron-right"></i></span>
         </div>
         <div class="context-submenu">
             <div class="context-menu-item" onclick="contextMenuAction('status', 'open')">Open</div>
@@ -258,8 +258,8 @@
     </div>
     <div class="context-menu-submenu">
         <div class="context-menu-item">
-            <span class="context-icon">&#128683;</span> Close As...
-            <span class="submenu-arrow">&#9656;</span>
+            <span class="context-icon"><i class="icon-x-circle"></i></span> Close As...
+            <span class="submenu-arrow"><i class="icon-chevron-right"></i></span>
         </div>
         <div class="context-submenu">
             <div class="context-menu-item" onclick="contextMenuAction('close-as', 'benign')" style="color:#10b981;">&#10003; Benign</div>
@@ -269,8 +269,8 @@
     </div>
     <div class="context-menu-submenu">
         <div class="context-menu-item">
-            <span class="context-icon">&#9733;</span> Set Priority
-            <span class="submenu-arrow">&#9656;</span>
+            <span class="context-icon"><i class="icon-flag"></i></span> Set Priority
+            <span class="submenu-arrow"><i class="icon-chevron-right"></i></span>
         </div>
         <div class="context-submenu">
             <div class="context-menu-item" onclick="contextMenuAction('priority', 'critical')">Critical</div>
@@ -281,17 +281,17 @@
     </div>
     <div class="context-menu-divider"></div>
     <div class="context-menu-item" onclick="contextMenuAction('create-case')">
-        <span class="context-icon">&#128193;</span> Create Case
+        <span class="context-icon"><i class="icon-folder-plus"></i></span> Create Case
     </div>
     <div class="context-menu-item" onclick="contextMenuAction('add-to-case')">
-        <span class="context-icon">&#128194;</span> Add to Case...
+        <span class="context-icon"><i class="icon-folder"></i></span> Add to Case...
     </div>
     <div class="context-menu-divider"></div>
     <div class="context-menu-item" onclick="contextMenuAction('copy-id')">
-        <span class="context-icon">&#128203;</span> Copy Alert ID
+        <span class="context-icon"><i class="icon-clipboard"></i></span> Copy Alert ID
     </div>
     <div class="context-menu-item" onclick="contextMenuAction('kibana')">
-        <span class="context-icon">&#128279;</span> Open in Kibana
+        <span class="context-icon"><i class="icon-external-link"></i></span> Open in Kibana
     </div>
 </div>
 
@@ -4120,7 +4120,7 @@ async function checkKFPMatches(caseData) {
         const match = data.matches[0];
         container.innerHTML = `
             <div class="fp-suggestion-banner">
-                <span class="fp-icon">&#9888;</span>
+                <span class="fp-icon"><i class="icon-alert-triangle"></i></span>
                 <span class="fp-text">
                     Matches known false positive: <strong>${escapeHtml(match.title)}</strong>
                     <span style="font-size:0.75rem;color:var(--text-muted);margin-left:0.25rem;">(matched: ${match.matched_fields.join(', ')})</span>
@@ -4196,7 +4196,7 @@ async function checkKFPMatchesForTab(caseData) {
         const match = data.matches[0];
         container.innerHTML = `
             <div class="fp-suggestion-banner">
-                <span class="fp-icon">&#9888;</span>
+                <span class="fp-icon"><i class="icon-alert-triangle"></i></span>
                 <span class="fp-text">
                     Matches known false positive: <strong>${escapeHtml(match.title)}</strong>
                     <span style="font-size:0.75rem;color:var(--text-muted);margin-left:0.25rem;">(matched: ${match.matched_fields.join(', ')})</span>
@@ -5358,7 +5358,7 @@ function renderPlaybooksSection(alertId) {
     }
 
     // Browse Playbook Library link
-    html += `<span class="playbook-library-toggle" onclick="togglePlaybookLibrary('${escapeHtml(alertId)}')">Browse Playbook Library &#9662;</span>`;
+    html += `<span class="playbook-library-toggle" onclick="togglePlaybookLibrary('${escapeHtml(alertId)}')">Browse Playbook Library <i class="icon-chevron-down"></i></span>`;
     html += `<div id="playbook-library-panel-${CSS.escape(alertId)}" style="display:none;"></div>`;
 
     // Show completed executions count
@@ -6165,9 +6165,9 @@ function renderAlerts() {
             <td>${formatDate(a.timestamp)}</td>
             <td class="quick-actions-col" onclick="event.stopPropagation()">
                 <div class="quick-actions">
-                    <button class="quick-action-btn" onclick="quickAssignToMe('${escapeHtml(a.id)}')" title="Assign to me">&#128100;</button>
-                    <button class="quick-action-btn" onclick="quickStatusChange('${escapeHtml(a.id)}', 'investigating')" title="Mark investigating">&#128270;</button>
-                    <button class="quick-action-btn" onclick="showCreateCaseForm('${escapeHtml(a.id)}')" title="Create case">&#128193;</button>
+                    <button class="quick-action-btn" onclick="quickAssignToMe('${escapeHtml(a.id)}')" title="Assign to me"><i class="icon-user-check"></i></button>
+                    <button class="quick-action-btn" onclick="quickStatusChange('${escapeHtml(a.id)}', 'investigating')" title="Mark investigating"><i class="icon-search"></i></button>
+                    <button class="quick-action-btn" onclick="showCreateCaseForm('${escapeHtml(a.id)}')" title="Create case"><i class="icon-folder-plus"></i></button>
                 </div>
             </td>
         </tr>
@@ -6321,11 +6321,11 @@ function toggleAnalytics() {
     const icon = document.getElementById('analytics-toggle-icon');
     if (dash.style.display === 'none') {
         dash.style.display = 'block';
-        icon.innerHTML = '&#9660;';
+        icon.innerHTML = '<i class="icon-chevron-down"></i>';
         renderAnalytics();
     } else {
         dash.style.display = 'none';
-        icon.innerHTML = '&#9654;';
+        icon.innerHTML = '<i class="icon-chevron-right"></i>';
         stopMap();
     }
 }
@@ -7589,7 +7589,7 @@ function toggleInvestigationTimer() {
         if (investigationStartTime) {
             investigationElapsedTime += Math.floor((Date.now() - investigationStartTime) / 1000);
         }
-        btn.innerHTML = '&#9654;'; // Play icon
+        btn.innerHTML = '<i class="icon-play"></i>'; // Play icon
         btn.classList.add('playing');
         display.classList.add('paused');
     }

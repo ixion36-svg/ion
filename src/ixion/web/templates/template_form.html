@@ -614,9 +614,9 @@ function renderSections() {
             '<span class="se-card-title">' + escapeHtml(titleText) + '</span>' +
             '<span class="se-card-type">' + escapeHtml(st.label) + '</span>' +
             '<div class="se-card-actions">' +
-                '<button type="button" title="Move up" onclick="moveSection(' + idx + ', -1)">&#9650;</button>' +
-                '<button type="button" title="Move down" onclick="moveSection(' + idx + ', 1)">&#9660;</button>' +
-                '<button type="button" class="se-delete" title="Delete" onclick="removeSection(' + idx + ')">&#10005;</button>' +
+                '<button type="button" title="Move up" onclick="moveSection(' + idx + ', -1)"><i class="icon-chevron-up"></i></button>' +
+                '<button type="button" title="Move down" onclick="moveSection(' + idx + ', 1)"><i class="icon-chevron-down"></i></button>' +
+                '<button type="button" class="se-delete" title="Delete" onclick="removeSection(' + idx + ')"><i class="icon-x"></i></button>' +
             '</div>';
         card.appendChild(header);
 

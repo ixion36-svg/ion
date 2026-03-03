@@ -787,6 +787,145 @@ body::before {
 }
 
 /* =============================================================================
+   Lucide Icon Colors — theme-aware semantic coloring
+   ============================================================================= */
+
+/* ── Default: icons inherit the theme accent ──────────────────────────────── */
+.action-icon i,
+.tool-icon i,
+.tool-icon-sm i,
+.stat-icon i,
+.card-icon i {
+    color: var(--primary);
+    transition: color 0.2s, filter 0.2s;
+}
+
+/* Subtle glow on card/action hover */
+.action-card:hover .action-icon i,
+.tool-card:hover .tool-icon i,
+.tool-card:hover .tool-icon-sm i,
+.stat-card:hover .stat-icon i {
+    filter: drop-shadow(0 0 6px var(--primary-glow));
+}
+
+/* ── Semantic icon colors — override per icon meaning ─────────────────────── */
+
+/* Danger / Alert icons — always red-ish */
+.icon-alert-triangle,
+.icon-shield-alert,
+.icon-triangle-alert {
+    color: var(--danger) !important;
+}
+
+/* Success / Check icons */
+.icon-check,
+.icon-check-square,
+.icon-circle-check,
+.icon-shield-check {
+    color: var(--success) !important;
+}
+
+/* Warning / Caution */
+.icon-ban,
+.icon-x-circle {
+    color: var(--warning) !important;
+}
+
+/* Info / Search / Discover */
+.icon-search,
+.icon-scan-eye,
+.icon-eye {
+    color: var(--info) !important;
+}
+
+/* Folders — warm amber */
+.icon-folder,
+.icon-folder-open,
+.icon-folder-plus {
+    color: var(--neon-yellow) !important;
+}
+
+/* Files / Documents — muted cool */
+.icon-file-text,
+.icon-file-scan,
+.icon-file-code,
+.icon-scroll-text {
+    color: var(--text-secondary) !important;
+}
+
+/* Globe / External — theme accent */
+.icon-globe,
+.icon-external-link,
+.icon-link {
+    color: var(--primary) !important;
+}
+
+/* Navigation chrome — subtle, don't overpower */
+.dropdown-arrow i,
+.np-btn-sm i,
+.chat-toggle-btn i,
+.context-icon i,
+.submenu-arrow i {
+    color: var(--text-secondary);
+}
+.chat-toggle-btn:hover i,
+.np-btn-sm:hover i {
+    color: var(--primary);
+}
+
+/* Quick-action buttons in tables */
+.quick-action-btn i {
+    color: var(--text-secondary);
+    transition: color 0.15s;
+}
+.quick-action-btn:hover i {
+    color: var(--primary);
+}
+
+/* Notepad delete — red */
+.np-btn-danger i {
+    color: var(--danger) !important;
+}
+
+/* ── Training role card icons — each tier gets its own tint ───────────────── */
+.role-card.t1 .card-icon i { color: var(--neon-green); }
+.role-card.t2 .card-icon i { color: var(--neon-blue); }
+.role-card.t3 .card-icon i { color: var(--neon-purple); }
+.role-card.t4 .card-icon i { color: var(--neon-orange); }
+
+/* ── Security dashboard stat icons ────────────────────────────────────────── */
+.stat-icon-total i    { color: var(--primary) !important; }
+.stat-icon-critical i { color: var(--danger) !important; }
+.stat-icon-high i     { color: var(--neon-orange) !important; }
+.stat-icon-blocked i  { color: var(--warning) !important; }
+
+/* ── Analyst workspace stat bar — colored per section ─────────────────────── */
+.stat-alerts .stat-icon i      { color: var(--danger) !important; }
+.stat-cases .stat-icon i       { color: var(--neon-blue) !important; }
+.stat-observables .stat-icon i { color: var(--neon-yellow) !important; }
+.stat-playbooks .stat-icon i   { color: var(--neon-green) !important; }
+
+/* ── Light mode adjustments — slightly bolder for readability ─────────────── */
+[data-mode="light"] .action-icon i,
+[data-mode="light"] .tool-icon i,
+[data-mode="light"] .tool-icon-sm i,
+[data-mode="light"] .stat-icon i,
+[data-mode="light"] .card-icon i {
+    filter: saturate(1.1) brightness(0.9);
+}
+[data-mode="light"] .icon-folder,
+[data-mode="light"] .icon-folder-open,
+[data-mode="light"] .icon-folder-plus {
+    color: #b45309 !important;
+}
+[data-mode="light"] .icon-file-text,
+[data-mode="light"] .icon-file-scan,
+[data-mode="light"] .icon-file-code,
+[data-mode="light"] .icon-scroll-text {
+    color: var(--text-muted) !important;
+}
+
+/* =============================================================================
    Forms
    ============================================================================= */
 

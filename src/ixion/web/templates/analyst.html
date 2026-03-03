@@ -11,28 +11,28 @@
 <!-- Quick Stats Bar -->
 <div class="analyst-stats-bar" id="analyst-stats">
     <div class="stat-card stat-alerts" onclick="navigateTo('alerts')">
-        <span class="stat-icon">&#9888;</span>
+        <span class="stat-icon"><i class="icon-alert-triangle"></i></span>
         <div class="stat-content">
             <span class="stat-value" id="stat-open-alerts">-</span>
             <span class="stat-label">Open Alerts</span>
         </div>
     </div>
     <div class="stat-card stat-cases" onclick="navigateTo('cases')">
-        <span class="stat-icon">&#128193;</span>
+        <span class="stat-icon"><i class="icon-folder"></i></span>
         <div class="stat-content">
             <span class="stat-value" id="stat-active-cases">-</span>
             <span class="stat-label">Active Cases</span>
         </div>
     </div>
     <div class="stat-card stat-observables" onclick="navigateTo('observables')">
-        <span class="stat-icon">&#128269;</span>
+        <span class="stat-icon"><i class="icon-search"></i></span>
         <div class="stat-content">
             <span class="stat-value" id="stat-watched-iocs">-</span>
             <span class="stat-label">Watched IOCs</span>
         </div>
     </div>
     <div class="stat-card stat-playbooks" onclick="navigateTo('playbooks')">
-        <span class="stat-icon">&#128214;</span>
+        <span class="stat-icon"><i class="icon-book-open"></i></span>
         <div class="stat-content">
             <span class="stat-value" id="stat-active-playbooks">-</span>
             <span class="stat-label">Active Playbooks</span>
@@ -54,7 +54,7 @@
             <h2 class="section-title">Investigation</h2>
             <div class="tools-cards">
                 <div class="tool-card" onclick="navigateTo('alerts')">
-                    <div class="tool-icon">&#9888;</div>
+                    <div class="tool-icon"><i class="icon-alert-triangle"></i></div>
                     <h3>Alert Triage</h3>
                     <p>Review, investigate, and escalate security alerts from Elasticsearch</p>
                     <div class="tool-actions">
@@ -63,7 +63,7 @@
                 </div>
 
                 <div class="tool-card" onclick="navigateTo('cases')">
-                    <div class="tool-icon">&#128193;</div>
+                    <div class="tool-icon"><i class="icon-folder"></i></div>
                     <h3>Case Management</h3>
                     <p>Create and manage investigation cases, link alerts, and track progress</p>
                     <div class="tool-actions">
@@ -72,7 +72,7 @@
                 </div>
 
                 <div class="tool-card" onclick="navigateTo('observables')">
-                    <div class="tool-icon">&#128269;</div>
+                    <div class="tool-icon"><i class="icon-scan-eye"></i></div>
                     <h3>Observables</h3>
                     <p>Track and enrich IOCs - IPs, domains, hashes, URLs, and more</p>
                     <div class="tool-actions">
@@ -81,7 +81,7 @@
                 </div>
 
                 <div class="tool-card" onclick="navigateTo('playbooks')">
-                    <div class="tool-icon">&#128214;</div>
+                    <div class="tool-icon"><i class="icon-book-open"></i></div>
                     <h3>Playbooks</h3>
                     <p>Create and execute investigation playbooks with automated steps</p>
                     <div class="tool-actions">
@@ -96,7 +96,7 @@
             <h2 class="section-title">Search & Discovery</h2>
             <div class="tools-cards">
                 <div class="tool-card" onclick="navigateTo('discover')">
-                    <div class="tool-icon">&#128270;</div>
+                    <div class="tool-icon"><i class="icon-search"></i></div>
                     <h3>Discover</h3>
                     <p>Search and explore Elasticsearch data with saved queries</p>
                     <div class="tool-actions">
@@ -105,13 +105,13 @@
                 </div>
 
                 <div class="tool-card" onclick="navigateTo('tools', 'lookup')">
-                    <div class="tool-icon">&#127760;</div>
+                    <div class="tool-icon"><i class="icon-globe"></i></div>
                     <h3>IOC Lookup</h3>
                     <p>Query threat intelligence via OpenCTI for IPs, domains, and hashes</p>
                 </div>
 
                 <div class="tool-card" onclick="navigateTo('tools', 'ioc')">
-                    <div class="tool-icon">&#128196;</div>
+                    <div class="tool-icon"><i class="icon-file-scan"></i></div>
                     <h3>IOC Processor</h3>
                     <p>Extract, defang, and process IOCs from text and logs</p>
                 </div>
@@ -123,43 +123,43 @@
             <h2 class="section-title">SOC Utilities</h2>
             <div class="tools-cards tools-cards-compact">
                 <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'timestamp')">
-                    <div class="tool-icon-sm">&#128339;</div>
+                    <div class="tool-icon-sm"><i class="icon-clock"></i></div>
                     <h4>Timestamp</h4>
                     <p>Convert between timestamp formats</p>
                 </div>
 
                 <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'hash')">
-                    <div class="tool-icon-sm">&#128273;</div>
+                    <div class="tool-icon-sm"><i class="icon-hash"></i></div>
                     <h4>Hash Identifier</h4>
                     <p>Identify hash types (MD5, SHA, etc.)</p>
                 </div>
 
                 <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'url')">
-                    <div class="tool-icon-sm">&#128279;</div>
+                    <div class="tool-icon-sm"><i class="icon-link"></i></div>
                     <h4>URL Parser</h4>
                     <p>Parse and analyze URL components</p>
                 </div>
 
                 <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'regex')">
-                    <div class="tool-icon-sm">&#10024;</div>
+                    <div class="tool-icon-sm"><i class="icon-code"></i></div>
                     <h4>Regex Tester</h4>
                     <p>Test regular expressions</p>
                 </div>
 
                 <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'email')">
-                    <div class="tool-icon-sm">&#128231;</div>
+                    <div class="tool-icon-sm"><i class="icon-mail"></i></div>
                     <h4>Email Headers</h4>
                     <p>Analyze email header information</p>
                 </div>
 
                 <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'log')">
-                    <div class="tool-icon-sm">&#128220;</div>
+                    <div class="tool-icon-sm"><i class="icon-scroll-text"></i></div>
                     <h4>Log Parser</h4>
                     <p>Parse various log formats</p>
                 </div>
 
                 <div class="tool-card tool-card-sm" onclick="navigateTo('tools', 'encoding')">
-                    <div class="tool-icon-sm">&#128259;</div>
+                    <div class="tool-icon-sm"><i class="icon-file-code"></i></div>
                     <h4>Encoding</h4>
                     <p>Encode/decode Base64, Hex, URL</p>
                 </div>
@@ -172,16 +172,16 @@
         <h3>Quick Actions</h3>
         <div class="quick-action-buttons">
             <button class="btn btn-primary" onclick="navigateTo('alerts')">
-                <span>&#9888;</span> Triage Alerts
+                <i class="icon-alert-triangle"></i> Triage Alerts
             </button>
             <button class="btn" onclick="navigateTo('discover')">
-                <span>&#128270;</span> Search Logs
+                <i class="icon-search"></i> Search Logs
             </button>
             <button class="btn" onclick="navigateTo('observables')">
-                <span>&#128269;</span> Lookup IOC
+                <i class="icon-scan-eye"></i> Lookup IOC
             </button>
             <button class="btn" onclick="openQuickIOCLookup()">
-                <span>&#127760;</span> Quick Lookup
+                <i class="icon-globe"></i> Quick Lookup
             </button>
         </div>
     </div>
@@ -1118,7 +1118,7 @@ async function viewKBArticle(docId) {
         const colId = doc.collection_id;
 
         // Build breadcrumb
-        breadcrumbEl.innerHTML = '<a onclick="backToKBList()">&#8592; Back to articles</a>'
+        breadcrumbEl.innerHTML = '<a onclick="backToKBList()"><i class="icon-arrow-left"></i> Back to articles</a>'
             + '<span class="kb-breadcrumb-sep">/</span>'
             + '<a onclick="selectKBCollection(' + colId + ')">' + esc(colName) + '</a>'
             + '<span class="kb-breadcrumb-sep">/</span>'

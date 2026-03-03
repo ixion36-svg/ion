@@ -19,11 +19,11 @@
         </div>
         <div id="folder-tree" class="folder-tree">
             <div class="folder-item active" data-id="" onclick="selectFolder(null)">
-                <span class="folder-icon">📁</span>
+                <span class="folder-icon"><i class="icon-folder"></i></span>
                 <span class="folder-name">All Templates</span>
             </div>
             <div class="folder-item" data-id="uncategorized" onclick="selectFolder('uncategorized')">
-                <span class="folder-icon">📄</span>
+                <span class="folder-icon"><i class="icon-file-text"></i></span>
                 <span class="folder-name">Uncategorized</span>
             </div>
             <div id="folder-list"></div>
@@ -323,7 +323,7 @@ function renderFolderItems(folders, depth) {
 
         html += '<div class="' + indent + '">';
         html += '<div class="folder-item' + (isActive ? ' active' : '') + '" data-id="' + f.id + '" onclick="selectFolder(' + f.id + ')">';
-        html += '<span class="folder-icon">' + (f.children.length > 0 ? '📂' : '📁') + '</span>';
+        html += '<span class="folder-icon">' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
         html += '<span class="folder-name">' + escapeHtml(f.name) + '</span>';
         html += '<span class="folder-manage-counts">(' + f.template_count + ')</span>';
         html += '</div>';
@@ -549,7 +549,7 @@ function renderFolderManageItems(folders, depth = 0) {
         html += '<div class="' + indent + '">';
         html += '<div class="folder-manage-item">';
         html += '<div class="folder-manage-info">';
-        html += '<span>' + (f.children.length > 0 ? '📂' : '📁') + '</span>';
+        html += '<span>' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
         html += '<span>' + escapeHtml(f.name) + '</span>';
         html += '<span class="folder-manage-counts">' + f.template_count + ' templates, ' + (f.document_count || 0) + ' docs</span>';
         html += '</div>';

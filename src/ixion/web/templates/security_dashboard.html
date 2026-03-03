@@ -14,7 +14,7 @@
 <!-- Threat Summary Banner -->
 <div class="security-banner" id="threat-banner">
     <div class="threat-level" id="threat-level">
-        <span class="threat-icon">&#9888;</span>
+        <span class="threat-icon"><i class="icon-shield-alert"></i></span>
         <span class="threat-text">Loading threat assessment...</span>
     </div>
     <div class="threat-stats" id="threat-stats">
@@ -25,28 +25,28 @@
 <!-- Statistics Cards -->
 <div class="stats-grid">
     <div class="stat-card">
-        <div class="stat-icon stat-icon-total">&#128202;</div>
+        <div class="stat-icon stat-icon-total"><i class="icon-chart-bar"></i></div>
         <div class="stat-content">
             <div class="stat-value" id="stat-total">-</div>
             <div class="stat-label">Events (24h)</div>
         </div>
     </div>
     <div class="stat-card stat-card-critical">
-        <div class="stat-icon stat-icon-critical">&#9888;</div>
+        <div class="stat-icon stat-icon-critical"><i class="icon-alert-triangle"></i></div>
         <div class="stat-content">
             <div class="stat-value" id="stat-critical">-</div>
             <div class="stat-label">Critical</div>
         </div>
     </div>
     <div class="stat-card stat-card-high">
-        <div class="stat-icon stat-icon-high">&#9888;</div>
+        <div class="stat-icon stat-icon-high"><i class="icon-alert-triangle"></i></div>
         <div class="stat-content">
             <div class="stat-value" id="stat-high">-</div>
             <div class="stat-label">High</div>
         </div>
     </div>
     <div class="stat-card stat-card-blocked">
-        <div class="stat-icon stat-icon-blocked">&#128683;</div>
+        <div class="stat-icon stat-icon-blocked"><i class="icon-ban"></i></div>
         <div class="stat-content">
             <div class="stat-value" id="stat-blocked">-</div>
             <div class="stat-label">Blocked</div>
@@ -651,7 +651,7 @@ async function loadThreatSummary() {
                     <span class="list-item-ip">${escapeHtml(ip.ip)}</span>
                     <div class="list-item-actions">
                         <span class="list-item-count">${ip.count}</span>
-                        <button class="btn btn-sm btn-danger" onclick="quickBlockIP('${escapeHtml(ip.ip)}')" title="Block IP">&#128683;</button>
+                        <button class="btn btn-sm btn-danger" onclick="quickBlockIP('${escapeHtml(ip.ip)}')" title="Block IP"><i class="icon-ban"></i></button>
                     </div>
                 </div>
             `).join('');
@@ -728,7 +728,7 @@ async function loadEvents() {
                 <td>${event.event_count}</td>
                 <td><span class="status-badge status-${event.status.replace(/_/g, '-')}">${formatStatus(event.status)}</span></td>
                 <td>
-                    <button class="btn btn-sm" onclick="event.stopPropagation(); quickBlockIP('${escapeHtml(event.source_ip)}')" title="Block IP">&#128683;</button>
+                    <button class="btn btn-sm" onclick="event.stopPropagation(); quickBlockIP('${escapeHtml(event.source_ip)}')" title="Block IP"><i class="icon-ban"></i></button>
                 </td>
             </tr>
         `}).join('');
@@ -815,7 +815,7 @@ async function showEventDetail(eventId) {
             if (payloadSections) {
                 rawDataHtml = `
                 <div class="event-payload">
-                    <div class="event-payload-title">&#9888; Detected Payload / Trigger Data</div>
+                    <div class="event-payload-title"><i class="icon-alert-triangle"></i> Detected Payload / Trigger Data</div>
                     <div class="event-payload-content">${payloadSections}</div>
                 </div>`;
             }

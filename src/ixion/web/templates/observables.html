@@ -1367,13 +1367,13 @@ function renderObservables() {
             </td>
             <td class="actions-cell" onclick="event.stopPropagation();">
                 <button class="btn btn-sm ${obs.is_watched ? 'btn-warning' : ''}" onclick="toggleWatchlist(${obs.id}, ${obs.is_watched})" title="${obs.is_watched ? 'Remove from watchlist' : 'Add to watchlist'}">
-                    <span style="font-size: 0.875rem;">&#128065;</span>
+                    <i class="icon-eye"></i>
                 </button>
                 <button class="btn btn-sm" onclick="enrichObservable(${obs.id})" title="Enrich">
-                    <span style="font-size: 0.875rem;">&#128269;</span>
+                    <i class="icon-search"></i>
                 </button>
                 <button class="btn btn-sm" onclick="showTimeline(${obs.id})" title="View Timeline">
-                    <span style="font-size: 0.875rem;">&#128197;</span>
+                    <i class="icon-clock"></i>
                 </button>
             </td>
         </tr>
