@@ -31,9 +31,16 @@ services:
     # Security hardening
     security_opt:
       - no-new-privileges:true
-    read_only: true
     tmpfs:
       - /tmp
+
+    # Health check — used by seeder to know when IXION is ready
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
 
     # Resource limits (increased for NLP processing)
     deploy:
@@ -96,6 +103,29 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
+
+  # =============================================================================
+  # Seeder - One-shot data population
+  # =============================================================================
+  # Seeds KB articles and playbooks on first run, then exits.
+  # Shares ixion-data volume for .seeded marker persistence.
+  # Skips automatically on subsequent starts.
+  seeder:
+    image: ixion:latest
+    container_name: ixion-seeder
+    entrypoint: ["python", "/app/seed_all.py"]
+    volumes:
+      - ixion-data:/data
+    env_file:
+      - .env
+    environment:
+      - IXION_SEED_URL=http://ixion:8000
+    depends_on:
+      ixion:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - default
 
 networks:
   ixion-dev:

@@ -42,8 +42,9 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy application source and entrypoint
+# Copy application source, seed scripts, and entrypoint
 COPY src/ src/
+COPY seed_all.py seed_knowledge_base*.py seed_playbooks.py /app/
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

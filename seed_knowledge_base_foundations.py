@@ -10,19 +10,20 @@ Usage:
     cd C:\\Users\\Tomo\\ixion
     C:\\Python314\\python.exe seed_knowledge_base_foundations.py
 """
+import os
 import requests
 import sys
 import time
 from io import BytesIO
 
-BASE = "http://127.0.0.1:8000"
+BASE = os.environ.get("IXION_SEED_URL", "http://127.0.0.1:8000")
 SESSION = requests.Session()
 
 
 def login():
     r = SESSION.post(
         f"{BASE}/api/auth/login",
-        json={"username": "admin", "password": "admin2025"},
+        json={"username": "admin", "password": os.environ.get("IXION_ADMIN_PASSWORD", "admin2025")},
     )
     r.raise_for_status()
     print("[+] Logged in as admin")

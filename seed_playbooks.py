@@ -1,11 +1,12 @@
 """Seed ~25 inactive SOC playbooks into the IXION playbook library."""
 
+import os
 import sys
 import requests
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = os.environ.get("IXION_SEED_URL", "http://127.0.0.1:8000")
 ADMIN_USER = "admin"
-ADMIN_PASS = "admin2025"
+ADMIN_PASS = os.environ.get("IXION_ADMIN_PASSWORD", "admin2025")
 
 PLAYBOOKS = [
     # ── Phishing & Email (4) ──────────────────────────────────────────────
