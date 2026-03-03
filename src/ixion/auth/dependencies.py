@@ -4,6 +4,7 @@ import logging
 from typing import Optional, Callable, List, Generator
 
 from fastapi import Depends, HTTPException, status, Request, Cookie
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from ixion.models.user import User
@@ -216,6 +217,57 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
             detail="Admin access required",
         )
     return user
+
+
+def require_page_auth(
+    request: Request,
+    session_token: Optional[str] = Depends(get_session_token),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> User:
+    """For page routes: redirect to /login if not authenticated."""
+    if not session_token:
+        raise HTTPException(
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+            headers={"Location": "/login?redirect=" + str(request.url.path)},
+        )
+
+    user = auth_service.validate_session(session_token)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+            headers={"Location": "/login?redirect=" + str(request.url.path)},
+        )
+
+    return user
+
+
+def require_page_permission(permission_name: str) -> Callable:
+    """For page routes: redirect to /login if not auth'd, 403 if no permission."""
+    def dependency(
+        request: Request,
+        session_token: Optional[str] = Depends(get_session_token),
+        auth_service: AuthService = Depends(get_auth_service),
+    ) -> User:
+        if not session_token:
+            raise HTTPException(
+                status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+                headers={"Location": "/login?redirect=" + str(request.url.path)},
+            )
+
+        user = auth_service.validate_session(session_token)
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+                headers={"Location": "/login?redirect=" + str(request.url.path)},
+            )
+
+        if not user.has_permission(permission_name):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied: {permission_name} required",
+            )
+        return user
+    return dependency
 
 
 class PermissionChecker:

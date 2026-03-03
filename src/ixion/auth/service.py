@@ -495,21 +495,6 @@ class AuthService:
                 list(all_permissions.keys()),  # All permissions
             ),
             (
-                "editor",
-                "Can create and edit templates and documents",
-                True,
-                [
-                    "template:read", "template:create", "template:update", "template:delete",
-                    "document:read", "document:create", "document:update", "document:delete",
-                ],
-            ),
-            (
-                "viewer",
-                "Read-only access to templates and documents",
-                True,
-                ["template:read", "document:read"],
-            ),
-            (
                 "analyst",
                 "SOC Analyst with alert triage and case management",
                 True,

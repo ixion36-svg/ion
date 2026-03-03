@@ -2,7 +2,9 @@
 
 import uvicorn
 from pathlib import Path
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
+from ixion.models.user import User
+from ixion.auth.dependencies import require_page_auth, require_page_permission
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -251,56 +253,56 @@ async def startup_event():
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
+async def index(request: Request, user: User = Depends(require_page_auth)):
     """Render the main dashboard."""
     return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.get("/templates", response_class=HTMLResponse)
-async def templates_page(request: Request):
+async def templates_page(request: Request, user: User = Depends(require_page_permission("template:read"))):
     """Render the templates page."""
     return templates.TemplateResponse("templates.html", {"request": request})
 
 
 @app.get("/templates/new", response_class=HTMLResponse)
-async def new_template_page(request: Request):
+async def new_template_page(request: Request, user: User = Depends(require_page_permission("template:read"))):
     """Render the new template page."""
     return templates.TemplateResponse("template_form.html", {"request": request, "template": None})
 
 
 @app.get("/templates/{template_id}", response_class=HTMLResponse)
-async def view_template_page(request: Request, template_id: int):
+async def view_template_page(request: Request, template_id: int, user: User = Depends(require_page_permission("template:read"))):
     """Render the template view page."""
     return templates.TemplateResponse("template_view.html", {"request": request, "template_id": template_id})
 
 
 @app.get("/templates/{template_id}/edit", response_class=HTMLResponse)
-async def edit_template_page(request: Request, template_id: int):
+async def edit_template_page(request: Request, template_id: int, user: User = Depends(require_page_permission("template:read"))):
     """Render the template edit page."""
     return templates.TemplateResponse("template_form.html", {"request": request, "template_id": template_id})
 
 
 @app.get("/templates/{template_id}/render", response_class=HTMLResponse)
-async def render_template_page(request: Request, template_id: int):
+async def render_template_page(request: Request, template_id: int, user: User = Depends(require_page_permission("template:read"))):
     """Render the template rendering page."""
     return templates.TemplateResponse("template_render.html", {"request": request, "template_id": template_id})
 
 
 @app.get("/templates/{template_id}/versions", response_class=HTMLResponse)
-async def versions_page(request: Request, template_id: int):
+async def versions_page(request: Request, template_id: int, user: User = Depends(require_page_permission("template:read"))):
     """Render the versions page."""
     return templates.TemplateResponse("versions.html", {"request": request, "template_id": template_id})
 
 
 @app.get("/documents", response_class=HTMLResponse)
-async def documents_page(request: Request):
+async def documents_page(request: Request, user: User = Depends(require_page_permission("document:read"))):
     """Render the documents page."""
     return templates.TemplateResponse("documents.html", {"request": request})
 
 
 
 @app.get("/gitlab", response_class=HTMLResponse)
-async def gitlab_page(request: Request):
+async def gitlab_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the GitLab integration page."""
     return templates.TemplateResponse("gitlab.html", {"request": request})
 
@@ -313,103 +315,103 @@ async def login_page(request: Request):
 
 
 @app.get("/profile", response_class=HTMLResponse)
-async def profile_page(request: Request):
+async def profile_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the user profile page."""
     return templates.TemplateResponse("profile.html", {"request": request})
 
 
 @app.get("/users", response_class=HTMLResponse)
-async def users_page(request: Request):
+async def users_page(request: Request, user: User = Depends(require_page_permission("user:read"))):
     """Render the user management page (admin only)."""
     return templates.TemplateResponse("users.html", {"request": request})
 
 
 @app.get("/audit-logs", response_class=HTMLResponse)
-async def audit_logs_page(request: Request):
+async def audit_logs_page(request: Request, user: User = Depends(require_page_permission("system:audit_view"))):
     """Render the audit logs page (admin only)."""
     return templates.TemplateResponse("audit_logs.html", {"request": request})
 
 
 @app.get("/security", response_class=HTMLResponse)
-async def security_dashboard_page(request: Request):
-    """Render the security dashboard page (admin only)."""
+async def security_dashboard_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
+    """Render the security dashboard page."""
     return templates.TemplateResponse("security_dashboard.html", {"request": request})
 
 
 @app.get("/alerts", response_class=HTMLResponse)
-async def alerts_page(request: Request):
-    """Render the alerts investigation page (admin only)."""
+async def alerts_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the alerts investigation page."""
     return templates.TemplateResponse("alerts.html", {"request": request})
 
 
 @app.get("/cases", response_class=HTMLResponse)
-async def cases_page(request: Request):
+async def cases_page(request: Request, user: User = Depends(require_page_permission("case:read"))):
     """Render the cases management page."""
     return templates.TemplateResponse("cases.html", {"request": request})
 
 
 @app.get("/observables", response_class=HTMLResponse)
-async def observables_page(request: Request):
+async def observables_page(request: Request, user: User = Depends(require_page_permission("observable:read"))):
     """Render the observables tracking page."""
     return templates.TemplateResponse("observables.html", {"request": request})
 
 
 @app.get("/tools", response_class=HTMLResponse)
-async def tools_page(request: Request):
+async def tools_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the document tools page."""
     return templates.TemplateResponse("tools.html", {"request": request})
 
 
 @app.get("/discover", response_class=HTMLResponse)
-async def discover_page(request: Request):
+async def discover_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the discover and hunt page for analysts."""
     return templates.TemplateResponse("discover.html", {"request": request})
 
 
 @app.get("/analyst", response_class=HTMLResponse)
-async def analyst_page(request: Request):
+async def analyst_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the unified analyst workspace page."""
     return templates.TemplateResponse("analyst.html", {"request": request})
 
 
 @app.get("/integrations", response_class=HTMLResponse)
-async def integrations_page(request: Request):
-    """Render the integrations management page (admin only)."""
+async def integrations_page(request: Request, user: User = Depends(require_page_permission("integration:read"))):
+    """Render the integrations management page."""
     return templates.TemplateResponse("integrations.html", {"request": request})
 
 
 @app.get("/settings", response_class=HTMLResponse)
-async def settings_page(request: Request):
-    """Render the system settings page (admin only)."""
+async def settings_page(request: Request, user: User = Depends(require_page_permission("system:settings"))):
+    """Render the system settings page."""
     return templates.TemplateResponse("settings.html", {"request": request})
 
 
 @app.get("/playbooks", response_class=HTMLResponse)
-async def playbooks_page(request: Request):
-    """Render the playbooks management page (admin only)."""
+async def playbooks_page(request: Request, user: User = Depends(require_page_permission("playbook:read"))):
+    """Render the playbooks management page."""
     return templates.TemplateResponse("playbooks.html", {"request": request})
 
 
 @app.get("/chat", response_class=HTMLResponse)
-async def chat_page(request: Request):
+async def chat_page(request: Request, user: User = Depends(require_page_permission("ai:chat"))):
     """Render the AI chat page."""
     return templates.TemplateResponse("chat.html", {"request": request})
 
 
 @app.get("/training", response_class=HTMLResponse)
-async def training_page(request: Request):
+async def training_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the training pathways page."""
     return templates.TemplateResponse("training.html", {"request": request})
 
 
 @app.get("/notes", response_class=HTMLResponse)
-async def notes_page(request: Request):
+async def notes_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the full-page notes view."""
     return templates.TemplateResponse("notes.html", {"request": request})
 
 
 @app.get("/topology", response_class=HTMLResponse)
-async def topology_page(request: Request):
+async def topology_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
     """Render the network topology visualization page."""
     return templates.TemplateResponse("topology.html", {"request": request})
 

@@ -131,18 +131,11 @@ function updateUserMenu() {
         `;
     }
 
-    // Role-based nav visibility: 4-tier hierarchy
+    // Role-based nav visibility: analyst items are always visible (server enforces access)
     const roles = currentUserData.roles;
-    const isAnalyst = ['analyst', 'lead', 'engineering', 'admin'].some(r => roles.includes(r));
     const isLead = ['lead', 'engineering', 'admin'].some(r => roles.includes(r));
     const isEngineer = ['engineering', 'admin'].some(r => roles.includes(r));
     const isAdmin = roles.includes('admin');
-
-    // Analyst+ links (analyst/lead/engineering/admin)
-    ['nav-alerts-link', 'nav-cases-link', 'nav-observables-link', 'nav-playbooks-link', 'nav-training-link'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = isAnalyst ? 'block' : 'none';
-    });
 
     // Lead+ links (lead/engineering/admin) - security read access
     ['nav-security-link', 'nav-topology-link'].forEach(id => {
