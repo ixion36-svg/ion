@@ -6,7 +6,7 @@ version: '3.8'
 
 services:
   ixion:
-    image: ixion:latest
+    image: ixion:${IXION_VERSION:-latest}
     container_name: ixion
     restart: unless-stopped
 
@@ -55,6 +55,25 @@ services:
     networks:
       - default
       - ixion-dev
+
+    # Logging — override with a Docker logging driver if desired
+    # Default: json-file (docker logs). Alternatives: syslog, fluentd, gelf
+    # logging:
+    #   driver: syslog
+    #   options:
+    #     syslog-address: "udp://syslog-host:514"
+    #     syslog-facility: "local0"
+    #     tag: "ixion"
+    # logging:
+    #   driver: fluentd
+    #   options:
+    #     fluentd-address: "fluentd-host:24224"
+    #     tag: "ixion"
+    # logging:
+    #   driver: gelf
+    #   options:
+    #     gelf-address: "udp://graylog-host:12201"
+    #     tag: "ixion"
 
     depends_on:
       - ollama
@@ -111,7 +130,7 @@ services:
   # Shares ixion-data volume for .seeded marker persistence.
   # Skips automatically on subsequent starts.
   seeder:
-    image: ixion:latest
+    image: ixion:${IXION_VERSION:-latest}
     container_name: ixion-seeder
     entrypoint: ["python", "/app/seed_all.py"]
     volumes:

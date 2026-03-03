@@ -416,6 +416,7 @@ def setup_logging(
     ecs_format: bool = True,
     log_file: Optional[str] = None,
     elasticsearch_url: Optional[str] = None,
+    syslog_url: Optional[str] = None,
 ) -> None:
     """Configure application logging.
 
@@ -425,10 +426,11 @@ def setup_logging(
         ecs_format: Use full ECS format (vs simple JSON)
         log_file: Optional file path to write logs to (for Filebeat collection)
         elasticsearch_url: Optional Elasticsearch URL for direct log shipping
+        syslog_url: Optional syslog server URL (e.g. udp://syslog:514, tcp://syslog:514)
     """
     global _es_handler
 
-    from logging.handlers import RotatingFileHandler
+    from logging.handlers import RotatingFileHandler, SysLogHandler
     from pathlib import Path
 
     # Get settings from environment or parameters
@@ -437,6 +439,7 @@ def setup_logging(
     ecs_format = os.environ.get("IXION_LOG_ECS", str(ecs_format)).lower() == "true"
     log_file = os.environ.get("IXION_LOG_FILE", log_file)
     elasticsearch_url = os.environ.get("IXION_ES_LOG_URL", elasticsearch_url)
+    syslog_url = os.environ.get("IXION_SYSLOG_URL", syslog_url)
 
     # Configure root logger
     root_logger = logging.getLogger()
@@ -499,6 +502,50 @@ def setup_logging(
         _es_handler.setLevel(getattr(logging, level, logging.INFO))
         root_logger.addHandler(_es_handler)
         _es_handler.start()
+
+    # Create syslog handler if URL is specified
+    if syslog_url:
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(syslog_url)
+            scheme = parsed.scheme.lower()  # udp or tcp
+            host = parsed.hostname or "localhost"
+            port = parsed.port or 514
+            facility = os.environ.get("IXION_SYSLOG_FACILITY", "local0")
+
+            # Map facility name to SysLogHandler constant
+            facility_map = {
+                "kern": SysLogHandler.LOG_KERN,
+                "user": SysLogHandler.LOG_USER,
+                "mail": SysLogHandler.LOG_MAIL,
+                "daemon": SysLogHandler.LOG_DAEMON,
+                "auth": SysLogHandler.LOG_AUTH,
+                "syslog": SysLogHandler.LOG_SYSLOG,
+                "local0": SysLogHandler.LOG_LOCAL0,
+                "local1": SysLogHandler.LOG_LOCAL1,
+                "local2": SysLogHandler.LOG_LOCAL2,
+                "local3": SysLogHandler.LOG_LOCAL3,
+                "local4": SysLogHandler.LOG_LOCAL4,
+                "local5": SysLogHandler.LOG_LOCAL5,
+                "local6": SysLogHandler.LOG_LOCAL6,
+                "local7": SysLogHandler.LOG_LOCAL7,
+            }
+            syslog_facility = facility_map.get(facility.lower(), SysLogHandler.LOG_LOCAL0)
+
+            import socket
+            socktype = socket.SOCK_STREAM if scheme == "tcp" else socket.SOCK_DGRAM
+
+            syslog_handler = SysLogHandler(
+                address=(host, port),
+                facility=syslog_facility,
+                socktype=socktype,
+            )
+            syslog_handler.setLevel(getattr(logging, level, logging.INFO))
+            syslog_handler.setFormatter(formatter)
+            root_logger.addHandler(syslog_handler)
+        except Exception as e:
+            # Log to stdout if syslog setup fails — don't crash the app
+            print(f"WARNING: Failed to configure syslog handler ({syslog_url}): {e}", file=sys.stderr)
 
     # Configure specific loggers
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
