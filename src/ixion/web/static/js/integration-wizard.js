@@ -437,19 +437,19 @@ function renderConfigureStep() {
     const isLastSubStep = wizardState.currentSubStep === subSteps.length - 1;
 
     let backAction = isFirstSubStep
-        ? (isFirstIntegration ? "goToStep('select')" : 'previousIntegration()')
-        : 'previousSubStep()';
+        ? (isFirstIntegration ? 'goToStepSelect' : 'previousIntegration')
+        : 'previousSubStep';
 
     let nextAction = isLastSubStep
-        ? (isLastIntegration ? "goToStep('summary')" : 'nextIntegration()')
-        : 'nextSubStep()';
+        ? (isLastIntegration ? 'goToStepSummary' : 'nextIntegration')
+        : 'nextSubStep';
 
     let nextLabel = isLastSubStep
         ? (isLastIntegration ? 'Review & Save' : 'Next Integration')
         : 'Next';
 
     footer.innerHTML = `
-        <button class="btn btn-secondary" onclick="${backAction}">Back</button>
+        <button class="btn btn-secondary" onclick="wizardDispatch('${backAction}')">Back</button>
         <div class="footer-spacer"></div>
         <button class="btn" onclick="skipIntegration()" style="margin-right: auto;">Skip This Integration</button>
         <button class="btn btn-primary" onclick="saveSubStepAndContinue('${nextAction}')">${nextLabel}</button>
@@ -859,6 +859,22 @@ function collectCurrentFormData(integrationName) {
     });
 }
 
+/** Dispatch table for wizard navigation — avoids eval(). */
+const WIZARD_ACTIONS = {
+    nextSubStep,
+    previousSubStep,
+    nextIntegration,
+    previousIntegration,
+    skipIntegration,
+    goToStepSelect: () => goToStep('select'),
+    goToStepSummary: () => goToStep('summary'),
+};
+
+function wizardDispatch(actionName) {
+    const fn = WIZARD_ACTIONS[actionName];
+    if (fn) fn();
+}
+
 /**
  * Save current sub-step data and continue
  */
@@ -866,7 +882,7 @@ function saveSubStepAndContinue(nextAction) {
     const currentIntegration = wizardState.selectedIntegrations[wizardState.currentIntegrationIndex];
     collectCurrentFormData(currentIntegration);
     saveWizardState();
-    eval(nextAction);
+    wizardDispatch(nextAction);
 }
 
 function nextSubStep() {

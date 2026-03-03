@@ -52,6 +52,19 @@ BASE_DIR = Path(__file__).parent
 _app_config = get_app_config()
 _debug_mode = _app_config.debug_mode
 
+if _debug_mode:
+    logger.warning(
+        "SECURITY: Debug mode is ON — /docs, /redoc, and /openapi.json are publicly "
+        "accessible. Set IXION_DEBUG_MODE=false for production deployments."
+    )
+
+if not _app_config.cookie_secure:
+    logger.warning(
+        "SECURITY: cookie_secure is OFF — session cookies will not have the Secure "
+        "flag unless HTTPS is auto-detected. Set IXION_COOKIE_SECURE=true behind a "
+        "TLS terminator or reverse proxy."
+    )
+
 app = FastAPI(
     title="IXION",
     description="Intelligence eXchange & Integration Operations Network - Security Operations Portal for Guarded Glass",
@@ -90,13 +103,20 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if request.url.scheme == "https" or request.headers.get("X-Forwarded-Proto") == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
-        # Content Security Policy (adjust as needed for your app)
+        # Content Security Policy
+        # NOTE: 'unsafe-inline' in script-src is required because the app uses
+        # onclick handlers extensively.  DOMPurify sanitises all dynamic HTML so
+        # the practical XSS risk is mitigated.  object-src and base-uri are
+        # locked down to block plugin-based and base-tag attacks.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
+            "object-src 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'; "
             "frame-ancestors 'none'"
         )
 

@@ -7,9 +7,10 @@ import os
 import platform
 import sys
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from ixion.web.api import limiter
 from ixion.auth.dependencies import require_admin, require_permission
 from ixion.models.user import User
 from ixion.core.config import get_config, set_config, Config
@@ -552,7 +553,8 @@ async def get_database_stats(current_user: User = Depends(require_admin)):
 
 
 @router.post("/database/backup")
-async def create_database_backup(current_user: User = Depends(require_admin)):
+@limiter.limit("5/minute")
+async def create_database_backup(request: Request, current_user: User = Depends(require_admin)):
     """Create a backup of the database."""
     import shutil
     from datetime import datetime
@@ -649,7 +651,9 @@ async def delete_database_backup(
 
 
 @router.post("/database/restore/{filename}")
+@limiter.limit("3/minute")
 async def restore_database_backup(
+    request: Request,
     filename: str,
     current_user: User = Depends(require_admin),
 ):
@@ -691,7 +695,9 @@ async def restore_database_backup(
 
 
 @router.post("/database/cleanup")
+@limiter.limit("3/minute")
 async def cleanup_old_data(
+    request: Request,
     days_to_keep: int = 30,
     current_user: User = Depends(require_admin),
 ):

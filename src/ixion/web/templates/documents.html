@@ -817,7 +817,7 @@ function renderMarkdown(content) {
             breaks: true,
             gfm: true
         });
-        let html = marked.parse(content);
+        let html = safeMarkdown(content);
         // Wrap tables in scrollable container
         html = html.replace(/<table>/g, '<div class="table-wrapper"><table>').replace(/<\/table>/g, '</table></div>');
         return html;

@@ -159,6 +159,20 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: analyst_notes.folder_id")
 
+    # Migrations for users table — account lockout columns
+    if insp.has_table("users"):
+        existing = {col["name"] for col in insp.get_columns("users")}
+        for col_name, col_type in {
+            "failed_login_attempts": "INTEGER DEFAULT 0",
+            "locked_until": "DATETIME",
+        }.items():
+            if col_name not in existing:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
+                    )
+                    logger.info("Migrated: users.%s", col_name)
+
 
 def init_db(db_path: Optional[Path] = None) -> Engine:
     """Initialize the database, creating all tables."""

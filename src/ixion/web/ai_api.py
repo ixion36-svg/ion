@@ -6,7 +6,7 @@ import uuid
 import shutil
 from pathlib import Path
 from typing import List, Optional, Dict
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -20,6 +20,7 @@ from ixion.services.ollama_service import (
 )
 from ixion.services.ai_chat_service import AIChatService
 from ixion.services.ai_context_service import AIContextService
+from ixion.web.api import limiter
 from ixion.auth.dependencies import get_current_user
 from ixion.models.user import User
 from ixion.models.ai_preferences import AIResponseFeedback
@@ -186,7 +187,9 @@ async def get_system_prompts(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/chat", response_model=ChatResponse)
+@limiter.limit("30/minute")
 async def chat(
+    http_request: Request,
     request: ChatRequest,
     current_user: User = Depends(get_current_user),
 ):
@@ -224,7 +227,9 @@ async def chat(
 
 
 @router.post("/chat/stream")
+@limiter.limit("30/minute")
 async def chat_stream(
+    http_request: Request,
     request: ChatRequest,
     current_user: User = Depends(get_current_user),
 ):
@@ -920,7 +925,7 @@ async def upload_file(
         oldest_key = min(user_files.keys(), key=lambda k: user_files[k]["uploaded_at"])
         del user_files[oldest_key]
 
-    logger.info(f"User {current_user.username} uploaded file: {file.filename} ({file_id})")
+    logger.info("User %s uploaded file: %s (%s)", current_user.username, file.filename, file_id)
 
     return {
         "id": file_id,
@@ -1007,7 +1012,7 @@ async def apply_file_edit(
     file_info["lines"] = len(new_content.splitlines())
     file_info["last_edited"] = datetime.utcnow().isoformat()
 
-    logger.info(f"User {current_user.username} edited file: {file_info['name']} ({file_id})")
+    logger.info("User %s edited file: %s (%s)", current_user.username, file_info['name'], file_id)
 
     return {
         "id": file_id,

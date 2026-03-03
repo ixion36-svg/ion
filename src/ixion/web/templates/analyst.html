@@ -1129,7 +1129,7 @@ async function viewKBArticle(docId) {
 
         if (typeof marked !== 'undefined') {
             marked.setOptions({ breaks: true, gfm: true });
-            let rendered = marked.parse(content);
+            let rendered = safeMarkdown(content);
             rendered = rendered.replace(/<table>/g, '<div class="table-wrapper"><table>').replace(/<\/table>/g, '</table></div>');
             content = rendered;
         } else {

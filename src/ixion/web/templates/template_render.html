@@ -474,7 +474,7 @@ async function renderTemplate(save, documentName) {
 
         // Render markdown in preview
         if (typeof marked !== 'undefined' && templateInfo && templateInfo.format === 'markdown') {
-            document.getElementById('output-container').innerHTML = '<div class="rendered-content">' + marked.parse(result.rendered) + '</div>';
+            document.getElementById('output-container').innerHTML = '<div class="rendered-content">' + safeMarkdown(result.rendered) + '</div>';
         } else {
             document.getElementById('output-container').innerHTML = '<pre class="rendered-output">' + escapeHtml(result.rendered) + '</pre>';
         }

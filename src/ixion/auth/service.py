@@ -10,6 +10,7 @@ from ixion.models.user import User, UserSession, Role, Permission
 from ixion.storage.user_repository import UserRepository, RoleRepository, PermissionRepository
 from ixion.storage.auth_repository import SessionRepository, AuditLogRepository
 from ixion.auth.password import password_hasher
+from ixion.core.config import get_config
 
 
 class AuthService:
@@ -17,6 +18,10 @@ class AuthService:
 
     # Default session lifetime: 24 hours
     DEFAULT_SESSION_LIFETIME_HOURS = 24
+
+    # Account lockout settings
+    MAX_FAILED_ATTEMPTS = 5
+    LOCKOUT_DURATION_MINUTES = 15
 
     # Dummy hash for timing attack prevention - bcrypt hash of random string
     # Used to ensure constant-time comparison even when user doesn't exist
@@ -79,9 +84,46 @@ class AuthService:
             self._log_failed_login(username, ip_address, "Account disabled")
             return None, None, "Account is disabled"
 
+        # Account lockout (opt-in via IXION_ACCOUNT_LOCKOUT_ENABLED)
+        lockout_enabled = get_config().account_lockout_enabled
+        now = datetime.utcnow()
+
+        if lockout_enabled and user.locked_until and user.locked_until > now:
+            password_hasher.verify(password, user.password_hash)
+            remaining = int((user.locked_until - now).total_seconds() // 60) + 1
+            self._log_failed_login(username, ip_address, "Account locked")
+            return None, None, f"Account is temporarily locked. Try again in {remaining} minute(s)"
+
         if not password_hasher.verify(password, user.password_hash):
+            if lockout_enabled:
+                user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+                if user.failed_login_attempts >= self.MAX_FAILED_ATTEMPTS:
+                    user.locked_until = now + timedelta(minutes=self.LOCKOUT_DURATION_MINUTES)
+                    self.db_session.flush()
+                    self._log_failed_login(
+                        username, ip_address,
+                        f"Account locked after {self.MAX_FAILED_ATTEMPTS} failed attempts",
+                    )
+                    self.audit_repo.create(
+                        user_id=user.id,
+                        action="account_locked",
+                        resource_type="user",
+                        resource_id=user.id,
+                        details={
+                            "failed_attempts": user.failed_login_attempts,
+                            "locked_until": user.locked_until.isoformat(),
+                        },
+                        ip_address=ip_address,
+                    )
+                    return None, None, f"Account is temporarily locked. Try again in {self.LOCKOUT_DURATION_MINUTES} minute(s)"
+                self.db_session.flush()
             self._log_failed_login(username, ip_address, "Invalid password")
             return None, None, "Invalid username or password"
+
+        # Successful login — reset failed attempts
+        if lockout_enabled and user.failed_login_attempts:
+            user.failed_login_attempts = 0
+            user.locked_until = None
 
         # Clean up expired sessions for this user (but keep valid ones)
         expired_count = self.session_repo.delete_expired_for_user(user.id)

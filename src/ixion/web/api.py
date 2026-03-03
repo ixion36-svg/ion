@@ -32,7 +32,8 @@ from ixion.services.kibana_sync_helpers import (
 from ixion.services.observable_extractor import extract_observables_from_raw
 
 # Rate limiter - uses IP address as key
-limiter = Limiter(key_func=get_remote_address)
+# Global default: 120 requests/minute per IP. Individual endpoints can override.
+limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
 # OIDC state cookie name for CSRF protection
 OIDC_STATE_COOKIE_NAME = "oidc_state"
@@ -367,12 +368,14 @@ async def get_oidc_public_config(request: Request, response: Response):
 
     # Store state in httponly cookie for validation on callback
     config = get_config()
+    is_https = scheme == "https"
+    cookie_secure = config.cookie_secure or is_https
     response.set_cookie(
         key=OIDC_STATE_COOKIE_NAME,
         value=state,
         httponly=True,
         samesite="lax",  # Lax needed for OAuth redirects
-        secure=config.cookie_secure,
+        secure=cookie_secure,
         max_age=600,  # 10 minutes
     )
 

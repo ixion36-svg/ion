@@ -1985,7 +1985,7 @@
 
         // Use marked if available, otherwise basic formatting
         if (typeof marked !== 'undefined') {
-            return marked.parse(content);
+            return safeMarkdown(content);
         }
 
         // Basic formatting fallback

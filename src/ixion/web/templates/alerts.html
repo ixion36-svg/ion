@@ -3407,7 +3407,7 @@ function renderCaseManagementModal(caseData) {
 
     // Description
     const descHtml = caseData.description
-        ? `<div class="case-mgmt-section"><h5>Description</h5><div style="font-size:0.8125rem;line-height:1.5;margin:0;" class="case-description-md">${marked.parse(caseData.description)}</div></div>`
+        ? `<div class="case-mgmt-section"><h5>Description</h5><div style="font-size:0.8125rem;line-height:1.5;margin:0;" class="case-description-md">${safeMarkdown(caseData.description)}</div></div>`
         : '';
 
     // Linked alerts

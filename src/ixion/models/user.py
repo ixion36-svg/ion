@@ -50,6 +50,10 @@ class User(Base, TimestampMixin):
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    # Account lockout fields
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
     # Relationships
     roles: Mapped[List["Role"]] = relationship(
         "Role", secondary=user_roles, back_populates="users"

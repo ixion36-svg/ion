@@ -1644,7 +1644,7 @@ function renderPanelContent(c) {
         html += '<div class="cpanel-section-title">Description</div>';
         const desc = c.description || c.evidence_summary || '';
         if (typeof marked !== 'undefined') {
-            html += '<div class="cpanel-description">' + marked.parse(desc) + '</div>';
+            html += '<div class="cpanel-description">' + safeMarkdown(desc) + '</div>';
         } else {
             html += '<div class="cpanel-description">' + esc(desc) + '</div>';
         }

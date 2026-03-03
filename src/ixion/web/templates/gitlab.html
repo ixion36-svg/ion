@@ -761,7 +761,7 @@ async function showIssueDetail(iid) {
 
         // Render description as markdown
         document.getElementById('issue-detail-description').innerHTML =
-            issue.description ? marked.parse(issue.description) : '<em>No description</em>';
+            issue.description ? safeMarkdown(issue.description) : '<em>No description</em>';
 
         // State
         const stateSpan = document.getElementById('issue-detail-state');
@@ -832,7 +832,7 @@ async function loadComments(iid) {
                     <span class="comment-author">${escapeHtml(c.author)}</span>
                     <span class="comment-date">${formatDate(c.created_at)}</span>
                 </div>
-                <div class="comment-body">${marked.parse(c.body)}</div>
+                <div class="comment-body">${safeMarkdown(c.body)}</div>
             </div>
         `).join('');
     } catch (error) {

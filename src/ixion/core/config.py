@@ -29,6 +29,7 @@ class Config:
     # Security settings
     cookie_secure: bool = False  # Set to True when using HTTPS in production
     debug_mode: bool = False  # Enable API docs and detailed errors (disable in production)
+    account_lockout_enabled: bool = False  # Lock accounts after repeated failed logins
 
     # GitLab integration
     gitlab_enabled: bool = False
@@ -111,6 +112,7 @@ class Config:
             # Security settings
             cookie_secure=data.get("cookie_secure", False),
             debug_mode=data.get("debug_mode", False),
+            account_lockout_enabled=data.get("account_lockout_enabled", False),
             # GitLab integration
             gitlab_enabled=data.get("gitlab_enabled", False),
             gitlab_url=data.get("gitlab_url", ""),
@@ -178,6 +180,7 @@ class Config:
                     # Security settings
                     "cookie_secure": self.cookie_secure,
                     "debug_mode": self.debug_mode,
+                    "account_lockout_enabled": self.account_lockout_enabled,
                     # GitLab integration
                     "gitlab_enabled": self.gitlab_enabled,
                     "gitlab_url": self.gitlab_url,
@@ -268,6 +271,8 @@ def get_config() -> Config:
             _config.cookie_secure = _get_env_bool("IXION_COOKIE_SECURE")
         if os.environ.get("IXION_DEBUG_MODE"):
             _config.debug_mode = _get_env_bool("IXION_DEBUG_MODE")
+        if os.environ.get("IXION_ACCOUNT_LOCKOUT_ENABLED"):
+            _config.account_lockout_enabled = _get_env_bool("IXION_ACCOUNT_LOCKOUT_ENABLED")
         if os.environ.get("IXION_OIDC_ENABLED"):
             _config.oidc_enabled = _get_env_bool("IXION_OIDC_ENABLED")
         if os.environ.get("IXION_OIDC_KEYCLOAK_URL"):

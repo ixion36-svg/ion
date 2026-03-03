@@ -1,5 +1,15 @@
 // IXION Web UI JavaScript
 
+/**
+ * Render markdown to sanitized HTML. All user-controlled markdown
+ * MUST go through this function — never use marked.parse() directly.
+ */
+function safeMarkdown(content) {
+    if (!content) return '';
+    const raw = (typeof marked !== 'undefined') ? marked.parse(content) : content;
+    return (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(raw) : raw;
+}
+
 // API helper
 const api = {
     async request(method, url, data = null) {
