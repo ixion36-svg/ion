@@ -137,6 +137,9 @@
 }
 .topo-hub-ring:nth-child(2) { inset: -18px; animation-delay: 1s; opacity: .15; }
 @keyframes hub-pulse { 0%,100% { opacity: .3; transform: scale(1); } 50% { opacity: .1; transform: scale(1.04); } }
+.topo-hub-img {
+    width: 40px; height: 40px; object-fit: contain; border-radius: 8px;
+}
 .topo-hub-logo {
     font-size: 1.2rem; font-weight: 900; color: var(--primary);
     text-shadow: var(--glow-sm); letter-spacing: 2px;
@@ -683,6 +686,7 @@
                 <div class="topo-hub-ring"></div>
                 <div class="topo-hub-ring"></div>
                 <div class="topo-hub-inner" id="hub-node">
+                    <img src="/static/img/ion-logo.png" alt="ION" class="topo-hub-img">
                     <div class="topo-hub-logo">ION</div>
                     <div class="topo-hub-port">:8000</div>
                 </div>

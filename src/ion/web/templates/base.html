@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ION{% endblock %}</title>
+    <link rel="icon" type="image/png" href="/static/img/ion-logo.png">
     <link rel="stylesheet" href="/static/css/lucide.css?v=0.7.1">
     <link rel="stylesheet" href="/static/css/style.css?v=0.7.1">
     <link rel="stylesheet" href="/static/css/chat.css?v=0.7.1">
@@ -14,7 +15,7 @@
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <a href="/">ION</a>
+            <a href="/"><img src="/static/img/ion-logo.png" alt="ION" class="nav-logo">ION</a>
         </div>
         <ul class="nav-links">
             <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>

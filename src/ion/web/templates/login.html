@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - ION</title>
+    <link rel="icon" type="image/png" href="/static/img/ion-logo.png">
     <link rel="stylesheet" href="/static/css/style.css?v=0.7.0">
     <script>
         // Load theme and mode immediately to prevent flash
@@ -49,6 +50,14 @@
         .login-header {
             text-align: center;
             margin-bottom: 32px;
+        }
+
+        .login-logo {
+            width: 96px;
+            height: 96px;
+            object-fit: contain;
+            border-radius: 12px;
+            margin-bottom: 16px;
         }
 
         .login-header h1 {
@@ -180,8 +189,9 @@
 <body>
     <div class="login-container">
         <div class="login-header">
+            <img src="/static/img/ion-logo.png" alt="ION" class="login-logo">
             <h1>ION</h1>
-            <p>Intelligence eXchange &amp; Integration Operations Network</p>
+            <p>Intelligent Operating Network</p>
         </div>
 
         <form class="login-form" id="login-form">

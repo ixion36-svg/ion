@@ -476,6 +476,16 @@ body::before {
     text-shadow: var(--glow-sm);
     letter-spacing: 0.1em;
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-logo {
+    height: 32px;
+    width: 32px;
+    object-fit: contain;
+    border-radius: 6px;
 }
 
 .nav-links {
