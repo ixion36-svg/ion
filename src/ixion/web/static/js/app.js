@@ -145,8 +145,10 @@ function updateUserMenu() {
     });
 
     // Lead+ links (lead/engineering/admin) - security read access
-    const securityLink = document.getElementById('nav-security-link');
-    if (securityLink) securityLink.style.display = isLead ? 'block' : 'none';
+    ['nav-security-link', 'nav-topology-link'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = isLead ? 'block' : 'none';
+    });
 
     // Engineer+ links (engineering/admin)
     ['nav-integrations-link', 'nav-settings-link'].forEach(id => {

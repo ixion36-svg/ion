@@ -408,6 +408,12 @@ async def notes_page(request: Request):
     return templates.TemplateResponse("notes.html", {"request": request})
 
 
+@app.get("/topology", response_class=HTMLResponse)
+async def topology_page(request: Request):
+    """Render the network topology visualization page."""
+    return templates.TemplateResponse("topology.html", {"request": request})
+
+
 def main():
     """Run the web server."""
     import argparse
