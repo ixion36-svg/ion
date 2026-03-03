@@ -63,6 +63,59 @@
                 </label>
             </div>
 
+            <!-- AI Knowledge Sources -->
+            <div class="ai-settings-section">
+                <div class="ai-settings-header" onclick="toggleSettingsPanel()">
+                    <label>AI Knowledge Sources</label>
+                    <svg class="ai-settings-chevron" id="ai-settings-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </div>
+                <div class="ai-settings-panel" id="ai-settings-panel" style="display: none;">
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="pref-rag-kb" onchange="saveAIPreferences()">
+                        <label for="pref-rag-kb">Knowledge Base articles</label>
+                    </div>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="pref-rag-notes" onchange="saveAIPreferences()">
+                        <label for="pref-rag-notes">Analyst Notes</label>
+                    </div>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="pref-rag-playbooks" onchange="saveAIPreferences()">
+                        <label for="pref-rag-playbooks">Playbooks</label>
+                    </div>
+
+                    <div class="ai-settings-divider"></div>
+
+                    <label class="ai-settings-sublabel">Response Settings</label>
+                    <div class="ai-toggle">
+                        <input type="checkbox" id="pref-show-citations" checked onchange="saveAIPreferences()">
+                        <label for="pref-show-citations">Show source citations</label>
+                    </div>
+                    <div class="ai-toggle">
+                        <label for="pref-max-refs" style="margin-right: 8px;">Max references:</label>
+                        <select id="pref-max-refs" onchange="saveAIPreferences()">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3" selected>3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                        </select>
+                    </div>
+
+                    <div class="ai-settings-divider"></div>
+
+                    <label class="ai-settings-sublabel">Custom Instructions</label>
+                    <textarea id="pref-custom-instructions"
+                        maxlength="500"
+                        placeholder="e.g. Always include MITRE ATT&CK technique IDs"
+                        onchange="saveAIPreferences()"
+                        oninput="updateCharCount()"
+                    ></textarea>
+                    <div class="ai-char-count" id="ai-char-count">0/500</div>
+                </div>
+            </div>
+
             <!-- Chat History -->
             <div class="ai-history-section">
                 <label>Recent Chats</label>
@@ -943,6 +996,196 @@
     font-size: 0.7rem;
 }
 
+/* AI Settings Section */
+.ai-settings-section {
+    margin-bottom: 20px;
+}
+
+.ai-settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+.ai-settings-header label {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 0;
+    cursor: pointer;
+}
+
+.ai-settings-chevron {
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+
+.ai-settings-chevron.open {
+    transform: rotate(180deg);
+}
+
+.ai-settings-panel {
+    margin-top: 8px;
+    padding: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.ai-settings-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 10px 0;
+}
+
+.ai-settings-sublabel {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.ai-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.ai-toggle input[type="checkbox"] {
+    accent-color: var(--primary);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.ai-toggle label {
+    font-size: 0.82rem;
+    color: var(--text);
+    cursor: pointer;
+    margin: 0;
+}
+
+.ai-toggle select {
+    padding: 4px 8px;
+    background: var(--surface-dark);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.82rem;
+}
+
+#pref-custom-instructions {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px;
+    background: var(--surface-dark);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    resize: vertical;
+    line-height: 1.4;
+}
+
+#pref-custom-instructions:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+#pref-custom-instructions::placeholder {
+    color: var(--text-muted);
+}
+
+.ai-char-count {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-align: right;
+    margin-top: 2px;
+}
+
+/* Citation bar */
+.ai-citations-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+    padding: 8px 0 0 0;
+}
+
+.ai-citations-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-right: 4px;
+    align-self: center;
+}
+
+.ai-citation-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    background: var(--surface);
+    border-left: 3px solid var(--primary);
+    border-radius: 0 4px 4px 0;
+    font-size: 0.75rem;
+    color: var(--text);
+}
+
+.ai-citation-chip .ai-cite-icon {
+    font-size: 0.8rem;
+}
+
+/* Feedback buttons */
+.ai-feedback-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.ai-feedback-btn {
+    padding: 4px 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.ai-feedback-btn:hover {
+    background: var(--surface-light);
+    color: var(--text);
+}
+
+.ai-feedback-btn.active-up {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: #22c55e;
+    color: #22c55e;
+}
+
+.ai-feedback-btn.active-down {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.ai-feedback-btn.used {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .ai-chat-sidebar {
@@ -972,6 +1215,8 @@
     let currentSessionId = null;
     let chatSessions = [];
     let uploadedFiles = [];
+    let aiPreferences = {};
+    let pendingCitations = null;
 
     const AI_QUICK_PROMPTS = {
         analyst: [
@@ -1012,6 +1257,7 @@
         checkPageAIStatus();
         updatePageQuickPrompts();
         loadChatHistory();
+        loadAIPreferences();
 
         // Wire up event handlers
         const form = document.querySelector('.ai-chat-form');
@@ -1653,6 +1899,7 @@
             // Create assistant message container
             const assistantMsgId = addPageMessage('assistant', '');
             const contentEl = document.getElementById(assistantMsgId);
+            pendingCitations = null;
 
             // Stream the response
             const reader = response.body.getReader();
@@ -1673,12 +1920,13 @@
 
                         try {
                             const parsed = JSON.parse(data);
-                            if (parsed.content) {
+                            if (parsed.citations) {
+                                pendingCitations = parsed.citations;
+                            } else if (parsed.content) {
                                 fullResponse += parsed.content;
                                 contentEl.innerHTML = formatPageMessage(fullResponse);
                                 scrollPageToBottom();
                             }
-                            // Session tracking disabled for now
                         } catch (e) {
                             // Not JSON
                         }
@@ -1690,6 +1938,15 @@
             const msgIndex = aiPageMessages.findIndex(m => m.id === assistantMsgId);
             if (msgIndex !== -1) {
                 aiPageMessages[msgIndex].content = fullResponse;
+            }
+
+            // Render citations and feedback below the message
+            const msgWrapper = contentEl.closest('.ai-page-message');
+            if (msgWrapper) {
+                if (pendingCitations && pendingCitations.length > 0 && aiPreferences.show_citations !== false) {
+                    msgWrapper.insertAdjacentHTML('beforeend', renderCitations(pendingCitations));
+                }
+                msgWrapper.insertAdjacentHTML('beforeend', renderFeedbackButtons(assistantMsgId));
             }
 
         } catch (error) {
@@ -1788,6 +2045,148 @@
             });
         });
     }
+
+    // =========================================================================
+    // AI Preferences, Citations, Feedback
+    // =========================================================================
+
+    async function loadAIPreferences() {
+        try {
+            const response = await fetch('/api/ai/preferences', {
+                credentials: 'include'
+            });
+            if (response.ok) {
+                aiPreferences = await response.json();
+                applyPreferencesToUI();
+            }
+        } catch (error) {
+            console.error('Failed to load AI preferences:', error);
+        }
+    }
+
+    function applyPreferencesToUI() {
+        const kb = document.getElementById('pref-rag-kb');
+        const notes = document.getElementById('pref-rag-notes');
+        const playbooks = document.getElementById('pref-rag-playbooks');
+        const citations = document.getElementById('pref-show-citations');
+        const maxRefs = document.getElementById('pref-max-refs');
+        const customInst = document.getElementById('pref-custom-instructions');
+
+        if (kb) kb.checked = !!aiPreferences.rag_knowledge_base;
+        if (notes) notes.checked = !!aiPreferences.rag_user_notes;
+        if (playbooks) playbooks.checked = !!aiPreferences.rag_playbooks;
+        if (citations) citations.checked = aiPreferences.show_citations !== false;
+        if (maxRefs) maxRefs.value = String(aiPreferences.max_context_snippets || 3);
+        if (customInst) {
+            customInst.value = aiPreferences.custom_instructions || '';
+            updateCharCount();
+        }
+    }
+
+    async function saveAIPreferences() {
+        const payload = {
+            rag_knowledge_base: document.getElementById('pref-rag-kb')?.checked || false,
+            rag_user_notes: document.getElementById('pref-rag-notes')?.checked || false,
+            rag_playbooks: document.getElementById('pref-rag-playbooks')?.checked || false,
+            show_citations: document.getElementById('pref-show-citations')?.checked ?? true,
+            max_context_snippets: parseInt(document.getElementById('pref-max-refs')?.value || '3', 10),
+            custom_instructions: document.getElementById('pref-custom-instructions')?.value || '',
+        };
+
+        try {
+            const response = await fetch('/api/ai/preferences', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(payload)
+            });
+            if (response.ok) {
+                aiPreferences = await response.json();
+                if (typeof showToast === 'function') {
+                    showToast('AI preferences saved', 'success');
+                }
+            }
+        } catch (error) {
+            console.error('Failed to save AI preferences:', error);
+        }
+    }
+
+    function updateCharCount() {
+        const textarea = document.getElementById('pref-custom-instructions');
+        const counter = document.getElementById('ai-char-count');
+        if (textarea && counter) {
+            counter.textContent = textarea.value.length + '/500';
+        }
+    }
+
+    window.toggleSettingsPanel = function() {
+        const panel = document.getElementById('ai-settings-panel');
+        const chevron = document.getElementById('ai-settings-chevron');
+        if (panel) {
+            const isHidden = panel.style.display === 'none';
+            panel.style.display = isHidden ? 'block' : 'none';
+            if (chevron) chevron.classList.toggle('open', isHidden);
+        }
+    };
+
+    // Make save callable from inline handlers
+    window.saveAIPreferences = saveAIPreferences;
+    window.updateCharCount = updateCharCount;
+
+    function renderCitations(citations) {
+        if (!citations || citations.length === 0) return '';
+        const icons = {
+            knowledge_base: '<span class="ai-cite-icon">&#128196;</span>',
+            user_note: '<span class="ai-cite-icon">&#128221;</span>',  // Analyst Notes
+            playbook: '<span class="ai-cite-icon">&#128203;</span>',
+        };
+        const labels = {
+            knowledge_base: 'KB',
+            user_note: 'Note',
+            playbook: 'PB',
+        };
+        const chips = citations.map(c => {
+            const icon = icons[c.type] || '';
+            const label = labels[c.type] || c.type;
+            return `<span class="ai-citation-chip">${icon} ${escapeHtml(label)}: ${escapeHtml(c.title)}</span>`;
+        }).join('');
+        return `<div class="ai-citations-bar"><span class="ai-citations-label">Sources referenced:</span>${chips}</div>`;
+    }
+
+    function renderFeedbackButtons(msgId) {
+        return `<div class="ai-feedback-row" data-msg-id="${msgId}">
+            <button class="ai-feedback-btn" onclick="submitFeedback(this, 'up')" title="Good response">&#128077;</button>
+            <button class="ai-feedback-btn" onclick="submitFeedback(this, 'down')" title="Poor response">&#128078;</button>
+        </div>`;
+    }
+
+    window.submitFeedback = async function(btn, rating) {
+        const row = btn.closest('.ai-feedback-row');
+        if (!row || row.classList.contains('submitted')) return;
+        row.classList.add('submitted');
+
+        // Highlight selected
+        const buttons = row.querySelectorAll('.ai-feedback-btn');
+        buttons.forEach(b => b.classList.add('used'));
+        btn.classList.add(rating === 'up' ? 'active-up' : 'active-down');
+
+        const citationsJson = pendingCitations ? JSON.stringify(pendingCitations) : null;
+
+        try {
+            await fetch('/api/ai/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    rating: rating,
+                    context_type: aiCurrentContext,
+                    rag_sources_used: citationsJson,
+                })
+            });
+        } catch (error) {
+            console.error('Failed to submit feedback:', error);
+        }
+    };
 
     function exportPageAIChat() {
         if (aiPageMessages.length === 0) {

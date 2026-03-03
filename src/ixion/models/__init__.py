@@ -67,6 +67,10 @@ from ixion.models.ai_chat import (
     AIChatMessage,
     AIContextType,
 )
+from ixion.models.ai_preferences import (
+    AIUserPreference,
+    AIResponseFeedback,
+)
 from ixion.models.saved_search import (
     SavedSearch,
     SearchType,
@@ -152,6 +156,9 @@ __all__ = [
     "AIChatSession",
     "AIChatMessage",
     "AIContextType",
+    # AI Preferences models
+    "AIUserPreference",
+    "AIResponseFeedback",
     # Saved Search models
     "SavedSearch",
     "SearchType",

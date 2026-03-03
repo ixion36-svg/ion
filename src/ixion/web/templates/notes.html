@@ -130,6 +130,12 @@
 .notes-quill-wrap .ql-snow .ql-active .ql-stroke{stroke:var(--accent,#00e5ff)}
 .notes-quill-wrap .ql-snow .ql-active .ql-fill{fill:var(--accent,#00e5ff)}
 .notes-quill-wrap .ql-snow .ql-active{color:var(--accent,#00e5ff)}
+
+/* AI Notes toggle */
+.notes-ai-toggle{display:flex;align-items:center;gap:6px;padding:4px 0}
+.notes-ai-toggle input[type="checkbox"]{accent-color:var(--accent,#00e5ff);width:14px;height:14px;cursor:pointer}
+.notes-ai-toggle label{font-size:.75rem;color:var(--text-secondary,#8b949e);cursor:pointer;margin:0;user-select:none}
+.notes-ai-toggle label:hover{color:var(--text-primary,#f0f6fc)}
 </style>
 
 <div class="notes-page">
@@ -138,6 +144,10 @@
         <div class="notes-sidebar-header">
             <div class="notes-sidebar-title">
                 <h3>Notes</h3>
+            </div>
+            <div class="notes-ai-toggle" id="notes-ai-toggle">
+                <input type="checkbox" id="notes-ai-rag-toggle" title="Allow AI assistant to reference analyst notes">
+                <label for="notes-ai-rag-toggle">AI can read notes</label>
             </div>
             <div class="notes-search-row">
                 <input type="text" id="fp-notes-search" class="notes-search" placeholder="Search notes...">
@@ -209,4 +219,36 @@
 
 {% block scripts %}
 <script src="/static/js/notes-page.js?v=0.8.1"></script>
+<script>
+// AI RAG toggle for notes page
+(function() {
+    const toggle = document.getElementById('notes-ai-rag-toggle');
+    if (!toggle) return;
+
+    // Load current preference
+    fetch('/api/ai/preferences', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+            if (data) toggle.checked = !!data.rag_user_notes;
+        })
+        .catch(() => {});
+
+    // Save on change
+    toggle.addEventListener('change', function() {
+        fetch('/api/ai/preferences', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ rag_user_notes: toggle.checked })
+        })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+            if (data && typeof showToast === 'function') {
+                showToast(toggle.checked ? 'AI can now reference analyst notes' : 'AI notes access disabled', 'success');
+            }
+        })
+        .catch(() => {});
+    });
+})();
+</script>
 {% endblock %}

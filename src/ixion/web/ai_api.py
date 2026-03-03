@@ -19,8 +19,10 @@ from ixion.services.ollama_service import (
     SYSTEM_PROMPTS,
 )
 from ixion.services.ai_chat_service import AIChatService
+from ixion.services.ai_context_service import AIContextService
 from ixion.auth.dependencies import get_current_user
 from ixion.models.user import User
+from ixion.models.ai_preferences import AIResponseFeedback
 from ixion.storage.database import get_session
 
 logger = logging.getLogger(__name__)
@@ -107,6 +109,28 @@ class ChatWithHistoryRequest(BaseModel):
     message: str
     context_type: str = Field(default="default", pattern="^(analyst|engineering|default)$")
     stream: bool = True
+
+
+# AI Preferences / Feedback models
+_SENTINEL = object()
+
+
+class AIPreferencesRequest(BaseModel):
+    rag_knowledge_base: Optional[bool] = None
+    rag_user_notes: Optional[bool] = None
+    rag_playbooks: Optional[bool] = None
+    show_citations: Optional[bool] = None
+    custom_instructions: Optional[str] = None
+    max_context_snippets: Optional[int] = None
+
+
+class FeedbackRequest(BaseModel):
+    rating: str = Field(..., pattern="^(up|down)$")
+    comment: Optional[str] = None
+    session_id: Optional[int] = None
+    message_id: Optional[int] = None
+    context_type: Optional[str] = None
+    rag_sources_used: Optional[str] = None
 
 
 # Endpoints
@@ -214,6 +238,60 @@ async def chat_stream(
             detail="AI service (Ollama) is not available. Please ensure Ollama is running.",
         )
 
+    # --- RAG context injection ---
+    enhanced_system_prompt = None
+    citations_metadata = []
+
+    try:
+        for db in get_session():
+            ctx_service = AIContextService(db)
+            prefs = ctx_service.get_user_preferences(current_user.id)
+
+            any_rag_enabled = (
+                prefs.rag_knowledge_base or prefs.rag_user_notes or prefs.rag_playbooks
+            )
+
+            if any_rag_enabled and request.messages:
+                # Find last user message for keyword extraction
+                last_user_msg = ""
+                for m in reversed(request.messages):
+                    if m.role == "user":
+                        last_user_msg = m.content
+                        break
+
+                if last_user_msg:
+                    rag_context = ctx_service.retrieve_context(
+                        last_user_msg, current_user.id, prefs
+                    )
+                    if rag_context.snippets:
+                        citations_metadata = rag_context.to_citations_metadata()
+
+                        # Build layered system prompt
+                        base_prompt = SYSTEM_PROMPTS.get(
+                            request.context_type, SYSTEM_PROMPTS.get("default", "")
+                        )
+                        layers = [base_prompt]
+
+                        if prefs.custom_instructions:
+                            layers.append(
+                                f"\nUser's custom instructions: {prefs.custom_instructions}"
+                            )
+
+                        layers.append("\n" + rag_context.to_prompt_block())
+                        enhanced_system_prompt = "\n".join(layers)
+
+            # Custom instructions even without RAG
+            if not enhanced_system_prompt and prefs.custom_instructions:
+                base_prompt = SYSTEM_PROMPTS.get(
+                    request.context_type, SYSTEM_PROMPTS.get("default", "")
+                )
+                enhanced_system_prompt = (
+                    base_prompt
+                    + f"\nUser's custom instructions: {prefs.custom_instructions}"
+                )
+    except Exception as e:
+        logger.warning("RAG context retrieval failed, continuing without: %s", e)
+
     async def generate():
         try:
             messages = [{"role": m.role, "content": m.content} for m in request.messages]
@@ -227,15 +305,23 @@ async def chat_stream(
                         messages[i]["content"] += files_context
                         break
 
-            async for chunk in service.chat_stream(
+            stream_kwargs = dict(
                 messages=messages,
                 model=request.model,
                 context_type=request.context_type,
                 temperature=request.temperature,
                 max_tokens=request.max_tokens,
                 user_id=current_user.id,
-            ):
+            )
+            if enhanced_system_prompt:
+                stream_kwargs["system_prompt"] = enhanced_system_prompt
+
+            async for chunk in service.chat_stream(**stream_kwargs):
                 yield f"data: {json.dumps(chunk)}\n\n"
+
+            # Emit citations event before DONE if we have any
+            if citations_metadata:
+                yield f"data: {json.dumps({'citations': citations_metadata})}\n\n"
 
             yield "data: [DONE]\n\n"
         except OllamaError as e:
@@ -654,6 +740,85 @@ async def get_history_stats(current_user: User = Depends(get_current_user)):
     for db in get_session():
         service = AIChatService(db)
         return service.get_user_stats(current_user.id)
+
+
+# =============================================================================
+# AI Preferences & Feedback Endpoints
+# =============================================================================
+
+@router.get("/preferences")
+async def get_ai_preferences(current_user: User = Depends(get_current_user)):
+    """Get user's AI preferences (creates defaults if missing)."""
+    for db in get_session():
+        service = AIContextService(db)
+        prefs = service.get_user_preferences(current_user.id)
+        return {
+            "rag_knowledge_base": prefs.rag_knowledge_base,
+            "rag_user_notes": prefs.rag_user_notes,
+            "rag_playbooks": prefs.rag_playbooks,
+            "show_citations": prefs.show_citations,
+            "custom_instructions": prefs.custom_instructions or "",
+            "max_context_snippets": prefs.max_context_snippets,
+        }
+
+
+@router.put("/preferences")
+async def update_ai_preferences(
+    request: AIPreferencesRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Update user's AI preferences (partial update)."""
+    updates = {}
+    if request.rag_knowledge_base is not None:
+        updates["rag_knowledge_base"] = request.rag_knowledge_base
+    if request.rag_user_notes is not None:
+        updates["rag_user_notes"] = request.rag_user_notes
+    if request.rag_playbooks is not None:
+        updates["rag_playbooks"] = request.rag_playbooks
+    if request.show_citations is not None:
+        updates["show_citations"] = request.show_citations
+    if request.custom_instructions is not None:
+        # Enforce max 500 chars
+        updates["custom_instructions"] = request.custom_instructions[:500]
+    if request.max_context_snippets is not None:
+        updates["max_context_snippets"] = min(max(request.max_context_snippets, 1), 5)
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    for db in get_session():
+        service = AIContextService(db)
+        prefs = service.update_preferences(current_user.id, updates)
+        return {
+            "rag_knowledge_base": prefs.rag_knowledge_base,
+            "rag_user_notes": prefs.rag_user_notes,
+            "rag_playbooks": prefs.rag_playbooks,
+            "show_citations": prefs.show_citations,
+            "custom_instructions": prefs.custom_instructions or "",
+            "max_context_snippets": prefs.max_context_snippets,
+            "message": "Preferences updated",
+        }
+
+
+@router.post("/feedback")
+async def submit_feedback(
+    request: FeedbackRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Submit thumbs up/down feedback on an AI response."""
+    for db in get_session():
+        feedback = AIResponseFeedback(
+            user_id=current_user.id,
+            session_id=request.session_id,
+            message_id=request.message_id,
+            rating=request.rating,
+            comment=request.comment,
+            context_type=request.context_type,
+            rag_sources_used=request.rag_sources_used,
+        )
+        db.add(feedback)
+        db.commit()
+        return {"status": "saved", "id": feedback.id}
 
 
 # =============================================================================
