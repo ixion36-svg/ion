@@ -62,7 +62,7 @@ ION is designed to integrate with existing infrastructure:
 
 ```bash
 # Clone the repository
-git clone https://github.com/ion36-svg/ion.git
+git clone https://github.com/ixion36-svg/ion.git
 cd ion
 
 # Copy and configure environment
@@ -87,7 +87,7 @@ docker exec -it ion-ollama ollama pull qwen2.5:7b
 
 ```bash
 # Clone the repository
-git clone https://github.com/ion36-svg/ion.git
+git clone https://github.com/ixion36-svg/ion.git
 cd ion
 
 # Install Python dependencies
