@@ -1,11 +1,12 @@
 """Seed SOC-CMM document templates into the ION template library."""
+import os
 import requests
 
-BASE = "http://127.0.0.1:8000"
+BASE = os.environ.get("ION_SEED_URL", "http://127.0.0.1:8000")
 SESSION = requests.Session()
 
 def login():
-    r = SESSION.post(f"{BASE}/api/auth/login", json={"username": "admin", "password": "admin2025"})
+    r = SESSION.post(f"{BASE}/api/auth/login", json={"username": "admin", "password": os.environ.get("ION_ADMIN_PASSWORD", "admin2025")})
     r.raise_for_status()
     # Auth is cookie-based — session cookies are stored automatically
     print("Logged in as admin")

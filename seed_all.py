@@ -27,11 +27,13 @@ MARKER = Path(DATA_DIR) / ".ion" / ".seeded"
 
 # Ordered list of seed scripts (HTTP API only)
 SEEDS = [
+    ("Core Templates", "seed_ion_data.py"),
     ("Knowledge Base (core)", "seed_knowledge_base.py"),
     ("Knowledge Base (blue team)", "seed_knowledge_base_blueteam.py"),
     ("Knowledge Base (foundations)", "seed_knowledge_base_foundations.py"),
     ("Knowledge Base (security fundamentals)", "seed_knowledge_base_security_fundamentals.py"),
     ("Playbooks", "seed_playbooks.py"),
+    ("SOC Templates", "seed_soc_templates.py"),
 ]
 
 HEALTH_URL = f"{SEED_URL}/api/health"

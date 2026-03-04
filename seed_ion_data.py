@@ -1,42 +1,84 @@
-"""Seed ION with test templates and collections."""
+"""Seed ION with core document templates and collections.
 
+Seeds 4 template collections (Incident Response, Threat Intelligence,
+Compliance, SOC Operations) and 5 Jinja2 document templates.
+
+Uses the HTTP API — requires a running ION server.
+
+Environment variables:
+  ION_SEED_URL          Base URL (default: http://127.0.0.1:8000)
+  ION_ADMIN_PASSWORD    Admin password (default: admin2025)
+"""
+
+import os
 import sys
-sys.path.insert(0, '/app/src')
+import requests
 
-from pathlib import Path
-from ion.storage.database import get_engine, get_session_factory
-from ion.models.template import Template, TemplateVersion
-from ion.models.collection import Collection
-from datetime import datetime
+BASE = os.environ.get("ION_SEED_URL", "http://127.0.0.1:8000")
+SESSION = requests.Session()
 
-db_path = Path('/data/.ion/ion.db')
-engine = get_engine(db_path)
-factory = get_session_factory(engine)
-session = factory()
 
-# Create Collections
-collections_data = [
-    ('Incident Response', 'Templates for incident response documentation'),
-    ('Threat Intelligence', 'Threat intel report templates'),
-    ('Compliance', 'Compliance and audit templates'),
-    ('SOC Operations', 'Daily SOC operation templates'),
-]
+def login():
+    r = SESSION.post(
+        f"{BASE}/api/auth/login",
+        json={"username": "admin", "password": os.environ.get("ION_ADMIN_PASSWORD", "admin2025")},
+    )
+    r.raise_for_status()
+    print("Logged in as admin")
 
-print('Creating Collections...')
-collections = {}
-for name, desc in collections_data:
-    existing = session.query(Collection).filter_by(name=name).first()
-    if not existing:
-        c = Collection(name=name, description=desc)
-        session.add(c)
-        session.flush()
-        collections[name] = c
-        print(f'  Created: {name}')
-    else:
-        collections[name] = existing
-        print(f'  Exists: {name}')
 
-# Template content (using raw strings to avoid escape issues)
+def get_or_create_collection(name, desc, parent_id=None):
+    r = SESSION.get(f"{BASE}/api/collections")
+    data = r.json()
+    cols = data if isinstance(data, list) else data.get("collections", [])
+    for c in cols:
+        if c["name"] == name:
+            return c["id"]
+    body = {"name": name, "description": desc}
+    if parent_id:
+        body["parent_id"] = parent_id
+    r = SESSION.post(f"{BASE}/api/collections", json=body)
+    if r.status_code == 400:
+        r2 = SESSION.get(f"{BASE}/api/collections")
+        data2 = r2.json()
+        cols2 = data2 if isinstance(data2, list) else data2.get("collections", [])
+        for c2 in cols2:
+            if c2["name"] == name:
+                return c2["id"]
+        return None
+    r.raise_for_status()
+    cid = r.json()["id"]
+    print(f"  Created collection: {name} (id={cid})")
+    return cid
+
+
+def create_template(name, content, fmt, collection_id, tags=None):
+    r = SESSION.get(f"{BASE}/api/templates", params={"search": name})
+    data = r.json()
+    tpls = data if isinstance(data, list) else data.get("templates", [])
+    for t in tpls:
+        if t["name"] == name:
+            print(f"  Skipped (exists): {name}")
+            return t["id"]
+    body = {
+        "name": name,
+        "content": content,
+        "format": fmt,
+        "tags": tags or [],
+    }
+    r = SESSION.post(f"{BASE}/api/templates", json=body)
+    r.raise_for_status()
+    tid = r.json()["id"]
+    # Move template into collection
+    SESSION.post(f"{BASE}/api/collections/{collection_id}/templates/{tid}")
+    print(f"  Created template: {name} (id={tid})")
+    return tid
+
+
+# ---------------------------------------------------------------------------
+# Template content (Jinja2 markdown templates)
+# ---------------------------------------------------------------------------
+
 incident_report = r'''# Incident Report: {{ incident_id }}
 
 ## Executive Summary
@@ -150,41 +192,47 @@ compliance_checklist = r'''# {{ framework }} Compliance Checklist
 - **Non-Compliant:** {{ non_compliant_count }}
 '''
 
-templates_data = [
-    ('Incident Report', 'Incident Response', 'markdown', incident_report),
-    ('Threat Actor Profile', 'Threat Intelligence', 'markdown', threat_actor),
-    ('Daily SOC Summary', 'SOC Operations', 'markdown', daily_summary),
-    ('Malware Analysis Report', 'Threat Intelligence', 'markdown', malware_report),
-    ('Compliance Checklist', 'Compliance', 'markdown', compliance_checklist),
+# ---------------------------------------------------------------------------
+# Data definitions
+# ---------------------------------------------------------------------------
+
+COLLECTIONS = [
+    ("Incident Response", "Templates for incident response documentation"),
+    ("Threat Intelligence", "Threat intel report templates"),
+    ("Compliance", "Compliance and audit templates"),
+    ("SOC Operations", "Daily SOC operation templates"),
 ]
 
-print('Creating Templates...')
-for name, collection_name, fmt, content in templates_data:
-    existing = session.query(Template).filter_by(name=name).first()
-    if not existing:
-        t = Template(
-            name=name,
-            format=fmt,
-            content=content,
-            collection_id=collections[collection_name].id,
-            created_by='admin'
-        )
-        session.add(t)
-        session.flush()
+TEMPLATES = [
+    ("Incident Report", "Incident Response", "markdown", incident_report, ["incident", "ir"]),
+    ("Threat Actor Profile", "Threat Intelligence", "markdown", threat_actor, ["threat-intel", "apt"]),
+    ("Daily SOC Summary", "SOC Operations", "markdown", daily_summary, ["soc", "shift-handover"]),
+    ("Malware Analysis Report", "Threat Intelligence", "markdown", malware_report, ["malware", "reverse-engineering"]),
+    ("Compliance Checklist", "Compliance", "markdown", compliance_checklist, ["compliance", "audit"]),
+]
 
-        v = TemplateVersion(
-            template_id=t.id,
-            version=1,
-            content=content,
-            created_by='admin',
-            comment='Initial version'
-        )
-        session.add(v)
-        print(f'  Created: {name}')
-    else:
-        print(f'  Exists: {name}')
 
-session.commit()
-print('\nION data seeding complete!')
-print(f'Collections: {session.query(Collection).count()}')
-print(f'Templates: {session.query(Template).count()}')
+def main():
+    login()
+
+    # Create collections
+    print("\nCreating collections...")
+    collections = {}
+    for name, desc in COLLECTIONS:
+        cid = get_or_create_collection(name, desc)
+        collections[name] = cid
+
+    # Create templates
+    print("\nCreating templates...")
+    created = 0
+    for name, col_name, fmt, content, tags in TEMPLATES:
+        col_id = collections.get(col_name)
+        if col_id:
+            create_template(name, content, fmt, col_id, tags)
+            created += 1
+
+    print(f"\nION data seeding complete! ({created} templates across {len(COLLECTIONS)} collections)")
+
+
+if __name__ == "__main__":
+    main()
