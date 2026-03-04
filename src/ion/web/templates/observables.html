@@ -1841,7 +1841,7 @@ function renderGraph(container, data) {
     // Load vis.js if not already loaded
     if (typeof vis === 'undefined') {
         const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/vis-network@9.1.6/dist/vis-network.min.js';
+        script.src = '/static/js/vis-network.min.js';
         script.onload = () => doRenderGraph(container, data);
         document.head.appendChild(script);
     } else {

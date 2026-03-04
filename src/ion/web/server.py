@@ -110,7 +110,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # locked down to block plugin-based and base-tag attacks.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
