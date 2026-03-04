@@ -2,11 +2,10 @@
 # Intelligent Operating Network
 # For air-gapped/secure environment deployment
 
-version: '3.8'
-
 services:
   ion:
-    image: ion:${ION_VERSION:-latest}
+    build: .
+    image: ixion36/ion:${ION_VERSION:-latest}
     container_name: ion
     restart: unless-stopped
 
@@ -25,7 +24,7 @@ services:
       - .env
 
     environment:
-      # Ollama connection (when enabled)
+      # Ollama connection (when enabled via --profile ai)
       - OLLAMA_URL=http://ollama:11434
 
     # Security hardening
@@ -52,10 +51,6 @@ services:
           cpus: '0.5'
           memory: 256M
 
-    networks:
-      - default
-      - ion-dev
-
     # Logging — override with a Docker logging driver if desired
     # Default: json-file (docker logs). Alternatives: syslog, fluentd, gelf
     # logging:
@@ -75,16 +70,15 @@ services:
     #     gelf-address: "udp://graylog-host:12201"
     #     tag: "ion"
 
-    depends_on:
-      - ollama
-
   # =============================================================================
-  # Ollama - Local LLM Service
+  # Ollama - Local LLM Service (opt-in via: docker compose --profile ai up)
   # =============================================================================
   ollama:
     image: ollama/ollama:latest
     container_name: ion-ollama
     restart: unless-stopped
+    profiles:
+      - ai
 
     # No ports exposed - Ollama is only accessible via ION's chat interface
     # Uncomment below if direct API access is needed for debugging
@@ -130,7 +124,7 @@ services:
   # Shares ion-data volume for .seeded marker persistence.
   # Skips automatically on subsequent starts.
   seeder:
-    image: ion:${ION_VERSION:-latest}
+    image: ixion36/ion:${ION_VERSION:-latest}
     container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]
     volumes:
@@ -143,13 +137,6 @@ services:
       ion:
         condition: service_healthy
     restart: "no"
-    networks:
-      - default
-
-networks:
-  ion-dev:
-    external: true
-    name: ion_ion-net
 
 volumes:
   ion-data:

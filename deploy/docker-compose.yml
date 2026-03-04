@@ -1,0 +1,112 @@
+# ION - Standalone Deployment
+# Intelligent Operating Network
+#
+# Usage (no repo clone needed — just this file + .env):
+#   1. Save this file and create a .env file (see below)
+#   2. docker compose up -d
+#   3. Open http://localhost:8000
+#
+# With Ollama (local AI):
+#   docker compose --profile ai up -d
+#
+# Required .env file (create alongside this docker-compose.yml):
+#   ION_ADMIN_PASSWORD=changeme        # Admin login password
+#
+# Optional .env variables:
+#   ION_PORT=8000                      # Host port (default: 8000)
+#   ION_VERSION=latest                 # Image tag (default: latest)
+#   ION_COOKIE_SECURE=false            # Set true behind HTTPS
+#   ION_ELASTICSEARCH_ENABLED=false    # Enable ES integration
+#   ION_ELASTICSEARCH_URL=             # ES URL
+#   ION_ELASTICSEARCH_USERNAME=        # ES username
+#   ION_ELASTICSEARCH_PASSWORD=        # ES password
+#   ION_OPENCTI_ENABLED=false          # Enable OpenCTI
+#   ION_OPENCTI_URL=                   # OpenCTI URL
+#   ION_OPENCTI_TOKEN=                 # OpenCTI API token
+#   OLLAMA_MEMORY=8G                   # Ollama RAM limit
+
+services:
+  ion:
+    image: ixion36/ion:${ION_VERSION:-latest}
+    container_name: ion
+    restart: unless-stopped
+
+    ports:
+      - "${ION_PORT:-8000}:8000"
+
+    volumes:
+      - ion-data:/data
+
+    env_file:
+      - .env
+
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Ollama - opt-in via: docker compose --profile ai up -d
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ion-ollama
+    restart: unless-stopped
+    profiles:
+      - ai
+
+    volumes:
+      - ollama-models:/root/.ollama
+
+    environment:
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-4}
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_KEEP_ALIVE=30m
+
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: ${OLLAMA_MEMORY:-8G}
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  # Seeds KB articles and playbooks on first run, then exits
+  seeder:
+    image: ixion36/ion:${ION_VERSION:-latest}
+    container_name: ion-seeder
+    entrypoint: ["python", "/app/seed_all.py"]
+    volumes:
+      - ion-data:/data
+    env_file:
+      - .env
+    environment:
+      - ION_SEED_URL=http://ion:8000
+    depends_on:
+      ion:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  ion-data:
+    driver: local
+  ollama-models:
+    driver: local

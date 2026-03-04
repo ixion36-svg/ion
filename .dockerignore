@@ -36,6 +36,7 @@ docs/_build
 .docforge
 *.db
 *.sqlite
+.env
 
 # OS files
 .DS_Store

@@ -80,7 +80,7 @@ class ElasticsearchService:
         password: Optional[str] = None,
         alert_index: Optional[str] = None,
         case_index: Optional[str] = None,
-        verify_ssl: bool = True,
+        verify_ssl: Optional[bool] = None,
     ):
         """Initialize Elasticsearch service.
 

@@ -47,7 +47,7 @@ if ($needsSeed) {
         }
         Start-Sleep -Seconds 3
         $elapsed += 3
-        Write-Output "  Not ready, retrying... ($($timeout - $elapsed)s remaining)"
+        Write-Output "  Not ready, retrying... $($timeout - $elapsed)s remaining"
     }
 
     if ($elapsed -ge $timeout) {

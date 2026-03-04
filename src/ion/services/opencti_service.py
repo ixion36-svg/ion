@@ -46,7 +46,7 @@ class OpenCTIService:
         self,
         url: Optional[str] = None,
         token: Optional[str] = None,
-        verify_ssl: bool = True,
+        verify_ssl: Optional[bool] = None,
     ):
         """Initialize OpenCTI service.
 
