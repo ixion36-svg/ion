@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import logging
 import httpx
 
-from ion.core.config import get_elasticsearch_config
+from ion.core.config import get_elasticsearch_config, get_ssl_verify
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +145,7 @@ class ElasticsearchService:
             async with httpx.AsyncClient(
                 headers=self._get_headers(),
                 auth=self._get_auth(),
-                verify=self.verify_ssl,
+                verify=get_ssl_verify(self.verify_ssl),
                 timeout=httpx.Timeout(30.0, connect=10.0),
             ) as client:
                 response = await client.request(method, url, **kwargs)

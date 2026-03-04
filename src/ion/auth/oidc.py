@@ -10,6 +10,7 @@ from jose import jwt, JWTError, ExpiredSignatureError
 from sqlalchemy.orm import Session
 
 from ion.auth.oidc_config import OIDCConfig
+from ion.core.config import get_ssl_verify
 from ion.models.user import User, Role
 from ion.storage.user_repository import UserRepository, RoleRepository
 
@@ -74,7 +75,7 @@ class OIDCValidator:
 
         # Fetch fresh keys
         try:
-            async with httpx.AsyncClient(verify=self.config.verify_ssl) as client:
+            async with httpx.AsyncClient(verify=get_ssl_verify(self.config.verify_ssl)) as client:
                 response = await client.get(
                     self.config.jwks_url,
                     timeout=10.0,
@@ -104,7 +105,7 @@ class OIDCValidator:
             return self._jwks_cache
 
         try:
-            with httpx.Client(verify=self.config.verify_ssl) as client:
+            with httpx.Client(verify=get_ssl_verify(self.config.verify_ssl)) as client:
                 response = client.get(
                     self.config.jwks_url,
                     timeout=10.0,

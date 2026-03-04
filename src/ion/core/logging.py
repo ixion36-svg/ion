@@ -338,7 +338,8 @@ class ElasticsearchHandler(logging.Handler):
             bulk_body += json.dumps(doc, default=str) + "\n"
 
         try:
-            with httpx.Client(verify=self.verify_ssl, timeout=10.0) as client:
+            from ion.core.config import get_ssl_verify
+            with httpx.Client(verify=get_ssl_verify(self.verify_ssl), timeout=10.0) as client:
                 response = client.post(
                     f"{self.es_url}/_bulk",
                     headers=self._get_headers(),

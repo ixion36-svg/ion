@@ -711,7 +711,8 @@ async def get_server_log_metrics(
 
         url = f"{es_service.url}/ion-logs-*/_search"
 
-        async with httpx.AsyncClient(verify=verify_ssl, timeout=10.0) as client:
+        from ion.core.config import get_ssl_verify
+        async with httpx.AsyncClient(verify=get_ssl_verify(verify_ssl), timeout=10.0) as client:
             response = await client.post(
                 url,
                 headers=headers,

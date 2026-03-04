@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any, List
 import logging
 import httpx
 
-from ion.core.config import get_opencti_config
+from ion.core.config import get_opencti_config, get_ssl_verify
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ class OpenCTIService:
         try:
             async with httpx.AsyncClient(
                 headers=self._get_headers(),
-                verify=self.verify_ssl,
+                verify=get_ssl_verify(self.verify_ssl),
                 timeout=httpx.Timeout(30.0, connect=10.0),
             ) as client:
                 response = await client.post(graphql_url, json=payload)

@@ -4,7 +4,7 @@ import httpx
 import logging
 from typing import Optional, Dict, Any, List
 
-from ion.core.config import get_dfir_iris_config
+from ion.core.config import get_dfir_iris_config, get_ssl_verify
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ class DFIRIRISService:
             self._client = httpx.AsyncClient(
                 base_url=self.url,
                 headers=self._get_headers(),
-                verify=self.config.get("verify_ssl", True),
+                verify=get_ssl_verify(self.config.get("verify_ssl", True)),
                 timeout=httpx.Timeout(30.0, connect=10.0),
             )
         return self._client

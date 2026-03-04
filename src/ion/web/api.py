@@ -20,7 +20,7 @@ import httpx
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from ion.core.config import get_config, get_oidc_config, get_gitlab_config, get_dfir_iris_config
+from ion.core.config import get_config, get_oidc_config, get_gitlab_config, get_dfir_iris_config, get_ssl_verify
 from ion.services.dfir_iris_service import get_dfir_iris_service
 from ion.services.case_description import build_case_description
 from ion.services.kibana_sync_helpers import (
@@ -444,7 +444,7 @@ async def oidc_callback(
 
     try:
         # Exchange authorization code for tokens
-        async with httpx.AsyncClient(verify=oidc_config.verify_ssl) as client:
+        async with httpx.AsyncClient(verify=get_ssl_verify(oidc_config.verify_ssl)) as client:
             token_response = await client.post(
                 oidc_config.token_url,
                 data={

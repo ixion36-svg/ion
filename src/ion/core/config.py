@@ -27,6 +27,9 @@ class Config:
     oidc_role_mapping: Dict[str, str] = field(default_factory=dict)
     oidc_verify_ssl: bool = True
 
+    # Custom CA bundle for self-signed certificates (set via ION_CA_BUNDLE env var)
+    ca_bundle: str = ""  # Path to CA cert file, e.g. /etc/ssl/certs/my-ca.pem
+
     # Security settings
     cookie_secure: bool = False  # Set to True when using HTTPS in production
     debug_mode: bool = False  # Enable API docs and detailed errors (disable in production)
@@ -270,6 +273,8 @@ def get_config() -> Config:
             _config = Config()
 
         # Override with environment variables
+        if os.environ.get("ION_CA_BUNDLE"):
+            _config.ca_bundle = os.environ.get("ION_CA_BUNDLE", "")
         if os.environ.get("ION_COOKIE_SECURE"):
             _config.cookie_secure = _get_env_bool("ION_COOKIE_SECURE")
         if os.environ.get("ION_DEBUG_MODE"):
@@ -382,6 +387,25 @@ def set_config(config: Optional[Config]) -> None:
     """Set the global configuration instance. Pass None to clear cache."""
     global _config
     _config = config
+
+
+from typing import Union
+
+
+def get_ssl_verify(verify_ssl: bool = True) -> Union[bool, str]:
+    """Resolve the httpx ``verify`` parameter.
+
+    Returns:
+        - CA bundle path (str) when ``ION_CA_BUNDLE`` is set and ``verify_ssl`` is True
+        - True when ``verify_ssl`` is True and no custom CA bundle is configured
+        - False when ``verify_ssl`` is False
+    """
+    if not verify_ssl:
+        return False
+    config = get_config()
+    if config.ca_bundle:
+        return config.ca_bundle
+    return True
 
 
 def get_oidc_config():

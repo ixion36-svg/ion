@@ -19,6 +19,9 @@ services:
       # Optional: Mount custom config file
       # - ./config.json:/data/.ion/config.json:ro
 
+      # Optional: Mount a self-signed CA certificate bundle
+      # - ./ca.pem:/etc/ssl/certs/custom-ca.pem:ro
+
     # Load environment variables from .env file
     env_file:
       - .env
@@ -26,6 +29,8 @@ services:
     environment:
       # Ollama connection (when enabled via --profile ai)
       - OLLAMA_URL=http://ollama:11434
+      # Optional: Trust a self-signed CA for OpenCTI, ES, Keycloak, etc.
+      # - ION_CA_BUNDLE=/etc/ssl/certs/custom-ca.pem
 
     # Security hardening
     security_opt:
