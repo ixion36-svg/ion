@@ -25,6 +25,7 @@ class Config:
     oidc_auto_create_users: bool = True
     oidc_role_claim: str = "realm_access.roles"
     oidc_role_mapping: Dict[str, str] = field(default_factory=dict)
+    oidc_verify_ssl: bool = True
 
     # Security settings
     cookie_secure: bool = False  # Set to True when using HTTPS in production
@@ -109,6 +110,7 @@ class Config:
             oidc_auto_create_users=data.get("oidc_auto_create_users", True),
             oidc_role_claim=data.get("oidc_role_claim", "realm_access.roles"),
             oidc_role_mapping=data.get("oidc_role_mapping", {}),
+            oidc_verify_ssl=data.get("oidc_verify_ssl", True),
             # Security settings
             cookie_secure=data.get("cookie_secure", False),
             debug_mode=data.get("debug_mode", False),
@@ -177,6 +179,7 @@ class Config:
                     "oidc_auto_create_users": self.oidc_auto_create_users,
                     "oidc_role_claim": self.oidc_role_claim,
                     "oidc_role_mapping": self.oidc_role_mapping,
+                    "oidc_verify_ssl": self.oidc_verify_ssl,
                     # Security settings
                     "cookie_secure": self.cookie_secure,
                     "debug_mode": self.debug_mode,
@@ -283,6 +286,8 @@ def get_config() -> Config:
             _config.oidc_client_id = os.environ.get("ION_OIDC_CLIENT_ID", "")
         if os.environ.get("ION_OIDC_CLIENT_SECRET"):
             _config.oidc_client_secret = os.environ.get("ION_OIDC_CLIENT_SECRET", "")
+        if os.environ.get("ION_OIDC_VERIFY_SSL"):
+            _config.oidc_verify_ssl = _get_env_bool("ION_OIDC_VERIFY_SSL", True)
 
         # GitLab environment variable overrides
         if os.environ.get("ION_GITLAB_ENABLED"):
@@ -396,6 +401,7 @@ def get_oidc_config():
         auto_create_users=config.oidc_auto_create_users,
         role_claim=config.oidc_role_claim,
         role_mapping=config.oidc_role_mapping,
+        verify_ssl=config.oidc_verify_ssl,
     )
 
 

@@ -444,7 +444,7 @@ async def oidc_callback(
 
     try:
         # Exchange authorization code for tokens
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=oidc_config.verify_ssl) as client:
             token_response = await client.post(
                 oidc_config.token_url,
                 data={

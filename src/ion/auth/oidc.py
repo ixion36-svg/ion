@@ -74,7 +74,7 @@ class OIDCValidator:
 
         # Fetch fresh keys
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(verify=self.config.verify_ssl) as client:
                 response = await client.get(
                     self.config.jwks_url,
                     timeout=10.0,
@@ -104,7 +104,7 @@ class OIDCValidator:
             return self._jwks_cache
 
         try:
-            with httpx.Client() as client:
+            with httpx.Client(verify=self.config.verify_ssl) as client:
                 response = client.get(
                     self.config.jwks_url,
                     timeout=10.0,

@@ -68,6 +68,7 @@ class OIDCSettingsUpdate(BaseModel):
     oidc_client_secret: Optional[str] = None  # Only update if provided and not masked
     oidc_auto_create_users: Optional[bool] = None
     oidc_role_claim: Optional[str] = None
+    oidc_verify_ssl: Optional[bool] = None
 
 
 # =============================================================================
@@ -149,6 +150,7 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
             "oidc_client_secret_set": bool(config.oidc_client_secret),
             "oidc_auto_create_users": config.oidc_auto_create_users,
             "oidc_role_claim": config.oidc_role_claim,
+            "oidc_verify_ssl": config.oidc_verify_ssl,
         },
         "config_path": str(get_config_path()),
     }
@@ -297,6 +299,9 @@ async def update_oidc_settings(
 
     if settings.oidc_role_claim is not None:
         config.oidc_role_claim = settings.oidc_role_claim
+
+    if settings.oidc_verify_ssl is not None:
+        config.oidc_verify_ssl = settings.oidc_verify_ssl
 
     config.to_file(get_config_path())
     reload_config()

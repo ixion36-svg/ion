@@ -20,6 +20,7 @@ class OIDCConfig:
     auto_create_users: bool = True  # Auto-create ION users on first OIDC login
     role_claim: str = "realm_access.roles"  # JWT claim path for roles
     role_mapping: Dict[str, str] = field(default_factory=dict)  # Keycloak -> ION role mapping
+    verify_ssl: bool = True  # Whether to verify SSL certificates
 
     @property
     def issuer_url(self) -> str:
