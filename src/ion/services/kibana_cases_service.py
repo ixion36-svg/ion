@@ -30,9 +30,11 @@ class KibanaCasesService:
             if self.config.get("username") and self.config.get("password"):
                 auth = (self.config["username"], self.config["password"])
 
+            from ion.core.config import get_ssl_verify
             self._client = httpx.Client(
                 base_url=self.config["url"],
                 auth=auth,
+                verify=get_ssl_verify(),
                 headers={
                     "kbn-xsrf": "true",
                     "Content-Type": "application/json",

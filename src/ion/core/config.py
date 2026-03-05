@@ -30,6 +30,10 @@ class Config:
     # Custom CA bundle for self-signed certificates (set via ION_CA_BUNDLE env var)
     ca_bundle: str = ""  # Path to CA cert file, e.g. /etc/ssl/certs/my-ca.pem
 
+    # TLS for ION web server (serve HTTPS directly without reverse proxy)
+    ssl_cert: str = ""  # Path to PEM certificate file
+    ssl_key: str = ""   # Path to PEM private key file
+
     # Security settings
     cookie_secure: bool = False  # Set to True when using HTTPS in production
     debug_mode: bool = False  # Enable API docs and detailed errors (disable in production)
@@ -114,6 +118,9 @@ class Config:
             oidc_role_claim=data.get("oidc_role_claim", "realm_access.roles"),
             oidc_role_mapping=data.get("oidc_role_mapping", {}),
             oidc_verify_ssl=data.get("oidc_verify_ssl", True),
+            # TLS
+            ssl_cert=data.get("ssl_cert", ""),
+            ssl_key=data.get("ssl_key", ""),
             # Security settings
             cookie_secure=data.get("cookie_secure", False),
             debug_mode=data.get("debug_mode", False),
@@ -183,6 +190,9 @@ class Config:
                     "oidc_role_claim": self.oidc_role_claim,
                     "oidc_role_mapping": self.oidc_role_mapping,
                     "oidc_verify_ssl": self.oidc_verify_ssl,
+                    # TLS
+                    "ssl_cert": self.ssl_cert,
+                    "ssl_key": self.ssl_key,
                     # Security settings
                     "cookie_secure": self.cookie_secure,
                     "debug_mode": self.debug_mode,
@@ -275,6 +285,10 @@ def get_config() -> Config:
         # Override with environment variables
         if os.environ.get("ION_CA_BUNDLE"):
             _config.ca_bundle = os.environ.get("ION_CA_BUNDLE", "")
+        if os.environ.get("ION_SSL_CERT"):
+            _config.ssl_cert = os.environ.get("ION_SSL_CERT", "")
+        if os.environ.get("ION_SSL_KEY"):
+            _config.ssl_key = os.environ.get("ION_SSL_KEY", "")
         if os.environ.get("ION_COOKIE_SECURE"):
             _config.cookie_secure = _get_env_bool("ION_COOKIE_SECURE")
         if os.environ.get("ION_DEBUG_MODE"):

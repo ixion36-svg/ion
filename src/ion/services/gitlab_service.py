@@ -170,9 +170,11 @@ class GitLabService:
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client."""
         if self._client is None:
+            from ion.core.config import get_ssl_verify
             self._client = httpx.AsyncClient(
                 headers=self._get_headers(),
                 timeout=httpx.Timeout(60.0, connect=10.0),
+                verify=get_ssl_verify(),
             )
         return self._client
 
@@ -194,9 +196,11 @@ class GitLabService:
 
         # Use a fresh client per request to avoid connection issues with concurrent requests
         try:
+            from ion.core.config import get_ssl_verify
             async with httpx.AsyncClient(
                 headers=self._get_headers(),
                 timeout=httpx.Timeout(60.0, connect=10.0),
+                verify=get_ssl_verify(),
             ) as client:
                 response = await client.request(method, url, **kwargs)
         except httpx.ConnectError as e:

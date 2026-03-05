@@ -920,7 +920,7 @@ async def get_wizard_integrations(current_user: User = Depends(require_permissio
         },
         "ollama": {
             "name": "Ollama",
-            "description": "Local AI model for chat and analysis",
+            "description": "AI model for chat and analysis (local or remote Ollama)",
             "enabled": config.ollama_enabled,
             "configured": bool(config.ollama_url),
             "url": config.ollama_url,
@@ -1163,8 +1163,10 @@ async def test_wizard_integration(
             if not is_valid:
                 return {"success": False, "error": f"Invalid URL: {error}"}
 
+            from ion.core.config import get_ssl_verify
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(10.0, connect=5.0),
+                verify=get_ssl_verify(),
             ) as client:
                 response = await client.get(f"{url}/api/tags")
                 response.raise_for_status()
@@ -1515,6 +1517,11 @@ async def save_wizard_integration(
     config.to_file(get_config_path())
     reload_config()
 
+    # Reset Ollama service so it picks up new URL/model/timeout
+    if integration == "ollama":
+        from ion.services.ollama_service import reset_ollama_service
+        reset_ollama_service()
+
     return {"status": "saved", "integration": integration}
 
 
@@ -1637,6 +1644,11 @@ async def save_all_wizard_integrations(
     config.to_file(get_config_path())
     reload_config()
 
+    # Reset Ollama service so it picks up new URL/model/timeout
+    if "ollama" in saved:
+        from ion.services.ollama_service import reset_ollama_service
+        reset_ollama_service()
+
     return {
         "status": "completed",
         "saved": saved,
@@ -1653,9 +1665,10 @@ async def get_ollama_models(current_user: User = Depends(require_permission("int
         return {"available": False, "models": [], "error": "Ollama URL not configured"}
 
     import httpx
+    from ion.core.config import get_ssl_verify
 
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=3.0)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=3.0), verify=get_ssl_verify()) as client:
             response = await client.get(f"{config.ollama_url.rstrip('/')}/api/tags")
             response.raise_for_status()
             data = response.json()

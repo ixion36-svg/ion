@@ -439,19 +439,37 @@ async def topology_page(request: Request, user: User = Depends(require_page_perm
 def main():
     """Run the web server."""
     import argparse
+    from ion.core.config import get_config
+
     parser = argparse.ArgumentParser(description="ION Web Server")
-    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
-    parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
+    parser.add_argument("--host", default=None, help="Host to bind to")
+    parser.add_argument("--port", type=int, default=None, help="Port to bind to")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
+    parser.add_argument("--ssl-cert", default=None, help="Path to SSL certificate (PEM)")
+    parser.add_argument("--ssl-key", default=None, help="Path to SSL private key (PEM)")
     args = parser.parse_args()
 
-    print(f"Starting ION Web UI at http://{args.host}:{args.port}")
-    uvicorn.run(
-        "ion.web.server:app",
-        host=args.host,
-        port=args.port,
-        reload=args.reload,
-    )
+    config = get_config()
+    ssl_cert = args.ssl_cert or config.ssl_cert or None
+    ssl_key = args.ssl_key or config.ssl_key or None
+    host = args.host or os.environ.get("ION_HOST", "127.0.0.1")
+    port = args.port or int(os.environ.get("ION_PORT", "8000"))
+
+    kwargs = {
+        "host": host,
+        "port": port,
+        "reload": args.reload,
+    }
+
+    if ssl_cert and ssl_key:
+        kwargs["ssl_certfile"] = ssl_cert
+        kwargs["ssl_keyfile"] = ssl_key
+        scheme = "https"
+    else:
+        scheme = "http"
+
+    print(f"Starting ION Web UI at {scheme}://{host}:{port}")
+    uvicorn.run("ion.web.server:app", **kwargs)
 
 
 if __name__ == "__main__":

@@ -340,9 +340,12 @@ class OllamaService:
     def client(self) -> httpx.AsyncClient:
         """Get or create HTTP client."""
         if self._client is None or self._client.is_closed:
+            from ion.core.config import get_ssl_verify
+            verify = get_ssl_verify()
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
                 timeout=httpx.Timeout(self.timeout, connect=10.0),
+                verify=verify,
             )
         return self._client
 
@@ -614,6 +617,7 @@ def get_ollama_service() -> OllamaService:
         _ollama_service = OllamaService(
             base_url=getattr(config, 'ollama_url', 'http://localhost:11434'),
             default_model=getattr(config, 'ollama_model', 'qwen2.5:0.5b'),
+            timeout=float(getattr(config, 'ollama_timeout', 120)),
         )
     return _ollama_service
 
