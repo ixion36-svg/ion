@@ -361,10 +361,10 @@ async def get_oidc_public_config(request: Request, response: Response):
     # Build the redirect URI — use explicit base_url if configured,
     # otherwise auto-detect from request headers (fragile behind proxies)
     config = get_config()
+    scheme = request.headers.get("X-Forwarded-Proto", request.url.scheme)
     if config.base_url:
         redirect_uri = f"{config.base_url}/api/auth/oidc/callback"
     else:
-        scheme = request.headers.get("X-Forwarded-Proto", request.url.scheme)
         host = request.headers.get("X-Forwarded-Host", request.url.netloc)
         redirect_uri = f"{scheme}://{host}/api/auth/oidc/callback"
 
@@ -372,7 +372,6 @@ async def get_oidc_public_config(request: Request, response: Response):
     state = secrets.token_urlsafe(32)
 
     # Store state in httponly cookie for validation on callback
-    config = get_config()
     is_https = scheme == "https"
     cookie_secure = config.cookie_secure or is_https
     response.set_cookie(
