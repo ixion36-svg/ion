@@ -15,7 +15,7 @@ services:
   # Elasticsearch - Search and Analytics
   # ===========================================================================
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.0
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
     container_name: ion-elasticsearch
     restart: unless-stopped
     environment:
@@ -40,7 +40,7 @@ services:
   # Kibana - Elasticsearch Visualization
   # ===========================================================================
   kibana:
-    image: docker.elastic.co/kibana/kibana:9.3.0
+    image: docker.elastic.co/kibana/kibana:8.11.0
     container_name: ion-kibana
     restart: unless-stopped
     environment:

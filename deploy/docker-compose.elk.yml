@@ -4,31 +4,26 @@
 # Includes Filebeat sidecar for shipping logs to Elasticsearch.
 #
 # Usage:
-#   docker-compose -f docker-compose.elk.yml up -d
+#   docker compose -f docker-compose.elk.yml up -d
 #
 # Prerequisites:
 #   - Elasticsearch cluster accessible at ELASTICSEARCH_HOSTS
 #   - Run setup-elasticsearch.sh first to create indices/policies
 # =============================================================================
 
-version: '3.8'
-
 services:
   # ===========================================================================
   # ION Application
   # ===========================================================================
   ion:
-    image: ion:latest
+    image: ixion36/ion:${ION_VERSION:-latest}
     container_name: ion
     restart: unless-stopped
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
-      # Application settings
-      - ION_DB_PATH=/data/.ion/ion.db
-      - ION_COOKIE_SECURE=false
-      - ION_ADMIN_PASSWORD=${ION_ADMIN_PASSWORD:-changeme}
-
       # Logging settings
       - ION_LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ION_LOG_JSON=true
@@ -42,11 +37,11 @@ services:
       # Shared log volume with Filebeat
       - ion-logs:/var/log/ion
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 15s
     networks:
       - ion-net
     logging:
@@ -59,7 +54,7 @@ services:
   # Filebeat - Log Shipper
   # ===========================================================================
   filebeat:
-    image: docker.elastic.co/beats/filebeat:9.3.0
+    image: docker.elastic.co/beats/filebeat:8.11.0
     container_name: ion-filebeat
     restart: unless-stopped
     user: root

@@ -28,7 +28,7 @@ services:
 
     environment:
       # Ollama connection (when enabled via --profile ai)
-      - OLLAMA_URL=http://ollama:11434
+      - ION_OLLAMA_URL=http://ollama:11434
       # Optional: Trust a self-signed CA for OpenCTI, ES, Keycloak, etc.
       # - ION_CA_BUNDLE=/etc/ssl/certs/custom-ca.pem
 

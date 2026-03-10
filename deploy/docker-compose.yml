@@ -41,7 +41,7 @@ services:
       - .env
 
     environment:
-      - OLLAMA_URL=http://ollama:11434
+      - ION_OLLAMA_URL=http://ollama:11434
 
     security_opt:
       - no-new-privileges:true

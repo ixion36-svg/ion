@@ -12,10 +12,8 @@
 # - Place your TLS private key at: ./ssl/server.key
 #
 # Usage:
-#   docker-compose -f docker-compose.https.yml up -d
+#   docker compose -f docker-compose.https.yml up -d
 # =============================================================================
-
-version: '3.8'
 
 services:
   # ===========================================================================
@@ -36,9 +34,6 @@ services:
 
       # TLS certificates
       - ./ssl:/etc/nginx/ssl:ro
-
-      # Logs (optional - for debugging)
-      # - ./logs/nginx:/var/log/nginx
 
     depends_on:
       - ion
@@ -75,7 +70,7 @@ services:
   # ION Application
   # ===========================================================================
   ion:
-    image: ion:latest
+    image: ixion36/ion:${ION_VERSION:-latest}
     container_name: ion-app
     restart: unless-stopped
 
@@ -87,6 +82,9 @@ services:
       # Persistent data
       - ion-data:/data
 
+    env_file:
+      - .env
+
     environment:
       # Server configuration
       - ION_HOST=0.0.0.0
@@ -94,16 +92,6 @@ services:
 
       # IMPORTANT: Set to true when using HTTPS
       - ION_COOKIE_SECURE=true
-
-      # Initial admin password (change after first login!)
-      # - ION_ADMIN_PASSWORD=ChangeMe123!
-
-      # OIDC/Keycloak configuration (optional)
-      # - ION_OIDC_ENABLED=true
-      # - ION_OIDC_KEYCLOAK_URL=https://keycloak.example.com
-      # - ION_OIDC_REALM=ion
-      # - ION_OIDC_CLIENT_ID=ion-app
-      # - ION_OIDC_CLIENT_SECRET=your-client-secret
 
     networks:
       - ion-network
@@ -117,7 +105,7 @@ services:
 
     # Health check
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/stats')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
       timeout: 10s
       start_period: 10s
@@ -128,10 +116,10 @@ services:
       resources:
         limits:
           cpus: '2'
-          memory: 512M
+          memory: 1G
         reservations:
           cpus: '0.5'
-          memory: 128M
+          memory: 256M
 
 # =============================================================================
 # Networks
