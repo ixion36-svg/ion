@@ -366,7 +366,8 @@ class SIEMExporter:
         payload = "\n".join(self._format_splunk_hec(e) for e in events)
 
         try:
-            async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
+            from ion.core.config import get_ssl_verify
+            async with httpx.AsyncClient(timeout=30.0, verify=get_ssl_verify()) as client:
                 response = await client.post(
                     url,
                     content=payload,

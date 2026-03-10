@@ -1148,10 +1148,11 @@ async def test_wizard_integration(
                     existing = get_config()
                     auth = (config_data.username, existing.elasticsearch_password)
 
+            from ion.core.config import get_ssl_verify
             async with httpx.AsyncClient(
                 headers=headers,
                 auth=auth,
-                verify=config_data.verify_ssl if config_data.verify_ssl is not None else True,
+                verify=get_ssl_verify(config_data.verify_ssl if config_data.verify_ssl is not None else True),
                 timeout=httpx.Timeout(10.0, connect=5.0),
             ) as client:
                 response = await client.get(f"{url}/")
@@ -1283,12 +1284,13 @@ async def test_wizard_integration(
                 return {"success": False, "error": "Token is required"}
 
             query = '{ about { version } }'
+            from ion.core.config import get_ssl_verify
             async with httpx.AsyncClient(
                 headers={
                     "Authorization": f"Bearer {token}",
                     "Content-Type": "application/json",
                 },
-                verify=config_data.verify_ssl if config_data.verify_ssl is not None else True,
+                verify=get_ssl_verify(config_data.verify_ssl if config_data.verify_ssl is not None else True),
                 timeout=httpx.Timeout(10.0, connect=5.0),
             ) as client:
                 response = await client.post(
@@ -1411,12 +1413,13 @@ async def test_wizard_integration(
             if not api_key:
                 return {"success": False, "error": "API key is required"}
 
+            from ion.core.config import get_ssl_verify
             async with httpx.AsyncClient(
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
-                verify=config_data.verify_ssl if config_data.verify_ssl is not None else True,
+                verify=get_ssl_verify(config_data.verify_ssl if config_data.verify_ssl is not None else True),
                 timeout=httpx.Timeout(10.0, connect=5.0),
             ) as client:
                 response = await client.get(f"{url}/manage/cases/list")
