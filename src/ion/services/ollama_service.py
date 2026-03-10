@@ -329,10 +329,12 @@ class OllamaService:
         base_url: str = "http://localhost:11434",
         default_model: str = "qwen2.5:0.5b",
         timeout: float = 120.0,
+        verify_ssl: bool = True,
     ):
         self.base_url = base_url.rstrip("/")
         self.default_model = default_model
         self.timeout = timeout
+        self.verify_ssl = verify_ssl
         self._client: Optional[httpx.AsyncClient] = None
         self._queue = get_request_queue()
 
@@ -341,7 +343,7 @@ class OllamaService:
         """Get or create HTTP client."""
         if self._client is None or self._client.is_closed:
             from ion.core.config import get_ssl_verify
-            verify = get_ssl_verify()
+            verify = get_ssl_verify(self.verify_ssl)
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
                 timeout=httpx.Timeout(self.timeout, connect=10.0),
@@ -618,6 +620,7 @@ def get_ollama_service() -> OllamaService:
             base_url=getattr(config, 'ollama_url', 'http://localhost:11434'),
             default_model=getattr(config, 'ollama_model', 'qwen2.5:0.5b'),
             timeout=float(getattr(config, 'ollama_timeout', 120)),
+            verify_ssl=getattr(config, 'ollama_verify_ssl', True),
         )
     return _ollama_service
 

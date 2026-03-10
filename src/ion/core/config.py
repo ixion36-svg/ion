@@ -47,6 +47,7 @@ class Config:
     gitlab_url: str = ""  # e.g., https://gitlab.example.com or http://localhost:8929
     gitlab_token: str = ""  # Personal access token with api scope
     gitlab_project_id: str = ""  # Project ID or path (e.g., "group/project" or "123")
+    gitlab_verify_ssl: bool = True
 
     # OpenCTI integration
     opencti_enabled: bool = True
@@ -69,6 +70,7 @@ class Config:
     ollama_url: str = "http://localhost:11434"  # Ollama API URL
     ollama_model: str = "qwen2.5:7b"  # Default model
     ollama_timeout: int = 120  # Request timeout in seconds
+    ollama_verify_ssl: bool = True
 
     # Kibana Cases integration
     kibana_cases_enabled: bool = True
@@ -77,6 +79,7 @@ class Config:
     kibana_password: str = ""  # Kibana password
     kibana_space_id: str = "default"  # Kibana space ID
     kibana_case_owner: str = "securitySolution"  # Case owner app (securitySolution, observability, cases)
+    kibana_verify_ssl: bool = True
 
     # DFIR-IRIS integration
     dfir_iris_enabled: bool = False
@@ -135,6 +138,7 @@ class Config:
             gitlab_url=data.get("gitlab_url", ""),
             gitlab_token=data.get("gitlab_token", ""),
             gitlab_project_id=data.get("gitlab_project_id", ""),
+            gitlab_verify_ssl=data.get("gitlab_verify_ssl", True),
             # OpenCTI integration
             opencti_enabled=data.get("opencti_enabled", True),
             opencti_url=data.get("opencti_url", ""),
@@ -154,6 +158,7 @@ class Config:
             ollama_url=data.get("ollama_url", "http://localhost:11434"),
             ollama_model=data.get("ollama_model", "qwen2.5:7b"),
             ollama_timeout=data.get("ollama_timeout", 120),
+            ollama_verify_ssl=data.get("ollama_verify_ssl", True),
             # Kibana Cases integration
             kibana_cases_enabled=data.get("kibana_cases_enabled", True),
             kibana_url=data.get("kibana_url", ""),
@@ -161,6 +166,7 @@ class Config:
             kibana_password=data.get("kibana_password", ""),
             kibana_space_id=data.get("kibana_space_id", "default"),
             kibana_case_owner=data.get("kibana_case_owner", "securitySolution"),
+            kibana_verify_ssl=data.get("kibana_verify_ssl", True),
             # DFIR-IRIS integration
             dfir_iris_enabled=data.get("dfir_iris_enabled", False),
             dfir_iris_url=data.get("dfir_iris_url", ""),
@@ -209,6 +215,7 @@ class Config:
                     "gitlab_url": self.gitlab_url,
                     "gitlab_token": self.gitlab_token,
                     "gitlab_project_id": self.gitlab_project_id,
+                    "gitlab_verify_ssl": self.gitlab_verify_ssl,
                     # OpenCTI integration
                     "opencti_enabled": self.opencti_enabled,
                     "opencti_url": self.opencti_url,
@@ -228,6 +235,7 @@ class Config:
                     "ollama_url": self.ollama_url,
                     "ollama_model": self.ollama_model,
                     "ollama_timeout": self.ollama_timeout,
+                    "ollama_verify_ssl": self.ollama_verify_ssl,
                     # Kibana Cases integration
                     "kibana_cases_enabled": self.kibana_cases_enabled,
                     "kibana_url": self.kibana_url,
@@ -235,6 +243,7 @@ class Config:
                     "kibana_password": self.kibana_password,
                     "kibana_space_id": self.kibana_space_id,
                     "kibana_case_owner": self.kibana_case_owner,
+                    "kibana_verify_ssl": self.kibana_verify_ssl,
                     # DFIR-IRIS integration
                     "dfir_iris_enabled": self.dfir_iris_enabled,
                     "dfir_iris_url": self.dfir_iris_url,
@@ -326,6 +335,8 @@ def get_config() -> Config:
             _config.gitlab_token = os.environ.get("ION_GITLAB_TOKEN", "")
         if os.environ.get("ION_GITLAB_PROJECT_ID"):
             _config.gitlab_project_id = os.environ.get("ION_GITLAB_PROJECT_ID", "")
+        if os.environ.get("ION_GITLAB_VERIFY_SSL"):
+            _config.gitlab_verify_ssl = _get_env_bool("ION_GITLAB_VERIFY_SSL", True)
 
         # OpenCTI environment variable overrides
         if os.environ.get("ION_OPENCTI_ENABLED"):
@@ -364,6 +375,8 @@ def get_config() -> Config:
             _config.ollama_model = os.environ.get("ION_OLLAMA_MODEL", "qwen2.5:7b")
         if os.environ.get("ION_OLLAMA_TIMEOUT"):
             _config.ollama_timeout = int(os.environ.get("ION_OLLAMA_TIMEOUT", "120"))
+        if os.environ.get("ION_OLLAMA_VERIFY_SSL"):
+            _config.ollama_verify_ssl = _get_env_bool("ION_OLLAMA_VERIFY_SSL", True)
 
         # Kibana Cases environment overrides
         if os.environ.get("ION_KIBANA_CASES_ENABLED"):
@@ -378,6 +391,8 @@ def get_config() -> Config:
             _config.kibana_space_id = os.environ.get("ION_KIBANA_SPACE_ID", "default")
         if os.environ.get("ION_KIBANA_CASE_OWNER"):
             _config.kibana_case_owner = os.environ.get("ION_KIBANA_CASE_OWNER", "securitySolution")
+        if os.environ.get("ION_KIBANA_VERIFY_SSL"):
+            _config.kibana_verify_ssl = _get_env_bool("ION_KIBANA_VERIFY_SSL", True)
 
         # DFIR-IRIS environment overrides
         if os.environ.get("ION_DFIR_IRIS_ENABLED"):
@@ -463,6 +478,7 @@ def get_gitlab_config() -> dict:
         "url": config.gitlab_url,
         "token": config.gitlab_token,
         "project_id": config.gitlab_project_id,
+        "verify_ssl": config.gitlab_verify_ssl,
     }
 
 
@@ -514,6 +530,7 @@ def get_kibana_config() -> dict:
         "password": password,
         "space_id": config.kibana_space_id,
         "case_owner": config.kibana_case_owner,
+        "verify_ssl": config.kibana_verify_ssl,
     }
 
 

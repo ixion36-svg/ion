@@ -250,7 +250,10 @@ class ElasticsearchService:
             "sort": [{"@timestamp": {"order": "desc"}}],
             "query": {
                 "bool": {
-                    "must": must_clauses
+                    "must": must_clauses,
+                    "must_not": [
+                        {"exists": {"field": "kibana.alert.building_block_type"}}
+                    ]
                 }
             }
         }

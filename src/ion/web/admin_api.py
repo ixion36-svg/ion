@@ -37,6 +37,7 @@ class GitLabSettingsUpdate(BaseModel):
     gitlab_url: Optional[str] = None
     gitlab_token: Optional[str] = None  # Only update if provided and not masked
     gitlab_project_id: Optional[str] = None
+    gitlab_verify_ssl: Optional[bool] = None
 
 
 class OpenCTISettingsUpdate(BaseModel):
@@ -122,6 +123,7 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
             "gitlab_token": mask_secret(config.gitlab_token),
             "gitlab_token_set": bool(config.gitlab_token),
             "gitlab_project_id": config.gitlab_project_id,
+            "gitlab_verify_ssl": config.gitlab_verify_ssl,
         },
         "opencti": {
             "opencti_enabled": config.opencti_enabled,
@@ -205,6 +207,9 @@ async def update_gitlab_settings(
 
     if settings.gitlab_project_id is not None:
         config.gitlab_project_id = settings.gitlab_project_id
+
+    if settings.gitlab_verify_ssl is not None:
+        config.gitlab_verify_ssl = settings.gitlab_verify_ssl
 
     config.to_file(get_config_path())
     reload_config()
@@ -897,6 +902,7 @@ async def get_wizard_integrations(current_user: User = Depends(require_permissio
                 "password": {"type": "password", "label": "Password", "placeholder": "Leave blank to keep current"},
                 "space_id": {"type": "text", "label": "Space ID", "default": "default"},
                 "case_owner": {"type": "select", "label": "Case Owner", "options": ["securitySolution", "observability", "cases"], "default": "securitySolution"},
+                "verify_ssl": {"type": "checkbox", "label": "Verify SSL Certificate", "default": True},
             },
         },
         "gitlab": {
@@ -909,6 +915,7 @@ async def get_wizard_integrations(current_user: User = Depends(require_permissio
                 "url": {"type": "url", "label": "GitLab URL", "placeholder": "https://gitlab.example.com", "required": True},
                 "token": {"type": "password", "label": "Personal Access Token", "placeholder": "Token with 'api' scope", "required": True},
                 "project_id": {"type": "text", "label": "Project ID or Path", "placeholder": "group/project or 123", "required": True},
+                "verify_ssl": {"type": "checkbox", "label": "Verify SSL Certificate", "default": True},
             },
         },
         "opencti": {
@@ -933,6 +940,7 @@ async def get_wizard_integrations(current_user: User = Depends(require_permissio
                 "url": {"type": "url", "label": "Ollama URL", "placeholder": "http://localhost:11434", "default": "http://localhost:11434"},
                 "model": {"type": "select", "label": "Default Model", "options": [], "default": "qwen2.5:0.5b", "dynamic": True},
                 "timeout": {"type": "number", "label": "Request Timeout (seconds)", "default": 120, "min": 30, "max": 600},
+                "verify_ssl": {"type": "checkbox", "label": "Verify SSL Certificate", "default": True},
             },
         },
         "virustotal": {
@@ -1046,9 +1054,12 @@ async def test_wizard_integration(
             auth = (username, password) if username and password else None
             space_id = config_data.space_id or "default"
 
+            from ion.core.config import get_ssl_verify
+            verify = get_ssl_verify(config_data.verify_ssl if config_data.verify_ssl is not None else True)
             async with httpx.AsyncClient(
                 auth=auth,
                 timeout=httpx.Timeout(10.0, connect=5.0),
+                verify=verify,
             ) as client:
                 response = await client.get(f"{url}/api/status")
                 response.raise_for_status()
@@ -1087,9 +1098,12 @@ async def test_wizard_integration(
             if not project_id:
                 return {"success": False, "error": "Project ID is required"}
 
+            from ion.core.config import get_ssl_verify
+            verify = get_ssl_verify(config_data.verify_ssl if config_data.verify_ssl is not None else True)
             async with httpx.AsyncClient(
                 headers={"PRIVATE-TOKEN": token},
                 timeout=httpx.Timeout(10.0, connect=5.0),
+                verify=verify,
             ) as client:
                 # URL-encode the project path if it contains /
                 import urllib.parse
@@ -1171,7 +1185,7 @@ async def test_wizard_integration(
             from ion.core.config import get_ssl_verify
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(10.0, connect=5.0),
-                verify=get_ssl_verify(),
+                verify=get_ssl_verify(config.ollama_verify_ssl),
             ) as client:
                 response = await client.get(f"{url}/api/tags")
                 response.raise_for_status()
@@ -1461,6 +1475,8 @@ async def save_wizard_integration(
             config.kibana_space_id = config_data.space_id
         if config_data.case_owner is not None:
             config.kibana_case_owner = config_data.case_owner
+        if config_data.verify_ssl is not None:
+            config.kibana_verify_ssl = config_data.verify_ssl
 
     elif integration == "gitlab":
         if config_data.enabled is not None:
@@ -1471,6 +1487,8 @@ async def save_wizard_integration(
             config.gitlab_token = config_data.token
         if config_data.project_id is not None:
             config.gitlab_project_id = config_data.project_id
+        if config_data.verify_ssl is not None:
+            config.gitlab_verify_ssl = config_data.verify_ssl
 
     elif integration == "opencti":
         if config_data.enabled is not None:
@@ -1491,6 +1509,8 @@ async def save_wizard_integration(
             config.ollama_model = config_data.model
         if config_data.timeout is not None:
             config.ollama_timeout = config_data.timeout
+        if config_data.verify_ssl is not None:
+            config.ollama_verify_ssl = config_data.verify_ssl
 
     elif integration == "virustotal":
         if config_data.enabled is not None:
@@ -1522,10 +1542,16 @@ async def save_wizard_integration(
     config.to_file(get_config_path())
     reload_config()
 
-    # Reset Ollama service so it picks up new URL/model/timeout
+    # Reset singleton services so they pick up new settings
     if integration == "ollama":
         from ion.services.ollama_service import reset_ollama_service
         reset_ollama_service()
+    elif integration == "kibana":
+        from ion.services.kibana_cases_service import reset_kibana_cases_service
+        reset_kibana_cases_service()
+    elif integration == "gitlab":
+        from ion.services.gitlab_service import reset_gitlab_service
+        reset_gitlab_service()
 
     return {"status": "saved", "integration": integration}
 
@@ -1577,6 +1603,8 @@ async def save_all_wizard_integrations(
                     config.kibana_space_id = config_data.space_id
                 if config_data.case_owner is not None:
                     config.kibana_case_owner = config_data.case_owner
+                if config_data.verify_ssl is not None:
+                    config.kibana_verify_ssl = config_data.verify_ssl
                 saved.append("kibana")
 
             elif integration_name == "gitlab":
@@ -1588,6 +1616,8 @@ async def save_all_wizard_integrations(
                     config.gitlab_token = config_data.token
                 if config_data.project_id is not None:
                     config.gitlab_project_id = config_data.project_id
+                if config_data.verify_ssl is not None:
+                    config.gitlab_verify_ssl = config_data.verify_ssl
                 saved.append("gitlab")
 
             elif integration_name == "opencti":
@@ -1610,6 +1640,8 @@ async def save_all_wizard_integrations(
                     config.ollama_model = config_data.model
                 if config_data.timeout is not None:
                     config.ollama_timeout = config_data.timeout
+                if config_data.verify_ssl is not None:
+                    config.ollama_verify_ssl = config_data.verify_ssl
                 saved.append("ollama")
 
             elif integration_name == "virustotal":
@@ -1649,10 +1681,16 @@ async def save_all_wizard_integrations(
     config.to_file(get_config_path())
     reload_config()
 
-    # Reset Ollama service so it picks up new URL/model/timeout
+    # Reset singleton services so they pick up new settings
     if "ollama" in saved:
         from ion.services.ollama_service import reset_ollama_service
         reset_ollama_service()
+    if "kibana" in saved:
+        from ion.services.kibana_cases_service import reset_kibana_cases_service
+        reset_kibana_cases_service()
+    if "gitlab" in saved:
+        from ion.services.gitlab_service import reset_gitlab_service
+        reset_gitlab_service()
 
     return {
         "status": "completed",
@@ -1673,7 +1711,7 @@ async def get_ollama_models(current_user: User = Depends(require_permission("int
     from ion.core.config import get_ssl_verify
 
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=3.0), verify=get_ssl_verify()) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=3.0), verify=get_ssl_verify(config.ollama_verify_ssl)) as client:
             response = await client.get(f"{config.ollama_url.rstrip('/')}/api/tags")
             response.raise_for_status()
             data = response.json()

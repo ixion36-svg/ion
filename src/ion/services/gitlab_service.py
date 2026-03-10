@@ -139,6 +139,7 @@ class GitLabService:
         self.url = (url or config["url"]).rstrip("/")
         self.token = token or config["token"]
         self.project_id = project_id or config["project_id"]
+        self.verify_ssl = config.get("verify_ssl", True)
         self._client: Optional[httpx.AsyncClient] = None
 
     @property
@@ -174,7 +175,7 @@ class GitLabService:
             self._client = httpx.AsyncClient(
                 headers=self._get_headers(),
                 timeout=httpx.Timeout(60.0, connect=10.0),
-                verify=get_ssl_verify(),
+                verify=get_ssl_verify(self.verify_ssl),
             )
         return self._client
 
@@ -200,7 +201,7 @@ class GitLabService:
             async with httpx.AsyncClient(
                 headers=self._get_headers(),
                 timeout=httpx.Timeout(60.0, connect=10.0),
-                verify=get_ssl_verify(),
+                verify=get_ssl_verify(self.verify_ssl),
             ) as client:
                 response = await client.request(method, url, **kwargs)
         except httpx.ConnectError as e:

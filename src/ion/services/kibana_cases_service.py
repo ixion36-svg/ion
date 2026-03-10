@@ -34,7 +34,7 @@ class KibanaCasesService:
             self._client = httpx.Client(
                 base_url=self.config["url"],
                 auth=auth,
-                verify=get_ssl_verify(),
+                verify=get_ssl_verify(self.config.get("verify_ssl", True)),
                 headers={
                     "kbn-xsrf": "true",
                     "Content-Type": "application/json",
