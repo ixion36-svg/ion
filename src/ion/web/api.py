@@ -358,10 +358,15 @@ async def get_oidc_public_config(request: Request, response: Response):
     if not oidc_config.enabled or not oidc_config.is_valid():
         return {"enabled": False}
 
-    # Build the redirect URI based on the request
-    scheme = request.headers.get("X-Forwarded-Proto", request.url.scheme)
-    host = request.headers.get("X-Forwarded-Host", request.url.netloc)
-    redirect_uri = f"{scheme}://{host}/api/auth/oidc/callback"
+    # Build the redirect URI — use explicit base_url if configured,
+    # otherwise auto-detect from request headers (fragile behind proxies)
+    config = get_config()
+    if config.base_url:
+        redirect_uri = f"{config.base_url}/api/auth/oidc/callback"
+    else:
+        scheme = request.headers.get("X-Forwarded-Proto", request.url.scheme)
+        host = request.headers.get("X-Forwarded-Host", request.url.netloc)
+        redirect_uri = f"{scheme}://{host}/api/auth/oidc/callback"
 
     # Generate cryptographically secure state for CSRF protection
     state = secrets.token_urlsafe(32)
@@ -438,9 +443,13 @@ async def oidc_callback(
         return error_redirect("OIDC is not configured")
 
     # Build the redirect URI (must match what was sent in auth request)
-    scheme = request.headers.get("X-Forwarded-Proto", request.url.scheme)
-    host = request.headers.get("X-Forwarded-Host", request.url.netloc)
-    redirect_uri = f"{scheme}://{host}/api/auth/oidc/callback"
+    config = get_config()
+    if config.base_url:
+        redirect_uri = f"{config.base_url}/api/auth/oidc/callback"
+    else:
+        scheme = request.headers.get("X-Forwarded-Proto", request.url.scheme)
+        host = request.headers.get("X-Forwarded-Host", request.url.netloc)
+        redirect_uri = f"{scheme}://{host}/api/auth/oidc/callback"
 
     try:
         # Exchange authorization code for tokens

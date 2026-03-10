@@ -61,6 +61,7 @@ class ElasticsearchSettingsUpdate(BaseModel):
 
 class OIDCSettingsUpdate(BaseModel):
     """OIDC/Keycloak settings."""
+    base_url: Optional[str] = None
     oidc_enabled: Optional[bool] = None
     oidc_keycloak_url: Optional[str] = None
     oidc_realm: Optional[str] = None
@@ -142,6 +143,7 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
             "elasticsearch_verify_ssl": config.elasticsearch_verify_ssl,
         },
         "oidc": {
+            "base_url": config.base_url,
             "oidc_enabled": config.oidc_enabled,
             "oidc_keycloak_url": config.oidc_keycloak_url,
             "oidc_realm": config.oidc_realm,
@@ -278,6 +280,9 @@ async def update_oidc_settings(
 ):
     """Update OIDC/Keycloak settings."""
     config = get_config()
+
+    if settings.base_url is not None:
+        config.base_url = settings.base_url.rstrip("/")
 
     if settings.oidc_enabled is not None:
         config.oidc_enabled = settings.oidc_enabled

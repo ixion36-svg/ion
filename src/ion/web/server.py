@@ -114,6 +114,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
+            "connect-src 'self'; "
             "object-src 'none'; "
             "base-uri 'self'; "
             "form-action 'self'; "
@@ -149,6 +150,7 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 # Setup templates
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+templates.env.globals["ion_version"] = ion.__version__
 
 # Include API routes
 app.include_router(api_router, prefix="/api")
@@ -208,6 +210,14 @@ async def startup_event():
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"Failed to seed SOC templates: {e}")
+
+    # Seed built-in Knowledge Base articles (392 articles, idempotent)
+    try:
+        from ion.services.kb_seed_service import seed_knowledge_base
+        seed_knowledge_base()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to seed Knowledge Base: {e}")
 
     # Start Kibana bidirectional sync if enabled (via connector)
     try:

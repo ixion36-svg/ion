@@ -8344,15 +8344,15 @@ async function confirmAddToCase() {
 // Populate bulk assign dropdown with users
 async function loadBulkAssignOptions() {
     try {
-        const resp = await fetch('/api/users/');
+        const resp = await fetch('/api/chat/users');
         if (!resp.ok) return;
-        const users = await resp.json();
+        const data = await resp.json();
 
         const select = document.getElementById('bulk-assign');
-        users.forEach(u => {
+        (data.users || []).forEach(u => {
             const opt = document.createElement('option');
             opt.value = u.id;
-            opt.textContent = u.username;
+            opt.textContent = u.display_name || u.username;
             select.appendChild(opt);
         });
     } catch (err) {

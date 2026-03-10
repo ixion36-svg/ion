@@ -248,6 +248,12 @@
 
             <form id="oidc-form" onsubmit="saveSettings(event, 'oidc')">
                 <div class="form-group">
+                    <label for="base_url">ION Base URL</label>
+                    <input type="url" id="base_url" name="base_url" placeholder="https://ion.example.org">
+                    <span class="form-help">External URL of this ION instance. Used to build the OIDC redirect URI. Must match Keycloak's "Valid Redirect URIs" setting.</span>
+                </div>
+
+                <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" id="oidc_enabled" name="oidc_enabled">
                         Enable OIDC Authentication
@@ -1623,6 +1629,7 @@ function populateForms(config) {
     updateSecretStatus('opencti_token', config.opencti.opencti_token_set);
 
     // OIDC
+    document.getElementById('base_url').value = config.oidc.base_url || '';
     document.getElementById('oidc_enabled').checked = config.oidc.oidc_enabled;
     document.getElementById('oidc_keycloak_url').value = config.oidc.oidc_keycloak_url || '';
     document.getElementById('oidc_realm').value = config.oidc.oidc_realm || '';
@@ -1684,6 +1691,7 @@ async function saveSettings(event, section) {
         }
         data.opencti_verify_ssl = form.opencti_verify_ssl.checked;
     } else if (section === 'oidc') {
+        data.base_url = form.base_url.value;
         data.oidc_enabled = form.oidc_enabled.checked;
         data.oidc_keycloak_url = form.oidc_keycloak_url.value;
         data.oidc_realm = form.oidc_realm.value;

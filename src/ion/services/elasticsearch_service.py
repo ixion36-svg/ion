@@ -429,10 +429,15 @@ class ElasticsearchService:
             return val
 
         # Primary path: nested threat object (ECS format)
+        # Elastic Security 8.x stores threat as an array; older/custom as a dict
         threat = source.get("threat", {})
         mitre_technique_id = None
         mitre_technique_name = None
         mitre_tactic_name = None
+
+        # Unwrap array → first element (Elastic Security 8.x detection alerts)
+        if isinstance(threat, list) and threat:
+            threat = threat[0]
 
         if isinstance(threat, dict) and threat:
             technique = threat.get("technique", {})
@@ -441,12 +446,21 @@ class ElasticsearchService:
                 mitre_technique_id = _first(technique.get("id"))
                 mitre_technique_name = _first(technique.get("name"))
             elif isinstance(technique, list) and technique:
-                mitre_technique_id = _first(technique[0].get("id"))
-                mitre_technique_name = _first(technique[0].get("name"))
+                first_tech = technique[0] if isinstance(technique[0], dict) else {}
+                mitre_technique_id = _first(first_tech.get("id"))
+                mitre_technique_name = _first(first_tech.get("name"))
+                # Check for subtechnique (more specific)
+                subtechniques = first_tech.get("subtechnique", [])
+                if isinstance(subtechniques, list) and subtechniques:
+                    sub = subtechniques[0] if isinstance(subtechniques[0], dict) else {}
+                    if sub.get("id"):
+                        mitre_technique_id = _first(sub.get("id"))
+                        mitre_technique_name = _first(sub.get("name")) or mitre_technique_name
             if isinstance(tactic, dict):
                 mitre_tactic_name = _first(tactic.get("name"))
             elif isinstance(tactic, list) and tactic:
-                mitre_tactic_name = _first(tactic[0].get("name"))
+                first_tactic = tactic[0] if isinstance(tactic[0], dict) else {}
+                mitre_tactic_name = _first(first_tactic.get("name"))
 
         # Fallback: dot-notation keys (Kibana Security alert format)
         if not mitre_technique_id:
@@ -455,6 +469,20 @@ class ElasticsearchService:
             mitre_technique_name = _first(source.get("threat.technique.name"))
         if not mitre_tactic_name:
             mitre_tactic_name = _first(source.get("threat.tactic.name"))
+
+        # Fallback: kibana.alert.rule.parameters.threat (Elastic Security 8.x rule config)
+        if not mitre_technique_id:
+            params_threat = source.get("kibana.alert.rule.parameters", {}).get("threat", [])
+            if isinstance(params_threat, list) and params_threat:
+                pt = params_threat[0] if isinstance(params_threat[0], dict) else {}
+                pt_techniques = pt.get("technique", [])
+                if isinstance(pt_techniques, list) and pt_techniques:
+                    pt_tech = pt_techniques[0] if isinstance(pt_techniques[0], dict) else {}
+                    mitre_technique_id = _first(pt_tech.get("id"))
+                    mitre_technique_name = _first(pt_tech.get("name"))
+                pt_tactic = pt.get("tactic", {})
+                if isinstance(pt_tactic, dict) and not mitre_tactic_name:
+                    mitre_tactic_name = _first(pt_tactic.get("name"))
 
         # Fallback: signal.rule.threat[0].technique[0] (Elastic SIEM format)
         if not mitre_technique_id:

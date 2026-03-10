@@ -16,6 +16,9 @@ class Config:
     auto_save: bool = True
     max_versions_to_keep: int = 100
 
+    # Base URL for OIDC redirect URIs (e.g., https://ion.example.org)
+    base_url: str = ""
+
     # OIDC/Keycloak configuration
     oidc_enabled: bool = True
     oidc_keycloak_url: str = ""
@@ -108,6 +111,8 @@ class Config:
             default_format=data.get("default_format", "markdown"),
             auto_save=data.get("auto_save", True),
             max_versions_to_keep=data.get("max_versions_to_keep", 100),
+            # Base URL
+            base_url=data.get("base_url", ""),
             # OIDC configuration
             oidc_enabled=data.get("oidc_enabled", True),
             oidc_keycloak_url=data.get("oidc_keycloak_url", ""),
@@ -180,6 +185,8 @@ class Config:
                     "default_format": self.default_format,
                     "auto_save": self.auto_save,
                     "max_versions_to_keep": self.max_versions_to_keep,
+                    # Base URL
+                    "base_url": self.base_url,
                     # OIDC configuration
                     "oidc_enabled": self.oidc_enabled,
                     "oidc_keycloak_url": self.oidc_keycloak_url,
@@ -283,6 +290,8 @@ def get_config() -> Config:
             _config = Config()
 
         # Override with environment variables
+        if os.environ.get("ION_BASE_URL"):
+            _config.base_url = os.environ.get("ION_BASE_URL", "").rstrip("/")
         if os.environ.get("ION_CA_BUNDLE"):
             _config.ca_bundle = os.environ.get("ION_CA_BUNDLE", "")
         if os.environ.get("ION_SSL_CERT"):

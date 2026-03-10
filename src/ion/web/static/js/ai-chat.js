@@ -296,8 +296,14 @@ async function streamAIResponse() {
     });
 
     if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Request failed');
+        let msg = 'Request failed';
+        try {
+            const error = await response.json();
+            msg = error.detail || msg;
+        } catch {
+            msg = `AI service error (${response.status})`;
+        }
+        throw new Error(msg);
     }
 
     // Create message element for streaming
