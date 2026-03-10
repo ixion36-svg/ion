@@ -737,8 +737,8 @@ const SERVICES = [
     },
     {
         id: 'kibana', name: 'Kibana', port: 5601, protocol: 'HTTPS',
-        icon: 'icon-bar-chart-2', testUrl: null, configUrl: '/api/elasticsearch/config',
-        description: 'Data visualization & dashboards', parentCheck: 'elasticsearch',
+        icon: 'icon-bar-chart-2', testUrl: '/api/kibana/status', configUrl: '/api/kibana/config',
+        description: 'Data visualization & dashboards',
     },
     {
         id: 'gitlab', name: 'GitLab', port: 8929, protocol: 'HTTPS',

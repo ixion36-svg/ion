@@ -35,7 +35,7 @@ FROM python:3.11-slim as runtime
 
 LABEL org.opencontainers.image.title="ION" \
       org.opencontainers.image.description="Intelligent Operating Network - Security Operations Portal" \
-      org.opencontainers.image.version="0.9.2" \
+      org.opencontainers.image.version="0.9.3" \
       org.opencontainers.image.source="https://hub.docker.com/repository/docker/ixion36/ion"
 
 # Security: Run as non-root user

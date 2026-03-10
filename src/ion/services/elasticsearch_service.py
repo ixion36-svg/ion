@@ -188,6 +188,23 @@ class ElasticsearchService:
                 "version": info.get("version", {}).get("number"),
             }
         except ElasticsearchError as e:
+            # GET / requires cluster monitor privilege; fall back to a
+            # lightweight index query that only needs read access.
+            if "403" in str(e) or "unauthorized" in str(e).lower() or "security_exception" in str(e).lower():
+                try:
+                    result = await self._request(
+                        "POST",
+                        f"/{self.alert_index}/_search",
+                        json={"size": 0},
+                    )
+                    return {
+                        "connected": True,
+                        "cluster_name": None,
+                        "version": None,
+                        "note": "Limited permissions — cluster info unavailable",
+                    }
+                except ElasticsearchError:
+                    pass
             return {
                 "connected": False,
                 "error": str(e),
