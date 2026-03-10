@@ -21,6 +21,8 @@
         <a href="#elasticsearch" class="settings-nav-item" data-section="elasticsearch">Elasticsearch</a>
         <a href="#gitlab" class="settings-nav-item" data-section="gitlab">GitLab</a>
         <a href="#opencti" class="settings-nav-item" data-section="opencti">OpenCTI</a>
+        <a href="#kibana" class="settings-nav-item" data-section="kibana">Kibana Cases</a>
+        <a href="#dfir_iris" class="settings-nav-item" data-section="dfir_iris">DFIR-IRIS</a>
         <a href="#oidc" class="settings-nav-item" data-section="oidc">OIDC / Keycloak</a>
         <a href="#sessions" class="settings-nav-item" data-section="sessions">Active Sessions</a>
         <a href="#database" class="settings-nav-item" data-section="database">Database</a>
@@ -244,6 +246,115 @@
 
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="testConnection('opencti')">Test Connection</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Kibana Cases Settings -->
+        <section id="kibana" class="settings-section">
+            <h2>Kibana Cases Integration</h2>
+            <p class="section-description">Configure Kibana for bidirectional case synchronization.</p>
+
+            <form id="kibana-form" onsubmit="saveSettings(event, 'kibana')">
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="kibana_cases_enabled" name="kibana_cases_enabled">
+                        Enable Kibana Cases Integration
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="kibana_url">Kibana URL</label>
+                    <input type="url" id="kibana_url" name="kibana_url" placeholder="http://localhost:5601">
+                    <span class="form-help">Full URL including protocol and port</span>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="kibana_username">Username</label>
+                        <input type="text" id="kibana_username" name="kibana_username" placeholder="Uses ES credentials if empty">
+                    </div>
+                    <div class="form-group">
+                        <label for="kibana_password">Password</label>
+                        <input type="password" id="kibana_password" name="kibana_password" placeholder="Leave blank to keep current">
+                        <span class="form-help" id="kibana_password_status"></span>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="kibana_space_id">Space ID</label>
+                        <input type="text" id="kibana_space_id" name="kibana_space_id" placeholder="default">
+                        <span class="form-help">Kibana space ID (use "default" for the default space)</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="kibana_case_owner">Case Owner</label>
+                        <select id="kibana_case_owner" name="kibana_case_owner">
+                            <option value="securitySolution">Security Solution</option>
+                            <option value="observability">Observability</option>
+                            <option value="cases">Cases</option>
+                        </select>
+                        <span class="form-help">Kibana application that owns the cases</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="kibana_verify_ssl" name="kibana_verify_ssl" checked>
+                        Verify SSL Certificate
+                    </label>
+                    <span class="form-help">Disable for self-signed certificates</span>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="testConnection('kibana')">Test Connection</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- DFIR-IRIS Settings -->
+        <section id="dfir_iris" class="settings-section">
+            <h2>DFIR-IRIS Integration</h2>
+            <p class="section-description">Configure DFIR-IRIS for incident response case escalation.</p>
+
+            <form id="dfir_iris-form" onsubmit="saveSettings(event, 'dfir_iris')">
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="dfir_iris_enabled" name="dfir_iris_enabled">
+                        Enable DFIR-IRIS Integration
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="dfir_iris_url">DFIR-IRIS URL</label>
+                    <input type="url" id="dfir_iris_url" name="dfir_iris_url" placeholder="https://iris.example.com">
+                    <span class="form-help">Full URL of your DFIR-IRIS instance</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="dfir_iris_api_key">API Key</label>
+                    <input type="password" id="dfir_iris_api_key" name="dfir_iris_api_key" placeholder="Leave blank to keep current">
+                    <span class="form-help" id="dfir_iris_api_key_status">Bearer API key from IRIS user profile</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="dfir_iris_default_customer">Default Customer ID</label>
+                    <input type="number" id="dfir_iris_default_customer" name="dfir_iris_default_customer" min="1" placeholder="1">
+                    <span class="form-help">Default customer ID for new cases in IRIS</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="dfir_iris_verify_ssl" name="dfir_iris_verify_ssl" checked>
+                        Verify SSL Certificate
+                    </label>
+                    <span class="form-help">Disable for self-signed certificates</span>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="testConnection('dfir_iris')">Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
             </form>
@@ -1637,6 +1748,22 @@ function populateForms(config) {
     document.getElementById('opencti_verify_ssl').checked = config.opencti.opencti_verify_ssl;
     updateSecretStatus('opencti_token', config.opencti.opencti_token_set);
 
+    // Kibana Cases
+    document.getElementById('kibana_cases_enabled').checked = config.kibana.kibana_cases_enabled;
+    document.getElementById('kibana_url').value = config.kibana.kibana_url || '';
+    document.getElementById('kibana_username').value = config.kibana.kibana_username || '';
+    document.getElementById('kibana_space_id').value = config.kibana.kibana_space_id || 'default';
+    document.getElementById('kibana_case_owner').value = config.kibana.kibana_case_owner || 'securitySolution';
+    document.getElementById('kibana_verify_ssl').checked = config.kibana.kibana_verify_ssl !== false;
+    updateSecretStatus('kibana_password', config.kibana.kibana_password_set);
+
+    // DFIR-IRIS
+    document.getElementById('dfir_iris_enabled').checked = config.dfir_iris.dfir_iris_enabled;
+    document.getElementById('dfir_iris_url').value = config.dfir_iris.dfir_iris_url || '';
+    document.getElementById('dfir_iris_default_customer').value = config.dfir_iris.dfir_iris_default_customer || 1;
+    document.getElementById('dfir_iris_verify_ssl').checked = config.dfir_iris.dfir_iris_verify_ssl !== false;
+    updateSecretStatus('dfir_iris_api_key', config.dfir_iris.dfir_iris_api_key_set);
+
     // OIDC
     document.getElementById('base_url').value = config.oidc.base_url || '';
     document.getElementById('oidc_enabled').checked = config.oidc.oidc_enabled;
@@ -1700,6 +1827,24 @@ async function saveSettings(event, section) {
             data.opencti_token = form.opencti_token.value;
         }
         data.opencti_verify_ssl = form.opencti_verify_ssl.checked;
+    } else if (section === 'kibana') {
+        data.kibana_cases_enabled = form.kibana_cases_enabled.checked;
+        data.kibana_url = form.kibana_url.value;
+        data.kibana_username = form.kibana_username.value;
+        if (form.kibana_password.value) {
+            data.kibana_password = form.kibana_password.value;
+        }
+        data.kibana_space_id = form.kibana_space_id.value;
+        data.kibana_case_owner = form.kibana_case_owner.value;
+        data.kibana_verify_ssl = form.kibana_verify_ssl.checked;
+    } else if (section === 'dfir_iris') {
+        data.dfir_iris_enabled = form.dfir_iris_enabled.checked;
+        data.dfir_iris_url = form.dfir_iris_url.value;
+        if (form.dfir_iris_api_key.value) {
+            data.dfir_iris_api_key = form.dfir_iris_api_key.value;
+        }
+        data.dfir_iris_default_customer = parseInt(form.dfir_iris_default_customer.value) || 1;
+        data.dfir_iris_verify_ssl = form.dfir_iris_verify_ssl.checked;
     } else if (section === 'oidc') {
         data.base_url = form.base_url.value;
         data.oidc_enabled = form.oidc_enabled.checked;

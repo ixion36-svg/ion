@@ -73,6 +73,26 @@ class OIDCSettingsUpdate(BaseModel):
     oidc_verify_ssl: Optional[bool] = None
 
 
+class KibanaSettingsUpdate(BaseModel):
+    """Kibana Cases integration settings."""
+    kibana_cases_enabled: Optional[bool] = None
+    kibana_url: Optional[str] = None
+    kibana_username: Optional[str] = None
+    kibana_password: Optional[str] = None  # Only update if provided and not masked
+    kibana_space_id: Optional[str] = None
+    kibana_case_owner: Optional[str] = None
+    kibana_verify_ssl: Optional[bool] = None
+
+
+class DFIRIrisSettingsUpdate(BaseModel):
+    """DFIR-IRIS integration settings."""
+    dfir_iris_enabled: Optional[bool] = None
+    dfir_iris_url: Optional[str] = None
+    dfir_iris_api_key: Optional[str] = None  # Only update if provided and not masked
+    dfir_iris_verify_ssl: Optional[bool] = None
+    dfir_iris_default_customer: Optional[int] = None
+
+
 # =============================================================================
 # Helper Functions
 # =============================================================================
@@ -155,6 +175,24 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
             "oidc_auto_create_users": config.oidc_auto_create_users,
             "oidc_role_claim": config.oidc_role_claim,
             "oidc_verify_ssl": config.oidc_verify_ssl,
+        },
+        "kibana": {
+            "kibana_cases_enabled": config.kibana_cases_enabled,
+            "kibana_url": config.kibana_url,
+            "kibana_username": config.kibana_username,
+            "kibana_password": mask_secret(config.kibana_password),
+            "kibana_password_set": bool(config.kibana_password),
+            "kibana_space_id": config.kibana_space_id,
+            "kibana_case_owner": config.kibana_case_owner,
+            "kibana_verify_ssl": config.kibana_verify_ssl,
+        },
+        "dfir_iris": {
+            "dfir_iris_enabled": config.dfir_iris_enabled,
+            "dfir_iris_url": config.dfir_iris_url,
+            "dfir_iris_api_key": mask_secret(config.dfir_iris_api_key),
+            "dfir_iris_api_key_set": bool(config.dfir_iris_api_key),
+            "dfir_iris_verify_ssl": config.dfir_iris_verify_ssl,
+            "dfir_iris_default_customer": config.dfir_iris_default_customer,
         },
         "config_path": str(get_config_path()),
     }
@@ -318,6 +356,72 @@ async def update_oidc_settings(
     return {"status": "updated", "section": "oidc"}
 
 
+@router.put("/config/kibana")
+async def update_kibana_settings(
+    settings: KibanaSettingsUpdate,
+    current_user: User = Depends(require_permission("system:settings")),
+):
+    """Update Kibana Cases integration settings."""
+    config = get_config()
+
+    if settings.kibana_cases_enabled is not None:
+        config.kibana_cases_enabled = settings.kibana_cases_enabled
+
+    if settings.kibana_url is not None:
+        config.kibana_url = settings.kibana_url.rstrip("/")
+
+    if settings.kibana_username is not None:
+        config.kibana_username = settings.kibana_username
+
+    if settings.kibana_password is not None and not settings.kibana_password.startswith("*"):
+        config.kibana_password = settings.kibana_password
+
+    if settings.kibana_space_id is not None:
+        config.kibana_space_id = settings.kibana_space_id
+
+    if settings.kibana_case_owner is not None:
+        config.kibana_case_owner = settings.kibana_case_owner
+
+    if settings.kibana_verify_ssl is not None:
+        config.kibana_verify_ssl = settings.kibana_verify_ssl
+
+    config.to_file(get_config_path())
+    reload_config()
+
+    from ion.services.kibana_cases_service import reset_kibana_cases_service
+    reset_kibana_cases_service()
+
+    return {"status": "updated", "section": "kibana"}
+
+
+@router.put("/config/dfir_iris")
+async def update_dfir_iris_settings(
+    settings: DFIRIrisSettingsUpdate,
+    current_user: User = Depends(require_permission("system:settings")),
+):
+    """Update DFIR-IRIS integration settings."""
+    config = get_config()
+
+    if settings.dfir_iris_enabled is not None:
+        config.dfir_iris_enabled = settings.dfir_iris_enabled
+
+    if settings.dfir_iris_url is not None:
+        config.dfir_iris_url = settings.dfir_iris_url.rstrip("/")
+
+    if settings.dfir_iris_api_key is not None and not settings.dfir_iris_api_key.startswith("*"):
+        config.dfir_iris_api_key = settings.dfir_iris_api_key
+
+    if settings.dfir_iris_verify_ssl is not None:
+        config.dfir_iris_verify_ssl = settings.dfir_iris_verify_ssl
+
+    if settings.dfir_iris_default_customer is not None:
+        config.dfir_iris_default_customer = settings.dfir_iris_default_customer
+
+    config.to_file(get_config_path())
+    reload_config()
+    return {"status": "updated", "section": "dfir_iris"}
+
+
 @router.post("/config/test/{integration}")
 async def test_integration_connection(
     integration: str,
@@ -352,8 +456,40 @@ async def test_integration_connection(
         if not service.is_configured:
             return {"success": False, "error": "Elasticsearch is not configured"}
         try:
+            result = await service.test_connection()
+            return {"success": result.get("connected", False), "details": result, "error": result.get("error")}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    elif integration == "kibana":
+        from ion.services.kibana_cases_service import get_kibana_cases_service
+        service = get_kibana_cases_service()
+        if not service.enabled:
+            return {"success": False, "error": "Kibana Cases is not enabled"}
+        try:
             result = service.test_connection()
-            return {"success": True, "details": result}
+            return {"success": result.get("success", False), "details": result, "error": result.get("error")}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    elif integration == "dfir_iris":
+        config = get_config()
+        if not config.dfir_iris_enabled:
+            return {"success": False, "error": "DFIR-IRIS is not enabled"}
+        if not config.dfir_iris_url or not config.dfir_iris_api_key:
+            return {"success": False, "error": "DFIR-IRIS URL and API key are required"}
+        try:
+            import httpx
+            from ion.core.config import get_ssl_verify
+            async with httpx.AsyncClient(
+                headers={"Authorization": f"Bearer {config.dfir_iris_api_key}"},
+                verify=get_ssl_verify(config.dfir_iris_verify_ssl),
+                timeout=httpx.Timeout(10.0, connect=5.0),
+            ) as client:
+                response = await client.get(f"{config.dfir_iris_url}/api/versions")
+                response.raise_for_status()
+                data = response.json()
+                return {"success": True, "details": data}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
