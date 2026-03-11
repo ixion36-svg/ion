@@ -1,0 +1,1396 @@
+"""PCAP file parser and network traffic analyzer."""
+
+import io
+import math
+import struct
+import collections
+from datetime import datetime, timezone
+from dataclasses import dataclass, field, asdict
+from typing import Optional, Any
+
+import dpkt
+
+
+@dataclass
+class Finding:
+    category: str
+    severity: str  # low, medium, high, critical
+    title: str
+    detail: str
+
+
+@dataclass
+class PcapResult:
+    file_name: str = ""
+    file_size: int = 0
+    packet_count: int = 0
+    capture_duration: float = 0.0
+    time_start: str = ""
+    time_end: str = ""
+    protocols: dict = field(default_factory=dict)
+    top_src_ips: list = field(default_factory=list)
+    top_dst_ips: list = field(default_factory=list)
+    top_src_ports: list = field(default_factory=list)
+    top_dst_ports: list = field(default_factory=list)
+    dns_queries: list = field(default_factory=list)
+    http_requests: list = field(default_factory=list)
+    tls_handshakes: list = field(default_factory=list)
+    conversations: list = field(default_factory=list)
+    data_transfer: dict = field(default_factory=dict)
+    isakmp_sessions: list = field(default_factory=list)
+    findings: list = field(default_factory=list)
+    verdict: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+# Ports commonly associated with malicious activity
+SUSPICIOUS_PORTS = {
+    4444: "Metasploit default",
+    5555: "Common RAT",
+    1234: "Common backdoor",
+    31337: "Back Orifice / elite",
+    8888: "Common C2",
+    6666: "IRC / backdoor",
+    6667: "IRC",
+    6697: "IRC over TLS",
+    9001: "Tor ORPort",
+    9050: "Tor SOCKS",
+    9150: "Tor Browser SOCKS",
+    3333: "Mining pool",
+    14444: "Mining pool (Monero)",
+    3389: "RDP (external exposure risk)",
+    23: "Telnet (cleartext)",
+    21: "FTP (cleartext)",
+}
+
+CLEARTEXT_PORTS = {21, 23, 80, 110, 143, 161, 25, 587}
+
+
+def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
+    """Parse a PCAP/PCAPNG file and return analysis results."""
+    buf = io.BytesIO(file_bytes)
+
+    try:
+        reader = dpkt.pcap.Reader(buf)
+    except (ValueError, dpkt.UnpackError):
+        buf.seek(0)
+        try:
+            reader = dpkt.pcapng.Reader(buf)
+        except Exception as e:
+            raise ValueError(f"Not a valid PCAP or PCAPNG file: {e}")
+
+    # Counters
+    proto_counter = collections.Counter()
+    src_ip_counter = collections.Counter()
+    dst_ip_counter = collections.Counter()
+    src_port_counter = collections.Counter()
+    dst_port_counter = collections.Counter()
+    dns_counter = collections.Counter()
+    http_counter = collections.Counter()
+    tls_sni_counter = collections.Counter()
+    conv_bytes = collections.Counter()  # (src, dst) -> bytes
+    ip_sent = collections.Counter()
+    ip_recv = collections.Counter()
+    conn_times: dict[tuple, list] = {}  # (src, dst, port) -> [timestamps]
+    isakmp_sessions: dict[bytes, dict] = {}  # initiator_spi -> session info
+    payload_sigs: list[dict] = []  # malware signature hits
+    suspicious_uas: list[dict] = []  # suspicious HTTP User-Agents
+    cleartext_creds: list[dict] = []  # cleartext credential leaks
+
+    timestamps = []
+    packet_count = 0
+
+    for ts, raw in reader:
+        packet_count += 1
+        timestamps.append(ts)
+
+        ip_pkt = _extract_ip(raw)
+        if ip_pkt is None:
+            proto_counter["Other"] += 1
+            continue
+
+        src_ip = _ip_to_str(ip_pkt.src)
+        dst_ip = _ip_to_str(ip_pkt.dst)
+        pkt_len = len(raw)
+
+        src_ip_counter[src_ip] += 1
+        dst_ip_counter[dst_ip] += 1
+        ip_sent[src_ip] += pkt_len
+        ip_recv[dst_ip] += pkt_len
+
+        conv_key = tuple(sorted([src_ip, dst_ip]))
+        conv_bytes[conv_key] += pkt_len
+
+        if isinstance(ip_pkt.data, dpkt.tcp.TCP):
+            tcp = ip_pkt.data
+            proto_counter["TCP"] += 1
+            src_port_counter[tcp.sport] += 1
+            dst_port_counter[tcp.dport] += 1
+
+            # Track connection times for beaconing detection
+            if tcp.flags & dpkt.tcp.TH_SYN and not (tcp.flags & dpkt.tcp.TH_ACK):
+                key = (src_ip, dst_ip, tcp.dport)
+                conn_times.setdefault(key, []).append(ts)
+
+            _parse_tcp_payload(tcp, src_ip, dst_ip, dns_counter, http_counter,
+                               tls_sni_counter, payload_sigs, suspicious_uas, cleartext_creds)
+
+        elif isinstance(ip_pkt.data, dpkt.udp.UDP):
+            udp = ip_pkt.data
+            proto_counter["UDP"] += 1
+            src_port_counter[udp.sport] += 1
+            dst_port_counter[udp.dport] += 1
+
+            if udp.sport == 53 or udp.dport == 53:
+                _parse_dns(udp.data, dns_counter)
+
+            # ISAKMP/IKE on UDP 500 or NAT-T on UDP 4500
+            if udp.dport in (500, 4500) or udp.sport in (500, 4500):
+                _parse_isakmp(bytes(udp.data), src_ip, dst_ip, udp.sport, udp.dport,
+                              ts, isakmp_sessions, proto_counter)
+
+        elif isinstance(ip_pkt.data, dpkt.icmp.ICMP):
+            proto_counter["ICMP"] += 1
+        else:
+            proto_counter["Other"] += 1
+
+    # Build result
+    result = PcapResult(
+        file_name=filename,
+        file_size=len(file_bytes),
+        packet_count=packet_count,
+    )
+
+    if timestamps:
+        t_start = min(timestamps)
+        t_end = max(timestamps)
+        result.time_start = datetime.fromtimestamp(t_start, tz=timezone.utc).isoformat()
+        result.time_end = datetime.fromtimestamp(t_end, tz=timezone.utc).isoformat()
+        result.capture_duration = round(t_end - t_start, 2)
+
+    result.protocols = dict(proto_counter.most_common())
+    result.top_src_ips = [{"ip": ip, "count": c} for ip, c in src_ip_counter.most_common(20)]
+    result.top_dst_ips = [{"ip": ip, "count": c} for ip, c in dst_ip_counter.most_common(20)]
+    result.top_src_ports = [{"port": p, "count": c} for p, c in src_port_counter.most_common(20)]
+    result.top_dst_ports = [{"port": p, "count": c} for p, c in dst_port_counter.most_common(20)]
+
+    result.dns_queries = [
+        {"query": q, "count": c} for q, c in dns_counter.most_common(50)
+    ]
+    result.http_requests = [
+        {"request": r, "count": c} for r, c in http_counter.most_common(50)
+    ]
+    result.tls_handshakes = [
+        {"sni": s, "count": c} for s, c in tls_sni_counter.most_common(50)
+    ]
+    result.conversations = [
+        {"pair": f"{k[0]} <-> {k[1]}", "bytes": v}
+        for k, v in conv_bytes.most_common(20)
+    ]
+
+    total_bytes = sum(ip_sent.values())
+    top_talkers = sorted(
+        set(list(ip_sent.keys()) + list(ip_recv.keys())),
+        key=lambda ip: ip_sent[ip] + ip_recv[ip],
+        reverse=True,
+    )[:20]
+    result.data_transfer = {
+        "total_bytes": total_bytes,
+        "by_ip": [
+            {"ip": ip, "sent": ip_sent[ip], "received": ip_recv[ip]}
+            for ip in top_talkers
+        ],
+    }
+
+    # Summarise ISAKMP sessions for the results
+    result.isakmp_sessions = _summarise_isakmp(isakmp_sessions)
+
+    # Run heuristic analysis
+    findings = _analyze(
+        result, conn_times, dns_counter, src_ip_counter, dst_ip_counter,
+        src_port_counter, dst_port_counter, ip_sent, ip_recv, proto_counter,
+        isakmp_sessions, payload_sigs, suspicious_uas, cleartext_creds,
+    )
+    result.findings = [asdict(f) for f in findings]
+    result.verdict = _compute_verdict(findings)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Packet parsing helpers
+# ---------------------------------------------------------------------------
+
+def _extract_ip(raw: bytes) -> Optional[Any]:
+    """Extract IP packet from raw bytes (handles Ethernet + raw IP)."""
+    try:
+        eth = dpkt.ethernet.Ethernet(raw)
+        if isinstance(eth.data, dpkt.ip.IP):
+            return eth.data
+        if isinstance(eth.data, dpkt.ip6.IP6):
+            return eth.data
+    except (dpkt.UnpackError, dpkt.NeedData):
+        pass
+    # Try raw IP
+    try:
+        ip = dpkt.ip.IP(raw)
+        if ip.v == 4:
+            return ip
+    except (dpkt.UnpackError, dpkt.NeedData):
+        pass
+    return None
+
+
+def _ip_to_str(addr: bytes) -> str:
+    """Convert packed IP bytes to string."""
+    if len(addr) == 4:
+        return ".".join(str(b) for b in addr)
+    if len(addr) == 16:
+        # IPv6
+        parts = []
+        for i in range(0, 16, 2):
+            parts.append(f"{addr[i]:02x}{addr[i+1]:02x}")
+        return ":".join(parts)
+    return addr.hex()
+
+
+def _parse_tcp_payload(tcp, src_ip, dst_ip, dns_counter, http_counter,
+                       tls_sni_counter, payload_sigs, suspicious_uas, cleartext_creds):
+    """Parse TCP payload for HTTP, TLS, DNS-over-TCP, and malware signatures."""
+    data = bytes(tcp.data)
+    if not data:
+        return
+
+    # DNS over TCP (port 53)
+    if tcp.sport == 53 or tcp.dport == 53:
+        if len(data) > 2:
+            _parse_dns(data[2:], dns_counter)  # skip 2-byte length prefix
+        return
+
+    # TLS ClientHello detection
+    if len(data) > 5 and data[0] == 0x16:
+        sni = _extract_tls_sni(data)
+        if sni:
+            tls_sni_counter[sni] += 1
+        return
+
+    # Scan payloads for magic bytes and signatures (limit to avoid performance issues)
+    if len(data) >= 2 and len(payload_sigs) < 200:
+        _scan_payload_signatures(data, src_ip, dst_ip, tcp.sport, tcp.dport, payload_sigs)
+
+    # HTTP detection
+    is_http = tcp.dport == 80 or tcp.sport == 80
+    if is_http or data[:4] in (b"GET ", b"POST", b"PUT ", b"HEAD", b"DELE", b"PATC", b"OPTI"):
+        try:
+            if data[:4] in (b"GET ", b"POST", b"PUT ", b"HEAD", b"DELE", b"PATC", b"OPTI"):
+                req = dpkt.http.Request(data)
+                host = req.headers.get("host", dst_ip)
+                key = f"{req.method} {host}{req.uri[:80]}"
+                http_counter[key] += 1
+
+                # Check for suspicious User-Agents
+                ua = req.headers.get("user-agent", "")
+                if ua and len(suspicious_uas) < 50:
+                    _check_suspicious_ua(ua, src_ip, dst_ip, req.uri[:80], suspicious_uas)
+
+                # Check for PowerShell download cradles in URIs
+                uri_lower = req.uri.lower()
+                if len(payload_sigs) < 200:
+                    for pattern in _POWERSHELL_URI_PATTERNS:
+                        if pattern in uri_lower:
+                            payload_sigs.append({
+                                "sig": "PowerShell Download Cradle",
+                                "detail": f"{req.method} {host}{req.uri[:100]}",
+                                "src": src_ip, "dst": dst_ip,
+                                "severity": "critical",
+                            })
+                            break
+
+        except (dpkt.UnpackError, dpkt.NeedData):
+            pass
+
+    # Cleartext credential detection (FTP, SMTP, POP3, IMAP)
+    if len(cleartext_creds) < 50:
+        _check_cleartext_creds(data, src_ip, dst_ip, tcp.sport, tcp.dport, cleartext_creds)
+
+
+def _parse_dns(data: bytes, dns_counter):
+    """Parse DNS packet and collect query names."""
+    try:
+        dns = dpkt.dns.DNS(data)
+        for q in dns.qd:
+            name = q.name
+            if name:
+                dns_counter[name] += 1
+    except (dpkt.UnpackError, dpkt.NeedData):
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Payload signature scanning
+# ---------------------------------------------------------------------------
+
+# Magic bytes for executable/malware file transfers
+_MAGIC_SIGNATURES = [
+    (b"MZ", "PE Executable (MZ)", "critical"),
+    (b"\x7fELF", "ELF Binary", "critical"),
+    (b"#!/", "Script (shebang)", "medium"),
+    (b"PK\x03\x04", "ZIP/JAR/Office Archive", "low"),
+    (b"\xd0\xcf\x11\xe0", "OLE2 (Legacy Office doc)", "medium"),
+    (b"%PDF", "PDF Document", "low"),
+]
+
+# Shellcode / exploit patterns (longer patterns to reduce false positives)
+_SHELLCODE_PATTERNS = [
+    (b"\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90", "NOP sled (16+ bytes)", "critical"),
+    (b"\xcc\xcc\xcc\xcc\xcc\xcc\xcc\xcc", "INT3 breakpoint sled (8+ bytes)", "high"),
+    (b"\xfc\xe8\x82\x00\x00\x00", "Metasploit reverse shell prologue", "critical"),
+    (b"\xfc\xe8\x89\x00\x00\x00", "Metasploit bind shell prologue", "critical"),
+    (b"\xfc\x48\x83\xe4\xf0", "Metasploit x64 shellcode prologue", "critical"),
+    (b"\x31\xc0\x50\x68\x2f\x2f", "Linux execve shellcode (/bin/sh)", "critical"),
+]
+
+# Base64-encoded PE header variants
+_BASE64_PE_MARKERS = [b"TVqQ", b"TVpQ", b"TVoA", b"TVpB", b"TVpA"]
+
+# PowerShell download patterns in HTTP URIs
+_POWERSHELL_URI_PATTERNS = [
+    "powershell", "invoke-expression", "iex(", "downloadstring",
+    "downloadfile", "invoke-webrequest", "bitstransfer",
+    "start-bitstransfer", "certutil", "mshta",
+]
+
+# Suspicious HTTP User-Agents (common in malware/tools)
+_SUSPICIOUS_UA_PATTERNS = [
+    ("python-requests", "Python requests library", "medium"),
+    ("python-urllib", "Python urllib", "medium"),
+    ("curl/", "curl", "low"),
+    ("wget/", "wget", "low"),
+    ("powershell", "PowerShell", "high"),
+    ("certutil", "CertUtil", "critical"),
+    ("mshta", "MSHTA", "critical"),
+    ("bitsadmin", "BITSAdmin", "high"),
+    ("winhttp", "WinHTTP raw", "medium"),
+    ("go-http-client", "Go HTTP client", "medium"),
+    ("cobalt", "Cobalt Strike", "critical"),
+    ("empire", "Empire C2", "critical"),
+    ("metasploit", "Metasploit", "critical"),
+    ("havoc", "Havoc C2", "critical"),
+    ("sliver", "Sliver C2", "critical"),
+    ("mozilla/4.0 (compatible;)", "Bare compat UA (common in malware)", "high"),
+    ("java/", "Java HTTP client", "medium"),
+]
+
+
+def _scan_payload_signatures(data: bytes, src_ip: str, dst_ip: str,
+                             sport: int, dport: int, payload_sigs: list):
+    """Scan TCP payload for magic bytes, shellcode, and encoded PE markers."""
+    # Only scan first 512 bytes for magic bytes (file headers at start of transfer)
+    head = data[:512]
+
+    for magic, name, severity in _MAGIC_SIGNATURES:
+        if head.startswith(magic):
+            # PE/ELF over standard web ports is less unusual (could be legitimate download)
+            web_ports = (80, 443, 8080, 8443)
+            if severity == "critical" and (dport in web_ports or sport in web_ports):
+                severity = "medium"
+            # PE/ELF over non-web port is highly suspicious
+            elif severity != "critical" and name in ("PE Executable (MZ)", "ELF Binary") \
+                    and dport not in web_ports and sport not in web_ports and dport != 21:
+                severity = "critical"
+            payload_sigs.append({
+                "sig": f"File Transfer: {name}",
+                "detail": f"{src_ip}:{sport} -> {dst_ip}:{dport}",
+                "src": src_ip, "dst": dst_ip,
+                "severity": severity,
+            })
+            return  # one match per packet
+
+    # Shellcode patterns (scan first 2048 bytes)
+    scan_region = data[:2048]
+    for pattern, name, severity in _SHELLCODE_PATTERNS:
+        if pattern in scan_region:
+            payload_sigs.append({
+                "sig": f"Shellcode: {name}",
+                "detail": f"{src_ip}:{sport} -> {dst_ip}:{dport}",
+                "src": src_ip, "dst": dst_ip,
+                "severity": severity,
+            })
+            return
+
+    # Base64-encoded PE in payload (e.g., PowerShell encoded payloads)
+    for marker in _BASE64_PE_MARKERS:
+        if marker in head:
+            payload_sigs.append({
+                "sig": "Base64-encoded PE executable",
+                "detail": f"{src_ip}:{sport} -> {dst_ip}:{dport} (marker: {marker.decode()})",
+                "src": src_ip, "dst": dst_ip,
+                "severity": "critical",
+            })
+            return
+
+    # Encoded PowerShell commands in payload
+    lower_head = head.lower()
+    if b"powershell" in lower_head and (b"-enc" in lower_head or b"-e " in lower_head
+                                         or b"encodedcommand" in lower_head):
+        payload_sigs.append({
+            "sig": "Encoded PowerShell command",
+            "detail": f"{src_ip}:{sport} -> {dst_ip}:{dport}",
+            "src": src_ip, "dst": dst_ip,
+            "severity": "critical",
+        })
+
+
+def _check_suspicious_ua(ua: str, src_ip: str, dst_ip: str, uri: str, suspicious_uas: list):
+    """Check HTTP User-Agent against known suspicious patterns."""
+    ua_lower = ua.lower()
+
+    # Empty or very short UA
+    if len(ua.strip()) < 5:
+        suspicious_uas.append({
+            "ua": ua or "(empty)",
+            "reason": "Missing/minimal User-Agent",
+            "src": src_ip, "dst": dst_ip, "uri": uri,
+            "severity": "high",
+        })
+        return
+
+    for pattern, name, severity in _SUSPICIOUS_UA_PATTERNS:
+        if pattern in ua_lower:
+            suspicious_uas.append({
+                "ua": ua[:120],
+                "reason": name,
+                "src": src_ip, "dst": dst_ip, "uri": uri,
+                "severity": severity,
+            })
+            return
+
+
+def _check_cleartext_creds(data: bytes, src_ip: str, dst_ip: str,
+                           sport: int, dport: int, cleartext_creds: list):
+    """Detect cleartext credentials in FTP, SMTP, POP3, IMAP, HTTP Basic Auth."""
+    if len(data) < 5:
+        return
+
+    try:
+        text = data[:256].decode("ascii", errors="ignore")
+    except Exception:
+        return
+
+    text_upper = text.upper()
+
+    # FTP credentials (port 21)
+    if dport == 21 or sport == 21:
+        if text_upper.startswith("USER ") or text_upper.startswith("PASS "):
+            cmd = text.split("\r")[0].split("\n")[0]
+            cleartext_creds.append({
+                "protocol": "FTP",
+                "detail": f"{src_ip} -> {dst_ip}: {cmd[:60]}",
+                "src": src_ip, "dst": dst_ip,
+            })
+            return
+
+    # SMTP AUTH (ports 25, 587)
+    if dport in (25, 587) or sport in (25, 587):
+        if text_upper.startswith("AUTH ") or text_upper.startswith("EHLO "):
+            cmd = text.split("\r")[0].split("\n")[0]
+            cleartext_creds.append({
+                "protocol": "SMTP",
+                "detail": f"{src_ip} -> {dst_ip}: {cmd[:60]}",
+                "src": src_ip, "dst": dst_ip,
+            })
+            return
+
+    # POP3 credentials (port 110)
+    if dport == 110 or sport == 110:
+        if text_upper.startswith("USER ") or text_upper.startswith("PASS "):
+            cmd = text.split("\r")[0].split("\n")[0]
+            cleartext_creds.append({
+                "protocol": "POP3",
+                "detail": f"{src_ip} -> {dst_ip}: {cmd[:60]}",
+                "src": src_ip, "dst": dst_ip,
+            })
+            return
+
+    # HTTP Basic Auth (base64-encoded but trivially decoded)
+    if b"Authorization: Basic " in data[:256]:
+        cleartext_creds.append({
+            "protocol": "HTTP Basic Auth",
+            "detail": f"{src_ip} -> {dst_ip}:{dport}",
+            "src": src_ip, "dst": dst_ip,
+        })
+
+
+# ---------------------------------------------------------------------------
+# ISAKMP / IKE parsing
+# ---------------------------------------------------------------------------
+
+# ISAKMP exchange types
+_ISAKMP_EXCHANGE = {
+    0: "None",
+    1: "Base",
+    2: "Identity Protection (Main Mode)",
+    4: "Aggressive",
+    5: "Informational",
+    32: "Quick Mode",
+    33: "New Group Mode",
+    34: "IKE_SA_INIT (IKEv2)",
+    35: "IKE_AUTH (IKEv2)",
+    36: "CREATE_CHILD_SA (IKEv2)",
+    37: "INFORMATIONAL (IKEv2)",
+}
+
+# ISAKMP notification types that indicate errors (1-16383 are error types)
+_ISAKMP_NOTIFY_ERRORS = {
+    1: "INVALID_PAYLOAD_TYPE",
+    2: "DOI_NOT_SUPPORTED",
+    3: "SITUATION_NOT_SUPPORTED",
+    4: "INVALID_COOKIE",
+    5: "INVALID_MAJOR_VERSION",
+    6: "INVALID_MINOR_VERSION",
+    7: "INVALID_EXCHANGE_TYPE",
+    8: "INVALID_FLAGS",
+    9: "INVALID_MESSAGE_ID",
+    10: "INVALID_PROTOCOL_ID",
+    11: "INVALID_SPI",
+    12: "INVALID_TRANSFORM_ID",
+    13: "ATTRIBUTES_NOT_SUPPORTED",
+    14: "NO_PROPOSAL_CHOSEN",
+    24: "AUTHENTICATION_FAILED",
+    34: "INVALID_KE_PAYLOAD",
+    43: "INVALID_SYNTAX",
+}
+
+# ISAKMP next-payload types we care about
+_PAYLOAD_SA = 1
+_PAYLOAD_NOTIFY = 11
+_PAYLOAD_DELETE = 12
+_PAYLOAD_NONE = 0
+
+
+def _parse_isakmp(data: bytes, src_ip: str, dst_ip: str, sport: int, dport: int,
+                  ts: float, sessions: dict, proto_counter: collections.Counter):
+    """Parse an ISAKMP/IKE packet header and track session state."""
+    # NAT-T (port 4500): skip 4-byte non-ESP marker
+    if (sport == 4500 or dport == 4500) and len(data) >= 4:
+        marker = struct.unpack("!I", data[:4])[0]
+        if marker == 0:
+            data = data[4:]
+
+    # ISAKMP header is 28 bytes minimum
+    if len(data) < 28:
+        return
+
+    try:
+        init_spi = data[0:8]
+        resp_spi = data[8:16]
+        next_payload = data[16]
+        version = data[17]
+        exchange_type = data[18]
+        flags = data[19]
+        msg_id = struct.unpack("!I", data[20:24])[0]
+        total_len = struct.unpack("!I", data[24:28])[0]
+    except (struct.error, IndexError):
+        return
+
+    # Sanity check: length should be at least 28 and not wildly larger than data
+    if total_len < 28 or total_len > len(data) + 100:
+        return
+
+    ike_major = (version >> 4) & 0x0F
+    ike_minor = version & 0x0F
+    is_response = bool(flags & 0x20)  # R flag (IKEv2) or similar
+    is_initiator = not is_response
+
+    proto_counter["ISAKMP"] += 1
+
+    spi_key = init_spi
+    if spi_key not in sessions:
+        sessions[spi_key] = {
+            "init_spi": init_spi.hex(),
+            "resp_spi": None,
+            "initiator_ip": None,
+            "responder_ip": None,
+            "ike_version": f"{ike_major}.{ike_minor}",
+            "exchange_types": [],
+            "packets": 0,
+            "initiator_packets": 0,
+            "responder_packets": 0,
+            "first_seen": ts,
+            "last_seen": ts,
+            "notifications": [],
+            "has_delete": False,
+            "established": False,
+            "retransmits": 0,
+        }
+
+    sess = sessions[spi_key]
+    sess["packets"] += 1
+    sess["last_seen"] = ts
+
+    exchange_name = _ISAKMP_EXCHANGE.get(exchange_type, f"Unknown({exchange_type})")
+    if exchange_name not in sess["exchange_types"]:
+        sess["exchange_types"].append(exchange_name)
+
+    # Determine who is initiator vs responder
+    resp_is_zero = (resp_spi == b'\x00' * 8)
+    if resp_is_zero or sess["initiator_ip"] is None:
+        # First packet or responder hasn't replied yet
+        if sess["initiator_ip"] is None:
+            sess["initiator_ip"] = src_ip
+            sess["responder_ip"] = dst_ip
+    if not resp_is_zero:
+        sess["resp_spi"] = resp_spi.hex()
+
+    # Count directional packets
+    if src_ip == sess["initiator_ip"]:
+        sess["initiator_packets"] += 1
+    else:
+        sess["responder_packets"] += 1
+
+    # Detect retransmissions: same initiator SPI, same exchange type from same source
+    # with responder SPI still zero after first packet
+    if resp_is_zero and sess["packets"] > 1 and src_ip == sess["initiator_ip"]:
+        sess["retransmits"] += 1
+
+    # Check if session reached established state (IKEv1: Quick Mode seen, IKEv2: IKE_AUTH seen)
+    if exchange_type in (32, 35):  # Quick Mode or IKE_AUTH
+        sess["established"] = True
+
+    # Parse notification payloads (walk the payload chain)
+    _parse_isakmp_payloads(data[28:], next_payload, sess)
+
+
+def _parse_isakmp_payloads(data: bytes, next_payload: int, sess: dict):
+    """Walk ISAKMP payload chain looking for Notification and Delete payloads."""
+    offset = 0
+    max_payloads = 20  # safety limit
+    count = 0
+
+    while next_payload != _PAYLOAD_NONE and offset + 4 <= len(data) and count < max_payloads:
+        count += 1
+        current_type = next_payload
+        next_payload = data[offset]
+        payload_len = struct.unpack("!H", data[offset + 2:offset + 4])[0]
+        if payload_len < 4:
+            break
+
+        payload_body = data[offset + 4:offset + payload_len] if offset + payload_len <= len(data) else b""
+
+        if current_type == _PAYLOAD_NOTIFY and len(payload_body) >= 4:
+            # Notification payload: DOI(4), protocol(1), SPI size(1), notify type(2)
+            try:
+                notify_type = struct.unpack("!H", payload_body[2:4])[0]
+                name = _ISAKMP_NOTIFY_ERRORS.get(notify_type, f"Type {notify_type}")
+                is_error = notify_type < 16384
+                sess["notifications"].append({
+                    "type": notify_type,
+                    "name": name,
+                    "is_error": is_error,
+                })
+            except struct.error:
+                pass
+
+        if current_type == _PAYLOAD_DELETE:
+            sess["has_delete"] = True
+
+        offset += payload_len
+
+
+def _summarise_isakmp(sessions: dict) -> list:
+    """Build a summary list of ISAKMP sessions for the result output."""
+    if not sessions:
+        return []
+    result = []
+    for spi_key, sess in sessions.items():
+        errors = [n for n in sess["notifications"] if n.get("is_error")]
+        status = "Established" if sess["established"] else (
+            "Failed" if errors else (
+                "No Response" if sess["responder_packets"] == 0 else "Incomplete"
+            )
+        )
+        result.append({
+            "init_spi": sess["init_spi"],
+            "resp_spi": sess["resp_spi"],
+            "initiator": sess["initiator_ip"],
+            "responder": sess["responder_ip"],
+            "ike_version": sess["ike_version"],
+            "exchanges": sess["exchange_types"],
+            "status": status,
+            "packets": sess["packets"],
+            "initiator_packets": sess["initiator_packets"],
+            "responder_packets": sess["responder_packets"],
+            "retransmits": sess["retransmits"],
+            "errors": [n["name"] for n in errors],
+            "has_delete": sess["has_delete"],
+            "duration": round(sess["last_seen"] - sess["first_seen"], 2),
+        })
+    return sorted(result, key=lambda s: s["status"] != "Established")
+
+
+def _detect_isakmp_issues(sessions: dict) -> list[Finding]:
+    """Detect ISAKMP/IKE negotiation problems.
+
+    Logic:
+    - Internal-to-internal ISAKMP is expected (your VPN infrastructure).
+    - External IP involved + established = unauthorized VPN tunnel (critical).
+    - External IP involved + failed/no response = probing attempt (high).
+    - Internal sessions: only flag failures/retransmits (operational health).
+    """
+    findings = []
+    if not sessions:
+        return findings
+
+    total = len(sessions)
+    ext_established = []
+    ext_failed = []
+    ext_probing = []
+    int_no_response = []
+    int_failed = []
+    int_incomplete = []
+    retransmit_sessions = []
+    delete_sessions = []
+
+    for spi_key, sess in sessions.items():
+        errors = [n for n in sess["notifications"] if n.get("is_error")]
+        init_ip = sess["initiator_ip"] or ""
+        resp_ip = sess["responder_ip"] or ""
+        label = f"{init_ip} -> {resp_ip}"
+        both_internal = _is_private(init_ip) and _is_private(resp_ip)
+
+        if not both_internal:
+            # External IP involved — this is where we care most
+            if sess["established"]:
+                ext_established.append((label, sess))
+            elif errors:
+                ext_failed.append((label, sess, errors))
+            elif sess["responder_packets"] == 0:
+                ext_probing.append((label, sess))
+            else:
+                ext_failed.append((label, sess, errors))
+        else:
+            # Internal-to-internal — only flag operational issues
+            if sess["responder_packets"] == 0:
+                int_no_response.append((label, sess))
+            elif errors:
+                int_failed.append((label, sess, errors))
+            elif not sess["established"]:
+                int_incomplete.append((label, sess))
+
+        if sess["retransmits"] > 2:
+            retransmit_sessions.append((label, sess))
+
+        if sess["has_delete"]:
+            delete_sessions.append((label, sess))
+
+    # === EXTERNAL IKE — high priority ===
+
+    # 1. Established VPN tunnels with external IPs (unauthorized tunnel)
+    if ext_established:
+        details = "; ".join(
+            f"{lbl} (v{s['ike_version']}, {s['packets']} pkts, "
+            f"exchanges: {', '.join(s['exchange_types'])})"
+            for lbl, s in ext_established[:5]
+        )
+        findings.append(Finding(
+            category="ISAKMP/IKE",
+            severity="critical",
+            title=f"Unauthorized VPN: {len(ext_established)} IKE session(s) established with external IP(s)",
+            detail=f"IKE/IPsec tunnels established with non-internal IP addresses. This may indicate "
+                   f"an unauthorized VPN tunnel, rogue IPsec connection, or compromised endpoint "
+                   f"phoning home via encrypted tunnel. Sessions: {details}",
+        ))
+
+    # 2. Failed external IKE (attempted unauthorized tunnel)
+    if ext_failed:
+        details = "; ".join(
+            f"{lbl} ({', '.join(e['name'] for e in errs[:2]) if errs else 'incomplete'})"
+            for lbl, s, errs in ext_failed[:5]
+        )
+        findings.append(Finding(
+            category="ISAKMP/IKE",
+            severity="high",
+            title=f"External IKE negotiation attempts: {len(ext_failed)} failed session(s)",
+            detail=f"IKE negotiations with external IPs failed. Someone may be attempting to "
+                   f"establish an unauthorized VPN tunnel. Sessions: {details}",
+        ))
+
+    # 3. External probing (sent IKE init but got no response)
+    if ext_probing:
+        details = "; ".join(
+            f"{lbl} ({s['initiator_packets']} pkts, {s['retransmits']} retransmits)"
+            for lbl, s in ext_probing[:5]
+        )
+        findings.append(Finding(
+            category="ISAKMP/IKE",
+            severity="high",
+            title=f"External IKE probing: {len(ext_probing)} unanswered session(s)",
+            detail=f"IKE initiation attempts to/from external IPs with no response. This may indicate "
+                   f"reconnaissance, a misconfigured VPN client, or an endpoint attempting to tunnel out. "
+                   f"Sessions: {details}",
+        ))
+
+    # === INTERNAL IKE — operational health ===
+
+    # 4. Internal sessions with no response (your VPN server not replying)
+    if int_no_response:
+        details = "; ".join(
+            f"{lbl} ({s['initiator_packets']} pkts, {s['retransmits']} retransmits)"
+            for lbl, s in int_no_response[:5]
+        )
+        findings.append(Finding(
+            category="ISAKMP/IKE",
+            severity="high",
+            title=f"Internal IKE: {len(int_no_response)} session(s) received no server response",
+            detail=f"Internal VPN server did not respond to IKE initiations. Check if the VPN "
+                   f"service is running and UDP 500/4500 is not blocked. Sessions: {details}",
+        ))
+
+    # 5. Internal negotiation failures
+    if int_failed:
+        for lbl, sess, errors in int_failed[:3]:
+            error_names = ", ".join(e["name"] for e in errors[:3]) if errors else "unknown"
+            findings.append(Finding(
+                category="ISAKMP/IKE",
+                severity="medium",
+                title=f"Internal IKE negotiation failed: {lbl}",
+                detail=f"Error(s): {error_names}. IKE v{sess['ike_version']}, "
+                       f"exchanges: {', '.join(sess['exchange_types'])}. "
+                       f"Check proposal compatibility and credentials.",
+            ))
+
+    # 6. Internal incomplete negotiations
+    if int_incomplete:
+        details = "; ".join(
+            f"{lbl} ({s['initiator_packets']}i/{s['responder_packets']}r pkts)"
+            for lbl, s in int_incomplete[:5]
+        )
+        findings.append(Finding(
+            category="ISAKMP/IKE",
+            severity="medium",
+            title=f"Internal IKE: {len(int_incomplete)} session(s) incomplete",
+            detail=f"Phase 1 succeeded but never reached Phase 2 / IKE_AUTH. "
+                   f"Check Phase 2 proposals and authentication. Sessions: {details}",
+        ))
+
+    # 7. Excessive retransmissions
+    if retransmit_sessions:
+        details = "; ".join(
+            f"{lbl} ({s['retransmits']} retransmits)" for lbl, s in retransmit_sessions[:5]
+        )
+        findings.append(Finding(
+            category="ISAKMP/IKE",
+            severity="medium",
+            title=f"IKE: {len(retransmit_sessions)} session(s) with excessive retransmissions",
+            detail=f"Packets are being lost or peer is slow. Check network path, MTU, and "
+                   f"firewall rules for UDP 500/4500. Sessions: {details}",
+        ))
+
+    # 8. High session teardown rate
+    if delete_sessions and total >= 3:
+        pct = len(delete_sessions) * 100 // total
+        if pct > 50:
+            findings.append(Finding(
+                category="ISAKMP/IKE",
+                severity="medium",
+                title=f"IKE: {len(delete_sessions)}/{total} sessions torn down ({pct}%)",
+                detail=f"High proportion of IKE sessions explicitly deleted. May indicate "
+                       f"unstable VPN tunnels or DPD failures.",
+            ))
+
+    # Summary: all internal and healthy
+    int_established = total - len(ext_established) - len(ext_failed) - len(ext_probing) \
+        - len(int_no_response) - len(int_failed) - len(int_incomplete)
+    if total > 0 and not findings:
+        findings.append(Finding(
+            category="ISAKMP/IKE",
+            severity="low",
+            title=f"IKE: {int_established}/{total} internal session(s) established normally",
+            detail=f"All IKE/IPsec negotiations are between internal IPs and completed successfully. "
+                   f"No unauthorized external tunnels detected.",
+        ))
+
+    return findings
+
+
+def _extract_tls_sni(data: bytes) -> Optional[str]:
+    """Extract SNI from TLS ClientHello."""
+    try:
+        if len(data) < 44:
+            return None
+        # TLS record: type(1) version(2) length(2) -> handshake
+        if data[0] != 0x16:
+            return None
+        # Handshake type 1 = ClientHello at offset 5
+        if data[5] != 0x01:
+            return None
+
+        # Skip to session_id
+        offset = 43
+        if offset >= len(data):
+            return None
+        session_id_len = data[offset]
+        offset += 1 + session_id_len
+
+        # Skip cipher suites
+        if offset + 2 > len(data):
+            return None
+        cs_len = struct.unpack("!H", data[offset:offset + 2])[0]
+        offset += 2 + cs_len
+
+        # Skip compression methods
+        if offset >= len(data):
+            return None
+        cm_len = data[offset]
+        offset += 1 + cm_len
+
+        # Extensions
+        if offset + 2 > len(data):
+            return None
+        ext_len = struct.unpack("!H", data[offset:offset + 2])[0]
+        offset += 2
+        ext_end = offset + ext_len
+
+        while offset + 4 <= ext_end and offset + 4 <= len(data):
+            ext_type = struct.unpack("!H", data[offset:offset + 2])[0]
+            ext_data_len = struct.unpack("!H", data[offset + 2:offset + 4])[0]
+            offset += 4
+
+            if ext_type == 0x0000:  # SNI extension
+                if offset + 5 <= len(data):
+                    sni_list_len = struct.unpack("!H", data[offset:offset + 2])[0]
+                    sni_type = data[offset + 2]
+                    sni_len = struct.unpack("!H", data[offset + 3:offset + 5])[0]
+                    if sni_type == 0 and offset + 5 + sni_len <= len(data):
+                        return data[offset + 5:offset + 5 + sni_len].decode("ascii", errors="ignore")
+                return None
+
+            offset += ext_data_len
+
+    except (struct.error, IndexError):
+        pass
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Heuristic analysis
+# ---------------------------------------------------------------------------
+
+def _analyze(
+    result: PcapResult,
+    conn_times: dict,
+    dns_counter: collections.Counter,
+    src_ip_counter: collections.Counter,
+    dst_ip_counter: collections.Counter,
+    src_port_counter: collections.Counter,
+    dst_port_counter: collections.Counter,
+    ip_sent: collections.Counter,
+    ip_recv: collections.Counter,
+    proto_counter: collections.Counter,
+    isakmp_sessions: dict,
+    payload_sigs: list,
+    suspicious_uas: list,
+    cleartext_creds: list,
+) -> list[Finding]:
+    findings = []
+
+    # 1. Beaconing detection
+    findings.extend(_detect_beaconing(conn_times))
+
+    # 2. DNS tunneling
+    findings.extend(_detect_dns_tunneling(dns_counter))
+
+    # 3. Suspicious ports
+    findings.extend(_detect_suspicious_ports(dst_port_counter))
+
+    # 4. Large data exfiltration
+    findings.extend(_detect_exfiltration(ip_sent, ip_recv))
+
+    # 5. Port scanning
+    findings.extend(_detect_port_scan(conn_times))
+
+    # 6. DGA domains
+    findings.extend(_detect_dga(dns_counter))
+
+    # 7. ICMP anomaly (check if lots of ICMP)
+    total_pkts = sum(proto_counter.values())
+    icmp_count = proto_counter.get("ICMP", 0)
+    if total_pkts > 100 and icmp_count > total_pkts * 0.2:
+        findings.append(Finding(
+            category="Network Anomaly",
+            severity="medium",
+            title=f"High ICMP traffic: {icmp_count} packets ({icmp_count * 100 // total_pkts}%)",
+            detail="Elevated ICMP traffic may indicate ICMP tunneling, network reconnaissance, or a ping flood.",
+        ))
+
+    # 8. Cleartext sensitive protocols
+    for port in CLEARTEXT_PORTS:
+        count = dst_port_counter.get(port, 0)
+        if count > 10:
+            svc = {21: "FTP", 23: "Telnet", 80: "HTTP", 110: "POP3", 143: "IMAP",
+                   161: "SNMP", 25: "SMTP", 587: "SMTP"}.get(port, str(port))
+            findings.append(Finding(
+                category="Cleartext Protocol",
+                severity="low",
+                title=f"Cleartext {svc} traffic detected ({count} packets to port {port})",
+                detail=f"Unencrypted {svc} traffic may expose credentials or sensitive data.",
+            ))
+
+    # 9. ISAKMP/IKE health checks
+    findings.extend(_detect_isakmp_issues(isakmp_sessions))
+
+    # 10. Malware payload signatures (magic bytes, shellcode, encoded PE)
+    findings.extend(_detect_payload_signatures(payload_sigs))
+
+    # 11. Suspicious HTTP User-Agents
+    findings.extend(_detect_suspicious_uas(suspicious_uas))
+
+    # 12. Cleartext credential exposure
+    findings.extend(_detect_cleartext_creds(cleartext_creds))
+
+    return findings
+
+
+def _detect_beaconing(conn_times: dict) -> list[Finding]:
+    findings = []
+    for (src, dst, port), times in conn_times.items():
+        if len(times) < 5:
+            continue
+        times_sorted = sorted(times)
+        intervals = [times_sorted[i + 1] - times_sorted[i] for i in range(len(times_sorted) - 1)]
+        mean = sum(intervals) / len(intervals)
+        if mean < 1:
+            continue
+        variance = sum((x - mean) ** 2 for x in intervals) / len(intervals)
+        std_dev = variance ** 0.5
+        cv = std_dev / mean if mean > 0 else float("inf")
+        if cv < 0.15:
+            findings.append(Finding(
+                category="Command & Control",
+                severity="high",
+                title=f"Beaconing: {src} -> {dst}:{port}",
+                detail=f"Regular connections every ~{mean:.1f}s (CV={cv:.3f}, {len(times)} connections). "
+                       f"Low variance suggests automated C2 beaconing.",
+            ))
+    return findings
+
+
+def _detect_dns_tunneling(dns_counter: collections.Counter) -> list[Finding]:
+    findings = []
+    # Check for long subdomain names
+    long_queries = [q for q in dns_counter if len(q) > 50]
+    if long_queries:
+        findings.append(Finding(
+            category="DNS Tunneling",
+            severity="high",
+            title=f"Unusually long DNS queries ({len(long_queries)} unique)",
+            detail=f"DNS queries exceeding 50 chars may indicate DNS tunneling or data exfiltration. "
+                   f"Examples: {', '.join(long_queries[:3])}",
+        ))
+
+    # Check for high subdomain diversity under one domain
+    domain_subs: dict[str, set] = {}
+    domain_query_count: dict[str, int] = {}
+    for q, count in dns_counter.items():
+        parts = q.split(".")
+        if len(parts) >= 3:
+            base = ".".join(parts[-2:])
+            domain_subs.setdefault(base, set()).add(q)
+            domain_query_count[base] = domain_query_count.get(base, 0) + count
+    for base, subs in domain_subs.items():
+        total_hits = domain_query_count.get(base, 0)
+        if len(subs) > 50:
+            findings.append(Finding(
+                category="DNS Tunneling",
+                severity="high",
+                title=f"High subdomain diversity for {base} ({len(subs)} unique)",
+                detail=f"Excessive unique subdomains under a single domain is a strong DNS tunneling indicator.",
+            ))
+        elif len(subs) > 15:
+            findings.append(Finding(
+                category="DNS Tunneling",
+                severity="medium",
+                title=f"Elevated subdomain diversity for {base} ({len(subs)} unique, {total_hits} queries)",
+                detail=f"Multiple unique subdomains under {base} with high query volume may indicate DNS C2 or tunneling.",
+            ))
+        elif len(subs) >= 5 and total_hits > 50:
+            findings.append(Finding(
+                category="DNS Anomaly",
+                severity="medium",
+                title=f"Repetitive DNS queries to {base} ({total_hits} queries, {len(subs)} subdomains)",
+                detail=f"High query volume to a single domain with multiple subdomains may indicate C2 beaconing over DNS.",
+            ))
+
+    return findings
+
+
+def _detect_suspicious_ports(dst_port_counter: collections.Counter) -> list[Finding]:
+    findings = []
+    for port, label in SUSPICIOUS_PORTS.items():
+        count = dst_port_counter.get(port, 0)
+        if count > 0:
+            sev = "critical" if port in (4444, 31337) else "high" if port in (6667, 9001, 9050, 3333) else "medium"
+            findings.append(Finding(
+                category="Suspicious Port",
+                severity=sev,
+                title=f"Traffic to port {port} ({label}): {count} packets",
+                detail=f"Port {port} is associated with {label}. {count} packets observed.",
+            ))
+    return findings
+
+
+def _detect_exfiltration(ip_sent: collections.Counter, ip_recv: collections.Counter) -> list[Finding]:
+    findings = []
+    for ip, sent in ip_sent.most_common(50):
+        if _is_private(ip):
+            recv = ip_recv.get(ip, 0)
+            if sent > 100_000_000:  # >100MB sent from an internal IP
+                findings.append(Finding(
+                    category="Data Exfiltration",
+                    severity="high",
+                    title=f"Large outbound transfer from {ip}: {_fmt_bytes(sent)}",
+                    detail=f"Internal IP {ip} sent {_fmt_bytes(sent)} (received {_fmt_bytes(recv)}). "
+                           f"Ratio: {sent / max(recv, 1):.1f}:1",
+                ))
+            elif recv > 0 and sent / max(recv, 1) > 10 and sent > 10_000_000:
+                findings.append(Finding(
+                    category="Data Exfiltration",
+                    severity="medium",
+                    title=f"Asymmetric traffic from {ip}: {sent / max(recv, 1):.1f}:1 ratio",
+                    detail=f"Internal IP {ip} sent {_fmt_bytes(sent)} but received only {_fmt_bytes(recv)}.",
+                ))
+    return findings
+
+
+def _detect_port_scan(conn_times: dict) -> list[Finding]:
+    findings = []
+    # Vertical scan: one src -> one dst on many ports
+    src_dst_ports: dict[tuple, set] = {}
+    # Horizontal scan: one src -> many dsts on same port
+    src_port_dsts: dict[tuple, set] = {}
+
+    for (src, dst, port) in conn_times:
+        src_dst_ports.setdefault((src, dst), set()).add(port)
+        src_port_dsts.setdefault((src, port), set()).add(dst)
+
+    for (src, dst), ports in src_dst_ports.items():
+        if len(ports) > 20:
+            findings.append(Finding(
+                category="Reconnaissance",
+                severity="high",
+                title=f"Port scan: {src} -> {dst} ({len(ports)} ports)",
+                detail=f"Source {src} connected to {len(ports)} unique ports on {dst}. "
+                       f"Ports include: {', '.join(str(p) for p in sorted(ports)[:10])}...",
+            ))
+
+    for (src, port), dsts in src_port_dsts.items():
+        if len(dsts) > 10:
+            findings.append(Finding(
+                category="Reconnaissance",
+                severity="medium",
+                title=f"Horizontal scan: {src} port {port} -> {len(dsts)} hosts",
+                detail=f"Source {src} connected to {len(dsts)} unique hosts on port {port}.",
+            ))
+
+    return findings
+
+
+def _detect_dga(dns_counter: collections.Counter) -> list[Finding]:
+    findings = []
+    high_entropy_domains = []
+    for query in dns_counter:
+        parts = query.split(".")
+        if len(parts) >= 2:
+            sld = parts[-2]  # second-level domain
+            if len(sld) >= 6:
+                entropy = _shannon_entropy(sld)
+                if entropy > 3.5:
+                    high_entropy_domains.append((query, round(entropy, 2)))
+
+    if len(high_entropy_domains) > 3:
+        examples = high_entropy_domains[:5]
+        findings.append(Finding(
+            category="DGA Detection",
+            severity="high",
+            title=f"Possible DGA: {len(high_entropy_domains)} high-entropy domains",
+            detail=f"Multiple DNS queries with high randomness in the domain name suggest Domain Generation "
+                   f"Algorithm activity. Examples: {', '.join(f'{d} (H={e})' for d, e in examples)}",
+        ))
+    elif high_entropy_domains:
+        for domain, entropy in high_entropy_domains:
+            findings.append(Finding(
+                category="DGA Detection",
+                severity="medium",
+                title=f"High-entropy domain: {domain} (H={entropy})",
+                detail=f"Domain name has unusually high randomness (Shannon entropy {entropy}), "
+                       f"which may indicate DGA or algorithmically generated malware C2.",
+            ))
+
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# Payload / UA / credential detections
+# ---------------------------------------------------------------------------
+
+def _detect_payload_signatures(payload_sigs: list) -> list[Finding]:
+    """Generate findings from payload signature matches."""
+    findings = []
+    if not payload_sigs:
+        return findings
+
+    # Group by signature name and deduplicate
+    sig_groups: dict[str, list] = {}
+    for sig in payload_sigs:
+        sig_groups.setdefault(sig["sig"], []).append(sig)
+
+    for sig_name, hits in sig_groups.items():
+        worst_sev = max(hits, key=lambda h: {"critical": 4, "high": 3, "medium": 2, "low": 1}.get(h["severity"], 0))
+        severity = worst_sev["severity"]
+        examples = "; ".join(h["detail"] for h in hits[:5])
+        count = len(hits)
+
+        category = "Malware Signature"
+        if "Shellcode" in sig_name:
+            category = "Shellcode Detection"
+        elif "PowerShell" in sig_name:
+            category = "PowerShell Abuse"
+        elif "File Transfer" in sig_name:
+            category = "Suspicious File Transfer"
+
+        findings.append(Finding(
+            category=category,
+            severity=severity,
+            title=f"{sig_name}: {count} occurrence(s)",
+            detail=f"Detected in traffic: {examples}" +
+                   (f" ... and {count - 5} more" if count > 5 else ""),
+        ))
+
+    return findings
+
+
+def _detect_suspicious_uas(suspicious_uas: list) -> list[Finding]:
+    """Generate findings from suspicious HTTP User-Agents."""
+    findings = []
+    if not suspicious_uas:
+        return findings
+
+    # Group by reason
+    ua_groups: dict[str, list] = {}
+    for ua in suspicious_uas:
+        ua_groups.setdefault(ua["reason"], []).append(ua)
+
+    for reason, hits in ua_groups.items():
+        worst = max(hits, key=lambda h: {"critical": 4, "high": 3, "medium": 2, "low": 1}.get(h["severity"], 0))
+        examples = "; ".join(f"{h['src']}->{h['dst']} UA=\"{h['ua'][:60]}\"" for h in hits[:3])
+        findings.append(Finding(
+            category="Suspicious User-Agent",
+            severity=worst["severity"],
+            title=f"Suspicious HTTP User-Agent: {reason} ({len(hits)} request(s))",
+            detail=f"HTTP requests with tool/malware-associated User-Agent detected. {examples}",
+        ))
+
+    return findings
+
+
+def _detect_cleartext_creds(cleartext_creds: list) -> list[Finding]:
+    """Generate findings from cleartext credential exposure."""
+    findings = []
+    if not cleartext_creds:
+        return findings
+
+    # Group by protocol
+    proto_groups: dict[str, list] = {}
+    for cred in cleartext_creds:
+        proto_groups.setdefault(cred["protocol"], []).append(cred)
+
+    for protocol, hits in proto_groups.items():
+        examples = "; ".join(h["detail"] for h in hits[:3])
+        findings.append(Finding(
+            category="Credential Exposure",
+            severity="high",
+            title=f"Cleartext {protocol} credentials: {len(hits)} instance(s)",
+            detail=f"Authentication credentials sent in cleartext over {protocol}. "
+                   f"These can be intercepted by any network observer. {examples}",
+        ))
+
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# Verdict
+# ---------------------------------------------------------------------------
+
+SEVERITY_WEIGHTS = {"critical": 50, "high": 25, "medium": 10, "low": 3}
+
+
+def _compute_verdict(findings: list[Finding]) -> dict:
+    if not findings:
+        return {
+            "label": "Likely Benign",
+            "confidence": 85,
+            "reasons": ["No suspicious patterns detected in traffic analysis."],
+        }
+
+    score = sum(SEVERITY_WEIGHTS.get(f.severity, 0) for f in findings)
+
+    # Deduplicate reasons by category
+    reasons = []
+    seen_cats = set()
+    for f in sorted(findings, key=lambda x: SEVERITY_WEIGHTS.get(x.severity, 0), reverse=True):
+        if f.category not in seen_cats and len(reasons) < 5:
+            reasons.append(f.title)
+            seen_cats.add(f.category)
+
+    if score >= 50:
+        return {
+            "label": "Needs Investigation",
+            "confidence": min(95, 50 + score),
+            "reasons": reasons,
+            "score": score,
+            "finding_count": len(findings),
+        }
+    else:
+        return {
+            "label": "Likely Benign",
+            "confidence": max(55, 100 - score * 2),
+            "reasons": reasons if reasons else ["Minor anomalies detected but within normal parameters."],
+            "score": score,
+            "finding_count": len(findings),
+        }
+
+
+# ---------------------------------------------------------------------------
+# Utilities
+# ---------------------------------------------------------------------------
+
+def _is_private(ip: str) -> bool:
+    return (
+        ip.startswith("10.")
+        or ip.startswith("192.168.")
+        or ip.startswith("172.16.") or ip.startswith("172.17.") or ip.startswith("172.18.")
+        or ip.startswith("172.19.") or ip.startswith("172.2") or ip.startswith("172.3")
+        or ip.startswith("127.")
+        or ip.startswith("fe80")
+        or ip.startswith("fc") or ip.startswith("fd")
+    )
+
+
+def _fmt_bytes(n: int) -> str:
+    if n < 1024:
+        return f"{n} B"
+    if n < 1024 * 1024:
+        return f"{n / 1024:.1f} KB"
+    if n < 1024 * 1024 * 1024:
+        return f"{n / (1024 * 1024):.1f} MB"
+    return f"{n / (1024 * 1024 * 1024):.1f} GB"
+
+
+def _shannon_entropy(s: str) -> float:
+    if not s:
+        return 0.0
+    freq = collections.Counter(s.lower())
+    length = len(s)
+    return -sum((c / length) * math.log2(c / length) for c in freq.values())

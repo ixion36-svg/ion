@@ -23,6 +23,7 @@ from ion.web.ai_api import router as ai_router
 from ion.web.kibana_api import router as kibana_router
 from ion.web.skills_api import router as skills_router
 from ion.web.notes_api import router as notes_router
+from ion.web.pcap_api import router as pcap_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -162,6 +163,7 @@ app.include_router(ai_router)
 app.include_router(kibana_router, prefix="/api/kibana")
 app.include_router(skills_router, prefix="/api/skills")
 app.include_router(notes_router, prefix="/api/notes")
+app.include_router(pcap_router, prefix="/api/pcap")
 
 
 @app.on_event("startup")
@@ -438,6 +440,12 @@ async def training_page(request: Request, user: User = Depends(require_page_perm
 async def notes_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the full-page notes view."""
     return templates.TemplateResponse("notes.html", {"request": request})
+
+
+@app.get("/pcap", response_class=HTMLResponse)
+async def pcap_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the PCAP analyzer page."""
+    return templates.TemplateResponse("pcap.html", {"request": request})
 
 
 @app.get("/topology", response_class=HTMLResponse)
