@@ -3659,6 +3659,8 @@ async def update_case(
         case.severity = data.severity
     if data.assigned_to_id is not None:
         case.assigned_to_id = data.assigned_to_id
+    _synced_alert_ids = []
+    _mapped_triage = None
     if data.status is not None:
         old_status = case.status.value if hasattr(case.status, "value") else case.status
         new_status = data.status
@@ -3699,9 +3701,34 @@ async def update_case(
             case.closed_at = None
         case.status = new_status
 
+        # Sync linked alert triage statuses to match case status
+        _case_to_triage = {
+            "open": "open",
+            "in_progress": "investigating",
+            "resolved": "resolved",
+            "closed": "closed",
+        }
+        _mapped_triage = _case_to_triage.get(new_status)
+        _synced_alert_ids = []
+        if _mapped_triage:
+            linked_triages = session.query(AlertTriage).filter_by(case_id=case.id).all()
+            for t in linked_triages:
+                t.status = _mapped_triage
+                _synced_alert_ids.append(t.es_alert_id)
+
     session.commit()
     session.refresh(case)
     await _sync_case_to_es(case, session)
+
+    # Sync alert workflow_status to Elasticsearch
+    if data.status is not None and _synced_alert_ids:
+        try:
+            from ion.services.elasticsearch_service import ElasticsearchService
+            es = ElasticsearchService()
+            if es.is_configured:
+                await es.update_alert_workflow_status(_synced_alert_ids, _mapped_triage)
+        except Exception as e:
+            logger.warning(f"Failed to sync alert workflow_status on case update: {e}")
 
     # Sync updates to Kibana
     new_version, kibana_url = sync_case_update_to_kibana(
