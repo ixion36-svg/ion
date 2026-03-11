@@ -408,6 +408,106 @@ _es_handler: Optional[ElasticsearchHandler] = None
 
 
 # =============================================================================
+# In-Memory Log Buffer (for admin UI log viewer)
+# =============================================================================
+
+class MemoryLogHandler(logging.Handler):
+    """Handler that stores recent log records in a fixed-size ring buffer.
+
+    Used by the admin UI to display application logs without needing
+    direct access to container stdout or log files.
+    """
+
+    def __init__(self, capacity: int = 2000):
+        super().__init__()
+        from collections import deque
+        self._buffer: deque = deque(maxlen=capacity)
+        self._lock = threading.Lock()
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            entry = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "level": record.levelname,
+                "logger": record.name,
+                "message": record.getMessage(),
+                "file": record.filename,
+                "line": record.lineno,
+                "function": record.funcName,
+            }
+            # Add exception info if present
+            if record.exc_info and record.exc_info[0]:
+                import traceback
+                entry["exception"] = "".join(
+                    traceback.format_exception(*record.exc_info)
+                )
+            # Add request context if available
+            req_id = _request_id.get()
+            if req_id:
+                entry["request_id"] = req_id
+            user = _username.get()
+            if user:
+                entry["username"] = user
+            ip = _client_ip.get()
+            if ip:
+                entry["client_ip"] = ip
+
+            with self._lock:
+                self._buffer.append(entry)
+        except Exception:
+            self.handleError(record)
+
+    def get_logs(
+        self,
+        limit: int = 200,
+        level: Optional[str] = None,
+        logger_name: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return recent log entries, newest first.
+
+        Args:
+            limit: Max entries to return
+            level: Filter by minimum level (DEBUG/INFO/WARNING/ERROR/CRITICAL)
+            logger_name: Filter by logger name prefix
+            search: Filter by message substring (case-insensitive)
+        """
+        level_priority = {
+            "DEBUG": 0, "INFO": 1, "WARNING": 2, "ERROR": 3, "CRITICAL": 4,
+        }
+        min_priority = level_priority.get(level.upper(), 0) if level else 0
+
+        with self._lock:
+            entries = list(self._buffer)
+
+        # Filter
+        result = []
+        for entry in reversed(entries):  # newest first
+            if min_priority > 0:
+                entry_priority = level_priority.get(entry["level"], 0)
+                if entry_priority < min_priority:
+                    continue
+            if logger_name and not entry["logger"].startswith(logger_name):
+                continue
+            if search and search.lower() not in entry["message"].lower():
+                continue
+            result.append(entry)
+            if len(result) >= limit:
+                break
+
+        return result
+
+
+# Global memory handler reference
+_memory_handler: Optional[MemoryLogHandler] = None
+
+
+def get_memory_handler() -> Optional[MemoryLogHandler]:
+    """Get the global memory log handler (for the admin logs API)."""
+    return _memory_handler
+
+
+# =============================================================================
 # Logger Setup
 # =============================================================================
 
@@ -429,7 +529,7 @@ def setup_logging(
         elasticsearch_url: Optional Elasticsearch URL for direct log shipping
         syslog_url: Optional syslog server URL (e.g. udp://syslog:514, tcp://syslog:514)
     """
-    global _es_handler
+    global _es_handler, _memory_handler
 
     from logging.handlers import RotatingFileHandler, SysLogHandler
     from pathlib import Path
@@ -468,6 +568,11 @@ def setup_logging(
     stdout_handler.setLevel(getattr(logging, level, logging.INFO))
     stdout_handler.setFormatter(formatter)
     root_logger.addHandler(stdout_handler)
+
+    # Create in-memory handler for admin UI log viewer
+    _memory_handler = MemoryLogHandler(capacity=2000)
+    _memory_handler.setLevel(getattr(logging, level, logging.INFO))
+    root_logger.addHandler(_memory_handler)
 
     # Create file handler if log_file is specified
     if log_file:

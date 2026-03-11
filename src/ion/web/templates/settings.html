@@ -27,6 +27,7 @@
         <a href="#sessions" class="settings-nav-item" data-section="sessions">Active Sessions</a>
         <a href="#database" class="settings-nav-item" data-section="database">Database</a>
         <a href="#system" class="settings-nav-item" data-section="system">System Info</a>
+        <a href="#logs" class="settings-nav-item" data-section="logs">System Logs</a>
     </nav>
 
     <!-- Settings Content -->
@@ -502,6 +503,39 @@
             <div id="env-vars" class="env-vars-list">
                 <div class="loading">Loading...</div>
             </div>
+        </section>
+
+        <!-- System Logs -->
+        <section id="logs" class="settings-section">
+            <h2>System Logs</h2>
+            <p class="section-description">Recent application logs from the server (last 2000 entries buffered in memory).</p>
+
+            <div class="logs-toolbar">
+                <select id="log-level-filter" onchange="loadSystemLogs()">
+                    <option value="">All Levels</option>
+                    <option value="DEBUG">DEBUG</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING+</option>
+                    <option value="ERROR">ERROR+</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                </select>
+                <input type="text" id="log-search" placeholder="Search logs..." onkeydown="if(event.key==='Enter') loadSystemLogs()">
+                <select id="log-limit">
+                    <option value="100">100 entries</option>
+                    <option value="200" selected>200 entries</option>
+                    <option value="500">500 entries</option>
+                    <option value="1000">1000 entries</option>
+                </select>
+                <button class="btn btn-sm" onclick="loadSystemLogs()">Refresh</button>
+                <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.85rem;color:var(--text-secondary);">
+                    <input type="checkbox" id="log-auto-refresh"> Auto-refresh (10s)
+                </label>
+            </div>
+
+            <div id="logs-container" class="logs-container">
+                <div class="loading">Click Refresh or select this tab to load logs...</div>
+            </div>
+            <div id="logs-count" style="padding:0.5rem 0;font-size:0.8rem;color:var(--text-secondary);"></div>
         </section>
     </div>
 </div>
@@ -1619,6 +1653,66 @@
         border-radius: 0;
     }
 }
+
+/* System Logs */
+.logs-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+.logs-toolbar select, .logs-toolbar input[type="text"] {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+.logs-toolbar input[type="text"] {
+    flex: 1;
+    min-width: 150px;
+}
+.logs-container {
+    background: var(--bg-primary, #0d1117);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    max-height: 600px;
+    overflow-y: auto;
+    font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+.log-entry {
+    padding: 0.3rem 0.75rem;
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
+    display: grid;
+    grid-template-columns: 80px 70px 1fr;
+    gap: 0.75rem;
+    align-items: start;
+}
+.log-entry:hover { background: rgba(255,255,255,0.03); }
+.log-time { color: var(--text-muted); white-space: nowrap; }
+.log-level { font-weight: 600; white-space: nowrap; }
+.log-level.DEBUG { color: #8b949e; }
+.log-level.INFO { color: #58a6ff; }
+.log-level.WARNING { color: #d29922; }
+.log-level.ERROR { color: #f85149; }
+.log-level.CRITICAL { color: #ff7b72; background: rgba(248,81,73,0.15); padding: 0 4px; border-radius: 3px; }
+.log-msg { color: var(--text-primary); word-break: break-word; }
+.log-meta { color: var(--text-muted); font-size: 0.72rem; margin-top: 0.15rem; }
+.log-exception {
+    color: #f85149;
+    white-space: pre-wrap;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    padding: 0.4rem;
+    background: rgba(248,81,73,0.08);
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
 </style>
 {% endblock %}
 
@@ -1657,6 +1751,8 @@ function setupNavigation() {
                 loadBackups();
             } else if (section === 'wizard') {
                 loadWizardStatus();
+            } else if (section === 'logs') {
+                loadSystemLogs();
             }
         });
     });
@@ -2253,5 +2349,85 @@ async function loadSystemInfo() {
         envContainer.innerHTML = '';
     }
 }
+
+// =============================================================================
+// System Logs
+// =============================================================================
+
+let logsAutoRefreshTimer = null;
+
+async function loadSystemLogs() {
+    const container = document.getElementById('logs-container');
+    const countEl = document.getElementById('logs-count');
+    const level = document.getElementById('log-level-filter').value;
+    const search = document.getElementById('log-search').value;
+    const limit = document.getElementById('log-limit').value;
+
+    // Build query params
+    const params = new URLSearchParams({limit});
+    if (level) params.set('level', level);
+    if (search) params.set('search', search);
+
+    try {
+        const response = await fetch(`/api/admin/logs?${params}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+
+        if (!data.logs || data.logs.length === 0) {
+            container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);">No log entries found</div>';
+            countEl.textContent = '';
+            return;
+        }
+
+        container.innerHTML = data.logs.map(entry => {
+            const time = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString('en-GB', {hour12: false}) : '';
+            const msg = escapeHtml(entry.message || '');
+            const meta = [entry.logger, entry.function ? `${entry.file}:${entry.line}` : ''].filter(Boolean).join(' · ');
+            const exc = entry.exception ? `<div class="log-exception">${escapeHtml(entry.exception)}</div>` : '';
+            const extra = [
+                entry.username ? `user:${entry.username}` : '',
+                entry.client_ip ? `ip:${entry.client_ip}` : '',
+                entry.request_id ? `req:${entry.request_id.substring(0,8)}` : '',
+            ].filter(Boolean).join(' · ');
+            const metaLine = [meta, extra].filter(Boolean).join(' — ');
+
+            return `<div class="log-entry">
+                <span class="log-time">${time}</span>
+                <span class="log-level ${entry.level}">${entry.level}</span>
+                <div>
+                    <div class="log-msg">${msg}</div>
+                    ${metaLine ? `<div class="log-meta">${escapeHtml(metaLine)}</div>` : ''}
+                    ${exc}
+                </div>
+            </div>`;
+        }).join('');
+
+        countEl.textContent = `Showing ${data.logs.length} entries (newest first)`;
+
+    } catch (error) {
+        container.innerHTML = `<div style="padding:1rem;color:#f85149;">Failed to load logs: ${escapeHtml(error.message)}</div>`;
+        countEl.textContent = '';
+    }
+
+    // Handle auto-refresh
+    setupLogsAutoRefresh();
+}
+
+function setupLogsAutoRefresh() {
+    const checkbox = document.getElementById('log-auto-refresh');
+    if (logsAutoRefreshTimer) {
+        clearInterval(logsAutoRefreshTimer);
+        logsAutoRefreshTimer = null;
+    }
+    if (checkbox && checkbox.checked) {
+        logsAutoRefreshTimer = setInterval(loadSystemLogs, 10000);
+    }
+}
+
+// Wire up auto-refresh toggle
+document.addEventListener('DOMContentLoaded', () => {
+    const cb = document.getElementById('log-auto-refresh');
+    if (cb) cb.addEventListener('change', setupLogsAutoRefresh);
+});
 </script>
 {% endblock %}

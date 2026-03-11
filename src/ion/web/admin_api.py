@@ -1874,3 +1874,38 @@ async def get_ollama_models(current_user: User = Depends(require_permission("int
         return {"available": False, "models": [], "error": "Cannot connect to Ollama"}
     except Exception as e:
         return {"available": False, "models": [], "error": str(e)}
+
+
+# =============================================================================
+# System Logs (in-memory buffer for admin UI)
+# =============================================================================
+
+@router.get("/logs", dependencies=[Depends(require_admin)])
+async def get_system_logs(
+    limit: int = 200,
+    level: Optional[str] = None,
+    logger_name: Optional[str] = None,
+    search: Optional[str] = None,
+):
+    """Get recent application logs from the in-memory buffer.
+
+    Admin-only endpoint for viewing server logs in the browser.
+    Returns the most recent log entries (newest first).
+    """
+    from ion.core.logging import get_memory_handler
+
+    handler = get_memory_handler()
+    if handler is None:
+        return {"logs": [], "total": 0, "error": "Log buffer not initialized"}
+
+    # Clamp limit
+    limit = max(1, min(limit, 1000))
+
+    logs = handler.get_logs(
+        limit=limit,
+        level=level,
+        logger_name=logger_name,
+        search=search,
+    )
+
+    return {"logs": logs, "total": len(logs)}
