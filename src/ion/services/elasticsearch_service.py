@@ -1197,43 +1197,77 @@ class ElasticsearchService:
             return {"error": "Elasticsearch is not configured", "indices": []}
 
         try:
-            # Get index list with stats
-            if include_stats:
-                result = await self._request("GET", f"/_cat/indices/{pattern}?format=json&h=index,health,status,docs.count,store.size,creation.date")
-            else:
-                result = await self._request("GET", f"/_cat/indices/{pattern}?format=json&h=index,health,status")
-
-            indices = []
-            for idx in result:
-                index_name = idx.get("index", "")
-
-                # Filter system indices if requested
-                if not include_system and index_name.startswith("."):
-                    continue
-
-                index_info = {
-                    "name": index_name,
-                    "health": idx.get("health"),
-                    "status": idx.get("status"),
-                }
-
-                if include_stats:
-                    index_info["doc_count"] = int(idx.get("docs.count", 0) or 0)
-                    index_info["size"] = idx.get("store.size", "0b")
-                    index_info["created"] = idx.get("creation.date")
-
-                indices.append(index_info)
-
-            # Sort by name
-            indices.sort(key=lambda x: x["name"])
-
-            return {
-                "indices": indices,
-                "total": len(indices),
-            }
-
+            indices = await self._list_indices_cat(pattern, include_system, include_stats)
         except ElasticsearchError as e:
-            return {"error": str(e), "indices": []}
+            # /_cat/indices requires monitor privilege; fall back to
+            # _resolve/index which only needs view_index_metadata
+            if "403" in str(e) or "security_exception" in str(e).lower() or "unauthorized" in str(e).lower():
+                try:
+                    indices = await self._list_indices_resolve(pattern, include_system)
+                except ElasticsearchError as e2:
+                    return {"error": str(e2), "indices": []}
+            else:
+                return {"error": str(e), "indices": []}
+
+        indices.sort(key=lambda x: x["name"])
+        return {"indices": indices, "total": len(indices)}
+
+    async def _list_indices_cat(
+        self,
+        pattern: str,
+        include_system: bool,
+        include_stats: bool,
+    ) -> list:
+        """List indices via /_cat/indices (requires monitor privilege)."""
+        if include_stats:
+            result = await self._request("GET", f"/_cat/indices/{pattern}?format=json&h=index,health,status,docs.count,store.size,creation.date")
+        else:
+            result = await self._request("GET", f"/_cat/indices/{pattern}?format=json&h=index,health,status")
+
+        indices = []
+        for idx in result:
+            index_name = idx.get("index", "")
+            if not include_system and index_name.startswith("."):
+                continue
+            index_info = {
+                "name": index_name,
+                "health": idx.get("health"),
+                "status": idx.get("status"),
+            }
+            if include_stats:
+                index_info["doc_count"] = int(idx.get("docs.count", 0) or 0)
+                index_info["size"] = idx.get("store.size", "0b")
+                index_info["created"] = idx.get("creation.date")
+            indices.append(index_info)
+        return indices
+
+    async def _list_indices_resolve(
+        self,
+        pattern: str,
+        include_system: bool,
+    ) -> list:
+        """Fallback: list indices via _resolve/index (lower privilege)."""
+        result = await self._request("GET", f"/_resolve/index/{pattern}")
+        indices = []
+        for idx in result.get("indices", []):
+            index_name = idx.get("name", "")
+            if not include_system and index_name.startswith("."):
+                continue
+            # Try to get doc count via a count query per index
+            doc_count = 0
+            try:
+                count_result = await self._request("GET", f"/{index_name}/_count")
+                doc_count = count_result.get("count", 0)
+            except ElasticsearchError:
+                pass
+            indices.append({
+                "name": index_name,
+                "health": None,
+                "status": "open",
+                "doc_count": doc_count,
+                "size": None,
+            })
+        return indices
 
     async def get_index_mappings(
         self,

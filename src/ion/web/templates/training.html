@@ -281,7 +281,7 @@
     margin-bottom: 0.25rem;
     padding-right: 2.5rem;
 }
-.detail-tier-badge {
+.detail-tier-badge, .detail-fw-badge {
     display: inline-block;
     font-size: 0.65rem;
     text-transform: uppercase;
@@ -295,6 +295,65 @@
 .detail-tier-badge.t2 { color: var(--neon-blue); border: 1px solid var(--neon-blue); }
 .detail-tier-badge.t3 { color: var(--neon-purple); border: 1px solid var(--neon-purple); }
 .detail-tier-badge.t4 { color: var(--neon-orange); border: 1px solid var(--neon-orange); }
+.detail-fw-badge {
+    margin-left: 0.3rem;
+    background: rgba(255,255,255,0.05);
+    font-size: 0.58rem;
+    letter-spacing: 0.04em;
+}
+.detail-fw-badge.fw-ukcsc { color: #34d399; border: 1px solid rgba(52,211,153,0.5); }
+.detail-fw-badge.fw-sfia { color: #fbbf24; border: 1px solid rgba(251,191,36,0.5); }
+/* Framework info block in detail panel */
+.detail-fw-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+.detail-fw-equiv {
+    display: block;
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+    margin-bottom: 0.75rem;
+    line-height: 1.5;
+}
+.detail-fw-equiv span {
+    display: inline-block;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.58rem;
+    margin-right: 0.3rem;
+    color: var(--text-secondary);
+}
+/* Framework labels on role cards */
+.role-card .card-fw {
+    font-size: 0.48rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 600;
+    margin-top: 0.15rem;
+    opacity: 0.75;
+    line-height: 1.4;
+}
+.role-card.t1 .card-fw { color: #5eead4; }
+.role-card.t2 .card-fw { color: #60a5fa; }
+.role-card.t3 .card-fw { color: #a78bfa; }
+.role-card.t4 .card-fw { color: #fb923c; }
+/* Framework tag in pathway steps */
+.pathway-step .step-fw {
+    display: block;
+    font-size: 0.48rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--text-muted);
+    margin-top: 0.1rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
 
 /* KPI stats row */
 .detail-kpis {
@@ -2057,6 +2116,115 @@
     color: var(--text-muted);
     text-transform: uppercase;
 }
+
+/* ---------- My Training Plan Tab ---------- */
+.tp-header { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+.tp-header-left { display:flex; align-items:center; gap:0.5rem; }
+.tp-header-right { display:flex; align-items:center; gap:0.5rem; }
+.tp-select { padding:0.5rem 0.75rem; background:var(--bg-secondary); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.85rem; }
+.tp-select-sm { padding:0.35rem 0.5rem; font-size:0.8rem; }
+.tp-input { width:100%; padding:0.5rem 0.75rem; background:var(--bg-secondary); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.85rem; font-family:inherit; }
+.tp-input:focus { outline:none; border-color:var(--primary); }
+.tp-btn { padding:0.5rem 1rem; border:1px solid var(--border); border-radius:6px; background:transparent; color:var(--text-secondary); cursor:pointer; font-size:0.82rem; transition:all 0.15s; }
+.tp-btn:hover { color:var(--text-primary); border-color:var(--text-secondary); }
+.tp-btn-primary { background:var(--primary); color:#000; border-color:var(--primary); font-weight:600; }
+.tp-btn-primary:hover { opacity:0.85; color:#000; }
+.tp-btn-danger-sm { padding:0.35rem 0.6rem; color:#f85149; border-color:transparent; }
+.tp-btn-danger-sm:hover { border-color:#f85149; }
+
+.tp-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:0.75rem; margin-bottom:1.5rem; }
+.tp-summary-card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:1rem; text-align:center; }
+.tp-summary-value { font-size:1.4rem; font-weight:700; color:var(--text-bright); }
+.tp-summary-label { font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-top:0.25rem; }
+.tp-summary-card-progress { display:flex; flex-direction:column; justify-content:center; }
+.tp-progress-bar { width:100%; height:8px; background:var(--bg-tertiary,#1c2333); border-radius:4px; overflow:hidden; }
+.tp-progress-fill { height:100%; background:linear-gradient(90deg,var(--primary),#22c55e); border-radius:4px; transition:width 0.4s ease; }
+
+.tp-items-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; }
+.tp-items-header h3 { margin:0; font-size:1rem; color:var(--text-bright); }
+.tp-hint { font-size:0.72rem; color:var(--text-muted); font-style:italic; }
+.tp-items-list { display:flex; flex-direction:column; gap:0.5rem; }
+
+.tp-item { display:flex; flex-wrap:wrap; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; transition:border-color 0.15s; }
+.tp-item:hover { border-color:var(--text-secondary); }
+.tp-item.completed { opacity:0.7; }
+.tp-item.completed .tp-item-name { text-decoration:line-through; }
+.tp-item-check { width:20px; height:20px; border-radius:50%; border:2px solid var(--border); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; flex-shrink:0; }
+.tp-item-check:hover { border-color:var(--primary); }
+.tp-item-check.checked { background:var(--primary); border-color:var(--primary); }
+.tp-item-check.checked::after { content:'\2713'; color:#000; font-size:0.7rem; font-weight:700; }
+.tp-item-info { min-width:0; flex:1; }
+.tp-item-name { font-weight:600; color:var(--text-primary); font-size:0.85rem; }
+.tp-item-provider { font-size:0.72rem; color:var(--text-muted); }
+.tp-item-price { font-weight:600; color:var(--neon-cyan); font-size:0.85rem; white-space:nowrap; }
+.tp-item-difficulty { font-size:0.65rem; padding:0.15rem 0.5rem; border-radius:999px; text-transform:uppercase; font-weight:600; }
+.tp-item-difficulty.beginner { background:rgba(34,197,94,0.15); color:#22c55e; }
+.tp-item-difficulty.intermediate { background:rgba(59,130,246,0.15); color:#3b82f6; }
+.tp-item-difficulty.advanced { background:rgba(168,85,247,0.15); color:#a855f7; }
+.tp-item-difficulty.expert { background:rgba(239,68,68,0.15); color:#ef4444; }
+.tp-item-funding { font-size:0.7rem; padding:0.2rem 0.5rem; border-radius:4px; cursor:pointer; white-space:nowrap; }
+.tp-item-funding.company { background:rgba(0,229,255,0.15); color:var(--neon-cyan); }
+.tp-item-funding.self { background:rgba(248,81,73,0.15); color:#f85149; }
+.tp-item-funding.split { background:rgba(234,179,8,0.15); color:#eab308; }
+.tp-item-funding.tbd { background:rgba(139,148,158,0.15); color:var(--text-secondary); }
+.tp-item-status { font-size:0.7rem; padding:0.2rem 0.5rem; border-radius:4px; cursor:pointer; white-space:nowrap; }
+.tp-item-status.planned { background:rgba(139,148,158,0.15); color:var(--text-secondary); }
+.tp-item-status.in_progress { background:rgba(59,130,246,0.15); color:#3b82f6; }
+.tp-item-status.completed { background:rgba(34,197,94,0.15); color:#22c55e; }
+.tp-item-status.skipped { background:rgba(139,148,158,0.1); color:var(--text-muted); text-decoration:line-through; }
+.tp-item-actions { display:flex; gap:0.25rem; }
+.tp-item-actions button { padding:0.2rem 0.4rem; background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:0.75rem; }
+.tp-item-actions button:hover { color:#f85149; }
+
+.tp-empty { text-align:center; padding:2rem; color:var(--text-muted); font-size:0.85rem; }
+.tp-empty-hero { text-align:center; padding:4rem 2rem; }
+.tp-empty-hero h3 { margin:1rem 0 0.5rem; color:var(--text-bright); }
+.tp-empty-hero p { color:var(--text-secondary); margin-bottom:1.5rem; max-width:400px; margin-left:auto; margin-right:auto; }
+
+/* Training plan modal */
+.tp-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; display:flex; align-items:center; justify-content:center; }
+.tp-modal { background:var(--bg-primary); border:1px solid var(--border); border-radius:12px; padding:1.5rem; width:400px; max-width:90vw; }
+.tp-modal h3 { margin:0 0 1rem; color:var(--text-bright); }
+.tp-form-group { margin-bottom:1rem; }
+.tp-form-group label { display:block; font-size:0.78rem; color:var(--text-secondary); margin-bottom:0.25rem; font-weight:600; }
+.tp-modal-actions { display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.25rem; }
+
+/* Add to Plan button on cert cards */
+.cert-card { position:relative; }
+.cert-add-plan { position:absolute; top:6px; right:6px; padding:2px 8px; font-size:0.65rem; background:var(--primary); color:#000; border:none; border-radius:4px; cursor:pointer; font-weight:600; opacity:0; transition:opacity 0.15s; z-index:5; }
+.cert-card:hover .cert-add-plan { opacity:1; }
+.cert-add-plan.added { background:#22c55e; pointer-events:none; }
+
+/* Funding cycle menu on items */
+.tp-funding-menu, .tp-status-menu { position:absolute; background:var(--bg-primary); border:1px solid var(--border); border-radius:6px; padding:0.25rem 0; z-index:100; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+.tp-funding-menu button, .tp-status-menu button { display:block; width:100%; text-align:left; padding:0.4rem 0.75rem; border:none; background:transparent; color:var(--text-primary); cursor:pointer; font-size:0.78rem; white-space:nowrap; }
+.tp-funding-menu button:hover, .tp-status-menu button:hover { background:var(--bg-secondary); }
+
+/* Calendar source toggle */
+.cal-src-btn { padding:0.4rem 0.75rem; border:1px solid var(--border); border-radius:6px; background:transparent; color:var(--text-secondary); cursor:pointer; font-size:0.78rem; transition:all 0.15s; }
+.cal-src-btn:hover { color:var(--text-primary); border-color:var(--text-secondary); }
+.cal-src-btn.active { background:var(--primary); color:#000; border-color:var(--primary); font-weight:600; }
+
+/* Study schedule date inputs */
+.cal-sched-row { display:flex; align-items:center; gap:0.75rem; padding:0.6rem 0.75rem; background:var(--bg-secondary); border:1px solid var(--border); border-radius:6px; margin-bottom:0.4rem; flex-wrap:wrap; }
+.cal-sched-row .tp-item-name { font-weight:600; font-size:0.82rem; flex:1; min-width:150px; }
+.cal-sched-row .tp-item-provider { font-size:0.7rem; color:var(--text-muted); }
+.cal-sched-row label { font-size:0.7rem; color:var(--text-secondary); white-space:nowrap; }
+.cal-sched-row input[type="date"] { padding:0.3rem 0.5rem; background:var(--bg-primary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:0.78rem; }
+.cal-sched-row input[type="number"] { width:60px; padding:0.3rem 0.5rem; background:var(--bg-primary); border:1px solid var(--border); border-radius:4px; color:var(--text-primary); font-size:0.78rem; text-align:center; }
+.cal-sched-status { font-size:0.65rem; padding:0.15rem 0.5rem; border-radius:999px; }
+.cal-sched-status.planned { background:rgba(139,148,158,0.15); color:var(--text-secondary); }
+.cal-sched-status.in_progress { background:rgba(59,130,246,0.15); color:#3b82f6; }
+.cal-sched-status.completed { background:rgba(34,197,94,0.15); color:#22c55e; }
+
+/* Forecast table */
+.fc-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+.fc-table th { text-align:left; padding:0.5rem 0.75rem; color:var(--text-secondary); font-size:0.7rem; text-transform:uppercase; border-bottom:1px solid var(--border); font-weight:600; }
+.fc-table td { padding:0.5rem 0.75rem; border-bottom:1px solid var(--border); color:var(--text-primary); }
+.fc-table tr:hover td { background:var(--bg-secondary); }
+.fc-table .fc-cost { font-weight:600; color:var(--neon-cyan); }
+.fc-table .fc-progress { width:60px; height:6px; background:var(--bg-tertiary,#1c2333); border-radius:3px; overflow:hidden; display:inline-block; vertical-align:middle; margin-left:0.5rem; }
+.fc-table .fc-progress-bar { height:100%; background:var(--primary); border-radius:3px; }
 </style>
 
 <div class="training-header">
@@ -2070,6 +2238,7 @@
     <button class="training-tab" data-tab="tab-assessment" onclick="switchTab('tab-assessment')">Skills Assessment</button>
     <button class="training-tab" data-tab="tab-team" id="tab-team-btn" onclick="switchTab('tab-team')" style="display:none;">Team Skills</button>
     <button class="training-tab" data-tab="tab-schedule" id="tab-schedule-btn" onclick="switchTab('tab-schedule')" style="display:none;">Team Schedule</button>
+    <button class="training-tab" data-tab="tab-myplan" onclick="switchTab('tab-myplan')">My Training Plan</button>
     <button class="training-tab" data-tab="tab-calendar" onclick="switchTab('tab-calendar')">Training Calendar</button>
 </div>
 
@@ -2092,12 +2261,13 @@
 
     <!-- Tier 1: Foundation -->
     <div class="tier">
-        <span class="tier-label t1">Foundation</span>
+        <span class="tier-label t1">Foundation <span style="opacity:0.6;font-size:0.55rem;font-weight:400;">/ UKCSC Associate &middot; SFIA 3 &middot; EO</span></span>
         <div class="tier-cards">
             <div class="role-card t1" data-role="l1-analyst" onclick="showRoleDetail('l1-analyst')">
                 <div class="card-tooltip">
                     <div class="tt-title">L1 SOC Analyst</div>
                     <div class="tt-meta">Tier 1 &middot; Entry Point &middot; 0-1 yr</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Associate &middot; SFIA 3</div>
                     <div class="tt-specs">
                         <span class="tt-spec">SIEM</span>
                         <span class="tt-spec">Triage</span>
@@ -2107,6 +2277,7 @@
                 <div class="card-icon"><i class="icon-shield"></i></div>
                 <div class="card-title">L1 SOC Analyst</div>
                 <div class="card-exp">0-1 yr</div>
+                <div class="card-fw">Associate &middot; SFIA 3</div>
             </div>
         </div>
     </div>
@@ -2115,12 +2286,13 @@
 
     <!-- Tier 2: Core -->
     <div class="tier">
-        <span class="tier-label t2">Core</span>
+        <span class="tier-label t2">Core <span style="opacity:0.6;font-size:0.55rem;font-weight:400;">/ UKCSC Practitioner &middot; SFIA 4-5 &middot; HEO/SEO</span></span>
         <div class="tier-cards">
             <div class="role-card t2" data-role="l2-analyst" onclick="showRoleDetail('l2-analyst')">
                 <div class="card-tooltip">
                     <div class="tt-title">L2 SOC Analyst</div>
                     <div class="tt-meta">Tier 2 &middot; 1-3 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Practitioner &middot; SFIA 4</div>
                     <div class="tt-specs">
                         <span class="tt-spec">Wireshark</span>
                         <span class="tt-spec">Scripting</span>
@@ -2130,11 +2302,13 @@
                 <div class="card-icon"><i class="icon-shield-check"></i></div>
                 <div class="card-title">L2 SOC Analyst</div>
                 <div class="card-exp">1-3 yrs</div>
+                <div class="card-fw">Practitioner &middot; SFIA 4</div>
             </div>
             <div class="role-card t2" data-role="l3-analyst" onclick="showRoleDetail('l3-analyst')">
                 <div class="card-tooltip">
                     <div class="tt-title">L3 / Senior SOC Analyst</div>
                     <div class="tt-meta">Tier 2 &middot; 3-5 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Practitioner &middot; SFIA 5</div>
                     <div class="tt-specs">
                         <span class="tt-spec">Advanced SIEM</span>
                         <span class="tt-spec">Forensic Triage</span>
@@ -2143,6 +2317,7 @@
                 <div class="card-icon"><i class="icon-shield-plus"></i></div>
                 <div class="card-title">L3 / Senior SOC Analyst</div>
                 <div class="card-exp">3-5 yrs</div>
+                <div class="card-fw">Practitioner &middot; SFIA 5</div>
             </div>
         </div>
     </div>
@@ -2151,12 +2326,13 @@
 
     <!-- Tier 3: Specialist & Leadership -->
     <div class="tier">
-        <span class="tier-label t3">Specialist &amp; Leadership</span>
+        <span class="tier-label t3">Specialist &amp; Leadership <span style="opacity:0.6;font-size:0.55rem;font-weight:400;">/ UKCSC Principal &middot; SFIA 5-6 &middot; SEO/G7</span></span>
         <div class="tier-cards">
             <div class="role-card t3" data-role="soc-lead" onclick="showRoleDetail('soc-lead')">
                 <div class="card-tooltip">
                     <div class="tt-title">SOC Lead</div>
                     <div class="tt-meta">Tier 3 &middot; 5-8 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Principal &middot; SFIA 6</div>
                     <div class="tt-specs">
                         <span class="tt-spec">Leadership</span>
                         <span class="tt-spec">KPIs</span>
@@ -2166,11 +2342,13 @@
                 <div class="card-icon"><i class="icon-crown"></i></div>
                 <div class="card-title">SOC Lead</div>
                 <div class="card-exp">5-8 yrs</div>
+                <div class="card-fw">Principal &middot; SFIA 6</div>
             </div>
             <div class="role-card t3" data-role="incident-responder" onclick="showRoleDetail('incident-responder')">
                 <div class="card-tooltip">
                     <div class="tt-title">Incident Responder</div>
                     <div class="tt-meta">Tier 3 &middot; 2-5 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Principal &middot; SFIA 5</div>
                     <div class="tt-specs">
                         <span class="tt-spec">Forensics</span>
                         <span class="tt-spec">Containment</span>
@@ -2180,11 +2358,13 @@
                 <div class="card-icon"><i class="icon-zap"></i></div>
                 <div class="card-title">Incident Responder</div>
                 <div class="card-exp">2-5 yrs</div>
+                <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
             <div class="role-card t3" data-role="threat-hunter" onclick="showRoleDetail('threat-hunter')">
                 <div class="card-tooltip">
                     <div class="tt-title">Threat Hunter</div>
                     <div class="tt-meta">Tier 3 &middot; 3-6 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Principal &middot; SFIA 5</div>
                     <div class="tt-specs">
                         <span class="tt-spec">Hypothesis</span>
                         <span class="tt-spec">ATT&CK</span>
@@ -2194,11 +2374,13 @@
                 <div class="card-icon"><i class="icon-crosshair"></i></div>
                 <div class="card-title">Threat Hunter</div>
                 <div class="card-exp">3-6 yrs</div>
+                <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
             <div class="role-card t3" data-role="threat-intel" onclick="showRoleDetail('threat-intel')">
                 <div class="card-tooltip">
                     <div class="tt-title">Threat Intel Analyst</div>
                     <div class="tt-meta">Tier 3 &middot; 2-5 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Principal &middot; SFIA 5</div>
                     <div class="tt-specs">
                         <span class="tt-spec">OSINT</span>
                         <span class="tt-spec">STIX/TAXII</span>
@@ -2208,11 +2390,13 @@
                 <div class="card-icon"><i class="icon-target"></i></div>
                 <div class="card-title">Threat Intel Analyst</div>
                 <div class="card-exp">2-5 yrs</div>
+                <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
             <div class="role-card t3" data-role="detection-engineer" onclick="showRoleDetail('detection-engineer')">
                 <div class="card-tooltip">
                     <div class="tt-title">Detection Engineer</div>
                     <div class="tt-meta">Tier 3 &middot; 2-5 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Principal &middot; SFIA 5</div>
                     <div class="tt-specs">
                         <span class="tt-spec">Sigma</span>
                         <span class="tt-spec">YARA</span>
@@ -2222,11 +2406,13 @@
                 <div class="card-icon"><i class="icon-radar"></i></div>
                 <div class="card-title">Detection Engineer</div>
                 <div class="card-exp">2-5 yrs</div>
+                <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
             <div class="role-card t3" data-role="security-engineer" onclick="showRoleDetail('security-engineer')">
                 <div class="card-tooltip">
                     <div class="tt-title">Security Engineer / DevSecOps</div>
                     <div class="tt-meta">Tier 3 &middot; 3-6 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Principal &middot; SFIA 5</div>
                     <div class="tt-specs">
                         <span class="tt-spec">IaC</span>
                         <span class="tt-spec">CI/CD</span>
@@ -2236,6 +2422,7 @@
                 <div class="card-icon"><i class="icon-wrench"></i></div>
                 <div class="card-title">Security Engineer / DevSecOps</div>
                 <div class="card-exp">3-6 yrs</div>
+                <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
         </div>
     </div>
@@ -2244,12 +2431,13 @@
 
     <!-- Tier 4: Expert -->
     <div class="tier">
-        <span class="tier-label t4">Expert</span>
+        <span class="tier-label t4">Expert <span style="opacity:0.6;font-size:0.55rem;font-weight:400;">/ UKCSC Chartered &middot; SFIA 6-7 &middot; G7/G6</span></span>
         <div class="tier-cards">
             <div class="role-card t4" data-role="malware-analyst" onclick="showRoleDetail('malware-analyst')">
                 <div class="card-tooltip">
                     <div class="tt-title">Malware Analyst</div>
                     <div class="tt-meta">Tier 4 &middot; 5-8 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Chartered &middot; SFIA 6</div>
                     <div class="tt-specs">
                         <span class="tt-spec">Reverse Eng</span>
                         <span class="tt-spec">Ghidra</span>
@@ -2259,11 +2447,13 @@
                 <div class="card-icon"><i class="icon-bug"></i></div>
                 <div class="card-title">Malware Analyst</div>
                 <div class="card-exp">5-8 yrs</div>
+                <div class="card-fw">Chartered &middot; SFIA 6</div>
             </div>
             <div class="role-card t4" data-role="digital-forensics" onclick="showRoleDetail('digital-forensics')">
                 <div class="card-tooltip">
                     <div class="tt-title">Digital Forensics</div>
                     <div class="tt-meta">Tier 4 &middot; 4-7 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Chartered &middot; SFIA 6</div>
                     <div class="tt-specs">
                         <span class="tt-spec">EnCase</span>
                         <span class="tt-spec">Volatility</span>
@@ -2273,11 +2463,13 @@
                 <div class="card-icon"><i class="icon-fingerprint"></i></div>
                 <div class="card-title">Digital Forensics</div>
                 <div class="card-exp">4-7 yrs</div>
+                <div class="card-fw">Chartered &middot; SFIA 6</div>
             </div>
             <div class="role-card t4" data-role="pen-tester" onclick="showRoleDetail('pen-tester')">
                 <div class="card-tooltip">
                     <div class="tt-title">Penetration Tester</div>
                     <div class="tt-meta">Tier 4 &middot; 4-7 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Chartered &middot; SFIA 6</div>
                     <div class="tt-specs">
                         <span class="tt-spec">OSCP</span>
                         <span class="tt-spec">Burp Suite</span>
@@ -2287,11 +2479,13 @@
                 <div class="card-icon"><i class="icon-terminal"></i></div>
                 <div class="card-title">Penetration Tester</div>
                 <div class="card-exp">4-7 yrs</div>
+                <div class="card-fw">Chartered &middot; SFIA 6</div>
             </div>
             <div class="role-card t4" data-role="cloud-security" onclick="showRoleDetail('cloud-security')">
                 <div class="card-tooltip">
                     <div class="tt-title">Cloud Security Engineer</div>
                     <div class="tt-meta">Tier 4 &middot; 4-7 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Chartered &middot; SFIA 6</div>
                     <div class="tt-specs">
                         <span class="tt-spec">AWS/Azure</span>
                         <span class="tt-spec">Terraform</span>
@@ -2301,11 +2495,13 @@
                 <div class="card-icon"><i class="icon-cloud"></i></div>
                 <div class="card-title">Cloud Security Engineer</div>
                 <div class="card-exp">4-7 yrs</div>
+                <div class="card-fw">Chartered &middot; SFIA 6</div>
             </div>
             <div class="role-card t4" data-role="security-architect" onclick="showRoleDetail('security-architect')">
                 <div class="card-tooltip">
                     <div class="tt-title">Security Architect</div>
                     <div class="tt-meta">Tier 4 &middot; 8-12 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Chartered &middot; SFIA 7</div>
                     <div class="tt-specs">
                         <span class="tt-spec">TOGAF</span>
                         <span class="tt-spec">Zero Trust</span>
@@ -2315,11 +2511,13 @@
                 <div class="card-icon"><i class="icon-layout-dashboard"></i></div>
                 <div class="card-title">Security Architect</div>
                 <div class="card-exp">8-12 yrs</div>
+                <div class="card-fw">Chartered &middot; SFIA 7</div>
             </div>
             <div class="role-card t4" data-role="grc" onclick="showRoleDetail('grc')">
                 <div class="card-tooltip">
                     <div class="tt-title">GRC / Compliance</div>
                     <div class="tt-meta">Tier 4 &middot; 5-8 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Chartered &middot; SFIA 6</div>
                     <div class="tt-specs">
                         <span class="tt-spec">ISO 27001</span>
                         <span class="tt-spec">NIST</span>
@@ -2329,6 +2527,7 @@
                 <div class="card-icon"><i class="icon-scroll-text"></i></div>
                 <div class="card-title">GRC / Compliance</div>
                 <div class="card-exp">5-8 yrs</div>
+                <div class="card-fw">Chartered &middot; SFIA 6</div>
             </div>
         </div>
     </div>
@@ -2469,8 +2668,155 @@
     </div>
 </div>
 
+<!-- Tab 6: My Training Plan -->
+<div class="tab-content" id="tab-myplan">
+    <!-- Plan selector / create -->
+    <div class="tp-header">
+        <div class="tp-header-left">
+            <select id="tp-plan-select" class="tp-select" onchange="tpSelectPlan(this.value)">
+                <option value="">-- Select a plan --</option>
+            </select>
+            <button class="tp-btn tp-btn-primary" onclick="tpShowCreateModal()">+ New Plan</button>
+        </div>
+        <div class="tp-header-right" id="tp-plan-actions" style="display:none;">
+            <select id="tp-status-select" class="tp-select tp-select-sm" onchange="tpChangeStatus(this.value)">
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+                <option value="archived">Archived</option>
+            </select>
+            <button class="tp-btn tp-btn-danger-sm" onclick="tpDeletePlan()" title="Delete plan"><i class="icon-trash-2"></i></button>
+        </div>
+    </div>
+
+    <!-- Plan summary cards -->
+    <div class="tp-summary" id="tp-summary" style="display:none;">
+        <div class="tp-summary-card">
+            <div class="tp-summary-value" id="tp-total-items">0</div>
+            <div class="tp-summary-label">Certifications</div>
+        </div>
+        <div class="tp-summary-card">
+            <div class="tp-summary-value" id="tp-completed-count">0</div>
+            <div class="tp-summary-label">Completed</div>
+        </div>
+        <div class="tp-summary-card">
+            <div class="tp-summary-value" id="tp-total-cost">0</div>
+            <div class="tp-summary-label">Total Cost</div>
+        </div>
+        <div class="tp-summary-card">
+            <div class="tp-summary-value" id="tp-company-cost">0</div>
+            <div class="tp-summary-label">Company Funded</div>
+        </div>
+        <div class="tp-summary-card">
+            <div class="tp-summary-value" id="tp-self-cost">0</div>
+            <div class="tp-summary-label">Self Funded</div>
+        </div>
+        <div class="tp-summary-card tp-summary-card-progress">
+            <div class="tp-progress-bar">
+                <div class="tp-progress-fill" id="tp-progress-fill" style="width:0%"></div>
+            </div>
+            <div class="tp-summary-label" id="tp-progress-label">0% Complete</div>
+        </div>
+    </div>
+
+    <!-- Plan items table -->
+    <div id="tp-items-container" style="display:none;">
+        <div class="tp-items-header">
+            <h3>Plan Items</h3>
+            <span class="tp-hint">Tip: Add certs from Career Pathways by clicking "Add to Plan" on any role's certification cards</span>
+        </div>
+        <div id="tp-items-list" class="tp-items-list">
+            <div class="tp-empty">No certifications added yet. Browse Career Pathways and add certifications to this plan.</div>
+        </div>
+    </div>
+
+    <!-- Lead Training Budget Dashboard (visible for lead+ users) -->
+    <div id="tp-forecast-section" style="display:none;">
+        <div style="border-top:2px solid var(--border);margin-top:2rem;padding-top:1.5rem;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+                <div>
+                    <h3 style="margin:0;color:var(--text-bright);font-size:1.15rem;">Training Budget Dashboard</h3>
+                    <p style="margin:0.25rem 0 0;font-size:0.75rem;color:var(--text-muted);">Aligned with UKCSC Career Framework, SFIA, Defence Cyber Academy &amp; Gov Security Profession</p>
+                </div>
+                <button class="tp-btn" onclick="tpLoadForecast()" style="font-size:0.75rem;"><i class="icon-refresh-cw"></i> Refresh</button>
+            </div>
+
+            <!-- Budget overview totals -->
+            <div class="tp-summary" id="tp-forecast-totals"></div>
+
+            <!-- Employment type breakdown -->
+            <div style="margin-top:1.25rem;">
+                <h4 style="margin:0 0 0.75rem;font-size:0.9rem;color:var(--text-bright);">Breakdown by Employment Type</h4>
+                <div id="tp-forecast-emp-breakdown"></div>
+            </div>
+
+            <!-- Per-person table -->
+            <div style="margin-top:1.25rem;">
+                <h4 style="margin:0 0 0.75rem;font-size:0.9rem;color:var(--text-bright);">Personnel Training Plans</h4>
+                <div id="tp-forecast-table"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty state when no plan selected -->
+    <div id="tp-empty-state" class="tp-empty-hero">
+        <i class="icon-book-open" style="font-size:3rem;color:var(--text-secondary);"></i>
+        <h3>My Training Plan</h3>
+        <p>Create a training plan to track certifications, costs, and progress towards your career goals.</p>
+        <button class="tp-btn tp-btn-primary" onclick="tpShowCreateModal()">Create Your First Plan</button>
+    </div>
+</div>
+
+<!-- Create plan modal -->
+<div id="tp-create-modal" class="tp-modal-overlay" style="display:none;">
+    <div class="tp-modal" style="width:500px;">
+        <h3>Create Training Plan</h3>
+        <div class="tp-form-group">
+            <label>Plan Name</label>
+            <input type="text" id="tp-new-name" class="tp-input" placeholder="e.g., 2026 Certification Goals">
+        </div>
+        <div class="tp-form-group">
+            <label>Target Role (optional)</label>
+            <select id="tp-new-role" class="tp-select">
+                <option value="">-- None --</option>
+            </select>
+        </div>
+        <div class="tp-form-group">
+            <label>Auto-populate certs from roles (optional — select one or more)</label>
+            <div id="tp-new-roles-multi" style="display:flex;flex-wrap:wrap;gap:0.35rem;max-height:160px;overflow-y:auto;padding:0.5rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;margin-top:0.25rem;">
+            </div>
+            <span style="font-size:0.68rem;color:var(--text-muted);">Select roles to include their certifications. Build a custom pathway across any combination of roles.</span>
+        </div>
+        <div class="tp-form-group">
+            <label>Notes (optional)</label>
+            <textarea id="tp-new-notes" class="tp-input" rows="2" placeholder="Plan description..."></textarea>
+        </div>
+        <div class="tp-modal-actions">
+            <button class="tp-btn" onclick="tpHideCreateModal()">Cancel</button>
+            <button class="tp-btn tp-btn-primary" onclick="tpCreatePlan()">Create Plan</button>
+        </div>
+    </div>
+</div>
+
 <!-- Tab 5: Training Calendar -->
 <div class="tab-content" id="tab-calendar">
+    <!-- Source toggle -->
+    <div class="cal-source-toggle" style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;">
+        <span style="font-size:0.8rem;color:var(--text-secondary);font-weight:600;">Source:</span>
+        <button class="cal-src-btn active" data-src="plan" onclick="switchCalSource('plan')">My Training Plan</button>
+        <button class="cal-src-btn" data-src="auto" onclick="switchCalSource('auto')">Auto-Generated</button>
+        <span id="cal-plan-name" style="font-size:0.75rem;color:var(--text-muted);margin-left:auto;"></span>
+    </div>
+
+    <!-- Cert study schedule (only for plan source) -->
+    <div id="cal-plan-schedule" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+            <h3 style="margin:0;font-size:0.95rem;color:var(--text-bright);">Study Schedule</h3>
+            <span style="font-size:0.7rem;color:var(--text-muted);">Set study periods for each certification, then view on the calendar below</span>
+        </div>
+        <div id="cal-plan-items" class="tp-items-list" style="margin-bottom:1.5rem;"></div>
+    </div>
+
     <!-- Summary stats -->
     <div class="cal-stats" id="cal-stats"></div>
 
@@ -2504,6 +2850,7 @@
     <div id="cal-gantt-view" style="display:none;"></div>
 </div>
 
+
 <script>
 // =========================================================================
 // Role Data (15 roles — expanded with experience, prerequisites,
@@ -2514,6 +2861,11 @@ const ROLES = {
         title: 'L1 SOC Analyst',
         tier: 1,
         tierLabel: 'Foundation',
+        ukcsc: 'Associate',
+        sfia: 3,
+        csGrade: 'EO',
+        dcaTrain: 'DC1',
+        govProf: 'Awareness',
         icon: '\u{1F6E1}',
         experience: '0-1 year',
         description: 'The front line of cybersecurity defense. L1 Analysts monitor security alerts around the clock, perform initial triage, and escalate incidents. This is where every SOC career begins.',
@@ -2545,6 +2897,11 @@ const ROLES = {
         title: 'L2 SOC Analyst',
         tier: 2,
         tierLabel: 'Core',
+        ukcsc: 'Practitioner',
+        sfia: 4,
+        csGrade: 'HEO',
+        dcaTrain: 'DC1+',
+        govProf: 'Working',
         icon: '\u{1F6E1}',
         experience: '1-3 years',
         description: 'Handles escalated incidents from L1 with deeper investigation skills. L2 Analysts perform detailed analysis, correlate events across data sources, and develop detection improvements.',
@@ -2577,6 +2934,11 @@ const ROLES = {
         title: 'L3 / Senior SOC Analyst',
         tier: 2,
         tierLabel: 'Core',
+        ukcsc: 'Practitioner',
+        sfia: 5,
+        csGrade: 'SEO',
+        dcaTrain: 'DC2',
+        govProf: 'Practitioner',
         icon: '\u{1F6E1}',
         experience: '3-5 years',
         description: 'The most experienced analyst tier. L3 Analysts handle the most complex incidents, lead investigations, develop new detection strategies, and act as technical authorities within the SOC.',
@@ -2609,6 +2971,11 @@ const ROLES = {
         title: 'SOC Lead',
         tier: 3,
         tierLabel: 'Specialist & Leadership',
+        ukcsc: 'Principal',
+        sfia: 6,
+        csGrade: 'G7',
+        dcaTrain: 'DC3 / MSc',
+        govProf: 'Expert',
         icon: '\u{1F4BC}',
         experience: '5-8 years',
         description: 'Oversees SOC operations and manages analyst teams. SOC Leads set processes, define KPIs, coordinate incident response, and liaise with leadership on security posture and risk.',
@@ -2641,6 +3008,11 @@ const ROLES = {
         title: 'Incident Responder',
         tier: 3,
         tierLabel: 'Specialist & Leadership',
+        ukcsc: 'Principal',
+        sfia: 5,
+        csGrade: 'SEO / G7',
+        dcaTrain: 'DC2+',
+        govProf: 'Practitioner',
         icon: '\u{1F6A8}',
         experience: '2-5 years',
         description: 'Handles active security incidents from detection through remediation. Incident Responders contain threats, perform root-cause analysis, and coordinate recovery efforts across technical teams.',
@@ -2674,6 +3046,11 @@ const ROLES = {
         title: 'Threat Hunter',
         tier: 3,
         tierLabel: 'Specialist & Leadership',
+        ukcsc: 'Principal',
+        sfia: 5,
+        csGrade: 'SEO / G7',
+        dcaTrain: 'DC2+',
+        govProf: 'Practitioner',
         icon: '\u{1F50E}',
         experience: '3-6 years',
         description: 'Proactively searches for threats that evade automated detection. Threat Hunters develop hypotheses, query large datasets, and use adversary TTPs to identify hidden intrusions.',
@@ -2708,6 +3085,11 @@ const ROLES = {
         title: 'Threat Intel Analyst',
         tier: 3,
         tierLabel: 'Specialist & Leadership',
+        ukcsc: 'Principal',
+        sfia: 5,
+        csGrade: 'SEO / G7',
+        dcaTrain: 'DC2+',
+        govProf: 'Practitioner',
         icon: '\u{1F3AF}',
         experience: '2-5 years',
         description: 'Gathers, analyzes, and disseminates intelligence about cyber threats. Threat Intel Analysts track adversary groups, assess TTPs, and produce actionable reporting to guide defensive operations.',
@@ -2742,6 +3124,11 @@ const ROLES = {
         title: 'Detection Engineer',
         tier: 3,
         tierLabel: 'Specialist & Leadership',
+        ukcsc: 'Principal',
+        sfia: 5,
+        csGrade: 'SEO / G7',
+        dcaTrain: 'DC2+',
+        govProf: 'Practitioner',
         icon: '\u{1F4E1}',
         experience: '2-5 years',
         description: 'Builds and maintains the detection logic that powers SOC operations. Detection Engineers write SIEM rules, develop analytics pipelines, and continuously improve detection coverage.',
@@ -2776,6 +3163,11 @@ const ROLES = {
         title: 'Security Engineer / DevSecOps',
         tier: 3,
         tierLabel: 'Specialist & Leadership',
+        ukcsc: 'Principal',
+        sfia: 5,
+        csGrade: 'SEO / G7',
+        dcaTrain: 'DC2+',
+        govProf: 'Practitioner',
         icon: '\u{1F527}',
         experience: '3-6 years',
         description: 'Designs, implements, and maintains security infrastructure. Security Engineers embed security into CI/CD pipelines, manage security tooling, and automate defensive capabilities across the enterprise.',
@@ -2810,6 +3202,11 @@ const ROLES = {
         title: 'Malware Analyst',
         tier: 4,
         tierLabel: 'Expert',
+        ukcsc: 'Chartered',
+        sfia: 6,
+        csGrade: 'G7 / G6',
+        dcaTrain: 'MSc / Specialist',
+        govProf: 'Expert',
         icon: '\u{1F9A0}',
         experience: '5-8 years',
         description: 'Reverse-engineers malicious software to understand capabilities, origins, and indicators of compromise. Malware Analysts dissect executables, scripts, and exploits to create signatures and defensive intelligence.',
@@ -2845,6 +3242,11 @@ const ROLES = {
         title: 'Digital Forensics',
         tier: 4,
         tierLabel: 'Expert',
+        ukcsc: 'Chartered',
+        sfia: 6,
+        csGrade: 'G7 / G6',
+        dcaTrain: 'MSc / Specialist',
+        govProf: 'Expert',
         icon: '\u{1F50D}',
         experience: '4-7 years',
         description: 'Investigates digital evidence from computers, networks, and mobile devices. Forensics professionals recover artifacts, reconstruct timelines, and present findings for legal proceedings.',
@@ -2879,6 +3281,11 @@ const ROLES = {
         title: 'Penetration Tester',
         tier: 4,
         tierLabel: 'Expert',
+        ukcsc: 'Chartered',
+        sfia: 6,
+        csGrade: 'G7 / G6',
+        dcaTrain: 'MSc / Specialist',
+        govProf: 'Expert',
         icon: '\u{1F528}',
         experience: '4-7 years',
         description: 'Simulates real-world attacks to identify vulnerabilities before adversaries exploit them. Penetration Testers scope engagements, exploit weaknesses, and deliver actionable remediation guidance.',
@@ -2914,6 +3321,11 @@ const ROLES = {
         title: 'Cloud Security Engineer',
         tier: 4,
         tierLabel: 'Expert',
+        ukcsc: 'Chartered',
+        sfia: 6,
+        csGrade: 'G7 / G6',
+        dcaTrain: 'MSc / Specialist',
+        govProf: 'Expert',
         icon: '\u2601',
         experience: '4-7 years',
         description: 'Secures cloud infrastructure across AWS, Azure, and GCP. Cloud Security Engineers design secure architectures, implement IAM policies, and ensure compliance in multi-cloud environments.',
@@ -2948,6 +3360,11 @@ const ROLES = {
         title: 'Security Architect',
         tier: 4,
         tierLabel: 'Expert',
+        ukcsc: 'Chartered',
+        sfia: 7,
+        csGrade: 'G6 / SCS',
+        dcaTrain: 'MSc / Strategic',
+        govProf: 'Expert',
         icon: '\u{1F3DF}',
         experience: '8-12 years',
         description: 'Designs enterprise-wide security frameworks and architecture. Security Architects translate business requirements into secure designs, define standards, and guide organizations through complex risk decisions.',
@@ -2982,6 +3399,11 @@ const ROLES = {
         title: 'GRC / Compliance',
         tier: 4,
         tierLabel: 'Expert',
+        ukcsc: 'Chartered',
+        sfia: 6,
+        csGrade: 'G7 / G6',
+        dcaTrain: 'MSc / Strategic',
+        govProf: 'Expert',
         icon: '\u{1F4DC}',
         experience: '5-8 years',
         description: 'Manages governance, risk, and compliance programs. GRC professionals ensure organizations meet regulatory requirements, conduct risk assessments, and build frameworks that balance security with business agility.',
@@ -3376,7 +3798,9 @@ function renderDetailPanel() {
                 const isLast = i === pathway.steps.length - 1;
                 const stepClass = isLast ? 'pathway-step current' : 'pathway-step';
                 const arrow = i < pathway.steps.length - 1 ? '<span class="pathway-arrow">\u2192</span>' : '';
-                return `<span class="${stepClass}" onclick="showRoleDetail('${s}')">${esc(SHORT_NAMES[s] || s)}</span>${arrow}`;
+                const stepRole = ROLES[s];
+                const fwLabel = stepRole ? `${stepRole.ukcsc} \u00b7 SFIA ${stepRole.sfia}` : '';
+                return `<span class="${stepClass}" onclick="showRoleDetail('${s}')">${esc(SHORT_NAMES[s] || s)}<span class="step-fw">${fwLabel}</span></span>${arrow}`;
             }).join('');
 
             pathwaySectionHtml = `
@@ -3402,10 +3826,11 @@ function renderDetailPanel() {
             });
             const chips = sorted.map(([id, pathNames]) => {
                 const r = ROLES[id];
+                const fwTag = r ? `${r.ukcsc} \u00b7 S${r.sfia}` : `T${r?.tier || '?'}`;
                 return `<span class="reachable-chip" onclick="showRoleDetail('${id}')">
                     <span class="chip-arrow">\u2192</span>
                     ${esc(r?.title || id)}
-                    <span class="chip-tier">T${r?.tier || '?'}</span>
+                    <span class="chip-tier">${fwTag}</span>
                 </span>`;
             }).join('');
             fromHtml = `<div class="reachable-roles">${chips}</div>`;
@@ -3451,8 +3876,13 @@ function renderDetailPanel() {
         const isSansContractor = certFilter === 'contractor' && c.provider === 'GIAC / SANS';
         const sansNote = isSansContractor ? ' <span style="font-size:0.6rem;color:var(--neon-yellow);font-style:italic;">(uncommon for contractors)</span>' : '';
         if (!certPassesFilter(c)) return '';
+        const inPlan = tpIsCertInActivePlan(c.name);
+        const addBtnCls = inPlan ? 'cert-add-plan added' : 'cert-add-plan';
+        const addBtnText = inPlan ? 'In Plan' : '+ Plan';
+        const certDataAttr = btoa(JSON.stringify({name:c.name,provider:c.provider,price:c.price,difficulty:c.difficulty}));
         return `
             <div class="cert-card">
+                <button class="${addBtnCls}" data-cert="${certDataAttr}" onclick="event.stopPropagation();tpAddCertFromCardBtn(this)">${addBtnText}</button>
                 <div class="cert-header">
                     <span class="cert-name">${esc(c.name)}</span>
                     <span class="cert-price">~\u00a3${c.price.toLocaleString()}</span>
@@ -3516,7 +3946,16 @@ function renderDetailPanel() {
 
     const html = `
         <div class="detail-title">${esc(role.title)}</div>
-        <span class="detail-tier-badge ${tierClass}">${esc(role.tierLabel)}</span>
+        <div class="detail-fw-row">
+            <span class="detail-tier-badge ${tierClass}">${esc(role.tierLabel)}</span>
+            <span class="detail-fw-badge fw-ukcsc">UKCSC ${esc(role.ukcsc)}</span>
+            <span class="detail-fw-badge fw-sfia">SFIA ${role.sfia}</span>
+        </div>
+        <div class="detail-fw-equiv">
+            <span title="Civil Service grade equivalent">CS: ${esc(role.csGrade)}</span>
+            <span title="Defence Cyber Academy training stage">DCA: ${esc(role.dcaTrain)}</span>
+            <span title="Gov Security Profession proficiency">GSP: ${esc(role.govProf)}</span>
+        </div>
 
         ${kpiHtml}
         ${pathwaySectionHtml}
@@ -3554,6 +3993,13 @@ function renderDetailPanel() {
         <div class="detail-section">
             <h3>Recommended Certifications${hasMultipleSteps ? ' (Full Pathway)' : ''}</h3>
             ${certsHtml}
+        </div>
+
+        <div class="detail-section" style="border-top:1px solid var(--border);padding-top:1rem;margin-top:1rem;">
+            <button class="tp-btn tp-btn-primary" style="width:100%;padding:0.75rem;font-size:0.9rem;" onclick="tpCreateFromPathway()">
+                Create "${esc(role.title)}" Training Plan (${filteredKpiCerts.length} certs, ~\u00a3${filteredKpiCost.toLocaleString()})
+            </button>
+            <p style="text-align:center;font-size:0.7rem;color:var(--text-muted);margin-top:0.5rem;">Auto-creates a plan named after this role with all ${certFilter !== 'all' ? (certFilter === 'cs' ? 'CS-funded' : 'contractor') + ' ' : ''}certs</p>
         </div>
     `;
 
@@ -3613,6 +4059,7 @@ function switchTab(tabId) {
     if (tabId === 'tab-assessment') renderAssessmentForm();
     if (tabId === 'tab-team') loadTeamData();
     if (tabId === 'tab-schedule') initSchedule();
+    if (tabId === 'tab-myplan') tpInit();
     if (tabId === 'tab-calendar') initCalendar();
 }
 
@@ -4630,6 +5077,46 @@ function buildTrainingPlan() {
 function renderCalStats() {
     const container = document.getElementById('cal-stats');
     if (!container) return;
+
+    if (calSource === 'plan') {
+        const plan = tpPlans.find(p => p.id === tpActivePlanId);
+        if (!plan || !plan.items || plan.items.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted);font-style:italic;">Create a training plan (My Training Plan tab) or switch to Auto-Generated mode.</p>';
+            return;
+        }
+        const activeItems = plan.items.filter(i => i.status !== 'skipped');
+        const completedItems = plan.items.filter(i => i.status === 'completed');
+        const totalCost = activeItems.reduce((s, i) => s + i.price, 0);
+        const targetTitle = plan.target_role && ROLES[plan.target_role] ? ROLES[plan.target_role].title : (plan.target_role || '-');
+        const lastEnd = calPlanSchedule.length > 0 ? calPlanSchedule.reduce((max, s) => s.endDate > max ? s.endDate : max, new Date()) : null;
+        const totalWeeks = lastEnd ? Math.max(0, Math.ceil((lastEnd - new Date()) / (7 * 86400000))) : 0;
+
+        container.innerHTML = `
+            <div class="cal-stat">
+                <div class="cal-stat-value">${activeItems.length}</div>
+                <div class="cal-stat-label">Certifications</div>
+            </div>
+            <div class="cal-stat">
+                <div class="cal-stat-value">${completedItems.length}/${activeItems.length}</div>
+                <div class="cal-stat-label">Completed</div>
+            </div>
+            <div class="cal-stat">
+                <div class="cal-stat-value">~\u00a3${totalCost.toLocaleString()}</div>
+                <div class="cal-stat-label">Total Cost</div>
+            </div>
+            <div class="cal-stat">
+                <div class="cal-stat-value">${totalWeeks > 0 ? '~' + totalWeeks + 'w' : '-'}</div>
+                <div class="cal-stat-label">Est. Timeline</div>
+            </div>
+            <div class="cal-stat">
+                <div class="cal-stat-value">${esc(targetTitle)}</div>
+                <div class="cal-stat-label">Target Role</div>
+            </div>
+        `;
+        return;
+    }
+
+    // Auto-generated mode
     const targetRole = careerGoal.target_role;
     if (!targetRole || !ROLES[targetRole]) {
         container.innerHTML = '<p style="color:var(--text-muted);font-style:italic;">Select a target role in the Skills Assessment tab to generate your training calendar.</p>';
@@ -4667,7 +5154,14 @@ function initCalendar() {
     const now = new Date();
     calYear = now.getFullYear();
     calMonth = now.getMonth();
-    buildTrainingPlan();
+    if (calSource === 'plan' && tpActivePlanId) {
+        buildPlanCalendar();
+        renderCalPlanSchedule();
+        document.getElementById('cal-plan-schedule').style.display = '';
+    } else {
+        buildTrainingPlan();
+        document.getElementById('cal-plan-schedule').style.display = 'none';
+    }
     renderCalStats();
     renderCalMonth();
 }
@@ -5568,6 +6062,745 @@ async function checkTeamTabAccess() {
 }
 
 // =========================================================================
+// My Training Plan
+// =========================================================================
+let tpPlans = [];
+let tpActivePlanId = null;
+let tpInitialized = false;
+
+async function tpInit() {
+    // Populate role dropdown in create modal
+    const roleSelect = document.getElementById('tp-new-role');
+    if (roleSelect && roleSelect.options.length <= 1) {
+        Object.entries(ROLES).forEach(([id, r]) => {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = r.title;
+            roleSelect.appendChild(opt);
+        });
+    }
+    await tpLoadPlans();
+}
+
+async function tpLoadPlans() {
+    try {
+        const resp = await fetch('/api/skills/training-plans');
+        if (!resp.ok) throw new Error('Failed to load plans');
+        const data = await resp.json();
+        tpPlans = data.plans || [];
+    } catch (e) {
+        console.warn('Could not load training plans:', e);
+        tpPlans = [];
+    }
+    tpRenderPlanSelector();
+    if (tpActivePlanId) {
+        const plan = tpPlans.find(p => p.id === tpActivePlanId);
+        if (plan) {
+            tpRenderPlan(plan);
+        } else {
+            tpActivePlanId = null;
+            tpShowEmpty();
+        }
+    } else if (tpPlans.length > 0) {
+        // Auto-select first active plan, or first plan
+        const activePlan = tpPlans.find(p => p.status === 'active') || tpPlans[0];
+        tpActivePlanId = activePlan.id;
+        tpRenderPlan(activePlan);
+    } else {
+        tpShowEmpty();
+    }
+}
+
+function tpRenderPlanSelector() {
+    const sel = document.getElementById('tp-plan-select');
+    if (!sel) return;
+    const curVal = tpActivePlanId;
+    sel.innerHTML = '<option value="">-- Select a plan --</option>';
+    tpPlans.forEach(p => {
+        const statusTag = p.status !== 'draft' ? ` (${p.status})` : '';
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name + statusTag;
+        sel.appendChild(opt);
+    });
+    if (curVal) sel.value = curVal;
+}
+
+function tpSelectPlan(val) {
+    const id = parseInt(val);
+    if (!id) { tpActivePlanId = null; tpShowEmpty(); return; }
+    tpActivePlanId = id;
+    const plan = tpPlans.find(p => p.id === id);
+    if (plan) tpRenderPlan(plan);
+}
+
+function tpShowEmpty() {
+    document.getElementById('tp-summary').style.display = 'none';
+    document.getElementById('tp-items-container').style.display = 'none';
+    document.getElementById('tp-plan-actions').style.display = 'none';
+    document.getElementById('tp-empty-state').style.display = '';
+}
+
+function tpRenderPlan(plan) {
+    document.getElementById('tp-empty-state').style.display = 'none';
+    document.getElementById('tp-summary').style.display = '';
+    document.getElementById('tp-items-container').style.display = '';
+    document.getElementById('tp-plan-actions').style.display = '';
+
+    // Status select
+    const statusSel = document.getElementById('tp-status-select');
+    if (statusSel) statusSel.value = plan.status;
+
+    // Summary stats
+    const items = plan.items || [];
+    const totalCost = items.reduce((s, i) => s + (i.status !== 'skipped' ? i.price : 0), 0);
+    const companyCost = items.filter(i => i.funding_type === 'company' && i.status !== 'skipped').reduce((s, i) => s + i.price, 0);
+    const selfCost = items.filter(i => i.funding_type === 'self' && i.status !== 'skipped').reduce((s, i) => s + i.price, 0);
+    const completedCount = items.filter(i => i.status === 'completed').length;
+    const activeItems = items.filter(i => i.status !== 'skipped').length;
+    const pct = activeItems > 0 ? Math.round((completedCount / activeItems) * 100) : 0;
+
+    document.getElementById('tp-total-items').textContent = items.length;
+    document.getElementById('tp-completed-count').textContent = completedCount;
+    document.getElementById('tp-total-cost').textContent = '\u00a3' + totalCost.toLocaleString();
+    document.getElementById('tp-company-cost').textContent = '\u00a3' + companyCost.toLocaleString();
+    document.getElementById('tp-self-cost').textContent = '\u00a3' + selfCost.toLocaleString();
+    document.getElementById('tp-progress-fill').style.width = pct + '%';
+    document.getElementById('tp-progress-label').textContent = pct + '% Complete';
+
+    // Items list
+    const container = document.getElementById('tp-items-list');
+    if (items.length === 0) {
+        container.innerHTML = '<div class="tp-empty">No certifications added yet. Browse Career Pathways and add certifications to this plan.</div>';
+        return;
+    }
+
+    container.innerHTML = items.map(item => {
+        const isCompleted = item.status === 'completed';
+        const isSkipped = item.status === 'skipped';
+        const cls = isCompleted ? 'tp-item completed' : isSkipped ? 'tp-item completed' : 'tp-item';
+        const checkCls = isCompleted ? 'tp-item-check checked' : 'tp-item-check';
+        const diffCls = item.difficulty ? `tp-item-difficulty ${item.difficulty}` : 'tp-item-difficulty';
+        return `
+        <div class="${cls}" data-item-id="${item.id}">
+            <div class="${checkCls}" onclick="tpToggleComplete(${plan.id},${item.id},'${item.status}')" title="Toggle complete"></div>
+            <div class="tp-item-info">
+                <div class="tp-item-name">${esc(item.cert_name)}</div>
+                <div class="tp-item-provider">${esc(item.provider || '')}</div>
+            </div>
+            <span class="tp-item-price">~\u00a3${item.price.toLocaleString()}</span>
+            <span class="${diffCls}">${esc(item.difficulty || '-')}</span>
+            <span class="tp-item-funding ${item.funding_type}" onclick="tpCycleFunding(event,${plan.id},${item.id},'${item.funding_type}')" title="Click to change">${tpFundingLabel(item.funding_type)}</span>
+            <span class="tp-item-status ${item.status}" onclick="tpCycleStatus(event,${plan.id},${item.id},'${item.status}')" title="Click to change">${tpStatusLabel(item.status)}</span>
+            <div class="tp-item-actions">
+                <button onclick="tpRemoveItem(${plan.id},${item.id})" title="Remove"><i class="icon-x"></i></button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function tpFundingLabel(f) {
+    return { company: 'Company', self: 'Self', split: 'Split', tbd: 'TBD' }[f] || 'TBD';
+}
+function tpStatusLabel(s) {
+    return { planned: 'Planned', in_progress: 'In Progress', completed: 'Completed', skipped: 'Skipped' }[s] || s;
+}
+
+async function tpToggleComplete(planId, itemId, currentStatus) {
+    const newStatus = currentStatus === 'completed' ? 'planned' : 'completed';
+    await tpUpdateItem(planId, itemId, { status: newStatus });
+}
+
+function tpCycleFunding(event, planId, itemId, current) {
+    event.stopPropagation();
+    const cycle = ['tbd', 'company', 'self', 'split'];
+    const idx = cycle.indexOf(current);
+    const next = cycle[(idx + 1) % cycle.length];
+    tpUpdateItem(planId, itemId, { funding_type: next });
+}
+
+function tpCycleStatus(event, planId, itemId, current) {
+    event.stopPropagation();
+    const cycle = ['planned', 'in_progress', 'completed', 'skipped'];
+    const idx = cycle.indexOf(current);
+    const next = cycle[(idx + 1) % cycle.length];
+    tpUpdateItem(planId, itemId, { status: next });
+}
+
+async function tpUpdateItem(planId, itemId, updates) {
+    try {
+        const resp = await fetch(`/api/skills/training-plans/${planId}/items/${itemId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+        });
+        if (!resp.ok) throw new Error('Update failed');
+        const plan = await resp.json();
+        // Update local cache
+        const idx = tpPlans.findIndex(p => p.id === planId);
+        if (idx >= 0) tpPlans[idx] = plan;
+        tpRenderPlan(plan);
+    } catch (e) {
+        console.error('Failed to update item:', e);
+    }
+}
+
+async function tpRemoveItem(planId, itemId) {
+    try {
+        const resp = await fetch(`/api/skills/training-plans/${planId}/items/${itemId}`, { method: 'DELETE' });
+        if (!resp.ok) throw new Error('Delete failed');
+        const plan = await resp.json();
+        const idx = tpPlans.findIndex(p => p.id === planId);
+        if (idx >= 0) tpPlans[idx] = plan;
+        tpRenderPlan(plan);
+    } catch (e) {
+        console.error('Failed to remove item:', e);
+    }
+}
+
+async function tpChangeStatus(newStatus) {
+    if (!tpActivePlanId) return;
+    try {
+        const resp = await fetch(`/api/skills/training-plans/${tpActivePlanId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus }),
+        });
+        if (!resp.ok) throw new Error('Status update failed');
+        const plan = await resp.json();
+        const idx = tpPlans.findIndex(p => p.id === tpActivePlanId);
+        if (idx >= 0) tpPlans[idx] = plan;
+        tpRenderPlanSelector();
+        document.getElementById('tp-plan-select').value = tpActivePlanId;
+    } catch (e) {
+        console.error('Failed to update plan status:', e);
+    }
+}
+
+async function tpDeletePlan() {
+    if (!tpActivePlanId) return;
+    if (!confirm('Delete this training plan and all its items?')) return;
+    try {
+        await fetch(`/api/skills/training-plans/${tpActivePlanId}`, { method: 'DELETE' });
+        tpPlans = tpPlans.filter(p => p.id !== tpActivePlanId);
+        tpActivePlanId = null;
+        tpRenderPlanSelector();
+        if (tpPlans.length > 0) {
+            tpActivePlanId = tpPlans[0].id;
+            document.getElementById('tp-plan-select').value = tpActivePlanId;
+            tpRenderPlan(tpPlans[0]);
+        } else {
+            tpShowEmpty();
+        }
+    } catch (e) {
+        console.error('Failed to delete plan:', e);
+    }
+}
+
+function tpShowCreateModal() {
+    document.getElementById('tp-new-name').value = '';
+    document.getElementById('tp-new-role').value = careerGoal.target_role || '';
+    document.getElementById('tp-new-notes').value = '';
+    // Populate role multi-select checkboxes
+    const multiDiv = document.getElementById('tp-new-roles-multi');
+    if (multiDiv && multiDiv.children.length === 0) {
+        const tiers = { 1: 'Foundation', 2: 'Intermediate', 3: 'Advanced', 4: 'Leadership' };
+        Object.entries(ROLES).forEach(([id, r]) => {
+            const label = document.createElement('label');
+            label.style.cssText = 'display:flex;align-items:center;gap:0.35rem;font-size:0.78rem;color:var(--text-primary);cursor:pointer;padding:0.2rem 0.5rem;border-radius:4px;background:var(--bg-primary);border:1px solid var(--border);white-space:nowrap;';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = id;
+            cb.className = 'tp-role-cb';
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(r.title));
+            multiDiv.appendChild(label);
+        });
+    } else if (multiDiv) {
+        multiDiv.querySelectorAll('.tp-role-cb').forEach(cb => cb.checked = false);
+    }
+    document.getElementById('tp-create-modal').style.display = '';
+}
+function tpHideCreateModal() {
+    document.getElementById('tp-create-modal').style.display = 'none';
+}
+
+async function tpCreatePlan() {
+    const name = document.getElementById('tp-new-name').value.trim();
+    if (!name) { alert('Please enter a plan name.'); return; }
+    const targetRole = document.getElementById('tp-new-role').value || null;
+    const notes = document.getElementById('tp-new-notes').value.trim() || null;
+
+    // Gather selected roles for auto-population
+    const selectedRoles = [];
+    document.querySelectorAll('.tp-role-cb:checked').forEach(cb => selectedRoles.push(cb.value));
+
+    try {
+        const resp = await fetch('/api/skills/training-plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, target_role: targetRole, notes }),
+        });
+        if (!resp.ok) throw new Error('Create failed');
+        let plan = await resp.json();
+
+        // Auto-add certs from selected roles (deduplicated)
+        if (selectedRoles.length > 0) {
+            const seenCerts = new Set();
+            const items = [];
+            selectedRoles.forEach(roleId => {
+                const role = ROLES[roleId];
+                if (!role) return;
+                (role.certs || []).forEach(c => {
+                    if (!seenCerts.has(c.name)) {
+                        seenCerts.add(c.name);
+                        items.push({
+                            cert_name: c.name,
+                            provider: c.provider,
+                            price: c.price,
+                            difficulty: c.difficulty,
+                        });
+                    }
+                });
+            });
+            if (items.length > 0) {
+                const addResp = await fetch(`/api/skills/training-plans/${plan.id}/items`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items }),
+                });
+                if (addResp.ok) plan = await addResp.json();
+            }
+        }
+
+        tpPlans.unshift(plan);
+        tpActivePlanId = plan.id;
+        tpHideCreateModal();
+        tpRenderPlanSelector();
+        document.getElementById('tp-plan-select').value = plan.id;
+        tpRenderPlan(plan);
+    } catch (e) {
+        console.error('Failed to create plan:', e);
+        alert('Failed to create plan.');
+    }
+}
+
+// Check if a cert is in the active plan (for "Add to Plan" button state)
+function tpIsCertInActivePlan(certName) {
+    if (!tpActivePlanId) return false;
+    const plan = tpPlans.find(p => p.id === tpActivePlanId);
+    if (!plan) return false;
+    return (plan.items || []).some(i => i.cert_name === certName);
+}
+
+// Wrapper to decode base64 data-cert attribute
+function tpAddCertFromCardBtn(btn) {
+    const certData = JSON.parse(atob(btn.dataset.cert));
+    tpAddCertFromCard(btn, certData);
+}
+
+// Add cert from role detail panel cert card
+async function tpAddCertFromCard(btn, certData) {
+    if (!tpActivePlanId) {
+        // No plan exists, ask to create one
+        if (tpPlans.length === 0) {
+            if (!confirm('No training plan exists yet. Create one first?')) return;
+            switchTab('tab-myplan');
+            tpShowCreateModal();
+            return;
+        }
+        // Have plans but none selected — select first
+        tpActivePlanId = tpPlans[0].id;
+    }
+    try {
+        const resp = await fetch(`/api/skills/training-plans/${tpActivePlanId}/items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: [{
+                cert_name: certData.name,
+                provider: certData.provider,
+                price: certData.price,
+                difficulty: certData.difficulty,
+            }]}),
+        });
+        if (!resp.ok) throw new Error('Add failed');
+        const plan = await resp.json();
+        const idx = tpPlans.findIndex(p => p.id === tpActivePlanId);
+        if (idx >= 0) tpPlans[idx] = plan;
+        // Update button state
+        btn.classList.add('added');
+        btn.textContent = 'In Plan';
+    } catch (e) {
+        console.error('Failed to add cert to plan:', e);
+    }
+}
+
+// =========================================================================
+// Create plan from pathway (role detail panel button)
+// =========================================================================
+async function tpCreateFromPathway() {
+    if (!activeRole) return;
+    const role = ROLES[activeRole];
+    if (!role) return;
+
+    // Mirror exact logic from renderDetailPanel to get pathway steps
+    const pathwaySteps = (viewMode === 'to' && role.pathways.length > 0)
+        ? role.pathways[activePathwayIndex].steps
+        : [activeRole];
+    const cumulative = getPathwayCumulative(pathwaySteps);
+    const filteredCerts = cumulative.allCerts.filter(({ cert }) => certPassesFilter(cert));
+
+    if (filteredCerts.length === 0) {
+        alert('No certifications match the current filter for this pathway.');
+        return;
+    }
+
+    // Auto-name: "Role Title — Training Plan"
+    const planName = `${role.title} — Training Plan`;
+
+    try {
+        // Create plan
+        const createResp = await fetch('/api/skills/training-plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: planName, target_role: activeRole }),
+        });
+        if (!createResp.ok) {
+            const err = await createResp.json().catch(() => ({}));
+            if (createResp.status === 409) {
+                alert(`A plan named "${planName}" already exists. Delete it first or add certs individually via the "+ Plan" buttons.`);
+                return;
+            }
+            throw new Error(err.detail || 'Create failed');
+        }
+        const plan = await createResp.json();
+
+        // Add all filtered certs
+        const items = filteredCerts.map(({ cert }) => ({
+            cert_name: cert.name,
+            provider: cert.provider,
+            price: cert.price,
+            difficulty: cert.difficulty,
+        }));
+        const addResp = await fetch(`/api/skills/training-plans/${plan.id}/items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items }),
+        });
+        if (!addResp.ok) throw new Error('Add items failed');
+        const fullPlan = await addResp.json();
+
+        tpPlans.unshift(fullPlan);
+        tpActivePlanId = fullPlan.id;
+
+        // Close detail panel and switch to My Training Plan tab
+        closeDetail();
+        switchTab('tab-myplan');
+    } catch (e) {
+        console.error('Failed to create plan from pathway:', e);
+        alert('Failed to create plan: ' + e.message);
+    }
+}
+
+// =========================================================================
+// Calendar — Training Plan Source Integration
+// =========================================================================
+let calSource = 'plan'; // 'plan' or 'auto'
+let calPlanSchedule = []; // [{item, startDate, endDate, studyWeeks}] for plan-based cal
+
+function switchCalSource(src) {
+    calSource = src;
+    document.querySelectorAll('.cal-src-btn').forEach(b => b.classList.toggle('active', b.dataset.src === src));
+    const schedDiv = document.getElementById('cal-plan-schedule');
+    if (schedDiv) schedDiv.style.display = src === 'plan' ? '' : 'none';
+    initCalendar();
+}
+
+function buildPlanCalendar() {
+    trainingPlan = [];
+    calPlanSchedule = [];
+    const plan = tpPlans.find(p => p.id === tpActivePlanId);
+    const nameEl = document.getElementById('cal-plan-name');
+    if (!plan || !plan.items || plan.items.length === 0) {
+        if (nameEl) nameEl.textContent = plan ? `Plan: ${plan.name} (no items)` : 'No plan selected';
+        return;
+    }
+    if (nameEl) nameEl.textContent = `Plan: ${plan.name}`;
+
+    const today = new Date();
+    let dayOffset = 7;
+    const activeItems = plan.items.filter(i => i.status !== 'skipped');
+
+    activeItems.forEach((item, idx) => {
+        // Determine study period: use target_date if set, otherwise auto-space
+        let startDate, endDate;
+        const studyWeeks = item.difficulty === 'expert' ? 12 : item.difficulty === 'advanced' ? 8 : item.difficulty === 'intermediate' ? 6 : 4;
+
+        if (item.target_date) {
+            // Target date is exam date; study period is studyWeeks before
+            endDate = new Date(item.target_date + 'T00:00:00');
+            startDate = new Date(endDate);
+            startDate.setDate(startDate.getDate() - studyWeeks * 7);
+        } else {
+            startDate = new Date(today);
+            startDate.setDate(startDate.getDate() + dayOffset);
+            endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + studyWeeks * 7);
+            dayOffset += Math.max(14, studyWeeks * 4);
+        }
+
+        const schedItem = { item, startDate, endDate, studyWeeks };
+        calPlanSchedule.push(schedItem);
+
+        // Build calendar event
+        const catCss = item.status === 'completed' ? 'cat-cert' : 'cat-cert';
+        trainingPlan.push({
+            name: item.cert_name,
+            category: 'Certification',
+            catCss: 'cat-cert',
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
+            type: item.status === 'completed' ? 'milestone' : 'cert',
+            planItemId: item.id,
+        });
+    });
+}
+
+function renderCalPlanSchedule() {
+    const container = document.getElementById('cal-plan-items');
+    if (!container) return;
+    const plan = tpPlans.find(p => p.id === tpActivePlanId);
+    if (!plan || !plan.items || plan.items.length === 0) {
+        container.innerHTML = '<div class="tp-empty">No items in your training plan. Add certifications from Career Pathways first.</div>';
+        return;
+    }
+
+    const activeItems = plan.items.filter(i => i.status !== 'skipped');
+    container.innerHTML = activeItems.map((item, idx) => {
+        const sched = calPlanSchedule[idx];
+        const startVal = sched ? dateStr(sched.startDate) : '';
+        const endVal = sched ? dateStr(sched.endDate) : '';
+        const weeks = sched ? sched.studyWeeks : 4;
+        const statusCls = `cal-sched-status ${item.status}`;
+        const statusLabel = { planned: 'Planned', in_progress: 'Studying', completed: 'Passed', skipped: 'Skipped' }[item.status] || item.status;
+        return `
+        <div class="cal-sched-row">
+            <div style="flex:1;min-width:150px;">
+                <div class="tp-item-name">${esc(item.cert_name)}</div>
+                <div class="tp-item-provider">${esc(item.provider || '')} - ~\u00a3${item.price.toLocaleString()}</div>
+            </div>
+            <span class="${statusCls}">${statusLabel}</span>
+            <label>Start:</label>
+            <input type="date" value="${startVal}" onchange="calUpdateItemDate(${item.id},'start',this.value)">
+            <label>Exam:</label>
+            <input type="date" value="${endVal}" onchange="calUpdateItemDate(${item.id},'end',this.value)">
+            <label>Weeks:</label>
+            <input type="number" min="1" max="52" value="${weeks}" onchange="calUpdateItemWeeks(${item.id},this.value,this)">
+        </div>`;
+    }).join('');
+}
+
+function calUpdateItemDate(itemId, which, val) {
+    if (!tpActivePlanId || !val) return;
+    // Update target_date on the item (exam date)
+    if (which === 'end') {
+        tpUpdateItem(tpActivePlanId, itemId, { target_date: val }).then(() => {
+            // Rebuild calendar
+            buildPlanCalendar();
+            renderCalPlanSchedule();
+            renderCalStats();
+            if (calView === 'month') renderCalMonth(); else renderGantt();
+        });
+    } else {
+        // Start date change: compute new target_date from weeks
+        const sched = calPlanSchedule.find(s => s.item.id === itemId);
+        if (!sched) return;
+        const start = new Date(val + 'T00:00:00');
+        const end = new Date(start);
+        end.setDate(end.getDate() + sched.studyWeeks * 7);
+        tpUpdateItem(tpActivePlanId, itemId, { target_date: dateStr(end) }).then(() => {
+            buildPlanCalendar();
+            renderCalPlanSchedule();
+            renderCalStats();
+            if (calView === 'month') renderCalMonth(); else renderGantt();
+        });
+    }
+}
+
+function calUpdateItemWeeks(itemId, weeksVal, input) {
+    const weeks = parseInt(weeksVal) || 4;
+    if (weeks < 1 || weeks > 52) return;
+    const sched = calPlanSchedule.find(s => s.item.id === itemId);
+    if (!sched) return;
+    // Keep the end date (exam), adjust start
+    const newEnd = new Date(sched.endDate);
+    const newStart = new Date(newEnd);
+    newStart.setDate(newStart.getDate() - weeks * 7);
+    sched.studyWeeks = weeks;
+    sched.startDate = newStart;
+    // Update the corresponding trainingPlan entry
+    const tpItem = trainingPlan.find(t => t.planItemId === itemId);
+    if (tpItem) {
+        tpItem.startDate = new Date(newStart);
+        tpItem.endDate = new Date(newEnd);
+    }
+    renderCalStats();
+    if (calView === 'month') renderCalMonth(); else renderGantt();
+}
+
+// =========================================================================
+// Lead Training Forecast
+// =========================================================================
+let forecastLoaded = false;
+
+const EMP_TYPE_LABELS = { cs: 'Civil Servant', contractor: 'Contractor', military: 'Military', other: 'Other' };
+const EMP_TYPE_COLORS = { cs: '#00e5ff', contractor: '#f97316', military: '#22c55e', other: '#8b949e' };
+
+async function tpLoadForecast() {
+    const totalsEl = document.getElementById('tp-forecast-totals');
+    const empEl = document.getElementById('tp-forecast-emp-breakdown');
+    const tableEl = document.getElementById('tp-forecast-table');
+    if (!totalsEl || !tableEl) return;
+
+    try {
+        const resp = await fetch('/api/skills/training-plans/forecast');
+        if (resp.status === 403) {
+            document.getElementById('tp-forecast-section').style.display = 'none';
+            return;
+        }
+        if (!resp.ok) throw new Error('Forecast failed');
+        const data = await resp.json();
+        forecastLoaded = true;
+
+        const t = data.totals;
+        const totalCerts = data.forecasts.reduce((s, f) => s + f.item_count, 0);
+        const totalCompleted = data.forecasts.reduce((s, f) => s + f.completed_count, 0);
+        const overallPct = totalCerts > 0 ? Math.round(totalCompleted / totalCerts * 100) : 0;
+        // Estimate yearly budget (all active plans = this FY)
+        const companyLiability = t.company + (t.split * 0.5) + t.tbd; // TBD assumed company until classified
+
+        totalsEl.innerHTML = `
+            <div class="tp-summary-card">
+                <div class="tp-summary-value">${data.plan_count}</div>
+                <div class="tp-summary-label">Personnel with Plans</div>
+            </div>
+            <div class="tp-summary-card">
+                <div class="tp-summary-value">${totalCerts}</div>
+                <div class="tp-summary-label">Total Certifications</div>
+            </div>
+            <div class="tp-summary-card">
+                <div class="tp-summary-value" style="color:var(--neon-cyan);">\u00a3${t.total.toLocaleString()}</div>
+                <div class="tp-summary-label">Total Forecast</div>
+            </div>
+            <div class="tp-summary-card">
+                <div class="tp-summary-value" style="color:#f97316;">\u00a3${companyLiability.toLocaleString()}</div>
+                <div class="tp-summary-label">Est. Company Liability</div>
+            </div>
+            <div class="tp-summary-card">
+                <div class="tp-summary-value">\u00a3${t.company.toLocaleString()}</div>
+                <div class="tp-summary-label">Confirmed Company</div>
+            </div>
+            <div class="tp-summary-card">
+                <div class="tp-summary-value">\u00a3${t.self.toLocaleString()}</div>
+                <div class="tp-summary-label">Self Funded</div>
+            </div>
+            <div class="tp-summary-card">
+                <div class="tp-summary-value">\u00a3${t.tbd.toLocaleString()}</div>
+                <div class="tp-summary-label">Unclassified (TBD)</div>
+            </div>
+            <div class="tp-summary-card tp-summary-card-progress">
+                <div class="tp-progress-bar">
+                    <div class="tp-progress-fill" style="width:${overallPct}%"></div>
+                </div>
+                <div class="tp-summary-label">${overallPct}% Team Completion</div>
+            </div>
+        `;
+
+        // Employment type breakdown
+        if (empEl) {
+            const empTypes = data.by_employment_type || {};
+            if (Object.keys(empTypes).length === 0) {
+                empEl.innerHTML = '<div class="tp-empty" style="padding:1rem;">No data yet.</div>';
+            } else {
+                let empHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.75rem;">';
+                for (const [type, d] of Object.entries(empTypes)) {
+                    const label = EMP_TYPE_LABELS[type] || type;
+                    const color = EMP_TYPE_COLORS[type] || '#8b949e';
+                    const liability = d.company + (d.split * 0.5) + d.tbd;
+                    empHtml += `
+                    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:1rem;border-left:3px solid ${color};">
+                        <div style="font-weight:700;color:${color};font-size:0.9rem;margin-bottom:0.5rem;">${esc(label)}</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.25rem 1rem;font-size:0.78rem;">
+                            <span style="color:var(--text-muted);">Personnel</span><span style="color:var(--text-primary);font-weight:600;">${d.headcount}</span>
+                            <span style="color:var(--text-muted);">Certifications</span><span style="color:var(--text-primary);font-weight:600;">${d.certs}</span>
+                            <span style="color:var(--text-muted);">Total Cost</span><span style="color:var(--neon-cyan);font-weight:600;">\u00a3${d.total.toLocaleString()}</span>
+                            <span style="color:var(--text-muted);">Company</span><span style="font-weight:600;">\u00a3${d.company.toLocaleString()}</span>
+                            <span style="color:var(--text-muted);">Self</span><span style="font-weight:600;">\u00a3${d.self.toLocaleString()}</span>
+                            <span style="color:var(--text-muted);">Est. Liability</span><span style="color:#f97316;font-weight:600;">\u00a3${liability.toLocaleString()}</span>
+                        </div>
+                    </div>`;
+                }
+                empHtml += '</div>';
+                empEl.innerHTML = empHtml;
+            }
+        }
+
+        // Per-person table
+        if (data.forecasts.length === 0) {
+            tableEl.innerHTML = '<div class="tp-empty">No personnel have active training plans yet.</div>';
+            return;
+        }
+
+        let rows = data.forecasts.map(f => {
+            const pct = f.item_count > 0 ? Math.round(f.completed_count / f.item_count * 100) : 0;
+            const targetTitle = f.target_role && ROLES[f.target_role] ? ROLES[f.target_role].title : (f.target_role || '-');
+            const empLabel = EMP_TYPE_LABELS[f.employment_type] || f.employment_type || 'CS';
+            const empColor = EMP_TYPE_COLORS[f.employment_type] || '#8b949e';
+            return `<tr>
+                <td><strong>${esc(f.display_name)}</strong><br><span style="font-size:0.7rem;color:var(--text-muted);">${esc(f.username)}</span></td>
+                <td><span style="display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.7rem;font-weight:600;background:${empColor}22;color:${empColor};">${esc(empLabel)}</span></td>
+                <td>${esc(f.plan_name)}</td>
+                <td>${esc(targetTitle)}</td>
+                <td style="text-align:center;">${f.item_count}</td>
+                <td class="fc-cost">\u00a3${f.total_cost.toLocaleString()}</td>
+                <td class="fc-cost">\u00a3${f.company_cost.toLocaleString()}</td>
+                <td class="fc-cost">\u00a3${f.self_cost.toLocaleString()}</td>
+                <td>
+                    ${pct}%
+                    <span class="fc-progress"><span class="fc-progress-bar" style="width:${pct}%"></span></span>
+                </td>
+            </tr>`;
+        }).join('');
+
+        tableEl.innerHTML = `
+            <div style="overflow-x:auto;">
+            <table class="fc-table">
+                <thead><tr>
+                    <th>Person</th><th>Type</th><th>Plan</th><th>Target Role</th><th style="text-align:center;">Certs</th>
+                    <th>Total</th><th>Company</th><th>Self</th><th>Progress</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+            </div>`;
+    } catch (e) {
+        console.error('Forecast error:', e);
+        if (tableEl) tableEl.innerHTML = '<div class="tp-empty">Failed to load forecast data.</div>';
+    }
+}
+
+function tpShowForecastIfLead() {
+    // Check if user has lead+ access by trying the forecast endpoint
+    const el = document.getElementById('tp-forecast-section');
+    if (!el) return;
+    fetch('/api/skills/training-plans/forecast').then(resp => {
+        if (resp.ok) {
+            el.style.display = '';
+            tpLoadForecast();
+        }
+    }).catch(() => {});
+}
+
+// =========================================================================
 // Init
 // =========================================================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -5575,6 +6808,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadAssessmentData();
     populateRoleDropdowns();
     checkTeamTabAccess();
+    // Pre-load training plans so "Add to Plan" buttons work on pathways tab
+    try {
+        const resp = await fetch('/api/skills/training-plans');
+        if (resp.ok) {
+            const data = await resp.json();
+            tpPlans = data.plans || [];
+            if (tpPlans.length > 0) {
+                const activePlan = tpPlans.find(p => p.status === 'active') || tpPlans[0];
+                tpActivePlanId = activePlan.id;
+            }
+        }
+    } catch (e) { /* ignore */ }
+    // Show forecast section for leads
+    tpShowForecastIfLead();
 });
 </script>
 {% endblock %}

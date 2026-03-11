@@ -161,6 +161,7 @@ class UserCreate(BaseModel):
     password: str
     display_name: Optional[str] = None
     roles: Optional[List[str]] = None
+    employment_type: Optional[str] = "cs"  # cs, contractor, military, other
 
 
 class UserUpdate(BaseModel):
@@ -168,6 +169,7 @@ class UserUpdate(BaseModel):
     email: Optional[str] = None
     display_name: Optional[str] = None
     is_active: Optional[bool] = None
+    employment_type: Optional[str] = None
 
 
 class UserRolesUpdate(BaseModel):
@@ -309,6 +311,7 @@ async def get_current_user_info(
         "must_change_password": current_user.must_change_password,
         "last_login": current_user.last_login.isoformat() if current_user.last_login else None,
         "roles": [r.name for r in current_user.roles],
+        "employment_type": getattr(current_user, "employment_type", None) or "cs",
         "permissions": list(set(
             p.name for r in current_user.roles for p in r.permissions
         )),
@@ -599,6 +602,7 @@ async def list_users(
             "is_active": u.is_active,
             "last_login": u.last_login.isoformat() if u.last_login else None,
             "roles": [r.name for r in u.roles],
+            "employment_type": getattr(u, "employment_type", None) or "cs",
             "created_at": u.created_at.isoformat() if u.created_at else None,
         }
         for u in users
@@ -630,6 +634,10 @@ async def create_user(
     if error:
         raise HTTPException(status_code=400, detail=error)
 
+    # Set employment type
+    if user_create.employment_type and user_create.employment_type in ("cs", "contractor", "military", "other"):
+        user.employment_type = user_create.employment_type
+
     session.commit()
 
     return {
@@ -660,6 +668,7 @@ async def get_user(
         "must_change_password": user.must_change_password,
         "last_login": user.last_login.isoformat() if user.last_login else None,
         "roles": [r.name for r in user.roles],
+        "employment_type": getattr(user, "employment_type", None) or "cs",
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "updated_at": user.updated_at.isoformat() if user.updated_at else None,
     }
@@ -699,6 +708,10 @@ async def update_user(
         display_name=user_update.display_name,
         is_active=user_update.is_active,
     )
+
+    # Update employment type if provided
+    if user_update.employment_type and user_update.employment_type in ("cs", "contractor", "military", "other"):
+        user.employment_type = user_update.employment_type
 
     audit_repo.create(
         user_id=current_user.id,

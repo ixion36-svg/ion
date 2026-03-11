@@ -1,7 +1,7 @@
 """Skills assessment API endpoints (SOC-CMM aligned)."""
 
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from ion.auth.dependencies import get_current_user, get_db_session, require_permission
 from ion.models.skills import (
     AssessmentSnapshot, KnowledgeArticle, SOCCMMAssessment,
-    SkillAssessment, TeamCertification, TeamScheduleEntry, UserCareerGoal,
+    SkillAssessment, TeamCertification, TeamScheduleEntry,
+    TrainingPlan, TrainingPlanItem, UserCareerGoal,
 )
 from ion.models.user import Role, User
 
@@ -648,6 +649,42 @@ class KnowledgeSave(BaseModel):
     notes: Optional[str] = None
 
 
+class TrainingPlanCreate(BaseModel):
+    name: str
+    target_role: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class TrainingPlanUpdate(BaseModel):
+    name: Optional[str] = None
+    target_role: Optional[str] = None
+    status: Optional[str] = None  # draft, active, completed, archived
+    notes: Optional[str] = None
+
+
+class TrainingPlanItemCreate(BaseModel):
+    cert_name: str
+    provider: Optional[str] = None
+    price: float = 0
+    difficulty: Optional[str] = None
+    funding_type: str = "tbd"  # company, self, split, tbd
+    priority: int = 0
+    target_date: Optional[str] = None  # YYYY-MM-DD
+    notes: Optional[str] = None
+
+
+class TrainingPlanItemUpdate(BaseModel):
+    status: Optional[str] = None  # planned, in_progress, completed, skipped
+    funding_type: Optional[str] = None
+    priority: Optional[int] = None
+    target_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class TrainingPlanItemBulkAdd(BaseModel):
+    items: List[TrainingPlanItemCreate]
+
+
 class KnowledgeBulkSave(BaseModel):
     articles: List[KnowledgeSave]
 
@@ -712,3 +749,365 @@ def save_knowledge(
             )
     session.commit()
     return {"status": "ok", "saved": len(payload.articles)}
+
+
+# =============================================================================
+# Training Plans (any authenticated user)
+# =============================================================================
+
+
+def _plan_to_dict(plan: TrainingPlan, items: list) -> dict:
+    """Serialize a training plan with its items."""
+    item_list = []
+    for it in items:
+        item_list.append({
+            "id": it.id,
+            "cert_name": it.cert_name,
+            "provider": it.provider,
+            "price": it.price,
+            "difficulty": it.difficulty,
+            "status": it.status,
+            "funding_type": it.funding_type,
+            "priority": it.priority,
+            "target_date": str(it.target_date) if it.target_date else None,
+            "completed_at": it.completed_at.isoformat() if it.completed_at else None,
+            "notes": it.notes,
+        })
+    total_cost = sum(it.price for it in items)
+    completed = sum(1 for it in items if it.status == "completed")
+    return {
+        "id": plan.id,
+        "name": plan.name,
+        "target_role": plan.target_role,
+        "status": plan.status,
+        "notes": plan.notes,
+        "created_at": plan.created_at.isoformat() if plan.created_at else None,
+        "updated_at": plan.updated_at.isoformat() if plan.updated_at else None,
+        "items": item_list,
+        "total_cost": total_cost,
+        "completed_count": completed,
+        "total_count": len(item_list),
+    }
+
+
+@router.get("/training-plans")
+def get_training_plans(
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Get all training plans for the current user."""
+    plans = (
+        session.query(TrainingPlan)
+        .filter(TrainingPlan.user_id == current_user.id)
+        .order_by(TrainingPlan.created_at.desc())
+        .all()
+    )
+    result = []
+    for plan in plans:
+        items = (
+            session.query(TrainingPlanItem)
+            .filter(TrainingPlanItem.plan_id == plan.id)
+            .order_by(TrainingPlanItem.priority, TrainingPlanItem.id)
+            .all()
+        )
+        result.append(_plan_to_dict(plan, items))
+    return {"plans": result}
+
+
+@router.get("/training-plans/forecast")
+def get_training_forecast(
+    current_user: User = Depends(require_permission("security:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Get aggregate training cost forecast across all users' plans (lead+)."""
+    # Get all active/draft plans (not archived)
+    plans = (
+        session.query(TrainingPlan)
+        .filter(TrainingPlan.status.in_(["draft", "active"]))
+        .all()
+    )
+
+    user_forecasts = []
+    totals = {"total": 0, "company": 0, "self": 0, "split": 0, "tbd": 0}
+    by_emp_type = {}  # emp_type -> {total, company, self, split, tbd, headcount}
+
+    for plan in plans:
+        user = session.query(User).filter(User.id == plan.user_id).first()
+        if not user or not user.is_active:
+            continue
+        items = (
+            session.query(TrainingPlanItem)
+            .filter(TrainingPlanItem.plan_id == plan.id, TrainingPlanItem.status != "skipped")
+            .all()
+        )
+        plan_total = sum(it.price for it in items)
+        plan_company = sum(it.price for it in items if it.funding_type == "company")
+        plan_self = sum(it.price for it in items if it.funding_type == "self")
+        plan_split = sum(it.price for it in items if it.funding_type == "split")
+        plan_tbd = sum(it.price for it in items if it.funding_type == "tbd")
+        completed = sum(1 for it in items if it.status == "completed")
+
+        emp_type = getattr(user, "employment_type", None) or "cs"
+
+        user_forecasts.append({
+            "user_id": user.id,
+            "username": user.username,
+            "display_name": user.display_name or user.username,
+            "employment_type": emp_type,
+            "plan_id": plan.id,
+            "plan_name": plan.name,
+            "plan_status": plan.status,
+            "target_role": plan.target_role,
+            "total_cost": plan_total,
+            "company_cost": plan_company,
+            "self_cost": plan_self,
+            "split_cost": plan_split,
+            "tbd_cost": plan_tbd,
+            "item_count": len(items),
+            "completed_count": completed,
+        })
+        totals["total"] += plan_total
+        totals["company"] += plan_company
+        totals["self"] += plan_self
+        totals["split"] += plan_split
+        totals["tbd"] += plan_tbd
+
+        # Aggregate by employment type
+        if emp_type not in by_emp_type:
+            by_emp_type[emp_type] = {"total": 0, "company": 0, "self": 0, "split": 0, "tbd": 0, "headcount": 0, "certs": 0}
+        by_emp_type[emp_type]["total"] += plan_total
+        by_emp_type[emp_type]["company"] += plan_company
+        by_emp_type[emp_type]["self"] += plan_self
+        by_emp_type[emp_type]["split"] += plan_split
+        by_emp_type[emp_type]["tbd"] += plan_tbd
+        by_emp_type[emp_type]["headcount"] += 1
+        by_emp_type[emp_type]["certs"] += len(items)
+
+    return {
+        "forecasts": user_forecasts,
+        "totals": totals,
+        "by_employment_type": by_emp_type,
+        "plan_count": len(user_forecasts),
+    }
+
+
+@router.post("/training-plans")
+def create_training_plan(
+    payload: TrainingPlanCreate,
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Create a new training plan."""
+    # Check for duplicate name
+    existing = (
+        session.query(TrainingPlan)
+        .filter(TrainingPlan.user_id == current_user.id, TrainingPlan.name == payload.name)
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="A plan with this name already exists")
+    plan = TrainingPlan(
+        user_id=current_user.id,
+        name=payload.name,
+        target_role=payload.target_role,
+        notes=payload.notes,
+    )
+    session.add(plan)
+    session.commit()
+    session.refresh(plan)
+    return _plan_to_dict(plan, [])
+
+
+@router.put("/training-plans/{plan_id}")
+def update_training_plan(
+    plan_id: int,
+    payload: TrainingPlanUpdate,
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Update a training plan's metadata."""
+    plan = (
+        session.query(TrainingPlan)
+        .filter(TrainingPlan.id == plan_id, TrainingPlan.user_id == current_user.id)
+        .first()
+    )
+    if not plan:
+        raise HTTPException(status_code=404, detail="Training plan not found")
+    if payload.name is not None:
+        plan.name = payload.name
+    if payload.target_role is not None:
+        plan.target_role = payload.target_role
+    if payload.status is not None:
+        if payload.status not in ("draft", "active", "completed", "archived"):
+            raise HTTPException(status_code=400, detail="Invalid status")
+        plan.status = payload.status
+    if payload.notes is not None:
+        plan.notes = payload.notes
+    session.commit()
+    items = (
+        session.query(TrainingPlanItem)
+        .filter(TrainingPlanItem.plan_id == plan.id)
+        .order_by(TrainingPlanItem.priority, TrainingPlanItem.id)
+        .all()
+    )
+    return _plan_to_dict(plan, items)
+
+
+@router.delete("/training-plans/{plan_id}")
+def delete_training_plan(
+    plan_id: int,
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Delete a training plan and all its items."""
+    plan = (
+        session.query(TrainingPlan)
+        .filter(TrainingPlan.id == plan_id, TrainingPlan.user_id == current_user.id)
+        .first()
+    )
+    if not plan:
+        raise HTTPException(status_code=404, detail="Training plan not found")
+    session.query(TrainingPlanItem).filter(TrainingPlanItem.plan_id == plan_id).delete()
+    session.delete(plan)
+    session.commit()
+    return {"status": "ok"}
+
+
+@router.post("/training-plans/{plan_id}/items")
+def add_plan_items(
+    plan_id: int,
+    payload: TrainingPlanItemBulkAdd,
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Add certifications/items to a training plan."""
+    plan = (
+        session.query(TrainingPlan)
+        .filter(TrainingPlan.id == plan_id, TrainingPlan.user_id == current_user.id)
+        .first()
+    )
+    if not plan:
+        raise HTTPException(status_code=404, detail="Training plan not found")
+    # Get current max priority
+    max_pri = (
+        session.query(func.max(TrainingPlanItem.priority))
+        .filter(TrainingPlanItem.plan_id == plan_id)
+        .scalar()
+    ) or 0
+    added = 0
+    for item in payload.items:
+        # Skip duplicates within the same plan
+        exists = (
+            session.query(TrainingPlanItem)
+            .filter(
+                TrainingPlanItem.plan_id == plan_id,
+                TrainingPlanItem.cert_name == item.cert_name,
+            )
+            .first()
+        )
+        if exists:
+            continue
+        max_pri += 1
+        target_d = date.fromisoformat(item.target_date) if item.target_date else None
+        session.add(TrainingPlanItem(
+            plan_id=plan_id,
+            cert_name=item.cert_name,
+            provider=item.provider,
+            price=item.price,
+            difficulty=item.difficulty,
+            funding_type=item.funding_type,
+            priority=max_pri,
+            target_date=target_d,
+            notes=item.notes,
+        ))
+        added += 1
+    session.commit()
+    items = (
+        session.query(TrainingPlanItem)
+        .filter(TrainingPlanItem.plan_id == plan.id)
+        .order_by(TrainingPlanItem.priority, TrainingPlanItem.id)
+        .all()
+    )
+    return _plan_to_dict(plan, items)
+
+
+@router.put("/training-plans/{plan_id}/items/{item_id}")
+def update_plan_item(
+    plan_id: int,
+    item_id: int,
+    payload: TrainingPlanItemUpdate,
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Update a single training plan item (status, funding, etc.)."""
+    plan = (
+        session.query(TrainingPlan)
+        .filter(TrainingPlan.id == plan_id, TrainingPlan.user_id == current_user.id)
+        .first()
+    )
+    if not plan:
+        raise HTTPException(status_code=404, detail="Training plan not found")
+    item = (
+        session.query(TrainingPlanItem)
+        .filter(TrainingPlanItem.id == item_id, TrainingPlanItem.plan_id == plan_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if payload.status is not None:
+        if payload.status not in ("planned", "in_progress", "completed", "skipped"):
+            raise HTTPException(status_code=400, detail="Invalid item status")
+        item.status = payload.status
+        if payload.status == "completed":
+            item.completed_at = datetime.utcnow()
+        elif payload.status != "completed":
+            item.completed_at = None
+    if payload.funding_type is not None:
+        item.funding_type = payload.funding_type
+    if payload.priority is not None:
+        item.priority = payload.priority
+    if payload.target_date is not None:
+        item.target_date = date.fromisoformat(payload.target_date) if payload.target_date else None
+    if payload.notes is not None:
+        item.notes = payload.notes
+    session.commit()
+    items = (
+        session.query(TrainingPlanItem)
+        .filter(TrainingPlanItem.plan_id == plan.id)
+        .order_by(TrainingPlanItem.priority, TrainingPlanItem.id)
+        .all()
+    )
+    return _plan_to_dict(plan, items)
+
+
+@router.delete("/training-plans/{plan_id}/items/{item_id}")
+def delete_plan_item(
+    plan_id: int,
+    item_id: int,
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Remove a single item from a training plan."""
+    plan = (
+        session.query(TrainingPlan)
+        .filter(TrainingPlan.id == plan_id, TrainingPlan.user_id == current_user.id)
+        .first()
+    )
+    if not plan:
+        raise HTTPException(status_code=404, detail="Training plan not found")
+    item = (
+        session.query(TrainingPlanItem)
+        .filter(TrainingPlanItem.id == item_id, TrainingPlanItem.plan_id == plan_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    session.delete(item)
+    session.commit()
+    items = (
+        session.query(TrainingPlanItem)
+        .filter(TrainingPlanItem.plan_id == plan.id)
+        .order_by(TrainingPlanItem.priority, TrainingPlanItem.id)
+        .all()
+    )
+    return _plan_to_dict(plan, items)

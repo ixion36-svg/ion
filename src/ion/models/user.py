@@ -54,6 +54,9 @@ class User(Base, TimestampMixin):
     failed_login_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
+    # Employment classification (cs = civil servant, contractor, military, other)
+    employment_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default="cs")
+
     # Relationships
     roles: Mapped[List["Role"]] = relationship(
         "Role", secondary=user_roles, back_populates="users"

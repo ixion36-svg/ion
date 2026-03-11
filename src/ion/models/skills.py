@@ -1,4 +1,4 @@
-"""Skills assessment, SOC-CMM alignment, and team schedule models."""
+"""Skills assessment, SOC-CMM alignment, team schedule, and training plan models."""
 
 from datetime import date, datetime
 from typing import Optional
@@ -103,6 +103,41 @@ class SOCCMMAssessment(Base, TimestampMixin):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     assessed_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     assessed_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+
+class TrainingPlan(Base, TimestampMixin):
+    """A user's personal training plan with selected certifications and cost tracking."""
+
+    __tablename__ = "training_plans"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_user_plan_name"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    target_role: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")  # draft, active, completed, archived
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class TrainingPlanItem(Base, TimestampMixin):
+    """Individual certification or training item within a training plan."""
+
+    __tablename__ = "training_plan_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    plan_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    cert_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    provider: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    price: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    difficulty: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # beginner, intermediate, advanced, expert
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="planned")  # planned, in_progress, completed, skipped
+    funding_type: Mapped[str] = mapped_column(String(20), nullable=False, default="tbd")  # company, self, split, tbd
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # ordering
+    target_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
 class KnowledgeArticle(Base, TimestampMixin):

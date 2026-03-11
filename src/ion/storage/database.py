@@ -159,12 +159,13 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: analyst_notes.folder_id")
 
-    # Migrations for users table — account lockout columns
+    # Migrations for users table — account lockout columns + employment type
     if insp.has_table("users"):
         existing = {col["name"] for col in insp.get_columns("users")}
         for col_name, col_type in {
             "failed_login_attempts": "INTEGER DEFAULT 0",
             "locked_until": "DATETIME",
+            "employment_type": "VARCHAR(20) DEFAULT 'cs'",
         }.items():
             if col_name not in existing:
                 with engine.begin() as conn:

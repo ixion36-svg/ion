@@ -90,6 +90,8 @@ from ion.models.skills import (
     TeamCertification,
     SOCCMMAssessment,
     KnowledgeArticle,
+    TrainingPlan,
+    TrainingPlanItem,
 )
 from ion.models.analyst_note import AnalystNote
 from ion.models.note_folder import NoteFolder
@@ -177,6 +179,9 @@ __all__ = [
     "TeamCertification",
     "SOCCMMAssessment",
     "KnowledgeArticle",
+    # Training plan models
+    "TrainingPlan",
+    "TrainingPlanItem",
     # Analyst notepad
     "AnalystNote",
     "NoteFolder",

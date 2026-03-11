@@ -842,9 +842,9 @@ function displayIndices(data) {
     tbody.innerHTML = data.indices.map(idx => `
         <tr>
             <td class="clickable" onclick="loadMappings('${idx.name}')">${idx.name}</td>
-            <td><span class="health-${idx.health}">${idx.health}</span></td>
-            <td>${idx.doc_count.toLocaleString()}</td>
-            <td>${idx.size}</td>
+            <td><span class="health-${idx.health || 'unknown'}">${idx.health || '-'}</span></td>
+            <td>${(idx.doc_count != null ? idx.doc_count : 0).toLocaleString()}</td>
+            <td>${idx.size || '-'}</td>
             <td>
                 <button class="btn btn-sm" onclick="loadMappings('${idx.name}')">Fields</button>
                 <button class="btn btn-sm" onclick="searchIndex('${idx.name}')">Search</button>
@@ -1110,11 +1110,16 @@ function escapeHtml(text) {
 }
 
 function showToast(message, type = 'info') {
-    // Use existing toast function if available
-    if (typeof window.showToast === 'function') {
-        window.showToast(message, type);
-    } else {
-        alert(message);
+    const container = document.getElementById('toast-container');
+    if (container) {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.style.animation = 'slideIn 0.3s ease reverse';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 }
 
