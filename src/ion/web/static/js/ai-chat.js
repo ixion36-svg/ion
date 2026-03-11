@@ -288,6 +288,7 @@ async function streamAIResponse() {
     const response = await fetch('/api/ai/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
             messages: aiMessages.map(m => ({ role: m.role, content: m.content })),
             context_type: aiContextType,

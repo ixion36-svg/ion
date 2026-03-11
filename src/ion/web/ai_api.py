@@ -143,6 +143,58 @@ async def get_ai_status(current_user: User = Depends(get_current_user)):
     return StatusResponse(**status)
 
 
+@router.get("/diagnostic")
+async def ai_diagnostic(current_user: User = Depends(get_current_user)):
+    """Diagnostic endpoint: check all AI chat dependencies without making a real request."""
+    checks = {}
+
+    # 1. Ollama service init
+    try:
+        service = get_ollama_service()
+        checks["ollama_init"] = {"ok": True, "url": service.base_url, "model": service.default_model}
+    except Exception as e:
+        checks["ollama_init"] = {"ok": False, "error": str(e)}
+        return {"checks": checks}
+
+    # 2. Ollama connectivity
+    try:
+        available = await service.is_available()
+        checks["ollama_available"] = {"ok": available}
+    except Exception as e:
+        checks["ollama_available"] = {"ok": False, "error": str(e)}
+
+    # 3. Database / AI preferences
+    try:
+        for db in get_session():
+            ctx_service = AIContextService(db)
+            prefs = ctx_service.get_user_preferences(current_user.id)
+            checks["db_preferences"] = {
+                "ok": True,
+                "rag_kb": prefs.rag_knowledge_base,
+                "rag_notes": prefs.rag_user_notes,
+                "rag_playbooks": prefs.rag_playbooks,
+            }
+    except Exception as e:
+        checks["db_preferences"] = {"ok": False, "error": str(e)}
+
+    # 4. Quick Ollama chat test (non-streaming, tiny prompt)
+    try:
+        if checks.get("ollama_available", {}).get("ok"):
+            result = await service.chat(
+                messages=[{"role": "user", "content": "ping"}],
+                context_type="default",
+                temperature=0.1,
+                max_tokens=5,
+                user_id=current_user.id,
+            )
+            checks["ollama_chat"] = {"ok": True, "model": result.get("model")}
+    except Exception as e:
+        checks["ollama_chat"] = {"ok": False, "error": str(e)}
+
+    all_ok = all(c.get("ok", False) for c in checks.values())
+    return {"status": "ok" if all_ok else "error", "checks": checks}
+
+
 @router.get("/queue")
 async def get_queue_status(current_user: User = Depends(get_current_user)):
     """Get AI request queue status."""
@@ -224,6 +276,9 @@ async def chat(
         )
     except OllamaError as e:
         raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error("AI chat error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"AI chat error: {e}")
 
 
 @router.post("/chat/stream")
@@ -234,10 +289,20 @@ async def chat_stream(
     current_user: User = Depends(get_current_user),
 ):
     """Send a chat message to the AI (streaming response)."""
-    service = get_ollama_service()
+    try:
+        service = get_ollama_service()
+    except Exception as e:
+        logger.error("Failed to initialize Ollama service: %s", e, exc_info=True)
+        raise HTTPException(status_code=503, detail=f"AI service initialization failed: {e}")
 
     # Check if service is available
-    if not await service.is_available():
+    try:
+        available = await service.is_available()
+    except Exception as e:
+        logger.error("Failed to check Ollama availability: %s", e, exc_info=True)
+        raise HTTPException(status_code=503, detail=f"AI service check failed: {e}")
+
+    if not available:
         raise HTTPException(
             status_code=503,
             detail="AI service (Ollama) is not available. Please ensure Ollama is running.",
@@ -295,7 +360,7 @@ async def chat_stream(
                     + f"\nUser's custom instructions: {prefs.custom_instructions}"
                 )
     except Exception as e:
-        logger.warning("RAG context retrieval failed, continuing without: %s", e)
+        logger.warning("RAG context retrieval failed, continuing without: %s", e, exc_info=True)
 
     async def generate():
         try:
@@ -329,7 +394,8 @@ async def chat_stream(
                 yield f"data: {json.dumps({'citations': citations_metadata})}\n\n"
 
             yield "data: [DONE]\n\n"
-        except OllamaError as e:
+        except Exception as e:
+            logger.error("AI chat stream error: %s", e, exc_info=True)
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(

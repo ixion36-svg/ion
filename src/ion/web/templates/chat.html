@@ -1893,7 +1893,12 @@
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                let detail = `HTTP ${response.status}`;
+                try {
+                    const errBody = await response.json();
+                    if (errBody.detail) detail += `: ${errBody.detail}`;
+                } catch {}
+                throw new Error(detail);
             }
 
             // Create assistant message container
@@ -1920,7 +1925,9 @@
 
                         try {
                             const parsed = JSON.parse(data);
-                            if (parsed.citations) {
+                            if (parsed.error) {
+                                throw new Error(parsed.error);
+                            } else if (parsed.citations) {
                                 pendingCitations = parsed.citations;
                             } else if (parsed.content) {
                                 fullResponse += parsed.content;
@@ -1928,7 +1935,10 @@
                                 scrollPageToBottom();
                             }
                         } catch (e) {
-                            // Not JSON
+                            if (e.message && !e.message.includes('JSON')) {
+                                throw e; // Re-throw real errors
+                            }
+                            // Skip invalid JSON
                         }
                     }
                 }
@@ -1951,7 +1961,8 @@
 
         } catch (error) {
             console.error('AI chat error:', error);
-            addPageMessage('assistant', 'Sorry, I encountered an error. Please try again.');
+            const errMsg = error.message || 'Unknown error';
+            addPageMessage('assistant', `Sorry, I encountered an error: ${errMsg}`);
         } finally {
             aiIsStreaming = false;
             document.getElementById('ai-page-typing').style.display = 'none';
