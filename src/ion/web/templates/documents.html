@@ -138,7 +138,9 @@
             </div>
 
             <div id="edit-view" class="document-content" style="display: none;">
-                <textarea id="edit-content" class="edit-textarea" rows="20"></textarea>
+                <div id="edit-quill-wrap" class="doc-quill-wrap">
+                    <div id="edit-quill-editor"></div>
+                </div>
             </div>
 
             <div id="rewrite-view" class="document-content" style="display: none;">
@@ -574,6 +576,24 @@
     max-height: 300px;
     overflow-y: auto;
 }
+/* Document Quill editor */
+.doc-quill-wrap { display: flex; flex-direction: column; min-height: 400px; }
+.doc-quill-wrap .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--border-color, #30363d); background: var(--bg-secondary, #161b22); }
+.doc-quill-wrap .ql-container.ql-snow { border: none; flex: 1; overflow-y: auto; max-height: 60vh; }
+.doc-quill-wrap .ql-editor { color: var(--text-primary, #f0f6fc); font-size: 0.875rem; line-height: 1.7; min-height: 300px; }
+.doc-quill-wrap .ql-editor.ql-blank::before { color: var(--text-secondary, #8b949e); font-style: normal; }
+.doc-quill-wrap .ql-snow .ql-stroke { stroke: var(--text-secondary, #8b949e); }
+.doc-quill-wrap .ql-snow .ql-fill { fill: var(--text-secondary, #8b949e); }
+.doc-quill-wrap .ql-snow .ql-picker-label { color: var(--text-secondary, #8b949e); }
+.doc-quill-wrap .ql-snow .ql-picker-options { background: var(--bg-primary, #0d1117); border-color: var(--border-color, #30363d); }
+.doc-quill-wrap .ql-snow .ql-picker-item { color: var(--text-primary, #f0f6fc); }
+.doc-quill-wrap .ql-snow button:hover .ql-stroke { stroke: var(--accent, #00e5ff); }
+.doc-quill-wrap .ql-snow .ql-picker-label:hover { color: var(--accent, #00e5ff); }
+.doc-quill-wrap .ql-editor h1, .doc-quill-wrap .ql-editor h2, .doc-quill-wrap .ql-editor h3 { color: var(--text-primary, #f0f6fc); }
+.doc-quill-wrap .ql-editor pre.ql-syntax { background: var(--bg-secondary, #161b22); border: 1px solid var(--border-color, #30363d); border-radius: 6px; padding: 0.75rem; }
+.doc-quill-wrap .ql-editor blockquote { border-left: 3px solid var(--accent, #00e5ff); padding-left: 1rem; color: var(--text-secondary, #8b949e); }
+.doc-quill-wrap .ql-editor a { color: var(--accent, #00e5ff); }
+.doc-quill-wrap .ql-editor code { background: var(--bg-secondary, #161b22); padding: 2px 5px; border-radius: 3px; font-size: 0.8125rem; }
 </style>
 <script>
 {% raw %}
@@ -585,6 +605,7 @@ let currentDocVersion = 1;
 let currentDocInputData = null;
 let allDocuments = [];
 let allCollections = [];
+let docQuillEditor = null;
 let allTags = [];
 let selectedFolderId = null;
 let kbCollectionIds = new Set();
@@ -592,6 +613,38 @@ let moveDocumentId = null;
 let pendingAmendmentContent = '';
 let previewVersionNumber = null;
 let currentDocTags = [];
+let docQuillInitialHtml = '';
+
+function initDocQuillEditor(content, format) {
+    // Destroy previous instance
+    const container = document.getElementById('edit-quill-wrap');
+    container.innerHTML = '<div id="edit-quill-editor"></div>';
+    docQuillEditor = null;
+
+    // Convert markdown content to HTML for the editor
+    let htmlContent = content || '';
+    if (format === 'markdown' && typeof marked !== 'undefined') {
+        htmlContent = safeMarkdown(content);
+    }
+
+    docQuillEditor = new Quill('#edit-quill-editor', {
+        theme: 'snow',
+        modules: {
+            toolbar: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                ['blockquote', 'code-block'],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                ['link'],
+                ['clean']
+            ]
+        },
+        placeholder: 'Edit document content...'
+    });
+
+    docQuillEditor.root.innerHTML = htmlContent;
+    docQuillInitialHtml = docQuillEditor.root.innerHTML;
+}
 
 async function loadDocuments() {
     try {
@@ -904,7 +957,7 @@ async function viewDocument(id) {
         // Render content based on format
         document.getElementById('rendered-view').innerHTML = renderContent(doc.rendered_content, doc.output_format);
         document.getElementById('modal-doc-content').textContent = doc.rendered_content;
-        document.getElementById('edit-content').value = doc.rendered_content;
+        initDocQuillEditor(doc.rendered_content, doc.output_format);
 
         // Reset to rendered view
         switchTab('rendered');
@@ -1243,10 +1296,10 @@ async function restoreDocument(id) {
 }
 
 function showAmendmentModal() {
-    pendingAmendmentContent = document.getElementById('edit-content').value;
+    pendingAmendmentContent = docQuillEditor ? docQuillEditor.root.innerHTML : '';
 
-    // Check if content actually changed
-    if (pendingAmendmentContent === currentDocContent) {
+    // Check if content actually changed (compare against initial Quill state)
+    if (pendingAmendmentContent === docQuillInitialHtml) {
         showToast('No changes to save', 'warning');
         return;
     }
@@ -1637,7 +1690,11 @@ document.getElementById('doc-copy-rewritten').addEventListener('click', function
 
 document.getElementById('doc-apply-to-edit').addEventListener('click', function() {
     const rewrittenText = document.getElementById('doc-rewritten-text').textContent;
-    document.getElementById('edit-content').value = rewrittenText;
+    if (docQuillEditor) {
+        // Convert markdown to HTML, then load into Quill
+        const html = (typeof marked !== 'undefined') ? safeMarkdown(rewrittenText) : rewrittenText;
+        docQuillEditor.root.innerHTML = html;
+    }
     switchTab('edit');
     showToast('Rewritten text applied to Edit tab', 'success');
 });
