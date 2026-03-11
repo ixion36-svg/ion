@@ -452,6 +452,7 @@ async def oidc_callback(
 
     try:
         # Exchange authorization code for tokens
+        logger.info(f"OIDC callback: exchanging code at {oidc_config.token_url} (redirect_uri={redirect_uri})")
         async with httpx.AsyncClient(verify=get_ssl_verify(oidc_config.verify_ssl)) as client:
             token_response = await client.post(
                 oidc_config.token_url,
@@ -469,9 +470,11 @@ async def oidc_callback(
             if token_response.status_code != 200:
                 error_data = token_response.json() if token_response.content else {}
                 error_msg = error_data.get("error_description", "Token exchange failed")
+                logger.warning(f"OIDC token exchange failed ({token_response.status_code}): {error_msg}")
                 return error_redirect(error_msg)
 
             tokens = token_response.json()
+            logger.info("OIDC callback: token exchange successful")
 
         # Validate the access token and extract user info
         from ion.auth.oidc import OIDCValidator, OIDCUserSync, OIDCValidationError
@@ -479,11 +482,13 @@ async def oidc_callback(
 
         validator = OIDCValidator(oidc_config)
         token_data = await validator.validate_token_async(tokens["access_token"])
+        logger.info(f"OIDC callback: token validated for {token_data.preferred_username} ({token_data.email})")
 
         # Sync user to ION database
         sync = OIDCUserSync(session, oidc_config)
         user = sync.sync_user(token_data)
         session.commit()
+        logger.info(f"OIDC callback: user synced — {user.username} (id={user.id})")
 
         # Create a ION session for the user
         ip_address = get_client_ip(request)
@@ -558,13 +563,17 @@ async def oidc_callback(
         return redirect_response
 
     except OIDCValidationError as e:
+        logger.warning(f"OIDC token validation failed: {e}")
         return error_redirect(f"Token validation failed: {e}")
-    except httpx.HTTPError:
+    except httpx.HTTPError as e:
+        logger.error(f"OIDC token exchange HTTP error: {e}", exc_info=True)
         return error_redirect("Authentication service unavailable")
     except ValueError as e:
         # User creation failed (auto-create disabled)
+        logger.warning(f"OIDC user sync failed: {e}")
         return error_redirect(str(e))
-    except Exception:
+    except Exception as e:
+        logger.error(f"Unexpected OIDC callback error: {e}", exc_info=True)
         return error_redirect("Authentication failed")
 
 

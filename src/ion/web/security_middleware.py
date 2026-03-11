@@ -58,7 +58,7 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
         "/api/security/",
         "/static/",
         "/login",
-        "/api/auth/login",
+        "/api/auth/",  # Auth endpoints (login, OIDC callback — codes/state params trigger false positives)
         "/api/extract/",  # Extract endpoints analyze user documents which may contain code
         "/extract",
         "/api/templates",  # Templates contain Jinja2 syntax like {{ }} which triggers patterns
