@@ -813,6 +813,67 @@ class ElasticsearchService:
             logger.warning("Failed to delete KFP %s from Elasticsearch: %s", kfp_id, e)
             return False
 
+    # ION triage status → Kibana alert workflow_status mapping
+    _WORKFLOW_STATUS_MAP = {
+        "open": "open",
+        "investigating": "acknowledged",
+        "escalated": "acknowledged",
+        "resolved": "closed",
+        "closed": "closed",
+        "false_positive": "closed",
+    }
+
+    async def update_alert_workflow_status(
+        self,
+        alert_ids: List[str],
+        ion_status: str,
+    ) -> bool:
+        """Update kibana.alert.workflow_status in Elasticsearch for one or more alerts.
+
+        Maps ION triage statuses to Kibana workflow statuses:
+          open → open, investigating/escalated → acknowledged,
+          resolved/closed/false_positive → closed
+
+        Uses _update_by_query to work across index patterns without needing
+        the exact index name for each alert.
+
+        Returns True on success, False on failure (logs warning, does not raise).
+        """
+        workflow_status = self._WORKFLOW_STATUS_MAP.get(ion_status)
+        if not workflow_status:
+            logger.warning("No workflow_status mapping for ION status: %s", ion_status)
+            return False
+
+        if not alert_ids:
+            return True
+
+        try:
+            body = {
+                "query": {"ids": {"values": alert_ids}},
+                "script": {
+                    "source": "ctx._source['kibana.alert.workflow_status'] = params.status",
+                    "lang": "painless",
+                    "params": {"status": workflow_status},
+                },
+            }
+            encoded_index = self.alert_index.replace(",", "%2C")
+            result = await self._request(
+                "POST",
+                f"/{encoded_index}/_update_by_query?conflicts=proceed&ignore_unavailable=true",
+                json=body,
+            )
+            updated = result.get("updated", 0)
+            logger.info(
+                "Updated workflow_status to '%s' for %d/%d alerts",
+                workflow_status, updated, len(alert_ids),
+            )
+            return True
+        except ElasticsearchError as e:
+            logger.warning(
+                "Failed to update alert workflow_status in ES: %s", e,
+            )
+            return False
+
     async def get_cluster_health(self) -> Dict[str, Any]:
         """Get Elasticsearch cluster health status."""
         if not self.is_configured:

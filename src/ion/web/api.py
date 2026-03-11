@@ -4347,6 +4347,16 @@ async def bulk_update_triage(
 
     session.commit()
 
+    # Sync workflow_status to Elasticsearch when bulk-updating status
+    if data.status:
+        try:
+            from ion.services.elasticsearch_service import ElasticsearchService
+            es = ElasticsearchService()
+            if es.is_configured:
+                await es.update_alert_workflow_status(data.alert_ids, data.status)
+        except Exception as e:
+            logger.warning(f"Failed to sync bulk workflow_status to ES: {e}")
+
     result = {
         "updated": updated,
         "alert_ids": data.alert_ids,
@@ -4421,8 +4431,10 @@ async def update_alert_triage(
         session.add(triage)
         session.flush()
 
+    status_changed = False
     if data.status is not None:
         triage.status = data.status
+        status_changed = True
     if data.assigned_to_id is not None:
         triage.assigned_to_id = data.assigned_to_id
     if data.priority is not None:
@@ -4469,6 +4481,17 @@ async def update_alert_triage(
         triage.mitre_techniques = validated_techniques
 
     session.commit()
+
+    # Sync workflow_status to Elasticsearch when triage status changes
+    if status_changed and data.status:
+        try:
+            from ion.services.elasticsearch_service import ElasticsearchService
+            es = ElasticsearchService()
+            if es.is_configured:
+                await es.update_alert_workflow_status([alert_id], data.status)
+        except Exception as e:
+            logger.warning(f"Failed to sync workflow_status to ES for {alert_id}: {e}")
+
     return {
         "id": triage.id,
         "es_alert_id": triage.es_alert_id,
@@ -4606,6 +4629,24 @@ async def close_alert(
         }
 
     session.commit()
+
+    # Sync workflow_status to Elasticsearch for closed alerts
+    try:
+        from ion.services.elasticsearch_service import ElasticsearchService
+        es = ElasticsearchService()
+        if es.is_configured:
+            # Collect all alert IDs that were closed (primary + sibling alerts in the case)
+            closed_alert_ids = [alert_id]
+            if case_closed and triage.case_id:
+                sibling_triages = session.query(AlertTriage).filter(
+                    AlertTriage.case_id == triage.case_id,
+                    AlertTriage.es_alert_id != alert_id,
+                ).all()
+                closed_alert_ids.extend(st.es_alert_id for st in sibling_triages)
+            status_str = new_status.value if hasattr(new_status, "value") else new_status
+            await es.update_alert_workflow_status(closed_alert_ids, status_str)
+    except Exception as e:
+        logger.warning(f"Failed to sync workflow_status to ES on alert close: {e}")
 
     # Sync KFP to ES and create document if one was created
     if kfp_created:
