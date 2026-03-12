@@ -336,6 +336,39 @@
 
     <!-- ==================== ADMIN DASHBOARD ==================== -->
     <div class="dashboard-grid admin-dashboard" id="admin-dashboard" style="display: none;">
+        <!-- Administration Quick Actions - Full Width -->
+        <section class="section" style="grid-column: 1 / -1;">
+            <div class="section-header">
+                <h2>Administration</h2>
+            </div>
+            <div class="action-grid">
+                <a href="/users" class="action-card">
+                    <div class="action-icon"><i class="icon-users"></i></div>
+                    <div class="action-label">Manage Users</div>
+                </a>
+                <a href="/settings" class="action-card">
+                    <div class="action-icon"><i class="icon-settings"></i></div>
+                    <div class="action-label">Settings</div>
+                </a>
+                <a href="/integrations" class="action-card">
+                    <div class="action-icon"><i class="icon-link"></i></div>
+                    <div class="action-label">Integrations</div>
+                </a>
+                <a href="/audit-logs" class="action-card">
+                    <div class="action-icon"><i class="icon-clipboard-list"></i></div>
+                    <div class="action-label">Audit Logs</div>
+                </a>
+                <a href="/security" class="action-card">
+                    <div class="action-icon"><i class="icon-shield"></i></div>
+                    <div class="action-label">Security</div>
+                </a>
+                <a href="/alerts" class="action-card action-card-danger">
+                    <div class="action-icon"><i class="icon-alert-triangle"></i></div>
+                    <div class="action-label">Alerts</div>
+                </a>
+            </div>
+        </section>
+
         <!-- Left Column -->
         <div class="dashboard-column">
             <!-- System Status -->
@@ -390,31 +423,6 @@
 
         <!-- Right Column -->
         <div class="dashboard-column">
-            <!-- Admin Quick Actions -->
-            <section class="section">
-                <div class="section-header">
-                    <h2>Administration</h2>
-                </div>
-                <div class="action-grid">
-                    <a href="/users" class="action-card">
-                        <div class="action-icon"><i class="icon-users"></i></div>
-                        <div class="action-label">Manage Users</div>
-                    </a>
-                    <a href="/audit-logs" class="action-card">
-                        <div class="action-icon"><i class="icon-clipboard-list"></i></div>
-                        <div class="action-label">Audit Logs</div>
-                    </a>
-                    <a href="/security" class="action-card">
-                        <div class="action-icon"><i class="icon-shield"></i></div>
-                        <div class="action-label">Security</div>
-                    </a>
-                    <a href="/alerts" class="action-card">
-                        <div class="action-icon"><i class="icon-alert-triangle"></i></div>
-                        <div class="action-label">Alerts</div>
-                    </a>
-                </div>
-            </section>
-
             <!-- Recent Documents -->
             <section class="section">
                 <div class="section-header">
