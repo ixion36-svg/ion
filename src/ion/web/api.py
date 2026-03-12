@@ -499,8 +499,6 @@ async def oidc_callback(
 
         # Create session token with session rotation
         from ion.storage.auth_repository import SessionRepository
-        import secrets
-        from datetime import datetime, timedelta
 
         session_repo = SessionRepository(session)
         audit_repo = AuditLogRepository(session)
@@ -3989,10 +3987,13 @@ async def escalate_case_to_dfir_iris(
     except HTTPException:
         raise
     except httpx.HTTPStatusError as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"DFIR-IRIS API error: HTTP {e.response.status_code} - {e.response.text[:200]}",
-        )
+        # Surface the clearer auth-failure messages from the service
+        msg = str(e)
+        if "authentication failed" in msg.lower() or "login page" in msg.lower():
+            detail = msg
+        else:
+            detail = f"DFIR-IRIS API error: HTTP {e.response.status_code} - {e.response.text[:200]}"
+        raise HTTPException(status_code=502, detail=detail)
     except httpx.ConnectError as e:
         raise HTTPException(
             status_code=502,

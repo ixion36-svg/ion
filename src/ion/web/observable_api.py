@@ -83,6 +83,7 @@ class AlertSummary(BaseModel):
     status: str
     priority: Optional[str] = None
     created_at: str
+    context: Optional[str] = None  # field role: source_ip, target_user, etc.
 
 
 class CaseSummary(BaseModel):
@@ -599,19 +600,20 @@ async def get_observable_alerts(
     if not observable:
         raise HTTPException(status_code=404, detail="Observable not found")
 
-    alerts = service.get_related_alerts(observable_id, limit=limit)
+    results = service.get_related_alerts_with_context(observable_id, limit=limit)
     return {
         "alerts": [
             AlertSummary(
-                id=a.id,
-                es_alert_id=a.es_alert_id,
-                status=a.status.value if hasattr(a.status, 'value') else a.status,
-                priority=a.priority,
-                created_at=a.created_at.isoformat(),
+                id=r["alert"].id,
+                es_alert_id=r["alert"].es_alert_id,
+                status=r["alert"].status.value if hasattr(r["alert"].status, 'value') else r["alert"].status,
+                priority=r["alert"].priority,
+                created_at=r["alert"].created_at.isoformat(),
+                context=r["context"],
             )
-            for a in alerts
+            for r in results
         ],
-        "total": len(alerts),
+        "total": len(results),
     }
 
 

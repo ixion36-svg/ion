@@ -1782,7 +1782,7 @@ async function escalateCase(caseId) {
     if (!confirm('Escalate this case to DFIR-IRIS?')) return;
 
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/escalate-iris', {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/escalate/dfir-iris', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         });

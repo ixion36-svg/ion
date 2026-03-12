@@ -52,7 +52,7 @@ class CollectionRepository:
             .options(joinedload(Collection.templates))
             .where(Collection.name == name)
         )
-        return self.session.execute(stmt).unique().scalar_one_or_none()
+        return self.session.execute(stmt).unique().scalars().first()
 
     def get_by_name_and_parent(self, name: str, parent_id: int | None) -> Optional[Collection]:
         """Get a collection by name within a specific parent folder."""

@@ -1146,6 +1146,24 @@ sha256,abc123...,c2,</pre>
     from { opacity: 1; }
     to { opacity: 0; }
 }
+
+.context-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    margin-left: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    vertical-align: middle;
+}
+.context-badge.ctx-source { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+.context-badge.ctx-dest   { background: rgba(249, 115, 22, 0.15); color: #fb923c; }
+.context-badge.ctx-subject { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+.context-badge.ctx-target { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.context-badge.ctx-host   { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+.context-badge.ctx-generic { background: rgba(156, 163, 175, 0.15); color: #9ca3af; }
 </style>
 
 {% raw %}
@@ -1520,6 +1538,7 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
                     <div class="related-item">
                         <div>
                             <span style="font-family: monospace; font-size: 0.75rem;">${escapeHtml(a.es_alert_id.substring(0, 20))}...</span>
+                            ${a.context ? formatContext(a.context) : ''}
                         </div>
                         <div>
                             <span class="threat-badge ${a.priority || 'unknown'}">${a.priority || 'N/A'}</span>
@@ -2047,6 +2066,52 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+const CONTEXT_LABELS = {
+    source_ip: ['Source IP', 'ctx-source'],
+    destination_ip: ['Dest IP', 'ctx-dest'],
+    host_ip: ['Host IP', 'ctx-host'],
+    hostname: ['Host', 'ctx-host'],
+    source_hostname: ['Source Host', 'ctx-source'],
+    destination_hostname: ['Dest Host', 'ctx-dest'],
+    subject_user: ['Subject User', 'ctx-subject'],
+    target_user: ['Target User', 'ctx-target'],
+    user_account: ['User', 'ctx-generic'],
+    subject_domain: ['Subject Domain', 'ctx-subject'],
+    target_domain: ['Target Domain', 'ctx-target'],
+    source_port: ['Src Port', 'ctx-source'],
+    destination_port: ['Dst Port', 'ctx-dest'],
+    process_name: ['Process', 'ctx-generic'],
+    process_path: ['Process Path', 'ctx-generic'],
+    parent_process: ['Parent Proc', 'ctx-generic'],
+    parent_process_path: ['Parent Path', 'ctx-generic'],
+    command_line: ['Cmdline', 'ctx-generic'],
+    process_id: ['PID', 'ctx-generic'],
+    file_path: ['File', 'ctx-generic'],
+    rule_name: ['Rule', 'ctx-generic'],
+    alert_reason: ['Reason', 'ctx-generic'],
+    severity: ['Severity', 'ctx-generic'],
+    risk_score: ['Risk', 'ctx-generic'],
+    event_action: ['Action', 'ctx-generic'],
+    event_category: ['Category', 'ctx-generic'],
+    event_outcome: ['Outcome', 'ctx-generic'],
+    event_id: ['Event ID', 'ctx-generic'],
+    logon_type: ['Logon Type', 'ctx-generic'],
+    mitre_technique: ['MITRE Tech', 'ctx-generic'],
+    mitre_technique_name: ['MITRE Name', 'ctx-generic'],
+    mitre_tactic: ['MITRE Tactic', 'ctx-generic'],
+};
+
+function formatContext(ctx) {
+    if (!ctx) return '';
+    const entry = CONTEXT_LABELS[ctx];
+    if (entry) {
+        return `<span class="context-badge ${entry[1]}">${entry[0]}</span>`;
+    }
+    // Fallback: replace underscores and title-case
+    const label = ctx.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return `<span class="context-badge ctx-generic">${escapeHtml(label)}</span>`;
 }
 
 // =============================================================================

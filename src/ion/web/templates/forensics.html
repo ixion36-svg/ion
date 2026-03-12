@@ -1,0 +1,1567 @@
+{% extends "base.html" %}
+
+{% block title %}Forensics - ION{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div>
+        <h1>Forensic Investigations</h1>
+        <p class="subtitle" style="color:var(--text-secondary);margin:4px 0 0;">Chain of custody, evidence tracking, and investigation management</p>
+    </div>
+    <button class="btn btn-primary" id="btn-new-investigation" onclick="showNewCaseModal()">+ New Investigation</button>
+</div>
+
+<!-- Metric Tiles -->
+<div class="fr-tiles">
+    <div class="fr-tile fr-tile-blue">
+        <div class="fr-tile-value" id="stat-intake">0</div>
+        <div class="fr-tile-label">Intake</div>
+    </div>
+    <div class="fr-tile fr-tile-cyan">
+        <div class="fr-tile-value" id="stat-active">0</div>
+        <div class="fr-tile-label">Active Investigations</div>
+    </div>
+    <div class="fr-tile fr-tile-red">
+        <div class="fr-tile-value" id="stat-overdue">0</div>
+        <div class="fr-tile-label">SLA Overdue</div>
+    </div>
+    <div class="fr-tile fr-tile-green">
+        <div class="fr-tile-value" id="stat-closed">0</div>
+        <div class="fr-tile-label">Closed</div>
+    </div>
+    <div class="fr-tile fr-tile-purple">
+        <div class="fr-tile-value" id="stat-evidence">0</div>
+        <div class="fr-tile-label">Evidence Items</div>
+    </div>
+    <div class="fr-tile fr-tile-amber">
+        <div class="fr-tile-value" id="stat-locked">0</div>
+        <div class="fr-tile-label">Locked</div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="fr-tabs">
+    <button class="fr-tab active" data-tab="pipeline" onclick="switchTab('pipeline')">Investigation Pipeline</button>
+    <button class="fr-tab" data-tab="investigations" onclick="switchTab('investigations')">All Investigations</button>
+    <button class="fr-tab" data-tab="evidence" onclick="switchTab('evidence')">Evidence Tracker</button>
+    <button class="fr-tab" data-tab="playbooks" onclick="switchTab('playbooks')">Forensic Playbooks</button>
+    <button class="fr-tab" data-tab="reference" onclick="switchTab('reference')">Reference Docs</button>
+</div>
+
+<!-- ==================== PIPELINE TAB (Stage Kanban) ==================== -->
+<div class="fr-panel" id="panel-pipeline">
+    <div class="fr-pipeline">
+        <div class="fr-stage" data-status="intake">
+            <div class="fr-stage-header fr-stage-intake"><span>Intake</span><span class="fr-stage-count" id="pipe-intake">0</span></div>
+            <div class="fr-stage-cards" id="pipe-col-intake"></div>
+        </div>
+        <div class="fr-stage" data-status="evidence_collection">
+            <div class="fr-stage-header fr-stage-evidence"><span>Evidence Collection</span><span class="fr-stage-count" id="pipe-evidence_collection">0</span></div>
+            <div class="fr-stage-cards" id="pipe-col-evidence_collection"></div>
+        </div>
+        <div class="fr-stage" data-status="analysis">
+            <div class="fr-stage-header fr-stage-analysis"><span>Analysis</span><span class="fr-stage-count" id="pipe-analysis">0</span></div>
+            <div class="fr-stage-cards" id="pipe-col-analysis"></div>
+        </div>
+        <div class="fr-stage" data-status="reporting">
+            <div class="fr-stage-header fr-stage-reporting"><span>Reporting</span><span class="fr-stage-count" id="pipe-reporting">0</span></div>
+            <div class="fr-stage-cards" id="pipe-col-reporting"></div>
+        </div>
+        <div class="fr-stage" data-status="review">
+            <div class="fr-stage-header fr-stage-review"><span>Review</span><span class="fr-stage-count" id="pipe-review">0</span></div>
+            <div class="fr-stage-cards" id="pipe-col-review"></div>
+        </div>
+        <div class="fr-stage" data-status="closed">
+            <div class="fr-stage-header fr-stage-closed"><span>Closed</span><span class="fr-stage-count" id="pipe-closed">0</span></div>
+            <div class="fr-stage-cards" id="pipe-col-closed"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== ALL INVESTIGATIONS TAB ==================== -->
+<div class="fr-panel" id="panel-investigations" style="display:none;">
+    <div class="cases-filters-bar">
+        <input type="text" id="filter-search" class="cases-filter-input" placeholder="Search case number or title..." oninput="debouncedFilter()">
+        <select id="filter-status" class="cases-filter-select" onchange="loadCases()">
+            <option value="">All Statuses</option>
+            <option value="intake">Intake</option>
+            <option value="evidence_collection">Evidence Collection</option>
+            <option value="analysis">Analysis</option>
+            <option value="reporting">Reporting</option>
+            <option value="review">Review</option>
+            <option value="closed">Closed</option>
+        </select>
+        <select id="filter-type" class="cases-filter-select" onchange="loadCases()"></select>
+        <select id="filter-priority" class="cases-filter-select" onchange="loadCases()">
+            <option value="">All Priorities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+        </select>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="cases-table">
+            <thead><tr><th>Case #</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Lead</th><th>Progress</th><th>SLA</th><th>Lock</th><th>Created</th></tr></thead>
+            <tbody id="cases-tbody"></tbody>
+        </table>
+        <div class="empty-state" id="cases-empty" style="display:none;">No investigations found</div>
+    </div>
+</div>
+
+<!-- ==================== EVIDENCE TAB ==================== -->
+<div class="fr-panel" id="panel-evidence" style="display:none;">
+    <div class="cases-filters-bar">
+        <select id="evidence-case-select" class="cases-filter-select" onchange="loadEvidenceForCase()"><option value="">Select an investigation...</option></select>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="evidence-table">
+            <thead><tr><th>Evidence #</th><th>Name</th><th>Type</th><th>Status</th><th>Hashes</th><th>Storage</th><th>Collected By</th><th>Custody</th><th>Actions</th></tr></thead>
+            <tbody id="evidence-tbody"></tbody>
+        </table>
+        <div class="empty-state" id="evidence-empty">Select an investigation to view evidence</div>
+    </div>
+</div>
+
+<!-- ==================== PLAYBOOKS TAB ==================== -->
+<div class="fr-panel" id="panel-playbooks" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <select id="pb-filter-type" class="cases-filter-select" onchange="loadPlaybooks()"><option value="">All Types</option></select>
+        <button class="btn btn-primary" onclick="showNewPlaybookModal()">+ New Playbook</button>
+    </div>
+    <div class="table-container">
+        <table class="data-table" id="playbooks-table">
+            <thead><tr><th>Name</th><th>Investigation Type</th><th>Steps</th><th>Active</th><th>Created By</th><th>Actions</th></tr></thead>
+            <tbody id="playbooks-tbody"></tbody>
+        </table>
+        <div class="empty-state" id="playbooks-empty" style="display:none;">No forensic playbooks found</div>
+    </div>
+</div>
+
+<!-- ==================== REFERENCE DOCS TAB ==================== -->
+<div class="fr-panel" id="panel-reference" style="display:none;">
+    <div class="fr-ref-grid" id="ref-docs-grid"></div>
+</div>
+
+<!-- ==================== MODALS ==================== -->
+
+<!-- New Investigation Modal (Wizard: playbook → details) -->
+<div class="modal-overlay" id="modal-new-case" style="display:none;">
+    <div class="modal-dialog" style="max-width:700px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-header"><h2>New Forensic Investigation</h2><button class="modal-close" onclick="closeModal('modal-new-case')">&times;</button></div>
+        <div class="modal-body">
+            <!-- Step 1: Select Playbook -->
+            <div id="nc-step-1">
+                <label>Select a Forensic Playbook</label>
+                <p style="color:var(--text-secondary);font-size:.8rem;margin:0 0 8px;">Choose a playbook to guide the investigation with pre-defined sections, or skip to create a blank investigation.</p>
+                <select id="nc-playbook" class="form-input" onchange="onPlaybookSelect()">
+                    <option value="">-- No Playbook (blank investigation) --</option>
+                </select>
+                <div id="nc-playbook-preview" style="margin-top:12px;display:none;">
+                    <div style="font-weight:600;font-size:.9rem;margin-bottom:6px;" id="nc-pb-name"></div>
+                    <div style="color:var(--text-secondary);font-size:.8rem;margin-bottom:8px;" id="nc-pb-desc"></div>
+                    <div id="nc-pb-steps" style="max-height:200px;overflow-y:auto;"></div>
+                </div>
+            </div>
+            <hr style="border:0;border-top:1px solid var(--border-color,#30363d);margin:16px 0;">
+            <!-- Step 2: Case Details -->
+            <div id="nc-step-2">
+                <label>Title *</label><input type="text" id="nc-title" class="form-input" placeholder="Investigation title">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div><label>Investigation Type *</label><select id="nc-type" class="form-input"></select></div>
+                    <div><label>Priority</label>
+                    <select id="nc-priority" class="form-input"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div><label>Lead Investigator</label><select id="nc-lead" class="form-input"><option value="">Unassigned</option></select></div>
+                    <div><label>Classification</label><input type="text" id="nc-classification" class="form-input" placeholder="e.g. TLP:RED"></div>
+                </div>
+                <label>Description</label><textarea id="nc-description" class="form-input" rows="3" placeholder="Describe the investigation..."></textarea>
+                <label>Link to SOC Case (optional)</label><input type="number" id="nc-alert-case" class="form-input" placeholder="Alert Case ID">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-new-case')">Cancel</button>
+            <button class="btn btn-primary" onclick="createCase()">Create Investigation</button>
+        </div>
+    </div>
+</div>
+
+<!-- Case Detail Modal -->
+<div class="modal-overlay" id="modal-case-detail" style="display:none;">
+    <div class="modal-dialog" style="max-width:960px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-header">
+            <h2 id="cd-title">Investigation Detail</h2>
+            <button class="modal-close" onclick="closeModal('modal-case-detail')">&times;</button>
+        </div>
+        <div class="modal-body" id="cd-body">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+                <span class="badge" id="cd-status-badge"></span>
+                <span class="badge" id="cd-priority-badge"></span>
+                <span id="cd-case-number" style="color:var(--text-secondary);font-size:.85rem;"></span>
+                <span id="cd-type" style="color:var(--text-secondary);font-size:.85rem;"></span>
+                <span id="cd-playbook-name" style="color:var(--accent,#00e5ff);font-size:.8rem;"></span>
+                <span id="cd-lock-indicator" style="font-size:.8rem;"></span>
+                <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
+                    <select id="cd-status-select" class="form-input" style="width:auto;padding:4px 8px;" onchange="updateCaseStatus()"></select>
+                    <button class="btn btn-secondary" style="padding:4px 10px;" id="cd-lock-btn" onclick="toggleLock()">Lock</button>
+                    <button class="btn btn-secondary" style="padding:4px 10px;" onclick="showCloseModal()">Close</button>
+                    <button class="btn btn-secondary" style="padding:4px 10px;" onclick="generateReport()">Report</button>
+                </div>
+            </div>
+            <!-- SLA Badges -->
+            <div id="cd-sla-badges" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
+            <!-- Progress bar -->
+            <div id="cd-progress-bar" style="margin-bottom:16px;display:none;">
+                <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-secondary);margin-bottom:4px;">
+                    <span id="cd-progress-label">Sections: 0/0</span>
+                    <span id="cd-progress-pct">0%</span>
+                </div>
+                <div style="background:var(--border-color,#30363d);border-radius:4px;height:6px;overflow:hidden;">
+                    <div id="cd-progress-fill" style="height:100%;background:var(--accent,#00e5ff);border-radius:4px;transition:width .3s;width:0%;"></div>
+                </div>
+            </div>
+            <div id="cd-description" style="margin-bottom:16px;color:var(--text-secondary);font-size:.85rem;"></div>
+            <!-- Sub-tabs: Sections is now the primary tab -->
+            <div class="fr-tabs" style="margin-bottom:12px;">
+                <button class="fr-tab active" onclick="switchDetailTab('sections')">Sections</button>
+                <button class="fr-tab" onclick="switchDetailTab('evidence')">Evidence</button>
+                <button class="fr-tab" onclick="switchDetailTab('timeline')">Timeline</button>
+                <button class="fr-tab" onclick="switchDetailTab('report')">Report</button>
+            </div>
+            <!-- Sections Tab (fillable investigation steps) -->
+            <div id="cd-tab-sections">
+                <div id="cd-sections-list"></div>
+                <button class="btn btn-secondary" style="margin-top:8px;" onclick="showAddStepModal()">+ Add Section</button>
+            </div>
+            <div id="cd-tab-evidence" style="display:none;">
+                <button class="btn btn-primary" style="margin-bottom:12px;" onclick="showAddEvidenceModal()">+ Add Evidence</button>
+                <div id="cd-evidence-list"></div>
+            </div>
+            <div id="cd-tab-timeline" style="display:none;">
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <input type="text" id="cd-note-input" class="form-input" placeholder="Add a timeline note..." style="flex:1;">
+                    <button class="btn btn-primary" onclick="addTimelineNote()">Add</button>
+                </div>
+                <div id="cd-timeline" style="max-height:400px;overflow-y:auto;"></div>
+            </div>
+            <div id="cd-tab-report" style="display:none;">
+                <div id="cd-report-content" style="white-space:pre-wrap;font-family:monospace;background:var(--bg-secondary);padding:16px;border-radius:8px;max-height:500px;overflow-y:auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Close Investigation Modal -->
+<div class="modal-overlay" id="modal-close-case" style="display:none;">
+    <div class="modal-dialog" style="max-width:600px;">
+        <div class="modal-header"><h2>Close Investigation</h2><button class="modal-close" onclick="closeModal('modal-close-case')">&times;</button></div>
+        <div class="modal-body">
+            <p style="color:var(--text-secondary);margin-bottom:12px;">Closing will auto-generate a report in the Document Library under "Forensic Reports".</p>
+            <label>Summary</label><textarea id="cc-summary" class="form-input" rows="3" placeholder="Executive summary..."></textarea>
+            <label>Findings</label><textarea id="cc-findings" class="form-input" rows="4" placeholder="Key findings..."></textarea>
+            <label>Recommendations</label><textarea id="cc-recommendations" class="form-input" rows="3" placeholder="Recommended actions..."></textarea>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-close-case')">Cancel</button>
+            <button class="btn btn-primary" onclick="closeCaseSubmit()">Close Investigation</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Evidence Modal -->
+<div class="modal-overlay" id="modal-add-evidence" style="display:none;">
+    <div class="modal-dialog" style="max-width:600px;">
+        <div class="modal-header"><h2>Add Evidence</h2><button class="modal-close" onclick="closeModal('modal-add-evidence')">&times;</button></div>
+        <div class="modal-body">
+            <label>Name *</label><input type="text" id="ae-name" class="form-input" placeholder="Evidence item name">
+            <label>Evidence Type *</label><select id="ae-type" class="form-input"></select>
+            <label>Source</label><input type="text" id="ae-source" class="form-input" placeholder="Where evidence was collected from">
+            <label>Storage Location</label><input type="text" id="ae-storage" class="form-input" placeholder="Current storage location">
+            <label>MD5 Hash</label><input type="text" id="ae-md5" class="form-input" placeholder="MD5 hash (optional)">
+            <label>SHA-256 Hash</label><input type="text" id="ae-sha256" class="form-input" placeholder="SHA-256 hash (optional)">
+            <label>Description</label><textarea id="ae-description" class="form-input" rows="3" placeholder="Evidence description..."></textarea>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-add-evidence')">Cancel</button>
+            <button class="btn btn-primary" onclick="addEvidence()">Add Evidence</button>
+        </div>
+    </div>
+</div>
+
+<!-- Custody Action Modal -->
+<div class="modal-overlay" id="modal-custody" style="display:none;">
+    <div class="modal-dialog" style="max-width:500px;">
+        <div class="modal-header"><h2>Log Custody Action</h2><button class="modal-close" onclick="closeModal('modal-custody')">&times;</button></div>
+        <div class="modal-body">
+            <label>Action *</label><select id="cust-action" class="form-input"></select>
+            <label>Location</label><input type="text" id="cust-location" class="form-input" placeholder="Location">
+            <label>Received By</label><select id="cust-received-by" class="form-input"><option value="">N/A</option></select>
+            <label>Notes</label><textarea id="cust-notes" class="form-input" rows="3" placeholder="Notes..."></textarea>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-custody')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitCustody()">Log Action</button>
+        </div>
+    </div>
+</div>
+
+<!-- Custody Log Modal -->
+<div class="modal-overlay" id="modal-custody-log" style="display:none;">
+    <div class="modal-dialog" style="max-width:700px;">
+        <div class="modal-header"><h2 id="cl-title">Chain of Custody</h2><button class="modal-close" onclick="closeModal('modal-custody-log')">&times;</button></div>
+        <div class="modal-body"><div id="cl-entries" style="max-height:500px;overflow-y:auto;"></div></div>
+    </div>
+</div>
+
+<!-- Add Section Modal (ad-hoc step) -->
+<div class="modal-overlay" id="modal-add-step" style="display:none;">
+    <div class="modal-dialog" style="max-width:500px;">
+        <div class="modal-header"><h2>Add Investigation Section</h2><button class="modal-close" onclick="closeModal('modal-add-step')">&times;</button></div>
+        <div class="modal-body">
+            <label>Section Title *</label><input type="text" id="as-title" class="form-input" placeholder="e.g. Network Analysis">
+            <label>Guidance / Description</label><textarea id="as-description" class="form-input" rows="3" placeholder="What should be documented in this section?"></textarea>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:8px;"><input type="checkbox" id="as-required"><label for="as-required" style="margin:0;">Required section</label></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-add-step')">Cancel</button>
+            <button class="btn btn-primary" onclick="addCaseStep()">Add Section</button>
+        </div>
+    </div>
+</div>
+
+<!-- IOC Extract Modal -->
+<div class="modal-overlay" id="modal-ioc-extract" style="display:none;">
+    <div class="modal-dialog" style="max-width:700px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-header"><h2>Extract IOCs</h2><button class="modal-close" onclick="closeModal('modal-ioc-extract')">&times;</button></div>
+        <div class="modal-body">
+            <div class="ioc-upload-area" id="ioc-drop-zone">
+                <div id="ioc-upload-prompt">
+                    <div style="font-size:2rem;margin-bottom:8px;">&#128196;</div>
+                    <div style="font-weight:600;margin-bottom:4px;">Drop a file here or click to upload</div>
+                    <div style="font-size:.8rem;color:var(--text-secondary);">CSV, TXT, LOG, JSON, TSV, IOC (max 10 MB)</div>
+                    <input type="file" id="ioc-file-input" accept=".csv,.txt,.log,.json,.md,.tsv,.ioc" style="display:none;">
+                </div>
+                <div id="ioc-file-name" style="display:none;font-weight:600;"></div>
+            </div>
+            <div style="text-align:center;color:var(--text-secondary);font-size:.85rem;margin:8px 0;">— or paste text directly —</div>
+            <textarea class="form-input" id="ioc-paste-text" rows="4" placeholder="Paste IOC data, log snippets, threat intel reports, etc."></textarea>
+            <div style="margin-top:10px;display:flex;gap:8px;">
+                <button class="btn btn-primary" onclick="runIOCExtraction()">Extract IOCs</button>
+                <button class="btn btn-secondary" onclick="clearIOCModal()">Clear</button>
+            </div>
+            <div id="ioc-results" style="display:none;margin-top:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <h3 style="margin:0;">Extracted IOCs <span id="ioc-total-badge" class="badge" style="font-size:.75rem;"></span></h3>
+                    <button class="btn btn-primary" style="padding:5px 14px;" onclick="applyIOCsToStep()">Apply to Section Fields</button>
+                </div>
+                <div id="ioc-results-body"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New/Edit Playbook Modal -->
+<div class="modal-overlay" id="modal-playbook" style="display:none;">
+    <div class="modal-dialog" style="max-width:700px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-header"><h2 id="pb-modal-title">New Forensic Playbook</h2><button class="modal-close" onclick="closeModal('modal-playbook')">&times;</button></div>
+        <div class="modal-body">
+            <label>Name *</label><input type="text" id="pb-name" class="form-input" placeholder="Playbook name">
+            <label>Investigation Type</label><select id="pb-type" class="form-input"><option value="">Any</option></select>
+            <div style="display:flex;align-items:center;gap:8px;margin:8px 0;"><input type="checkbox" id="pb-active" checked><label for="pb-active" style="margin:0;">Active</label></div>
+            <label>Description</label><textarea id="pb-desc" class="form-input" rows="3" placeholder="Playbook description..."></textarea>
+            <h3 style="margin:16px 0 8px;">Steps</h3>
+            <div id="pb-steps-list"></div>
+            <button class="btn btn-secondary" style="margin-top:8px;" onclick="addPlaybookStepRow()">+ Add Step</button>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-playbook')">Cancel</button>
+            <button class="btn btn-primary" onclick="savePlaybook()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Report Modal -->
+<div class="modal-overlay" id="modal-report" style="display:none;">
+    <div class="modal-dialog" style="max-width:800px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-header"><h2 id="rpt-title">Investigation Report</h2><button class="modal-close" onclick="closeModal('modal-report')">&times;</button></div>
+        <div class="modal-body"><div id="rpt-content" style="white-space:pre-wrap;font-family:monospace;background:var(--bg-secondary);padding:16px;border-radius:8px;"></div></div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('modal-report')">Close</button>
+            <button class="btn btn-primary" onclick="copyReport()">Copy to Clipboard</button>
+        </div>
+    </div>
+</div>
+
+<!-- Reference Doc Viewer Modal -->
+<div class="modal-overlay" id="modal-ref-doc" style="display:none;">
+    <div class="modal-dialog" style="max-width:800px;max-height:90vh;overflow-y:auto;">
+        <div class="modal-header"><h2 id="ref-doc-title">Reference Document</h2><button class="modal-close" onclick="closeModal('modal-ref-doc')">&times;</button></div>
+        <div class="modal-body"><div id="ref-doc-content" class="ref-doc-body"></div></div>
+    </div>
+</div>
+
+<style>
+/* ── Modal Overlay / Dialog ─────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.modal-dialog {
+    background: var(--bg-card, #161b22);
+    border: 1px solid var(--border-color, #30363d);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color, #30363d);
+    background: var(--bg-secondary, #0d1117);
+    border-radius: 12px 12px 0 0;
+}
+.modal-header h2 { font-size: 1.1rem; margin: 0; }
+.modal-close {
+    background: none; border: none; font-size: 1.5rem;
+    cursor: pointer; color: var(--text-secondary); transition: color .2s;
+}
+.modal-close:hover { color: #f85149; }
+.modal-body { padding: 1.25rem; }
+.modal-body label {
+    display: block; margin: 10px 0 4px;
+    font-weight: 600; font-size: .85rem; color: var(--text-secondary);
+}
+.modal-footer {
+    display: flex; gap: 0.75rem; padding: 1rem 1.25rem;
+    border-top: 1px solid var(--border-color, #30363d);
+    justify-content: flex-end;
+    background: var(--bg-secondary, #0d1117);
+    border-radius: 0 0 12px 12px;
+}
+
+/* ── Filter Bar (matches cases.html) ────────────────────── */
+.cases-filters-bar {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    width: 100%;
+}
+.cases-filter-input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary, #0d1117);
+    border: 1px solid var(--border-color, #30363d);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+.cases-filter-input::placeholder { color: var(--text-secondary); }
+.cases-filter-input:focus { outline: none; border-color: var(--accent, #00e5ff); }
+.cases-filter-select {
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-secondary, #0d1117);
+    border: 1px solid var(--border-color, #30363d);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    min-width: 150px;
+}
+.cases-filter-select:focus { outline: none; border-color: var(--accent, #00e5ff); }
+
+/* ── Tabs ───────────────────────────────────────────────── */
+.fr-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color, #30363d);
+    margin-bottom: 16px;
+    overflow-x: auto;
+    width: 100%;
+}
+.fr-tab {
+    padding: 8px 18px; background: transparent; border: none;
+    color: var(--text-secondary); cursor: pointer; font-size: .85rem;
+    font-weight: 600; border-bottom: 2px solid transparent;
+    transition: color .15s, border-color .15s; white-space: nowrap;
+}
+.fr-tab.active { color: var(--accent, #00e5ff); border-bottom-color: var(--accent, #00e5ff); }
+.fr-tab:hover { color: var(--text-primary); }
+.fr-panel { margin-top: 4px; width: 100%; }
+
+/* ── Metric Tiles ───────────────────────────────────────── */
+.fr-tiles {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+    width: 100%;
+}
+.fr-tile {
+    background: var(--bg-card, #161b22);
+    border: 1px solid var(--border-color, #30363d);
+    border-radius: 12px; padding: 18px 16px;
+    text-align: center; position: relative; overflow: hidden;
+}
+.fr-tile::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.fr-tile-blue::before { background: #58a6ff; }
+.fr-tile-cyan::before { background: #00e5ff; }
+.fr-tile-red::before { background: #f85149; }
+.fr-tile-green::before { background: #3fb950; }
+.fr-tile-purple::before { background: #bc8cff; }
+.fr-tile-amber::before { background: #f0c000; }
+.fr-tile-value { font-size: 1.8rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+.fr-tile-label { font-size: .75rem; color: var(--text-secondary); margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
+
+/* ── Pipeline / Stage Kanban ────────────────────────────── */
+.fr-pipeline {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    overflow-x: auto;
+    min-height: 300px;
+    width: 100%;
+}
+.fr-stage {
+    background: var(--bg-card, #161b22);
+    border: 1px solid var(--border-color, #30363d);
+    border-radius: 10px; display: flex; flex-direction: column;
+    min-width: 0;
+}
+.fr-stage-header {
+    padding: 10px 12px; display: flex; justify-content: space-between;
+    align-items: center; font-weight: 700; font-size: .8rem;
+    text-transform: uppercase; letter-spacing: .5px; border-radius: 10px 10px 0 0;
+}
+.fr-stage-intake { background: #1a2233; color: #58a6ff; }
+.fr-stage-evidence { background: #0d2818; color: #3fb950; }
+.fr-stage-analysis { background: #2d1f00; color: #f0c000; }
+.fr-stage-reporting { background: #1a0d2e; color: #bc8cff; }
+.fr-stage-review { background: #2a1a00; color: #f0883e; }
+.fr-stage-closed { background: #1c2128; color: #6e7681; }
+.fr-stage-count { background: rgba(255,255,255,.15); padding: 2px 8px; border-radius: 10px; font-size: .75rem; }
+.fr-stage-cards { padding: 8px; flex: 1; overflow-y: auto; max-height: 500px; }
+
+/* ── Pipeline Cards ─────────────────────────────────────── */
+.fr-card {
+    background: var(--bg-secondary, #0d1117);
+    border: 1px solid var(--border-color, #30363d);
+    border-radius: 8px; padding: 10px; margin-bottom: 8px;
+    cursor: pointer; transition: border-color .15s;
+}
+.fr-card:hover { border-color: var(--accent, #00e5ff); }
+.fr-card-num { font-size: .7rem; color: var(--text-secondary); font-weight: 600; }
+.fr-card-title { font-size: .85rem; font-weight: 600; margin: 3px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-card-meta { display: flex; gap: 6px; align-items: center; font-size: .7rem; color: var(--text-secondary); flex-wrap: wrap; }
+.fr-card-lock { color: #f0c000; }
+
+/* ── Table ──────────────────────────────────────────────── */
+.table-container { overflow-x: auto; width: 100%; }
+.data-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.data-table th, .data-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border-color, #30363d); }
+.data-table th { color: var(--text-secondary); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .5px; }
+.data-table tr { cursor: pointer; transition: background .15s; }
+.data-table tr:hover { background: var(--bg-secondary, #161b22); }
+.empty-state { text-align: center; padding: 40px; color: var(--text-secondary); }
+
+/* ── Form inputs ────────────────────────────────────────── */
+.form-input {
+    width: 100%; padding: 8px 12px;
+    border: 1px solid var(--border-color, #30363d);
+    border-radius: 6px; background: var(--bg-secondary, #0d1117);
+    color: var(--text-primary); font-size: .9rem; box-sizing: border-box;
+}
+.form-input:focus { outline: none; border-color: var(--accent, #00e5ff); }
+textarea.form-input { resize: vertical; }
+
+/* ── Badges ─────────────────────────────────────────────── */
+.badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: .75rem; font-weight: 600; text-transform: uppercase; }
+.badge-intake { background: #1a2233; color: #58a6ff; }
+.badge-evidence_collection { background: #0d2818; color: #3fb950; }
+.badge-analysis { background: #2d1f00; color: #f0c000; }
+.badge-reporting { background: #1a0d2e; color: #bc8cff; }
+.badge-review { background: #2a1a00; color: #f0883e; }
+.badge-closed { background: #1c2128; color: #6e7681; }
+.badge-critical { background: #5c1a1a; color: #f85149; }
+.badge-high { background: #5c3a1a; color: #f0883e; }
+.badge-medium { background: #3b2e00; color: #f0c000; }
+.badge-low { background: #1c2128; color: #8b949e; }
+
+/* ── SLA ────────────────────────────────────────────────── */
+.sla-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: .7rem; font-weight: 600; }
+.sla-met { background: #0d2818; color: #3fb950; }
+.sla-on-track { background: #0d2818; color: #3fb950; }
+.sla-at-risk { background: #2d1f00; color: #f0c000; }
+.sla-breached { background: #5c1a1a; color: #f85149; }
+.sla-breached-met { background: #3b2e00; color: #f0883e; }
+
+/* ── Timeline ───────────────────────────────────────────── */
+.tl-entry { padding: 10px 12px; border-left: 3px solid var(--border-color, #30363d); margin-bottom: 8px; background: var(--bg-secondary, #0d1117); border-radius: 0 6px 6px 0; }
+.tl-entry.status_change { border-left-color: #58a6ff; }
+.tl-entry.evidence_added { border-left-color: #3fb950; }
+.tl-entry.custody_change { border-left-color: #f0c000; }
+.tl-meta { font-size: .75rem; color: var(--text-secondary); margin-bottom: 4px; }
+.tl-content { font-size: .85rem; }
+
+/* ── Evidence card ──────────────────────────────────────── */
+.ev-card { background: var(--bg-secondary, #0d1117); border: 1px solid var(--border-color, #30363d); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+.ev-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.ev-card-hash { font-family: monospace; font-size: .75rem; color: var(--text-secondary); word-break: break-all; }
+
+/* ── Playbook step builder ──────────────────────────────── */
+.pb-step-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; padding: 8px; background: var(--bg-secondary, #0d1117); border-radius: 6px; }
+.pb-step-row input, .pb-step-row textarea { flex: 1; }
+.pb-step-num { min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: var(--accent, #00e5ff); color: #000; border-radius: 50%; font-weight: 700; font-size: .8rem; flex-shrink: 0; }
+
+/* ── Section Cards (fillable investigation steps) ────────── */
+.section-card {
+    background: var(--bg-secondary, #0d1117);
+    border: 1px solid var(--border-color, #30363d);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: border-color .15s;
+}
+.section-card.completed { border-color: #3fb950; }
+.section-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+}
+.section-card-header:hover { background: rgba(255,255,255,.03); }
+.section-num {
+    min-width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; font-weight: 700; font-size: .8rem; flex-shrink: 0;
+    background: var(--border-color, #30363d); color: var(--text-primary);
+}
+.section-card.completed .section-num { background: #3fb950; color: #000; }
+.section-card-title { flex: 1; font-weight: 600; font-size: .9rem; }
+.section-card-title small { font-weight: 400; color: var(--text-secondary); font-size: .8rem; display: block; margin-top: 2px; }
+.section-card-status { font-size: .75rem; font-weight: 600; padding: 2px 10px; border-radius: 10px; }
+.section-card-status.done { background: #0d2818; color: #3fb950; }
+.section-card-status.pending { background: #1c2128; color: #8b949e; }
+.section-card-status.required { background: #3b2e00; color: #f0c000; }
+.section-card-body {
+    display: none;
+    padding: 0 16px 16px;
+}
+.section-card.open .section-card-body { display: block; }
+.section-guidance {
+    background: var(--bg-card, #161b22);
+    border-left: 3px solid var(--accent, #00e5ff);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    font-size: .8rem;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+.section-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    align-items: center;
+}
+
+/* ── Structured Fields ───────────────────────────────── */
+.sf-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px 16px; }
+.sf-group { display: flex; flex-direction: column; gap: 4px; }
+.sf-label { font-size: .78rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .3px; }
+.sf-input { font-size: .85rem !important; padding: 6px 10px !important; }
+.sf-check-row { flex-direction: row; align-items: center; gap: 6px; }
+.sf-check-row input[type="checkbox"] { width: 16px; height: 16px; }
+.sf-list { display: flex; flex-direction: column; gap: 4px; }
+.sf-list-row { display: flex; gap: 6px; align-items: center; }
+.sf-list-row input { flex: 1; }
+.sf-list-remove { background: none; border: none; color: #f85149; cursor: pointer; font-size: 18px; padding: 0 4px; line-height: 1; }
+.sf-list-remove:hover { color: #ff6b6b; }
+.sf-table-wrap { width: 100%; }
+.sf-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.sf-table th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border-color, #30363d); font-weight: 600; color: var(--text-secondary); font-size: .75rem; text-transform: uppercase; }
+.sf-table td { padding: 3px 4px; }
+.sf-table td input { width: 100%; font-size: .82rem; }
+.sf-notes-group { grid-column: 1 / -1; }
+
+/* ── IOC Extraction ──────────────────────────────── */
+.ioc-upload-area { border: 2px dashed var(--border-color, #30363d); border-radius: 10px; padding: 24px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; }
+.ioc-upload-area:hover, .ioc-upload-area.dragover { border-color: var(--accent, #00e5ff); background: rgba(0,229,255,.05); }
+.ioc-category { margin-bottom: 12px; }
+.ioc-category-header { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border-color, #30363d); margin-bottom: 6px; cursor: pointer; }
+.ioc-category-title { font-weight: 700; font-size: .85rem; text-transform: uppercase; letter-spacing: .3px; }
+.ioc-category-count { font-size: .75rem; color: var(--text-secondary); }
+.ioc-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.ioc-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--bg-secondary, #0d1117); border: 1px solid var(--border-color, #30363d); border-radius: 6px; padding: 3px 10px; font-size: .82rem; font-family: monospace; cursor: pointer; transition: border-color .15s; }
+.ioc-chip:hover { border-color: var(--accent, #00e5ff); }
+.ioc-chip.selected { border-color: #3fb950; background: rgba(63,185,80,.1); }
+.ioc-chip input[type="checkbox"] { width: 14px; height: 14px; margin: 0; }
+.btn-extract-ioc { padding: 4px 10px; font-size: .75rem; background: var(--bg-secondary, #161b22); border: 1px solid var(--border-color, #30363d); color: var(--text-secondary); border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.btn-extract-ioc:hover { border-color: var(--accent, #00e5ff); color: var(--accent, #00e5ff); }
+
+/* ── Reference Docs Grid ───────────────────────────────── */
+.fr-ref-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; width: 100%; }
+.fr-ref-card { background: var(--bg-card, #161b22); border: 1px solid var(--border-color, #30363d); border-radius: 10px; padding: 20px; cursor: pointer; transition: border-color .15s, transform .15s; }
+.fr-ref-card:hover { border-color: var(--accent, #00e5ff); transform: translateY(-2px); }
+.fr-ref-category { font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; color: var(--accent, #00e5ff); font-weight: 700; margin-bottom: 6px; }
+.fr-ref-title { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+.fr-ref-preview { font-size: .8rem; color: var(--text-secondary); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ref-doc-body { line-height: 1.7; font-size: .9rem; }
+.ref-doc-body h2 { margin-top: 20px; margin-bottom: 8px; color: var(--accent, #00e5ff); }
+.ref-doc-body h3 { margin-top: 16px; margin-bottom: 6px; }
+.ref-doc-body code { background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px; font-size: .85rem; }
+.ref-doc-body pre { background: var(--bg-secondary); padding: 12px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
+.ref-doc-body pre code { padding: 0; background: none; }
+.ref-doc-body table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.ref-doc-body th, .ref-doc-body td { padding: 6px 10px; border: 1px solid var(--border-color, #30363d); font-size: .85rem; }
+.ref-doc-body th { background: var(--bg-secondary); }
+.ref-doc-body ul, .ref-doc-body ol { padding-left: 20px; }
+.ref-doc-body li { margin-bottom: 4px; }
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1200px) {
+    .fr-tiles { grid-template-columns: repeat(3, 1fr); }
+    .fr-pipeline { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+    .fr-tiles { grid-template-columns: repeat(2, 1fr); }
+    .fr-pipeline { grid-template-columns: 1fr; }
+    .cases-filters-bar { flex-direction: column; }
+    .modal-dialog { width: 95%; }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const API = '/api/forensics';
+let allCases = [];
+let allPlaybooks = [];
+let currentCaseId = null;
+let currentCaseData = null;
+let currentEvidenceId = null;
+let editingPlaybookId = null;
+let enums = {};
+let users = [];
+let referenceDocs = [];
+let filterTimeout = null;
+
+async function init() {
+    try {
+        const [enumsRes, usersRes, refRes, pbRes] = await Promise.all([
+            fetch(API + '/enums'), fetch('/api/users'), fetch(API + '/reference-docs'), fetch(API + '/playbooks?active_only=true')
+        ]);
+        if (enumsRes.ok) enums = await enumsRes.json();
+        if (usersRes.ok) users = await usersRes.json();
+        if (refRes.ok) referenceDocs = await refRes.json();
+        if (pbRes.ok) allPlaybooks = await pbRes.json();
+    } catch(e) {
+        if (!enums.investigation_types) {
+            enums = {case_statuses:['intake','evidence_collection','analysis','reporting','review','closed'],case_priorities:['critical','high','medium','low'],investigation_types:['malware_analysis','insider_threat','data_breach','unauthorized_access','network_intrusion','fraud','policy_violation','other'],evidence_types:['disk_image','memory_dump','network_capture','log_files','documents','email','mobile_device','physical_media','screenshot','other'],evidence_statuses:['collected','in_transit','in_storage','under_analysis','returned','destroyed'],custody_actions:['collected','transferred','checked_out','checked_in','analyzed','imaged','returned','destroyed']};
+        }
+    }
+    populateDropdowns();
+    loadCases();
+}
+
+function populateDropdowns() {
+    const types = enums.investigation_types || [];
+    for (const sel of ['filter-type','pb-filter-type']) { const el=document.getElementById(sel); if(!el)continue; el.innerHTML='<option value="">All Types</option>'; types.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=fmtLabel(t);el.appendChild(o)}); }
+    for (const sel of ['nc-type','pb-type']) { const el=document.getElementById(sel); if(!el)continue; if(sel==='pb-type')el.innerHTML='<option value="">Any</option>'; else el.innerHTML=''; types.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=fmtLabel(t);el.appendChild(o)}); }
+    // Playbook selector in New Case modal
+    const pbSel=document.getElementById('nc-playbook'); if(pbSel){pbSel.innerHTML='<option value="">-- No Playbook (blank investigation) --</option>';allPlaybooks.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name+(p.investigation_type?' ('+fmtLabel(p.investigation_type)+')':'');pbSel.appendChild(o)})}
+    const aeType=document.getElementById('ae-type'); if(aeType){aeType.innerHTML='';(enums.evidence_types||[]).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=fmtLabel(t);aeType.appendChild(o)});}
+    const custAct=document.getElementById('cust-action'); if(custAct){custAct.innerHTML='';(enums.custody_actions||[]).forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=fmtLabel(a);custAct.appendChild(o)});}
+    const cdStatus=document.getElementById('cd-status-select'); if(cdStatus){cdStatus.innerHTML='';(enums.case_statuses||[]).forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=fmtLabel(s);cdStatus.appendChild(o)});}
+    if(users.length){for(const sel of ['nc-lead','cust-received-by']){const el=document.getElementById(sel);if(!el)continue;const first=el.querySelector('option');el.innerHTML='';if(first)el.appendChild(first);users.forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.display_name||u.username;el.appendChild(o)});}}
+}
+
+function fmtLabel(s){return s?s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()):''}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function fmtDate(iso){if(!iso)return'-';const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
+function fmtDateTime(iso){if(!iso)return'-';const d=new Date(iso);return fmtDate(iso)+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
+function showToast(msg,err){const d=document.createElement('div');d.textContent=msg;d.style.cssText='position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;z-index:9999;font-size:.9rem;color:#fff;background:'+(err?'#f85149':'#3fb950');document.body.appendChild(d);setTimeout(()=>d.remove(),3000)}
+function closeModal(id){document.getElementById(id).style.display='none'}
+function debouncedFilter(){clearTimeout(filterTimeout);filterTimeout=setTimeout(()=>renderCasesTable(),300)}
+
+// ======== TABS ========
+function switchTab(tab){
+    document.querySelectorAll('.fr-tab[data-tab]').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+    document.querySelectorAll('.fr-panel').forEach(p=>p.style.display='none');
+    document.getElementById('panel-'+tab).style.display='';
+    if(tab==='evidence')populateEvidenceCaseSelect();
+    else if(tab==='playbooks')loadPlaybooks();
+    else if(tab==='reference')renderReferenceDocs();
+}
+function switchDetailTab(tab){
+    const tabs=['sections','evidence','timeline','report'];
+    document.querySelectorAll('#cd-body .fr-tab').forEach((b,i)=>b.classList.toggle('active',tabs[i]===tab));
+    tabs.forEach(t=>{const el=document.getElementById('cd-tab-'+t);if(el)el.style.display=t===tab?'':'none'});
+    if(tab==='report')loadReportTab();
+}
+
+// ======== PLAYBOOK SELECTION IN CREATE MODAL ========
+function onPlaybookSelect() {
+    const pbId = document.getElementById('nc-playbook').value;
+    const preview = document.getElementById('nc-playbook-preview');
+    if (!pbId) { preview.style.display = 'none'; return; }
+    const pb = allPlaybooks.find(p => p.id == pbId);
+    if (!pb) { preview.style.display = 'none'; return; }
+    preview.style.display = '';
+    document.getElementById('nc-pb-name').textContent = pb.name;
+    document.getElementById('nc-pb-desc').textContent = pb.description || '';
+    // Auto-set investigation type if the playbook has one
+    if (pb.investigation_type) document.getElementById('nc-type').value = pb.investigation_type;
+    // Show steps preview
+    const stepsDiv = document.getElementById('nc-pb-steps');
+    stepsDiv.innerHTML = (pb.steps || []).map((s, i) => {
+        const fc = (s.fields||[]).length;
+        return `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;padding:8px;background:var(--bg-secondary,#0d1117);border-radius:6px;">
+            <span class="section-num" style="min-width:24px;height:24px;font-size:.7rem;">${i+1}</span>
+            <div style="flex:1;font-size:.85rem;">
+                <strong>${esc(s.title)}</strong>${s.is_required?' <span style="color:#f0c000;font-size:.7rem;">REQUIRED</span>':''}${fc?' <span style="color:var(--text-secondary);font-size:.7rem;">'+fc+' fields</span>':''}
+                ${s.description?'<div style="color:var(--text-secondary);font-size:.8rem;margin-top:2px;">'+esc(s.description)+'</div>':''}
+            </div>
+        </div>`;
+    }).join('') || '<div style="color:var(--text-secondary);font-size:.8rem;">No steps defined</div>';
+}
+
+// ======== CASES ========
+async function loadCases(){
+    const params=new URLSearchParams();
+    const s=document.getElementById('filter-status');if(s&&s.value)params.set('status',s.value);
+    const t=document.getElementById('filter-type');if(t&&t.value)params.set('investigation_type',t.value);
+    const p=document.getElementById('filter-priority');if(p&&p.value)params.set('priority',p.value);
+    try{const res=await fetch(API+'/cases?'+params);if(!res.ok)throw 0;allCases=await res.json()}catch(e){allCases=[]}
+    renderCasesTable();renderPipeline();updateStats();loadOverdueCount();
+}
+
+function stepProgress(c) {
+    if (!c.step_count) return '';
+    const pct = c.step_count > 0 ? Math.round((c.steps_completed / c.step_count) * 100) : 0;
+    const color = pct === 100 ? '#3fb950' : pct > 0 ? '#00e5ff' : '#6e7681';
+    return `<div style="display:flex;align-items:center;gap:6px;" title="${c.steps_completed}/${c.step_count} sections">
+        <div style="flex:1;background:var(--border-color,#30363d);border-radius:3px;height:4px;min-width:40px;overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;"></div>
+        </div>
+        <span style="font-size:.7rem;color:${color};">${c.steps_completed}/${c.step_count}</span>
+    </div>`;
+}
+
+function renderCasesTable(){
+    const search=(document.getElementById('filter-search')?.value||'').toLowerCase();
+    const filtered=allCases.filter(c=>!search||c.case_number.toLowerCase().includes(search)||c.title.toLowerCase().includes(search));
+    const tbody=document.getElementById('cases-tbody'),empty=document.getElementById('cases-empty');
+    if(!filtered.length){tbody.innerHTML='';empty.style.display='';return}
+    empty.style.display='none';
+    tbody.innerHTML=filtered.map(c=>`<tr onclick="openCaseDetail(${c.id})">
+        <td><strong>${esc(c.case_number)}</strong></td><td>${esc(c.title)}</td><td>${fmtLabel(c.investigation_type)}</td>
+        <td><span class="badge badge-${c.priority}">${c.priority}</span></td>
+        <td><span class="badge badge-${c.status}">${fmtLabel(c.status)}</span></td>
+        <td>${esc(c.lead_investigator_username||'Unassigned')}</td>
+        <td>${stepProgress(c)}</td>
+        <td>${renderSlaCell(c)}</td>
+        <td>${c.is_locked?'<span style="color:#f0c000;" title="Locked by '+esc(c.locked_by_username||'')+'">Locked</span>':'-'}</td>
+        <td>${fmtDate(c.created_at)}</td></tr>`).join('');
+}
+
+function renderSlaCell(c){
+    if(c.status==='closed')return'<span class="sla-badge sla-met">Done</span>';
+    const now=new Date();let worst='on_track';
+    for(const m of ['initial_response','evidence_collection','analysis','reporting']){
+        const due=c['sla_'+m+'_due'],met=c['sla_'+m+'_met'];if(!due||met)continue;
+        if(new Date(due)<now){worst='breached';break}
+        const total=new Date(due)-new Date(c.created_at),remaining=new Date(due)-now;
+        if(remaining/total<0.25&&worst!=='breached')worst='at_risk';
+    }
+    const cls={on_track:'sla-on-track',at_risk:'sla-at-risk',breached:'sla-breached'}[worst];
+    const label={on_track:'On Track',at_risk:'At Risk',breached:'Overdue'}[worst];
+    return`<span class="sla-badge ${cls}">${label}</span>`;
+}
+
+// ======== PIPELINE ========
+function renderPipeline(){
+    const stages=['intake','evidence_collection','analysis','reporting','review','closed'];
+    stages.forEach(s=>{
+        const col=document.getElementById('pipe-col-'+s);
+        const cards=allCases.filter(c=>c.status===s);
+        document.getElementById('pipe-'+s).textContent=cards.length;
+        col.innerHTML=cards.map(c=>`<div class="fr-card" onclick="openCaseDetail(${c.id})">
+            <div class="fr-card-num">${esc(c.case_number)}</div>
+            <div class="fr-card-title">${esc(c.title)}</div>
+            ${stepProgress(c)}
+            <div class="fr-card-meta">
+                <span class="badge badge-${c.priority}" style="font-size:.65rem;padding:1px 6px;">${c.priority}</span>
+                <span>${esc(c.lead_investigator_username||'Unassigned')}</span>
+                ${c.is_locked?'<span class="fr-card-lock" title="Locked">Locked</span>':''}
+                ${renderSlaCell(c)}
+            </div>
+        </div>`).join('')||'<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:.8rem;">No cases</div>';
+    });
+}
+
+function updateStats(){
+    document.getElementById('stat-intake').textContent=allCases.filter(c=>c.status==='intake').length;
+    document.getElementById('stat-active').textContent=allCases.filter(c=>!['intake','closed'].includes(c.status)).length;
+    document.getElementById('stat-closed').textContent=allCases.filter(c=>c.status==='closed').length;
+    document.getElementById('stat-evidence').textContent=allCases.reduce((s,c)=>s+(c.evidence_count||0),0);
+    document.getElementById('stat-locked').textContent=allCases.filter(c=>c.is_locked).length;
+}
+async function loadOverdueCount(){try{const r=await fetch(API+'/cases/overdue');if(r.ok){const d=await r.json();document.getElementById('stat-overdue').textContent=d.length}}catch(e){}}
+
+// ======== CASE DETAIL ========
+async function openCaseDetail(id){
+    currentCaseId=id;
+    try{const r=await fetch(API+'/cases/'+id);if(!r.ok)throw 0;currentCaseData=await r.json();renderCaseDetail(currentCaseData);document.getElementById('modal-case-detail').style.display='flex'}catch(e){showToast('Failed to load',true)}
+}
+function renderCaseDetail(c){
+    document.getElementById('cd-title').textContent=c.title;
+    document.getElementById('cd-case-number').textContent=c.case_number;
+    document.getElementById('cd-type').textContent=fmtLabel(c.investigation_type);
+    document.getElementById('cd-playbook-name').textContent=c.playbook_name?('Playbook: '+c.playbook_name):'';
+    document.getElementById('cd-status-badge').className='badge badge-'+c.status;
+    document.getElementById('cd-status-badge').textContent=fmtLabel(c.status);
+    document.getElementById('cd-priority-badge').className='badge badge-'+c.priority;
+    document.getElementById('cd-priority-badge').textContent=c.priority;
+    document.getElementById('cd-status-select').value=c.status;
+    document.getElementById('cd-description').textContent=c.description||'';
+    // Lock
+    const lockInd=document.getElementById('cd-lock-indicator');
+    const lockBtn=document.getElementById('cd-lock-btn');
+    if(c.is_locked){lockInd.innerHTML='<span style="color:#f0c000;">Locked by '+esc(c.locked_by_username||'unknown')+' ('+fmtDateTime(c.locked_at)+')</span>';lockBtn.textContent='Unlock';lockBtn.style.color='#f0c000'}
+    else{lockInd.innerHTML='';lockBtn.textContent='Lock';lockBtn.style.color=''}
+    // SLA
+    const slaDiv=document.getElementById('cd-sla-badges');slaDiv.innerHTML='';
+    if(c.sla_status&&c.sla_status.milestones){c.sla_status.milestones.forEach(m=>{const cls={met:'sla-met',on_track:'sla-on-track',at_risk:'sla-at-risk',breached:'sla-breached',breached_met:'sla-breached-met',not_set:''}[m.status]||'';slaDiv.innerHTML+=`<span class="sla-badge ${cls}" title="${m.due||''}">${fmtLabel(m.name)}: ${fmtLabel(m.status)}</span>`})}
+    // Progress bar
+    const steps = c.case_steps || [];
+    const progBar = document.getElementById('cd-progress-bar');
+    if (steps.length) {
+        progBar.style.display = '';
+        const done = steps.filter(s => s.is_completed).length;
+        const pct = Math.round((done / steps.length) * 100);
+        document.getElementById('cd-progress-label').textContent = `Sections: ${done}/${steps.length} complete`;
+        document.getElementById('cd-progress-pct').textContent = pct + '%';
+        document.getElementById('cd-progress-fill').style.width = pct + '%';
+        document.getElementById('cd-progress-fill').style.background = pct === 100 ? '#3fb950' : 'var(--accent,#00e5ff)';
+    } else { progBar.style.display = 'none'; }
+    // Render sections, timeline, evidence
+    renderSections(steps);
+    renderTimeline(c.timeline_entries||[]);
+    renderDetailEvidence(c.evidence_items||[]);
+    switchDetailTab('sections');
+}
+
+// ======== SECTIONS (fillable steps) ========
+function renderFieldInput(field, value, stepId) {
+    const k = field.key, lbl = esc(field.label||k), ph = esc(field.placeholder||'');
+    const fid = `sf-${stepId}-${k}`;
+    switch(field.type) {
+        case 'textarea':
+            return `<div class="sf-group"><label class="sf-label">${lbl}</label><textarea class="form-input sf-input" id="${fid}" rows="3" placeholder="${ph}" data-field-key="${k}">${esc(value||'')}</textarea></div>`;
+        case 'list': {
+            const items = Array.isArray(value) ? value : [];
+            let html = `<div class="sf-group"><label class="sf-label">${lbl}</label><div class="sf-list" id="${fid}" data-field-key="${k}" data-field-type="list">`;
+            items.forEach((v,i) => { html += `<div class="sf-list-row"><input class="form-input sf-input" value="${esc(v)}" placeholder="${ph}"><button type="button" class="btn-icon sf-list-remove" onclick="this.parentElement.remove()" title="Remove">&times;</button></div>`; });
+            html += `</div><button type="button" class="btn btn-secondary" style="padding:3px 10px;font-size:12px;margin-top:4px;" onclick="addListItem('${fid}','${ph}')">+ Add</button></div>`;
+            return html;
+        }
+        case 'table': {
+            const cols = field.columns || [];
+            const rows = Array.isArray(value) ? value : [];
+            let html = `<div class="sf-group"><label class="sf-label">${lbl}</label><div class="sf-table-wrap" id="${fid}" data-field-key="${k}" data-field-type="table" data-cols='${JSON.stringify(cols)}'>`;
+            html += `<table class="sf-table"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}<th style="width:30px"></th></tr></thead><tbody>`;
+            rows.forEach(row => {
+                html += `<tr>${cols.map(c=>`<td><input class="form-input sf-input" value="${esc(row[c]||'')}" data-col="${esc(c)}"></td>`).join('')}<td><button type="button" class="btn-icon sf-list-remove" onclick="this.closest('tr').remove()" title="Remove">&times;</button></td></tr>`;
+            });
+            html += `</tbody></table>`;
+            html += `<button type="button" class="btn btn-secondary" style="padding:3px 10px;font-size:12px;margin-top:4px;" onclick="addTableRow('${fid}')">+ Add Row</button></div></div>`;
+            return html;
+        }
+        case 'select': {
+            const opts = field.options || [];
+            let html = `<div class="sf-group"><label class="sf-label">${lbl}</label><select class="form-input sf-input" id="${fid}" data-field-key="${k}">`;
+            html += `<option value="">-- Select --</option>`;
+            opts.forEach(o => { html += `<option value="${esc(o)}" ${value===o?'selected':''}>${esc(o)}</option>`; });
+            html += `</select></div>`;
+            return html;
+        }
+        case 'checkbox':
+            return `<div class="sf-group sf-check-row"><label class="sf-label"><input type="checkbox" id="${fid}" data-field-key="${k}" ${value?'checked':''}> ${lbl}</label></div>`;
+        default: // text
+            return `<div class="sf-group"><label class="sf-label">${lbl}</label><input class="form-input sf-input" id="${fid}" value="${esc(value||'')}" placeholder="${ph}" data-field-key="${k}"></div>`;
+    }
+}
+
+function addListItem(containerId, placeholder) {
+    const c = document.getElementById(containerId);
+    const row = document.createElement('div');
+    row.className = 'sf-list-row';
+    row.innerHTML = `<input class="form-input sf-input" placeholder="${placeholder||''}"><button type="button" class="btn-icon sf-list-remove" onclick="this.parentElement.remove()" title="Remove">&times;</button>`;
+    c.appendChild(row);
+    row.querySelector('input').focus();
+}
+
+function addTableRow(containerId) {
+    const wrap = document.getElementById(containerId);
+    const cols = JSON.parse(wrap.dataset.cols || '[]');
+    const tbody = wrap.querySelector('tbody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = cols.map(c => `<td><input class="form-input sf-input" data-col="${esc(c)}"></td>`).join('') + `<td><button type="button" class="btn-icon sf-list-remove" onclick="this.closest('tr').remove()" title="Remove">&times;</button></td>`;
+    tbody.appendChild(tr);
+    tr.querySelector('input').focus();
+}
+
+function collectFieldsData(stepId, fields) {
+    const data = {};
+    (fields||[]).forEach(f => {
+        const fid = `sf-${stepId}-${f.key}`;
+        if (f.type === 'list') {
+            const el = document.getElementById(fid);
+            if (el) data[f.key] = [...el.querySelectorAll('input')].map(i => i.value).filter(v => v.trim());
+        } else if (f.type === 'table') {
+            const el = document.getElementById(fid);
+            if (el) {
+                const cols = JSON.parse(el.dataset.cols || '[]');
+                data[f.key] = [...el.querySelectorAll('tbody tr')].map(tr => {
+                    const row = {};
+                    tr.querySelectorAll('input').forEach(inp => { row[inp.dataset.col] = inp.value; });
+                    return row;
+                }).filter(r => Object.values(r).some(v => v.trim()));
+            }
+        } else if (f.type === 'checkbox') {
+            const el = document.getElementById(fid);
+            if (el) data[f.key] = el.checked;
+        } else {
+            const el = document.getElementById(fid);
+            if (el) data[f.key] = el.value;
+        }
+    });
+    return data;
+}
+
+// Store fields definitions per step for save/complete
+const _stepFields = {};
+
+function renderSections(steps) {
+    const container = document.getElementById('cd-sections-list');
+    if (!steps.length) {
+        container.innerHTML = '<div class="empty-state">No sections. Add a section or create the investigation with a playbook.</div>';
+        return;
+    }
+    steps.forEach(s => { _stepFields[s.id] = s.fields || []; });
+    container.innerHTML = steps.map(s => {
+        const statusCls = s.is_completed ? 'done' : (s.is_required ? 'required' : 'pending');
+        const statusLabel = s.is_completed ? 'Complete' : (s.is_required ? 'Required' : 'Pending');
+        const fields = s.fields || [];
+        const fd = s.fields_data || {};
+        const hasFields = fields.length > 0;
+        return `<div class="section-card ${s.is_completed ? 'completed' : ''}" id="section-${s.id}">
+            <div class="section-card-header" onclick="toggleSection(${s.id})">
+                <span class="section-num">${s.is_completed ? '&#10003;' : s.step_order}</span>
+                <div class="section-card-title">
+                    ${esc(s.title)}
+                    ${s.completed_by_username ? '<small>Completed by ' + esc(s.completed_by_username) + ' on ' + fmtDate(s.completed_at) + '</small>' : ''}
+                </div>
+                <span class="section-card-status ${statusCls}">${statusLabel}</span>
+            </div>
+            <div class="section-card-body">
+                ${s.description ? '<div class="section-guidance">' + esc(s.description) + '</div>' : ''}
+                ${hasFields ? '<div class="sf-fields">' + fields.map(f => renderFieldInput(f, fd[f.key], s.id)).join('') + '</div>' : ''}
+                <div class="sf-notes-group">
+                    <label class="sf-label" style="margin-top:${hasFields ? '12px' : '0'};">${hasFields ? 'Additional Notes' : 'Findings & Analysis'}</label>
+                    <textarea class="form-input sf-input" id="section-content-${s.id}" rows="${hasFields ? 3 : 6}" placeholder="Enter your findings, analysis, and documentation...">${esc(s.content || '')}</textarea>
+                </div>
+                <div class="section-card-actions">
+                    <button class="btn btn-primary" style="padding:6px 16px;" onclick="saveSection(${s.id})">Save</button>
+                    ${!s.is_completed
+                        ? '<button class="btn btn-secondary" style="padding:6px 16px;color:#3fb950;" onclick="completeSection('+s.id+')">Mark Complete</button>'
+                        : '<button class="btn btn-secondary" style="padding:6px 16px;color:#f0c000;" onclick="reopenSection('+s.id+')">Reopen</button>'
+                    }
+                    <button class="btn-extract-ioc" onclick="showIOCExtractModal(${s.id})">&#128269; Extract IOCs</button>
+                    ${!s.playbook_step_id ? '<button class="btn btn-secondary" style="padding:6px 16px;color:#f85149;margin-left:auto;" onclick="deleteSection('+s.id+')">Delete</button>' : ''}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function toggleSection(stepId) {
+    const card = document.getElementById('section-' + stepId);
+    if (card) card.classList.toggle('open');
+}
+
+async function saveSection(stepId) {
+    const content = document.getElementById('section-content-' + stepId).value;
+    const fields = _stepFields[stepId] || [];
+    const fields_data = fields.length ? collectFieldsData(stepId, fields) : null;
+    const body = {content};
+    if (fields_data) body.fields_data = fields_data;
+    try {
+        const r = await fetch(API + '/cases/' + currentCaseId + '/steps/' + stepId, {
+            method: 'PATCH', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Failed'); }
+        showToast('Section saved');
+    } catch(e) { showToast(e.message, true); }
+}
+
+async function completeSection(stepId) {
+    const content = document.getElementById('section-content-' + stepId).value;
+    const fields = _stepFields[stepId] || [];
+    const fields_data = fields.length ? collectFieldsData(stepId, fields) : null;
+    const body = {content, is_completed: true};
+    if (fields_data) body.fields_data = fields_data;
+    try {
+        const r = await fetch(API + '/cases/' + currentCaseId + '/steps/' + stepId, {
+            method: 'PATCH', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body)
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Failed'); }
+        showToast('Section completed');
+        openCaseDetail(currentCaseId);
+    } catch(e) { showToast(e.message, true); }
+}
+
+async function reopenSection(stepId) {
+    try {
+        const r = await fetch(API + '/cases/' + currentCaseId + '/steps/' + stepId, {
+            method: 'PATCH', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({is_completed: false})
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Failed'); }
+        showToast('Section reopened');
+        openCaseDetail(currentCaseId);
+    } catch(e) { showToast(e.message, true); }
+}
+
+async function deleteSection(stepId) {
+    if (!confirm('Remove this section?')) return;
+    try {
+        const r = await fetch(API + '/cases/' + currentCaseId + '/steps/' + stepId, {method: 'DELETE'});
+        if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Failed'); }
+        showToast('Section removed');
+        openCaseDetail(currentCaseId);
+    } catch(e) { showToast(e.message, true); }
+}
+
+function showAddStepModal() {
+    ['as-title', 'as-description'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('as-required').checked = false;
+    document.getElementById('modal-add-step').style.display = 'flex';
+}
+
+async function addCaseStep() {
+    const title = document.getElementById('as-title').value.trim();
+    if (!title) { showToast('Title required', true); return; }
+    try {
+        const r = await fetch(API + '/cases/' + currentCaseId + '/steps', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title, description: document.getElementById('as-description').value || null, is_required: document.getElementById('as-required').checked})
+        });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Failed'); }
+        closeModal('modal-add-step');
+        showToast('Section added');
+        openCaseDetail(currentCaseId);
+    } catch(e) { showToast(e.message, true); }
+}
+// ======== IOC EXTRACTION ========
+let iocTargetStepId = null;
+let iocExtractedData = {};
+
+const IOC_LABELS = {
+    ipv4: 'IPv4 Addresses', ipv6: 'IPv6 Addresses',
+    md5: 'MD5 Hashes', sha1: 'SHA-1 Hashes', sha256: 'SHA-256 Hashes',
+    domains: 'Domains', urls: 'URLs', emails: 'Email Addresses',
+    cves: 'CVE IDs', mac_addresses: 'MAC Addresses', hostnames: 'Hostnames'
+};
+
+// Field-key heuristic mapping: IOC type → field keys that should receive these values
+const IOC_FIELD_MAP = {
+    ipv4: ['source_ips','affected_ips','c2_servers','ips_blocked','source_ips','ioc_ips','network_iocs'],
+    ipv6: ['source_ips','affected_ips','ips_blocked'],
+    md5: ['sample_hashes','evidence_hashes','file_hashes'],
+    sha1: ['sample_hashes','evidence_hashes','file_hashes'],
+    sha256: ['sample_hashes','evidence_hashes','file_hashes'],
+    domains: ['dns_queries','dns_indicators','c2_servers'],
+    urls: ['suspicious_strings','urls'],
+    emails: ['emails','email_exfil'],
+    hostnames: ['affected_hosts','compromised_hosts','isolated_hosts','hosts_reimaged','target_systems'],
+    cves: ['cves'],
+    mac_addresses: ['mac_addresses']
+};
+
+function showIOCExtractModal(stepId) {
+    iocTargetStepId = stepId;
+    clearIOCModal();
+    document.getElementById('modal-ioc-extract').style.display = 'flex';
+}
+
+function clearIOCModal() {
+    document.getElementById('ioc-paste-text').value = '';
+    document.getElementById('ioc-file-input').value = '';
+    document.getElementById('ioc-file-name').style.display = 'none';
+    document.getElementById('ioc-upload-prompt').style.display = '';
+    document.getElementById('ioc-results').style.display = 'none';
+    iocExtractedData = {};
+}
+
+// Drag & drop + click to upload
+(function initIOCUpload() {
+    document.addEventListener('DOMContentLoaded', () => {
+        const zone = document.getElementById('ioc-drop-zone');
+        const input = document.getElementById('ioc-file-input');
+        if (!zone || !input) return;
+        zone.addEventListener('click', () => input.click());
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+        zone.addEventListener('drop', e => {
+            e.preventDefault(); zone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; showFileName(e.dataTransfer.files[0].name); }
+        });
+        input.addEventListener('change', () => { if (input.files.length) showFileName(input.files[0].name); });
+    });
+})();
+
+function showFileName(name) {
+    document.getElementById('ioc-upload-prompt').style.display = 'none';
+    const fn = document.getElementById('ioc-file-name');
+    fn.textContent = name;
+    fn.style.display = '';
+}
+
+async function runIOCExtraction() {
+    const fileInput = document.getElementById('ioc-file-input');
+    const text = document.getElementById('ioc-paste-text').value.trim();
+    const hasFile = fileInput.files && fileInput.files.length > 0;
+
+    if (!hasFile && !text) { showToast('Upload a file or paste text first', true); return; }
+
+    const formData = new FormData();
+    if (hasFile) {
+        formData.append('file', fileInput.files[0]);
+    }
+    if (text) {
+        formData.append('text', text);
+    }
+
+    try {
+        const r = await fetch(API + '/extract-iocs', { method: 'POST', body: formData });
+        if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Extraction failed'); }
+        iocExtractedData = await r.json();
+        renderIOCResults(iocExtractedData);
+    } catch(e) { showToast(e.message, true); }
+}
+
+function renderIOCResults(data) {
+    const total = data._total || 0;
+    const resultsDiv = document.getElementById('ioc-results');
+    const body = document.getElementById('ioc-results-body');
+    const badge = document.getElementById('ioc-total-badge');
+    badge.textContent = total + ' found';
+    badge.style.background = total > 0 ? 'rgba(63,185,80,.15)' : 'rgba(248,81,73,.15)';
+    badge.style.color = total > 0 ? '#3fb950' : '#f85149';
+
+    if (total === 0) {
+        body.innerHTML = '<div class="empty-state" style="padding:16px;">No IOCs found in the provided content.</div>';
+        resultsDiv.style.display = '';
+        return;
+    }
+
+    let html = '';
+    for (const [type, label] of Object.entries(IOC_LABELS)) {
+        const items = data[type];
+        if (!items || !items.length) continue;
+        html += `<div class="ioc-category">
+            <div class="ioc-category-header">
+                <span class="ioc-category-title">${label}</span>
+                <span class="ioc-category-count">${items.length}</span>
+            </div>
+            <div class="ioc-items">
+                ${items.map((v, i) => `<label class="ioc-chip selected"><input type="checkbox" checked data-ioc-type="${type}" data-ioc-index="${i}"> ${esc(v)}</label>`).join('')}
+            </div>
+        </div>`;
+    }
+    body.innerHTML = html;
+    resultsDiv.style.display = '';
+}
+
+function applyIOCsToStep() {
+    if (!iocTargetStepId || !iocExtractedData._total) return;
+    const fields = _stepFields[iocTargetStepId] || [];
+    if (!fields.length) {
+        // No structured fields — dump everything into the notes textarea
+        const ta = document.getElementById('section-content-' + iocTargetStepId);
+        if (ta) {
+            let dump = '';
+            for (const [type, label] of Object.entries(IOC_LABELS)) {
+                const items = getSelectedIOCs(type);
+                if (items.length) dump += label + ':\n' + items.map(v => '  ' + v).join('\n') + '\n\n';
+            }
+            ta.value = (ta.value ? ta.value + '\n\n' : '') + dump.trim();
+        }
+        showToast('IOCs added to notes');
+        closeModal('modal-ioc-extract');
+        return;
+    }
+
+    // Smart-match IOC types to field keys
+    let applied = 0;
+    for (const [iocType, fieldKeys] of Object.entries(IOC_FIELD_MAP)) {
+        const items = getSelectedIOCs(iocType);
+        if (!items.length) continue;
+
+        // Find matching field by key
+        for (const fk of fieldKeys) {
+            const field = fields.find(f => f.key === fk);
+            if (!field) continue;
+            const fid = `sf-${iocTargetStepId}-${fk}`;
+
+            if (field.type === 'list') {
+                const container = document.getElementById(fid);
+                if (!container) continue;
+                // Add items that don't already exist
+                const existing = new Set([...container.querySelectorAll('input')].map(i => i.value.trim().toLowerCase()));
+                for (const val of items) {
+                    if (!existing.has(val.toLowerCase())) {
+                        addListItem(fid, field.placeholder || '');
+                        const inputs = container.querySelectorAll('input');
+                        inputs[inputs.length - 1].value = val;
+                        applied++;
+                    }
+                }
+                break; // matched, move to next IOC type
+            } else if (field.type === 'table') {
+                const wrap = document.getElementById(fid);
+                if (!wrap) continue;
+                const cols = JSON.parse(wrap.dataset.cols || '[]');
+                if (!cols.length) continue;
+                const tbody = wrap.querySelector('tbody');
+                for (const val of items) {
+                    addTableRow(fid);
+                    const lastRow = tbody.querySelector('tr:last-child');
+                    const firstInput = lastRow.querySelector('input');
+                    if (firstInput) { firstInput.value = val; applied++; }
+                }
+                break;
+            } else if (field.type === 'text') {
+                const el = document.getElementById(fid);
+                if (el && !el.value) { el.value = items.join(', '); applied++; break; }
+            }
+        }
+
+        // If no specific field matched, try broader label matching
+        if (!applied) {
+            for (const field of fields) {
+                const label = (field.label || '').toLowerCase();
+                const key = (field.key || '').toLowerCase();
+                const matchesType =
+                    (iocType === 'ipv4' && (label.includes('ip') || key.includes('ip'))) ||
+                    (iocType === 'hostnames' && (label.includes('host') || key.includes('host'))) ||
+                    (iocType === 'domains' && (label.includes('domain') || label.includes('dns') || key.includes('domain') || key.includes('dns'))) ||
+                    (iocType === 'sha256' && (label.includes('hash') || label.includes('sha') || key.includes('hash'))) ||
+                    (iocType === 'md5' && (label.includes('md5') || label.includes('hash') || key.includes('md5'))) ||
+                    (iocType === 'urls' && (label.includes('url') || key.includes('url'))) ||
+                    (iocType === 'emails' && (label.includes('email') || key.includes('email')));
+
+                if (matchesType && field.type === 'list') {
+                    const fid = `sf-${iocTargetStepId}-${field.key}`;
+                    const container = document.getElementById(fid);
+                    if (!container) continue;
+                    const existing = new Set([...container.querySelectorAll('input')].map(i => i.value.trim().toLowerCase()));
+                    for (const val of items) {
+                        if (!existing.has(val.toLowerCase())) {
+                            addListItem(fid, field.placeholder || '');
+                            const inputs = container.querySelectorAll('input');
+                            inputs[inputs.length - 1].value = val;
+                            applied++;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // Anything not matched goes into the notes
+    const unmatched = [];
+    for (const [type, label] of Object.entries(IOC_LABELS)) {
+        const items = getSelectedIOCs(type);
+        if (!items.length) continue;
+        // Check if any were applied to fields
+        const fieldKeys = IOC_FIELD_MAP[type] || [];
+        const hasFieldMatch = fieldKeys.some(fk => fields.some(f => f.key === fk));
+        const hasLabelMatch = fields.some(f => {
+            const l = (f.label||'').toLowerCase(), k = (f.key||'').toLowerCase();
+            return (type==='ipv4'&&(l.includes('ip')||k.includes('ip'))) ||
+                   (type==='hostnames'&&(l.includes('host')||k.includes('host'))) ||
+                   (type==='domains'&&(l.includes('domain')||l.includes('dns'))) ||
+                   (type==='sha256'&&(l.includes('hash')||l.includes('sha'))) ||
+                   (type==='md5'&&(l.includes('md5')||l.includes('hash')));
+        });
+        if (!hasFieldMatch && !hasLabelMatch) {
+            unmatched.push(label + ': ' + items.join(', '));
+        }
+    }
+    if (unmatched.length) {
+        const ta = document.getElementById('section-content-' + iocTargetStepId);
+        if (ta) ta.value = (ta.value ? ta.value + '\n\n' : '') + 'Extracted IOCs:\n' + unmatched.join('\n');
+    }
+
+    showToast(applied > 0 ? `${applied} IOCs applied to fields` : 'IOCs added to notes');
+    closeModal('modal-ioc-extract');
+}
+
+function getSelectedIOCs(type) {
+    const items = iocExtractedData[type] || [];
+    const checkboxes = document.querySelectorAll(`input[data-ioc-type="${type}"]`);
+    if (!checkboxes.length) return items; // all selected if no checkboxes
+    const selected = [];
+    checkboxes.forEach((cb, i) => { if (cb.checked) selected.push(items[i]); });
+    return selected;
+}
+
+function renderTimeline(entries){
+    const d=document.getElementById('cd-timeline');
+    if(!entries.length){d.innerHTML='<div class="empty-state">No timeline entries</div>';return}
+    d.innerHTML=entries.map(e=>`<div class="tl-entry ${e.entry_type}"><div class="tl-meta">${esc(e.username||'System')} &middot; ${fmtDateTime(e.timestamp)} &middot; <em>${fmtLabel(e.entry_type)}</em></div><div class="tl-content">${esc(e.content)}</div></div>`).join('');
+}
+function renderDetailEvidence(items){
+    const d=document.getElementById('cd-evidence-list');
+    if(!items.length){d.innerHTML='<div class="empty-state">No evidence items</div>';return}
+    d.innerHTML=items.map(e=>`<div class="ev-card"><div class="ev-card-header"><div><strong>${esc(e.evidence_number)}</strong> &mdash; ${esc(e.name)} <span class="badge badge-${e.status==='under_analysis'?'analysis':'intake'}" style="font-size:.7rem;">${fmtLabel(e.status)}</span></div><div style="display:flex;gap:6px;"><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" onclick="showCustodyLog(${e.id},'${esc(e.evidence_number)}')">Custody (${e.custody_entries||0})</button><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" onclick="showCustodyModal(${e.id})">+ Action</button></div></div><div style="font-size:.8rem;color:var(--text-secondary);">${fmtLabel(e.evidence_type)} &middot; ${esc(e.source||'N/A')} &middot; ${esc(e.storage_location||'N/A')}</div>${e.hash_sha256?`<div class="ev-card-hash">SHA256: ${e.hash_sha256}</div>`:''}${e.hash_md5?`<div class="ev-card-hash">MD5: ${e.hash_md5}</div>`:''}</div>`).join('');
+}
+
+// ======== CASE ACTIONS ========
+async function updateCaseStatus(){
+    try{const r=await fetch(API+'/cases/'+currentCaseId,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:document.getElementById('cd-status-select').value})});if(!r.ok){const e=await r.json();throw new Error(e.detail||'Failed')}showToast('Status updated');openCaseDetail(currentCaseId);loadCases()}catch(e){showToast(e.message,true)}
+}
+async function addTimelineNote(){
+    const input=document.getElementById('cd-note-input'),content=input.value.trim();if(!content)return;
+    try{const r=await fetch(API+'/cases/'+currentCaseId+'/timeline',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})});if(!r.ok)throw 0;input.value='';openCaseDetail(currentCaseId)}catch(e){showToast('Failed',true)}
+}
+async function loadReportTab(){try{const r=await fetch(API+'/cases/'+currentCaseId+'/report');if(!r.ok)throw 0;const rpt=await r.json();document.getElementById('cd-report-content').textContent=JSON.stringify(rpt,null,2)}catch(e){document.getElementById('cd-report-content').textContent='Failed to load report'}}
+
+async function toggleLock(){
+    const locked=currentCaseData&&currentCaseData.is_locked;
+    const action=locked?'unlock':'lock';
+    try{const r=await fetch(API+'/cases/'+currentCaseId+'/'+action,{method:'POST'});if(!r.ok){const e=await r.json();throw new Error(e.detail||'Failed')}showToast(locked?'Unlocked':'Locked');openCaseDetail(currentCaseId);loadCases()}catch(e){showToast(e.message,true)}
+}
+
+// ======== CREATE / CLOSE ========
+function showNewCaseModal(){['nc-title','nc-description','nc-classification','nc-alert-case'].forEach(id=>document.getElementById(id).value='');const pbSel=document.getElementById('nc-playbook');if(pbSel)pbSel.value='';const preview=document.getElementById('nc-playbook-preview');if(preview)preview.style.display='none';document.getElementById('modal-new-case').style.display='flex'}
+async function createCase(){
+    const title=document.getElementById('nc-title').value.trim(),type=document.getElementById('nc-type').value;
+    if(!title||!type){showToast('Title and type required',true);return}
+    const pbVal=document.getElementById('nc-playbook')?document.getElementById('nc-playbook').value:'';
+    const body={title,investigation_type:type,priority:document.getElementById('nc-priority').value,description:document.getElementById('nc-description').value||null,classification:document.getElementById('nc-classification').value||null,lead_investigator_id:document.getElementById('nc-lead').value?parseInt(document.getElementById('nc-lead').value):null,alert_case_id:document.getElementById('nc-alert-case').value?parseInt(document.getElementById('nc-alert-case').value):null,playbook_id:pbVal?parseInt(pbVal):null};
+    try{const r=await fetch(API+'/cases',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok){const e=await r.json();throw new Error(e.detail||'Failed')}closeModal('modal-new-case');showToast('Investigation created');loadCases()}catch(e){showToast(e.message,true)}
+}
+function showCloseModal(){['cc-summary','cc-findings','cc-recommendations'].forEach(id=>document.getElementById(id).value='');document.getElementById('modal-close-case').style.display='flex'}
+async function closeCaseSubmit(){
+    const body={summary:document.getElementById('cc-summary').value||null,findings:document.getElementById('cc-findings').value||null,recommendations:document.getElementById('cc-recommendations').value||null};
+    try{const r=await fetch(API+'/cases/'+currentCaseId+'/close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok){const e=await r.json();throw new Error(e.detail||'Failed')}const data=await r.json();closeModal('modal-close-case');closeModal('modal-case-detail');showToast('Investigation closed. Report saved to Document Library.');loadCases()}catch(e){showToast(e.message,true)}
+}
+
+// ======== REPORT ========
+async function generateReport(){
+    try{const r=await fetch(API+'/cases/'+currentCaseId+'/report');if(!r.ok)throw 0;const rpt=await r.json();document.getElementById('rpt-title').textContent='Report: '+rpt.case_number;document.getElementById('rpt-content').textContent=JSON.stringify(rpt,null,2);document.getElementById('modal-report').style.display='flex'}catch(e){showToast('Failed',true)}
+}
+function copyReport(){navigator.clipboard.writeText(document.getElementById('rpt-content').textContent).then(()=>showToast('Copied'))}
+
+// ======== EVIDENCE ========
+function populateEvidenceCaseSelect(){const sel=document.getElementById('evidence-case-select');sel.innerHTML='<option value="">Select an investigation...</option>';allCases.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.case_number+' - '+c.title;sel.appendChild(o)})}
+async function loadEvidenceForCase(){
+    const caseId=document.getElementById('evidence-case-select').value;
+    if(!caseId){document.getElementById('evidence-tbody').innerHTML='';document.getElementById('evidence-empty').style.display='';return}
+    try{const r=await fetch(API+'/cases/'+caseId+'/evidence');if(!r.ok)throw 0;renderEvidenceTable(await r.json())}catch(e){showToast('Failed',true)}
+}
+function renderEvidenceTable(items){
+    const tbody=document.getElementById('evidence-tbody'),empty=document.getElementById('evidence-empty');
+    if(!items.length){tbody.innerHTML='';empty.style.display='';return}empty.style.display='none';
+    tbody.innerHTML=items.map(e=>`<tr><td><strong>${esc(e.evidence_number)}</strong></td><td>${esc(e.name)}</td><td>${fmtLabel(e.evidence_type)}</td><td>${fmtLabel(e.status)}</td><td class="ev-card-hash" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;">${e.hash_sha256?'SHA:'+e.hash_sha256.substring(0,12)+'...':e.hash_md5?'MD5:'+e.hash_md5:'-'}</td><td>${esc(e.storage_location||'-')}</td><td>${esc(e.collected_by_username||'-')}</td><td><a href="#" onclick="event.stopPropagation();showCustodyLog(${e.id},'${esc(e.evidence_number)}')">${e.custody_entries||0} entries</a></td><td><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" onclick="event.stopPropagation();showCustodyModal(${e.id})">+ Custody</button></td></tr>`).join('');
+}
+function showAddEvidenceModal(){['ae-name','ae-source','ae-storage','ae-md5','ae-sha256','ae-description'].forEach(id=>document.getElementById(id).value='');document.getElementById('modal-add-evidence').style.display='flex'}
+async function addEvidence(){
+    const name=document.getElementById('ae-name').value.trim(),type=document.getElementById('ae-type').value;
+    if(!name||!type){showToast('Name and type required',true);return}
+    const body={name,evidence_type:type,source:document.getElementById('ae-source').value||null,storage_location:document.getElementById('ae-storage').value||null,hash_md5:document.getElementById('ae-md5').value||null,hash_sha256:document.getElementById('ae-sha256').value||null,description:document.getElementById('ae-description').value||null};
+    try{const r=await fetch(API+'/cases/'+currentCaseId+'/evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok){const e=await r.json();throw new Error(e.detail||'Failed')}closeModal('modal-add-evidence');showToast('Evidence added');openCaseDetail(currentCaseId);loadCases()}catch(e){showToast(e.message,true)}
+}
+
+// ======== CUSTODY ========
+function showCustodyModal(evId){currentEvidenceId=evId;['cust-location','cust-notes'].forEach(id=>document.getElementById(id).value='');document.getElementById('modal-custody').style.display='flex'}
+async function submitCustody(){
+    const body={action:document.getElementById('cust-action').value,location:document.getElementById('cust-location').value||null,received_by_id:document.getElementById('cust-received-by').value?parseInt(document.getElementById('cust-received-by').value):null,notes:document.getElementById('cust-notes').value||null};
+    try{const r=await fetch(API+'/evidence/'+currentEvidenceId+'/custody',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;closeModal('modal-custody');showToast('Custody action logged');if(currentCaseId)openCaseDetail(currentCaseId)}catch(e){showToast('Failed',true)}
+}
+async function showCustodyLog(evId,evNum){
+    try{const r=await fetch(API+'/evidence/'+evId+'/custody');if(!r.ok)throw 0;const entries=await r.json();document.getElementById('cl-title').textContent='Chain of Custody: '+evNum;const d=document.getElementById('cl-entries');d.innerHTML=entries.length?entries.map(e=>`<div class="tl-entry custody_change"><div class="tl-meta">${fmtDateTime(e.timestamp)} &middot; <strong>${fmtLabel(e.action)}</strong></div><div class="tl-content">Performed by: ${esc(e.performed_by_username||'-')}${e.received_by_username?' &rarr; Received by: '+esc(e.received_by_username):''}${e.location?'<br>Location: '+esc(e.location):''}${e.notes?'<br>Notes: '+esc(e.notes):''}</div></div>`).join(''):'<div class="empty-state">No custody entries</div>';document.getElementById('modal-custody-log').style.display='flex'}catch(e){showToast('Failed',true)}
+}
+
+// ======== PLAYBOOKS ========
+async function loadPlaybooks(){
+    const type=document.getElementById('pb-filter-type').value;
+    try{const r=await fetch(API+'/playbooks'+(type?'?investigation_type='+type:''));if(!r.ok)throw 0;renderPlaybooksTable(await r.json())}catch(e){showToast('Failed',true)}
+}
+function renderPlaybooksTable(pbs){
+    const tbody=document.getElementById('playbooks-tbody'),empty=document.getElementById('playbooks-empty');
+    if(!pbs.length){tbody.innerHTML='';empty.style.display='';return}empty.style.display='none';
+    tbody.innerHTML=pbs.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${fmtLabel(p.investigation_type||'Any')}</td><td>${p.step_count}</td><td>${p.is_active?'<span style="color:#3fb950;">Active</span>':'<span style="color:#6e7681;">Inactive</span>'}</td><td>${esc(p.created_by_username||'-')}</td><td><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" onclick="editPlaybook(${p.id})">Edit</button> <button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;color:#f85149;" onclick="deletePlaybook(${p.id})">Delete</button></td></tr>`).join('');
+}
+function showNewPlaybookModal(){editingPlaybookId=null;document.getElementById('pb-modal-title').textContent='New Forensic Playbook';['pb-name','pb-desc'].forEach(id=>document.getElementById(id).value='');document.getElementById('pb-type').value='';document.getElementById('pb-active').checked=true;document.getElementById('pb-steps-list').innerHTML='';addPlaybookStepRow();document.getElementById('modal-playbook').style.display='flex'}
+async function editPlaybook(id){
+    try{const r=await fetch(API+'/playbooks/'+id);if(!r.ok)throw 0;const pb=await r.json();editingPlaybookId=id;document.getElementById('pb-modal-title').textContent='Edit Playbook';document.getElementById('pb-name').value=pb.name;document.getElementById('pb-desc').value=pb.description||'';document.getElementById('pb-type').value=pb.investigation_type||'';document.getElementById('pb-active').checked=pb.is_active;document.getElementById('pb-steps-list').innerHTML='';(pb.steps||[]).forEach(s=>addPlaybookStepRow(s));if(!(pb.steps||[]).length)addPlaybookStepRow();document.getElementById('modal-playbook').style.display='flex'}catch(e){showToast('Failed',true)}
+}
+function addPlaybookStepRow(data){
+    const div=document.getElementById('pb-steps-list'),idx=div.children.length+1,row=document.createElement('div');row.className='pb-step-row';
+    row.innerHTML=`<span class="pb-step-num">${idx}</span><div style="flex:1;"><input type="text" class="form-input pb-step-title" placeholder="Step title" value="${esc((data&&data.title)||'')}"><textarea class="form-input pb-step-desc" rows="2" placeholder="Description" style="margin-top:4px;">${esc((data&&data.description)||'')}</textarea><div style="display:flex;gap:12px;align-items:center;margin-top:4px;"><label style="margin:0;font-size:.8rem;"><input type="checkbox" class="pb-step-req" ${data&&data.is_required?'checked':''}> Required</label><label style="margin:0;font-size:.8rem;">Est. hours: <input type="number" class="pb-step-hours" style="width:60px;" step="0.5" min="0" value="${(data&&data.expected_duration_hours)||''}"></label></div></div><button class="btn btn-secondary" style="padding:2px 8px;color:#f85149;align-self:flex-start;" onclick="this.parentElement.remove();renumberSteps();">&times;</button>`;
+    div.appendChild(row);
+}
+function renumberSteps(){document.querySelectorAll('#pb-steps-list .pb-step-num').forEach((el,i)=>el.textContent=i+1)}
+function collectSteps(){return Array.from(document.querySelectorAll('#pb-steps-list .pb-step-row')).map(row=>({title:row.querySelector('.pb-step-title').value.trim(),description:row.querySelector('.pb-step-desc').value.trim()||null,is_required:row.querySelector('.pb-step-req').checked,expected_duration_hours:parseFloat(row.querySelector('.pb-step-hours').value)||null})).filter(s=>s.title)}
+async function savePlaybook(){
+    const name=document.getElementById('pb-name').value.trim();if(!name){showToast('Name required',true);return}
+    const body={name,description:document.getElementById('pb-desc').value||null,investigation_type:document.getElementById('pb-type').value||null,is_active:document.getElementById('pb-active').checked,steps:collectSteps()};
+    try{const url=editingPlaybookId?API+'/playbooks/'+editingPlaybookId:API+'/playbooks';const r=await fetch(url,{method:editingPlaybookId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok){const e=await r.json();throw new Error(e.detail||'Failed')}closeModal('modal-playbook');showToast(editingPlaybookId?'Updated':'Created');loadPlaybooks()}catch(e){showToast(e.message,true)}
+}
+async function deletePlaybook(id){if(!confirm('Delete this playbook?'))return;try{const r=await fetch(API+'/playbooks/'+id,{method:'DELETE'});if(!r.ok)throw 0;showToast('Deleted');loadPlaybooks()}catch(e){showToast('Failed',true)}}
+
+// ======== REFERENCE DOCS ========
+function renderReferenceDocs(){
+    const grid=document.getElementById('ref-docs-grid');
+    grid.innerHTML=referenceDocs.map(d=>`<div class="fr-ref-card" onclick="viewRefDoc('${d.id}')"><div class="fr-ref-category">${esc(d.category)}</div><div class="fr-ref-title">${esc(d.title)}</div><div class="fr-ref-preview">${esc(d.content.substring(0,200))}...</div></div>`).join('')||'<div class="empty-state">No reference documents available</div>';
+}
+function viewRefDoc(id){
+    const doc=referenceDocs.find(d=>d.id===id);if(!doc)return;
+    document.getElementById('ref-doc-title').textContent=doc.title;
+    document.getElementById('ref-doc-content').innerHTML=simpleMarkdown(doc.content);
+    document.getElementById('modal-ref-doc').style.display='flex';
+}
+function simpleMarkdown(md){
+    return md.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>')
+        .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+        .replace(/`([^`]+)`/g,'<code>$1</code>')
+        .replace(/^```[\s\S]*?^```/gm,m=>'<pre><code>'+m.replace(/^```\w*\n?/,'').replace(/\n?```$/,'')+'</code></pre>')
+        .replace(/^\- (.+)$/gm,'<li>$1</li>')
+        .replace(/^\d+\. (.+)$/gm,'<li>$1</li>')
+        .replace(/\| .+/g,m=>{const cells=m.split('|').filter(c=>c.trim());if(cells.every(c=>/^[\-\s]+$/.test(c)))return'';return'<tr>'+cells.map(c=>'<td>'+c.trim()+'</td>').join('')+'</tr>'})
+        .replace(/\n\n/g,'<br><br>');
+}
+
+init();
+</script>
+{% endblock %}

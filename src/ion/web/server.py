@@ -24,6 +24,7 @@ from ion.web.kibana_api import router as kibana_router
 from ion.web.skills_api import router as skills_router
 from ion.web.notes_api import router as notes_router
 from ion.web.pcap_api import router as pcap_router
+from ion.web.forensics_api import router as forensics_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -164,6 +165,7 @@ app.include_router(kibana_router, prefix="/api/kibana")
 app.include_router(skills_router, prefix="/api/skills")
 app.include_router(notes_router, prefix="/api/notes")
 app.include_router(pcap_router, prefix="/api/pcap")
+app.include_router(forensics_router, prefix="/api/forensics")
 
 
 @app.on_event("startup")
@@ -220,6 +222,14 @@ async def startup_event():
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"Failed to seed Knowledge Base: {e}")
+
+    # Seed built-in Forensic Investigation playbooks (8 playbooks, idempotent)
+    try:
+        from ion.services.forensic_seed_service import seed_forensic_playbooks
+        seed_forensic_playbooks()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to seed forensic playbooks: {e}")
 
     # Start Kibana bidirectional sync if enabled (via connector)
     try:
@@ -446,6 +456,12 @@ async def notes_page(request: Request, user: User = Depends(require_page_auth)):
 async def pcap_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the PCAP analyzer page."""
     return templates.TemplateResponse("pcap.html", {"request": request})
+
+
+@app.get("/forensics", response_class=HTMLResponse)
+async def forensics_page(request: Request, user: User = Depends(require_page_permission("forensic:read"))):
+    """Render the forensic investigations page."""
+    return templates.TemplateResponse("forensics.html", {"request": request})
 
 
 @app.get("/topology", response_class=HTMLResponse)

@@ -504,6 +504,12 @@ class AuthService:
             # Security dashboard permissions
             ("security:read", "security", "read", "View security events"),
             ("security:manage", "security", "manage", "Manage security events, block IPs"),
+            # Forensic investigation permissions
+            ("forensic:read", "forensic", "read", "View forensic investigations"),
+            ("forensic:create", "forensic", "create", "Create forensic investigations and add evidence"),
+            ("forensic:update", "forensic", "update", "Update investigations, log custody actions"),
+            ("forensic:close", "forensic", "close", "Close forensic investigations"),
+            ("forensic:manage_playbooks", "forensic", "manage_playbooks", "Manage forensic playbooks"),
             # Other permissions
             ("discover:read", "discover", "read", "Use discover and hunting tools"),
             ("ai:chat", "ai", "chat", "Use AI chat"),
@@ -545,6 +551,7 @@ class AuthService:
                     "case:read", "case:create", "case:update", "case:close",
                     "observable:read", "observable:create", "observable:update", "observable:enrich",
                     "playbook:read", "playbook:execute",
+                    "forensic:read", "forensic:create", "forensic:update",
                     "discover:read", "ai:chat",
                     "template:read", "template:create", "template:update",
                     "document:read", "document:create", "document:update",
@@ -559,6 +566,7 @@ class AuthService:
                     "case:read", "case:create", "case:update", "case:close",
                     "observable:read", "observable:create", "observable:update", "observable:enrich",
                     "playbook:read", "playbook:execute", "playbook:create", "playbook:update", "playbook:delete",
+                    "forensic:read", "forensic:create", "forensic:update", "forensic:close", "forensic:manage_playbooks",
                     "discover:read", "ai:chat",
                     "template:read", "template:create", "template:update",
                     "document:read", "document:create", "document:update",
@@ -574,6 +582,7 @@ class AuthService:
                     "case:read", "case:create", "case:update", "case:close",
                     "observable:read", "observable:create", "observable:update", "observable:delete", "observable:enrich",
                     "playbook:read", "playbook:execute", "playbook:create", "playbook:update", "playbook:delete",
+                    "forensic:read", "forensic:create", "forensic:update", "forensic:close", "forensic:manage_playbooks",
                     "discover:read", "ai:chat",
                     "template:read", "template:create", "template:update", "template:delete",
                     "document:read", "document:create", "document:update", "document:delete",

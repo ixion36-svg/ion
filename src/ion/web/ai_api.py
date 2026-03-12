@@ -241,8 +241,8 @@ async def get_system_prompts(current_user: User = Depends(get_current_user)):
 @router.post("/chat", response_model=ChatResponse)
 @limiter.limit("30/minute")
 async def chat(
-    http_request: Request,
-    request: ChatRequest,
+    request: Request,
+    payload: ChatRequest,
     current_user: User = Depends(get_current_user),
 ):
     """Send a chat message to the AI (non-streaming)."""
@@ -256,14 +256,14 @@ async def chat(
         )
 
     try:
-        messages = [{"role": m.role, "content": m.content} for m in request.messages]
+        messages = [{"role": m.role, "content": m.content} for m in payload.messages]
 
         result = await service.chat(
             messages=messages,
-            model=request.model,
-            context_type=request.context_type,
-            temperature=request.temperature,
-            max_tokens=request.max_tokens,
+            model=payload.model,
+            context_type=payload.context_type,
+            temperature=payload.temperature,
+            max_tokens=payload.max_tokens,
             user_id=current_user.id,
         )
 
@@ -284,8 +284,8 @@ async def chat(
 @router.post("/chat/stream")
 @limiter.limit("30/minute")
 async def chat_stream(
-    http_request: Request,
-    request: ChatRequest,
+    request: Request,
+    payload: ChatRequest,
     current_user: User = Depends(get_current_user),
 ):
     """Send a chat message to the AI (streaming response)."""
@@ -321,10 +321,10 @@ async def chat_stream(
                 prefs.rag_knowledge_base or prefs.rag_user_notes or prefs.rag_playbooks
             )
 
-            if any_rag_enabled and request.messages:
+            if any_rag_enabled and payload.messages:
                 # Find last user message for keyword extraction
                 last_user_msg = ""
-                for m in reversed(request.messages):
+                for m in reversed(payload.messages):
                     if m.role == "user":
                         last_user_msg = m.content
                         break
@@ -338,7 +338,7 @@ async def chat_stream(
 
                         # Build layered system prompt
                         base_prompt = SYSTEM_PROMPTS.get(
-                            request.context_type, SYSTEM_PROMPTS.get("default", "")
+                            payload.context_type, SYSTEM_PROMPTS.get("default", "")
                         )
                         layers = [base_prompt]
 
@@ -353,7 +353,7 @@ async def chat_stream(
             # Custom instructions even without RAG
             if not enhanced_system_prompt and prefs.custom_instructions:
                 base_prompt = SYSTEM_PROMPTS.get(
-                    request.context_type, SYSTEM_PROMPTS.get("default", "")
+                    payload.context_type, SYSTEM_PROMPTS.get("default", "")
                 )
                 enhanced_system_prompt = (
                     base_prompt
@@ -364,7 +364,7 @@ async def chat_stream(
 
     async def generate():
         try:
-            messages = [{"role": m.role, "content": m.content} for m in request.messages]
+            messages = [{"role": m.role, "content": m.content} for m in payload.messages]
 
             # Add file context to the last user message if files are uploaded
             files_context = get_files_context(current_user.id)
@@ -377,10 +377,10 @@ async def chat_stream(
 
             stream_kwargs = dict(
                 messages=messages,
-                model=request.model,
-                context_type=request.context_type,
-                temperature=request.temperature,
-                max_tokens=request.max_tokens,
+                model=payload.model,
+                context_type=payload.context_type,
+                temperature=payload.temperature,
+                max_tokens=payload.max_tokens,
                 user_id=current_user.id,
             )
             if enhanced_system_prompt:

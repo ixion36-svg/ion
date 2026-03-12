@@ -90,6 +90,7 @@ class DFIRIRISService:
                 headers=self._get_headers(),
                 verify=get_ssl_verify(self.config.get("verify_ssl", True)),
                 timeout=httpx.Timeout(30.0, connect=10.0),
+                follow_redirects=False,
             )
         return self._client
 
@@ -103,6 +104,37 @@ class DFIRIRISService:
         """
         client = await self._get_client()
         response = await client.request(method, path, **kwargs)
+
+        # IRIS redirects to /login when auth fails — detect this
+        if response.status_code in (301, 302, 303, 307, 308):
+            location = response.headers.get("location", "")
+            logger.warning(
+                "DFIR-IRIS redirected to %s — likely auth failure (check API key)",
+                location,
+            )
+            raise httpx.HTTPStatusError(
+                f"DFIR-IRIS authentication failed (redirected to {location}). "
+                "Verify your API key is correct and has the required permissions. "
+                "Generate the key from IRIS User Settings > My API Key.",
+                request=response.request,
+                response=response,
+            )
+
+        # Detect HTML responses (login page returned instead of JSON)
+        content_type = response.headers.get("content-type", "")
+        if "text/html" in content_type:
+            logger.warning(
+                "DFIR-IRIS returned HTML instead of JSON (status %d) — likely auth failure",
+                response.status_code,
+            )
+            raise httpx.HTTPStatusError(
+                "DFIR-IRIS returned login page instead of API response. "
+                "Your API key may be invalid or expired. "
+                "Generate a new key from IRIS User Settings > My API Key.",
+                request=response.request,
+                response=response,
+            )
+
         response.raise_for_status()
         body = response.json()
         if isinstance(body, dict) and "data" in body:
@@ -114,6 +146,29 @@ class DFIRIRISService:
         try:
             client = await self._get_client()
             response = await client.get("/manage/cases/list")
+
+            # Redirect = auth failure
+            if response.status_code in (301, 302, 303, 307, 308):
+                location = response.headers.get("location", "")
+                return {
+                    "success": False,
+                    "error": (
+                        f"Authentication failed — IRIS redirected to {location}. "
+                        "Check that your API key is valid (User Settings > My API Key in IRIS)."
+                    ),
+                }
+
+            # HTML response = login page
+            content_type = response.headers.get("content-type", "")
+            if "text/html" in content_type:
+                return {
+                    "success": False,
+                    "error": (
+                        "Authentication failed — IRIS returned login page. "
+                        "Your API key may be invalid or expired."
+                    ),
+                }
+
             if response.status_code == 200:
                 body = response.json()
                 return {
@@ -123,6 +178,16 @@ class DFIRIRISService:
                         "message": "Connected to DFIR-IRIS",
                     },
                 }
+
+            if response.status_code == 403:
+                return {
+                    "success": False,
+                    "error": (
+                        "Permission denied (403). API key is valid but lacks "
+                        "permissions. Check user role in IRIS admin."
+                    ),
+                }
+
             return {
                 "success": False,
                 "error": f"HTTP {response.status_code}: {response.text[:200]}",

@@ -174,6 +174,40 @@ def _run_migrations(engine: Engine) -> None:
                     )
                     logger.info("Migrated: users.%s", col_name)
 
+    # Migrations for forensic_cases table — lock + report + playbook columns
+    if insp.has_table("forensic_cases"):
+        existing = {col["name"] for col in insp.get_columns("forensic_cases")}
+        for col_name, col_type in {
+            "is_locked": "BOOLEAN DEFAULT 0 NOT NULL",
+            "locked_by_id": "INTEGER REFERENCES users(id)",
+            "locked_at": "DATETIME",
+            "report_document_id": "INTEGER REFERENCES documents(id)",
+            "playbook_id": "INTEGER REFERENCES forensic_playbooks(id)",
+        }.items():
+            if col_name not in existing:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(f"ALTER TABLE forensic_cases ADD COLUMN {col_name} {col_type}")
+                    )
+                    logger.info("Migrated: forensic_cases.%s", col_name)
+
+    # Migrations for forensic_playbook_steps — structured fields
+    if insp.has_table("forensic_playbook_steps"):
+        existing = {col["name"] for col in insp.get_columns("forensic_playbook_steps")}
+        if "fields_json" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE forensic_playbook_steps ADD COLUMN fields_json TEXT"))
+                logger.info("Migrated: forensic_playbook_steps.fields_json")
+
+    # Migrations for forensic_case_steps — structured fields
+    if insp.has_table("forensic_case_steps"):
+        existing = {col["name"] for col in insp.get_columns("forensic_case_steps")}
+        for col_name in ("fields_json", "fields_data"):
+            if col_name not in existing:
+                with engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE forensic_case_steps ADD COLUMN {col_name} TEXT"))
+                    logger.info("Migrated: forensic_case_steps.%s", col_name)
+
 
 def init_db(db_path: Optional[Path] = None) -> Engine:
     """Initialize the database, creating all tables."""

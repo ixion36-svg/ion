@@ -52,7 +52,7 @@ class TemplateRepository:
             .options(joinedload(Template.tags), joinedload(Template.variables))
             .where(Template.name == name)
         )
-        return self.session.execute(stmt).unique().scalar_one_or_none()
+        return self.session.execute(stmt).unique().scalars().first()
 
     def list_all(
         self,

@@ -189,7 +189,7 @@ class TestObservableExtractor:
         raw = {"destination": {"port": "443"}, "network": {"protocol": "tcp"}}
         obs = extract_observables_from_raw(raw)
         types = {o["type"] for o in obs}
-        assert "port" in types
+        assert "destination_port" in types
         assert "protocol" in types
 
     def test_extracts_registry_keys(self):
@@ -228,6 +228,55 @@ class TestObservableExtractor:
         obs = extract_observables_from_raw(raw)
         hostnames = [o for o in obs if o["type"] == "hostname"]
         assert len(hostnames) == 1
+
+    def test_distinguishes_subject_vs_target_user(self):
+        """Windows logon events have subject (performer) and target (acted-upon) users."""
+        from ion.services.observable_extractor import extract_observables_from_raw
+        raw = {
+            "winlog": {
+                "event_data": {
+                    "SubjectUserName": "SYSTEM",
+                    "SubjectUserSid": "S-1-5-18",
+                    "SubjectDomainName": "NT AUTHORITY",
+                    "TargetUserName": "jsmith",
+                    "TargetUserSid": "S-1-5-21-123-456-789-1001",
+                    "TargetDomainName": "CORP",
+                    "IpAddress": "192.168.1.50",
+                    "WorkstationName": "WS-JSMITH",
+                    "LogonType": "10",
+                },
+                "event_id": "4624",
+            }
+        }
+        obs = extract_observables_from_raw(raw)
+        type_value = {(o["type"], o["value"]) for o in obs}
+        # Subject (performer) fields
+        assert ("subject_user", "SYSTEM") in type_value
+        assert ("subject_user", "S-1-5-18") in type_value
+        assert ("subject_domain", "NT AUTHORITY") in type_value
+        # Target (acted-upon) fields
+        assert ("target_user", "jsmith") in type_value
+        assert ("target_user", "S-1-5-21-123-456-789-1001") in type_value
+        assert ("target_domain", "CORP") in type_value
+        # Directional network fields
+        assert ("source_ip", "192.168.1.50") in type_value
+        assert ("source_hostname", "WS-JSMITH") in type_value
+        assert ("logon_type", "10") in type_value
+        assert ("event_id", "4624") in type_value
+
+    def test_distinguishes_source_vs_destination_hosts(self):
+        """Source and destination hostnames should be distinguished."""
+        from ion.services.observable_extractor import extract_observables_from_raw
+        raw = {
+            "source": {"domain": "attacker.evil.com"},
+            "destination": {"domain": "internal.corp.com"},
+            "host": {"name": "fw-01"},
+        }
+        obs = extract_observables_from_raw(raw)
+        type_value = {(o["type"], o["value"]) for o in obs}
+        assert ("source_hostname", "attacker.evil.com") in type_value
+        assert ("destination_hostname", "internal.corp.com") in type_value
+        assert ("hostname", "fw-01") in type_value
 
     def test_empty_input(self):
         from ion.services.observable_extractor import extract_observables_from_raw

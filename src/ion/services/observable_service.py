@@ -27,22 +27,47 @@ from ion.services.opencti_service import get_opencti_service, OpenCTIError
 
 logger = logging.getLogger(__name__)
 
-# Map legacy observable types to new enum values
+# Map context types (from observable_extractor) and legacy names to ObservableType enum.
+# The context string is preserved on ObservableLink.context so the role (source vs
+# destination, subject vs target) is never lost — this map only resolves to the
+# canonical type for the Observable record itself.
 LEGACY_TYPE_MAP = {
-    "hostname": ObservableType.HOSTNAME,
+    # IP addresses (role distinguished by context on the link)
     "source_ip": ObservableType.IPV4,
     "destination_ip": ObservableType.IPV4,
-    "url": ObservableType.URL,
-    "domain": ObservableType.DOMAIN,
-    "user_account": ObservableType.USER_ACCOUNT,
+    "host_ip": ObservableType.IPV4,
+    "ip": ObservableType.IPV4,
     "ipv4-addr": ObservableType.IPV4,
     "ipv6-addr": ObservableType.IPV6,
+    # Hostnames
+    "hostname": ObservableType.HOSTNAME,
+    "source_hostname": ObservableType.HOSTNAME,
+    "destination_hostname": ObservableType.HOSTNAME,
+    # User accounts (subject/target role distinguished by context)
+    "user_account": ObservableType.USER_ACCOUNT,
+    "subject_user": ObservableType.USER_ACCOUNT,
+    "target_user": ObservableType.USER_ACCOUNT,
+    "subject_domain": ObservableType.DOMAIN,
+    "target_domain": ObservableType.DOMAIN,
+    # URLs and domains
+    "url": ObservableType.URL,
+    "domain": ObservableType.DOMAIN,
     "domain-name": ObservableType.DOMAIN,
+    # File info
+    "file_path": ObservableType.FILE_HASH_SHA256,   # no dedicated type; store as-is
+    "process_path": ObservableType.FILE_HASH_SHA256,
+    "sha256": ObservableType.FILE_HASH_SHA256,
+    "sha1": ObservableType.FILE_HASH_SHA1,
+    "md5": ObservableType.FILE_HASH_MD5,
     "file-sha256": ObservableType.FILE_HASH_SHA256,
     "file-sha1": ObservableType.FILE_HASH_SHA1,
     "file-md5": ObservableType.FILE_HASH_MD5,
+    # Email
+    "email": ObservableType.EMAIL,
     "email-addr": ObservableType.EMAIL,
-    "ip": ObservableType.IPV4,
+    # Ports (store as-is via context, no dedicated ObservableType)
+    "source_port": ObservableType.IPV4,  # fallback — port context preserved on link
+    "destination_port": ObservableType.IPV4,
 }
 
 
@@ -609,6 +634,41 @@ class ObservableService:
         if not alert_ids:
             return []
         return self.session.query(AlertTriage).filter(AlertTriage.id.in_(alert_ids)).all()
+
+    def get_related_alerts_with_context(
+        self,
+        observable_id: int,
+        limit: int = 50,
+    ) -> List[dict]:
+        """Get all alerts containing this observable, with field context.
+
+        Returns dicts with 'alert' (AlertTriage) and 'context' (str) keys
+        so callers can display the role (source_ip, target_user, etc.).
+        """
+        links = (
+            self.session.query(ObservableLink)
+            .filter(
+                ObservableLink.observable_id == observable_id,
+                ObservableLink.link_type == ObservableLinkType.ALERT,
+            )
+            .order_by(desc(ObservableLink.created_at))
+            .limit(limit)
+            .all()
+        )
+        if not links:
+            return []
+
+        alert_ids = [link.entity_id for link in links]
+        alerts_by_id = {
+            a.id: a
+            for a in self.session.query(AlertTriage).filter(AlertTriage.id.in_(alert_ids)).all()
+        }
+        results = []
+        for link in links:
+            alert = alerts_by_id.get(link.entity_id)
+            if alert:
+                results.append({"alert": alert, "context": link.context or ""})
+        return results
 
     def get_related_cases(
         self,
