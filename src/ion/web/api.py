@@ -3470,6 +3470,12 @@ async def create_case(
                 _populate_triage_observables(triage, ctx.host, ctx.user, ctx.raw_data)
             if ctx.raw_data:
                 raw_data_list.append(ctx.raw_data)
+            else:
+                logger.info("create_case: alert %s has no raw_data in context", alert_id)
+    else:
+        logger.info("create_case: no alert_contexts provided")
+
+    logger.info("create_case: collected %d raw_data items for enrichment", len(raw_data_list))
 
     session.commit()
     session.refresh(new_case)
@@ -3484,6 +3490,7 @@ async def create_case(
 
     # Store enriched observables on the case (for display and Kibana sync)
     case_observables = enriched_observables or []
+    logger.info("create_case: %d observables enriched for case %s", len(case_observables), case_number)
     if case_observables:
         new_case.observables = case_observables
         session.commit()

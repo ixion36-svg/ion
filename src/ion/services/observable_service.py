@@ -51,28 +51,26 @@ LEGACY_TYPE_MAP = {
     "url": ObservableType.URL,
     "domain": ObservableType.DOMAIN,
     "domain-name": ObservableType.DOMAIN,
-    # File info
-    "file_path": ObservableType.FILE_HASH_SHA256,
-    "process_path": ObservableType.FILE_HASH_SHA256,
+    # File hashes
     "sha256": ObservableType.FILE_HASH_SHA256,
     "sha1": ObservableType.FILE_HASH_SHA1,
     "md5": ObservableType.FILE_HASH_MD5,
     "file-sha256": ObservableType.FILE_HASH_SHA256,
     "file-sha1": ObservableType.FILE_HASH_SHA1,
     "file-md5": ObservableType.FILE_HASH_MD5,
-    # Process info
-    "process_name": ObservableType.HOSTNAME,  # no dedicated type; context preserved on link
-    "command_line": ObservableType.HOSTNAME,
-    "parent_process": ObservableType.HOSTNAME,
-    "parent_process_path": ObservableType.FILE_HASH_SHA256,
     # Email
     "email": ObservableType.EMAIL,
     "email-addr": ObservableType.EMAIL,
-    "email_subject": ObservableType.EMAIL,
-    # Registry
-    "registry_key": ObservableType.HOSTNAME,
-    "registry_value": ObservableType.HOSTNAME,
 }
+
+# Types that are extracted as observables for display but don't map to a
+# canonical ObservableType (file paths, process names, registry keys, etc.).
+# These appear in the case observable list but skip normalization/enrichment.
+_DISPLAY_ONLY_TYPES = frozenset({
+    "file_path", "process_path", "process_name", "command_line",
+    "parent_process", "parent_process_path",
+    "email_subject", "registry_key", "registry_value",
+})
 
 
 class ObservableService:
@@ -575,12 +573,19 @@ class ObservableService:
         # Extract from all raw data
         for raw_data in raw_data_list:
             if not raw_data:
+                logger.debug("extract_enrich_for_case: skipping empty raw_data")
                 continue
-            for obs in extract_observables_from_raw(raw_data):
+            obs_list = extract_observables_from_raw(raw_data)
+            logger.info("extract_enrich_for_case: extracted %d observables from raw_data (%d keys)",
+                        len(obs_list), len(raw_data))
+            for obs in obs_list:
                 key = (obs["type"], obs["value"])
                 if key not in seen:
                     seen.add(key)
                     extracted.append(obs)
+
+        logger.info("extract_enrich_for_case: %d unique observables from %d raw_data items",
+                     len(extracted), len(raw_data_list))
 
         if not extracted:
             return []
@@ -595,11 +600,30 @@ class ObservableService:
             if obs_type_str not in ENRICHABLE_TYPES:
                 continue
 
+            # Display-only types: include in results but skip normalization/enrichment
+            if obs_type_str in _DISPLAY_ONLY_TYPES:
+                results.append({
+                    "type": obs_type_str,
+                    "value": obs_value,
+                    "observable_id": None,
+                    "threat_level": "unknown",
+                    "enrichment": None,
+                })
+                continue
+
             # Resolve to canonical type
             try:
                 obs_type = self._resolve_type(obs_type_str)
             except ValueError:
                 logger.warning("Skipping unknown observable type: %s", obs_type_str)
+                # Still include as display-only
+                results.append({
+                    "type": obs_type_str,
+                    "value": obs_value,
+                    "observable_id": None,
+                    "threat_level": "unknown",
+                    "enrichment": None,
+                })
                 continue
 
             # Create or get the normalized observable
@@ -640,6 +664,7 @@ class ObservableService:
                 "enrichment": enrichment_data,
             })
 
+        logger.info("extract_enrich_for_case: returning %d observables for case %s", len(results), case_id)
         self.session.flush()
         return results
 
