@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, get_db_session, require_permission
 from ion.models.skills import (
-    AssessmentSnapshot, KnowledgeArticle, SOCCMMAssessment,
-    SkillAssessment, TeamCertification, TeamScheduleEntry,
-    TrainingPlan, TrainingPlanItem, UserCareerGoal,
+    AssessmentReviewCycle, AssessmentSnapshot, KnowledgeArticle,
+    SOCCMMAssessment, SkillAssessment, TeamCertification,
+    TeamScheduleEntry, TrainingPlan, TrainingPlanItem, UserCareerGoal,
 )
 from ion.models.user import Role, User
 
@@ -98,17 +98,39 @@ def get_assessment(
     current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
-    """Get current user's skill assessment ratings."""
+    """Get current user's skill assessment ratings + review cycle status."""
     rows = (
         session.query(SkillAssessment)
         .filter(SkillAssessment.user_id == current_user.id)
         .all()
     )
+
+    # Get review cycle
+    cycle = (
+        session.query(AssessmentReviewCycle)
+        .filter(AssessmentReviewCycle.user_id == current_user.id)
+        .first()
+    )
+
+    review = None
+    if cycle:
+        now = datetime.utcnow()
+        is_overdue = now >= cycle.next_review_at
+        days_until = max(0, (cycle.next_review_at - now).days) if not is_overdue else 0
+        review = {
+            "submitted_at": cycle.submitted_at.isoformat(),
+            "next_review_at": cycle.next_review_at.isoformat(),
+            "is_locked": cycle.is_locked and not is_overdue,
+            "is_overdue": is_overdue,
+            "days_until_review": days_until,
+        }
+
     return {
         "assessments": [
             {"skill_key": r.skill_key, "rating": r.rating, "notes": r.notes}
             for r in rows
-        ]
+        ],
+        "review": review,
     }
 
 
@@ -119,6 +141,22 @@ def save_assessment(
     session: Session = Depends(get_db_session),
 ):
     """Bulk upsert skill assessment ratings for current user."""
+    # Check review cycle lock
+    cycle = (
+        session.query(AssessmentReviewCycle)
+        .filter(AssessmentReviewCycle.user_id == current_user.id)
+        .first()
+    )
+    if cycle and cycle.is_locked:
+        now = datetime.utcnow()
+        if now < cycle.next_review_at:
+            raise HTTPException(
+                status_code=403,
+                detail="Assessment is locked until next review cycle. Use 'Edit Assessment' to unlock.",
+            )
+        # Auto-unlock if overdue
+        cycle.is_locked = False
+
     for item in payload.assessments:
         existing = (
             session.query(SkillAssessment)
@@ -185,6 +223,77 @@ def save_career_goal(
         )
     session.commit()
     return {"status": "ok"}
+
+
+# =============================================================================
+# Assessment Review Cycle
+# =============================================================================
+
+REVIEW_CYCLE_DAYS = 90  # 3 months
+
+
+@router.post("/assessment/submit")
+def submit_assessment(
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Submit assessment and lock it for 3 months until the next review cycle."""
+    # Must have at least some ratings
+    count = (
+        session.query(func.count(SkillAssessment.id))
+        .filter(SkillAssessment.user_id == current_user.id)
+        .scalar()
+    )
+    if not count:
+        raise HTTPException(status_code=400, detail="Rate at least one skill before submitting.")
+
+    now = datetime.utcnow()
+    next_review = now + timedelta(days=REVIEW_CYCLE_DAYS)
+
+    cycle = (
+        session.query(AssessmentReviewCycle)
+        .filter(AssessmentReviewCycle.user_id == current_user.id)
+        .first()
+    )
+    if cycle:
+        cycle.submitted_at = now
+        cycle.next_review_at = next_review
+        cycle.is_locked = True
+    else:
+        cycle = AssessmentReviewCycle(
+            user_id=current_user.id,
+            submitted_at=now,
+            next_review_at=next_review,
+            is_locked=True,
+        )
+        session.add(cycle)
+
+    session.commit()
+    return {
+        "status": "ok",
+        "submitted_at": cycle.submitted_at.isoformat(),
+        "next_review_at": cycle.next_review_at.isoformat(),
+        "is_locked": True,
+    }
+
+
+@router.post("/assessment/unlock")
+def unlock_assessment(
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Unlock assessment for early editing (before review cycle is due)."""
+    cycle = (
+        session.query(AssessmentReviewCycle)
+        .filter(AssessmentReviewCycle.user_id == current_user.id)
+        .first()
+    )
+    if not cycle:
+        return {"status": "ok", "is_locked": False}
+
+    cycle.is_locked = False
+    session.commit()
+    return {"status": "ok", "is_locked": False}
 
 
 @router.get("/team-overview")

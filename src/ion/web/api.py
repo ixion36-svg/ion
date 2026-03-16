@@ -2613,13 +2613,23 @@ async def create_gitlab_issue(
     """Create a new GitLab issue."""
     service = get_gitlab_service()
     try:
+        description = issue_data.description or ""
+        sudo_user = None
+        if service.sudo_enabled:
+            # Impersonate: GitLab natively shows the real user
+            sudo_user = current_user.username
+        else:
+            # Text attribution fallback
+            display = current_user.display_name or current_user.username
+            description += f"\n\n---\n*Created by {display} via ION*"
         issue = await service.create_issue(
             title=issue_data.title,
-            description=issue_data.description,
+            description=description,
             labels=issue_data.labels,
             assignee_ids=issue_data.assignee_ids,
             milestone_id=issue_data.milestone_id,
             due_date=issue_data.due_date,
+            sudo_user=sudo_user,
         )
         return issue.to_dict()
     except GitLabError as e:
@@ -2733,9 +2743,19 @@ async def add_gitlab_issue_comment(
     """Add a comment to a GitLab issue."""
     service = get_gitlab_service()
     try:
+        sudo_user = None
+        if service.sudo_enabled:
+            # Impersonate: GitLab natively shows the real user
+            sudo_user = current_user.username
+            body = comment_data.body
+        else:
+            # Text attribution fallback
+            display = current_user.display_name or current_user.username
+            body = f"**{display}** (via ION):\n\n{comment_data.body}"
         comment = await service.add_issue_comment(
             issue_iid=issue_iid,
-            body=comment_data.body,
+            body=body,
+            sudo_user=sudo_user,
         )
         return comment.to_dict()
     except GitLabError as e:

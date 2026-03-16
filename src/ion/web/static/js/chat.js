@@ -278,6 +278,8 @@ function renderRoomList(roomsToRender) {
                 <p>No conversations yet.<br>Start a new chat!</p>
             </div>
         `;
+        // Re-add AI assistant tab
+        if (typeof addAITab === 'function') addAITab();
         return;
     }
 
@@ -307,6 +309,11 @@ function renderRoomList(roomsToRender) {
             </div>
         `;
     }).join('');
+
+    // Re-add AI assistant tab (innerHTML destroys it each render)
+    if (typeof addAITab === 'function') {
+        addAITab();
+    }
 }
 
 function filterRooms(query) {
@@ -326,9 +333,20 @@ async function openRoom(roomId) {
     activeRoomId = roomId;
     lastMessageTimestamp = null;
 
+    // Close AI chat if open
+    const aiView = document.getElementById('ai-chat-view');
+    if (aiView) aiView.classList.remove('show');
+    if (typeof aiChatActive !== 'undefined') aiChatActive = false;
+
+    // Clear any stale inline display styles so CSS classes take effect
+    const listView = document.getElementById('chat-room-list-view');
+    const activeView = document.getElementById('chat-active-view');
+    if (listView) listView.style.removeProperty('display');
+    if (activeView) activeView.style.removeProperty('display');
+
     // Show active view
-    document.getElementById('chat-room-list-view').classList.add('hidden');
-    document.getElementById('chat-active-view').classList.add('show');
+    listView.classList.add('hidden');
+    activeView.classList.add('show');
 
     // Load room details and messages
     try {
@@ -366,8 +384,14 @@ function closeActiveRoom() {
     activeRoomId = null;
     lastMessageTimestamp = null;
 
-    document.getElementById('chat-room-list-view').classList.remove('hidden');
-    document.getElementById('chat-active-view').classList.remove('show');
+    // Clear any inline display styles so CSS classes work
+    const listView = document.getElementById('chat-room-list-view');
+    const activeView = document.getElementById('chat-active-view');
+    if (listView) listView.style.removeProperty('display');
+    if (activeView) activeView.style.removeProperty('display');
+
+    listView.classList.remove('hidden');
+    activeView.classList.remove('show');
 
     // Refresh room list
     loadRooms();

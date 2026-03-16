@@ -206,6 +206,14 @@
                     <span class="form-help">Disable for self-signed certificates</span>
                 </div>
 
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="gitlab_sudo_enabled" name="gitlab_sudo_enabled">
+                        Enable Sudo Impersonation
+                    </label>
+                    <span class="form-help">Requires an admin-level API token. Comments and issues will appear as the logged-in ION user in GitLab.</span>
+                </div>
+
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="testConnection('gitlab')">Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -1836,6 +1844,7 @@ function populateForms(config) {
     document.getElementById('gitlab_url').value = config.gitlab.gitlab_url || '';
     document.getElementById('gitlab_project_id').value = config.gitlab.gitlab_project_id || '';
     document.getElementById('gitlab_verify_ssl').checked = config.gitlab.gitlab_verify_ssl !== false;
+    document.getElementById('gitlab_sudo_enabled').checked = config.gitlab.gitlab_sudo_enabled === true;
     updateSecretStatus('gitlab_token', config.gitlab.gitlab_token_set);
 
     // OpenCTI
@@ -1916,6 +1925,7 @@ async function saveSettings(event, section) {
         }
         data.gitlab_project_id = form.gitlab_project_id.value;
         data.gitlab_verify_ssl = form.gitlab_verify_ssl.checked;
+        data.gitlab_sudo_enabled = form.gitlab_sudo_enabled.checked;
     } else if (section === 'opencti') {
         data.opencti_enabled = form.opencti_enabled.checked;
         data.opencti_url = form.opencti_url.value;

@@ -140,6 +140,7 @@ class GitLabService:
         self.token = token or config["token"]
         self.project_id = project_id or config["project_id"]
         self.verify_ssl = config.get("verify_ssl", True)
+        self.sudo_enabled = config.get("sudo_enabled", False)
         self._client: Optional[httpx.AsyncClient] = None
 
     @property
@@ -189,17 +190,27 @@ class GitLabService:
         self,
         method: str,
         url: str,
+        sudo_user: Optional[str] = None,
         **kwargs,
     ) -> Any:
-        """Make an authenticated request to GitLab API."""
+        """Make an authenticated request to GitLab API.
+
+        Args:
+            sudo_user: If sudo_enabled, impersonate this GitLab username.
+                       The API token must belong to a GitLab admin.
+        """
         if not self.is_configured:
             raise GitLabError("GitLab integration is not configured")
+
+        headers = self._get_headers()
+        if sudo_user and self.sudo_enabled:
+            headers["Sudo"] = sudo_user
 
         # Use a fresh client per request to avoid connection issues with concurrent requests
         try:
             from ion.core.config import get_ssl_verify
             async with httpx.AsyncClient(
-                headers=self._get_headers(),
+                headers=headers,
                 timeout=httpx.Timeout(60.0, connect=10.0),
                 verify=get_ssl_verify(self.verify_ssl),
             ) as client:
@@ -310,6 +321,7 @@ class GitLabService:
         assignee_ids: Optional[List[int]] = None,
         milestone_id: Optional[int] = None,
         due_date: Optional[str] = None,
+        sudo_user: Optional[str] = None,
     ) -> GitLabIssue:
         """Create a new issue.
 
@@ -320,6 +332,7 @@ class GitLabService:
             assignee_ids: List of user IDs to assign
             milestone_id: Milestone ID
             due_date: Due date in YYYY-MM-DD format
+            sudo_user: GitLab username to impersonate (requires admin token + sudo_enabled)
 
         Returns:
             Created GitLabIssue object
@@ -340,6 +353,7 @@ class GitLabService:
         data = await self._request(
             "POST",
             f"{self.project_api_url}/issues",
+            sudo_user=sudo_user,
             json=payload,
         )
 
@@ -464,12 +478,18 @@ class GitLabService:
             if not note.get("system", False)
         ]
 
-    async def add_issue_comment(self, issue_iid: int, body: str) -> GitLabComment:
+    async def add_issue_comment(
+        self,
+        issue_iid: int,
+        body: str,
+        sudo_user: Optional[str] = None,
+    ) -> GitLabComment:
         """Add a comment to an issue.
 
         Args:
             issue_iid: The project-level issue ID
             body: Comment body (Markdown supported)
+            sudo_user: GitLab username to impersonate (requires admin token + sudo_enabled)
 
         Returns:
             Created GitLabComment object
@@ -477,6 +497,7 @@ class GitLabService:
         data = await self._request(
             "POST",
             f"{self.project_api_url}/issues/{issue_iid}/notes",
+            sudo_user=sudo_user,
             json={"body": body},
         )
 

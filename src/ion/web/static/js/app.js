@@ -173,12 +173,29 @@ function toggleUserDropdown() {
     }
 }
 
-// Close dropdown when clicking outside
+// Mobile nav hamburger toggle
+function toggleNavMenu() {
+    const hamburger = document.getElementById('nav-hamburger');
+    const navLinks = document.getElementById('nav-links');
+    if (hamburger && navLinks) {
+        hamburger.classList.toggle('open');
+        navLinks.classList.toggle('mobile-open');
+    }
+}
+
+// Close dropdown and mobile nav when clicking outside
 document.addEventListener('click', function(event) {
     const userMenu = document.getElementById('user-menu');
     const dropdown = document.getElementById('user-dropdown');
     if (userMenu && dropdown && !userMenu.contains(event.target)) {
         dropdown.classList.remove('show');
+    }
+    // Close mobile nav when clicking outside
+    const hamburger = document.getElementById('nav-hamburger');
+    const navLinks = document.getElementById('nav-links');
+    if (hamburger && navLinks && !hamburger.contains(event.target) && !navLinks.contains(event.target)) {
+        hamburger.classList.remove('open');
+        navLinks.classList.remove('mobile-open');
     }
 });
 

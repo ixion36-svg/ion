@@ -851,7 +851,7 @@ class ElasticsearchService:
             body = {
                 "query": {"ids": {"values": alert_ids}},
                 "script": {
-                    "source": "ctx._source['kibana.alert.workflow_status'] = params.status",
+                    "source": "if (ctx._source.kibana == null) { ctx._source.kibana = new HashMap(); } if (ctx._source.kibana.alert == null) { ctx._source.kibana.alert = new HashMap(); } ctx._source.kibana.alert.workflow_status = params.status;",
                     "lang": "painless",
                     "params": {"status": workflow_status},
                 },

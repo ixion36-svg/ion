@@ -9,6 +9,21 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ion.models.base import Base, TimestampMixin
 
 
+class AssessmentReviewCycle(Base, TimestampMixin):
+    """Tracks when a user last submitted their self-assessment and when the next review is due."""
+
+    __tablename__ = "assessment_review_cycles"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_review_cycle_user"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    next_review_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
 class SkillAssessment(Base, TimestampMixin):
     """User self-assessment rating for a specific skill."""
 

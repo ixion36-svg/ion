@@ -83,6 +83,7 @@ from ion.models.playbook import (
     ExecutionStatus,
 )
 from ion.models.skills import (
+    AssessmentReviewCycle,
     SkillAssessment,
     UserCareerGoal,
     AssessmentSnapshot,
@@ -186,6 +187,7 @@ __all__ = [
     "StepType",
     "ExecutionStatus",
     # Skills assessment models
+    "AssessmentReviewCycle",
     "SkillAssessment",
     "UserCareerGoal",
     "AssessmentSnapshot",

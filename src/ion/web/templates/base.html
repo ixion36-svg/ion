@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ION{% endblock %}</title>
     <link rel="icon" type="image/png" href="/static/img/ion-logo.png">
-    <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.4">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.9.4">
-    <link rel="stylesheet" href="/static/css/chat.css?v=0.9.4">
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.9.4">
+    <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.8">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.9.8">
+    <link rel="stylesheet" href="/static/css/chat.css?v=0.9.8">
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.9.8">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
     <script src="/static/js/theme-init.js"></script>
 </head>
@@ -17,7 +17,10 @@
         <div class="nav-brand">
             <a href="/"><img src="/static/img/ion-logo.png" alt="ION" class="nav-logo">ION</a>
         </div>
-        <ul class="nav-links">
+        <button class="nav-hamburger" id="nav-hamburger" onclick="toggleNavMenu()" aria-label="Toggle navigation">
+            <span></span><span></span><span></span>
+        </button>
+        <ul class="nav-links" id="nav-links">
             <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>
             <li><a href="/templates" class="{% if '/templates' in request.url.path %}active{% endif %}">Templates</a></li>
             <li><a href="/documents" class="{% if '/documents' in request.url.path %}active{% endif %}">Documents</a></li>
@@ -202,6 +205,20 @@
     .np-clip-item{display:flex;align-items:flex-start;gap:8px;padding:8px;border-radius:6px;margin-bottom:4px;background:var(--bg-secondary,#161b22)}
     .np-clip-text{flex:1;font-size:.82rem;color:var(--text-primary,#f0f6fc);white-space:pre-wrap;word-break:break-all}
     .np-clip-actions{display:flex;gap:4px;flex-shrink:0}
+
+    /* ── Hamburger Menu ─────────────────────────── */
+    .nav-hamburger{display:none;background:none;border:none;cursor:pointer;padding:6px;margin-left:auto;flex-shrink:0;z-index:101}
+    .nav-hamburger span{display:block;width:22px;height:2px;background:var(--text-primary,#f0f6fc);margin:5px 0;border-radius:2px;transition:all .25s ease}
+    .nav-hamburger.open span:nth-child(1){transform:rotate(45deg) translate(5px,5px)}
+    .nav-hamburger.open span:nth-child(2){opacity:0}
+    .nav-hamburger.open span:nth-child(3){transform:rotate(-45deg) translate(5px,-5px)}
+    @media (max-width: 600px){
+        .nav-hamburger{display:block}
+        .nav-links{display:none;position:absolute;top:56px;left:0;right:0;background:var(--bg-secondary,#161b22);border-bottom:1px solid var(--border,#30363d);flex-direction:column;padding:0.5rem;gap:0;z-index:99;max-height:80vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+        .nav-links.mobile-open{display:flex!important}
+        .nav-links li{width:100%}
+        .nav-links a{display:block;padding:0.6rem 1rem!important;font-size:0.85rem!important;border-radius:var(--radius)}
+    }
     </style>
 
     <main class="container">
@@ -217,11 +234,11 @@
     <!-- Markdown parser + sanitizer -->
     <script src="/static/js/marked.min.js"></script>
     <script src="/static/js/purify.min.js"></script>
-    <script src="/static/js/app.js?v=0.9.5"></script>
-    <script src="/static/js/chat.js?v=0.9.5"></script>
-    <script src="/static/js/ai-chat.js?v=0.9.5"></script>
+    <script src="/static/js/app.js?v=0.9.8"></script>
+    <script src="/static/js/chat.js?v=0.9.8"></script>
+    <script src="/static/js/ai-chat.js?v=0.9.8"></script>
     <script src="/static/js/quill.js"></script>
-    <script src="/static/js/notepad.js?v=0.9.5"></script>
+    <script src="/static/js/notepad.js?v=0.9.8"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

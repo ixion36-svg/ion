@@ -1113,6 +1113,70 @@
     transition: opacity 0.3s;
 }
 .sa-save-status.show { opacity: 1; }
+.sa-submit-btn { background: var(--neon-green, #22c55e); }
+.sa-submit-btn:hover { opacity: 0.9; }
+
+/* Review cycle banner */
+.sa-review-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+    font-size: 0.82rem;
+    gap: 1rem;
+}
+.sa-review-banner.locked {
+    background: rgba(37, 99, 235, 0.1);
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    color: var(--text-secondary);
+}
+.sa-review-banner.due-soon {
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: #b45309;
+}
+.sa-review-banner.overdue {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #dc2626;
+}
+.sa-review-banner .sa-review-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+}
+.sa-review-banner .sa-review-info strong {
+    white-space: nowrap;
+}
+.sa-review-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--radius);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+.sa-review-btn:hover {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+.sa-review-btn.primary {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+.sa-review-btn.primary:hover { opacity: 0.9; }
+
+/* Locked form state */
+.sa-form-locked .sa-rating-btn { pointer-events: none; opacity: 0.6; }
+.sa-form-locked .sa-career-goal select { pointer-events: none; opacity: 0.6; }
 
 /* =========================================================================
    Team Skills Tab — Team Composition & SOC Capabilities
@@ -2546,6 +2610,7 @@
 
 <!-- Tab 2: Skills Assessment -->
 <div class="tab-content" id="tab-assessment">
+    <div id="sa-review-banner" style="display:none;"></div>
     <div class="sa-career-goal">
         <div class="sa-field">
             <label>Your Current Role</label>
@@ -2561,6 +2626,7 @@
     <div class="sa-save-bar">
         <span class="sa-save-status" id="sa-save-status">Saved successfully</span>
         <button class="sa-save-btn" id="sa-save-btn" onclick="saveAssessment()">Save Assessment</button>
+        <button class="sa-save-btn sa-submit-btn" id="sa-submit-btn" onclick="submitAssessment()">Submit Assessment</button>
     </div>
 </div>
 
@@ -4170,6 +4236,7 @@ function getSkillName(skillKey) {
 let userRatings = {};  // skill_key -> rating
 let savedRatings = {}; // skill_key -> rating (from server)
 let careerGoal = { current_role: null, target_role: null };
+let reviewCycle = null; // { submitted_at, next_review_at, is_locked, is_overdue, days_until_review }
 
 async function loadAssessmentData() {
     try {
@@ -4183,6 +4250,7 @@ async function loadAssessmentData() {
                 userRatings[a.skill_key] = a.rating;
                 savedRatings[a.skill_key] = a.rating;
             });
+            reviewCycle = data.review || null;
         }
         if (gResp.ok) {
             const data = await gResp.json();
@@ -4191,6 +4259,8 @@ async function loadAssessmentData() {
     } catch (e) {
         console.warn('Could not load assessment data:', e);
     }
+    renderReviewBanner();
+    applyLockState();
 }
 
 function populateRoleDropdowns() {
@@ -4382,11 +4452,15 @@ async function saveAssessment() {
             .map(([skill_key, rating]) => ({skill_key, rating}));
 
         if (assessments.length > 0) {
-            await fetch('/api/skills/assessment', {
+            const resp = await fetch('/api/skills/assessment', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({assessments}),
             });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || 'Save failed');
+            }
         }
 
         savedRatings = {...userRatings};
@@ -4394,12 +4468,179 @@ async function saveAssessment() {
         status.classList.add('show');
         setTimeout(() => status.classList.remove('show'), 3000);
     } catch (e) {
-        status.textContent = 'Save failed';
+        status.textContent = e.message || 'Save failed';
         status.style.color = '#ef4444';
         status.classList.add('show');
         setTimeout(() => { status.classList.remove('show'); status.style.color = ''; }, 3000);
     }
     btn.disabled = false;
+}
+
+// =========================================================================
+// Review Cycle (3-month submission + lock)
+// =========================================================================
+
+function renderReviewBanner() {
+    const banner = document.getElementById('sa-review-banner');
+    if (!banner) return;
+
+    if (!reviewCycle) {
+        // Never submitted — no banner needed, show submit button
+        banner.style.display = 'none';
+        toggleSubmitButton(true);
+        return;
+    }
+
+    const submitted = new Date(reviewCycle.submitted_at);
+    const nextReview = new Date(reviewCycle.next_review_at);
+    const submittedStr = submitted.toLocaleDateString();
+    const nextStr = nextReview.toLocaleDateString();
+
+    if (reviewCycle.is_overdue) {
+        banner.style.display = 'flex';
+        banner.className = 'sa-review-banner overdue';
+        banner.innerHTML = `
+            <div class="sa-review-info">
+                <strong>Review Overdue</strong>
+                <span>Your last assessment was submitted on ${submittedStr}. A review was due on ${nextStr}. Please review and re-submit your skills.</span>
+            </div>
+            <button class="sa-review-btn primary" onclick="startReview()">Start Review</button>
+        `;
+        toggleSubmitButton(true);
+    } else if (reviewCycle.is_locked) {
+        banner.style.display = 'flex';
+        const dueSoon = reviewCycle.days_until_review <= 14;
+        banner.className = 'sa-review-banner ' + (dueSoon ? 'due-soon' : 'locked');
+        banner.innerHTML = `
+            <div class="sa-review-info">
+                <strong>${dueSoon ? 'Review Due Soon' : 'Assessment Submitted'}</strong>
+                <span>Submitted on ${submittedStr}. Next review due ${nextStr} (${reviewCycle.days_until_review} days).</span>
+            </div>
+            <button class="sa-review-btn" onclick="unlockAssessment()">Edit Assessment</button>
+        `;
+        toggleSubmitButton(false);
+    } else {
+        // Unlocked (user chose to edit early)
+        banner.style.display = 'flex';
+        banner.className = 'sa-review-banner locked';
+        banner.innerHTML = `
+            <div class="sa-review-info">
+                <strong>Editing Mode</strong>
+                <span>Assessment unlocked for editing. Submit when you are done to lock until next review.</span>
+            </div>
+        `;
+        toggleSubmitButton(true);
+    }
+}
+
+function applyLockState() {
+    const isLocked = reviewCycle && reviewCycle.is_locked && !reviewCycle.is_overdue;
+    const tab = document.getElementById('tab-assessment');
+    if (!tab) return;
+
+    if (isLocked) {
+        tab.classList.add('sa-form-locked');
+        document.getElementById('sa-save-btn').style.display = 'none';
+    } else {
+        tab.classList.remove('sa-form-locked');
+        document.getElementById('sa-save-btn').style.display = '';
+    }
+}
+
+function toggleSubmitButton(show) {
+    const btn = document.getElementById('sa-submit-btn');
+    if (btn) btn.style.display = show ? '' : 'none';
+}
+
+async function submitAssessment() {
+    // Save first, then submit
+    const assessments = Object.entries(userRatings)
+        .filter(([k, v]) => v > 0)
+        .map(([skill_key, rating]) => ({skill_key, rating}));
+
+    if (assessments.length === 0) {
+        const status = document.getElementById('sa-save-status');
+        status.textContent = 'Rate at least one skill before submitting';
+        status.style.color = '#ef4444';
+        status.classList.add('show');
+        setTimeout(() => { status.classList.remove('show'); status.style.color = ''; }, 3000);
+        return;
+    }
+
+    const btn = document.getElementById('sa-submit-btn');
+    btn.disabled = true;
+
+    try {
+        // Save ratings first
+        await saveAssessment();
+
+        // Then submit (lock)
+        const resp = await fetch('/api/skills/assessment/submit', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || 'Submit failed');
+        }
+        const data = await resp.json();
+        reviewCycle = {
+            submitted_at: data.submitted_at,
+            next_review_at: data.next_review_at,
+            is_locked: true,
+            is_overdue: false,
+            days_until_review: 90,
+        };
+        renderReviewBanner();
+        applyLockState();
+
+        const status = document.getElementById('sa-save-status');
+        status.textContent = 'Assessment submitted — next review in 3 months';
+        status.style.color = '';
+        status.classList.add('show');
+        setTimeout(() => status.classList.remove('show'), 4000);
+    } catch (e) {
+        const status = document.getElementById('sa-save-status');
+        status.textContent = e.message || 'Submit failed';
+        status.style.color = '#ef4444';
+        status.classList.add('show');
+        setTimeout(() => { status.classList.remove('show'); status.style.color = ''; }, 3000);
+    }
+    btn.disabled = false;
+}
+
+async function unlockAssessment() {
+    try {
+        const resp = await fetch('/api/skills/assessment/unlock', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+        });
+        if (!resp.ok) throw new Error('Unlock failed');
+
+        reviewCycle.is_locked = false;
+        renderReviewBanner();
+        applyLockState();
+    } catch (e) {
+        console.error('Unlock failed:', e);
+    }
+}
+
+async function startReview() {
+    // Overdue review — unlock and let user edit
+    try {
+        const resp = await fetch('/api/skills/assessment/unlock', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+        });
+        if (!resp.ok) throw new Error('Unlock failed');
+
+        reviewCycle.is_locked = false;
+        reviewCycle.is_overdue = false;
+        renderReviewBanner();
+        applyLockState();
+    } catch (e) {
+        console.error('Unlock failed:', e);
+    }
 }
 
 // =========================================================================

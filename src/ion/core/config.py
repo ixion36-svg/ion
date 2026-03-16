@@ -48,6 +48,7 @@ class Config:
     gitlab_token: str = ""  # Personal access token with api scope
     gitlab_project_id: str = ""  # Project ID or path (e.g., "group/project" or "123")
     gitlab_verify_ssl: bool = True
+    gitlab_sudo_enabled: bool = False  # Requires admin-level API token
 
     # OpenCTI integration
     opencti_enabled: bool = True
@@ -139,6 +140,7 @@ class Config:
             gitlab_token=data.get("gitlab_token", ""),
             gitlab_project_id=data.get("gitlab_project_id", ""),
             gitlab_verify_ssl=data.get("gitlab_verify_ssl", True),
+            gitlab_sudo_enabled=data.get("gitlab_sudo_enabled", False),
             # OpenCTI integration
             opencti_enabled=data.get("opencti_enabled", True),
             opencti_url=data.get("opencti_url", ""),
@@ -216,6 +218,7 @@ class Config:
                     "gitlab_token": self.gitlab_token,
                     "gitlab_project_id": self.gitlab_project_id,
                     "gitlab_verify_ssl": self.gitlab_verify_ssl,
+                    "gitlab_sudo_enabled": self.gitlab_sudo_enabled,
                     # OpenCTI integration
                     "opencti_enabled": self.opencti_enabled,
                     "opencti_url": self.opencti_url,
@@ -337,6 +340,8 @@ def get_config() -> Config:
             _config.gitlab_project_id = os.environ.get("ION_GITLAB_PROJECT_ID", "")
         if os.environ.get("ION_GITLAB_VERIFY_SSL"):
             _config.gitlab_verify_ssl = _get_env_bool("ION_GITLAB_VERIFY_SSL", True)
+        if os.environ.get("ION_GITLAB_SUDO"):
+            _config.gitlab_sudo_enabled = _get_env_bool("ION_GITLAB_SUDO", False)
 
         # OpenCTI environment variable overrides
         if os.environ.get("ION_OPENCTI_ENABLED"):
@@ -479,6 +484,7 @@ def get_gitlab_config() -> dict:
         "token": config.gitlab_token,
         "project_id": config.gitlab_project_id,
         "verify_ssl": config.gitlab_verify_ssl,
+        "sudo_enabled": config.gitlab_sudo_enabled,
     }
 
 

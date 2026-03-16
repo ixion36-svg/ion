@@ -150,9 +150,14 @@ async def create_kibana_case(
     }
     severity = severity_map.get(data.severity, "low")
 
+    # Attribute case to the ION user
+    display = current_user.display_name or current_user.username
+    description = data.description or ""
+    description += f"\n\n---\n*Created by {display} via ION*"
+
     result = service.create_case(
         title=data.title,
-        description=data.description or "",
+        description=description,
         severity=severity,
         tags=data.tags,
     )
@@ -315,9 +320,13 @@ async def add_kibana_case_comment(
     if not service.enabled:
         raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
 
+    # Attribute comment to the ION user (Kibana API posts as the service account)
+    display = current_user.display_name or current_user.username
+    attributed_comment = f"**{display}:** {data.comment}"
+
     result = service.add_comment(
         case_id=case_id,
-        comment=data.comment,
+        comment=attributed_comment,
     )
 
     if not result:

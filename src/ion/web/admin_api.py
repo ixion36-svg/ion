@@ -38,6 +38,7 @@ class GitLabSettingsUpdate(BaseModel):
     gitlab_token: Optional[str] = None  # Only update if provided and not masked
     gitlab_project_id: Optional[str] = None
     gitlab_verify_ssl: Optional[bool] = None
+    gitlab_sudo_enabled: Optional[bool] = None
 
 
 class OpenCTISettingsUpdate(BaseModel):
@@ -144,6 +145,7 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
             "gitlab_token_set": bool(config.gitlab_token),
             "gitlab_project_id": config.gitlab_project_id,
             "gitlab_verify_ssl": config.gitlab_verify_ssl,
+            "gitlab_sudo_enabled": config.gitlab_sudo_enabled,
         },
         "opencti": {
             "opencti_enabled": config.opencti_enabled,
@@ -249,8 +251,13 @@ async def update_gitlab_settings(
     if settings.gitlab_verify_ssl is not None:
         config.gitlab_verify_ssl = settings.gitlab_verify_ssl
 
+    if settings.gitlab_sudo_enabled is not None:
+        config.gitlab_sudo_enabled = settings.gitlab_sudo_enabled
+
     config.to_file(get_config_path())
     reload_config()
+    from ion.services.gitlab_service import reset_gitlab_service
+    reset_gitlab_service()
     return {"status": "updated", "section": "gitlab"}
 
 
@@ -956,6 +963,7 @@ class WizardIntegrationConfig(BaseModel):
     case_owner: Optional[str] = None
     # GitLab specific
     project_id: Optional[str] = None
+    sudo_enabled: Optional[bool] = None
     # Ollama specific
     model: Optional[str] = None
     timeout: Optional[int] = None
@@ -1628,6 +1636,8 @@ async def save_wizard_integration(
             config.gitlab_project_id = config_data.project_id
         if config_data.verify_ssl is not None:
             config.gitlab_verify_ssl = config_data.verify_ssl
+        if config_data.sudo_enabled is not None:
+            config.gitlab_sudo_enabled = config_data.sudo_enabled
 
     elif integration == "opencti":
         if config_data.enabled is not None:
@@ -1757,6 +1767,8 @@ async def save_all_wizard_integrations(
                     config.gitlab_project_id = config_data.project_id
                 if config_data.verify_ssl is not None:
                     config.gitlab_verify_ssl = config_data.verify_ssl
+                if config_data.sudo_enabled is not None:
+                    config.gitlab_sudo_enabled = config_data.sudo_enabled
                 saved.append("gitlab")
 
             elif integration_name == "opencti":

@@ -82,6 +82,10 @@ function addAITab() {
     const roomList = document.getElementById('chat-room-list');
     if (!roomList) return;
 
+    // Remove existing AI tab to avoid duplicates
+    const existing = document.getElementById('ai-assistant-room');
+    if (existing) existing.remove();
+
     // Add AI assistant as a special "room" at the top
     const aiRoom = document.createElement('div');
     aiRoom.id = 'ai-assistant-room';
@@ -110,10 +114,12 @@ function addAIChatView() {
     const panel = document.getElementById('chat-panel');
     if (!panel) return;
 
+    // Don't duplicate
+    if (document.getElementById('ai-chat-view')) return;
+
     const aiView = document.createElement('div');
     aiView.id = 'ai-chat-view';
     aiView.className = 'chat-active-view';
-    aiView.style.display = 'none';
     aiView.innerHTML = `
         <div class="chat-room-header ai-header">
             <button class="chat-back-btn" onclick="closeAIChat()">
@@ -188,13 +194,23 @@ function openAIChat() {
 
     aiChatActive = true;
 
-    // Hide room list and regular chat view
-    document.getElementById('chat-room-list-view').style.display = 'none';
-    const activeChatView = document.getElementById('chat-active-view');
-    if (activeChatView) activeChatView.style.display = 'none';
+    // Clear inline styles and use classes for consistent toggling
+    const listView = document.getElementById('chat-room-list-view');
+    const activeView = document.getElementById('chat-active-view');
+    const aiView = document.getElementById('ai-chat-view');
 
-    // Show AI view
-    document.getElementById('ai-chat-view').style.display = 'flex';
+    if (listView) {
+        listView.style.removeProperty('display');
+        listView.classList.add('hidden');
+    }
+    if (activeView) {
+        activeView.style.removeProperty('display');
+        activeView.classList.remove('show');
+    }
+    if (aiView) {
+        aiView.style.removeProperty('display');
+        aiView.classList.add('show');
+    }
 
     // Focus input
     setTimeout(() => {
@@ -204,8 +220,16 @@ function openAIChat() {
 
 function closeAIChat() {
     aiChatActive = false;
-    document.getElementById('ai-chat-view').style.display = 'none';
-    document.getElementById('chat-room-list-view').style.display = 'flex';
+
+    const listView = document.getElementById('chat-room-list-view');
+    const aiView = document.getElementById('ai-chat-view');
+
+    if (aiView) {
+        aiView.classList.remove('show');
+    }
+    if (listView) {
+        listView.classList.remove('hidden');
+    }
 }
 
 function clearAIChat() {
