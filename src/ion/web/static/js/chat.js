@@ -526,8 +526,9 @@ function renderMessages(messages) {
             // Render :meme_name: reactions as images
             const memeMatch = emoji.match(/^:([a-z0-9_]+):$/);
             let emojiDisplay;
-            if (memeMatch && chatMemeNames.has(memeMatch[1])) {
-                emojiDisplay = `<img src="/static/memes/${memeMatch[1]}.png" alt="${emoji}" style="width:16px;height:16px;object-fit:contain;vertical-align:middle">`;
+            const memeObj = memeMatch ? chatMemeList.find(m => m.name === memeMatch[1]) : null;
+            if (memeObj) {
+                emojiDisplay = `<img src="${memeObj.url}" alt="${emoji}" style="width:16px;height:16px;object-fit:contain;vertical-align:middle">`;
             } else {
                 emojiDisplay = emoji;
             }
@@ -581,8 +582,9 @@ function formatMessageContent(content) {
 
     // Render :meme_name: as inline images (custom memes from static/memes/)
     formatted = formatted.replace(/:([a-z0-9_]{1,64}):/g, function(match, name) {
-        if (chatMemeNames.has(name)) {
-            return '<img src="/static/memes/' + name + '.png" alt=":' + name + ':" title=":' + name + ':" class="chat-meme-inline" onerror="this.outerHTML=\':' + name + ':\';">';
+        const meme = chatMemeList.find(m => m.name === name);
+        if (meme) {
+            return '<img src="' + meme.url + '" alt=":' + name + ':" title=":' + name + ':" class="chat-meme-inline" onerror="this.outerHTML=\':' + name + ':\';">';
         }
         return match;
     });

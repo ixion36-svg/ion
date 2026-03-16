@@ -231,6 +231,14 @@ async def startup_event():
         import logging
         logging.getLogger(__name__).warning(f"Failed to seed forensic playbooks: {e}")
 
+    # Seed built-in meme pack for team chat (20 SOC-themed memes, idempotent)
+    try:
+        from ion.services.meme_seed_service import seed_memes
+        seed_memes()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to seed memes: {e}")
+
     # Start Kibana bidirectional sync if enabled (via connector)
     try:
         from ion.services.connectors import get_connector_registry
