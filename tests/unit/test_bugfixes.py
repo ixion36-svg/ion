@@ -151,7 +151,7 @@ class TestObservableExtractor:
         assert "destination_ip" in types
 
     def test_extracts_process_info(self):
-        """This was missing from the old sync service extractor."""
+        """Extracts process name/command/parent but NOT pid (metadata, not observable)."""
         from ion.services.observable_extractor import extract_observables_from_raw
         raw = {
             "process": {
@@ -165,35 +165,33 @@ class TestObservableExtractor:
         types = {o["type"] for o in obs}
         assert "process_name" in types
         assert "command_line" in types
-        assert "process_id" in types
         assert "parent_process" in types
+        # PIDs are metadata, not observables
+        assert "process_id" not in types
 
-    def test_extracts_mitre_attack(self):
-        """This was missing from the old sync service extractor."""
+    def test_no_longer_extracts_metadata(self):
+        """MITRE, ports, protocol, rule info, severity are metadata, not observables."""
         from ion.services.observable_extractor import extract_observables_from_raw
         raw = {
             "threat": {
                 "technique": {"id": "T1059", "name": "Command and Scripting Interpreter"},
                 "tactic": {"name": "Execution"},
-            }
+            },
+            "destination": {"port": "443"},
+            "network": {"protocol": "tcp"},
+            "kibana.alert.rule.name": "Brute Force Attempt",
+            "kibana.alert.severity": "high",
+            "kibana.alert.risk_score": "73",
         }
         obs = extract_observables_from_raw(raw)
         types = {o["type"] for o in obs}
-        assert "mitre_technique" in types
-        assert "mitre_technique_name" in types
-        assert "mitre_tactic" in types
-
-    def test_extracts_network_ports(self):
-        """This was missing from the old sync service extractor."""
-        from ion.services.observable_extractor import extract_observables_from_raw
-        raw = {"destination": {"port": "443"}, "network": {"protocol": "tcp"}}
-        obs = extract_observables_from_raw(raw)
-        types = {o["type"] for o in obs}
-        assert "destination_port" in types
-        assert "protocol" in types
+        # None of these should be extracted as observables
+        for metadata_type in ("mitre_technique", "mitre_technique_name", "mitre_tactic",
+                              "destination_port", "protocol", "rule_name", "severity", "risk_score"):
+            assert metadata_type not in types, f"{metadata_type} should not be extracted"
 
     def test_extracts_registry_keys(self):
-        """This was missing from the old sync service extractor."""
+        """Registry keys and values are true observables."""
         from ion.services.observable_extractor import extract_observables_from_raw
         raw = {"registry": {"path": r"HKLM\Software\Evil", "value": "payload"}}
         obs = extract_observables_from_raw(raw)
@@ -201,19 +199,25 @@ class TestObservableExtractor:
         assert "registry_key" in types
         assert "registry_value" in types
 
-    def test_extracts_kibana_security_fields(self):
-        """This was missing from the old sync service extractor."""
+    def test_filters_noise_values(self):
+        """System accounts, localhost, and short values are filtered out."""
         from ion.services.observable_extractor import extract_observables_from_raw
         raw = {
-            "kibana.alert.rule.name": "Brute Force Attempt",
-            "kibana.alert.severity": "high",
-            "kibana.alert.risk_score": "73",
+            "source.ip": "127.0.0.1",
+            "destination.ip": "10.20.30.40",
+            "host.name": "localhost",
+            "user.name": "SYSTEM",
+            "winlog.event_data.SubjectUserSid": "S-1-5-18",
+            "winlog.event_data.TargetUserName": "-",
         }
         obs = extract_observables_from_raw(raw)
-        types = {o["type"] for o in obs}
-        assert "rule_name" in types
-        assert "severity" in types
-        assert "risk_score" in types
+        values = {o["value"] for o in obs}
+        assert "127.0.0.1" not in values
+        assert "localhost" not in values
+        assert "SYSTEM" not in values
+        assert "S-1-5-18" not in values
+        assert "-" not in values
+        assert "10.20.30.40" in values
 
     def test_handles_flattened_dot_notation(self):
         """Kibana Security uses flattened keys like 'source.ip' as a single key."""
@@ -230,7 +234,7 @@ class TestObservableExtractor:
         assert len(hostnames) == 1
 
     def test_distinguishes_subject_vs_target_user(self):
-        """Windows logon events have subject (performer) and target (acted-upon) users."""
+        """Windows logon events: noise users/SIDs filtered, real users kept."""
         from ion.services.observable_extractor import extract_observables_from_raw
         raw = {
             "winlog": {
@@ -250,19 +254,17 @@ class TestObservableExtractor:
         }
         obs = extract_observables_from_raw(raw)
         type_value = {(o["type"], o["value"]) for o in obs}
-        # Subject (performer) fields
-        assert ("subject_user", "SYSTEM") in type_value
-        assert ("subject_user", "S-1-5-18") in type_value
-        assert ("subject_domain", "NT AUTHORITY") in type_value
-        # Target (acted-upon) fields
+        # SYSTEM and system SIDs are noise — filtered out
+        assert ("subject_user", "SYSTEM") not in type_value
+        assert ("subject_user", "S-1-5-18") not in type_value
+        # Real target user preserved
         assert ("target_user", "jsmith") in type_value
         assert ("target_user", "S-1-5-21-123-456-789-1001") in type_value
-        assert ("target_domain", "CORP") in type_value
-        # Directional network fields
+        # Directional network fields preserved
         assert ("source_ip", "192.168.1.50") in type_value
         assert ("source_hostname", "WS-JSMITH") in type_value
-        assert ("logon_type", "10") in type_value
-        assert ("event_id", "4624") in type_value
+        # Metadata removed: domain context, logon_type, event_id
+        assert not any(o["type"] in ("subject_domain", "target_domain", "logon_type", "event_id") for o in obs)
 
     def test_distinguishes_source_vs_destination_hosts(self):
         """Source and destination hostnames should be distinguished."""

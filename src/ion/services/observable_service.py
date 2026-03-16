@@ -47,14 +47,12 @@ LEGACY_TYPE_MAP = {
     "user_account": ObservableType.USER_ACCOUNT,
     "subject_user": ObservableType.USER_ACCOUNT,
     "target_user": ObservableType.USER_ACCOUNT,
-    "subject_domain": ObservableType.DOMAIN,
-    "target_domain": ObservableType.DOMAIN,
     # URLs and domains
     "url": ObservableType.URL,
     "domain": ObservableType.DOMAIN,
     "domain-name": ObservableType.DOMAIN,
     # File info
-    "file_path": ObservableType.FILE_HASH_SHA256,   # no dedicated type; store as-is
+    "file_path": ObservableType.FILE_HASH_SHA256,
     "process_path": ObservableType.FILE_HASH_SHA256,
     "sha256": ObservableType.FILE_HASH_SHA256,
     "sha1": ObservableType.FILE_HASH_SHA1,
@@ -62,12 +60,18 @@ LEGACY_TYPE_MAP = {
     "file-sha256": ObservableType.FILE_HASH_SHA256,
     "file-sha1": ObservableType.FILE_HASH_SHA1,
     "file-md5": ObservableType.FILE_HASH_MD5,
+    # Process info
+    "process_name": ObservableType.HOSTNAME,  # no dedicated type; context preserved on link
+    "command_line": ObservableType.HOSTNAME,
+    "parent_process": ObservableType.HOSTNAME,
+    "parent_process_path": ObservableType.FILE_HASH_SHA256,
     # Email
     "email": ObservableType.EMAIL,
     "email-addr": ObservableType.EMAIL,
-    # Ports (store as-is via context, no dedicated ObservableType)
-    "source_port": ObservableType.IPV4,  # fallback — port context preserved on link
-    "destination_port": ObservableType.IPV4,
+    "email_subject": ObservableType.EMAIL,
+    # Registry
+    "registry_key": ObservableType.HOSTNAME,
+    "registry_value": ObservableType.HOSTNAME,
 }
 
 
@@ -544,6 +548,100 @@ class ObservableService:
                     seen_observable_ids.add(obs.id)
 
         return observables
+
+    async def extract_enrich_for_case(
+        self,
+        case_id: int,
+        raw_data_list: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Extract observables from raw alert data, create normalized records,
+        enrich via OpenCTI, link to case, and return enriched results.
+
+        Observables that fail enrichment or resolve to unknown types are
+        silently dropped from the returned list (but still stored).
+
+        Args:
+            case_id: AlertCase ID to link observables to
+            raw_data_list: List of raw alert data dicts
+
+        Returns:
+            List of observable dicts with enrichment data for case display
+        """
+        from ion.services.observable_extractor import extract_observables_from_raw, ENRICHABLE_TYPES
+
+        seen: set = set()
+        extracted: List[Dict[str, str]] = []
+
+        # Extract from all raw data
+        for raw_data in raw_data_list:
+            if not raw_data:
+                continue
+            for obs in extract_observables_from_raw(raw_data):
+                key = (obs["type"], obs["value"])
+                if key not in seen:
+                    seen.add(key)
+                    extracted.append(obs)
+
+        if not extracted:
+            return []
+
+        results: List[Dict[str, Any]] = []
+
+        for obs_data in extracted:
+            obs_type_str = obs_data["type"]
+            obs_value = obs_data["value"]
+
+            # Only process enrichable types
+            if obs_type_str not in ENRICHABLE_TYPES:
+                continue
+
+            # Resolve to canonical type
+            try:
+                obs_type = self._resolve_type(obs_type_str)
+            except ValueError:
+                logger.warning("Skipping unknown observable type: %s", obs_type_str)
+                continue
+
+            # Create or get the normalized observable
+            try:
+                observable, created = self.get_or_create(obs_type, obs_value)
+            except Exception as e:
+                logger.warning("Failed to create observable %s=%s: %s", obs_type_str, obs_value, e)
+                continue
+
+            # Link to case
+            try:
+                self.link_to_case(observable.id, case_id, context=obs_type_str)
+            except Exception as e:
+                logger.warning("Failed to link observable %s to case %s: %s", observable.id, case_id, e)
+
+            # Attempt enrichment (non-blocking — failures just mean no enrichment data)
+            enrichment_data = None
+            try:
+                enrichment = await self.enrich(observable.id, source="opencti")
+                if enrichment:
+                    enrichment_data = {
+                        "source": enrichment.source,
+                        "is_malicious": enrichment.is_malicious,
+                        "score": enrichment.score,
+                        "labels": enrichment.labels or [],
+                        "threat_actors": enrichment.threat_actors or [],
+                        "threat_level": observable.threat_level.value if observable.threat_level else "unknown",
+                    }
+            except Exception as e:
+                logger.warning("Enrichment failed for %s=%s: %s", obs_type_str, obs_value, e)
+
+            # Include observable in results (enrichment_data may be None)
+            results.append({
+                "type": obs_type_str,
+                "value": obs_value,
+                "observable_id": observable.id,
+                "threat_level": observable.threat_level.value if observable.threat_level else "unknown",
+                "enrichment": enrichment_data,
+            })
+
+        self.session.flush()
+        return results
 
     def migrate_json_observables(self) -> Dict[str, int]:
         """One-time migration of all JSON observables to normalized table.

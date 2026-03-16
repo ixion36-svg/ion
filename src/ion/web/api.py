@@ -3456,10 +3456,8 @@ async def create_case(
             triage.case_id = new_case.id
             linked += 1
 
-    # Auto-populate observables for linked alerts if context provided
-    # and aggregate all observables for the case
-    case_observables = []
-    seen_observables = set()
+    # Auto-populate legacy triage observables and collect raw data for enrichment
+    raw_data_list = []
 
     if data.alert_contexts:
         context_map = {ctx.alert_id: ctx for ctx in data.alert_contexts}
@@ -3470,21 +3468,26 @@ async def create_case(
             triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
             if triage:
                 _populate_triage_observables(triage, ctx.host, ctx.user, ctx.raw_data)
-
-            # Extract observables from raw_data for case-level aggregation
             if ctx.raw_data:
-                for obs in extract_observables_from_raw(ctx.raw_data):
-                    key = (obs["type"], obs["value"])
-                    if key not in seen_observables:
-                        seen_observables.add(key)
-                        case_observables.append(obs)
-
-    # Store aggregated observables on the case
-    if case_observables:
-        new_case.observables = case_observables
+                raw_data_list.append(ctx.raw_data)
 
     session.commit()
     session.refresh(new_case)
+
+    # Extract, normalize, enrich, and link observables to case
+    from ion.services.observable_service import get_observable_service
+    obs_service = get_observable_service(session)
+    enriched_observables = await obs_service.extract_enrich_for_case(
+        case_id=new_case.id,
+        raw_data_list=raw_data_list,
+    )
+
+    # Store enriched observables on the case (for display and Kibana sync)
+    case_observables = enriched_observables or []
+    if case_observables:
+        new_case.observables = case_observables
+        session.commit()
+
     await _sync_case_to_es(new_case, session)
 
     # Sync to Kibana Cases if enabled

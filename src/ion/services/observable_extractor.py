@@ -20,6 +20,37 @@ _IP_PATTERN = re.compile(
     r"^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$"
 )
 
+# Types that are true observables — enrichable, trackable IOCs.
+# Everything else (event metadata, rule info, ports, PIDs) is context, not an observable.
+ENRICHABLE_TYPES = frozenset({
+    "source_ip", "destination_ip", "host_ip",
+    "hostname", "source_hostname", "destination_hostname",
+    "target_user", "subject_user", "user_account",
+    "url", "domain",
+    "file_path", "process_path",
+    "sha256", "md5", "sha1",
+    "process_name", "command_line",
+    "parent_process", "parent_process_path",
+    "email", "email_subject",
+    "registry_key", "registry_value",
+})
+
+# Values that are noise — generic system accounts, localhost, etc.
+_NOISE_VALUES = frozenset({
+    "-", "n/a", "na", "none", "null", "unknown", "undefined",
+    "system", "local service", "network service", "local system",
+    "nt authority\\system", "nt authority\\local service",
+    "nt authority\\network service", "nt authority",
+    "127.0.0.1", "::1", "0.0.0.0",
+    "localhost",
+})
+
+# SIDs that are always system/noise
+_NOISE_SID_PREFIXES = ("S-1-5-18", "S-1-5-19", "S-1-5-20", "S-1-0-0")
+
+# Minimum length for string values to avoid garbage single-char observables
+_MIN_VALUE_LEN = 2
+
 
 def _get_nested(data: dict, dotted_key: str) -> Any:
     """Retrieve a nested value using dot notation.
@@ -56,7 +87,19 @@ def extract_observables_from_raw(raw_data: dict) -> List[Dict[str, str]]:
 
     def _add(obs_type: str, value: str) -> None:
         value = str(value).strip()
-        if value and (obs_type, value) not in seen:
+        if not value or len(value) < _MIN_VALUE_LEN:
+            return
+        # Drop well-known noise values
+        if value.lower() in _NOISE_VALUES:
+            return
+        # Drop Windows system SIDs
+        if any(value.startswith(prefix) for prefix in _NOISE_SID_PREFIXES):
+            return
+        # Drop pure numeric values for user/hostname types (PIDs, port numbers leaking in)
+        if obs_type in ("target_user", "subject_user", "user_account", "hostname",
+                        "source_hostname", "destination_hostname") and value.isdigit():
+            return
+        if (obs_type, value) not in seen:
             seen.add((obs_type, value))
             observables.append({"type": obs_type, "value": value})
 
@@ -121,13 +164,6 @@ def extract_observables_from_raw(raw_data: dict) -> List[Dict[str, str]]:
     # ECS user.id (could be either; store as generic user_account)
     _extract_field(["user.id"], "user_account")
 
-    # Domain context for users (Windows AD domain)
-    _extract_field(["winlog.event_data.SubjectDomainName"], "subject_domain")
-    _extract_field([
-        "winlog.event_data.TargetDomainName",
-        "user.domain",
-    ], "target_domain")
-
     # =====================================================================
     # URLs and Domains
     # =====================================================================
@@ -148,19 +184,8 @@ def extract_observables_from_raw(raw_data: dict) -> List[Dict[str, str]]:
     # =====================================================================
     _extract_field(["process.name"], "process_name")
     _extract_field(["process.command_line", "process.args"], "command_line")
-    _extract_field(["process.pid"], "process_id")
     _extract_field(["process.parent.name"], "parent_process")
     _extract_field(["process.parent.executable"], "parent_process_path")
-
-    # =====================================================================
-    # Network — ports distinguished by direction
-    # =====================================================================
-    _extract_field(["source.port"], "source_port")
-    _extract_field(["destination.port", "server.port"], "destination_port")
-    _extract_field(["network.protocol", "network.transport"], "protocol")
-
-    # Windows logon type (4624: 2=Interactive, 3=Network, 10=RemoteInteractive, etc.)
-    _extract_field(["winlog.event_data.LogonType"], "logon_type")
 
     # =====================================================================
     # Email
@@ -173,32 +198,5 @@ def extract_observables_from_raw(raw_data: dict) -> List[Dict[str, str]]:
     # =====================================================================
     _extract_field(["registry.path", "registry.key"], "registry_key")
     _extract_field(["registry.value"], "registry_value")
-
-    # =====================================================================
-    # MITRE ATT&CK
-    # =====================================================================
-    _extract_field(["threat.technique.id", "kibana.alert.rule.threat.technique.id"], "mitre_technique")
-    _extract_field(["threat.technique.name", "kibana.alert.rule.threat.technique.name"], "mitre_technique_name")
-    _extract_field(["threat.tactic.name", "kibana.alert.rule.threat.tactic.name"], "mitre_tactic")
-
-    # =====================================================================
-    # Event Context
-    # =====================================================================
-    _extract_field(["event.action", "kibana.alert.original_event.action"], "event_action")
-    _extract_field(["event.category", "kibana.alert.original_event.category"], "event_category")
-    _extract_field(["event.outcome", "kibana.alert.original_event.outcome"], "event_outcome")
-    _extract_field(["message"], "message")
-
-    # Windows event ID (useful for 4624, 4625, 4688, 4720, etc.)
-    _extract_field(["winlog.event_id", "event.code"], "event_id")
-
-    # =====================================================================
-    # Kibana Security Alert specific fields
-    # =====================================================================
-    _extract_field(["kibana.alert.rule.name", "rule.name"], "rule_name")
-    _extract_field(["kibana.alert.rule.description", "rule.description"], "rule_description")
-    _extract_field(["kibana.alert.reason"], "alert_reason")
-    _extract_field(["kibana.alert.severity", "severity"], "severity")
-    _extract_field(["kibana.alert.risk_score"], "risk_score")
 
     return observables
