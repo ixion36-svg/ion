@@ -60,12 +60,30 @@ def seed_knowledge_base() -> None:
         from ion.data.kb_blueteam import COLLECTIONS as KB_BLUETEAM
         from ion.data.kb_foundations import COLLECTIONS as KB_FOUNDATIONS
         from ion.data.kb_fundamentals import COLLECTIONS as KB_FUNDAMENTALS
+        from ion.data.kb_offensive_security import COLLECTIONS as KB_OFFENSIVE
+        from ion.data.kb_offensive_access import COLLECTIONS as KB_OFF_ACCESS
+        from ion.data.kb_offensive_advanced import COLLECTIONS as KB_OFF_ADVANCED
+        from ion.data.kb_foundations_extended import COLLECTIONS as KB_FOUNDATIONS_EXT
+        from ion.data.kb_networking_protocols import COLLECTIONS as KB_NET_PROTO
+        from ion.data.kb_networking_defense import COLLECTIONS as KB_NET_DEF
+        from ion.data.kb_forensics_analysis import COLLECTIONS as KB_FORENSICS
+        from ion.data.kb_forensics_ir import COLLECTIONS as KB_FORENSICS_IR
+        from ion.data.kb_cloud_siem import COLLECTIONS as KB_CLOUD_SIEM
 
         all_modules = [
             ("Main KB", KB_MAIN, True),         # COLLECTIONS entries use functions
             ("Blue Team", KB_BLUETEAM, True),
             ("Foundations", KB_FOUNDATIONS, True),
             ("Fundamentals", KB_FUNDAMENTALS, False),  # Uses lists of dicts
+            ("Offensive Security", KB_OFFENSIVE, False),
+            ("Offensive — Access & Escalation", KB_OFF_ACCESS, False),
+            ("Offensive — C2, Web & Evasion", KB_OFF_ADVANCED, False),
+            ("Foundations Extended", KB_FOUNDATIONS_EXT, False),
+            ("Networking — Protocols & Infra", KB_NET_PROTO, False),
+            ("Networking — Defense & Analysis", KB_NET_DEF, False),
+            ("Forensics — Analysis", KB_FORENSICS, False),
+            ("Forensics — IR & Logs", KB_FORENSICS_IR, False),
+            ("Cloud, SIEM & Governance", KB_CLOUD_SIEM, False),
         ]
 
         total = 0

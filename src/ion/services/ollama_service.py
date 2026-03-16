@@ -291,6 +291,9 @@ RECOMMENDED_MODELS = {
     },
 }
 
+# Default max tokens when user doesn't specify — prevents runaway generation
+DEFAULT_NUM_PREDICT = 1024
+
 # System prompts for different contexts
 SYSTEM_PROMPTS = {
     "analyst": """You are an AI security analyst assistant integrated into ION, a security operations platform.
@@ -301,7 +304,9 @@ You help security analysts with:
 - Explaining malware behavior and techniques
 - Investigating incidents and suggesting next steps
 
-Be concise, technical, and actionable. Reference MITRE ATT&CK techniques when relevant.
+IMPORTANT: Keep responses concise and focused. Use bullet points and short paragraphs.
+Do NOT repeat the question or provide unnecessary preamble. Get straight to the answer.
+Reference MITRE ATT&CK techniques when relevant.
 If you don't know something, say so rather than guessing.""",
 
     "engineering": """You are an AI engineering assistant integrated into ION, a security operations platform.
@@ -313,11 +318,13 @@ You help engineers with:
 - Explaining code and system behavior
 - Reverse engineering concepts
 
-Provide code examples when helpful. Be precise and technical.""",
+IMPORTANT: Keep responses concise. Provide code examples when helpful but avoid excessive explanation.
+Do NOT repeat the question. Get straight to the answer. Be precise and technical.""",
 
     "default": """You are an AI assistant integrated into ION, a security operations platform.
 You help users with security analysis, coding, and general questions.
-Be concise and helpful.""",
+IMPORTANT: Keep responses concise and to the point. Use short paragraphs and bullet points.
+Do NOT repeat the question or add unnecessary filler. Answer directly.""",
 }
 
 
@@ -473,6 +480,8 @@ class OllamaService:
 
             full_messages.extend(messages)
 
+            num_predict = max_tokens or DEFAULT_NUM_PREDICT
+
             response = await self.client.post(
                 "/api/chat",
                 json={
@@ -481,7 +490,8 @@ class OllamaService:
                     "stream": False,
                     "options": {
                         "temperature": temperature,
-                        **({"num_predict": max_tokens} if max_tokens else {}),
+                        "num_predict": num_predict,
+                        "stop": ["<|im_end|>", "<|endoftext|>", "<|end|>"],
                     },
                 },
             )
@@ -547,6 +557,8 @@ class OllamaService:
 
             full_messages.extend(messages)
 
+            num_predict = max_tokens or DEFAULT_NUM_PREDICT
+
             async with self.client.stream(
                 "POST",
                 "/api/chat",
@@ -556,7 +568,8 @@ class OllamaService:
                     "stream": True,
                     "options": {
                         "temperature": temperature,
-                        **({"num_predict": max_tokens} if max_tokens else {}),
+                        "num_predict": num_predict,
+                        "stop": ["<|im_end|>", "<|endoftext|>", "<|end|>"],
                     },
                 },
             ) as response:
@@ -596,7 +609,11 @@ class OllamaService:
                     "prompt": prompt,
                     "system": system or SYSTEM_PROMPTS["default"],
                     "stream": False,
-                    "options": {"temperature": temperature},
+                    "options": {
+                        "temperature": temperature,
+                        "num_predict": DEFAULT_NUM_PREDICT,
+                        "stop": ["<|im_end|>", "<|endoftext|>", "<|end|>"],
+                    },
                 },
             )
             response.raise_for_status()
