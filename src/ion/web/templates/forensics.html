@@ -191,7 +191,8 @@
 <div class="modal-overlay" id="modal-case-detail" style="display:none;">
     <div class="modal-dialog" style="max-width:960px;max-height:90vh;overflow-y:auto;">
         <div class="modal-header">
-            <h2 id="cd-title">Investigation Detail</h2>
+            <h2 id="cd-title" class="editable-title" onclick="startEditTitle()" title="Click to edit title">Investigation Detail</h2>
+            <input type="text" id="cd-title-input" class="form-input" style="display:none;font-size:1.3rem;font-weight:700;flex:1;" onblur="saveTitle()" onkeydown="if(event.key==='Enter')saveTitle();if(event.key==='Escape')cancelEditTitle();">
             <button class="modal-close" onclick="closeModal('modal-case-detail')">&times;</button>
         </div>
         <div class="modal-body" id="cd-body">
@@ -221,7 +222,8 @@
                     <div id="cd-progress-fill" style="height:100%;background:var(--accent,#00e5ff);border-radius:4px;transition:width .3s;width:0%;"></div>
                 </div>
             </div>
-            <div id="cd-description" style="margin-bottom:16px;color:var(--text-secondary);font-size:.85rem;"></div>
+            <div id="cd-description" class="editable-desc" style="margin-bottom:16px;color:var(--text-secondary);font-size:.85rem;min-height:20px;cursor:pointer;" onclick="startEditDesc()" title="Click to edit description"></div>
+            <textarea id="cd-desc-input" class="form-input" style="display:none;margin-bottom:16px;font-size:.85rem;" rows="3" onblur="saveDesc()" onkeydown="if(event.key==='Escape')cancelEditDesc();"></textarea>
             <!-- Sub-tabs: Sections is now the primary tab -->
             <div class="fr-tabs" style="margin-bottom:12px;">
                 <button class="fr-tab active" onclick="switchDetailTab('sections')">Sections</button>
@@ -433,6 +435,11 @@
     border-radius: 12px 12px 0 0;
 }
 .modal-header h2 { font-size: 1.1rem; margin: 0; }
+.editable-title { cursor: pointer; border-bottom: 1px dashed transparent; transition: border-color .2s; }
+.editable-title:hover { border-bottom-color: var(--accent, #00e5ff); }
+.editable-desc { border: 1px dashed transparent; padding: 4px; border-radius: 4px; transition: border-color .2s; }
+.editable-desc:hover { border-color: var(--border-color, #30363d); }
+.editable-desc:empty::after { content: 'Click to add description...'; color: var(--text-secondary); opacity: .5; font-style: italic; }
 .modal-close {
     background: none; border: none; font-size: 1.5rem;
     cursor: pointer; color: var(--text-secondary); transition: color .2s;
@@ -1445,6 +1452,38 @@ function renderDetailEvidence(items){
 }
 
 // ======== CASE ACTIONS ========
+// ======== INLINE EDIT: Title & Description ========
+function startEditTitle(){
+    const h2=document.getElementById('cd-title'),inp=document.getElementById('cd-title-input');
+    inp.value=h2.textContent;h2.style.display='none';inp.style.display='';inp.focus();inp.select();
+}
+function cancelEditTitle(){
+    document.getElementById('cd-title').style.display='';document.getElementById('cd-title-input').style.display='none';
+}
+async function saveTitle(){
+    const inp=document.getElementById('cd-title-input'),h2=document.getElementById('cd-title');
+    const val=inp.value.trim();
+    if(!val||val===h2.textContent){cancelEditTitle();return}
+    try{const r=await fetch(API+'/cases/'+currentCaseId,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:val})});
+    if(!r.ok){const e=await r.json();throw new Error(e.detail||'Failed')}
+    h2.textContent=val;if(currentCaseData)currentCaseData.title=val;cancelEditTitle();showToast('Title updated');loadCases()}catch(e){showToast(e.message,true);cancelEditTitle()}
+}
+function startEditDesc(){
+    const div=document.getElementById('cd-description'),ta=document.getElementById('cd-desc-input');
+    ta.value=div.textContent;div.style.display='none';ta.style.display='';ta.focus();
+}
+function cancelEditDesc(){
+    document.getElementById('cd-description').style.display='';document.getElementById('cd-desc-input').style.display='none';
+}
+async function saveDesc(){
+    const ta=document.getElementById('cd-desc-input'),div=document.getElementById('cd-description');
+    const val=ta.value.trim();
+    if(val===div.textContent){cancelEditDesc();return}
+    try{const r=await fetch(API+'/cases/'+currentCaseId,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:val})});
+    if(!r.ok){const e=await r.json();throw new Error(e.detail||'Failed')}
+    div.textContent=val;if(currentCaseData)currentCaseData.description=val;cancelEditDesc();showToast('Description updated')}catch(e){showToast(e.message,true);cancelEditDesc()}
+}
+
 async function updateCaseStatus(){
     try{const r=await fetch(API+'/cases/'+currentCaseId,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:document.getElementById('cd-status-select').value})});if(!r.ok){const e=await r.json();throw new Error(e.detail||'Failed')}showToast('Status updated');openCaseDetail(currentCaseId);loadCases()}catch(e){showToast(e.message,true)}
 }

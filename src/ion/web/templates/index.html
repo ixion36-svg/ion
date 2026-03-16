@@ -13,6 +13,9 @@
                 <span id="current-date" class="text-muted"></span>
             </p>
         </div>
+        <div id="focus-mode-bar" style="display:none;margin-top:8px;">
+            <div class="focus-mode-selector" id="focus-selector"></div>
+        </div>
     </div>
 
     <!-- Stats Grid - Role-based visibility -->
@@ -1275,6 +1278,36 @@
     font-weight: 600;
     min-width: 24px;
 }
+
+/* ==================== FOCUS MODE ==================== */
+.focus-mode-selector {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.focus-btn {
+    padding: 5px 14px;
+    border: 1px solid var(--border-color, #30363d);
+    border-radius: 20px;
+    background: var(--surface, #161b22);
+    color: var(--text-secondary, #8b949e);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.focus-btn:hover {
+    border-color: var(--accent, #00e5ff);
+    color: var(--text-primary, #e6edf3);
+}
+
+.focus-btn-active {
+    background: var(--accent, #00e5ff);
+    color: #000;
+    border-color: var(--accent, #00e5ff);
+    font-weight: 600;
+}
 </style>
 {% endblock %}
 
@@ -1295,14 +1328,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // User info
         document.getElementById('user-display-name').textContent = data.user.display_name || data.user.username;
-        const roleDisplay = userRoles.length > 0 ? userRoles[0].charAt(0).toUpperCase() + userRoles[0].slice(1) : 'User';
+        const focusRole = data.user.focus_role;
+        const roleDisplay = focusRole
+            ? focusRole.charAt(0).toUpperCase() + focusRole.slice(1)
+            : (userRoles.length > 0 ? userRoles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(' / ') : 'User');
         document.getElementById('user-role').textContent = roleDisplay;
 
-        // Show role-specific dashboard
-        const isAdmin = userRoles.includes('admin');
-        const isEngineer = userRoles.includes('engineering');
-        const isLead = userRoles.includes('lead');
-        const isAnalyst = userRoles.includes('analyst');
+        // Focus mode bar — shown when user has multiple roles
+        if (userRoles.length > 1) {
+            const bar = document.getElementById('focus-mode-bar');
+            bar.style.display = '';
+            const sel = document.getElementById('focus-selector');
+            const btns = [{ name: null, label: 'All' }].concat(userRoles.map(r => ({ name: r, label: r.charAt(0).toUpperCase() + r.slice(1) })));
+            sel.innerHTML = btns.map(b => {
+                const active = b.name === focusRole ? ' focus-btn-active' : '';
+                return `<button class="focus-btn${active}" onclick="switchFocusMode(${b.name ? "'" + b.name + "'" : 'null'})">${escapeHtml(b.label)}</button>`;
+            }).join('');
+        }
+
+        // Show role-specific dashboard based on focus mode (or highest role)
+        const effectiveRoles = focusRole ? [focusRole] : userRoles;
+        const isAdmin = effectiveRoles.includes('admin');
+        const isEngineer = effectiveRoles.includes('engineering');
+        const isLead = effectiveRoles.includes('lead');
+        const isAnalyst = effectiveRoles.includes('analyst');
+        const isForensic = effectiveRoles.includes('forensic');
 
         if (isAdmin) {
             setupAdminDashboard(data);
@@ -1312,6 +1362,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             setupLeadDashboard(data);
         } else if (isAnalyst) {
             setupAnalystDashboard(data);
+        } else if (isForensic) {
+            setupForensicDashboard(data);
         } else {
             setupUserDashboard(data);
         }
@@ -1666,6 +1718,62 @@ async function checkSystemStatus(data, prefix) {
 }
 
 // ==================== USER DASHBOARD ====================
+// ==================== FORENSIC DASHBOARD ====================
+async function setupForensicDashboard(data) {
+    document.getElementById('user-dashboard').style.display = 'none';
+    // Re-use the analyst dashboard layout but focus on forensic content
+    document.getElementById('analyst-dashboard').style.display = 'grid';
+
+    // Hide alert-specific stat cards, show common ones
+    document.querySelectorAll('.analyst-visible').forEach(el => el.style.display = 'none');
+
+    // Replace alerts section content with forensic investigations
+    const alertsSection = document.getElementById('analyst-alerts-section');
+    if (alertsSection) {
+        alertsSection.querySelector('h2').textContent = 'Active Investigations';
+        const badge = document.getElementById('analyst-alerts-badge');
+        const actions = alertsSection.querySelector('.section-actions a');
+        if (actions) { actions.href = '/forensics'; actions.textContent = 'View All'; }
+
+        try {
+            const r = await fetch('/api/forensics/cases?status=intake&status=evidence_collection&status=analysis&status=reporting&status=review');
+            if (r.ok) {
+                const cases = await r.json();
+                if (badge) badge.textContent = cases.length;
+                const list = document.getElementById('analyst-alerts-list');
+                if (cases.length > 0) {
+                    list.innerHTML = cases.slice(0, 10).map(c => `
+                        <div class="alert-item severity-${c.priority}" onclick="window.location.href='/forensics'" style="cursor:pointer;">
+                            <span class="alert-severity ${c.priority}">${c.priority}</span>
+                            <div class="alert-content">
+                                <p class="alert-title">${escapeHtml(c.case_number + ' — ' + c.title)}</p>
+                                <div class="alert-footer">
+                                    <span class="alert-status status-${c.status}">${c.status.replace(/_/g, ' ')}</span>
+                                    <span class="alert-time">${c.investigation_type ? c.investigation_type.replace(/_/g, ' ') : ''}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    list.innerHTML = '<p class="empty-message">No active investigations</p>';
+                }
+            }
+        } catch (e) {
+            document.getElementById('analyst-alerts-list').innerHTML = '<p class="empty-message">Failed to load investigations</p>';
+        }
+    }
+
+    // Cases section — hide since forensic users don't have case permissions in focus mode
+    const casesSection = document.getElementById('analyst-cases-section');
+    if (casesSection) {
+        casesSection.querySelector('h2').textContent = 'Recent Evidence';
+        document.getElementById('analyst-cases-list').innerHTML = '<p class="empty-message"><a href="/forensics">Go to Forensics</a></p>';
+    }
+
+    // Recent templates
+    renderTemplates('analyst-recent-templates', data.recent_templates);
+}
+
 function setupUserDashboard(data) {
     document.getElementById('user-dashboard').style.display = 'grid';
 

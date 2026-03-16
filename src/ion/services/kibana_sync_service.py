@@ -153,7 +153,7 @@ class KibanaSyncService:
             # Map Kibana status to ION status
             status_map = {
                 "open": "open",
-                "in-progress": "in_progress",
+                "in-progress": "acknowledged",
                 "closed": "closed",
             }
 
@@ -196,8 +196,7 @@ class KibanaSyncService:
             # Map ION status to Kibana status
             status_map = {
                 "open": "open",
-                "in_progress": "in-progress",
-                "resolved": "closed",
+                "acknowledged": "in-progress",
                 "closed": "closed",
             }
 
@@ -354,7 +353,7 @@ class KibanaSyncService:
                     # Map Kibana status to ION
                     status_map = {
                         "open": "open",
-                        "in-progress": "in_progress",
+                        "in-progress": "acknowledged",
                         "closed": "closed",
                     }
                     status = status_map.get(
@@ -464,7 +463,7 @@ class KibanaSyncService:
                         if not triage:
                             triage = AlertTriage(
                                 es_alert_id=alert_id,
-                                status=AlertTriageStatus.INVESTIGATING,
+                                status=AlertTriageStatus.ACKNOWLEDGED,
                             )
                             session.add(triage)
                             session.flush()

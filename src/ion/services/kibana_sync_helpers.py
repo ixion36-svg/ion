@@ -122,8 +122,7 @@ def sync_case_update_to_kibana(
         if status:
             status_map = {
                 "open": "open",
-                "in_progress": "in-progress",
-                "resolved": "closed",
+                "acknowledged": "in-progress",
                 "closed": "closed",
             }
             kibana_status = status_map.get(status)

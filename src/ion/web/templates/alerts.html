@@ -44,17 +44,13 @@
             <span class="stat-value stat-open" id="stat-open">-</span>
             <span class="stat-label">Open</span>
         </div>
-        <div class="stat-item clickable" onclick="quickFilterByTriage('investigating')">
-            <span class="stat-value stat-investigating" id="stat-investigating">-</span>
-            <span class="stat-label">Investigating</span>
+        <div class="stat-item clickable" onclick="quickFilterByTriage('acknowledged')">
+            <span class="stat-value stat-acknowledged" id="stat-acknowledged">-</span>
+            <span class="stat-label">Acknowledged</span>
         </div>
-        <div class="stat-item clickable" onclick="quickFilterByTriage('escalated')">
-            <span class="stat-value stat-escalated" id="stat-escalated">-</span>
-            <span class="stat-label">Escalated</span>
-        </div>
-        <div class="stat-item clickable" onclick="quickFilterByTriage('resolved')">
-            <span class="stat-value stat-resolved" id="stat-resolved">-</span>
-            <span class="stat-label">Resolved</span>
+        <div class="stat-item clickable" onclick="quickFilterByTriage('closed')">
+            <span class="stat-value stat-closed" id="stat-closed">-</span>
+            <span class="stat-label">Closed</span>
         </div>
     </div>
     <div class="stats-group">
@@ -186,7 +182,7 @@
         <option value="">All Statuses</option>
         <option value="open">Open</option>
         <option value="acknowledged">Acknowledged</option>
-        <option value="resolved">Resolved</option>
+        <option value="closed">Closed</option>
     </select>
     <input type="text" id="alert-search" class="search-input" placeholder="Search alerts..." oninput="debouncedSearch()">
     <button class="btn btn-secondary" onclick="clearAllFilters()">Clear</button>
@@ -209,11 +205,8 @@
         <select id="bulk-status" class="bulk-select">
             <option value="">Change Status...</option>
             <option value="open">Open</option>
-            <option value="investigating">Investigating</option>
-            <option value="escalated">Escalated</option>
-            <option value="resolved">Resolved</option>
+            <option value="acknowledged">Acknowledged</option>
             <option value="closed">Closed</option>
-            <option value="false_positive">False Positive</option>
         </select>
         <select id="bulk-assign" class="bulk-select">
             <option value="">Assign To...</option>
@@ -249,11 +242,8 @@
         </div>
         <div class="context-submenu">
             <div class="context-menu-item" onclick="contextMenuAction('status', 'open')">Open</div>
-            <div class="context-menu-item" onclick="contextMenuAction('status', 'investigating')">Investigating</div>
-            <div class="context-menu-item" onclick="contextMenuAction('status', 'escalated')">Escalated</div>
-            <div class="context-menu-item" onclick="contextMenuAction('status', 'resolved')">Resolved</div>
+            <div class="context-menu-item" onclick="contextMenuAction('status', 'acknowledged')">Acknowledged</div>
             <div class="context-menu-item" onclick="contextMenuAction('status', 'closed')">Closed</div>
-            <div class="context-menu-item" onclick="contextMenuAction('status', 'false_positive')">False Positive</div>
         </div>
     </div>
     <div class="context-menu-submenu">
@@ -1486,11 +1476,8 @@ kbd {
 }
 
 .triage-dot.triage-open { background: #90caf9; }
-.triage-dot.triage-investigating { background: #ffb74d; }
-.triage-dot.triage-escalated { background: #ef5350; }
-.triage-dot.triage-resolved { background: #66bb6a; }
+.triage-dot.triage-acknowledged { background: #ffb74d; }
 .triage-dot.triage-closed { background: #9e9e9e; }
-.triage-dot.triage-false_positive { background: #b0bec5; }
 .triage-dot.triage-none { background: transparent; border: 1px dashed var(--border); }
 
 /* ============================================= */
@@ -2816,7 +2803,7 @@ let mapTargetLatLon = null;
 let cachedGeoPoints = null;
 
 const SEVERITY_ORDER = { critical: 1, high: 2, medium: 3, low: 4, info: 5 };
-const TRIAGE_STATUSES = ['open', 'investigating', 'escalated', 'resolved', 'closed', 'false_positive'];
+const TRIAGE_STATUSES = ['open', 'acknowledged', 'closed'];
 const PRIORITIES = ['critical', 'high', 'medium', 'low'];
 const OBSERVABLE_TYPES = ['hostname', 'source_ip', 'destination_ip', 'url', 'domain', 'user_account'];
 
@@ -3194,7 +3181,7 @@ function computeAlertAttention() {
     for (const a of allAlerts) {
         const triage = triageCache[a.id];
         const status = triage?.status || 'open';
-        const isOpen = !status || status === 'open' || status === 'investigating';
+        const isOpen = !status || status === 'open';
         const ageMs = now - new Date(a.timestamp).getTime();
 
         if (a.severity === 'critical' && isOpen && ageMs > 2 * 3600000) {
@@ -3206,8 +3193,8 @@ function computeAlertAttention() {
             highStaleIds.push(a.id);
         }
         if ((a.severity === 'critical' || a.severity === 'high') && !triage?.assigned_to_id) {
-            const resolved = status === 'resolved' || status === 'closed' || status === 'false_positive';
-            if (!resolved) {
+            const isClosed = status === 'closed';
+            if (!isClosed) {
                 unassigned++;
                 unassignedIds.push(a.id);
             }
@@ -3248,7 +3235,7 @@ function filterToAttention(severity, maxAgeHours) {
         if (a.severity !== severity) return false;
         const triage = triageCache[a.id];
         const status = triage?.status || 'open';
-        const isOpen = !status || status === 'open' || status === 'investigating';
+        const isOpen = !status || status === 'open';
         if (!isOpen) return false;
         return (now - new Date(a.timestamp).getTime()) > cutoff;
     });
@@ -3275,7 +3262,7 @@ function filterToAttentionUnassigned() {
         if (a.severity !== 'critical' && a.severity !== 'high') return false;
         const triage = triageCache[a.id];
         const status = triage?.status || 'open';
-        if (status === 'resolved' || status === 'closed' || status === 'false_positive') return false;
+        if (status === 'closed') return false;
         return !triage?.assigned_to_id;
     });
 
@@ -3312,8 +3299,8 @@ async function loadCases() {
 function renderCasesSummary() {
     const container = document.getElementById('cases-summary');
     const badge = document.getElementById('cases-count');
-    const openCases = casesData.filter(c => c.status === 'open' || c.status === 'in_progress');
-    badge.textContent = openCases.length;
+    const activeCases = casesData.filter(c => c.status === 'open' || c.status === 'acknowledged');
+    badge.textContent = activeCases.length;
 
     if (casesData.length === 0) {
         container.innerHTML = '<div class="empty-state">No cases</div>';
@@ -3325,7 +3312,7 @@ function renderCasesSummary() {
         duplicate: 'DUP', insufficient_data: 'N/D', not_applicable: 'N/A',
     };
     container.innerHTML = casesData.slice(0, 10).map(c => {
-        const statusColor = c.status === 'open' ? '#1976d2' : c.status === 'in_progress' ? '#f57c00' : '#616161';
+        const statusColor = c.status === 'open' ? '#1976d2' : c.status === 'acknowledged' ? '#f57c00' : '#616161';
         const closureBadge = c.closure_reason ? `<span class="closure-reason-badge reason-${c.closure_reason}" style="font-size:0.625rem;padding:0.0625rem 0.3rem;margin-left:0.25rem;">${closureLabels[c.closure_reason] || c.closure_reason}</span>` : '';
         return `
             <div class="list-item" onclick="showCaseDetail(${c.id})" title="${escapeHtml(c.title)}">
@@ -3359,7 +3346,7 @@ function renderCaseManagementModal(caseData) {
     overlay.id = 'case-mgmt-overlay';
     overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
 
-    const statusOptions = ['open', 'in_progress', 'closed'].map(s =>
+    const statusOptions = ['open', 'acknowledged', 'closed'].map(s =>
         `<option value="${s}" ${s === caseData.status ? 'selected' : ''}>${s.replace('_', ' ')}</option>`
     ).join('');
 
@@ -3374,7 +3361,7 @@ function renderCaseManagementModal(caseData) {
         insufficient_data: 'Insufficient Data', not_applicable: 'Not Applicable',
     };
     let closureInfoHtml = '';
-    if ((caseData.status === 'closed' || caseData.status === 'resolved') && caseData.closure_reason) {
+    if (caseData.status === 'closed' && caseData.closure_reason) {
         closureInfoHtml = `
             <div class="closure-info-block">
                 <div class="closure-info-header">
@@ -3478,7 +3465,7 @@ function renderCaseManagementModal(caseData) {
                 </div>
             </h3>
             <div class="ai-case-summary" id="ai-case-summary-${caseData.id}"></div>
-            ${caseData.status !== 'closed' && caseData.status !== 'resolved' ? `
+            ${caseData.status !== 'closed' ? `
             <div class="alert-closure-actions" style="margin:0.75rem 0;padding:0.75rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;">
                 <span style="font-size:0.75rem;color:var(--text-muted);margin-right:0.5rem;">Close Case As:</span>
                 <button class="alert-closure-btn benign" onclick="closeCaseWithAlerts(${caseData.id}, 'benign')">&#10003; Benign</button>
@@ -3539,7 +3526,7 @@ function renderCaseManagementModal(caseData) {
     loadCasePlaybookExecutions(caseData.id);
 
     // Check for known false positive matches (only for non-closed cases)
-    if (caseData.status !== 'closed' && caseData.status !== 'resolved') {
+    if (caseData.status !== 'closed') {
         checkKFPMatches(caseData);
     }
 }
@@ -3639,7 +3626,7 @@ async function confirmCloseCaseWithAlerts(caseId, closureType) {
 
 function handleCaseStatusChange(caseId, selectEl, oldStatus) {
     const newStatus = selectEl.value;
-    const isClosing = (newStatus === 'closed' || newStatus === 'resolved') && oldStatus !== 'closed' && oldStatus !== 'resolved';
+    const isClosing = newStatus === 'closed' && oldStatus !== 'closed';
     if (isClosing) {
         // Show closure reason modal instead of directly updating
         showClosureReasonModal(caseId, newStatus, selectEl);
@@ -5968,7 +5955,7 @@ async function renderCaseTab(caseId) {
             insufficient_data: 'Insufficient Data', not_applicable: 'Not Applicable',
         };
         let closureInfoHtml = '';
-        if ((c.status === 'closed' || c.status === 'resolved') && c.closure_reason) {
+        if (c.status === 'closed' && c.closure_reason) {
             closureInfoHtml = `
                 <div class="closure-info-block">
                     <div class="closure-info-header">
@@ -5991,7 +5978,7 @@ async function renderCaseTab(caseId) {
                     </div>
                 </h4>
                 <div class="ai-case-summary" id="ai-case-summary-${c.id}"></div>
-                ${c.status !== 'closed' && c.status !== 'resolved' ? `
+                ${c.status !== 'closed' ? `
                 <div class="alert-closure-actions" style="margin:0.5rem 0;padding:0.5rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;">
                     <span style="font-size:0.75rem;color:var(--text-muted);margin-right:0.5rem;">Close Case As:</span>
                     <button class="alert-closure-btn benign" onclick="closeCaseWithAlerts(${c.id}, 'benign')">&#10003; Benign</button>
@@ -6043,7 +6030,7 @@ async function renderCaseTab(caseId) {
         `;
 
         // Check for KFP matches on the case tab too
-        if (c.status !== 'closed' && c.status !== 'resolved') {
+        if (c.status !== 'closed') {
             checkKFPMatchesForTab(c);
         }
     } catch (e) {
@@ -6209,7 +6196,7 @@ function renderAlerts() {
             <td class="quick-actions-col" onclick="event.stopPropagation()">
                 <div class="quick-actions">
                     <button class="quick-action-btn" onclick="quickAssignToMe('${escapeHtml(a.id)}')" title="Assign to me"><i class="icon-user-check"></i></button>
-                    <button class="quick-action-btn" onclick="quickStatusChange('${escapeHtml(a.id)}', 'investigating')" title="Mark investigating"><i class="icon-search"></i></button>
+                    <button class="quick-action-btn" onclick="quickStatusChange('${escapeHtml(a.id)}', 'acknowledged')" title="Acknowledge"><i class="icon-search"></i></button>
                     <button class="quick-action-btn" onclick="showCreateCaseForm('${escapeHtml(a.id)}')" title="Create case"><i class="icon-folder-plus"></i></button>
                 </div>
             </td>
@@ -6244,7 +6231,7 @@ function updateStatsBar() {
     document.getElementById('stat-total').textContent = source.length;
 
     // By triage status
-    const triageStatusCounts = { open: 0, investigating: 0, escalated: 0, resolved: 0, closed: 0, false_positive: 0 };
+    const triageStatusCounts = { open: 0, acknowledged: 0, closed: 0 };
     source.forEach(a => {
         const triage = triageCache[a.id];
         const status = triage?.status || 'open';
@@ -6254,9 +6241,8 @@ function updateStatsBar() {
     });
 
     document.getElementById('stat-open').textContent = triageStatusCounts.open;
-    document.getElementById('stat-investigating').textContent = triageStatusCounts.investigating;
-    document.getElementById('stat-escalated').textContent = triageStatusCounts.escalated;
-    document.getElementById('stat-resolved').textContent = triageStatusCounts.resolved;
+    document.getElementById('stat-acknowledged').textContent = triageStatusCounts.acknowledged;
+    document.getElementById('stat-closed').textContent = triageStatusCounts.closed;
 
     // By severity
     const severityCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
@@ -6289,7 +6275,7 @@ function updateStatsBar() {
 }
 
 function quickFilterByTriage(status) {
-    document.getElementById('alert-triage-filter').value = status;
+    document.getElementById('alert-status-filter').value = status;
     applyFilters();
 }
 
@@ -6639,7 +6625,7 @@ function renderSeverityDonut() {
 }
 
 function renderTriageStatusDonut() {
-    const counts = { open: 0, investigating: 0, escalated: 0, resolved: 0, closed: 0, false_positive: 0 };
+    const counts = { open: 0, acknowledged: 0, closed: 0 };
     allAlerts.forEach(a => {
         const triage = triageCache[a.id];
         const status = triage?.status || 'open';
@@ -6647,12 +6633,9 @@ function renderTriageStatusDonut() {
     });
     renderDonut('chart-triage-status', [
         { label: 'Open', value: counts.open },
-        { label: 'Investigating', value: counts.investigating },
-        { label: 'Escalated', value: counts.escalated },
-        { label: 'Resolved', value: counts.resolved },
+        { label: 'Acknowledged', value: counts.acknowledged },
         { label: 'Closed', value: counts.closed },
-        { label: 'False Positive', value: counts.false_positive },
-    ], ['#1976d2', '#ff9800', '#f44336', '#4caf50', '#78909c', '#9e9e9e']);
+    ], ['#1976d2', '#ff9800', '#78909c']);
 }
 
 // --- Geo points extraction (cached) ---
@@ -6963,7 +6946,7 @@ function renderKeyMetrics() {
     let resolvedTimes = [];
     allAlerts.forEach(a => {
         const triage = triageCache[a.id];
-        if (triage && (triage.status === 'resolved' || triage.status === 'closed') && triage.updated_at) {
+        if (triage && triage.status === 'closed' && triage.updated_at) {
             const alertTime = new Date(a.timestamp).getTime();
             const resolveTime = new Date(triage.updated_at).getTime();
             if (resolveTime > alertTime) resolvedTimes.push(resolveTime - alertTime);
@@ -6983,7 +6966,7 @@ function renderKeyMetrics() {
         if (a.severity !== 'critical' && a.severity !== 'high') return;
         const triage = triageCache[a.id];
         const status = triage?.status || 'open';
-        if (status === 'resolved' || status === 'closed' || status === 'false_positive') return;
+        if (status === 'closed') return;
         if (!triage?.assigned_to_id) unassignedCritHigh++;
     });
     const unassClass = unassignedCritHigh > 5 ? 'metric-danger' : unassignedCritHigh > 0 ? 'metric-warn' : 'metric-good';
@@ -6994,15 +6977,16 @@ function renderKeyMetrics() {
     const caseRate = triaged > 0 ? ((withCase / triaged) * 100).toFixed(0) : '0';
     const caseClass = 'metric-info';
 
-    // False positive rate
-    const fpCount = Object.values(triageCache).filter(t => t.status === 'false_positive').length;
-    const fpRate = triaged > 0 ? ((fpCount / triaged) * 100).toFixed(0) : '0';
+    // False positive rate (cases closed as false_positive)
+    const fpCount = casesData.filter(c => c.closure_reason === 'false_positive').length;
+    const totalCases = casesData.length;
+    const fpRate = totalCases > 0 ? ((fpCount / totalCases) * 100).toFixed(0) : '0';
     const fpClass = parseFloat(fpRate) > 50 ? 'metric-warn' : 'metric-info';
 
-    // Escalation rate
-    const escCount = Object.values(triageCache).filter(t => t.status === 'escalated').length;
-    const escRate = triaged > 0 ? ((escCount / triaged) * 100).toFixed(0) : '0';
-    const escClass = parseFloat(escRate) > 30 ? 'metric-danger' : parseFloat(escRate) > 15 ? 'metric-warn' : 'metric-info';
+    // Closure rate (closed alerts out of triaged)
+    const closedCount = Object.values(triageCache).filter(t => t.status === 'closed').length;
+    const closureRate = triaged > 0 ? ((closedCount / triaged) * 100).toFixed(0) : '0';
+    const escClass = parseFloat(closureRate) > 80 ? 'metric-good' : 'metric-info';
 
     container.innerHTML = `
         <div class="key-metric-tile">
@@ -7026,8 +7010,8 @@ function renderKeyMetrics() {
             <div class="key-metric-label">False Positive Rate</div>
         </div>
         <div class="key-metric-tile">
-            <div class="key-metric-value ${escClass}">${escRate}%</div>
-            <div class="key-metric-label">Escalation Rate</div>
+            <div class="key-metric-value ${escClass}">${closureRate}%</div>
+            <div class="key-metric-label">Closure Rate</div>
         </div>
     `;
 }
@@ -7684,7 +7668,7 @@ function saveSavedFilters(filters) {
 function getCurrentFilterState() {
     return {
         timeRange: document.getElementById('alert-time-range').value,
-        triageStatus: document.getElementById('alert-triage-filter').value,
+        triageStatus: document.getElementById('alert-status-filter').value,
         severity: document.getElementById('alert-severity-filter').value,
         status: document.getElementById('alert-status-filter').value,
         search: document.getElementById('alert-search').value,
@@ -7694,7 +7678,7 @@ function getCurrentFilterState() {
 
 function applyFilterState(state) {
     document.getElementById('alert-time-range').value = state.timeRange || '24';
-    document.getElementById('alert-triage-filter').value = state.triageStatus || '';
+    document.getElementById('alert-status-filter').value = state.triageStatus || '';
     document.getElementById('alert-severity-filter').value = state.severity || '';
     document.getElementById('alert-status-filter').value = state.status || '';
     document.getElementById('alert-search').value = state.search || '';
@@ -8304,7 +8288,7 @@ async function addToExistingCase() {
         }
     }
 
-    const openCases = casesData.filter(c => c.status === 'open' || c.status === 'in_progress');
+    const openCases = casesData.filter(c => c.status === 'open' || c.status === 'acknowledged');
 
     if (openCases.length === 0) {
         showNotification('No open cases available. Create a new case instead.', 'warning');
@@ -8545,9 +8529,9 @@ function updateSelectedRow() {
 }
 
 function showStatusQuickPicker() {
-    const statuses = ['open', 'investigating', 'escalated', 'resolved', 'closed', 'false_positive'];
+    const statuses = ['open', 'acknowledged', 'closed'];
     const options = statuses.map((s, i) => `${i + 1}. ${s}`).join('\n');
-    const choice = prompt(`Select status:\n${options}\n\nEnter number (1-6):`);
+    const choice = prompt(`Select status:\n${options}\n\nEnter number (1-3):`);
 
     if (choice && statuses[parseInt(choice) - 1]) {
         quickStatusChange(currentDetailAlert.id, statuses[parseInt(choice) - 1]);

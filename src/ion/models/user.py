@@ -74,9 +74,17 @@ class User(Base, TimestampMixin):
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username='{self.username}')>"
 
+    @property
+    def effective_roles(self) -> List["Role"]:
+        """Roles used for permission checks — filtered by focus mode."""
+        focus = getattr(self, '_focus_role', None)
+        if focus is not None:
+            return [focus]
+        return list(self.roles)
+
     def has_permission(self, permission_name: str) -> bool:
-        """Check if user has a specific permission."""
-        for role in self.roles:
+        """Check if user has a specific permission (respects focus mode)."""
+        for role in self.effective_roles:
             for permission in role.permissions:
                 if permission.name == permission_name:
                     return True
@@ -90,12 +98,12 @@ class User(Base, TimestampMixin):
         return False
 
     def has_role(self, role_name: str) -> bool:
-        """Check if user has a specific role."""
-        return any(role.name == role_name for role in self.roles)
+        """Check if user has a specific role (respects focus mode)."""
+        return any(role.name == role_name for role in self.effective_roles)
 
     @property
     def is_admin(self) -> bool:
-        """Check if user has admin role."""
+        """Check if user has admin role (respects focus mode)."""
         return self.has_role("admin")
 
 
@@ -160,8 +168,14 @@ class UserSession(Base):
         DateTime, default=func.now(), nullable=False
     )
 
+    # Focus mode: restrict session to a single role (NULL = all roles)
+    active_role_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("roles.id"), nullable=True
+    )
+
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="sessions")
+    active_role: Mapped[Optional["Role"]] = relationship("Role", lazy="joined")
 
     def __repr__(self) -> str:
         return f"<UserSession(id={self.id}, user_id={self.user_id})>"

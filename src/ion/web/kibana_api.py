@@ -281,9 +281,8 @@ async def update_kibana_case(
     # Map status
     status_map = {
         "open": "open",
-        "in_progress": "in-progress",
+        "acknowledged": "in-progress",
         "in-progress": "in-progress",
-        "resolved": "closed",
         "closed": "closed",
     }
 

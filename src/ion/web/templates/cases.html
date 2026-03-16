@@ -26,9 +26,9 @@
         <span class="cases-stat-value" id="stat-open">0</span>
         <span class="cases-stat-label">Open Cases</span>
     </div>
-    <div class="cases-stat-card stat-inprogress">
-        <span class="cases-stat-value" id="stat-inprogress">0</span>
-        <span class="cases-stat-label">In Progress</span>
+    <div class="cases-stat-card stat-acknowledged">
+        <span class="cases-stat-value" id="stat-acknowledged">0</span>
+        <span class="cases-stat-label">Acknowledged</span>
     </div>
     <div class="cases-stat-card stat-critical">
         <span class="cases-stat-value" id="stat-critical">0</span>
@@ -81,21 +81,13 @@
         </div>
         <div class="kanban-cards" id="col-open"></div>
     </div>
-    <div class="kanban-column" data-status="in_progress"
-         ondragover="onDragOver(event)" ondrop="onDrop(event, 'in_progress')">
-        <div class="kanban-col-header col-inprogress">
-            <span class="kanban-col-title">In Progress</span>
-            <span class="kanban-col-count" id="col-count-in_progress">0</span>
+    <div class="kanban-column" data-status="acknowledged"
+         ondragover="onDragOver(event)" ondrop="onDrop(event, 'acknowledged')">
+        <div class="kanban-col-header col-acknowledged">
+            <span class="kanban-col-title">Acknowledged</span>
+            <span class="kanban-col-count" id="col-count-acknowledged">0</span>
         </div>
-        <div class="kanban-cards" id="col-in_progress"></div>
-    </div>
-    <div class="kanban-column" data-status="resolved"
-         ondragover="onDragOver(event)" ondrop="onDrop(event, 'resolved')">
-        <div class="kanban-col-header col-resolved">
-            <span class="kanban-col-title">Resolved</span>
-            <span class="kanban-col-count" id="col-count-resolved">0</span>
-        </div>
-        <div class="kanban-cards" id="col-resolved"></div>
+        <div class="kanban-cards" id="col-acknowledged"></div>
     </div>
     <div class="kanban-column" data-status="closed"
          ondragover="onDragOver(event)" ondrop="onDrop(event, 'closed')">
@@ -255,7 +247,7 @@
 }
 
 .cases-stat-card.stat-open { border-top-color: #3b82f6; }
-.cases-stat-card.stat-inprogress { border-top-color: #f59e0b; }
+.cases-stat-card.stat-acknowledged { border-top-color: #f59e0b; }
 .cases-stat-card.stat-critical { border-top-color: #ef4444; }
 .cases-stat-card.stat-resolution { border-top-color: #10b981; }
 
@@ -266,7 +258,7 @@
 }
 
 .stat-open .cases-stat-value { color: #3b82f6; }
-.stat-inprogress .cases-stat-value { color: #f59e0b; }
+.stat-acknowledged .cases-stat-value { color: #f59e0b; }
 .stat-critical .cases-stat-value { color: #ef4444; }
 .stat-resolution .cases-stat-value { color: #10b981; }
 
@@ -340,13 +332,11 @@
 }
 
 .col-open .kanban-col-title { color: #3b82f6; }
-.col-inprogress .kanban-col-title { color: #f59e0b; }
-.col-resolved .kanban-col-title { color: #8b5cf6; }
+.col-acknowledged .kanban-col-title { color: #f59e0b; }
 .col-closed .kanban-col-title { color: #6b7280; }
 
 .col-open { border-bottom-color: #3b82f6; }
-.col-inprogress { border-bottom-color: #f59e0b; }
-.col-resolved { border-bottom-color: #8b5cf6; }
+.col-acknowledged { border-bottom-color: #f59e0b; }
 .col-closed { border-bottom-color: #6b7280; }
 
 .kanban-col-title {
@@ -1362,15 +1352,15 @@ function filterCases() {
 
 function renderStats() {
     const open = allCases.filter(c => c.status === 'open').length;
-    const inProg = allCases.filter(c => c.status === 'in_progress').length;
-    const critActive = allCases.filter(c => c.severity === 'critical' && (c.status === 'open' || c.status === 'in_progress')).length;
+    const acked = allCases.filter(c => c.status === 'acknowledged').length;
+    const critActive = allCases.filter(c => c.severity === 'critical' && (c.status === 'open' || c.status === 'acknowledged')).length;
 
     document.getElementById('stat-open').textContent = open;
-    document.getElementById('stat-inprogress').textContent = inProg;
+    document.getElementById('stat-acknowledged').textContent = acked;
     document.getElementById('stat-critical').textContent = critActive;
 
     // Avg resolution time
-    const resolved = allCases.filter(c => (c.status === 'resolved' || c.status === 'closed') && c.created_at && c.closed_at);
+    const resolved = allCases.filter(c => c.status === 'closed' && c.created_at && c.closed_at);
     if (resolved.length > 0) {
         const totalMs = resolved.reduce((sum, c) => sum + (new Date(c.closed_at) - new Date(c.created_at)), 0);
         const avgMs = totalMs / resolved.length;
@@ -1385,15 +1375,14 @@ function renderStats() {
     }
 
     // Update unassigned count (always available from client-side data)
-    const unassigned = allCases.filter(c => !c.assigned_to && (c.status === 'open' || c.status === 'in_progress')).length;
+    const unassigned = allCases.filter(c => !c.assigned_to && (c.status === 'open' || c.status === 'acknowledged')).length;
     document.getElementById('stat-unassigned').textContent = unassigned;
 }
 
 function renderBoard() {
     const columns = {
         open: [],
-        in_progress: [],
-        resolved: [],
+        acknowledged: [],
         closed: [],
     };
 
@@ -1492,11 +1481,10 @@ function onDrop(e, targetStatus) {
         return;
     }
 
-    // If dropping into resolved or closed, require closure reason
-    if (targetStatus === 'resolved' || targetStatus === 'closed') {
+    // If dropping into closed, require closure reason
+    if (targetStatus === 'closed') {
         pendingClosure = { caseId: dragCaseId, targetStatus: targetStatus };
-        document.getElementById('closure-modal-title').textContent =
-            targetStatus === 'resolved' ? 'Resolve Case' : 'Close Case';
+        document.getElementById('closure-modal-title').textContent = 'Close Case';
         document.getElementById('closure-reason').value = '';
         document.getElementById('closure-notes').value = '';
         document.getElementById('closure-modal-overlay').style.display = 'flex';
@@ -1504,7 +1492,7 @@ function onDrop(e, targetStatus) {
         return;
     }
 
-    // Simple status transition (open / in_progress)
+    // Simple status transition (open / acknowledged)
     updateCaseStatus(dragCaseId, targetStatus, null, null);
     dragCaseId = null;
 }
@@ -1602,7 +1590,7 @@ function renderPanelContent(c) {
     html += '<div class="cpanel-meta-grid">';
     html += '<div class="cpanel-meta-item"><label>Status</label>'
         + '<select onchange="panelUpdateField(' + c.id + ',\'status\',this.value)">'
-        + ['open','in_progress','resolved','closed'].map(s =>
+        + ['open','acknowledged','closed'].map(s =>
             '<option value="' + s + '"' + (c.status === s ? ' selected' : '') + '>' + s.replace('_',' ') + '</option>'
         ).join('')
         + '</select></div>';
@@ -1715,11 +1703,10 @@ function closeCasePanel() {
 // Panel Inline Updates
 // =============================================================================
 async function panelUpdateField(caseId, field, value) {
-    // If changing status to resolved/closed, require closure reason
-    if (field === 'status' && (value === 'resolved' || value === 'closed')) {
+    // If changing status to closed, require closure reason
+    if (field === 'status' && value === 'closed') {
         pendingClosure = { caseId: caseId, targetStatus: value };
-        document.getElementById('closure-modal-title').textContent =
-            value === 'resolved' ? 'Resolve Case' : 'Close Case';
+        document.getElementById('closure-modal-title').textContent = 'Close Case';
         document.getElementById('closure-reason').value = '';
         document.getElementById('closure-notes').value = '';
         document.getElementById('closure-modal-overlay').style.display = 'flex';
@@ -1979,7 +1966,7 @@ function renderRow2Stats() {
     document.getElementById('stat-mttr').textContent = tm.mttr_hours != null ? tm.mttr_hours + 'h' : '-';
     document.getElementById('stat-closure-rate').textContent = tm.closure_rate_7d != null ? tm.closure_rate_7d + '%' : '-';
     document.getElementById('stat-weekly').textContent = (tm.created_7d || 0) + ' / ' + (tm.closed_7d || 0);
-    const unassigned = allCases.filter(c => !c.assigned_to && (c.status === 'open' || c.status === 'in_progress')).length;
+    const unassigned = allCases.filter(c => !c.assigned_to && (c.status === 'open' || c.status === 'acknowledged')).length;
     document.getElementById('stat-unassigned').textContent = unassigned;
 }
 
@@ -1991,7 +1978,7 @@ function computeAttentionAlerts() {
     const alerts = [];
 
     allCases.forEach(c => {
-        if (c.status === 'closed' || c.status === 'resolved') return;
+        if (c.status === 'closed') return;
 
         const updatedMs = c.updated_at ? new Date(c.updated_at).getTime() : 0;
         const createdMs = c.created_at ? new Date(c.created_at).getTime() : 0;
@@ -2001,13 +1988,13 @@ function computeAttentionAlerts() {
         if (updatedMs && ageSinceUpdate > 24 * 3600000) {
             alerts.push({ type: 'stale', label: 'Stale', case: c });
         }
-        if (!c.assigned_to && (c.status === 'open' || c.status === 'in_progress')) {
+        if (!c.assigned_to && (c.status === 'open' || c.status === 'acknowledged')) {
             alerts.push({ type: 'unassigned', label: 'Unassigned', case: c });
         }
         if ((c.severity === 'critical' || c.severity === 'high') && c.status === 'open') {
             alerts.push({ type: 'not-picked-up', label: 'Not Picked Up', case: c });
         }
-        if (createdMs && ageSinceCreate > 7 * 24 * 3600000 && (c.status === 'open' || c.status === 'in_progress')) {
+        if (createdMs && ageSinceCreate > 7 * 24 * 3600000 && (c.status === 'open' || c.status === 'acknowledged')) {
             alerts.push({ type: 'aged', label: 'Aged >7d', case: c });
         }
     });
@@ -2167,7 +2154,7 @@ function getSLAColor(ageMs) {
 function renderSLAIndicators() {
     const container = document.getElementById('analytics-sla');
     if (!container) return;
-    const active = allCases.filter(c => c.status === 'open' || c.status === 'in_progress');
+    const active = allCases.filter(c => c.status === 'open' || c.status === 'acknowledged');
     active.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     const top8 = active.slice(0, 8);
 

@@ -6,7 +6,7 @@ import json
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session, joinedload
 
-from ion.models.user import UserSession, AuditLog, User
+from ion.models.user import UserSession, AuditLog, User, Role
 
 
 class SessionRepository:
@@ -39,7 +39,10 @@ class SessionRepository:
         """Get a session by token."""
         stmt = (
             select(UserSession)
-            .options(joinedload(UserSession.user).joinedload(User.roles))
+            .options(
+                joinedload(UserSession.user).joinedload(User.roles).joinedload(Role.permissions),
+                joinedload(UserSession.active_role).joinedload(Role.permissions),
+            )
             .where(UserSession.session_token == session_token)
         )
         return self.session.execute(stmt).unique().scalar_one_or_none()
@@ -48,7 +51,10 @@ class SessionRepository:
         """Get a valid (non-expired) session by token."""
         stmt = (
             select(UserSession)
-            .options(joinedload(UserSession.user).joinedload(User.roles))
+            .options(
+                joinedload(UserSession.user).joinedload(User.roles).joinedload(Role.permissions),
+                joinedload(UserSession.active_role).joinedload(Role.permissions),
+            )
             .where(
                 UserSession.session_token == session_token,
                 UserSession.expires_at > datetime.utcnow(),

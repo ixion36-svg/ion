@@ -21,22 +21,18 @@ from ion.models.base import Base, TimestampMixin
 
 
 class AlertTriageStatus(str, Enum):
-    """Triage status for ES alerts."""
+    """Triage status for ES alerts — mirrors Elasticsearch workflow statuses."""
 
     OPEN = "open"
-    INVESTIGATING = "investigating"
-    ESCALATED = "escalated"
-    RESOLVED = "resolved"
+    ACKNOWLEDGED = "acknowledged"
     CLOSED = "closed"
-    FALSE_POSITIVE = "false_positive"
 
 
 class AlertCaseStatus(str, Enum):
-    """Status for investigation cases."""
+    """Status for investigation cases — mirrors Elasticsearch workflow statuses."""
 
     OPEN = "open"
-    IN_PROGRESS = "in_progress"
-    RESOLVED = "resolved"
+    ACKNOWLEDGED = "acknowledged"
     CLOSED = "closed"
 
 

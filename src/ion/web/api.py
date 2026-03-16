@@ -53,6 +53,7 @@ from ion.auth.service import AuthService
 from ion.auth.dependencies import (
     get_current_user,
     get_current_user_optional,
+    get_session_token,
     require_permission,
     require_admin,
     get_client_ip,
@@ -302,6 +303,7 @@ async def get_current_user_info(
     current_user: User = Depends(get_current_user),
 ):
     """Get current user information."""
+    focus_role = getattr(current_user, '_focus_role', None)
     return {
         "id": current_user.id,
         "username": current_user.username,
@@ -311,10 +313,59 @@ async def get_current_user_info(
         "must_change_password": current_user.must_change_password,
         "last_login": current_user.last_login.isoformat() if current_user.last_login else None,
         "roles": [r.name for r in current_user.roles],
+        "focus_role": focus_role.name if focus_role else None,
         "employment_type": getattr(current_user, "employment_type", None) or "cs",
         "permissions": list(set(
-            p.name for r in current_user.roles for p in r.permissions
+            p.name for r in current_user.effective_roles for p in r.permissions
         )),
+    }
+
+
+class FocusModeRequest(BaseModel):
+    role: Optional[str] = None  # role name or null to clear
+
+
+@router.post("/auth/focus-mode")
+async def set_focus_mode(
+    body: FocusModeRequest,
+    session_token: Optional[str] = Depends(get_session_token),
+    session: Session = Depends(get_db_session),
+):
+    """Switch focus mode to a specific role. Pass null to show all roles."""
+    from ion.models.user import UserSession
+    from ion.storage.auth_repository import SessionRepository
+
+    if not session_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    repo = SessionRepository(session)
+    user_session = repo.get_valid_session(session_token)
+    if not user_session:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    user = user_session.user
+    if body.role is None:
+        # Clear focus — use all roles
+        user_session.active_role_id = None
+        session.commit()
+        return {
+            "focus_role": None,
+            "permissions": list(set(
+                p.name for r in user.roles for p in r.permissions
+            )),
+        }
+
+    # Find the requested role among the user's assigned roles
+    target_role = next((r for r in user.roles if r.name == body.role), None)
+    if not target_role:
+        raise HTTPException(status_code=400, detail=f"Role '{body.role}' is not assigned to you")
+
+    user_session.active_role_id = target_role.id
+    session.commit()
+
+    return {
+        "focus_role": target_role.name,
+        "permissions": list(set(p.name for p in target_role.permissions)),
     }
 
 
@@ -1938,6 +1989,7 @@ async def get_dashboard(
         "error": "Connection timed out",
     }
 
+    focus_role = getattr(current_user, '_focus_role', None)
     return {
         "user": {
             "id": current_user.id,
@@ -1945,6 +1997,7 @@ async def get_dashboard(
             "display_name": current_user.display_name,
             "email": current_user.email,
             "roles": [r.name for r in current_user.roles],
+            "focus_role": focus_role.name if focus_role else None,
         },
         "stats": {
             "templates_count": len(templates),
@@ -3449,7 +3502,7 @@ async def create_case(
             if not triage:
                 triage = AlertTriage(
                     es_alert_id=alert_id,
-                    status=AlertTriageStatus.INVESTIGATING,
+                    status=AlertTriageStatus.ACKNOWLEDGED,
                 )
                 session.add(triage)
                 session.flush()
@@ -3538,9 +3591,9 @@ async def create_case(
             new_case.closed_by_id = current_user.id
             new_case.closed_at = datetime.utcnow()
 
-            # Set all linked triage entries to FALSE_POSITIVE
+            # Set all linked triage entries to CLOSED
             for triage_entry in new_case.triage_entries:
-                triage_entry.status = AlertTriageStatus.FALSE_POSITIVE
+                triage_entry.status = AlertTriageStatus.CLOSED
 
             # Add auto-closure note
             auto_note = Note(
@@ -3705,12 +3758,12 @@ async def update_case(
     if data.status is not None:
         old_status = case.status.value if hasattr(case.status, "value") else case.status
         new_status = data.status
-        # Closing/resolving: require closure_reason
-        if new_status in ("closed", "resolved") and old_status not in ("closed", "resolved"):
+        # Closing: require closure_reason
+        if new_status == "closed" and old_status != "closed":
             if not data.closure_reason:
                 raise HTTPException(
                     status_code=400,
-                    detail="closure_reason is required when closing or resolving a case",
+                    detail="closure_reason is required when closing a case",
                 )
             valid_reasons = {r.value for r in CaseClosureReason}
             if data.closure_reason not in valid_reasons:
@@ -3735,7 +3788,7 @@ async def update_case(
             if case.kibana_case_id:
                 sync_note_to_kibana(case.kibana_case_id, current_user.username, closure_note.content)
         # Reopening: clear closure fields
-        elif new_status not in ("closed", "resolved") and old_status in ("closed", "resolved"):
+        elif new_status != "closed" and old_status == "closed":
             case.closure_reason = None
             case.closure_notes = None
             case.closed_by_id = None
@@ -3745,8 +3798,7 @@ async def update_case(
         # Sync linked alert triage statuses to match case status
         _case_to_triage = {
             "open": "open",
-            "in_progress": "investigating",
-            "resolved": "resolved",
+            "acknowledged": "acknowledged",
             "closed": "closed",
         }
         _mapped_triage = _case_to_triage.get(new_status)
@@ -4311,10 +4363,10 @@ async def close_case_as_known_fp(
     case.closed_by_id = current_user.id
     case.closed_at = datetime.utcnow()
 
-    # Set all linked AlertTriage entries to false_positive
+    # Set all linked AlertTriage entries to closed
     updated_alerts = 0
     for triage in case.triage_entries:
-        triage.status = AlertTriageStatus.FALSE_POSITIVE
+        triage.status = AlertTriageStatus.CLOSED
         updated_alerts += 1
 
     session.commit()
@@ -4591,9 +4643,9 @@ async def close_alert(
     """
     # Map closure_type to AlertTriageStatus
     closure_map = {
-        "benign": AlertTriageStatus.RESOLVED,
-        "escalated": AlertTriageStatus.ESCALATED,
-        "false_positive": AlertTriageStatus.FALSE_POSITIVE,
+        "benign": AlertTriageStatus.CLOSED,
+        "escalated": AlertTriageStatus.ACKNOWLEDGED,
+        "false_positive": AlertTriageStatus.CLOSED,
     }
     if data.closure_type not in closure_map:
         raise HTTPException(
@@ -4648,11 +4700,7 @@ async def close_alert(
                 other_triages = session.query(AlertTriage).filter(
                     AlertTriage.case_id == case.id,
                     AlertTriage.es_alert_id != alert_id,
-                    AlertTriage.status.notin_([
-                        AlertTriageStatus.RESOLVED,
-                        AlertTriageStatus.ESCALATED,
-                        AlertTriageStatus.FALSE_POSITIVE,
-                    ]),
+                    AlertTriage.status != AlertTriageStatus.CLOSED,
                 ).all()
                 for ot in other_triages:
                     ot.status = new_status

@@ -208,6 +208,64 @@ def _run_migrations(engine: Engine) -> None:
                     conn.execute(text(f"ALTER TABLE forensic_case_steps ADD COLUMN {col_name} TEXT"))
                     logger.info("Migrated: forensic_case_steps.%s", col_name)
 
+    # Migration for user_sessions.active_role_id (focus mode)
+    if insp.has_table("user_sessions"):
+        existing = {col["name"] for col in insp.get_columns("user_sessions")}
+        if "active_role_id" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE user_sessions ADD COLUMN active_role_id INTEGER REFERENCES roles(id)")
+                )
+                logger.info("Migrated: user_sessions.active_role_id")
+
+    # Migrate old triage/case statuses to simplified open/acknowledged/closed
+    _migrate_status_values(engine)
+
+
+def _migrate_status_values(engine: Engine) -> None:
+    """Map old 6-value triage statuses and 4-value case statuses to new 3-value system.
+
+    investigating/escalated → acknowledged
+    resolved/false_positive → closed
+    in_progress → acknowledged (cases only)
+    Idempotent — only updates rows that still have old values.
+    """
+    # SQLAlchemy stores enum names (uppercase) for Enum columns
+    triage_map = {
+        "INVESTIGATING": "ACKNOWLEDGED",
+        "ESCALATED": "ACKNOWLEDGED",
+        "RESOLVED": "CLOSED",
+        "FALSE_POSITIVE": "CLOSED",
+        # Also handle lowercase in case values were stored that way
+        "investigating": "ACKNOWLEDGED",
+        "escalated": "ACKNOWLEDGED",
+        "resolved": "CLOSED",
+        "false_positive": "CLOSED",
+    }
+    case_map = {
+        "IN_PROGRESS": "ACKNOWLEDGED",
+        "RESOLVED": "CLOSED",
+        "in_progress": "ACKNOWLEDGED",
+        "resolved": "CLOSED",
+    }
+
+    with engine.begin() as conn:
+        for old, new in triage_map.items():
+            result = conn.execute(
+                text("UPDATE alert_triage SET status = :new WHERE status = :old"),
+                {"new": new, "old": old},
+            )
+            if result.rowcount:
+                logger.info("Migrated %d alert_triage rows: %s → %s", result.rowcount, old, new)
+
+        for old, new in case_map.items():
+            result = conn.execute(
+                text("UPDATE alert_cases SET status = :new WHERE status = :old"),
+                {"new": new, "old": old},
+            )
+            if result.rowcount:
+                logger.info("Migrated %d alert_cases rows: %s → %s", result.rowcount, old, new)
+
 
 def init_db(db_path: Optional[Path] = None) -> Engine:
     """Initialize the database, creating all tables."""

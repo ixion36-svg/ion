@@ -132,17 +132,43 @@ function updateUserMenu() {
     }
     if (dropdownHeader) {
         const roles = currentUserData.roles.map(r => `<span class="role-badge role-${r}">${r}</span>`).join(' ');
+        // Focus mode selector — only show if user has multiple roles
+        let focusHtml = '';
+        if (currentUserData.roles.length > 1) {
+            const activeRole = currentUserData.focus_role || '';
+            const opts = ['<option value=""' + (!activeRole ? ' selected' : '') + '>All Roles</option>'];
+            currentUserData.roles.forEach(r => {
+                opts.push('<option value="' + r + '"' + (activeRole === r ? ' selected' : '') + '>' + r.charAt(0).toUpperCase() + r.slice(1) + '</option>');
+            });
+            focusHtml = `
+                <div class="dropdown-focus" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color,#30363d);">
+                    <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:4px;">Focus Mode</label>
+                    <select id="focus-mode-select" class="form-input" style="width:100%;padding:4px 8px;font-size:.8rem;" onchange="switchFocusMode(this.value)">
+                        ${opts.join('')}
+                    </select>
+                </div>
+            `;
+        }
         dropdownHeader.innerHTML = `
             <div class="dropdown-user-info">
                 <strong>${escapeHtml(currentUserData.display_name || currentUserData.username)}</strong>
                 <span class="dropdown-email">${escapeHtml(currentUserData.email)}</span>
             </div>
             <div class="dropdown-roles">${roles}</div>
+            ${focusHtml}
         `;
     }
 
-    // Role-based nav visibility: analyst items are always visible (server enforces access)
-    const roles = currentUserData.roles;
+    updateNavForPermissions();
+}
+
+function updateNavForPermissions() {
+    if (!currentUserData) return;
+
+    // Use permissions array (already filtered by focus mode on the server)
+    const perms = new Set(currentUserData.permissions || []);
+    const roles = currentUserData.focus_role ? [currentUserData.focus_role] : currentUserData.roles;
+
     const isLead = ['lead', 'engineering', 'admin'].some(r => roles.includes(r));
     const isEngineer = ['engineering', 'admin'].some(r => roles.includes(r));
     const isAdmin = roles.includes('admin');
@@ -164,6 +190,36 @@ function updateUserMenu() {
         const el = document.getElementById(id);
         if (el) el.style.display = isAdmin ? 'block' : 'none';
     });
+
+    // Forensics link — only visible when user has forensic:read
+    const forensicsLink = document.getElementById('nav-forensics-link');
+    if (forensicsLink) {
+        forensicsLink.style.display = perms.has('forensic:read') ? 'block' : 'none';
+    }
+}
+
+async function switchFocusMode(roleName) {
+    try {
+        const body = roleName ? { role: roleName } : { role: null };
+        const resp = await fetch('/api/auth/focus-mode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            showToast(err.detail || 'Failed to switch focus', 'error');
+            return;
+        }
+        const result = await resp.json();
+        // Refresh user data and reload page to apply new view
+        currentUserData.focus_role = result.focus_role;
+        currentUserData.permissions = result.permissions;
+        // Reload to apply dashboard view change
+        window.location.reload();
+    } catch (e) {
+        showToast('Failed to switch focus mode', 'error');
+    }
 }
 
 function toggleUserDropdown() {

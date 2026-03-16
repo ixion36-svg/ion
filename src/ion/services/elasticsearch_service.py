@@ -21,7 +21,7 @@ class ElasticsearchAlert:
     id: str
     title: str
     severity: str  # critical, high, medium, low, info
-    status: str  # open, acknowledged, resolved
+    status: str  # open, acknowledged, closed
     source: str  # e.g., "watcher", "siem", "custom"
     message: str
     timestamp: datetime
@@ -254,6 +254,7 @@ class ElasticsearchService:
             must_clauses.append({
                 "bool": {
                     "should": [
+                        {"term": {"kibana.alert.workflow_status": status}},
                         {"term": {"kibana.alert.status": status}},
                         {"term": {"status": status}},
                         {"term": {"state": status}},
@@ -387,7 +388,7 @@ class ElasticsearchService:
         status_map = {
             "active": "open", "open": "open", "new": "open", "triggered": "open",
             "acknowledged": "acknowledged", "acked": "acknowledged", "in_progress": "acknowledged",
-            "resolved": "resolved", "closed": "resolved", "ok": "resolved",
+            "resolved": "closed", "closed": "closed", "ok": "closed",
         }
         status = status_map.get(str(status).lower(), "open")
 
@@ -813,14 +814,11 @@ class ElasticsearchService:
             logger.warning("Failed to delete KFP %s from Elasticsearch: %s", kfp_id, e)
             return False
 
-    # ION triage status → Kibana alert workflow_status mapping
+    # ION triage status → Kibana alert workflow_status mapping (1:1 now)
     _WORKFLOW_STATUS_MAP = {
         "open": "open",
-        "investigating": "acknowledged",
-        "escalated": "acknowledged",
-        "resolved": "closed",
+        "acknowledged": "acknowledged",
         "closed": "closed",
-        "false_positive": "closed",
     }
 
     async def update_alert_workflow_status(

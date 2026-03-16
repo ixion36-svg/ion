@@ -250,7 +250,15 @@ class AuthService:
             except Exception:
                 self.session_repo.session.rollback()
 
-        return user_session.user
+        user = user_session.user
+
+        # Apply focus mode: restrict permission checks to active role
+        if user_session.active_role_id and user_session.active_role:
+            # Only apply if user actually has this role assigned
+            if any(r.id == user_session.active_role_id for r in user.roles):
+                user._focus_role = user_session.active_role
+
+        return user
 
     def change_password(
         self,
@@ -551,7 +559,6 @@ class AuthService:
                     "case:read", "case:create", "case:update", "case:close",
                     "observable:read", "observable:create", "observable:update", "observable:enrich",
                     "playbook:read", "playbook:execute",
-                    "forensic:read", "forensic:create", "forensic:update",
                     "discover:read", "ai:chat",
                     "template:read", "template:create", "template:update",
                     "document:read", "document:create", "document:update",
@@ -574,6 +581,20 @@ class AuthService:
                 ],
             ),
             (
+                "forensic",
+                "Forensic Investigator with full forensic investigation access",
+                True,
+                [
+                    "alert:read",
+                    "case:read",
+                    "observable:read", "observable:enrich",
+                    "forensic:read", "forensic:create", "forensic:update", "forensic:close", "forensic:manage_playbooks",
+                    "discover:read", "ai:chat",
+                    "template:read", "template:create", "template:update",
+                    "document:read", "document:create", "document:update",
+                ],
+            ),
+            (
                 "engineering",
                 "SOC Engineer with system management and full operational access",
                 True,
@@ -582,7 +603,6 @@ class AuthService:
                     "case:read", "case:create", "case:update", "case:close",
                     "observable:read", "observable:create", "observable:update", "observable:delete", "observable:enrich",
                     "playbook:read", "playbook:execute", "playbook:create", "playbook:update", "playbook:delete",
-                    "forensic:read", "forensic:create", "forensic:update", "forensic:close", "forensic:manage_playbooks",
                     "discover:read", "ai:chat",
                     "template:read", "template:create", "template:update", "template:delete",
                     "document:read", "document:create", "document:update", "document:delete",
