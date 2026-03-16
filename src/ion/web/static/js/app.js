@@ -169,17 +169,16 @@ function updateNavForPermissions() {
     const perms = new Set(currentUserData.permissions || []);
     const roles = currentUserData.focus_role ? [currentUserData.focus_role] : currentUserData.roles;
 
-    const isLead = ['lead', 'engineering', 'admin'].some(r => roles.includes(r));
-    const isEngineer = ['engineering', 'admin'].some(r => roles.includes(r));
     const isAdmin = roles.includes('admin');
+    const isEngineer = ['engineering', 'admin'].some(r => roles.includes(r));
 
-    // Lead+ links (lead/engineering/admin) - security read access
+    // Permission-based nav visibility — security links shown if user has security:read
     ['nav-security-link', 'nav-topology-link'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.style.display = isLead ? 'block' : 'none';
+        if (el) el.style.display = perms.has('security:read') ? 'block' : 'none';
     });
 
-    // Engineer+ links (engineering/admin)
+    // Engineer+ links (engineering/admin) — integration & settings access
     ['nav-integrations-link', 'nav-settings-link'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = isEngineer ? 'block' : 'none';

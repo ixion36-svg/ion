@@ -28,8 +28,12 @@
     <!-- Toolbar -->
     <div class="toolbar">
         <input type="text" id="search-input" placeholder="Search issues..." class="search-input">
-        <select id="state-filter" class="filter-select" onchange="loadIssues()">
+        <select id="scope-filter" class="filter-select" onchange="loadIssues()">
+            <option value="my">My Issues</option>
             <option value="all">All Issues</option>
+        </select>
+        <select id="state-filter" class="filter-select" onchange="loadIssues()">
+            <option value="all">All States</option>
             <option value="opened">Open</option>
             <option value="closed">Closed</option>
         </select>
@@ -506,11 +510,13 @@ async function loadIssues() {
     const state = document.getElementById('state-filter').value;
     const label = document.getElementById('label-filter').value;
     const search = document.getElementById('search-input').value;
+    const scope = document.getElementById('scope-filter').value;
 
     listDiv.innerHTML = '<p class="loading">Loading issues...</p>';
 
     try {
         let url = `/api/gitlab/issues?state=${state}&per_page=50`;
+        if (scope === 'my') url += '&my_issues=true';
         if (label) url += `&labels=${encodeURIComponent(label)}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
 

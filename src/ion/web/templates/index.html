@@ -113,10 +113,6 @@
                         <div class="action-icon"><i class="icon-wrench"></i></div>
                         <div class="action-label">SOC Tools</div>
                     </a>
-                    <a href="/tools#lookup" class="action-card" onclick="localStorage.setItem('tools_tab','lookup')">
-                        <div class="action-icon"><i class="icon-search"></i></div>
-                        <div class="action-label">IOC Lookup</div>
-                    </a>
                     <a href="/gitlab" class="action-card">
                         <div class="action-icon"><i class="icon-check-square"></i></div>
                         <div class="action-label">Tasks</div>
@@ -142,6 +138,168 @@
                     <a href="/templates" class="btn btn-sm">View All</a>
                 </div>
                 <div id="analyst-recent-templates" class="card-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ==================== SENIOR ANALYST (L2) DASHBOARD ==================== -->
+    <div class="dashboard-grid senior-analyst-dashboard" id="senior-analyst-dashboard" style="display: none;">
+        <!-- Left Column - Alerts & Cases -->
+        <div class="dashboard-column">
+            <section class="section alerts-section" id="sa-alerts-section">
+                <div class="section-header">
+                    <h2>Security Alerts</h2>
+                    <div class="section-actions">
+                        <span class="alerts-badge" id="sa-alerts-badge">0</span>
+                        <a href="/alerts" class="btn btn-sm btn-primary">Investigate</a>
+                    </div>
+                </div>
+                <div id="sa-alerts-list" class="alerts-list">
+                    <p class="loading">Loading alerts...</p>
+                </div>
+            </section>
+
+            <section class="section cases-section">
+                <div class="section-header">
+                    <h2>Escalated Cases</h2>
+                    <a href="/alerts" class="btn btn-sm">View All</a>
+                </div>
+                <div id="sa-escalated-cases" class="cases-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Right Column -->
+        <div class="dashboard-column">
+            <section class="section">
+                <div class="section-header"><h2>Quick Actions</h2></div>
+                <div class="action-grid">
+                    <a href="/alerts" class="action-card action-card-danger">
+                        <div class="action-icon"><i class="icon-alert-triangle"></i></div>
+                        <div class="action-label">Triage Alerts</div>
+                    </a>
+                    <a href="/tools" class="action-card action-card-primary">
+                        <div class="action-icon"><i class="icon-wrench"></i></div>
+                        <div class="action-label">SOC Tools</div>
+                    </a>
+                    <a href="/observables" class="action-card">
+                        <div class="action-icon"><i class="icon-eye"></i></div>
+                        <div class="action-label">Observables</div>
+                    </a>
+                    <a href="/gitlab" class="action-card">
+                        <div class="action-icon"><i class="icon-check-square"></i></div>
+                        <div class="action-label">Tasks</div>
+                    </a>
+                </div>
+            </section>
+
+            <!-- Observable Trends -->
+            <section class="section" id="sa-observable-trends-section">
+                <div class="section-header"><h2>Observable Trends</h2></div>
+                <div id="sa-observable-trends">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+
+            <section class="section playbooks-section" id="sa-playbooks-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Active Playbooks</h2>
+                    <a href="/playbooks?tab=executions" class="btn btn-sm">View All</a>
+                </div>
+                <div id="sa-playbooks-list" class="playbooks-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ==================== PRINCIPAL ANALYST (L3) DASHBOARD ==================== -->
+    <div class="dashboard-grid principal-analyst-dashboard" id="principal-analyst-dashboard" style="display: none;">
+        <!-- KPI Row -->
+        <div class="kpi-row" style="grid-column: 1 / -1;">
+            <div class="kpi-card kpi-card-warning">
+                <div class="kpi-value" id="pa-open-cases">-</div>
+                <div class="kpi-label">Open Cases</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-value" id="pa-sla-compliance">-</div>
+                <div class="kpi-label">SLA Compliance</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-value" id="pa-l1-review">-</div>
+                <div class="kpi-label">L1 Cases Needing Review</div>
+            </div>
+            <div class="kpi-card kpi-card-danger">
+                <div class="kpi-value" id="pa-critical-alerts">-</div>
+                <div class="kpi-label">Critical Alerts</div>
+            </div>
+        </div>
+
+        <!-- Left Column -->
+        <div class="dashboard-column">
+            <section class="section alerts-section" id="pa-alerts-section">
+                <div class="section-header">
+                    <h2>Security Alerts</h2>
+                    <div class="section-actions">
+                        <span class="alerts-badge" id="pa-alerts-badge">0</span>
+                        <a href="/alerts" class="btn btn-sm btn-primary">View All</a>
+                    </div>
+                </div>
+                <div id="pa-alerts-list" class="alerts-list">
+                    <p class="loading">Loading alerts...</p>
+                </div>
+            </section>
+
+            <!-- Mentoring: L1 cases needing review -->
+            <section class="section" id="pa-mentoring-section">
+                <div class="section-header"><h2>L1 Cases Needing Review</h2></div>
+                <div id="pa-mentoring-list" class="cases-list">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+        </div>
+
+        <!-- Right Column -->
+        <div class="dashboard-column">
+            <section class="section">
+                <div class="section-header"><h2>Quick Actions</h2></div>
+                <div class="action-grid">
+                    <a href="/alerts" class="action-card action-card-danger">
+                        <div class="action-icon"><i class="icon-alert-triangle"></i></div>
+                        <div class="action-label">Alerts</div>
+                    </a>
+                    <a href="/tools" class="action-card action-card-primary">
+                        <div class="action-icon"><i class="icon-wrench"></i></div>
+                        <div class="action-label">SOC Tools</div>
+                    </a>
+                    <a href="/playbooks" class="action-card">
+                        <div class="action-icon"><i class="icon-book-open"></i></div>
+                        <div class="action-label">Playbooks</div>
+                    </a>
+                    <a href="/forensics" class="action-card">
+                        <div class="action-icon"><i class="icon-search"></i></div>
+                        <div class="action-label">Forensics</div>
+                    </a>
+                </div>
+            </section>
+
+            <!-- SLA Compliance -->
+            <section class="section" id="pa-sla-section">
+                <div class="section-header"><h2>SLA Compliance</h2></div>
+                <div id="pa-sla-bars">
+                    <p class="loading">Loading...</p>
+                </div>
+            </section>
+
+            <section class="section playbooks-section" id="pa-playbooks-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Active Playbooks</h2>
+                    <a href="/playbooks?tab=executions" class="btn btn-sm">View All</a>
+                </div>
+                <div id="pa-playbooks-list" class="playbooks-list">
                     <p class="loading">Loading...</p>
                 </div>
             </section>
@@ -1351,6 +1509,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isAdmin = effectiveRoles.includes('admin');
         const isEngineer = effectiveRoles.includes('engineering');
         const isLead = effectiveRoles.includes('lead');
+        const isPrincipalAnalyst = effectiveRoles.includes('principal_analyst');
+        const isSeniorAnalyst = effectiveRoles.includes('senior_analyst');
         const isAnalyst = effectiveRoles.includes('analyst');
         const isForensic = effectiveRoles.includes('forensic');
 
@@ -1360,6 +1520,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             setupEngineerDashboard(data);
         } else if (isLead) {
             setupLeadDashboard(data);
+        } else if (isPrincipalAnalyst) {
+            setupPrincipalAnalystDashboard(data);
+        } else if (isSeniorAnalyst) {
+            setupSeniorAnalystDashboard(data);
         } else if (isAnalyst) {
             setupAnalystDashboard(data);
         } else if (isForensic) {
@@ -1460,6 +1624,153 @@ async function setupAnalystDashboard(data) {
 
     // Recent templates
     renderTemplates('analyst-recent-templates', data.recent_templates);
+}
+
+// ==================== SENIOR ANALYST (L2) DASHBOARD ====================
+async function setupSeniorAnalystDashboard(data) {
+    document.getElementById('user-dashboard').style.display = 'none';
+    document.getElementById('senior-analyst-dashboard').style.display = 'grid';
+
+    // Show analyst-level stat cards
+    document.querySelectorAll('.analyst-visible').forEach(el => el.style.display = '');
+
+    // Elasticsearch Alerts
+    if (data.elasticsearch && data.elasticsearch.enabled && data.elasticsearch.connected) {
+        document.getElementById('sa-alerts-badge').textContent = data.elasticsearch.total_alerts || 0;
+
+        if (data.elasticsearch.critical_count > 0) {
+            document.getElementById('alerts-critical-card').style.display = '';
+            document.getElementById('alerts-critical-count').textContent = data.elasticsearch.critical_count;
+        }
+        if (data.elasticsearch.high_count > 0) {
+            document.getElementById('alerts-high-card').style.display = '';
+            document.getElementById('alerts-high-count').textContent = data.elasticsearch.high_count;
+        }
+
+        const alertsContainer = document.getElementById('sa-alerts-list');
+        if (data.elasticsearch.alerts && data.elasticsearch.alerts.length > 0) {
+            alertsContainer.innerHTML = data.elasticsearch.alerts.map(alert => renderAlertItem(alert)).join('');
+        } else {
+            alertsContainer.innerHTML = '<p class="empty-message">No alerts in the last 24 hours</p>';
+        }
+    } else {
+        document.getElementById('sa-alerts-list').innerHTML = '<p class="empty-message">Elasticsearch not configured</p>';
+    }
+
+    // Escalated / acknowledged cases
+    loadCases('sa-escalated-cases');
+
+    // Active Playbooks
+    loadActivePlaybooks('sa');
+
+    // Observable trends
+    try {
+        const obs = await api.get('/api/observables?limit=20&sort=created_at&order=desc').catch(() => []);
+        const container = document.getElementById('sa-observable-trends');
+        if (Array.isArray(obs) && obs.length > 0) {
+            const recent = obs.slice(0, 10);
+            container.innerHTML = '<div style="font-size:.85rem">' +
+                recent.map(o => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-color,#30363d);">
+                    <span style="font-family:monospace;word-break:break-all">${escapeHtml(o.value)}</span>
+                    <span style="color:var(--text-secondary);font-size:.78rem;white-space:nowrap;margin-left:12px">${escapeHtml(o.type)}</span>
+                </div>`).join('') + '</div>';
+        } else {
+            container.innerHTML = '<p class="empty-message">No recent observables</p>';
+        }
+    } catch (e) {
+        document.getElementById('sa-observable-trends').innerHTML = '<p class="empty-message">Could not load observables</p>';
+    }
+}
+
+// ==================== PRINCIPAL ANALYST (L3) DASHBOARD ====================
+async function setupPrincipalAnalystDashboard(data) {
+    document.getElementById('user-dashboard').style.display = 'none';
+    document.getElementById('principal-analyst-dashboard').style.display = 'grid';
+
+    // Show analyst-level stat cards
+    document.querySelectorAll('.analyst-visible').forEach(el => el.style.display = '');
+
+    // Fetch team metrics for SLA and mentoring data
+    const metricsPromise = api.get('/api/dashboard/team-metrics').catch(e => {
+        console.error('Failed to load team metrics:', e);
+        return null;
+    });
+
+    // Elasticsearch Alerts
+    if (data.elasticsearch && data.elasticsearch.enabled && data.elasticsearch.connected) {
+        document.getElementById('pa-alerts-badge').textContent = data.elasticsearch.total_alerts || 0;
+        document.getElementById('pa-critical-alerts').textContent = data.elasticsearch.critical_count || 0;
+
+        if (data.elasticsearch.critical_count > 0) {
+            document.getElementById('alerts-critical-card').style.display = '';
+            document.getElementById('alerts-critical-count').textContent = data.elasticsearch.critical_count;
+        }
+        if (data.elasticsearch.high_count > 0) {
+            document.getElementById('alerts-high-card').style.display = '';
+            document.getElementById('alerts-high-count').textContent = data.elasticsearch.high_count;
+        }
+
+        const alertsContainer = document.getElementById('pa-alerts-list');
+        if (data.elasticsearch.alerts && data.elasticsearch.alerts.length > 0) {
+            alertsContainer.innerHTML = data.elasticsearch.alerts.map(alert => renderAlertItem(alert)).join('');
+        } else {
+            alertsContainer.innerHTML = '<p class="empty-message">No alerts in the last 24 hours</p>';
+        }
+    } else {
+        document.getElementById('pa-alerts-list').innerHTML = '<p class="empty-message">Elasticsearch not configured</p>';
+    }
+
+    // Active Playbooks
+    loadActivePlaybooks('pa');
+
+    // Populate metrics
+    const metrics = await metricsPromise;
+    if (metrics) {
+        document.getElementById('pa-open-cases').textContent = metrics.open_cases;
+        // SLA compliance (percentage of cases closed within SLA)
+        const slaRate = metrics.closure_rate_7d !== null ? metrics.closure_rate_7d + '%' : 'N/A';
+        document.getElementById('pa-sla-compliance').textContent = slaRate;
+        document.getElementById('pa-sla-bars').innerHTML = `
+            <div style="font-size:.85rem;color:var(--text-secondary)">
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                    <span>Closure Rate (7d)</span><strong>${slaRate}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                    <span>MTTR</span><strong>${metrics.mttr_hours !== null ? metrics.mttr_hours + 'h' : 'N/A'}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                    <span>Unassigned Alerts</span><strong>${metrics.unassigned_alerts}</strong>
+                </div>
+            </div>`;
+
+        // L1 cases needing review — cases assigned to L1 analysts
+        const mentoring = document.getElementById('pa-mentoring-list');
+        if (metrics.cases_by_assignee && metrics.cases_by_assignee.length > 0) {
+            const l1Cases = metrics.cases_by_assignee.filter(a => a.open_count > 0);
+            if (l1Cases.length > 0) {
+                document.getElementById('pa-l1-review').textContent = l1Cases.reduce((sum, a) => sum + a.open_count, 0);
+                mentoring.innerHTML = l1Cases.map(a => `
+                    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-color,#30363d);font-size:.85rem">
+                        <span>${escapeHtml(a.display_name)}</span>
+                        <span style="color:var(--text-secondary)">${a.open_count} open</span>
+                    </div>
+                `).join('');
+            } else {
+                document.getElementById('pa-l1-review').textContent = '0';
+                mentoring.innerHTML = '<p class="empty-message">No cases needing review</p>';
+            }
+        } else {
+            document.getElementById('pa-l1-review').textContent = '0';
+            mentoring.innerHTML = '<p class="empty-message">No case assignments</p>';
+        }
+    } else {
+        document.getElementById('pa-open-cases').textContent = '-';
+        document.getElementById('pa-sla-compliance').textContent = '-';
+        document.getElementById('pa-l1-review').textContent = '-';
+        document.getElementById('pa-critical-alerts').textContent = '-';
+        document.getElementById('pa-mentoring-list').innerHTML = '<p class="empty-message">Could not load data</p>';
+        document.getElementById('pa-sla-bars').innerHTML = '<p class="empty-message">Could not load data</p>';
+    }
 }
 
 // ==================== LEAD DASHBOARD ====================

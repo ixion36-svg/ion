@@ -2614,6 +2614,10 @@ async def list_gitlab_issues(
     search: Optional[str] = None,
     per_page: int = 20,
     page: int = 1,
+    scope: Optional[str] = None,
+    author_username: Optional[str] = None,
+    assignee_username: Optional[str] = None,
+    my_issues: bool = False,
     current_user: User = Depends(require_permission("template:read")),
 ):
     """List GitLab issues.
@@ -2624,16 +2628,29 @@ async def list_gitlab_issues(
         search: Search in title and description
         per_page: Number of issues per page
         page: Page number
+        scope: GitLab scope filter ("created_by_me", "assigned_to_me", "all")
+        author_username: Filter by author GitLab username
+        assignee_username: Filter by assignee GitLab username
+        my_issues: If true, auto-filter to current user's GitLab username
     """
     service = get_gitlab_service()
     try:
         label_list = labels.split(",") if labels else None
+
+        # Auto-filter to current user's GitLab username if requested
+        if my_issues and not author_username and not assignee_username:
+            gl_user = getattr(current_user, 'gitlab_username', None) or current_user.username
+            assignee_username = gl_user
+
         issues = await service.list_issues(
             state=state,
             labels=label_list,
             search=search,
             per_page=per_page,
             page=page,
+            author_username=author_username,
+            assignee_username=assignee_username,
+            scope=scope,
         )
         return {"issues": [issue.to_dict() for issue in issues]}
     except GitLabError as e:
@@ -6107,6 +6124,108 @@ async def search_chat_users(
             for u in users
         ]
     }
+
+
+# ============================================================================
+# Chat Memes Endpoints
+# ============================================================================
+
+from ion.models.chat import ChatMeme
+
+
+@router.get("/chat/memes")
+async def list_memes(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """List all available memes for use in chat."""
+    memes = list(session.execute(select(ChatMeme).order_by(ChatMeme.name)).scalars().all())
+    return {
+        "memes": [
+            {
+                "id": m.id,
+                "name": m.name,
+                "filename": m.filename,
+                "url": f"/static/memes/{m.filename}",
+                "uploaded_by": m.uploaded_by.username if m.uploaded_by else None,
+            }
+            for m in memes
+        ]
+    }
+
+
+@router.post("/chat/memes")
+async def upload_meme(
+    name: str = Form(...),
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_permission("system:settings")),
+    session: Session = Depends(get_db_session),
+):
+    """Upload a new custom meme image (admin/engineering only)."""
+    import re
+    from pathlib import Path
+
+    # Validate name (alphanumeric + underscores, 1-64 chars)
+    if not re.match(r'^[a-z0-9_]{1,64}$', name):
+        raise HTTPException(400, "Meme name must be 1-64 lowercase alphanumeric characters or underscores")
+
+    # Check duplicate name
+    existing = session.execute(select(ChatMeme).where(ChatMeme.name == name)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(409, f"Meme '{name}' already exists")
+
+    # Validate file type
+    allowed_ext = {'.png', '.gif', '.jpg', '.jpeg', '.webp'}
+    fname = file.filename or "meme.png"
+    ext = '.' + fname.rsplit('.', 1)[-1].lower() if '.' in fname else ''
+    if ext not in allowed_ext:
+        raise HTTPException(400, f"Allowed image types: {', '.join(allowed_ext)}")
+
+    # Read and save
+    content = await file.read()
+    if len(content) > 2 * 1024 * 1024:  # 2 MB limit
+        raise HTTPException(400, "Meme image must be under 2 MB")
+    if len(content) == 0:
+        raise HTTPException(400, "Empty file")
+
+    safe_filename = f"{name}{ext}"
+    meme_dir = Path(__file__).parent / "static" / "memes"
+    meme_dir.mkdir(parents=True, exist_ok=True)
+    (meme_dir / safe_filename).write_bytes(content)
+
+    meme = ChatMeme(name=name, filename=safe_filename, uploaded_by_id=current_user.id)
+    session.add(meme)
+    session.commit()
+
+    return {
+        "id": meme.id,
+        "name": meme.name,
+        "filename": meme.filename,
+        "url": f"/static/memes/{meme.filename}",
+    }
+
+
+@router.delete("/chat/memes/{meme_id}")
+async def delete_meme(
+    meme_id: int,
+    current_user: User = Depends(require_permission("system:settings")),
+    session: Session = Depends(get_db_session),
+):
+    """Delete a custom meme (admin/engineering only)."""
+    from pathlib import Path
+
+    meme = session.execute(select(ChatMeme).where(ChatMeme.id == meme_id)).scalar_one_or_none()
+    if not meme:
+        raise HTTPException(404, "Meme not found")
+
+    # Delete file
+    meme_path = Path(__file__).parent / "static" / "memes" / meme.filename
+    if meme_path.exists():
+        meme_path.unlink()
+
+    session.delete(meme)
+    session.commit()
+    return {"message": f"Meme '{meme.name}' deleted"}
 
 
 # ============================================================================

@@ -36,6 +36,7 @@ from ion.models.chat import (
     ChatRoomMember,
     ChatMessage,
     MessageReaction,
+    ChatMeme,
 )
 from ion.models.integration import (
     IntegrationType,

@@ -17,6 +17,23 @@ const POLL_INTERVAL_MS = 5000;
 const TYPING_TIMEOUT_MS = 3000;
 const COMMON_EMOJIS = ['👍', '❤️', '😊', '🎉', '👀', '✅', '🔥', '💯', '😂', '🤔', '👏', '🙏'];
 
+// Custom meme cache — loaded once on init
+let chatMemeNames = new Set();
+let chatMemeList = [];
+
+async function loadChatMemes() {
+    try {
+        const resp = await fetch('/api/chat/memes');
+        if (resp.ok) {
+            const data = await resp.json();
+            chatMemeList = data.memes || [];
+            chatMemeNames = new Set(chatMemeList.map(m => m.name));
+        }
+    } catch (e) {
+        console.debug('Could not load chat memes:', e);
+    }
+}
+
 // Helper to ensure currentUserData is available
 async function ensureCurrentUser() {
     if (typeof currentUserData !== 'undefined' && currentUserData) {
@@ -54,8 +71,9 @@ function initChat() {
         createChatPanel();
     }
 
-    // Load rooms on init
+    // Load rooms and memes on init
     loadRooms();
+    loadChatMemes();
 
     // Start polling when chat is open
     startPolling();
@@ -121,6 +139,9 @@ function createChatPanel() {
                             ${COMMON_EMOJIS.map(e => `<div class="emoji-picker-item" onclick="insertEmoji('${e}')">${e}</div>`).join('')}
                         </div>
                     </div>
+                    <div class="meme-picker" id="meme-picker" style="display:none;position:absolute;bottom:100%;left:0;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:8px;padding:8px;z-index:100;max-width:280px;max-height:200px;overflow-y:auto;">
+                        <div id="meme-picker-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;"></div>
+                    </div>
                     <div class="chat-input-wrapper">
                         <div class="chat-input-actions">
                             <button class="chat-input-btn" onclick="toggleEmojiPicker()" title="Emoji">
@@ -129,6 +150,13 @@ function createChatPanel() {
                                     <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
                                     <circle cx="9" cy="9" r="1" fill="currentColor"/>
                                     <circle cx="15" cy="9" r="1" fill="currentColor"/>
+                                </svg>
+                            </button>
+                            <button class="chat-input-btn" onclick="toggleMemePicker()" title="Memes">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                    <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+                                    <path d="M21 15l-5-5L5 21"/>
                                 </svg>
                             </button>
                             <button class="chat-input-btn" onclick="showEnrichHelp()" title="Enrich Observable">
@@ -494,14 +522,22 @@ function renderMessages(messages) {
             }
         });
 
-        const reactionsHtml = Object.entries(reactionGroups).map(([emoji, data]) => `
-            <span class="reaction-badge ${data.hasOwn ? 'own' : ''}"
-                  onclick="toggleReaction(${msg.id}, '${emoji}')"
+        const reactionsHtml = Object.entries(reactionGroups).map(([emoji, data]) => {
+            // Render :meme_name: reactions as images
+            const memeMatch = emoji.match(/^:([a-z0-9_]+):$/);
+            let emojiDisplay;
+            if (memeMatch && chatMemeNames.has(memeMatch[1])) {
+                emojiDisplay = `<img src="/static/memes/${memeMatch[1]}.png" alt="${emoji}" style="width:16px;height:16px;object-fit:contain;vertical-align:middle">`;
+            } else {
+                emojiDisplay = emoji;
+            }
+            return `<span class="reaction-badge ${data.hasOwn ? 'own' : ''}"
+                  onclick="toggleReaction(${msg.id}, '${emoji.replace(/'/g, "\\'")}')"
                   title="${data.users.join(', ')}">
-                <span class="emoji">${emoji}</span>
+                <span class="emoji">${emojiDisplay}</span>
                 <span class="count">${data.count}</span>
-            </span>
-        `).join('');
+            </span>`;
+        }).join('');
 
         return `
             <div class="chat-message ${ownClass}" data-message-id="${msg.id}">
@@ -542,6 +578,14 @@ function formatMessageContent(content) {
 
     // Highlight @mentions
     formatted = formatted.replace(/@(\w+)/g, '<span class="mention">@$1</span>');
+
+    // Render :meme_name: as inline images (custom memes from static/memes/)
+    formatted = formatted.replace(/:([a-z0-9_]{1,64}):/g, function(match, name) {
+        if (chatMemeNames.has(name)) {
+            return '<img src="/static/memes/' + name + '.png" alt=":' + name + ':" title=":' + name + ':" class="chat-meme-inline" onerror="this.outerHTML=\':' + name + ':\';">';
+        }
+        return match;
+    });
 
     return formatted;
 }
@@ -1071,16 +1115,26 @@ async function toggleReaction(messageId, emoji) {
 }
 
 function showReactionPicker(messageId) {
-    // Simple inline picker - show common emojis
+    // Inline picker — common emojis + custom memes
     const picker = document.createElement('div');
     picker.className = 'emoji-picker show';
     picker.style.position = 'absolute';
+
+    let memeHtml = '';
+    if (chatMemeList.length > 0) {
+        memeHtml = '<div style="border-top:1px solid var(--border-color,#30363d);margin-top:4px;padding-top:4px;display:flex;flex-wrap:wrap;gap:2px">' +
+            chatMemeList.slice(0, 12).map(m =>
+                `<div class="emoji-picker-item" style="padding:2px" onclick="addReaction(${messageId}, ':${m.name}:')" title=":${m.name}:"><img src="${m.url}" alt=":${m.name}:" style="width:20px;height:20px;object-fit:contain"></div>`
+            ).join('') + '</div>';
+    }
+
     picker.innerHTML = `
         <div class="emoji-picker-grid">
             ${COMMON_EMOJIS.slice(0, 6).map(e =>
                 `<div class="emoji-picker-item" onclick="addReaction(${messageId}, '${e}')">${e}</div>`
             ).join('')}
         </div>
+        ${memeHtml}
     `;
 
     const msgEl = document.querySelector(`.chat-message[data-message-id="${messageId}"]`);
@@ -1127,6 +1181,42 @@ function insertEmoji(emoji) {
     input.focus();
 
     toggleEmojiPicker();
+}
+
+function toggleMemePicker() {
+    const picker = document.getElementById('meme-picker');
+    if (!picker) return;
+
+    const isVisible = picker.style.display !== 'none';
+    picker.style.display = isVisible ? 'none' : 'block';
+
+    if (!isVisible) {
+        // Populate meme grid
+        const grid = document.getElementById('meme-picker-grid');
+        if (chatMemeList.length === 0) {
+            grid.innerHTML = '<div style="grid-column:1/-1;font-size:.8rem;color:var(--text-secondary);padding:8px">No memes uploaded yet. Admins can upload via Settings.</div>';
+        } else {
+            grid.innerHTML = chatMemeList.map(m =>
+                `<div style="cursor:pointer;padding:4px;border-radius:4px;text-align:center" onclick="insertMeme('${m.name}')" title=":${m.name}:">
+                    <img src="${m.url}" alt=":${m.name}:" style="width:32px;height:32px;object-fit:contain">
+                    <div style="font-size:.65rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.name}</div>
+                </div>`
+            ).join('');
+        }
+    }
+}
+
+function insertMeme(name) {
+    const input = document.getElementById('chat-input');
+    const pos = input.selectionStart;
+    const value = input.value;
+    const memeStr = ':' + name + ':';
+
+    input.value = value.substring(0, pos) + memeStr + value.substring(pos);
+    input.selectionStart = input.selectionEnd = pos + memeStr.length;
+    input.focus();
+
+    document.getElementById('meme-picker').style.display = 'none';
 }
 
 // =============================================================================

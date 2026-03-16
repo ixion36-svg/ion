@@ -267,6 +267,9 @@ class GitLabService:
         search: Optional[str] = None,
         per_page: int = 20,
         page: int = 1,
+        author_username: Optional[str] = None,
+        assignee_username: Optional[str] = None,
+        scope: Optional[str] = None,
     ) -> List[GitLabIssue]:
         """List issues in the project.
 
@@ -276,6 +279,9 @@ class GitLabService:
             search: Search in title and description
             per_page: Number of issues per page
             page: Page number
+            author_username: Filter by author username
+            assignee_username: Filter by assignee username
+            scope: Filter scope ("created_by_me", "assigned_to_me", "all")
 
         Returns:
             List of GitLabIssue objects
@@ -292,6 +298,12 @@ class GitLabService:
             params["labels"] = ",".join(labels)
         if search:
             params["search"] = search
+        if author_username:
+            params["author_username"] = author_username
+        if assignee_username:
+            params["assignee_username"] = assignee_username
+        if scope:
+            params["scope"] = scope
 
         data = await self._request(
             "GET",

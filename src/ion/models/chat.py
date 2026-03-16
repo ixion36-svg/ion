@@ -114,7 +114,7 @@ class ChatMessage(Base):
 
 
 class MessageReaction(Base):
-    """Emoji reaction on a message."""
+    """Emoji reaction on a message — supports both unicode emoji and custom meme names."""
 
     __tablename__ = "message_reactions"
     __table_args__ = (
@@ -128,7 +128,7 @@ class MessageReaction(Base):
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=False
     )
-    emoji: Mapped[str] = mapped_column(String(10), nullable=False)  # e.g., "👍", "❤️"
+    emoji: Mapped[str] = mapped_column(String(64), nullable=False)  # unicode emoji or :meme_name:
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), nullable=False
     )
@@ -139,3 +139,25 @@ class MessageReaction(Base):
 
     def __repr__(self) -> str:
         return f"<MessageReaction(message_id={self.message_id}, emoji='{self.emoji}')>"
+
+
+class ChatMeme(Base):
+    """Custom meme/emoji image available in team chat."""
+
+    __tablename__ = "chat_memes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)  # short name, e.g. "nice"
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)  # file in static/memes/
+    uploaded_by_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), nullable=False
+    )
+
+    # Relationships
+    uploaded_by: Mapped["User"] = relationship("User", foreign_keys=[uploaded_by_id])
+
+    def __repr__(self) -> str:
+        return f"<ChatMeme(name='{self.name}', filename='{self.filename}')>"

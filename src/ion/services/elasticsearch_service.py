@@ -33,12 +33,16 @@ class ElasticsearchAlert:
     mitre_technique_id: Optional[str] = None
     mitre_technique_name: Optional[str] = None
     mitre_tactic_name: Optional[str] = None
+    geo_data: Dict[str, Any] = None
+    source_system: Optional[str] = None
 
     def __post_init__(self):
         if self.tags is None:
             self.tags = []
         if self.raw_data is None:
             self.raw_data = {}
+        if self.geo_data is None:
+            self.geo_data = {}
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for API response."""
@@ -58,6 +62,8 @@ class ElasticsearchAlert:
             "mitre_technique_id": self.mitre_technique_id,
             "mitre_technique_name": self.mitre_technique_name,
             "mitre_tactic_name": self.mitre_tactic_name,
+            "geo_data": self.geo_data,
+            "source_system": self.source_system,
         }
 
 
@@ -434,6 +440,37 @@ class ElasticsearchService:
         if isinstance(tags, str):
             tags = [tags]
 
+        # P3b: Auto-tag from data_stream.namespace/dataset
+        data_stream = source.get("data_stream", {})
+        if isinstance(data_stream, dict):
+            ds_namespace = data_stream.get("namespace")
+            ds_dataset = data_stream.get("dataset")
+            if ds_namespace and ds_namespace not in tags:
+                tags.append(ds_namespace)
+            if ds_dataset and ds_dataset not in tags:
+                tags.append(ds_dataset)
+
+        # P3a: Extract geo data from source/destination/client/server
+        geo_data = {}
+        for prefix in ("source", "destination", "client", "server"):
+            geo = source.get(prefix, {}).get("geo", {}) if isinstance(source.get(prefix), dict) else {}
+            if isinstance(geo, dict) and geo:
+                country = geo.get("country_name")
+                city = geo.get("city_name")
+                location = geo.get("location")  # {lat, lon}
+                if country:
+                    geo_data[f"{prefix}_country"] = country
+                if city:
+                    geo_data[f"{prefix}_city"] = city
+                if isinstance(location, dict) and location.get("lat") is not None:
+                    geo_data[f"{prefix}_lat"] = location["lat"]
+                    geo_data[f"{prefix}_lon"] = location["lon"]
+
+        # Source system from data_stream
+        source_system = None
+        if isinstance(data_stream, dict) and data_stream.get("namespace"):
+            source_system = data_stream.get("namespace")
+
         # Rule name
         rule_name = (
             source.get("kibana.alert.rule.name") or
@@ -535,6 +572,8 @@ class ElasticsearchService:
             mitre_technique_id=mitre_technique_id,
             mitre_technique_name=mitre_technique_name,
             mitre_tactic_name=mitre_tactic_name,
+            geo_data=geo_data,
+            source_system=source_system,
         )
 
     async def get_related_alerts(

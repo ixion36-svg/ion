@@ -57,6 +57,9 @@ class User(Base, TimestampMixin):
     # Employment classification (cs = civil servant, contractor, military, other)
     employment_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default="cs")
 
+    # External service usernames for integration filtering
+    gitlab_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
     # Relationships
     roles: Mapped[List["Role"]] = relationship(
         "Role", secondary=user_roles, back_populates="users"

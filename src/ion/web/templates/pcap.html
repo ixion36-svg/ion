@@ -191,6 +191,7 @@
             <button class="pcap-tab" data-panel="data">Data Transfer</button>
             <button class="pcap-tab" data-panel="isakmp" id="tab-isakmp" style="display:none">ISAKMP/IKE</button>
             <button class="pcap-tab" data-panel="findings">Findings <span id="findings-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab" data-panel="threatintel">Threat Intel <span id="ti-count-badge" class="badge" style="display:none"></span></button>
         </div>
 
         <!-- Panels -->
@@ -202,6 +203,7 @@
         <div class="pcap-panel" id="panel-data"></div>
         <div class="pcap-panel" id="panel-isakmp"></div>
         <div class="pcap-panel" id="panel-findings"></div>
+        <div class="pcap-panel" id="panel-threatintel"></div>
     </div>
 </div>
 {% endblock %}
@@ -348,6 +350,7 @@
         renderData(d);
         renderIsakmp(d);
         renderFindings(d);
+        renderThreatIntel(d);
     }
 
     function card(label, value, sub) {
@@ -544,6 +547,64 @@
             </div>`;
         }
         document.getElementById('panel-findings').innerHTML = html;
+    }
+
+    function renderThreatIntel(d) {
+        const ti = d.threat_intel;
+        const panel = document.getElementById('panel-threatintel');
+        const badge = document.getElementById('ti-count-badge');
+
+        if (!ti || ti.error) {
+            panel.innerHTML = '<p style="color:var(--text-secondary);font-size:.85rem;padding:20px">' +
+                (ti && ti.error ? 'Enrichment error: ' + esc(ti.error) : 'No threat intelligence data — OpenCTI may not be configured.') + '</p>';
+            return;
+        }
+
+        const obs = ti.observables || [];
+        if (!obs.length) {
+            panel.innerHTML = '<p style="color:var(--text-secondary);font-size:.85rem;padding:20px">No external IPs or domains found to enrich.</p>';
+            return;
+        }
+
+        // Badge for malicious hits
+        if (ti.malicious_count > 0) {
+            badge.style.display = 'inline';
+            badge.textContent = ti.malicious_count;
+            badge.style.cssText = 'display:inline;background:#f85149;color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        }
+
+        const threatColors = { unknown: '#8b949e', benign: '#3fb950', low: '#58a6ff', medium: '#d29922', high: '#f0883e', critical: '#f85149' };
+
+        let html = `<div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:.85rem;color:var(--text-secondary)">
+            <span>IPs checked: <strong>${ti.ips_checked}</strong></span>
+            <span>Domains checked: <strong>${ti.domains_checked}</strong></span>
+            <span>Total observables: <strong>${ti.total}</strong></span>
+            <span style="color:${ti.malicious_count ? '#f85149' : '#3fb950'}">Malicious hits: <strong>${ti.malicious_count}</strong></span>
+        </div>`;
+
+        html += '<table class="pcap-table"><thead><tr><th>Type</th><th>Value</th><th>Threat Level</th><th>Score</th><th>Labels</th><th>Threat Actors</th></tr></thead><tbody>';
+
+        for (const o of obs) {
+            const e = o.enrichment;
+            const level = o.threat_level || 'unknown';
+            const color = threatColors[level] || '#8b949e';
+            const score = e ? (e.score != null ? e.score : '—') : '—';
+            const labels = e && e.labels && e.labels.length ? e.labels.map(l => '<span style="background:' + color + '20;color:' + color + ';padding:1px 6px;border-radius:3px;font-size:.75rem;margin-right:3px">' + esc(typeof l === 'string' ? l : l.value || l.name || '') + '</span>').join('') : '—';
+            const actors = e && e.threat_actors && e.threat_actors.length ? e.threat_actors.map(a => esc(typeof a === 'string' ? a : a.name || '')).join(', ') : '—';
+            const rowBg = e && e.is_malicious ? 'background:rgba(248,81,73,0.06);' : '';
+
+            html += `<tr style="${rowBg}">
+                <td><span style="font-size:.75rem;text-transform:uppercase;color:var(--text-secondary)">${esc(o.type)}</span></td>
+                <td style="font-family:monospace;word-break:break-all"><a href="/observables?q=${encodeURIComponent(o.value)}" style="color:var(--text-primary);text-decoration:underline dotted">${esc(o.value)}</a></td>
+                <td><span style="color:${color};font-weight:600;font-size:.8rem">${esc(level)}</span></td>
+                <td style="text-align:center">${score}</td>
+                <td>${labels}</td>
+                <td>${actors}</td>
+            </tr>`;
+        }
+
+        html += '</tbody></table>';
+        panel.innerHTML = html;
     }
 
     function showToast(message, type) {
