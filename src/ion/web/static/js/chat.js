@@ -23,12 +23,23 @@ let chatMemeNames = new Set();
 let chatMemeList = [];
 
 async function loadChatMemes() {
+    // Use cached memes for instant render
+    try {
+        const cached = sessionStorage.getItem('ion_memes');
+        if (cached) {
+            chatMemeList = JSON.parse(cached);
+            chatMemeNames = new Set(chatMemeList.map(m => m.name));
+        }
+    } catch {}
+
+    // Refresh from server in background
     try {
         const resp = await fetch('/api/chat/memes');
         if (resp.ok) {
             const data = await resp.json();
             chatMemeList = data.memes || [];
             chatMemeNames = new Set(chatMemeList.map(m => m.name));
+            sessionStorage.setItem('ion_memes', JSON.stringify(chatMemeList));
         }
     } catch (e) {
         console.debug('Could not load chat memes:', e);
@@ -40,20 +51,10 @@ async function ensureCurrentUser() {
     if (typeof currentUserData !== 'undefined' && currentUserData) {
         return currentUserData;
     }
-    try {
-        const response = await fetch('/api/auth/me');
-        if (response.ok) {
-            const data = await response.json();
-            // Store globally if not already
-            if (typeof currentUserData === 'undefined') {
-                window.currentUserData = data;
-            } else {
-                currentUserData = data;
-            }
-            return data;
-        }
-    } catch (error) {
-        console.error('Error fetching current user:', error);
+    // Use loadCurrentUser from app.js (deduplicates the API call)
+    if (typeof loadCurrentUser === 'function') {
+        await loadCurrentUser();
+        return currentUserData;
     }
     return null;
 }
@@ -422,6 +423,9 @@ function filterRooms(query) {
 async function openRoom(roomId) {
     activeRoomId = roomId;
     lastMessageTimestamp = null;
+
+    // Also open as a bottom bubble
+    openChatBubble(roomId);
 
     // Persist active room for cross-page navigation
     sessionStorage.setItem('chat_active_room', roomId);
@@ -932,16 +936,15 @@ function startPolling() {
     if (pollInterval) return;
 
     pollInterval = setInterval(async () => {
-        if (!chatOpen) return;
+        // Always update unread counts (even when chat panel is closed)
+        // so the navbar badge stays current
+        await updateUnreadCounts();
 
-        // Poll for new messages if in active room
-        if (activeRoomId) {
+        // Poll for new messages and typing only when panel is open
+        if (chatOpen && activeRoomId) {
             await pollMessages();
             await pollTyping();
         }
-
-        // Always update unread counts
-        await updateUnreadCounts();
     }, POLL_INTERVAL_MS);
 }
 
@@ -1935,3 +1938,224 @@ document.addEventListener('click', function(event) {
         emojiPicker.classList.remove('show');
     }
 });
+
+// =============================================================================
+// Chat Bubbles — stacked mini windows at bottom of page
+// =============================================================================
+
+let openBubbles = {};     // roomId -> { expanded: bool }
+const MAX_BUBBLES = 4;
+
+function ensureBubbleBar() {
+    if (document.getElementById('chat-bubble-bar')) return;
+    const bar = document.createElement('div');
+    bar.id = 'chat-bubble-bar';
+    bar.className = 'chat-bubble-bar';
+    document.body.appendChild(bar);
+}
+
+/**
+ * Open a chat room as a stacked bubble at the bottom of the page.
+ * Called from the room list or programmatically.
+ */
+function openChatBubble(roomId) {
+    ensureBubbleBar();
+
+    // Already open? Just expand it.
+    if (openBubbles[roomId]) {
+        expandBubble(roomId);
+        return;
+    }
+
+    // Limit visible bubbles
+    const ids = Object.keys(openBubbles);
+    if (ids.length >= MAX_BUBBLES) {
+        closeChatBubble(parseInt(ids[0]));
+    }
+
+    // Find room info from cached rooms list
+    const room = rooms.find(r => r.id === roomId);
+    const displayName = room ? (room.display_name || room.name || 'Chat') : 'Chat';
+    const avatarChar = displayName.charAt(0).toUpperCase();
+
+    openBubbles[roomId] = { expanded: true };
+
+    const bubble = document.createElement('div');
+    bubble.id = `chat-bubble-${roomId}`;
+    bubble.className = 'chat-bubble expanded';
+    bubble.innerHTML = `
+        <div class="chat-bubble-header" onclick="toggleBubble(${roomId})">
+            <div class="chat-bubble-avatar">${escapeHtml(avatarChar)}</div>
+            <span class="chat-bubble-name">${escapeHtml(displayName)}</span>
+            <span class="chat-bubble-unread" id="bubble-unread-${roomId}" style="display:none;"></span>
+            <button class="chat-bubble-close" onclick="event.stopPropagation(); closeChatBubble(${roomId})" title="Close">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="chat-bubble-body" id="bubble-body-${roomId}">
+            <div class="chat-bubble-messages" id="bubble-messages-${roomId}">
+                <div style="padding:16px;color:var(--text-muted);text-align:center;font-size:.8rem;">Loading...</div>
+            </div>
+            <div class="chat-bubble-input-area">
+                <textarea class="chat-bubble-input" id="bubble-input-${roomId}" placeholder="Message..." rows="1"
+                    onkeydown="handleBubbleKeydown(event, ${roomId})"></textarea>
+                <button class="chat-bubble-send" onclick="sendBubbleMessage(${roomId})">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('chat-bubble-bar').appendChild(bubble);
+
+    // Load messages
+    loadBubbleMessages(roomId);
+
+    // Start bubble polling
+    startBubblePolling(roomId);
+}
+
+function closeChatBubble(roomId) {
+    const el = document.getElementById(`chat-bubble-${roomId}`);
+    if (el) el.remove();
+    stopBubblePolling(roomId);
+    delete openBubbles[roomId];
+}
+
+function toggleBubble(roomId) {
+    const bubble = document.getElementById(`chat-bubble-${roomId}`);
+    if (!bubble) return;
+    const state = openBubbles[roomId];
+    if (!state) return;
+
+    state.expanded = !state.expanded;
+    bubble.classList.toggle('expanded', state.expanded);
+    bubble.classList.toggle('collapsed', !state.expanded);
+
+    if (state.expanded) {
+        loadBubbleMessages(roomId);
+        // Mark as read
+        api.post(`/api/chat/rooms/${roomId}/read`).catch(() => {});
+        // Clear unread badge on this bubble
+        const badge = document.getElementById(`bubble-unread-${roomId}`);
+        if (badge) badge.style.display = 'none';
+    }
+}
+
+function expandBubble(roomId) {
+    const state = openBubbles[roomId];
+    if (!state) return;
+    if (!state.expanded) {
+        toggleBubble(roomId);
+    }
+}
+
+async function loadBubbleMessages(roomId) {
+    try {
+        const data = await api.get(`/api/chat/rooms/${roomId}/messages`);
+        renderBubbleMessages(roomId, data.messages || []);
+        await api.post(`/api/chat/rooms/${roomId}/read`);
+    } catch (e) {
+        console.debug('Failed to load bubble messages:', e);
+    }
+}
+
+function renderBubbleMessages(roomId, messages) {
+    const container = document.getElementById(`bubble-messages-${roomId}`);
+    if (!container) return;
+
+    const currentUserId = (typeof currentUserData !== 'undefined' && currentUserData) ? currentUserData.id : null;
+
+    if (!messages.length) {
+        container.innerHTML = '<div style="padding:16px;color:var(--text-muted);text-align:center;font-size:.8rem;">No messages yet</div>';
+        return;
+    }
+
+    container.innerHTML = messages.map(msg => {
+        const isMine = msg.user_id === currentUserId;
+        const cls = isMine ? 'bubble-msg mine' : 'bubble-msg';
+        const name = isMine ? '' : `<div class="bubble-msg-name">${escapeHtml(msg.display_name || msg.username || '?')}</div>`;
+        // Process memes in content
+        let content = escapeHtml(msg.content);
+        content = content.replace(/:([a-zA-Z0-9_]+):/g, (match, name) => {
+            if (chatMemeNames.has(name)) {
+                return `<img src="/static/memes/${name}.gif" onerror="this.src='/static/memes/${name}.png'" class="chat-meme-inline" alt=":${name}:">`;
+            }
+            return match;
+        });
+        return `<div class="${cls}">${name}<div class="bubble-msg-text">${content}</div></div>`;
+    }).join('');
+
+    // Scroll to bottom
+    container.scrollTop = container.scrollHeight;
+}
+
+function handleBubbleKeydown(event, roomId) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendBubbleMessage(roomId);
+    }
+}
+
+async function sendBubbleMessage(roomId) {
+    const input = document.getElementById(`bubble-input-${roomId}`);
+    if (!input) return;
+    const content = input.value.trim();
+    if (!content) return;
+
+    input.value = '';
+
+    try {
+        await api.post(`/api/chat/rooms/${roomId}/messages`, { content });
+        loadBubbleMessages(roomId);
+    } catch (e) {
+        showToast('Failed to send message', 'error');
+    }
+}
+
+// Bubble polling — lightweight per-bubble poll for new messages
+let _bubblePolls = {};
+
+function startBubblePolling(roomId) {
+    if (_bubblePolls[roomId]) return;
+    _bubblePolls[roomId] = setInterval(async () => {
+        if (!openBubbles[roomId]) {
+            stopBubblePolling(roomId);
+            return;
+        }
+        // Only refresh messages if expanded
+        if (openBubbles[roomId].expanded) {
+            try {
+                const data = await api.get(`/api/chat/rooms/${roomId}/messages`);
+                renderBubbleMessages(roomId, data.messages || []);
+            } catch {}
+        } else {
+            // Check unread count when collapsed
+            try {
+                const data = await api.get('/api/chat/rooms');
+                const roomData = (data.rooms || []).find(r => r.id === roomId);
+                if (roomData && roomData.unread_count > 0) {
+                    const badge = document.getElementById(`bubble-unread-${roomId}`);
+                    if (badge) {
+                        badge.textContent = roomData.unread_count;
+                        badge.style.display = 'inline';
+                    }
+                }
+            } catch {}
+        }
+    }, POLL_INTERVAL_MS);
+}
+
+function stopBubblePolling(roomId) {
+    if (_bubblePolls[roomId]) {
+        clearInterval(_bubblePolls[roomId]);
+        delete _bubblePolls[roomId];
+    }
+}
+
+/**
+ * Open a room in a bubble (called from notification click handlers, etc.)
+ */
+function openChatRoom(roomId) {
+    openChatBubble(roomId);
+}

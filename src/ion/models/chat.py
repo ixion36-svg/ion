@@ -33,6 +33,7 @@ class ChatRoom(Base, TimestampMixin):
     created_by_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=False
     )
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Relationships
     members: Mapped[List["ChatRoomMember"]] = relationship(

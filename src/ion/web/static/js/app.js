@@ -97,24 +97,42 @@ function debounce(func, wait) {
 // =============================================================================
 
 let currentUserData = null;
+let _loadUserPromise = null;
+
+// Restore cached user data immediately so nav renders without flash
+try {
+    const cached = sessionStorage.getItem('ion_user');
+    if (cached) {
+        currentUserData = JSON.parse(cached);
+    }
+} catch {}
 
 async function loadCurrentUser() {
-    try {
-        const response = await fetch('/api/auth/me');
-        if (response.status === 401) {
-            // Redirect to login if not authenticated (except on login page)
-            if (!window.location.pathname.startsWith('/login')) {
-                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+    // Deduplicate — return existing promise if already in flight
+    if (_loadUserPromise) return _loadUserPromise;
+
+    _loadUserPromise = (async () => {
+        try {
+            const response = await fetch('/api/auth/me');
+            if (response.status === 401) {
+                sessionStorage.removeItem('ion_user');
+                if (!window.location.pathname.startsWith('/login')) {
+                    window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }
+                return;
             }
-            return;
+            if (response.ok) {
+                currentUserData = await response.json();
+                sessionStorage.setItem('ion_user', JSON.stringify(currentUserData));
+                updateUserMenu();
+            }
+        } catch (error) {
+            console.error('Error loading user:', error);
+        } finally {
+            _loadUserPromise = null;
         }
-        if (response.ok) {
-            currentUserData = await response.json();
-            updateUserMenu();
-        }
-    } catch (error) {
-        console.error('Error loading user:', error);
-    }
+    })();
+    return _loadUserPromise;
 }
 
 function updateUserMenu() {
@@ -211,10 +229,10 @@ async function switchFocusMode(roleName) {
             return;
         }
         const result = await resp.json();
-        // Refresh user data and reload page to apply new view
+        // Update cached user data and reload page to apply new view
         currentUserData.focus_role = result.focus_role;
         currentUserData.permissions = result.permissions;
-        // Reload to apply dashboard view change
+        sessionStorage.setItem('ion_user', JSON.stringify(currentUserData));
         window.location.reload();
     } catch (e) {
         showToast('Failed to switch focus mode', 'error');
@@ -238,12 +256,18 @@ function toggleNavMenu() {
     }
 }
 
-// Close dropdown and mobile nav when clicking outside
+// Close dropdown, notification panel, and mobile nav when clicking outside
 document.addEventListener('click', function(event) {
     const userMenu = document.getElementById('user-menu');
     const dropdown = document.getElementById('user-dropdown');
     if (userMenu && dropdown && !userMenu.contains(event.target)) {
         dropdown.classList.remove('show');
+    }
+    // Close notification panel when clicking outside
+    const notifBell = document.getElementById('notif-bell-btn');
+    const notifPanel = document.getElementById('notif-panel');
+    if (notifBell && notifPanel && !notifBell.contains(event.target) && !notifPanel.contains(event.target)) {
+        notifPanel.classList.remove('show');
     }
     // Close mobile nav when clicking outside
     const hamburger = document.getElementById('nav-hamburger');
@@ -260,12 +284,168 @@ async function logout() {
     } catch (error) {
         // Ignore errors, redirect anyway
     }
+    sessionStorage.clear();
     window.location.href = '/login';
 }
 
-// Initialize user menu on page load (if not on login page)
+// =============================================================================
+// Notification System
+// =============================================================================
+
+let _notifPollInterval = null;
+const NOTIF_POLL_MS = 10000;
+
+function toggleNotifPanel() {
+    const panel = document.getElementById('notif-panel');
+    if (!panel) return;
+    const isOpen = panel.classList.toggle('show');
+    if (isOpen) {
+        loadNotifications();
+    }
+}
+
+async function loadNotifications() {
+    try {
+        const data = await api.get('/api/notifications?limit=30');
+        renderNotifications(data.notifications || []);
+        updateNotifBadge(data.unread_count || 0);
+    } catch (e) {
+        console.debug('Failed to load notifications:', e);
+    }
+}
+
+function renderNotifications(notifications) {
+    const list = document.getElementById('notif-list');
+    if (!list) return;
+
+    if (!notifications.length) {
+        list.innerHTML = '<div class="notif-empty">No notifications</div>';
+        return;
+    }
+
+    const sourceIcons = {
+        chat_mention: '@',
+        chat_dm: '\u2709',
+        case_assigned: '\u26A0',
+        gitlab_assigned: '\u{1F4CB}',
+        system: '\u2699',
+    };
+
+    list.innerHTML = notifications.map(n => {
+        const icon = sourceIcons[n.source] || '\u{1F514}';
+        const cls = n.is_read ? '' : ' unread';
+        const time = n.created_at ? formatNotifTime(n.created_at) : '';
+        return `<div class="notif-item${cls}" data-id="${n.id}" data-url="${escapeHtml(n.url || '')}" onclick="handleNotifClick(this)">
+            <div class="notif-item-icon">${icon}</div>
+            <div class="notif-item-content">
+                <div class="notif-item-title">${escapeHtml(n.title)}</div>
+                ${n.body ? `<div class="notif-item-body">${escapeHtml(n.body)}</div>` : ''}
+                <div class="notif-item-time">${time}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function formatNotifTime(isoString) {
+    const d = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return diffMin + 'm ago';
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return diffHr + 'h ago';
+    const diffDay = Math.floor(diffHr / 24);
+    if (diffDay < 7) return diffDay + 'd ago';
+    return d.toLocaleDateString();
+}
+
+async function handleNotifClick(el) {
+    const id = el.dataset.id;
+    const url = el.dataset.url;
+
+    // Mark read
+    try {
+        await api.post('/api/notifications/' + id + '/read');
+        el.classList.remove('unread');
+        // Decrement badge
+        const badge = document.getElementById('notif-unread-badge');
+        if (badge) {
+            const cur = parseInt(badge.textContent) || 0;
+            updateNotifBadge(Math.max(0, cur - 1));
+        }
+    } catch {}
+
+    // Navigate if URL provided
+    if (url && url !== 'null') {
+        if (url.startsWith('#chat-room-')) {
+            // Open chat to specific room
+            const roomId = url.replace('#chat-room-', '');
+            if (typeof openChatRoom === 'function') openChatRoom(parseInt(roomId));
+        } else {
+            window.location.href = url;
+        }
+    }
+}
+
+function updateNotifBadge(count) {
+    const badge = document.getElementById('notif-unread-badge');
+    const bell = document.getElementById('notif-bell-btn');
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.style.display = 'flex';
+            if (bell) bell.classList.add('has-unread');
+        } else {
+            badge.style.display = 'none';
+            if (bell) bell.classList.remove('has-unread');
+        }
+    }
+}
+
+async function markAllNotificationsRead() {
+    try {
+        await api.post('/api/notifications/read-all');
+        updateNotifBadge(0);
+        // Re-render the panel
+        const list = document.getElementById('notif-list');
+        if (list) {
+            list.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
+        }
+    } catch {}
+}
+
+async function pollNotifications() {
+    try {
+        const data = await api.get('/api/notifications/unread-count');
+        updateNotifBadge(data.unread_count || 0);
+
+        // Show toasts for new notifications
+        if (data.toasts && data.toasts.length) {
+            data.toasts.forEach(t => {
+                showToast(t.title + (t.body ? ': ' + t.body.substring(0, 60) : ''), 'info');
+            });
+        }
+    } catch {}
+}
+
+function startNotifPolling() {
+    if (_notifPollInterval) return;
+    // Initial check
+    pollNotifications();
+    _notifPollInterval = setInterval(pollNotifications, NOTIF_POLL_MS);
+}
+
+// Initialize user menu and notifications on page load (if not on login page)
 document.addEventListener('DOMContentLoaded', function() {
     if (!window.location.pathname.startsWith('/login')) {
+        // Render immediately from cache (no flash)
+        if (currentUserData) {
+            updateUserMenu();
+        }
+        // Then refresh from server in background
         loadCurrentUser();
+        // Start notification polling
+        startNotifPolling();
     }
 });

@@ -19,6 +19,16 @@ _engine: Optional[Engine] = None
 _session_factory: Optional[sessionmaker[Session]] = None
 
 
+def _set_sqlite_pragmas(dbapi_conn, connection_record):
+    """Set SQLite pragmas on each new connection for concurrency and durability."""
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")       # allow concurrent readers + writer
+    cursor.execute("PRAGMA busy_timeout=30000")      # wait up to 30s instead of failing immediately
+    cursor.execute("PRAGMA synchronous=NORMAL")      # safe with WAL, faster than FULL
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
 def get_engine(db_path: Optional[Path] = None) -> Engine:
     """Get or create the database engine."""
     global _engine
@@ -26,7 +36,18 @@ def get_engine(db_path: Optional[Path] = None) -> Engine:
         if db_path is None:
             db_path = get_config().db_path
         db_path.parent.mkdir(parents=True, exist_ok=True)
-        _engine = create_engine(f"sqlite:///{db_path}", echo=False)
+        _engine = create_engine(
+            f"sqlite:///{db_path}",
+            echo=False,
+            connect_args={"check_same_thread": False},
+            pool_size=5,
+            max_overflow=10,
+            pool_timeout=30,
+            pool_pre_ping=True,
+            pool_recycle=600,
+        )
+        from sqlalchemy import event
+        event.listen(_engine, "connect", _set_sqlite_pragmas)
     return _engine
 
 
@@ -237,6 +258,14 @@ def _run_migrations(engine: Engine) -> None:
                     text("ALTER TABLE chat_messages ADD COLUMN reply_to_id INTEGER REFERENCES chat_messages(id)")
                 )
                 logger.info("Migrated: chat_messages.reply_to_id")
+
+    # Migration for chat_rooms.is_system (system-managed group rooms)
+    if insp.has_table("chat_rooms"):
+        existing = {col["name"] for col in insp.get_columns("chat_rooms")}
+        if "is_system" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE chat_rooms ADD COLUMN is_system BOOLEAN DEFAULT 0 NOT NULL"))
+                logger.info("Migrated: chat_rooms.is_system")
 
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)

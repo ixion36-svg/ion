@@ -97,6 +97,12 @@ from ion.models.skills import (
 )
 from ion.models.analyst_note import AnalystNote
 from ion.models.note_folder import NoteFolder
+from ion.models.notification import Notification
+from ion.models.social import (
+    SocialPost,
+    SocialComment,
+    SocialReaction,
+)
 from ion.models.forensics import (
     ForensicCase,
     ForensicCaseStatus,
@@ -217,4 +223,10 @@ __all__ = [
     "ForensicPlaybookStep",
     "ForensicCaseStep",
     "ForensicTimelineEntry",
+    # Notification model
+    "Notification",
+    # Social Hub models
+    "SocialPost",
+    "SocialComment",
+    "SocialReaction",
 ]

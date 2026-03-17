@@ -3567,6 +3567,21 @@ async def create_case(
 
     logger.info("create_case: collected %d raw_data items for enrichment", len(raw_data_list))
 
+    # Notify assignee
+    if data.assigned_to_id and data.assigned_to_id != current_user.id:
+        try:
+            from ion.web.notification_api import create_notification
+            create_notification(
+                session, data.assigned_to_id,
+                source="case_assigned",
+                title=f"Case assigned: {case_number}",
+                body=data.title[:120],
+                url="/cases",
+                source_id=str(case_number),
+            )
+        except Exception as _ne:
+            logger.debug("Failed to create case notification: %s", _ne)
+
     session.commit()
     session.refresh(new_case)
 
@@ -3789,7 +3804,22 @@ async def update_case(
     if data.severity is not None:
         case.severity = data.severity
     if data.assigned_to_id is not None:
+        old_assignee = case.assigned_to_id
         case.assigned_to_id = data.assigned_to_id
+        # Notify new assignee
+        if data.assigned_to_id and data.assigned_to_id != current_user.id and data.assigned_to_id != old_assignee:
+            try:
+                from ion.web.notification_api import create_notification
+                create_notification(
+                    session, data.assigned_to_id,
+                    source="case_assigned",
+                    title=f"Case reassigned: {case.case_number}",
+                    body=case.title[:120] if case.title else "",
+                    url="/cases",
+                    source_id=str(case.case_number),
+                )
+            except Exception as _ne:
+                logger.debug("Failed to create reassign notification: %s", _ne)
     _synced_alert_ids = []
     _mapped_triage = None
     if data.status is not None:
@@ -5910,6 +5940,46 @@ async def send_chat_message(
     if member:
         member.is_typing = False
         member.typing_updated_at = None
+
+    # Create notifications for mentions and DMs
+    try:
+        from ion.web.notification_api import create_notification
+        sender_name = current_user.display_name or current_user.username
+        snippet = data.content.strip()[:80]
+
+        # Notifications for @mentions
+        if mention_ids:
+            for uid in mention_ids:
+                if uid != current_user.id:
+                    create_notification(
+                        session, uid,
+                        source="chat_mention",
+                        title=f"{sender_name} mentioned you",
+                        body=snippet,
+                        url=f"#chat-room-{room_id}",
+                        source_id=str(room_id),
+                    )
+
+        # Notification for DM (direct messages to the other user)
+        if room and room.room_type == "direct":
+            other_members = session.execute(
+                select(ChatRoomMember.user_id).where(
+                    ChatRoomMember.room_id == room_id,
+                    ChatRoomMember.user_id != current_user.id,
+                )
+            ).scalars().all()
+            for uid in other_members:
+                if not mention_ids or uid not in mention_ids:
+                    create_notification(
+                        session, uid,
+                        source="chat_dm",
+                        title=f"DM from {sender_name}",
+                        body=snippet,
+                        url=f"#chat-room-{room_id}",
+                        source_id=str(room_id),
+                    )
+    except Exception as _notif_err:
+        logger.debug("Failed to create chat notification: %s", _notif_err)
 
     session.commit()
 

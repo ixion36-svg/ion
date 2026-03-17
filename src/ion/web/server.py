@@ -25,6 +25,8 @@ from ion.web.skills_api import router as skills_router
 from ion.web.notes_api import router as notes_router
 from ion.web.pcap_api import router as pcap_router
 from ion.web.forensics_api import router as forensics_router
+from ion.web.notification_api import router as notification_router
+from ion.web.social_api import router as social_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -166,6 +168,8 @@ app.include_router(skills_router, prefix="/api/skills")
 app.include_router(notes_router, prefix="/api/notes")
 app.include_router(pcap_router, prefix="/api/pcap")
 app.include_router(forensics_router, prefix="/api/forensics")
+app.include_router(notification_router, prefix="/api")
+app.include_router(social_router, prefix="/api/social")
 
 
 @app.on_event("startup")
@@ -238,6 +242,14 @@ async def startup_event():
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"Failed to seed memes: {e}")
+
+    # Seed role-based group chat rooms (idempotent, reconciles memberships)
+    try:
+        from ion.services.chat_room_seed_service import seed_chat_rooms
+        seed_chat_rooms()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to seed chat rooms: {e}")
 
     # Start Kibana bidirectional sync if enabled (via connector)
     try:
@@ -470,6 +482,12 @@ async def pcap_page(request: Request, user: User = Depends(require_page_permissi
 async def forensics_page(request: Request, user: User = Depends(require_page_permission("forensic:read"))):
     """Render the forensic investigations page."""
     return templates.TemplateResponse("forensics.html", {"request": request})
+
+
+@app.get("/social", response_class=HTMLResponse)
+async def social_page(request: Request, user: User = Depends(require_page_auth)):
+    """Render the Social Hub page."""
+    return templates.TemplateResponse("social.html", {"request": request})
 
 
 @app.get("/topology", response_class=HTMLResponse)

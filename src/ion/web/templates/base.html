@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ION{% endblock %}</title>
     <link rel="icon" type="image/png" href="/static/img/ion-logo.png">
-    <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.16">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.9.16">
-    <link rel="stylesheet" href="/static/css/chat.css?v=0.9.16">
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.9.16">
+    <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.17">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.9.17">
+    <link rel="stylesheet" href="/static/css/chat.css?v=0.9.17">
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.9.17">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
     <script src="/static/js/theme-init.js"></script>
 </head>
@@ -35,6 +35,7 @@
             <li><a href="/pcap" class="{% if '/pcap' in request.url.path %}active{% endif %}">PCAP</a></li>
             <li><a href="/playbooks" class="{% if '/playbooks' in request.url.path %}active{% endif %}">Playbooks</a></li>
             <li><a href="/training" class="{% if '/training' in request.url.path %}active{% endif %}">Training</a></li>
+            <li><a href="/social" class="{% if '/social' in request.url.path %}active{% endif %}">Social Hub</a></li>
             <!-- Lead+ (lead/engineering/admin) -->
             <li id="nav-topology-link" style="display: none;">
                 <a href="/topology" class="{% if '/topology' in request.url.path %}active{% endif %}">Topology</a>
@@ -57,6 +58,20 @@
                 <a href="/audit-logs" class="{% if '/audit-logs' in request.url.path %}active{% endif %}">Audit Logs</a>
             </li>
         </ul>
+        <!-- Notification bell -->
+        <button class="chat-toggle-btn" id="notif-bell-btn" onclick="toggleNotifPanel()" title="Notifications">
+            <i class="icon-bell"></i>
+            <span class="chat-unread-badge" id="notif-unread-badge" style="display: none;">0</span>
+        </button>
+        <div class="notif-panel" id="notif-panel">
+            <div class="notif-panel-header">
+                <strong>Notifications</strong>
+                <button class="notif-mark-all" onclick="markAllNotificationsRead()">Mark all read</button>
+            </div>
+            <div class="notif-list" id="notif-list">
+                <div class="notif-empty">No notifications</div>
+            </div>
+        </div>
         <!-- Chat toggle button -->
         <button class="chat-toggle-btn" id="chat-toggle-btn" onclick="toggleChat()" title="Chat">
             <i class="icon-message-square"></i>
@@ -234,11 +249,11 @@
     <!-- Markdown parser + sanitizer -->
     <script src="/static/js/marked.min.js"></script>
     <script src="/static/js/purify.min.js"></script>
-    <script src="/static/js/app.js?v=0.9.16"></script>
-    <script src="/static/js/chat.js?v=0.9.16"></script>
-    <script src="/static/js/ai-chat.js?v=0.9.16"></script>
+    <script src="/static/js/app.js?v=0.9.17"></script>
+    <script src="/static/js/chat.js?v=0.9.17"></script>
+    <script src="/static/js/ai-chat.js?v=0.9.17"></script>
     <script src="/static/js/quill.js"></script>
-    <script src="/static/js/notepad.js?v=0.9.16"></script>
+    <script src="/static/js/notepad.js?v=0.9.17"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

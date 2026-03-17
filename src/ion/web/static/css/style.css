@@ -2233,3 +2233,121 @@ select option {
     border-right-color: var(--primary);
     background: var(--primary-dim);
 }
+
+/* =============================================================================
+   Notification Panel
+   ============================================================================= */
+
+.notif-panel {
+    display: none;
+    position: absolute;
+    top: 52px;
+    right: 180px;
+    width: 360px;
+    max-height: 440px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    z-index: 1100;
+    overflow: hidden;
+}
+
+.notif-panel.show {
+    display: flex;
+    flex-direction: column;
+}
+
+.notif-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.notif-mark-all {
+    background: none;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.notif-mark-all:hover {
+    text-decoration: underline;
+}
+
+.notif-list {
+    overflow-y: auto;
+    max-height: 380px;
+    flex: 1;
+}
+
+.notif-empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.notif-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.notif-item:hover {
+    background: var(--bg-secondary);
+}
+
+.notif-item.unread {
+    background: var(--primary-dim);
+}
+
+.notif-item-icon {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    background: var(--bg-secondary);
+    color: var(--primary);
+}
+
+.notif-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-item-title {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.notif-item-body {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+
+.notif-item-time {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}

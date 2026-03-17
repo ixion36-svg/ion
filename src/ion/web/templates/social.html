@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+{% block title %}Social Hub - ION{% endblock %}
+{% block content %}
+<style>
+    .social-hub { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
+    .social-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .social-header h1 { font-size: 1.5rem; color: var(--text-primary); margin: 0; }
+
+    /* Compose card */
+    .social-compose {
+        background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+        padding: 20px; margin-bottom: 20px;
+    }
+    .social-compose-row { display: flex; gap: 12px; margin-bottom: 12px; }
+    .social-compose-row input, .social-compose-row select {
+        padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+        background: var(--bg-secondary); color: var(--text-primary); font-size: 0.9rem;
+    }
+    .social-compose-row input { flex: 1; }
+    .social-compose textarea {
+        width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+        background: var(--bg-secondary); color: var(--text-primary); font-size: 0.9rem;
+        resize: vertical; min-height: 80px; font-family: inherit;
+    }
+    .social-compose textarea:focus, .social-compose-row input:focus {
+        outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-dim);
+    }
+    .social-compose-footer { display: flex; justify-content: flex-end; margin-top: 12px; }
+    .social-compose-footer .btn-primary {
+        padding: 10px 24px; background: var(--primary); color: var(--bg-deep); border: none;
+        border-radius: var(--radius); font-weight: 600; cursor: pointer; font-size: 0.9rem;
+    }
+    .social-compose-footer .btn-primary:hover { box-shadow: var(--glow-md); }
+
+    /* Filters */
+    .social-filters { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .social-filter-pill {
+        padding: 6px 16px; border-radius: 20px; border: 1px solid var(--border);
+        background: var(--bg-secondary); color: var(--text-secondary); cursor: pointer;
+        font-size: 0.8rem; font-weight: 500; transition: all 0.15s;
+    }
+    .social-filter-pill:hover { border-color: var(--primary); color: var(--text-primary); }
+    .social-filter-pill.active { background: var(--primary); color: var(--bg-deep); border-color: var(--primary); }
+
+    /* Post card */
+    .social-post {
+        background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+        margin-bottom: 16px; overflow: hidden;
+    }
+    .social-post.pinned { border-color: var(--neon-orange); }
+    .social-post-accent {
+        height: 3px; width: 100%;
+    }
+    .social-post-accent.announcement { background: var(--neon-orange, #f97316); }
+    .social-post-accent.good_work { background: var(--primary); }
+    .social-post-accent.certification { background: #a855f7; }
+    .social-post-accent.general { background: var(--border); }
+
+    .social-post-body { padding: 16px 20px; }
+    .social-post-meta {
+        display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.8rem;
+    }
+    .social-post-avatar {
+        width: 32px; height: 32px; border-radius: 50%; background: var(--primary-dim);
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; color: var(--primary); font-size: 0.85rem; flex-shrink: 0;
+    }
+    .social-post-author { font-weight: 600; color: var(--text-primary); }
+    .social-post-time { color: var(--text-muted); }
+    .social-post-pin { color: var(--neon-orange, #f97316); font-size: 0.75rem; font-weight: 600; }
+    .social-category-badge {
+        display: inline-block; padding: 2px 10px; border-radius: 10px;
+        font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .social-category-badge.announcement { background: rgba(249,115,22,0.15); color: #f97316; }
+    .social-category-badge.good_work { background: var(--primary-dim); color: var(--primary); }
+    .social-category-badge.certification { background: rgba(168,85,247,0.15); color: #a855f7; }
+    .social-category-badge.general { background: var(--bg-secondary); color: var(--text-muted); }
+
+    .social-post-title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin: 8px 0 6px; }
+    .social-post-content { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; }
+    .social-post-content p { margin: 0 0 8px; }
+
+    /* Actions bar */
+    .social-post-actions {
+        display: flex; align-items: center; gap: 4px; padding: 8px 20px 12px;
+        border-top: 1px solid var(--border); flex-wrap: wrap;
+    }
+    .social-react-btn {
+        padding: 4px 10px; border-radius: 16px; border: 1px solid var(--border);
+        background: var(--bg-secondary); cursor: pointer; font-size: 0.8rem;
+        display: flex; align-items: center; gap: 4px; transition: all 0.15s;
+        color: var(--text-secondary);
+    }
+    .social-react-btn:hover { border-color: var(--primary); }
+    .social-react-btn.reacted { background: var(--primary-dim); border-color: var(--primary); color: var(--primary); }
+    .social-react-btn .count { font-weight: 600; }
+    .social-comment-toggle {
+        margin-left: auto; padding: 4px 12px; border-radius: 16px; border: 1px solid var(--border);
+        background: var(--bg-secondary); cursor: pointer; font-size: 0.8rem; color: var(--text-muted);
+    }
+    .social-comment-toggle:hover { border-color: var(--primary); color: var(--text-primary); }
+    .social-post-admin-actions { margin-left: 8px; display: flex; gap: 4px; }
+    .social-admin-btn {
+        padding: 4px 8px; border-radius: var(--radius); border: none; background: none;
+        cursor: pointer; font-size: 0.75rem; color: var(--text-muted);
+    }
+    .social-admin-btn:hover { color: var(--primary); background: var(--bg-secondary); }
+
+    /* Comments section */
+    .social-comments { padding: 0 20px 16px; display: none; }
+    .social-comments.show { display: block; }
+    .social-comment-item {
+        display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);
+    }
+    .social-comment-item:last-child { border-bottom: none; }
+    .social-comment-avatar {
+        width: 24px; height: 24px; border-radius: 50%; background: var(--bg-secondary);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.65rem; font-weight: 700; color: var(--text-muted); flex-shrink: 0;
+    }
+    .social-comment-body { flex: 1; }
+    .social-comment-author { font-weight: 600; font-size: 0.8rem; color: var(--text-primary); }
+    .social-comment-text { font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px; }
+    .social-comment-time { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; }
+    .social-comment-delete { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; }
+    .social-comment-delete:hover { color: var(--danger); }
+
+    .social-comment-form { display: flex; gap: 8px; margin-top: 12px; }
+    .social-comment-form input {
+        flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+        background: var(--bg-secondary); color: var(--text-primary); font-size: 0.85rem;
+    }
+    .social-comment-form input:focus { outline: none; border-color: var(--primary); }
+    .social-comment-form button {
+        padding: 8px 16px; background: var(--primary); color: var(--bg-deep); border: none;
+        border-radius: var(--radius); cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    }
+
+    .social-empty { text-align: center; padding: 48px 16px; color: var(--text-muted); }
+    .social-empty i { font-size: 3rem; display: block; margin-bottom: 12px; }
+</style>
+
+<div class="social-hub">
+    <div class="social-header">
+        <h1><i class="icon-megaphone"></i> Social Hub</h1>
+    </div>
+
+    <!-- Compose -->
+    <div class="social-compose">
+        <div class="social-compose-row">
+            <input type="text" id="social-title" placeholder="Post title...">
+            <select id="social-category">
+                <option value="general">General</option>
+                <option value="announcement">Announcement</option>
+                <option value="good_work">Good Work</option>
+                <option value="certification">Certification</option>
+            </select>
+        </div>
+        <textarea id="social-body" placeholder="Share an update, shoutout, or announcement... (supports markdown)"></textarea>
+        <div class="social-compose-footer">
+            <button class="btn-primary" onclick="createSocialPost()">Post</button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="social-filters">
+        <button class="social-filter-pill active" data-cat="" onclick="filterPosts(this, '')">All</button>
+        <button class="social-filter-pill" data-cat="announcement" onclick="filterPosts(this, 'announcement')">Announcements</button>
+        <button class="social-filter-pill" data-cat="good_work" onclick="filterPosts(this, 'good_work')">Good Work</button>
+        <button class="social-filter-pill" data-cat="certification" onclick="filterPosts(this, 'certification')">Certifications</button>
+        <button class="social-filter-pill" data-cat="general" onclick="filterPosts(this, 'general')">General</button>
+    </div>
+
+    <!-- Feed -->
+    <div id="social-feed">
+        <div class="social-empty"><i class="icon-megaphone"></i>No posts yet. Be the first!</div>
+    </div>
+</div>
+
+<script src="/static/js/marked.min.js"></script>
+<script src="/static/js/purify.min.js"></script>
+<script>
+const EMOJI_MAP = {
+    thumbsup: String.fromCodePoint(0x1F44D),
+    clap: String.fromCodePoint(0x1F44F),
+    fire: String.fromCodePoint(0x1F525),
+    heart: String.fromCodePoint(0x2764, 0xFE0F),
+    rocket: String.fromCodePoint(0x1F680),
+    trophy: String.fromCodePoint(0x1F3C6),
+};
+const CATEGORY_LABELS = {
+    announcement: 'Announcement', good_work: 'Good Work',
+    certification: 'Certification', general: 'General'
+};
+let currentFilter = '';
+let socialPosts = [];
+let isAdminOrLead = false;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadCurrentUser();
+    if (currentUserData) {
+        const roles = currentUserData.roles || [];
+        isAdminOrLead = roles.includes('admin') || roles.includes('lead');
+    }
+    loadFeed();
+});
+
+async function loadFeed() {
+    try {
+        const url = currentFilter ? '/api/social/?category=' + currentFilter : '/api/social/';
+        const data = await api.get(url);
+        socialPosts = data.posts || [];
+        renderFeed(socialPosts);
+    } catch (e) {
+        console.error('Failed to load feed:', e);
+    }
+}
+
+function renderFeed(posts) {
+    const feed = document.getElementById('social-feed');
+    if (!posts.length) {
+        feed.innerHTML = '<div class="social-empty"><i class="icon-megaphone"></i>No posts yet. Be the first!</div>';
+        return;
+    }
+
+    feed.innerHTML = posts.map(p => {
+        const avatar = (p.author_display || p.author || '?').charAt(0).toUpperCase();
+        const pinHtml = p.is_pinned ? '<span class="social-post-pin">PINNED</span>' : '';
+        const pinnedClass = p.is_pinned ? ' pinned' : '';
+        const catBadge = '<span class="social-category-badge ' + p.category + '">' + (CATEGORY_LABELS[p.category] || p.category) + '</span>';
+        const bodyHtml = safeMarkdown(p.body);
+        const time = formatSocialTime(p.created_at);
+
+        // Reactions
+        let reactHtml = '';
+        for (const [emoji, info] of Object.entries(p.reactions || {})) {
+            const icon = EMOJI_MAP[emoji] || emoji;
+            const cls = info.reacted ? ' reacted' : '';
+            reactHtml += '<button class="social-react-btn' + cls + '" onclick="toggleReaction(' + p.id + ', \'' + emoji + '\')">' + icon + ' <span class="count">' + info.count + '</span></button>';
+        }
+        // Add reaction buttons for emojis not yet used
+        for (const [key, icon] of Object.entries(EMOJI_MAP)) {
+            if (!p.reactions || !p.reactions[key]) {
+                reactHtml += '<button class="social-react-btn" onclick="toggleReaction(' + p.id + ', \'' + key + '\')">' + icon + '</button>';
+            }
+        }
+
+        const commentBtn = '<button class="social-comment-toggle" onclick="toggleComments(' + p.id + ')">\ud83d\udcac ' + p.comment_count + ' comments</button>';
+
+        // Admin actions
+        let adminHtml = '';
+        if (isAdminOrLead) {
+            adminHtml += '<button class="social-admin-btn" onclick="togglePin(' + p.id + ')" title="' + (p.is_pinned ? 'Unpin' : 'Pin') + '">\ud83d\udccc</button>';
+        }
+        const isMine = currentUserData && p.user_id === currentUserData.id;
+        if (isMine || isAdminOrLead) {
+            adminHtml += '<button class="social-admin-btn" onclick="deletePost(' + p.id + ')" title="Delete">\ud83d\uddd1\ufe0f</button>';
+        }
+
+        return '<div class="social-post' + pinnedClass + '" id="social-post-' + p.id + '">' +
+            '<div class="social-post-accent ' + p.category + '"></div>' +
+            '<div class="social-post-body">' +
+                '<div class="social-post-meta">' +
+                    '<div class="social-post-avatar">' + escapeHtml(avatar) + '</div>' +
+                    '<span class="social-post-author">' + escapeHtml(p.author_display) + '</span>' +
+                    '<span class="social-post-time">' + time + '</span>' +
+                    pinHtml + catBadge +
+                '</div>' +
+                '<div class="social-post-title">' + escapeHtml(p.title) + '</div>' +
+                '<div class="social-post-content">' + bodyHtml + '</div>' +
+            '</div>' +
+            '<div class="social-post-actions">' +
+                reactHtml + commentBtn +
+                (adminHtml ? '<div class="social-post-admin-actions">' + adminHtml + '</div>' : '') +
+            '</div>' +
+            '<div class="social-comments" id="comments-' + p.id + '"></div>' +
+        '</div>';
+    }).join('');
+}
+
+function formatSocialTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = Math.floor((now - d) / 60000);
+    if (diff < 1) return 'just now';
+    if (diff < 60) return diff + 'm ago';
+    const hrs = Math.floor(diff / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return days + 'd ago';
+    return d.toLocaleDateString();
+}
+
+async function createSocialPost() {
+    const title = document.getElementById('social-title').value.trim();
+    const body = document.getElementById('social-body').value.trim();
+    const category = document.getElementById('social-category').value;
+
+    if (!title || !body) {
+        showToast('Title and body are required', 'error');
+        return;
+    }
+
+    try {
+        await api.post('/api/social/', { title, body, category });
+        document.getElementById('social-title').value = '';
+        document.getElementById('social-body').value = '';
+        showToast('Post created!', 'success');
+        loadFeed();
+    } catch (e) {
+        showToast(e.message || 'Failed to create post', 'error');
+    }
+}
+
+function filterPosts(btn, category) {
+    document.querySelectorAll('.social-filter-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = category;
+    loadFeed();
+}
+
+async function toggleReaction(postId, emoji) {
+    try {
+        await api.post('/api/social/' + postId + '/reactions', { emoji });
+        loadFeed();
+    } catch (e) {
+        showToast('Failed to react', 'error');
+    }
+}
+
+async function togglePin(postId) {
+    try {
+        const result = await api.post('/api/social/' + postId + '/pin');
+        showToast(result.is_pinned ? 'Post pinned' : 'Post unpinned', 'success');
+        loadFeed();
+    } catch (e) {
+        showToast(e.message || 'Failed to pin', 'error');
+    }
+}
+
+async function deletePost(postId) {
+    if (!confirm('Delete this post?')) return;
+    try {
+        await api.delete('/api/social/' + postId);
+        showToast('Post deleted', 'success');
+        loadFeed();
+    } catch (e) {
+        showToast(e.message || 'Failed to delete', 'error');
+    }
+}
+
+async function toggleComments(postId) {
+    const el = document.getElementById('comments-' + postId);
+    if (!el) return;
+    if (el.classList.contains('show')) {
+        el.classList.remove('show');
+        return;
+    }
+    el.classList.add('show');
+    await loadComments(postId);
+}
+
+async function loadComments(postId) {
+    const el = document.getElementById('comments-' + postId);
+    if (!el) return;
+    try {
+        const data = await api.get('/api/social/' + postId);
+        const comments = data.comments || [];
+        let html = comments.map(c => {
+            const av = (c.author_display || c.author || '?').charAt(0).toUpperCase();
+            const isMine = currentUserData && c.user_id === currentUserData.id;
+            const delBtn = (isMine || isAdminOrLead)
+                ? ' <button class="social-comment-delete" onclick="deleteComment(' + postId + ',' + c.id + ')">delete</button>'
+                : '';
+            return '<div class="social-comment-item">' +
+                '<div class="social-comment-avatar">' + escapeHtml(av) + '</div>' +
+                '<div class="social-comment-body">' +
+                    '<span class="social-comment-author">' + escapeHtml(c.author_display) + '</span>' + delBtn +
+                    '<div class="social-comment-text">' + escapeHtml(c.content) + '</div>' +
+                    '<div class="social-comment-time">' + formatSocialTime(c.created_at) + '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+
+        html += '<div class="social-comment-form">' +
+            '<input type="text" id="comment-input-' + postId + '" placeholder="Add a comment..." onkeydown="if(event.key===\'Enter\')addComment(' + postId + ')">' +
+            '<button onclick="addComment(' + postId + ')">Post</button>' +
+        '</div>';
+
+        el.innerHTML = html;
+    } catch (e) {
+        el.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-size:.85rem;">Failed to load comments</div>';
+    }
+}
+
+async function addComment(postId) {
+    const input = document.getElementById('comment-input-' + postId);
+    if (!input) return;
+    const content = input.value.trim();
+    if (!content) return;
+    try {
+        await api.post('/api/social/' + postId + '/comments', { content });
+        input.value = '';
+        await loadComments(postId);
+        // Update comment count in feed
+        loadFeed();
+    } catch (e) {
+        showToast('Failed to add comment', 'error');
+    }
+}
+
+async function deleteComment(postId, commentId) {
+    try {
+        await api.delete('/api/social/' + postId + '/comments/' + commentId);
+        await loadComments(postId);
+        loadFeed();
+    } catch (e) {
+        showToast('Failed to delete comment', 'error');
+    }
+}
+</script>
+{% endblock %}
