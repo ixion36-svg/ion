@@ -40,7 +40,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     model: Optional[str] = None
-    context_type: str = Field(default="default", pattern="^(analyst|engineering|default)$")
+    context_type: str = Field(default="security", pattern="^(security|engineering|coding|general|analyst|default)$")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: Optional[int] = Field(default=None, ge=1, le=4096)
     stream: bool = False
@@ -85,7 +85,7 @@ class PullRequest(BaseModel):
 
 # Chat History Models
 class CreateSessionRequest(BaseModel):
-    context_type: str = Field(default="default", pattern="^(analyst|engineering|default)$")
+    context_type: str = Field(default="security", pattern="^(security|engineering|coding|general|analyst|default)$")
     title: Optional[str] = None
 
 
@@ -108,7 +108,7 @@ class MessageResponse(BaseModel):
 class ChatWithHistoryRequest(BaseModel):
     session_id: Optional[int] = None  # None = create new session
     message: str
-    context_type: str = Field(default="default", pattern="^(analyst|engineering|default)$")
+    context_type: str = Field(default="security", pattern="^(security|engineering|coding|general|analyst|default)$")
     stream: bool = True
 
 
@@ -362,6 +362,32 @@ async def chat_stream(
     except Exception as e:
         logger.warning("RAG context retrieval failed, continuing without: %s", e, exc_info=True)
 
+    # --- Build user role context line ---
+    role_labels = {
+        "analyst": "L1 SOC Analyst",
+        "senior_analyst": "L2 Senior SOC Analyst",
+        "principal_analyst": "L3 Principal SOC Analyst",
+        "lead": "SOC Team Lead",
+        "forensic": "Digital Forensics Specialist",
+        "engineering": "Security Engineer",
+        "admin": "System Administrator",
+    }
+    focus_role_obj = getattr(current_user, "_focus_role", None)
+    if focus_role_obj is not None:
+        user_role = focus_role_obj.name
+    else:
+        roles = [r.name for r in current_user.roles] if hasattr(current_user, "roles") else []
+        user_role = roles[0] if roles else "analyst"
+    role_label = role_labels.get(user_role, user_role)
+    user_context_line = f"\nYou are speaking to: {current_user.display_name or current_user.username} ({role_label}). Tailor your responses to their experience level and responsibilities."
+
+    # Append role context to whichever system prompt we're using
+    if enhanced_system_prompt:
+        enhanced_system_prompt += user_context_line
+    else:
+        base = SYSTEM_PROMPTS.get(payload.context_type, SYSTEM_PROMPTS.get("general", ""))
+        enhanced_system_prompt = base + user_context_line
+
     async def generate():
         try:
             messages = [{"role": m.role, "content": m.content} for m in payload.messages]
@@ -383,6 +409,7 @@ async def chat_stream(
                 max_tokens=payload.max_tokens,
                 user_id=current_user.id,
             )
+            # Always pass the enhanced prompt (includes role context)
             if enhanced_system_prompt:
                 stream_kwargs["system_prompt"] = enhanced_system_prompt
 

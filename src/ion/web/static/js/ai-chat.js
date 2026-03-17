@@ -7,15 +7,26 @@
 
 let aiChatActive = false;
 let aiMessages = [];
-let aiContextType = 'default';
+let aiContextType = 'security';
 let aiModel = null;
 let aiAvailable = false;
 let aiStreaming = false;
 
 const AI_CONTEXTS = {
-    default: { name: 'General', icon: '🤖', description: 'General assistance' },
-    analyst: { name: 'Analyst', icon: '🔍', description: 'Security analysis help' },
-    engineering: { name: 'Engineering', icon: '💻', description: 'Code and query help' },
+    security: { name: 'Security', icon: '🛡️', description: 'Cyber security expert' },
+    engineering: { name: 'Engineering', icon: '🔧', description: 'Security engineering help' },
+    coding: { name: 'Coding', icon: '💻', description: 'Security tooling & code' },
+    general: { name: 'General', icon: '🤖', description: 'General assistance' },
+};
+
+const SIDEBAR_ROLE_TO_CONTEXT = {
+    admin: 'security',
+    analyst: 'security',
+    senior_analyst: 'security',
+    principal_analyst: 'security',
+    lead: 'security',
+    forensic: 'security',
+    engineering: 'engineering',
 };
 
 // =============================================================================
@@ -27,6 +38,12 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function initAIChat() {
+    // Auto-select context based on user's role
+    if (typeof currentUserData !== 'undefined' && currentUserData) {
+        const role = currentUserData.focus_role || (currentUserData.roles && currentUserData.roles[0]) || 'analyst';
+        aiContextType = SIDEBAR_ROLE_TO_CONTEXT[role] || 'security';
+    }
+
     // Check AI availability
     await checkAIStatus();
 
@@ -37,6 +54,9 @@ async function initAIChat() {
             clearInterval(checkPanel);
             addAITab();
             addAIChatView();
+            // Sync the dropdown to match the auto-selected context
+            const select = document.getElementById('ai-context-select');
+            if (select) select.value = aiContextType;
         }
     }, 100);
 }
@@ -136,9 +156,10 @@ function addAIChatView() {
                 </div>
                 <div class="chat-room-header-members">
                     <select id="ai-context-select" onchange="changeAIContext(this.value)" class="ai-context-select">
-                        <option value="default">General</option>
-                        <option value="analyst">Security Analyst</option>
+                        <option value="security">Security</option>
                         <option value="engineering">Engineering</option>
+                        <option value="coding">Coding</option>
+                        <option value="general">General</option>
                     </select>
                 </div>
             </div>

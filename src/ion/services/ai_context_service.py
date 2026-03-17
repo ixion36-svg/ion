@@ -32,6 +32,11 @@ STOP_WORDS = {
     "what", "which", "who", "whom", "these", "those", "am", "it", "its",
     "i", "me", "my", "we", "our", "you", "your", "he", "him", "his",
     "she", "her", "they", "them", "their", "about", "up",
+    # Greetings and conversational filler — should not trigger RAG
+    "hi", "hey", "hello", "howdy", "yo", "sup", "hiya",
+    "thanks", "thank", "cheers", "bye", "goodbye", "ok", "okay",
+    "yes", "yeah", "yep", "nope", "nah", "sure", "cool", "nice",
+    "please", "sorry", "wow", "lol", "haha", "hmm", "ah", "oh",
 }
 
 
@@ -117,6 +122,12 @@ class AIContextService:
     ) -> RAGContext:
         """Retrieve RAG context based on user query and enabled sources."""
         keywords = self._extract_keywords(query)
+        if not keywords:
+            return RAGContext()
+
+        # Skip RAG for very short queries — keywords under 3 chars match too
+        # broadly (e.g. "hi" matches "high", "this", "phishing", etc.)
+        keywords = [k for k in keywords if len(k) >= 3]
         if not keywords:
             return RAGContext()
 

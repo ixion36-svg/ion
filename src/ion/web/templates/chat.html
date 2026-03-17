@@ -22,20 +22,26 @@
             <div class="ai-context-section">
                 <label>Context Mode</label>
                 <div class="ai-context-buttons">
-                    <button class="ai-context-btn active" data-context="analyst" onclick="setAIContext('analyst')">
+                    <button class="ai-context-btn active" data-context="security" onclick="setAIContext('security')">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                         </svg>
-                        Analyst
+                        Security
                     </button>
                     <button class="ai-context-btn" data-context="engineering" onclick="setAIContext('engineering')">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                        </svg>
+                        Engineering
+                    </button>
+                    <button class="ai-context-btn" data-context="coding" onclick="setAIContext('coding')">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="16 18 22 12 16 6"></polyline>
                             <polyline points="8 6 2 12 8 18"></polyline>
                         </svg>
-                        Engineering
+                        Coding
                     </button>
-                    <button class="ai-context-btn" data-context="default" onclick="setAIContext('default')">
+                    <button class="ai-context-btn" data-context="general" onclick="setAIContext('general')">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle>
                             <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
@@ -1210,7 +1216,7 @@
     'use strict';
 
     let aiPageMessages = [];
-    let aiCurrentContext = 'analyst';
+    let aiCurrentContext = 'security';
     let aiIsStreaming = false;
     let currentSessionId = null;
     let chatSessions = [];
@@ -1218,34 +1224,53 @@
     let aiPreferences = {};
     let pendingCitations = null;
 
+    // Map user roles to default AI context
+    const ROLE_TO_CONTEXT = {
+        admin: 'security',
+        analyst: 'security',
+        senior_analyst: 'security',
+        principal_analyst: 'security',
+        lead: 'security',
+        forensic: 'security',
+        engineering: 'engineering',
+    };
+
     const AI_QUICK_PROMPTS = {
-        analyst: [
+        security: [
             "What are common indicators of a phishing attack?",
-            "Explain the MITRE ATT&CK framework",
-            "How do I analyze suspicious network traffic?",
-            "What should I look for in Windows event logs?",
-            "Explain common malware persistence techniques"
+            "Explain MITRE ATT&CK T1059 — Command and Scripting Interpreter",
+            "How do I triage a suspicious network connection?",
+            "What should I look for in Windows event logs for lateral movement?",
+            "Help me analyse this IOC for threat intelligence"
         ],
         engineering: [
-            "Help me write a Python log parser",
-            "Create a PowerShell script for event collection",
-            "Write a YARA rule for detecting malware",
-            "Help me create a Sigma detection rule",
-            "Write a bash script for IOC extraction"
+            "How do I configure Elastic Agent for log collection?",
+            "Help me tune Elasticsearch index performance",
+            "What's the best way to set up log pipelines with Filebeat?",
+            "Help me design a high-availability SIEM architecture",
+            "How do I harden a Linux server baseline?"
         ],
-        default: [
+        coding: [
+            "Help me write a Python log parser",
+            "Write a YARA rule for detecting packed executables",
+            "Help me create a Sigma detection rule",
+            "Build a KQL query for failed authentication events",
+            "Write a PowerShell script to extract IOCs from emails"
+        ],
+        general: [
             "What can you help me with?",
-            "Explain how to investigate an incident",
-            "What are security best practices?",
             "How do I document a security incident?",
-            "What tools are commonly used in SOC?"
+            "What are security best practices for new SOC analysts?",
+            "Help me write a post-incident report",
+            "What certifications should I pursue in cyber security?"
         ]
     };
 
     const AI_CONTEXT_TITLES = {
-        analyst: "Security Analyst Assistant",
-        engineering: "Engineering Assistant",
-        default: "General Assistant"
+        security: "Cyber Security Expert",
+        engineering: "Security Engineering Expert",
+        coding: "Security Coding Expert",
+        general: "General Assistant"
     };
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -1253,6 +1278,12 @@
     });
 
     function initChatPage() {
+        // Auto-select context based on user's role
+        if (typeof currentUserData !== 'undefined' && currentUserData) {
+            const role = currentUserData.focus_role || (currentUserData.roles && currentUserData.roles[0]) || 'analyst';
+            aiCurrentContext = ROLE_TO_CONTEXT[role] || 'security';
+        }
+
         // Check AI status
         checkPageAIStatus();
         updatePageQuickPrompts();
@@ -1309,6 +1340,9 @@
 
         // Load existing uploaded files
         loadUploadedFiles();
+
+        // Sync UI buttons to match the auto-selected context
+        setPageAIContext(aiCurrentContext);
     }
 
     async function checkPageAIStatus() {
