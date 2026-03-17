@@ -1,6 +1,15 @@
-"""Database connection and initialization."""
+"""Database connection and initialization.
+
+Supports SQLite (default) and PostgreSQL.
+Set ION_DATABASE_URL to a PostgreSQL connection string to use PostgreSQL:
+    ION_DATABASE_URL=postgresql://user:pass@host:5432/ion
+
+When ION_DATABASE_URL is not set, falls back to SQLite at the configured db_path.
+PostgreSQL requires the 'postgres' extra: pip install ion[postgres]
+"""
 
 import logging
+import os
 from pathlib import Path
 from typing import Generator, Optional
 from sqlalchemy import create_engine, Engine, inspect, text
@@ -19,6 +28,11 @@ _engine: Optional[Engine] = None
 _session_factory: Optional[sessionmaker[Session]] = None
 
 
+def _is_postgres(engine: Engine) -> bool:
+    """Check if the engine is connected to PostgreSQL."""
+    return engine.dialect.name == "postgresql"
+
+
 def _set_sqlite_pragmas(dbapi_conn, connection_record):
     """Set SQLite pragmas on each new connection for concurrency and durability."""
     cursor = dbapi_conn.cursor()
@@ -30,24 +44,44 @@ def _set_sqlite_pragmas(dbapi_conn, connection_record):
 
 
 def get_engine(db_path: Optional[Path] = None) -> Engine:
-    """Get or create the database engine."""
+    """Get or create the database engine.
+
+    If ION_DATABASE_URL is set, connects to that database (PostgreSQL).
+    Otherwise falls back to SQLite at db_path.
+    """
     global _engine
     if _engine is None:
-        if db_path is None:
-            db_path = get_config().db_path
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        _engine = create_engine(
-            f"sqlite:///{db_path}",
-            echo=False,
-            connect_args={"check_same_thread": False},
-            pool_size=5,
-            max_overflow=10,
-            pool_timeout=30,
-            pool_pre_ping=True,
-            pool_recycle=600,
-        )
-        from sqlalchemy import event
-        event.listen(_engine, "connect", _set_sqlite_pragmas)
+        database_url = os.environ.get("ION_DATABASE_URL")
+
+        if database_url:
+            # PostgreSQL (or any external DB)
+            logger.info("Using database: %s", database_url.split("@")[-1] if "@" in database_url else "external")
+            _engine = create_engine(
+                database_url,
+                echo=False,
+                pool_size=20,
+                max_overflow=30,
+                pool_timeout=30,
+                pool_pre_ping=True,
+                pool_recycle=1800,
+            )
+        else:
+            # SQLite (default)
+            if db_path is None:
+                db_path = get_config().db_path
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            _engine = create_engine(
+                f"sqlite:///{db_path}",
+                echo=False,
+                connect_args={"check_same_thread": False},
+                pool_size=5,
+                max_overflow=10,
+                pool_timeout=30,
+                pool_pre_ping=True,
+                pool_recycle=600,
+            )
+            from sqlalchemy import event
+            event.listen(_engine, "connect", _set_sqlite_pragmas)
     return _engine
 
 
