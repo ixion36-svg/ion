@@ -6069,7 +6069,9 @@ function applyFilters() {
 
     filteredAlerts = allAlerts.filter(a => {
         if (severity && a.severity !== severity) return false;
-        if (status && a.status !== status) return false;
+        // Prefer ION triage status over raw ES status
+        const effectiveStatus = (triageCache[a.id] && triageCache[a.id].status) || a.status;
+        if (status && effectiveStatus !== status) return false;
         if (entityFilter) {
             if (entityFilter.type === 'host' && a.host !== entityFilter.value) return false;
             if (entityFilter.type === 'user' && a.user !== entityFilter.value) return false;
@@ -6191,7 +6193,7 @@ function renderAlerts() {
             <td title="${escapeHtml(a.user || '-')}">${escapeHtml(a.user || '-')}</td>
             <td title="${escapeHtml(a.rule_name || '-')}">${escapeHtml(a.rule_name || '-')}</td>
             <td>${caseName}</td>
-            <td><span class="status-badge alert-status-${a.status}">${a.status}</span></td>
+            <td><span class="status-badge alert-status-${triageStatus !== 'none' ? triageStatus : a.status}">${triageStatus !== 'none' ? triageStatus : a.status}</span></td>
             <td>${formatDate(a.timestamp)}</td>
             <td class="quick-actions-col" onclick="event.stopPropagation()">
                 <div class="quick-actions">
@@ -6308,7 +6310,7 @@ function renderThreatBanner() {
     const total = allAlerts.length;
     const criticalCount = allAlerts.filter(a => a.severity === 'critical').length;
     const highCount = allAlerts.filter(a => a.severity === 'high').length;
-    const openCount = allAlerts.filter(a => a.status === 'open').length;
+    const openCount = allAlerts.filter(a => ((triageCache[a.id] && triageCache[a.id].status) || a.status) === 'open').length;
 
     // Compute threat level
     let level = 'normal';
@@ -7417,7 +7419,7 @@ async function linkToCurrentCase(alertId) {
 
     try {
         const resp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
-            method: 'POST',
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ case_id: currentTriage.case_id })
         });
@@ -7953,7 +7955,7 @@ async function contextMenuAction(action, value) {
 async function quickAssignToMe(alertId) {
     try {
         const resp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
-            method: 'POST',
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ assigned_to_id: currentUserData?.id || null })
         });
@@ -7972,7 +7974,7 @@ async function quickAssignToMe(alertId) {
 async function quickStatusChange(alertId, status) {
     try {
         const resp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
-            method: 'POST',
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status })
         });
@@ -7991,7 +7993,7 @@ async function quickStatusChange(alertId, status) {
 async function quickPriorityChange(alertId, priority) {
     try {
         const resp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
-            method: 'POST',
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ priority })
         });

@@ -384,8 +384,9 @@ class ElasticsearchService:
         }
         severity = severity_map.get(str(severity).lower(), "medium")
 
-        # Status
+        # Status — prefer workflow_status (what ION syncs) over alert status
         status = (
+            source.get("kibana.alert.workflow_status") or
             source.get("kibana.alert.status") or
             source.get("status") or
             source.get("state") or
@@ -888,7 +889,7 @@ class ElasticsearchService:
             body = {
                 "query": {"ids": {"values": alert_ids}},
                 "script": {
-                    "source": "if (ctx._source.kibana == null) { ctx._source.kibana = new HashMap(); } if (ctx._source.kibana.alert == null) { ctx._source.kibana.alert = new HashMap(); } ctx._source.kibana.alert.workflow_status = params.status;",
+                    "source": "ctx._source['kibana.alert.workflow_status'] = params.status; if (ctx._source.kibana == null) { ctx._source.kibana = new HashMap(); } if (ctx._source.kibana.alert == null) { ctx._source.kibana.alert = new HashMap(); } ctx._source.kibana.alert.workflow_status = params.status;",
                     "lang": "painless",
                     "params": {"status": workflow_status},
                 },

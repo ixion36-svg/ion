@@ -2638,9 +2638,29 @@ async def list_gitlab_issues(
         label_list = labels.split(",") if labels else None
 
         # Auto-filter to current user's GitLab username if requested
+        # Fetches both assigned-to and created-by, then merges (deduped)
         if my_issues and not author_username and not assignee_username:
             gl_user = getattr(current_user, 'gitlab_username', None) or current_user.username
-            assignee_username = gl_user
+            assigned, authored = await asyncio.gather(
+                service.list_issues(
+                    state=state, labels=label_list, search=search,
+                    per_page=per_page, page=page,
+                    assignee_username=gl_user, scope=scope,
+                ),
+                service.list_issues(
+                    state=state, labels=label_list, search=search,
+                    per_page=per_page, page=page,
+                    author_username=gl_user, scope=scope,
+                ),
+            )
+            seen = set()
+            issues = []
+            for issue in assigned + authored:
+                if issue.id not in seen:
+                    seen.add(issue.id)
+                    issues.append(issue)
+            issues.sort(key=lambda i: i.updated_at, reverse=True)
+            return {"issues": [issue.to_dict() for issue in issues]}
 
         issues = await service.list_issues(
             state=state,

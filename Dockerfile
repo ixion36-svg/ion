@@ -6,7 +6,7 @@
 # ============================================================================
 # Stage 1: Build stage - install dependencies
 # ============================================================================
-FROM python:3.11-slim as builder
+FROM python:3.14-slim as builder
 
 WORKDIR /build
 
@@ -31,11 +31,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ============================================================================
 # Stage 2: Runtime stage - minimal image
 # ============================================================================
-FROM python:3.11-slim as runtime
+FROM python:3.14-slim as runtime
 
 LABEL org.opencontainers.image.title="ION" \
       org.opencontainers.image.description="Intelligent Operating Network - Security Operations Portal" \
-      org.opencontainers.image.version="0.9.13" \
+      org.opencontainers.image.version="0.9.14" \
       org.opencontainers.image.source="https://hub.docker.com/repository/docker/ixion36/ion"
 
 # Security: Run as non-root user
