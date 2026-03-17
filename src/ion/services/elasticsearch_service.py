@@ -866,14 +866,12 @@ class ElasticsearchService:
         alert_ids: List[str],
         ion_status: str,
     ) -> bool:
-        """Update kibana.alert.workflow_status in Elasticsearch for one or more alerts.
+        """Update alert workflow_status in Elasticsearch/Kibana.
 
-        Maps ION triage statuses to Kibana workflow statuses:
-          open → open, investigating/escalated → acknowledged,
-          resolved/closed/false_positive → closed
-
-        Uses _update_by_query to work across index patterns without needing
-        the exact index name for each alert.
+        Strategy:
+        1. Try Kibana Detection Engine API (POST /api/detection_engine/signals/status)
+           — this is required for .alerts-* (Kibana Security) indices which are write-protected.
+        2. Fall back to direct ES _update_by_query for non-Kibana alerts (watcher, custom).
 
         Returns True on success, False on failure (logs warning, does not raise).
         """
@@ -885,24 +883,131 @@ class ElasticsearchService:
         if not alert_ids:
             return True
 
+        # Try Kibana Detection Engine API first (handles .alerts-* indices)
+        kibana_ok = await self._update_via_kibana_api(alert_ids, workflow_status)
+        if kibana_ok:
+            return True
+
+        # Fallback: direct ES _update_by_query (works for watcher/custom alerts)
+        return await self._update_via_es_direct(alert_ids, workflow_status)
+
+    async def _update_via_kibana_api(
+        self,
+        alert_ids: List[str],
+        workflow_status: str,
+    ) -> bool:
+        """Update alert status via Kibana's Detection Engine API.
+
+        POST /api/detection_engine/signals/status
+        Body: { "signal_ids": [...], "status": "open|acknowledged|closed" }
+
+        This is the only reliable way to update .alerts-* (Kibana Security) indices.
+        """
+        try:
+            from ion.core.config import get_kibana_config, get_ssl_verify
+            kibana_config = get_kibana_config()
+
+            # Use Kibana URL if configured, otherwise try deriving from ES URL
+            # (ES on :9200 often means Kibana on :5601 at the same host)
+            kibana_url = kibana_config.get("url", "").rstrip("/") if kibana_config.get("url") else ""
+            if not kibana_url and self.url:
+                # Derive Kibana URL from Elasticsearch URL (swap port 9200 → 5601)
+                import re
+                kibana_url = re.sub(r":9\d{3}$", ":5601", self.url)
+                if kibana_url == self.url:
+                    # Couldn't derive — ES isn't on a 9xxx port
+                    logger.debug("Cannot derive Kibana URL from ES URL: %s", self.url)
+                    return False
+                logger.debug("Derived Kibana URL from ES URL: %s", kibana_url)
+
+            if not kibana_url:
+                logger.debug("No Kibana URL available, skipping Kibana API for workflow_status")
+                return False
+
+            space_id = kibana_config.get("space_id", "default") if kibana_config.get("enabled") else "default"
+            if space_id and space_id != "default":
+                api_path = f"/s/{space_id}/api/detection_engine/signals/status"
+            else:
+                api_path = "/api/detection_engine/signals/status"
+
+            # Use Kibana auth if available, otherwise fall back to ES credentials
+            auth = None
+            kb_user = kibana_config.get("username") if kibana_config.get("enabled") else None
+            kb_pass = kibana_config.get("password") if kibana_config.get("enabled") else None
+            if kb_user and kb_pass:
+                auth = (kb_user, kb_pass)
+            elif self.username and self.password:
+                auth = (self.username, self.password)
+
+            body = {
+                "signal_ids": alert_ids,
+                "status": workflow_status,
+            }
+
+            verify_ssl = kibana_config.get("verify_ssl", True) if kibana_config.get("enabled") else self.verify_ssl
+            async with httpx.AsyncClient(
+                auth=auth,
+                verify=get_ssl_verify(verify_ssl),
+                timeout=httpx.Timeout(30.0, connect=10.0),
+            ) as client:
+                response = await client.post(
+                    f"{kibana_url}{api_path}",
+                    json=body,
+                    headers={
+                        "kbn-xsrf": "true",
+                        "Content-Type": "application/json",
+                    },
+                )
+
+            if response.status_code == 200:
+                logger.info(
+                    "Updated workflow_status to '%s' for %d alerts via Kibana API",
+                    workflow_status, len(alert_ids),
+                )
+                return True
+            else:
+                logger.debug(
+                    "Kibana API returned %d for workflow_status update: %s",
+                    response.status_code, response.text[:200],
+                )
+                return False
+
+        except Exception as e:
+            logger.debug("Kibana API workflow_status update failed: %s", e)
+            return False
+
+    async def _update_via_es_direct(
+        self,
+        alert_ids: List[str],
+        workflow_status: str,
+    ) -> bool:
+        """Fallback: update workflow_status via direct ES _update_by_query.
+
+        Works for watcher alerts, custom alert indices, and any non-Kibana-managed index.
+        """
         try:
             body = {
                 "query": {"ids": {"values": alert_ids}},
                 "script": {
-                    "source": "ctx._source['kibana.alert.workflow_status'] = params.status; if (ctx._source.kibana == null) { ctx._source.kibana = new HashMap(); } if (ctx._source.kibana.alert == null) { ctx._source.kibana.alert = new HashMap(); } ctx._source.kibana.alert.workflow_status = params.status;",
+                    "source": (
+                        "ctx._source['kibana.alert.workflow_status'] = params.status; "
+                        "if (ctx._source.kibana == null) { ctx._source.kibana = new HashMap(); } "
+                        "if (ctx._source.kibana.alert == null) { ctx._source.kibana.alert = new HashMap(); } "
+                        "ctx._source.kibana.alert.workflow_status = params.status;"
+                    ),
                     "lang": "painless",
                     "params": {"status": workflow_status},
                 },
             }
-            encoded_index = self.alert_index.replace(",", "%2C")
+            # Use comma-separated index pattern directly (no URL encoding needed)
             result = await self._request(
                 "POST",
-                f"/{encoded_index}/_update_by_query?conflicts=proceed&ignore_unavailable=true",
+                f"/{self.alert_index}/_update_by_query?conflicts=proceed&ignore_unavailable=true",
                 json=body,
             )
             updated = result.get("updated", 0)
             logger.info(
-                "Updated workflow_status to '%s' for %d/%d alerts",
+                "Updated workflow_status to '%s' for %d/%d alerts via ES direct",
                 workflow_status, updated, len(alert_ids),
             )
             return True
