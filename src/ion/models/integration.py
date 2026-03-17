@@ -20,7 +20,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.dialects.sqlite import JSON
+from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ion.models.base import Base, TimestampMixin
@@ -92,7 +92,7 @@ class Webhook(Base, TimestampMixin):
     )
     secret: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     source_type: Mapped[str] = mapped_column(
-        SQLEnum(IntegrationType), default=IntegrationType.CUSTOM, nullable=False
+        SQLEnum(IntegrationType, native_enum=False), default=IntegrationType.CUSTOM, nullable=False
     )
     event_types: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -153,10 +153,10 @@ class IntegrationEvent(Base):
 
     # Event classification
     event_type: Mapped[str] = mapped_column(
-        SQLEnum(IntegrationEventType), nullable=False
+        SQLEnum(IntegrationEventType, native_enum=False), nullable=False
     )
     integration_type: Mapped[str] = mapped_column(
-        SQLEnum(IntegrationType), nullable=False
+        SQLEnum(IntegrationType, native_enum=False), nullable=False
     )
 
     # Common fields
@@ -168,7 +168,7 @@ class IntegrationEvent(Base):
 
     # Activity log specific
     level: Mapped[Optional[str]] = mapped_column(
-        SQLEnum(LogLevel), nullable=True
+        SQLEnum(LogLevel, native_enum=False), nullable=True
     )
 
     # Webhook specific
@@ -180,12 +180,12 @@ class IntegrationEvent(Base):
     headers: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     source_ip: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
     status: Mapped[Optional[str]] = mapped_column(
-        SQLEnum(WebhookStatus), nullable=True
+        SQLEnum(WebhookStatus, native_enum=False), nullable=True
     )
 
     # Health check specific - reuses status but with IntegrationStatus
     health_status: Mapped[Optional[str]] = mapped_column(
-        SQLEnum(IntegrationStatus), nullable=True
+        SQLEnum(IntegrationStatus, native_enum=False), nullable=True
     )
 
     # User tracking

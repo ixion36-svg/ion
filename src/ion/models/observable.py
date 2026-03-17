@@ -87,7 +87,7 @@ class Observable(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     type: Mapped[str] = mapped_column(
-        SQLEnum(ObservableType), nullable=False
+        SQLEnum(ObservableType, native_enum=False), nullable=False
     )
     value: Mapped[str] = mapped_column(String(2048), nullable=False)
     normalized_value: Mapped[str] = mapped_column(String(2048), nullable=False)
@@ -99,7 +99,7 @@ class Observable(Base, TimestampMixin):
     )
     sighting_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     threat_level: Mapped[str] = mapped_column(
-        SQLEnum(ThreatLevel), default=ThreatLevel.UNKNOWN, nullable=False
+        SQLEnum(ThreatLevel, native_enum=False), default=ThreatLevel.UNKNOWN, nullable=False
     )
     is_whitelisted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     tags: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
@@ -257,7 +257,7 @@ class ObservableLink(Base):
         Integer, ForeignKey("observables.id", ondelete="CASCADE"), nullable=False
     )
     link_type: Mapped[str] = mapped_column(
-        SQLEnum(ObservableLinkType), nullable=False
+        SQLEnum(ObservableLinkType, native_enum=False), nullable=False
     )
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False)  # alert_triage.id or alert_cases.id
     context: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -325,7 +325,7 @@ class WatchlistAlert(Base):
         Integer, ForeignKey("observables.id", ondelete="CASCADE"), nullable=False
     )
     alert_type: Mapped[str] = mapped_column(
-        SQLEnum(WatchlistAlertType), nullable=False
+        SQLEnum(WatchlistAlertType, native_enum=False), nullable=False
     )
     message: Mapped[str] = mapped_column(String(1000), nullable=False)
     details: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)

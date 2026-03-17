@@ -3,17 +3,65 @@
 # For air-gapped/secure environment deployment
 
 services:
+  # =============================================================================
+  # PostgreSQL - Primary Database
+  # =============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: ion-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ion
+      POSTGRES_USER: ion
+      POSTGRES_PASSWORD: ${ION_DB_PASSWORD:-ion2025}
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    # Not exposed externally — only ION connects via Docker network
+    # Uncomment to access from host for debugging:
+    # ports:
+    #   - "5432:5432"
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ion -d ion"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # =============================================================================
+  # ION - Main Application
+  # =============================================================================
   ion:
     build: .
     image: ixion36/ion:${ION_VERSION:-latest}
     container_name: ion
     restart: unless-stopped
 
+    depends_on:
+      postgres:
+        condition: service_healthy
+
     ports:
       - "${ION_PORT:-8000}:8000"
 
     volumes:
-      # Persist database and configuration
+      # Persist config and uploaded files (DB is now in PostgreSQL)
       - ion-data:/data
 
       # Optional: Mount custom config file
@@ -27,6 +75,8 @@ services:
       - .env
 
     environment:
+      # PostgreSQL connection
+      - ION_DATABASE_URL=postgresql://ion:${ION_DB_PASSWORD:-ion2025}@postgres:5432/ion
       # Ollama connection (when enabled via --profile ai)
       - ION_OLLAMA_URL=http://ollama:11434
       # Optional: Trust a self-signed CA for OpenCTI, ES, Keycloak, etc.
@@ -63,16 +113,6 @@ services:
     #   options:
     #     syslog-address: "udp://syslog-host:514"
     #     syslog-facility: "local0"
-    #     tag: "ion"
-    # logging:
-    #   driver: fluentd
-    #   options:
-    #     fluentd-address: "fluentd-host:24224"
-    #     tag: "ion"
-    # logging:
-    #   driver: gelf
-    #   options:
-    #     gelf-address: "udp://graylog-host:12201"
     #     tag: "ion"
 
   # =============================================================================
@@ -144,6 +184,8 @@ services:
     restart: "no"
 
 volumes:
+  postgres-data:
+    driver: local
   ion-data:
     driver: local
   ollama-models:

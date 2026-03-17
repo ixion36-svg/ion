@@ -23,7 +23,7 @@ class AIChatSession(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title = Column(String(200), nullable=True)  # Auto-generated from first message
-    context_type = Column(SQLEnum(AIContextType), default=AIContextType.DEFAULT)
+    context_type = Column(SQLEnum(AIContextType, native_enum=False), default=AIContextType.DEFAULT)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

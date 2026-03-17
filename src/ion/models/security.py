@@ -93,13 +93,13 @@ class SecurityEvent(Base, TimestampMixin):
 
     # Event classification
     event_type: Mapped[SecurityEventType] = mapped_column(
-        SQLEnum(SecurityEventType), nullable=False, index=True
+        SQLEnum(SecurityEventType, native_enum=False), nullable=False, index=True
     )
     severity: Mapped[SecurityEventSeverity] = mapped_column(
-        SQLEnum(SecurityEventSeverity), nullable=False, index=True
+        SQLEnum(SecurityEventSeverity, native_enum=False), nullable=False, index=True
     )
     status: Mapped[SecurityEventStatus] = mapped_column(
-        SQLEnum(SecurityEventStatus), default=SecurityEventStatus.NEW, nullable=False
+        SQLEnum(SecurityEventStatus, native_enum=False), default=SecurityEventStatus.NEW, nullable=False
     )
 
     # Event details
@@ -233,12 +233,12 @@ class SecurityAlertRule(Base, TimestampMixin):
 
     # Rule configuration
     event_type: Mapped[SecurityEventType] = mapped_column(
-        SQLEnum(SecurityEventType), nullable=False
+        SQLEnum(SecurityEventType, native_enum=False), nullable=False
     )
     threshold: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     time_window_minutes: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
     severity: Mapped[SecurityEventSeverity] = mapped_column(
-        SQLEnum(SecurityEventSeverity), default=SecurityEventSeverity.MEDIUM
+        SQLEnum(SecurityEventSeverity, native_enum=False), default=SecurityEventSeverity.MEDIUM
     )
 
     # Matching criteria

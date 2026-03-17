@@ -6,14 +6,15 @@
 # ============================================================================
 # Stage 1: Build stage - install dependencies
 # ============================================================================
-FROM python:3.14-slim as builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /build
 
-# Install build dependencies
+# Install build dependencies (including libpq-dev for psycopg2)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libffi-dev \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment
@@ -31,12 +32,17 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ============================================================================
 # Stage 2: Runtime stage - minimal image
 # ============================================================================
-FROM python:3.14-slim as runtime
+FROM python:3.14-slim AS runtime
 
 LABEL org.opencontainers.image.title="ION" \
       org.opencontainers.image.description="Intelligent Operating Network - Security Operations Portal" \
       org.opencontainers.image.version="0.9.17" \
       org.opencontainers.image.source="https://hub.docker.com/repository/docker/ixion36/ion"
+
+# Install runtime PostgreSQL client library
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Security: Run as non-root user
 RUN groupadd -r ion && useradd -r -g ion ion
@@ -47,9 +53,10 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy application source, seed scripts, and entrypoint
+# Copy application source, seed scripts, migration tool, and entrypoint
 COPY src/ src/
 COPY seed_*.py /app/
+COPY migrate_to_postgres.py /app/
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

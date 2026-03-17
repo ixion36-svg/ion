@@ -64,7 +64,7 @@ class AlertCase(Base, TimestampMixin):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
-        SQLEnum(AlertCaseStatus), default=AlertCaseStatus.OPEN, nullable=False
+        SQLEnum(AlertCaseStatus, native_enum=False), default=AlertCaseStatus.OPEN, nullable=False
     )
     severity: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     created_by_id: Mapped[int] = mapped_column(
@@ -138,7 +138,7 @@ class AlertTriage(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     es_alert_id: Mapped[str] = mapped_column(String(500), unique=True, nullable=False)
     status: Mapped[str] = mapped_column(
-        SQLEnum(AlertTriageStatus), default=AlertTriageStatus.OPEN, nullable=False
+        SQLEnum(AlertTriageStatus, native_enum=False), default=AlertTriageStatus.OPEN, nullable=False
     )
     assigned_to_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
@@ -175,7 +175,7 @@ class Note(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     entity_type: Mapped[str] = mapped_column(
-        SQLEnum(NoteEntityType), nullable=False
+        SQLEnum(NoteEntityType, native_enum=False), nullable=False
     )
     entity_id: Mapped[str] = mapped_column(String(500), nullable=False)  # es_alert_id or case_id as string
     user_id: Mapped[int] = mapped_column(

@@ -112,6 +112,8 @@ def get_session(engine: Optional[Engine] = None) -> Generator[Session, None, Non
 def _run_migrations(engine: Engine) -> None:
     """Add missing columns to existing tables. Idempotent."""
     insp = inspect(engine)
+    # Use TIMESTAMP for PostgreSQL, DATETIME for SQLite
+    dt_type = "TIMESTAMP" if _is_postgres(engine) else "DATETIME"
 
     # Migrations for alert_cases table
     if insp.has_table("alert_cases"):
@@ -142,7 +144,7 @@ def _run_migrations(engine: Engine) -> None:
             "closure_reason": "VARCHAR(50)",
             "closure_notes": "TEXT",
             "closed_by_id": "INTEGER",
-            "closed_at": "DATETIME",
+            "closed_at": dt_type,
         }.items():
             if col_name not in existing:
                 with engine.begin() as conn:
@@ -219,7 +221,7 @@ def _run_migrations(engine: Engine) -> None:
         existing = {col["name"] for col in insp.get_columns("users")}
         for col_name, col_type in {
             "failed_login_attempts": "INTEGER DEFAULT 0",
-            "locked_until": "DATETIME",
+            "locked_until": dt_type,
             "employment_type": "VARCHAR(20) DEFAULT 'cs'",
         }.items():
             if col_name not in existing:
@@ -233,9 +235,9 @@ def _run_migrations(engine: Engine) -> None:
     if insp.has_table("forensic_cases"):
         existing = {col["name"] for col in insp.get_columns("forensic_cases")}
         for col_name, col_type in {
-            "is_locked": "BOOLEAN DEFAULT 0 NOT NULL",
+            "is_locked": "BOOLEAN DEFAULT FALSE NOT NULL",
             "locked_by_id": "INTEGER REFERENCES users(id)",
-            "locked_at": "DATETIME",
+            "locked_at": dt_type,
             "report_document_id": "INTEGER REFERENCES documents(id)",
             "playbook_id": "INTEGER REFERENCES forensic_playbooks(id)",
         }.items():
@@ -298,7 +300,7 @@ def _run_migrations(engine: Engine) -> None:
         existing = {col["name"] for col in insp.get_columns("chat_rooms")}
         if "is_system" not in existing:
             with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE chat_rooms ADD COLUMN is_system BOOLEAN DEFAULT 0 NOT NULL"))
+                conn.execute(text("ALTER TABLE chat_rooms ADD COLUMN is_system BOOLEAN DEFAULT FALSE NOT NULL"))
                 logger.info("Migrated: chat_rooms.is_system")
 
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
