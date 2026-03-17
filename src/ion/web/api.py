@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 import secrets
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Optional, List, Generator
+from typing import Optional, List, Dict, Generator
 from dataclasses import dataclass
 from urllib.parse import quote as url_quote
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request, Response, Cookie
@@ -4455,13 +4455,24 @@ class BatchTriageRequest(BaseModel):
     alert_ids: List[str]
 
 
+class BatchTriageRequestWithStatus(BaseModel):
+    """Batch triage request that can include ES-side statuses for sync."""
+    alert_ids: List[str]
+    es_statuses: Optional[Dict[str, str]] = None  # { alert_id: "open"|"acknowledged"|"closed" }
+
+
 @router.post("/elasticsearch/alerts-triage/batch")
 async def get_batch_triage(
-    data: BatchTriageRequest,
+    data: BatchTriageRequestWithStatus,
     current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
-    """Get triage data (including case info) for multiple alerts at once."""
+    """Get triage data (including case info) for multiple alerts at once.
+
+    If es_statuses is provided, syncs Kibana/ES status changes into ION triage
+    records (Kibana → ION direction). This handles the case where someone changes
+    alert status directly in Kibana.
+    """
     if not data.alert_ids:
         return {"triage": {}}
 
@@ -4470,9 +4481,42 @@ async def get_batch_triage(
         .filter(AlertTriage.es_alert_id.in_(data.alert_ids))
         .all()
     )
+    triage_map = {t.es_alert_id: t for t in triages}
+
+    # Sync ES status → ION triage (Kibana → ION direction)
+    if data.es_statuses:
+        valid_statuses = {"open", "acknowledged", "closed"}
+        for alert_id, es_status in data.es_statuses.items():
+            es_status_lower = es_status.lower() if es_status else "open"
+            if es_status_lower not in valid_statuses:
+                continue
+
+            triage = triage_map.get(alert_id)
+            if triage:
+                # Update if ES status differs from ION status
+                ion_status = triage.status.value if hasattr(triage.status, "value") else str(triage.status)
+                if ion_status.lower() != es_status_lower:
+                    triage.status = AlertTriageStatus(es_status_lower)
+                    logger.debug("Synced ES status '%s' → ION triage for alert %s", es_status_lower, alert_id)
+            else:
+                # Create triage record from ES status (so ION tracks it)
+                if es_status_lower != "open":
+                    # Only create records for non-open statuses (open is the default)
+                    new_triage = AlertTriage(
+                        es_alert_id=alert_id,
+                        status=AlertTriageStatus(es_status_lower),
+                    )
+                    session.add(new_triage)
+                    triage_map[alert_id] = new_triage
+
+        try:
+            session.commit()
+        except Exception:
+            session.rollback()
+            logger.warning("Failed to sync ES statuses to ION triage")
 
     result = {}
-    for t in triages:
+    for t in triage_map.values():
         result[t.es_alert_id] = {
             "status": t.status.value if hasattr(t.status, "value") else t.status,
             "priority": t.priority,

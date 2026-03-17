@@ -3136,20 +3136,26 @@ async function loadTriageBatch() {
     if (allAlerts.length === 0) return;
     try {
         const alertIds = allAlerts.map(a => a.id);
+        // Build ES status map so backend can sync Kibana→ION status changes
+        const esStatuses = {};
+        for (const a of allAlerts) {
+            if (a.status) esStatuses[a.id] = a.status;
+        }
         const response = await fetch('/api/elasticsearch/alerts-triage/batch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ alert_ids: alertIds }),
+            body: JSON.stringify({ alert_ids: alertIds, es_statuses: esStatuses }),
         });
         if (!response.ok) return;
         const data = await response.json();
         const triageMap = data.triage || {};
-        // Merge into triageCache (don't overwrite fuller records from loadTriage)
+        // Merge into triageCache — update status from server (reflects ES sync)
         for (const [alertId, triageInfo] of Object.entries(triageMap)) {
             if (!triageCache[alertId]) {
                 triageCache[alertId] = triageInfo;
             } else {
-                // Update case info even if we already have triage
+                // Always sync status + case info from server
+                triageCache[alertId].status = triageInfo.status;
                 triageCache[alertId].case_id = triageInfo.case_id;
                 triageCache[alertId].case_number = triageInfo.case_number;
                 triageCache[alertId].case_title = triageInfo.case_title;
