@@ -218,6 +218,16 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: user_sessions.active_role_id")
 
+    # Migration for users.gitlab_username (v0.9.13+)
+    if insp.has_table("users"):
+        existing = {col["name"] for col in insp.get_columns("users")}
+        if "gitlab_username" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE users ADD COLUMN gitlab_username VARCHAR(255)")
+                )
+                logger.info("Migrated: users.gitlab_username")
+
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
 

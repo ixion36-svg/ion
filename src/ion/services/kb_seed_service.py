@@ -60,7 +60,6 @@ def seed_knowledge_base() -> None:
         from ion.data.kb_blueteam import COLLECTIONS as KB_BLUETEAM
         from ion.data.kb_foundations import COLLECTIONS as KB_FOUNDATIONS
         from ion.data.kb_fundamentals import COLLECTIONS as KB_FUNDAMENTALS
-        from ion.data.kb_offensive_security import COLLECTIONS as KB_OFFENSIVE
         from ion.data.kb_offensive_access import COLLECTIONS as KB_OFF_ACCESS
         from ion.data.kb_offensive_advanced import COLLECTIONS as KB_OFF_ADVANCED
         from ion.data.kb_foundations_extended import COLLECTIONS as KB_FOUNDATIONS_EXT
@@ -75,7 +74,6 @@ def seed_knowledge_base() -> None:
             ("Blue Team", KB_BLUETEAM, True),
             ("Foundations", KB_FOUNDATIONS, True),
             ("Fundamentals", KB_FUNDAMENTALS, False),  # Uses lists of dicts
-            ("Offensive Security", KB_OFFENSIVE, False),
             ("Offensive — Access & Escalation", KB_OFF_ACCESS, False),
             ("Offensive — C2, Web & Evasion", KB_OFF_ADVANCED, False),
             ("Foundations Extended", KB_FOUNDATIONS_EXT, False),
