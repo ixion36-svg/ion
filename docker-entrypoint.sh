@@ -5,6 +5,7 @@
 # =============================================================================
 # Handles initialization, configuration, and startup
 # Supports PostgreSQL (ION_DATABASE_URL) or SQLite (fallback)
+# Auto-migrates from SQLite to PostgreSQL on first run if ion.db exists
 # =============================================================================
 
 set -e
@@ -13,6 +14,8 @@ set -e
 DATA_DIR="${ION_DATA_DIR:-/data}"
 CONFIG_DIR="${DATA_DIR}/.ion"
 CONFIG_PATH="${CONFIG_DIR}/config.json"
+SQLITE_DB="${CONFIG_DIR}/ion.db"
+MIGRATED_MARKER="${CONFIG_DIR}/ion.db.migrated"
 
 HOST="${ION_HOST:-0.0.0.0}"
 PORT="${ION_PORT:-8000}"
@@ -49,11 +52,10 @@ for attempt in range(30):
             raise
 "
 else
-    DB_PATH="${CONFIG_DIR}/ion.db"
-    echo "  Database: SQLite (${DB_PATH})"
+    echo "  Database: SQLite (${SQLITE_DB})"
 fi
 
-# Initialize database and seed auth
+# Initialize database (creates tables)
 echo "Initializing database..."
 python -c "
 from pathlib import Path
@@ -93,6 +95,40 @@ if not config_path.exists():
 
 print('Database initialized')
 "
+
+# =============================================================================
+# Auto-migrate SQLite -> PostgreSQL (one-time, on first upgrade)
+# =============================================================================
+# If PostgreSQL is configured AND an old ion.db exists AND hasn't been
+# migrated yet, automatically copy all data from SQLite to PostgreSQL.
+# After migration, renames ion.db to ion.db.migrated so it won't run again.
+# =============================================================================
+if [ -n "${ION_DATABASE_URL}" ] && [ -f "${SQLITE_DB}" ] && [ ! -f "${MIGRATED_MARKER}" ]; then
+    echo ""
+    echo "============================================"
+    echo "  SQLite database detected — auto-migrating"
+    echo "  to PostgreSQL (one-time operation)..."
+    echo "============================================"
+    echo ""
+
+    python /app/migrate_to_postgres.py "${SQLITE_DB}" "${ION_DATABASE_URL}"
+    MIGRATE_EXIT=$?
+
+    if [ $MIGRATE_EXIT -eq 0 ]; then
+        # Rename the old database so migration doesn't run again
+        mv "${SQLITE_DB}" "${MIGRATED_MARKER}"
+        echo ""
+        echo "Migration complete. Old database preserved at ${MIGRATED_MARKER}"
+        echo ""
+    else
+        echo ""
+        echo "WARNING: Migration failed (exit code ${MIGRATE_EXIT})."
+        echo "ION will continue with a fresh PostgreSQL database."
+        echo "The old SQLite database is still at ${SQLITE_DB}"
+        echo "You can retry manually: python /app/migrate_to_postgres.py ${SQLITE_DB}"
+        echo ""
+    fi
+fi
 
 # Seed authentication (idempotent — safe to run every startup)
 echo "Setting up authentication..."
