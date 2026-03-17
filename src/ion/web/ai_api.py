@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import uuid
 import shutil
 from pathlib import Path
@@ -308,59 +309,82 @@ async def chat_stream(
             detail="AI service (Ollama) is not available. Please ensure Ollama is running.",
         )
 
+    # --- Greeting / small-talk detection ---
+    # Small models (3B) tend to ramble on greetings. Detect and short-circuit.
+    GREETING_WORDS = {
+        "hi", "hey", "hello", "howdy", "yo", "sup", "hiya", "heya",
+        "morning", "afternoon", "evening", "goodmorning", "goodafternoon",
+        "goodevening", "thanks", "thank", "cheers", "bye", "goodbye",
+        "ok", "okay", "yes", "yeah", "yep", "nope", "nah", "sure",
+        "cool", "nice", "please", "sorry", "wow", "lol", "haha",
+        "hmm", "ah", "oh", "hey there", "hi there", "hello there",
+    }
+    is_greeting = False
+    if payload.messages:
+        last_user_msg = ""
+        for m in reversed(payload.messages):
+            if m.role == "user":
+                last_user_msg = m.content
+                break
+        # Strip punctuation and check if every word is a greeting/filler
+        words = re.findall(r"[a-zA-Z]+", last_user_msg.lower())
+        if words and all(w in GREETING_WORDS for w in words):
+            is_greeting = True
+
     # --- RAG context injection ---
     enhanced_system_prompt = None
     citations_metadata = []
 
-    try:
-        for db in get_session():
-            ctx_service = AIContextService(db)
-            prefs = ctx_service.get_user_preferences(current_user.id)
+    if not is_greeting:
+        try:
+            for db in get_session():
+                ctx_service = AIContextService(db)
+                prefs = ctx_service.get_user_preferences(current_user.id)
 
-            any_rag_enabled = (
-                prefs.rag_knowledge_base or prefs.rag_user_notes or prefs.rag_playbooks
-            )
+                any_rag_enabled = (
+                    prefs.rag_knowledge_base or prefs.rag_user_notes or prefs.rag_playbooks
+                )
 
-            if any_rag_enabled and payload.messages:
-                # Find last user message for keyword extraction
-                last_user_msg = ""
-                for m in reversed(payload.messages):
-                    if m.role == "user":
-                        last_user_msg = m.content
-                        break
+                if any_rag_enabled and payload.messages:
+                    # Find last user message for keyword extraction
+                    last_user_msg = ""
+                    for m in reversed(payload.messages):
+                        if m.role == "user":
+                            last_user_msg = m.content
+                            break
 
-                if last_user_msg:
-                    rag_context = ctx_service.retrieve_context(
-                        last_user_msg, current_user.id, prefs
-                    )
-                    if rag_context.snippets:
-                        citations_metadata = rag_context.to_citations_metadata()
-
-                        # Build layered system prompt
-                        base_prompt = SYSTEM_PROMPTS.get(
-                            payload.context_type, SYSTEM_PROMPTS.get("default", "")
+                    if last_user_msg:
+                        rag_context = ctx_service.retrieve_context(
+                            last_user_msg, current_user.id, prefs
                         )
-                        layers = [base_prompt]
+                        if rag_context.snippets:
+                            citations_metadata = rag_context.to_citations_metadata()
 
-                        if prefs.custom_instructions:
-                            layers.append(
-                                f"\nUser's custom instructions: {prefs.custom_instructions}"
+                            # Build layered system prompt
+                            base_prompt = SYSTEM_PROMPTS.get(
+                                payload.context_type, SYSTEM_PROMPTS.get("default", "")
                             )
+                            layers = [base_prompt]
 
-                        layers.append("\n" + rag_context.to_prompt_block())
-                        enhanced_system_prompt = "\n".join(layers)
+                            if prefs.custom_instructions:
+                                layers.append(
+                                    f"\nUser's custom instructions: {prefs.custom_instructions}"
+                                )
 
-            # Custom instructions even without RAG
-            if not enhanced_system_prompt and prefs.custom_instructions:
-                base_prompt = SYSTEM_PROMPTS.get(
-                    payload.context_type, SYSTEM_PROMPTS.get("default", "")
-                )
-                enhanced_system_prompt = (
-                    base_prompt
-                    + f"\nUser's custom instructions: {prefs.custom_instructions}"
-                )
-    except Exception as e:
-        logger.warning("RAG context retrieval failed, continuing without: %s", e, exc_info=True)
+                            layers.append("\n" + rag_context.to_prompt_block())
+                            enhanced_system_prompt = "\n".join(layers)
+
+                # Custom instructions even without RAG
+                if not enhanced_system_prompt and prefs.custom_instructions:
+                    base_prompt = SYSTEM_PROMPTS.get(
+                        payload.context_type, SYSTEM_PROMPTS.get("default", "")
+                    )
+                    enhanced_system_prompt = (
+                        base_prompt
+                        + f"\nUser's custom instructions: {prefs.custom_instructions}"
+                    )
+        except Exception as e:
+            logger.warning("RAG context retrieval failed, continuing without: %s", e, exc_info=True)
 
     # --- Build user role context line ---
     role_labels = {
@@ -388,6 +412,10 @@ async def chat_stream(
         base = SYSTEM_PROMPTS.get(payload.context_type, SYSTEM_PROMPTS.get("general", ""))
         enhanced_system_prompt = base + user_context_line
 
+    # For greetings, add a hard constraint so small models don't ramble
+    if is_greeting:
+        enhanced_system_prompt += "\n\nIMPORTANT: The user is just greeting you. Respond with a brief, friendly greeting and ask how you can help. Keep your response to 1-2 sentences maximum. Do NOT discuss any other topics."
+
     async def generate():
         try:
             messages = [{"role": m.role, "content": m.content} for m in payload.messages]
@@ -405,8 +433,8 @@ async def chat_stream(
                 messages=messages,
                 model=payload.model,
                 context_type=payload.context_type,
-                temperature=payload.temperature,
-                max_tokens=payload.max_tokens,
+                temperature=0.3 if is_greeting else payload.temperature,
+                max_tokens=100 if is_greeting else payload.max_tokens,
                 user_id=current_user.id,
             )
             # Always pass the enhanced prompt (includes role context)

@@ -12,6 +12,7 @@ let pollInterval = null;
 let typingTimeout = null;
 let mentionUsers = [];
 let selectedMentionIndex = 0;
+let replyToMessage = null;  // { id, username, display_name, content }
 
 const POLL_INTERVAL_MS = 5000;
 const TYPING_TIMEOUT_MS = 3000;
@@ -75,6 +76,22 @@ function initChat() {
     loadRooms();
     loadChatMemes();
 
+    // Restore chat state from sessionStorage (persist across page navigation)
+    const wasOpen = sessionStorage.getItem('chat_open') === '1';
+    const savedRoom = sessionStorage.getItem('chat_active_room');
+    if (wasOpen) {
+        chatOpen = true;
+        const panel = document.getElementById('chat-panel');
+        const toggleBtn = document.getElementById('chat-toggle-btn');
+        if (panel) panel.classList.add('open');
+        if (toggleBtn) toggleBtn.classList.add('active');
+
+        // Re-open the room they were in
+        if (savedRoom) {
+            setTimeout(() => openRoom(parseInt(savedRoom, 10)), 300);
+        }
+    }
+
     // Start polling when chat is open
     startPolling();
 }
@@ -92,6 +109,13 @@ function createChatPanel() {
                     <button class="chat-header-btn" onclick="showNewChatModal()" title="New chat">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                    </button>
+                    <button class="chat-header-btn" onclick="popOutChat()" title="Pop out">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/>
+                            <line x1="10" y1="14" x2="21" y2="3"/>
                         </svg>
                     </button>
                     <button class="chat-expand-btn" id="chat-expand-btn" onclick="toggleChatExpand()" title="Expand">
@@ -126,55 +150,78 @@ function createChatPanel() {
                     <div class="chat-room-header-name" id="chat-room-header-name"></div>
                     <div class="chat-room-header-members" id="chat-room-header-members"></div>
                 </div>
+                <div class="chat-header-actions">
+                    <button class="chat-header-btn" onclick="popOutChat()" title="Pop out">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/>
+                            <line x1="10" y1="14" x2="21" y2="3"/>
+                        </svg>
+                    </button>
+                    <button class="chat-expand-btn" onclick="toggleChatExpand()" title="Expand">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="chat-reply-bar" class="chat-reply-bar" style="display:none;">
+                <div class="chat-reply-preview">
+                    <span class="chat-reply-label">Replying to <strong id="chat-reply-author"></strong></span>
+                    <span class="chat-reply-text" id="chat-reply-text"></span>
+                </div>
+                <button class="chat-reply-cancel" onclick="cancelReply()">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
             </div>
             <div class="chat-messages" id="chat-messages">
                 <!-- Messages populated by JS -->
             </div>
             <div class="typing-indicator" id="typing-indicator" style="display: none;"></div>
+            <div class="mention-autocomplete" id="mention-autocomplete"></div>
+            <div class="emoji-picker" id="emoji-picker">
+                <div class="emoji-picker-grid">
+                    ${COMMON_EMOJIS.map(e => `<div class="emoji-picker-item" onclick="insertEmoji('${e}')">${e}</div>`).join('')}
+                </div>
+            </div>
+            <div class="meme-picker" id="meme-picker">
+                <div id="meme-picker-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;"></div>
+            </div>
             <div class="chat-input-area">
-                <div style="position: relative;">
-                    <div class="mention-autocomplete" id="mention-autocomplete"></div>
-                    <div class="emoji-picker" id="emoji-picker">
-                        <div class="emoji-picker-grid">
-                            ${COMMON_EMOJIS.map(e => `<div class="emoji-picker-item" onclick="insertEmoji('${e}')">${e}</div>`).join('')}
-                        </div>
-                    </div>
-                    <div class="meme-picker" id="meme-picker" style="display:none;position:absolute;bottom:100%;left:0;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:8px;padding:8px;z-index:100;max-width:280px;max-height:200px;overflow-y:auto;">
-                        <div id="meme-picker-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;"></div>
-                    </div>
-                    <div class="chat-input-wrapper">
-                        <div class="chat-input-actions">
-                            <button class="chat-input-btn" onclick="toggleEmojiPicker()" title="Emoji">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                                    <circle cx="9" cy="9" r="1" fill="currentColor"/>
-                                    <circle cx="15" cy="9" r="1" fill="currentColor"/>
-                                </svg>
-                            </button>
-                            <button class="chat-input-btn" onclick="toggleMemePicker()" title="Memes">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                    <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
-                                    <path d="M21 15l-5-5L5 21"/>
-                                </svg>
-                            </button>
-                            <button class="chat-input-btn" onclick="showEnrichHelp()" title="Enrich Observable">
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="11" cy="11" r="8"/>
-                                    <path d="M21 21l-4.35-4.35"/>
-                                </svg>
-                            </button>
-                        </div>
-                        <textarea class="chat-input" id="chat-input" placeholder="Type a message or /enrich ip 1.2.3.4" rows="1"
-                            onkeydown="handleInputKeydown(event)"
-                            oninput="handleInputChange(event)"></textarea>
-                        <button class="chat-send-btn" onclick="sendMessage()" id="chat-send-btn">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                <div class="chat-input-wrapper">
+                    <div class="chat-input-actions">
+                        <button class="chat-input-btn" onclick="toggleEmojiPicker()" title="Emoji">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                                <circle cx="9" cy="9" r="1" fill="currentColor"/>
+                                <circle cx="15" cy="9" r="1" fill="currentColor"/>
+                            </svg>
+                        </button>
+                        <button class="chat-input-btn" onclick="toggleMemePicker()" title="Memes">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+                                <path d="M21 15l-5-5L5 21"/>
+                            </svg>
+                        </button>
+                        <button class="chat-input-btn" onclick="showEnrichHelp()" title="Enrich Observable">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"/>
+                                <path d="M21 21l-4.35-4.35"/>
                             </svg>
                         </button>
                     </div>
+                    <textarea class="chat-input" id="chat-input" placeholder="Type a message or /enrich ip 1.2.3.4" rows="1"
+                        onkeydown="handleInputKeydown(event)"
+                        oninput="handleInputChange(event)"></textarea>
+                    <button class="chat-send-btn" onclick="sendMessage()" id="chat-send-btn">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </div>
@@ -245,6 +292,21 @@ function toggleChat() {
         panel.classList.remove('open');
         if (toggleBtn) toggleBtn.classList.remove('active');
     }
+
+    // Persist open/closed state
+    sessionStorage.setItem('chat_open', chatOpen ? '1' : '');
+}
+
+function popOutChat() {
+    const w = 420;
+    const h = 700;
+    const left = window.screenX + window.outerWidth - w - 30;
+    const top = window.screenY + 80;
+    const features = `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+    window.open('/chat', 'ion_chat', features);
+
+    // Close the sidebar panel since chat is now in its own window
+    if (chatOpen) toggleChat();
 }
 
 let chatExpanded = false;
@@ -361,6 +423,9 @@ async function openRoom(roomId) {
     activeRoomId = roomId;
     lastMessageTimestamp = null;
 
+    // Persist active room for cross-page navigation
+    sessionStorage.setItem('chat_active_room', roomId);
+
     // Close AI chat if open
     const aiView = document.getElementById('ai-chat-view');
     if (aiView) aiView.classList.remove('show');
@@ -411,6 +476,7 @@ async function openRoom(roomId) {
 function closeActiveRoom() {
     activeRoomId = null;
     lastMessageTimestamp = null;
+    sessionStorage.removeItem('chat_active_room');
 
     // Clear any inline display styles so CSS classes work
     const listView = document.getElementById('chat-room-list-view');
@@ -423,6 +489,38 @@ function closeActiveRoom() {
 
     // Refresh room list
     loadRooms();
+}
+
+// =============================================================================
+// Reply
+// =============================================================================
+
+function setReply(messageId, username, displayName, content) {
+    replyToMessage = { id: messageId, username, display_name: displayName, content };
+    const bar = document.getElementById('chat-reply-bar');
+    const author = document.getElementById('chat-reply-author');
+    const text = document.getElementById('chat-reply-text');
+    if (bar && author && text) {
+        author.textContent = displayName || username;
+        text.textContent = content.length > 80 ? content.substring(0, 80) + '...' : content;
+        bar.style.display = 'flex';
+    }
+    document.getElementById('chat-input')?.focus();
+}
+
+function cancelReply() {
+    replyToMessage = null;
+    const bar = document.getElementById('chat-reply-bar');
+    if (bar) bar.style.display = 'none';
+}
+
+function scrollToMessage(messageId) {
+    const el = document.querySelector(`.chat-message[data-message-id="${messageId}"]`);
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('chat-message-highlight');
+        setTimeout(() => el.classList.remove('chat-message-highlight'), 2000);
+    }
 }
 
 // =============================================================================
@@ -528,7 +626,7 @@ function renderMessages(messages) {
             let emojiDisplay;
             const memeObj = memeMatch ? chatMemeList.find(m => m.name === memeMatch[1]) : null;
             if (memeObj) {
-                emojiDisplay = `<img src="${memeObj.url}" alt="${emoji}" style="width:16px;height:16px;object-fit:contain;vertical-align:middle">`;
+                emojiDisplay = `<img src="${memeObj.url}" alt="${emoji}" style="width:24px;height:24px;object-fit:contain;vertical-align:middle">`;
             } else {
                 emojiDisplay = emoji;
             }
@@ -540,11 +638,29 @@ function renderMessages(messages) {
             </span>`;
         }).join('');
 
+        // Reply preview
+        let replyHtml = '';
+        if (msg.reply_preview) {
+            const rp = msg.reply_preview;
+            replyHtml = `<div class="chat-reply-quote" onclick="scrollToMessage(${rp.id})">
+                <span class="chat-reply-quote-author">${escapeHtml(rp.display_name || rp.username)}</span>
+                <span class="chat-reply-quote-text">${escapeHtml(rp.content)}</span>
+            </div>`;
+        }
+
+        const safeContent = escapeHtml(msg.content).replace(/'/g, '&#39;');
         return `
             <div class="chat-message ${ownClass}" data-message-id="${msg.id}">
+                ${replyHtml}
                 <div class="chat-message-header">
                     <span class="chat-message-author">${escapeHtml(msg.display_name || msg.username)}</span>
                     <span class="chat-message-time">${formatTime(msg.created_at)}</span>
+                    <button class="chat-reply-btn" onclick="setReply(${msg.id}, '${escapeHtml(msg.username)}', '${escapeHtml(msg.display_name || msg.username)}', '${safeContent}')" title="Reply">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 17 4 12 9 7"/>
+                            <path d="M20 18v-2a4 4 0 00-4-4H4"/>
+                        </svg>
+                    </button>
                 </div>
                 <div class="chat-message-content">${content}</div>
                 <div class="chat-message-reactions">
@@ -638,13 +754,18 @@ async function sendMessage() {
     const mentions = mentionMatches.map(m => m.substring(1));
 
     try {
-        await api.post(`/api/chat/rooms/${activeRoomId}/messages`, {
+        const payload = {
             content: content,
             mentions: mentions
-        });
+        };
+        if (replyToMessage) {
+            payload.reply_to_id = replyToMessage.id;
+        }
+        await api.post(`/api/chat/rooms/${activeRoomId}/messages`, payload);
 
         input.value = '';
         input.style.height = 'auto';
+        cancelReply();
 
         // Refresh messages
         const messagesData = await api.get(`/api/chat/rooms/${activeRoomId}/messages`);
@@ -1126,7 +1247,7 @@ function showReactionPicker(messageId) {
     if (chatMemeList.length > 0) {
         memeHtml = '<div style="border-top:1px solid var(--border-color,#30363d);margin-top:4px;padding-top:4px;display:flex;flex-wrap:wrap;gap:2px">' +
             chatMemeList.slice(0, 12).map(m =>
-                `<div class="emoji-picker-item" style="padding:2px" onclick="addReaction(${messageId}, ':${m.name}:')" title=":${m.name}:"><img src="${m.url}" alt=":${m.name}:" style="width:20px;height:20px;object-fit:contain"></div>`
+                `<div class="emoji-picker-item" style="padding:2px" onclick="addReaction(${messageId}, ':${m.name}:')" title=":${m.name}:"><img src="${m.url}" alt=":${m.name}:" style="width:28px;height:28px;object-fit:contain"></div>`
             ).join('') + '</div>';
     }
 
@@ -1169,7 +1290,13 @@ async function addReaction(messageId, emoji) {
 function toggleEmojiPicker() {
     const picker = document.getElementById('emoji-picker');
     if (picker) {
-        picker.classList.toggle('show');
+        const isVisible = picker.style.display === 'block';
+        picker.style.display = isVisible ? 'none' : 'block';
+        // Close meme picker if open
+        if (!isVisible) {
+            const memePicker = document.getElementById('meme-picker');
+            if (memePicker) memePicker.style.display = 'none';
+        }
     }
 }
 
@@ -1182,15 +1309,23 @@ function insertEmoji(emoji) {
     input.selectionStart = input.selectionEnd = pos + emoji.length;
     input.focus();
 
-    toggleEmojiPicker();
+    // Close picker
+    const picker = document.getElementById('emoji-picker');
+    if (picker) picker.style.display = 'none';
 }
 
 function toggleMemePicker() {
     const picker = document.getElementById('meme-picker');
     if (!picker) return;
 
-    const isVisible = picker.style.display !== 'none';
+    const isVisible = picker.style.display === 'block';
     picker.style.display = isVisible ? 'none' : 'block';
+
+    // Close emoji picker if open
+    if (!isVisible) {
+        const emojiPicker = document.getElementById('emoji-picker');
+        if (emojiPicker) emojiPicker.style.display = 'none';
+    }
 
     if (!isVisible) {
         // Populate meme grid
@@ -1200,7 +1335,7 @@ function toggleMemePicker() {
         } else {
             grid.innerHTML = chatMemeList.map(m =>
                 `<div style="cursor:pointer;padding:4px;border-radius:4px;text-align:center" onclick="insertMeme('${m.name}')" title=":${m.name}:">
-                    <img src="${m.url}" alt=":${m.name}:" style="width:32px;height:32px;object-fit:contain">
+                    <img src="${m.url}" alt=":${m.name}:" style="width:48px;height:48px;object-fit:contain">
                     <div style="font-size:.65rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.name}</div>
                 </div>`
             ).join('');

@@ -228,6 +228,16 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: users.gitlab_username")
 
+    # Migration for chat_messages.reply_to_id (v0.9.16+)
+    if insp.has_table("chat_messages"):
+        existing = {col["name"] for col in insp.get_columns("chat_messages")}
+        if "reply_to_id" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE chat_messages ADD COLUMN reply_to_id INTEGER REFERENCES chat_messages(id)")
+                )
+                logger.info("Migrated: chat_messages.reply_to_id")
+
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
 

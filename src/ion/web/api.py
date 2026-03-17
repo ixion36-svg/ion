@@ -5470,6 +5470,7 @@ class ChatRoomUpdate(BaseModel):
 class ChatMessageCreate(BaseModel):
     content: str
     mentions: Optional[List[str]] = None  # usernames
+    reply_to_id: Optional[int] = None
 
 
 class ChatMessageUpdate(BaseModel):
@@ -5821,6 +5822,21 @@ async def get_chat_messages(
         reactions_stmt = select(MessageReaction).where(MessageReaction.message_id == msg.id)
         reactions = list(session.execute(reactions_stmt).scalars().all())
 
+        # Build reply preview if this message is a reply
+        reply_preview = None
+        reply_to_id = getattr(msg, "reply_to_id", None)
+        if reply_to_id:
+            reply_msg = session.execute(
+                select(ChatMessage).where(ChatMessage.id == reply_to_id)
+            ).scalar_one_or_none()
+            if reply_msg:
+                reply_preview = {
+                    "id": reply_msg.id,
+                    "username": reply_msg.user.username if reply_msg.user else None,
+                    "display_name": reply_msg.user.display_name if reply_msg.user else None,
+                    "content": reply_msg.content[:120] + ("..." if len(reply_msg.content) > 120 else ""),
+                }
+
         result.append({
             "id": msg.id,
             "user_id": msg.user_id,
@@ -5828,6 +5844,8 @@ async def get_chat_messages(
             "display_name": msg.user.display_name if msg.user else None,
             "content": msg.content,
             "mentions": msg.mentions,
+            "reply_to_id": reply_to_id,
+            "reply_preview": reply_preview,
             "created_at": msg.created_at.isoformat(),
             "edited_at": msg.edited_at.isoformat() if msg.edited_at else None,
             "reactions": [
@@ -5878,6 +5896,7 @@ async def send_chat_message(
         user_id=current_user.id,
         content=data.content.strip(),
         mentions=mention_ids,
+        reply_to_id=data.reply_to_id,
     )
     session.add(message)
 

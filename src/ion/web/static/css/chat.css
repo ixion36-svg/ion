@@ -629,12 +629,126 @@
     30% { transform: translateY(-4px); }
 }
 
+/* Reply bar */
+.chat-reply-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    background: var(--bg-secondary, rgba(0,0,0,0.15));
+    border-top: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    font-size: 0.75rem;
+}
+
+.chat-reply-preview {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.chat-reply-label {
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.chat-reply-text {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-reply-cancel {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+    display: flex;
+}
+
+.chat-reply-cancel:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.1);
+}
+
+/* Reply quote in messages */
+.chat-reply-quote {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.25rem 0.5rem;
+    margin-bottom: 0.25rem;
+    border-left: 2px solid var(--primary);
+    background: rgba(0,0,0,0.1);
+    border-radius: 0 4px 4px 0;
+    font-size: 0.7rem;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.chat-reply-quote:hover {
+    background: rgba(0,0,0,0.2);
+}
+
+.chat-reply-quote-author {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.chat-reply-quote-text {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Reply button on messages */
+.chat-reply-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    display: inline-flex;
+    margin-left: auto;
+}
+
+.chat-message:hover .chat-reply-btn {
+    opacity: 1;
+}
+
+.chat-reply-btn:hover {
+    color: var(--primary);
+    background: rgba(37, 99, 235, 0.1);
+}
+
+/* Message highlight on scroll-to */
+.chat-message-highlight {
+    animation: msg-highlight 2s ease-out;
+}
+
+@keyframes msg-highlight {
+    0%, 20% { background: rgba(37, 99, 235, 0.15); }
+    100% { background: transparent; }
+}
+
 /* Message input area */
 .chat-input-area {
     padding: 0.625rem 0.75rem;
     border-top: 1px solid var(--border);
     background: var(--bg-card);
     border-radius: 0 0 12px 12px;
+    position: relative;
+    overflow: visible;
 }
 
 .chat-input-wrapper {
@@ -767,16 +881,19 @@
 
 /* Emoji picker */
 .emoji-picker {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
-    margin-bottom: 0.375rem;
-    padding: 0.375rem;
     display: none;
+    background: var(--bg-secondary, var(--bg-card));
+    border-top: 1px solid var(--border);
+    padding: 0.5rem;
+}
+
+.meme-picker {
+    display: none;
+    background: var(--bg-secondary, var(--bg-card));
+    border-top: 1px solid var(--border);
+    padding: 0.5rem;
+    max-height: 180px;
+    overflow-y: auto;
 }
 
 .emoji-picker.show {
@@ -1027,11 +1144,12 @@
 /* Inline meme images in chat messages */
 .chat-meme-inline {
     display: inline-block;
-    width: 24px;
-    height: 24px;
+    max-width: 128px;
+    max-height: 128px;
     object-fit: contain;
     vertical-align: middle;
-    margin: 0 2px;
+    margin: 4px 2px;
+    border-radius: 4px;
 }
 
 /* Command hint */

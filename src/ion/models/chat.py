@@ -97,6 +97,9 @@ class ChatMessage(Base):
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
     mentions: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # [user_id, ...]
+    reply_to_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("chat_messages.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), nullable=False
     )
@@ -105,6 +108,9 @@ class ChatMessage(Base):
     # Relationships
     room: Mapped["ChatRoom"] = relationship("ChatRoom", back_populates="messages")
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
+    reply_to: Mapped[Optional["ChatMessage"]] = relationship(
+        "ChatMessage", remote_side=[id], foreign_keys=[reply_to_id]
+    )
     reactions: Mapped[List["MessageReaction"]] = relationship(
         "MessageReaction", back_populates="message", cascade="all, delete-orphan"
     )
