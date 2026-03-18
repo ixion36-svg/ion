@@ -223,7 +223,7 @@ Configure in `docker-compose.yml` or `docker-compose.https.yml`:
 | `ION_OIDC_CLIENT_SECRET` | - | OIDC client secret |
 | `ION_OLLAMA_ENABLED` | `true` | Enable Ollama AI integration |
 | `ION_OLLAMA_URL` | `http://ollama:11434` | Ollama service URL |
-| `ION_OLLAMA_MODEL` | `qwen2.5:7b` | Default AI model |
+| `ION_OLLAMA_MODEL` | `llama3.1:8b` | Default AI model |
 | `ION_GITLAB_ENABLED` | `true` | Enable GitLab integration |
 | `ION_GITLAB_URL` | - | GitLab server URL |
 | `ION_GITLAB_TOKEN` | - | GitLab Personal Access Token |
@@ -289,11 +289,11 @@ environment:
 
 ```bash
 # Pull the default AI model into the Ollama sidecar (first time only)
-docker exec -it ion-ollama ollama pull qwen2.5:7b
+docker exec -it ion-ollama ollama pull llama3.1:8b
 
 # Verify AI is available
 curl http://localhost:8000/api/ai/status
-# Should return: {"available": true, "default_model": "qwen2.5:7b", ...}
+# Should return: {"available": true, "default_model": "llama3.1:8b", ...}
 ```
 
 Once available, AI assist buttons (Analyze, Extract, Suggest, Discuss) will appear automatically in the alert investigation UI.

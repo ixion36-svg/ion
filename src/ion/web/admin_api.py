@@ -1082,7 +1082,7 @@ async def get_wizard_integrations(current_user: User = Depends(require_permissio
             "url": config.ollama_url,
             "fields": {
                 "url": {"type": "url", "label": "Ollama URL", "placeholder": "http://localhost:11434", "default": "http://localhost:11434"},
-                "model": {"type": "select", "label": "Default Model", "options": [], "default": "qwen2.5:0.5b", "dynamic": True},
+                "model": {"type": "select", "label": "Default Model", "options": [], "default": "llama3.1:8b", "dynamic": True},
                 "timeout": {"type": "number", "label": "Request Timeout (seconds)", "default": 120, "min": 30, "max": 600},
                 "verify_ssl": {"type": "checkbox", "label": "Verify SSL Certificate", "default": True},
             },

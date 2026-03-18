@@ -270,12 +270,12 @@ class ModelInfo:
 # Recommended models for different use cases
 RECOMMENDED_MODELS = {
     "testing": {
-        "name": "qwen2.5:0.5b",
-        "description": "Tiny model for testing (~400MB RAM)",
-        "size": ModelSize.TINY,
+        "name": "llama3.2:3b",
+        "description": "Small model for testing (~2GB RAM)",
+        "size": ModelSize.SMALL,
     },
     "coding": {
-        "name": "qwen2.5-coder:7b",
+        "name": "llama3.1:8b",
         "description": "Best for code generation and review (~5GB RAM)",
         "size": ModelSize.MEDIUM,
     },
@@ -397,7 +397,7 @@ class OllamaService:
     def __init__(
         self,
         base_url: str = "http://localhost:11434",
-        default_model: str = "qwen2.5:0.5b",
+        default_model: str = "llama3.1:8b",
         timeout: float = 120.0,
         verify_ssl: bool = True,
     ):
@@ -554,7 +554,7 @@ class OllamaService:
                     "options": {
                         "temperature": temperature,
                         "num_predict": num_predict,
-                        "stop": ["<|im_end|>", "<|endoftext|>", "<|end|>"],
+                        "stop": ["<|eot_id|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
                     },
                 },
             )
@@ -632,7 +632,7 @@ class OllamaService:
                     "options": {
                         "temperature": temperature,
                         "num_predict": num_predict,
-                        "stop": ["<|im_end|>", "<|endoftext|>", "<|end|>"],
+                        "stop": ["<|eot_id|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
                     },
                 },
             ) as response:
@@ -675,7 +675,7 @@ class OllamaService:
                     "options": {
                         "temperature": temperature,
                         "num_predict": DEFAULT_NUM_PREDICT,
-                        "stop": ["<|im_end|>", "<|endoftext|>", "<|end|>"],
+                        "stop": ["<|eot_id|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
                     },
                 },
             )
@@ -698,7 +698,7 @@ def get_ollama_service() -> OllamaService:
         config = get_config()
         _ollama_service = OllamaService(
             base_url=getattr(config, 'ollama_url', 'http://localhost:11434'),
-            default_model=getattr(config, 'ollama_model', 'qwen2.5:0.5b'),
+            default_model=getattr(config, 'ollama_model', 'llama3.1:8b'),
             timeout=float(getattr(config, 'ollama_timeout', 120)),
             verify_ssl=getattr(config, 'ollama_verify_ssl', True),
         )

@@ -18,7 +18,7 @@ docker build -t ion:latest .
 docker-compose up -d
 
 # Pull the default AI model (first time)
-docker exec -it ion-ollama ollama pull qwen2.5:7b
+docker exec -it ion-ollama ollama pull llama3.1:8b
 
 # Access at http://localhost:8000
 ```
@@ -78,7 +78,7 @@ ION integrates with your existing infrastructure:
 | `ION_OPENCTI_TOKEN` | - | OpenCTI API token |
 | `ION_OLLAMA_ENABLED` | `true` | Enable AI features |
 | `ION_OLLAMA_URL` | `http://ollama:11434` | Ollama service URL |
-| `ION_OLLAMA_MODEL` | `qwen2.5:7b` | Default AI model |
+| `ION_OLLAMA_MODEL` | `llama3.1:8b` | Default AI model |
 | `ION_KIBANA_CASES_ENABLED` | `true` | Enable Kibana sync |
 | `ION_KIBANA_URL` | - | Kibana URL |
 | `ION_OIDC_ENABLED` | `true` | Enable Keycloak SSO |
@@ -247,7 +247,7 @@ docker-compose logs ion
 
 1. Check Ollama is running: `docker-compose logs ollama`
 2. Verify model is pulled: `docker exec ion-ollama ollama list`
-3. Pull model: `docker exec ion-ollama ollama pull qwen2.5:7b`
+3. Pull model: `docker exec ion-ollama ollama pull llama3.1:8b`
 
 ### API docs not accessible
 

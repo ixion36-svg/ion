@@ -76,7 +76,7 @@ docker build -t ion:latest .
 docker-compose up -d
 
 # Pull the default AI model (first time only)
-docker exec -it ion-ollama ollama pull qwen2.5:7b
+docker exec -it ion-ollama ollama pull llama3.1:8b
 
 # Access at http://localhost:8000
 ```
@@ -98,7 +98,7 @@ pip install -e .
 # Linux: curl -fsSL https://ollama.ai/install.sh | sh
 
 # Pull the default model
-ollama pull qwen2.5:7b
+ollama pull llama3.1:8b
 
 # Start Ollama service
 ollama serve
@@ -126,7 +126,7 @@ ION_DEBUG_MODE=false             # Disable API docs in production (default)
 # AI Features (Ollama)
 ION_OLLAMA_ENABLED=true
 ION_OLLAMA_URL=http://ollama:11434    # Docker service name
-ION_OLLAMA_MODEL=qwen2.5:7b            # default model
+ION_OLLAMA_MODEL=llama3.1:8b            # default model
 
 # Elasticsearch (your existing cluster)
 ION_ELASTICSEARCH_ENABLED=true
@@ -163,15 +163,14 @@ Recommended models for Ollama:
 
 | Model | Size | Use Case |
 |-------|------|----------|
-| `qwen2.5:0.5b` | ~400MB | Testing, low resources |
-| `qwen2.5:3b` | ~2GB | Balanced performance |
-| `qwen2.5:7b` | ~4GB | Default — recommended for SOC analysis |
-| `qwen2.5-coder:7b` | ~4GB | Best for code/security analysis |
-| `llama3.2:3b` | ~2GB | General purpose |
+| `llama3.1:8b` | ~5GB | Default — recommended for SOC analysis |
+| `llama3.2:3b` | ~2GB | Testing, balanced performance |
+| `gemma3:12b` | ~8GB | Strong guardrails, good security knowledge |
+| `mistral:7b` | ~4.5GB | Fast, good instruction following |
 
 Pull models with:
 ```bash
-ollama pull qwen2.5:7b
+ollama pull llama3.1:8b
 ```
 
 ---

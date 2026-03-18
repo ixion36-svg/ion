@@ -70,23 +70,22 @@ case "$MODEL_SIZE" in
     testing|test|small)
         echo "Installing testing models (minimal RAM usage)..."
         echo ""
-        pull_model "qwen2.5:0.5b" "Tiny model for testing (~400MB RAM)"
+        pull_model "llama3.2:3b" "Small model for testing (~2GB RAM)"
         ;;
 
     production|prod|full)
         echo "Installing production models (requires 8GB+ RAM)..."
         echo ""
-        pull_model "qwen2.5:0.5b" "Tiny model for testing (~400MB RAM)"
-        pull_model "qwen2.5-coder:7b" "Full coding model (~5GB RAM)"
+        pull_model "llama3.1:8b" "Default model (~5GB RAM)"
         ;;
 
     all)
         echo "Installing all recommended models..."
         echo ""
-        pull_model "qwen2.5:0.5b" "Tiny model for testing (~400MB RAM)"
-        pull_model "qwen2.5-coder:7b" "Full coding model (~5GB RAM)"
-        pull_model "llama3:8b" "General purpose model (~5GB RAM)"
-        pull_model "phi3:mini" "Lightweight model (~2GB RAM)"
+        pull_model "llama3.1:8b" "Default model (~5GB RAM)"
+        pull_model "llama3.2:3b" "Small model for testing (~2GB RAM)"
+        pull_model "gemma3:12b" "Strong guardrails model (~8GB RAM)"
+        pull_model "mistral:7b" "Fast general purpose (~4.5GB RAM)"
         ;;
 
     *)

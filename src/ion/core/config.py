@@ -69,7 +69,7 @@ class Config:
     # Ollama AI integration
     ollama_enabled: bool = True
     ollama_url: str = "http://localhost:11434"  # Ollama API URL
-    ollama_model: str = "qwen2.5:7b"  # Default model
+    ollama_model: str = "llama3.1:8b"  # Default model
     ollama_timeout: int = 120  # Request timeout in seconds
     ollama_verify_ssl: bool = True
 
@@ -158,7 +158,7 @@ class Config:
             # Ollama AI integration
             ollama_enabled=data.get("ollama_enabled", True),
             ollama_url=data.get("ollama_url", "http://localhost:11434"),
-            ollama_model=data.get("ollama_model", "qwen2.5:7b"),
+            ollama_model=data.get("ollama_model", "llama3.1:8b"),
             ollama_timeout=data.get("ollama_timeout", 120),
             ollama_verify_ssl=data.get("ollama_verify_ssl", True),
             # Kibana Cases integration
@@ -377,7 +377,7 @@ def get_config() -> Config:
         if os.environ.get("ION_OLLAMA_URL") or os.environ.get("OLLAMA_URL"):
             _config.ollama_url = os.environ.get("ION_OLLAMA_URL") or os.environ.get("OLLAMA_URL", "http://localhost:11434")
         if os.environ.get("ION_OLLAMA_MODEL"):
-            _config.ollama_model = os.environ.get("ION_OLLAMA_MODEL", "qwen2.5:7b")
+            _config.ollama_model = os.environ.get("ION_OLLAMA_MODEL", "llama3.1:8b")
         if os.environ.get("ION_OLLAMA_TIMEOUT"):
             _config.ollama_timeout = int(os.environ.get("ION_OLLAMA_TIMEOUT", "120"))
         if os.environ.get("ION_OLLAMA_VERIFY_SSL"):

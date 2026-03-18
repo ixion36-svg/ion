@@ -6,13 +6,13 @@
 # deployment package that can be transferred to the secure environment.
 #
 # Usage: ./scripts/build-offline-package.sh [version] [model]
-# Example: ./scripts/build-offline-package.sh 1.0.0 qwen2.5:0.5b
+# Example: ./scripts/build-offline-package.sh 1.0.0 llama3.1:8b
 # =============================================================================
 
 set -e
 
 VERSION="${1:-latest}"
-OLLAMA_MODEL="${2:-qwen2.5:0.5b}"
+OLLAMA_MODEL="${2:-llama3.1:8b}"
 PACKAGE_NAME="ion-offline-${VERSION}"
 OUTPUT_DIR="./dist/${PACKAGE_NAME}"
 
