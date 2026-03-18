@@ -193,27 +193,65 @@ function updateNavForPermissions() {
     // Permission-based nav visibility — security links shown if user has security:read
     ['nav-security-link', 'nav-topology-link'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.style.display = perms.has('security:read') ? 'block' : 'none';
+        if (el) el.style.display = perms.has('security:read') ? '' : 'none';
     });
 
     // Engineer+ links (engineering/admin) — integration & settings access
     ['nav-integrations-link', 'nav-settings-link'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.style.display = isEngineer ? 'block' : 'none';
+        if (el) el.style.display = isEngineer ? '' : 'none';
     });
 
     // Admin only links
     ['nav-admin-links', 'nav-audit-link'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.style.display = isAdmin ? 'block' : 'none';
+        if (el) el.style.display = isAdmin ? '' : 'none';
     });
 
     // Forensics link — only visible when user has forensic:read
     const forensicsLink = document.getElementById('nav-forensics-link');
     if (forensicsLink) {
-        forensicsLink.style.display = perms.has('forensic:read') ? 'block' : 'none';
+        forensicsLink.style.display = perms.has('forensic:read') ? '' : 'none';
     }
+
+    // Hide dropdown groups where ALL children are hidden
+    ['nav-group-engineering', 'nav-group-dfir'].forEach(groupId => {
+        const group = document.getElementById(groupId);
+        if (!group) return;
+        const menu = group.querySelector('.nav-dropdown-menu');
+        if (!menu) return;
+        const items = menu.querySelectorAll('li');
+        const allHidden = Array.from(items).every(li => li.style.display === 'none');
+        group.style.display = allHidden ? 'none' : '';
+    });
 }
+
+// Nav dropdown — click label navigates, click chevron toggles menu
+function toggleNavDropdown(event) {
+    const dropdown = event.target.closest('.nav-dropdown');
+    if (!dropdown) return;
+
+    // Chevron click = toggle dropdown menu
+    if (event.target.closest('.nav-chevron')) {
+        event.preventDefault();
+        event.stopPropagation();
+        document.querySelectorAll('.nav-dropdown.open').forEach(d => {
+            if (d !== dropdown) d.classList.remove('open');
+        });
+        dropdown.classList.toggle('open');
+        return;
+    }
+
+    // Label click = close any open dropdown and navigate (let <a href> work)
+    document.querySelectorAll('.nav-dropdown.open').forEach(d => d.classList.remove('open'));
+}
+
+// Close nav dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.nav-dropdown')) {
+        document.querySelectorAll('.nav-dropdown.open').forEach(d => d.classList.remove('open'));
+    }
+});
 
 async function switchFocusMode(roleName) {
     try {
@@ -326,6 +364,7 @@ function renderNotifications(notifications) {
     const sourceIcons = {
         chat_mention: '@',
         chat_dm: '\u2709',
+        chat_group: '\u{1F4AC}',
         case_assigned: '\u26A0',
         gitlab_assigned: '\u{1F4CB}',
         system: '\u2699',

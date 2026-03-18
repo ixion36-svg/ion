@@ -6005,23 +6005,38 @@ async def send_chat_message(
                     )
 
         # Notification for DM (direct messages to the other user)
-        if room and room.room_type == "direct":
-            other_members = session.execute(
-                select(ChatRoomMember.user_id).where(
-                    ChatRoomMember.room_id == room_id,
-                    ChatRoomMember.user_id != current_user.id,
+        # or group chat messages (notify all other members)
+        other_members = session.execute(
+            select(ChatRoomMember.user_id).where(
+                ChatRoomMember.room_id == room_id,
+                ChatRoomMember.user_id != current_user.id,
+            )
+        ).scalars().all()
+
+        notified_ids = set(mention_ids or [])
+        room_name = room.name or "Chat" if room else "Chat"
+
+        for uid in other_members:
+            if uid in notified_ids:
+                continue  # Already notified via @mention
+            if room and room.room_type == "direct":
+                create_notification(
+                    session, uid,
+                    source="chat_dm",
+                    title=f"DM from {sender_name}",
+                    body=snippet,
+                    url=f"#chat-room-{room_id}",
+                    source_id=str(room_id),
                 )
-            ).scalars().all()
-            for uid in other_members:
-                if not mention_ids or uid not in mention_ids:
-                    create_notification(
-                        session, uid,
-                        source="chat_dm",
-                        title=f"DM from {sender_name}",
-                        body=snippet,
-                        url=f"#chat-room-{room_id}",
-                        source_id=str(room_id),
-                    )
+            elif room and room.room_type == "group":
+                create_notification(
+                    session, uid,
+                    source="chat_group",
+                    title=f"{sender_name} in {room_name}",
+                    body=snippet,
+                    url=f"#chat-room-{room_id}",
+                    source_id=str(room_id),
+                )
     except Exception as _notif_err:
         logger.debug("Failed to create chat notification: %s", _notif_err)
 
@@ -7605,3 +7620,58 @@ async def search_analyst_knowledge_base(
     ]
 
     return {"results": results, "total": len(results)}
+
+
+# =============================================================================
+# DFIR-IRIS Integration Endpoints
+# =============================================================================
+
+@router.get("/iris/config")
+async def get_iris_config_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    """Get DFIR-IRIS configuration status (no sensitive data)."""
+    config = get_dfir_iris_config()
+    return {
+        "enabled": config.get("enabled", False),
+        "url": config.get("url", ""),
+        "has_token": bool(config.get("api_key")),
+        "verify_ssl": config.get("verify_ssl", True),
+        "default_customer": config.get("default_customer", 1),
+    }
+
+
+@router.get("/iris/test")
+async def test_iris_connection(
+    current_user: User = Depends(get_current_user),
+):
+    """Test the DFIR-IRIS connection."""
+    from ion.services.dfir_iris_service import get_dfir_iris_service
+    from ion.core.config import get_config as _get_config, get_ssl_verify
+    import httpx as _httpx
+    service = get_dfir_iris_service()
+    if not service.is_configured:
+        return {"connected": False, "error": "DFIR-IRIS is not configured"}
+    try:
+        cfg = _get_config()
+        async with _httpx.AsyncClient(
+            headers={"Authorization": f"Bearer {cfg.dfir_iris_api_key}"},
+            verify=get_ssl_verify(cfg.dfir_iris_verify_ssl),
+            timeout=_httpx.Timeout(10.0, connect=5.0),
+        ) as client:
+            resp = await client.get(f"{cfg.dfir_iris_url}/api/versions")
+            if resp.status_code == 200:
+                data = resp.json().get("data", {})
+                return {
+                    "connected": True,
+                    "status": "ok",
+                    "version": data.get("iris_current", "unknown"),
+                    "api_version": data.get("api_current", "unknown"),
+                }
+            # Fallback to test_connection
+            result = await service.test_connection()
+            if result.get("success"):
+                return {"connected": True, "status": "ok", "version": "unknown"}
+            return {"connected": False, "error": result.get("error", "Connection failed")}
+    except Exception as e:
+        return {"connected": False, "error": str(e)}

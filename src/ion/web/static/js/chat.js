@@ -87,9 +87,19 @@ function initChat() {
         if (panel) panel.classList.add('open');
         if (toggleBtn) toggleBtn.classList.add('active');
 
-        // Re-open the room they were in
+        // Re-open the room they were in (wait for rooms to load first)
         if (savedRoom) {
-            setTimeout(() => openRoom(parseInt(savedRoom, 10)), 300);
+            const savedId = parseInt(savedRoom, 10);
+            // Wait for loadRooms() to finish, then validate the room still exists
+            setTimeout(() => {
+                const roomExists = rooms.some(r => r.id === savedId);
+                if (roomExists) {
+                    openRoom(savedId);
+                } else {
+                    // Room no longer exists (DB change, redeployment, etc.)
+                    sessionStorage.removeItem('chat_active_room');
+                }
+            }, 500);
         }
     }
 
@@ -345,6 +355,11 @@ async function loadRooms() {
         const response = await fetch('/api/chat/rooms');
         if (!response.ok) {
             console.error('Failed to load rooms:', response.status);
+            if (response.status === 401) {
+                // Not authenticated — don't show error toast, user will be redirected
+                rooms = [];
+                renderRoomList(rooms);
+            }
             return;
         }
         const data = await response.json();
@@ -473,7 +488,18 @@ async function openRoom(roomId) {
 
     } catch (error) {
         console.error('Failed to open room:', error);
-        showToast('Failed to load chat', 'error');
+        // Clear stale room from sessionStorage so it doesn't retry on every page load
+        sessionStorage.removeItem('chat_active_room');
+        activeRoomId = null;
+        // Close the bubble if it was opened
+        closeChatBubble(roomId);
+        // Return to room list
+        const listView = document.getElementById('chat-room-list-view');
+        const activeView = document.getElementById('chat-active-view');
+        if (listView) { listView.classList.remove('hidden'); listView.style.removeProperty('display'); }
+        if (activeView) { activeView.classList.remove('show'); activeView.style.removeProperty('display'); }
+        // Reload rooms in case the list changed
+        loadRooms();
     }
 }
 
@@ -978,7 +1004,12 @@ async function pollMessages() {
             }
         }
     } catch (error) {
-        console.error('Poll messages error:', error);
+        // If room no longer exists, close it gracefully
+        if (error.message && error.message.includes('not found')) {
+            closeActiveRoom();
+        } else {
+            console.error('Poll messages error:', error);
+        }
     }
 }
 

@@ -756,8 +756,8 @@ const SERVICES = [
         description: 'Local AI model inference',
     },
     {
-        id: 'dfir_iris', name: 'DFIR-IRIS', port: 8100, protocol: 'HTTPS',
-        icon: 'icon-search', testUrl: null, configUrl: '/api/integrations/status',
+        id: 'dfir_iris', name: 'DFIR-IRIS', port: 8100, protocol: 'HTTP',
+        icon: 'icon-search', testUrl: '/api/iris/test', configUrl: '/api/iris/config',
         description: 'Incident response platform',
     },
 ];
@@ -946,7 +946,7 @@ async function refreshAll() {
             result.details = config;
 
             const isEnabled = config.enabled !== false && (
-                config.has_token !== false || config.url || config.configured !== false || config.available === true
+                config.has_token !== false || config.url || config.configured !== false || config.available === true || config.success === true
             );
             if (!isEnabled) {
                 result.status = 'disabled';
@@ -969,7 +969,7 @@ async function refreshAll() {
                     result.status = 'error';
                 }
             } else {
-                result.status = (config.connected || config.status === 'ok' || config.cluster_name || config.available)
+                result.status = (config.connected || config.status === 'ok' || config.cluster_name || config.available || config.success === true)
                     ? 'healthy' : 'error';
                 result.version = config.version || config.server_version || config.model || null;
             }

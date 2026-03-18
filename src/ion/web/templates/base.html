@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ION{% endblock %}</title>
     <link rel="icon" type="image/png" href="/static/img/ion-logo.png">
-    <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.18">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.9.18">
-    <link rel="stylesheet" href="/static/css/chat.css?v=0.9.18">
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.9.18">
+    <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.19">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.9.19">
+    <link rel="stylesheet" href="/static/css/chat.css?v=0.9.19">
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.9.19">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
     <script src="/static/js/theme-init.js"></script>
 </head>
@@ -22,41 +22,57 @@
         </button>
         <ul class="nav-links" id="nav-links">
             <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>
-            <li><a href="/templates" class="{% if '/templates' in request.url.path %}active{% endif %}">Templates</a></li>
-            <li><a href="/documents" class="{% if '/documents' in request.url.path %}active{% endif %}">Documents</a></li>
-            <li><a href="/analyst" class="{% if '/analyst' in request.url.path or '/tools' in request.url.path or '/discover' in request.url.path %}active{% endif %}">Analyst</a></li>
-            <li><a href="/chat" class="{% if '/chat' in request.url.path %}active{% endif %}">AI Chat</a></li>
-            <li><a href="/notes" class="{% if '/notes' in request.url.path %}active{% endif %}">Notes</a></li>
-            <li><a href="/gitlab" class="{% if '/gitlab' in request.url.path %}active{% endif %}">GitLab</a></li>
-            <li><a href="/alerts" class="{% if '/alerts' in request.url.path and '/audit' not in request.url.path %}active{% endif %}">Alerts</a></li>
-            <li><a href="/cases" class="{% if '/cases' in request.url.path %}active{% endif %}">Cases</a></li>
-            <li id="nav-forensics-link" style="display: none;"><a href="/forensics" class="{% if '/forensics' in request.url.path %}active{% endif %}">Forensics</a></li>
-            <li><a href="/observables" class="{% if '/observables' in request.url.path %}active{% endif %}">Observables</a></li>
-            <li><a href="/pcap" class="{% if '/pcap' in request.url.path %}active{% endif %}">PCAP</a></li>
-            <li><a href="/playbooks" class="{% if '/playbooks' in request.url.path %}active{% endif %}">Playbooks</a></li>
-            <li><a href="/training" class="{% if '/training' in request.url.path %}active{% endif %}">Training</a></li>
-            <li><a href="/social" class="{% if '/social' in request.url.path %}active{% endif %}">Social Hub</a></li>
-            <!-- Lead+ (lead/engineering/admin) -->
-            <li id="nav-topology-link" style="display: none;">
-                <a href="/topology" class="{% if '/topology' in request.url.path %}active{% endif %}">Topology</a>
+
+            <!-- Knowledge dropdown -->
+            <li class="nav-dropdown{% if '/templates' in request.url.path or '/documents' in request.url.path or '/notes' in request.url.path or '/training' in request.url.path or '/social' in request.url.path %} has-active{% endif %}">
+                <a href="/social" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Knowledge <span class="nav-chevron"></span></a>
+                <ul class="nav-dropdown-menu">
+                    <li><a href="/social" class="{% if '/social' in request.url.path %}active{% endif %}">Social Hub</a></li>
+                    <li><a href="/templates" class="{% if '/templates' in request.url.path %}active{% endif %}">Templates</a></li>
+                    <li><a href="/documents" class="{% if '/documents' in request.url.path %}active{% endif %}">Documents</a></li>
+                    <li><a href="/notes" class="{% if '/notes' in request.url.path %}active{% endif %}">Notes</a></li>
+                    <li><a href="/training" class="{% if '/training' in request.url.path %}active{% endif %}">Training</a></li>
+                </ul>
             </li>
-            <li id="nav-security-link" style="display: none;">
-                <a href="/security" class="{% if '/security' in request.url.path %}active{% endif %}">Security</a>
+
+            <!-- Analyst dropdown -->
+            <li class="nav-dropdown{% if '/alerts' in request.url.path or '/cases' in request.url.path or '/observables' in request.url.path or '/pcap' in request.url.path or '/analyst' in request.url.path or '/chat' in request.url.path or '/discover' in request.url.path or '/tools' in request.url.path %} has-active{% endif %}">
+                <a href="/analyst" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Analyst <span class="nav-chevron"></span></a>
+                <ul class="nav-dropdown-menu">
+                    <li><a href="/analyst" class="{% if '/analyst' in request.url.path or '/tools' in request.url.path %}active{% endif %}">SOC Dashboard</a></li>
+                    <li><a href="/alerts" class="{% if '/alerts' in request.url.path and '/audit' not in request.url.path %}active{% endif %}">Alerts</a></li>
+                    <li><a href="/cases" class="{% if '/cases' in request.url.path %}active{% endif %}">Cases</a></li>
+                    <li><a href="/observables" class="{% if '/observables' in request.url.path %}active{% endif %}">Observables</a></li>
+                    <li><a href="/pcap" class="{% if '/pcap' in request.url.path %}active{% endif %}">PCAP</a></li>
+                    <li><a href="/chat" class="{% if '/chat' in request.url.path %}active{% endif %}">AI Chat</a></li>
+                    <li><a href="/discover" class="{% if '/discover' in request.url.path %}active{% endif %}">Discover</a></li>
+                </ul>
             </li>
-            <!-- Engineer+ (engineering/admin) -->
-            <li id="nav-integrations-link" style="display: none;">
-                <a href="/integrations" class="{% if '/integrations' in request.url.path %}active{% endif %}">Integrations</a>
+
+            <!-- Engineering dropdown -->
+            <li class="nav-dropdown{% if '/gitlab' in request.url.path or '/topology' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
+                <a href="/topology" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Engineering <span class="nav-chevron"></span></a>
+                <ul class="nav-dropdown-menu">
+                    <li id="nav-topology-link" style="display: none;"><a href="/topology" class="{% if '/topology' in request.url.path %}active{% endif %}">Topology</a></li>
+                    <li><a href="/gitlab" class="{% if '/gitlab' in request.url.path %}active{% endif %}">GitLab</a></li>
+                    <li id="nav-security-link" style="display: none;"><a href="/security" class="{% if '/security' in request.url.path %}active{% endif %}">Security</a></li>
+                    <li id="nav-integrations-link" style="display: none;"><a href="/integrations" class="{% if '/integrations' in request.url.path %}active{% endif %}">Integrations</a></li>
+                    <li id="nav-admin-links" style="display: none;"><a href="/users" class="{% if '/users' in request.url.path %}active{% endif %}">Users</a></li>
+                    <li id="nav-audit-link" style="display: none;"><a href="/audit-logs" class="{% if '/audit-logs' in request.url.path %}active{% endif %}">Audit Logs</a></li>
+                </ul>
             </li>
-            <li id="nav-settings-link" style="display: none;">
-                <a href="/settings" class="{% if '/settings' in request.url.path %}active{% endif %}">Settings</a>
+
+            <!-- DFIR dropdown -->
+            <li class="nav-dropdown{% if '/forensics' in request.url.path or '/playbooks' in request.url.path %} has-active{% endif %}" id="nav-group-dfir">
+                <a href="/forensics" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">DFIR <span class="nav-chevron"></span></a>
+                <ul class="nav-dropdown-menu">
+                    <li id="nav-forensics-link" style="display: none;"><a href="/forensics" class="{% if '/forensics' in request.url.path %}active{% endif %}">Forensics</a></li>
+                    <li><a href="/playbooks" class="{% if '/playbooks' in request.url.path %}active{% endif %}">Playbooks</a></li>
+                </ul>
             </li>
-            <!-- Admin only -->
-            <li id="nav-admin-links" style="display: none;">
-                <a href="/users" class="{% if '/users' in request.url.path %}active{% endif %}">Users</a>
-            </li>
-            <li id="nav-audit-link" style="display: none;">
-                <a href="/audit-logs" class="{% if '/audit-logs' in request.url.path %}active{% endif %}">Audit Logs</a>
-            </li>
+
+            <!-- Settings (standalone) -->
+            <li id="nav-settings-link" style="display: none;"><a href="/settings" class="{% if '/settings' in request.url.path %}active{% endif %}">Settings</a></li>
         </ul>
         <!-- Notification bell -->
         <button class="chat-toggle-btn" id="notif-bell-btn" onclick="toggleNotifPanel()" title="Notifications">
@@ -232,7 +248,10 @@
         .nav-links{display:none;position:absolute;top:56px;left:0;right:0;background:var(--bg-secondary,#161b22);border-bottom:1px solid var(--border,#30363d);flex-direction:column;padding:0.5rem;gap:0;z-index:99;max-height:80vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)}
         .nav-links.mobile-open{display:flex!important}
         .nav-links li{width:100%}
-        .nav-links a{display:block;padding:0.6rem 1rem!important;font-size:0.85rem!important;border-radius:var(--radius)}
+        .nav-links a,.nav-dropdown-toggle{display:block;padding:0.6rem 1rem!important;font-size:0.85rem!important;border-radius:var(--radius)}
+        .nav-dropdown-menu{position:static;box-shadow:none;border:none;background:transparent;padding:0 0 0 1rem;min-width:0}
+        .nav-dropdown-menu a{padding:0.4rem 1rem!important;font-size:.82rem!important}
+        .nav-dropdown.open>.nav-dropdown-menu{display:block}
     }
     </style>
 
@@ -249,11 +268,11 @@
     <!-- Markdown parser + sanitizer -->
     <script src="/static/js/marked.min.js"></script>
     <script src="/static/js/purify.min.js"></script>
-    <script src="/static/js/app.js?v=0.9.18"></script>
-    <script src="/static/js/chat.js?v=0.9.18"></script>
-    <script src="/static/js/ai-chat.js?v=0.9.18"></script>
+    <script src="/static/js/app.js?v=0.9.19"></script>
+    <script src="/static/js/chat.js?v=0.9.19"></script>
+    <script src="/static/js/ai-chat.js?v=0.9.19"></script>
     <script src="/static/js/quill.js"></script>
-    <script src="/static/js/notepad.js?v=0.9.18"></script>
+    <script src="/static/js/notepad.js?v=0.9.19"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

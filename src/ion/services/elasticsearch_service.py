@@ -104,7 +104,7 @@ class ElasticsearchService:
         self.api_key = api_key or config.get("api_key", "")
         self.username = username or config.get("username", "")
         self.password = password or config.get("password", "")
-        self.alert_index = alert_index or config.get("alert_index", ".alerts-*,.watcher-history-*,alerts-*")
+        self.alert_index = alert_index or config.get("alert_index", ".alerts-security.alerts-production,alerts-*")
         self.case_index = case_index or config.get("case_index", "ion-cases")
         self.kfp_index = config.get("kfp_index", "ion-kfp")
         self.verify_ssl = verify_ssl if verify_ssl is not None else config.get("verify_ssl", True)
@@ -883,13 +883,12 @@ class ElasticsearchService:
         if not alert_ids:
             return True
 
-        # Try Kibana Detection Engine API first (handles .alerts-* indices)
+        # Try both Kibana API (for .alerts-* indices) and ES direct (for custom indices)
         kibana_ok = await self._update_via_kibana_api(alert_ids, workflow_status)
-        if kibana_ok:
-            return True
+        es_ok = await self._update_via_es_direct(alert_ids, workflow_status)
 
-        # Fallback: direct ES _update_by_query (works for watcher/custom alerts)
-        return await self._update_via_es_direct(alert_ids, workflow_status)
+        # Return True if either succeeded
+        return kibana_ok or es_ok
 
     async def _update_via_kibana_api(
         self,
@@ -993,7 +992,8 @@ class ElasticsearchService:
                         "ctx._source['kibana.alert.workflow_status'] = params.status; "
                         "if (ctx._source.kibana == null) { ctx._source.kibana = new HashMap(); } "
                         "if (ctx._source.kibana.alert == null) { ctx._source.kibana.alert = new HashMap(); } "
-                        "ctx._source.kibana.alert.workflow_status = params.status;"
+                        "ctx._source.kibana.alert.workflow_status = params.status; "
+                        "ctx._source.status = params.status;"
                     ),
                     "lang": "painless",
                     "params": {"status": workflow_status},

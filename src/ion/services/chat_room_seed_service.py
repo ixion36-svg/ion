@@ -14,23 +14,11 @@ logger = logging.getLogger(__name__)
 ROLE_ROOMS = [
     {
         "name": "SOC Analysts",
-        "roles": ["analyst", "senior_analyst", "principal_analyst"],
+        "roles": ["analyst", "senior_analyst", "principal_analyst", "lead", "forensic"],
     },
     {
         "name": "Engineering",
-        "roles": ["engineering"],
-    },
-    {
-        "name": "SOC Leads",
-        "roles": ["lead"],
-    },
-    {
-        "name": "Forensics",
-        "roles": ["forensic"],
-    },
-    {
-        "name": "All Hands",
-        "roles": ["analyst", "senior_analyst", "principal_analyst", "lead", "forensic", "engineering", "admin"],
+        "roles": ["engineering", "admin"],
     },
 ]
 
@@ -106,11 +94,30 @@ def seed_chat_rooms():
                     session.add(ChatRoomMember(room_id=room.id, user_id=uid))
                     members_added += 1
 
+        # Remove stale system rooms that are no longer in ROLE_ROOMS
+        valid_names = {cfg["name"] for cfg in ROLE_ROOMS}
+        stale_rooms = session.execute(
+            select(ChatRoom).where(
+                ChatRoom.is_system == True,
+                ChatRoom.name.notin_(valid_names),
+            )
+        ).scalars().all()
+        removed = 0
+        for stale in stale_rooms:
+            # Delete members first, then the room
+            session.execute(
+                select(ChatRoomMember).where(ChatRoomMember.room_id == stale.id)
+            )
+            from sqlalchemy import delete
+            session.execute(delete(ChatRoomMember).where(ChatRoomMember.room_id == stale.id))
+            session.delete(stale)
+            removed += 1
+
         session.commit()
-        if created or members_added:
+        if created or members_added or removed:
             logger.info(
-                "Chat rooms: %d created, %d members added across %d rooms",
-                created, members_added, len(ROLE_ROOMS),
+                "Chat rooms: %d created, %d removed, %d members added across %d rooms",
+                created, removed, members_added, len(ROLE_ROOMS),
             )
     except Exception:
         session.rollback()
