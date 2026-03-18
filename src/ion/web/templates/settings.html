@@ -499,8 +499,14 @@
         <!-- System Information -->
         <section id="system" class="settings-section">
             <h2>System Information</h2>
-            <p class="section-description">View system details and environment information.</p>
+            <p class="section-description">View system details, technologies, and environment information.</p>
 
+            <h3>Technologies Used</h3>
+            <div id="tech-stack" class="info-grid">
+                <div class="loading">Loading technologies...</div>
+            </div>
+
+            <h3 style="margin-top: 2rem;">System Details</h3>
             <div id="system-info" class="info-grid">
                 <div class="loading">Loading system information...</div>
             </div>
@@ -2281,6 +2287,7 @@ function formatDateTime(isoString) {
 // =============================================================================
 
 async function loadSystemInfo() {
+    const techContainer = document.getElementById('tech-stack');
     const infoContainer = document.getElementById('system-info');
     const envContainer = document.getElementById('env-vars');
 
@@ -2295,16 +2302,54 @@ async function loadSystemInfo() {
         const info = await infoResponse.json();
         const env = await envResponse.json();
 
-        // Render system info
+        // Render technologies section
+        const aiModel = info.ai && info.ai.enabled ? info.ai.model : 'Disabled';
+        const aiUrl = info.ai && info.ai.enabled ? info.ai.url : '';
+        techContainer.innerHTML = `
+            <div class="info-card">
+                <div class="info-card-label">Application</div>
+                <div class="info-card-value">ION v${info.ion_version}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Runtime</div>
+                <div class="info-card-value">Python ${info.python_version.split(' ')[0]}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Web Framework</div>
+                <div class="info-card-value">FastAPI ${info.packages['fastapi'] || ''} + Uvicorn</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Database</div>
+                <div class="info-card-value">${info.database_type} via SQLAlchemy</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">AI Model</div>
+                <div class="info-card-value">${aiModel}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">AI Engine</div>
+                <div class="info-card-value">${info.ai && info.ai.enabled ? 'Ollama' : 'N/A'}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Auth</div>
+                <div class="info-card-value">JWT + bcrypt + OIDC</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">PCAP Analysis</div>
+                <div class="info-card-value">dpkt ${info.packages['dpkt'] || ''}</div>
+            </div>
+            <div class="info-card" style="grid-column: 1 / -1;">
+                <div class="info-card-label">Key Dependencies</div>
+                <div class="packages-list">
+                    ${Object.entries(info.packages).map(([name, version]) =>
+                        `<span class="package-badge">${name}==${version}</span>`
+                    ).join('')}
+                </div>
+            </div>
+        `;
+
+        // Render system details
         infoContainer.innerHTML = `
-            <div class="info-card">
-                <div class="info-card-label">ION Version</div>
-                <div class="info-card-value">${info.ion_version}</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">Python Version</div>
-                <div class="info-card-value mono">${info.python_version.split(' ')[0]}</div>
-            </div>
             <div class="info-card">
                 <div class="info-card-label">Platform</div>
                 <div class="info-card-value">${info.platform}</div>
@@ -2331,14 +2376,6 @@ async function loadSystemInfo() {
                 <div class="info-card-value">${info.disk.used_gb} / ${info.disk.total_gb} GB (${info.disk.percent}%)</div>
             </div>
             ` : ''}
-            <div class="info-card" style="grid-column: 1 / -1;">
-                <div class="info-card-label">Installed Packages</div>
-                <div class="packages-list">
-                    ${Object.entries(info.packages).map(([name, version]) =>
-                        `<span class="package-badge">${name}==${version}</span>`
-                    ).join('')}
-                </div>
-            </div>
         `;
 
         // Render environment variables
@@ -2355,7 +2392,8 @@ async function loadSystemInfo() {
         }
 
     } catch (error) {
-        infoContainer.innerHTML = `<p class="loading">Error: ${error.message}</p>`;
+        techContainer.innerHTML = `<p class="loading">Error: ${error.message}</p>`;
+        infoContainer.innerHTML = '';
         envContainer.innerHTML = '';
     }
 }

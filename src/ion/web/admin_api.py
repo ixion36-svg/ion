@@ -516,17 +516,38 @@ async def get_system_info(current_user: User = Depends(require_admin)):
     # Get installed packages
     try:
         import pkg_resources
+        key_packages = [
+            "fastapi", "uvicorn", "sqlalchemy", "pydantic",
+            "jinja2", "python-jose", "passlib", "httpx",
+            "psutil", "dpkt", "rich", "bcrypt", "cryptography",
+            "python-multipart", "python-docx", "beautifulsoup4",
+            "markdown", "slowapi", "ecs-logging", "psycopg2-binary",
+        ]
         packages = {
             pkg.key: pkg.version
             for pkg in pkg_resources.working_set
-            if pkg.key in [
-                "fastapi", "uvicorn", "sqlalchemy", "pydantic",
-                "jinja2", "python-jose", "passlib", "httpx",
-                "psutil", "aiofiles"
-            ]
+            if pkg.key in key_packages
         }
     except Exception:
         packages = {}
+
+    # Get AI model info
+    ai_info = {}
+    try:
+        config_obj = get_config()
+        ai_info = {
+            "enabled": config_obj.ollama_enabled,
+            "model": config_obj.ollama_model,
+            "url": config_obj.ollama_url,
+        }
+    except Exception:
+        pass
+
+    # Get database type
+    db_type = "SQLite"
+    db_url = os.environ.get("ION_DATABASE_URL", "")
+    if "postgresql" in db_url or "postgres" in db_url:
+        db_type = "PostgreSQL"
 
     # Get disk usage for data directory
     config = get_config()
@@ -555,10 +576,12 @@ async def get_system_info(current_user: User = Depends(require_admin)):
         "architecture": platform.machine(),
         "packages": packages,
         "data_directory": str(data_dir),
+        "database_type": db_type,
         "database_path": str(config.db_path),
         "database_size_mb": db_size_mb,
         "config_path": str(get_config_path()),
         "disk": disk_info,
+        "ai": ai_info,
     }
 
 
