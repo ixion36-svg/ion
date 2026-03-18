@@ -18,7 +18,7 @@ ROLE_ROOMS = [
     },
     {
         "name": "Engineering",
-        "roles": ["engineering", "admin"],
+        "roles": ["engineering", "soc_engineer", "senior_engineer", "platform_engineer", "admin"],
     },
 ]
 

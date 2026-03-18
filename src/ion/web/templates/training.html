@@ -2383,6 +2383,22 @@
                 <div class="card-exp">3-5 yrs</div>
                 <div class="card-fw">Practitioner &middot; SFIA 5</div>
             </div>
+            <div class="role-card t2" data-role="soc-engineer" onclick="showRoleDetail('soc-engineer')">
+                <div class="card-tooltip">
+                    <div class="tt-title">SOC Engineer (L1)</div>
+                    <div class="tt-meta">Tier 2 &middot; 1-3 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Practitioner &middot; SFIA 4</div>
+                    <div class="tt-specs">
+                        <span class="tt-spec">Log Onboarding</span>
+                        <span class="tt-spec">SIEM Config</span>
+                        <span class="tt-spec">Elastic</span>
+                    </div>
+                </div>
+                <div class="card-icon"><i class="icon-wrench"></i></div>
+                <div class="card-title">SOC Engineer (L1)</div>
+                <div class="card-exp">1-3 yrs</div>
+                <div class="card-fw">Practitioner &middot; SFIA 4</div>
+            </div>
         </div>
     </div>
 
@@ -2488,6 +2504,53 @@
                 <div class="card-exp">3-6 yrs</div>
                 <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
+            <div class="role-card t3" data-role="senior-engineer" onclick="showRoleDetail('senior-engineer')">
+                <div class="card-tooltip">
+                    <div class="tt-title">Senior SOC Engineer (L2)</div>
+                    <div class="tt-meta">Tier 3 &middot; 3-5 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Principal &middot; SFIA 5</div>
+                    <div class="tt-specs">
+                        <span class="tt-spec">Elastic Admin</span>
+                        <span class="tt-spec">Detection-as-Code</span>
+                    </div>
+                </div>
+                <div class="card-icon"><i class="icon-settings"></i></div>
+                <div class="card-title">Senior SOC Engineer</div>
+                <div class="card-exp">3-5 yrs</div>
+                <div class="card-fw">Principal &middot; SFIA 5</div>
+            </div>
+            <div class="role-card t3" data-role="elastic-engineer" onclick="showRoleDetail('elastic-engineer')">
+                <div class="card-tooltip">
+                    <div class="tt-title">Elastic / SIEM Engineer</div>
+                    <div class="tt-meta">Tier 3 &middot; 3-6 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Principal &middot; SFIA 5</div>
+                    <div class="tt-specs">
+                        <span class="tt-spec">Elasticsearch</span>
+                        <span class="tt-spec">Kibana</span>
+                        <span class="tt-spec">Fleet</span>
+                    </div>
+                </div>
+                <div class="card-icon"><i class="icon-database"></i></div>
+                <div class="card-title">Elastic / SIEM Engineer</div>
+                <div class="card-exp">3-6 yrs</div>
+                <div class="card-fw">Principal &middot; SFIA 5</div>
+            </div>
+            <div class="role-card t3" data-role="platform-engineer" onclick="showRoleDetail('platform-engineer')">
+                <div class="card-tooltip">
+                    <div class="tt-title">Platform Engineer (L3)</div>
+                    <div class="tt-meta">Tier 3 &middot; 4-7 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Principal &middot; SFIA 5</div>
+                    <div class="tt-specs">
+                        <span class="tt-spec">Kubernetes</span>
+                        <span class="tt-spec">Terraform</span>
+                        <span class="tt-spec">Architecture</span>
+                    </div>
+                </div>
+                <div class="card-icon"><i class="icon-server"></i></div>
+                <div class="card-title">Platform Engineer</div>
+                <div class="card-exp">4-7 yrs</div>
+                <div class="card-fw">Principal &middot; SFIA 5</div>
+            </div>
         </div>
     </div>
 
@@ -2591,6 +2654,22 @@
                 <div class="card-icon"><i class="icon-scroll-text"></i></div>
                 <div class="card-title">GRC / Compliance</div>
                 <div class="card-exp">5-8 yrs</div>
+                <div class="card-fw">Chartered &middot; SFIA 6</div>
+            </div>
+            <div class="role-card t4" data-role="siem-architect" onclick="showRoleDetail('siem-architect')">
+                <div class="card-tooltip">
+                    <div class="tt-title">SIEM / Data Architect</div>
+                    <div class="tt-meta">Tier 4 &middot; 6-10 yrs experience</div>
+                    <div class="tt-meta" style="color:#34d399;">UKCSC Chartered &middot; SFIA 6</div>
+                    <div class="tt-specs">
+                        <span class="tt-spec">Elastic at Scale</span>
+                        <span class="tt-spec">Data Architecture</span>
+                        <span class="tt-spec">Kafka</span>
+                    </div>
+                </div>
+                <div class="card-icon"><i class="icon-network"></i></div>
+                <div class="card-title">SIEM / Data Architect</div>
+                <div class="card-exp">6-10 yrs</div>
                 <div class="card-fw">Chartered &middot; SFIA 6</div>
             </div>
         </div>
@@ -3218,11 +3297,13 @@ const ROLES = {
             { name: 'GCIA', provider: 'GIAC / SANS', price: 7900, difficulty: 'advanced' },
             { name: 'Splunk Enterprise Certified Admin', provider: 'Splunk', price: 105, difficulty: 'intermediate' },
             { name: 'Elastic Certified Engineer', provider: 'Elastic', price: 300, difficulty: 'intermediate' },
+            { name: 'Elastic Certified SIEM Analyst', provider: 'Elastic', price: 300, difficulty: 'intermediate' },
         ],
         pathways: [
             { name: 'Direct', steps: ['l1-analyst', 'l2-analyst', 'detection-engineer'] },
             { name: 'Senior Track', steps: ['l1-analyst', 'l2-analyst', 'l3-analyst', 'detection-engineer'] },
             { name: 'Engineering Track', steps: ['l1-analyst', 'l2-analyst', 'security-engineer', 'detection-engineer'] },
+            { name: 'SOC Engineering Track', steps: ['l1-analyst', 'soc-engineer', 'detection-engineer'] },
         ],
     },
     'security-engineer': {
@@ -3459,6 +3540,7 @@ const ROLES = {
             { name: 'Leadership Track', steps: ['l1-analyst', 'l2-analyst', 'l3-analyst', 'soc-lead', 'security-architect'] },
             { name: 'Cloud Track', steps: ['l1-analyst', 'l2-analyst', 'security-engineer', 'cloud-security', 'security-architect'] },
             { name: 'Senior + Engineering', steps: ['l1-analyst', 'l2-analyst', 'l3-analyst', 'security-engineer', 'security-architect'] },
+            { name: 'Platform Track', steps: ['l1-analyst', 'soc-engineer', 'senior-engineer', 'platform-engineer', 'security-architect'] },
         ],
     },
     'grc': {
@@ -3500,6 +3582,206 @@ const ROLES = {
             { name: 'Intel Track', steps: ['l1-analyst', 'l2-analyst', 'threat-intel', 'grc'] },
         ],
     },
+    // =========================================================================
+    // Engineering Career Track
+    // =========================================================================
+    'soc-engineer': {
+        title: 'SOC Engineer (L1)',
+        tier: 2,
+        tierLabel: 'Core',
+        ukcsc: 'Practitioner',
+        sfia: 4,
+        csGrade: 'HEO',
+        dcaTrain: 'DC1+',
+        govProf: 'Working',
+        icon: '\u{1F527}',
+        experience: '1-3 years',
+        description: 'The engineering entry point. SOC Engineers onboard log sources, configure SIEM platforms, maintain data pipelines, and support SOC operations with tooling and automation. This is where every security engineering career begins.',
+        prerequisites: [
+            'Basic networking and Linux/Windows system administration',
+            'Familiarity with at least one SIEM platform (Elastic, Splunk)',
+            'Understanding of log formats (syslog, JSON, CEF, ECS)',
+            'Basic scripting ability (Python or Bash)',
+        ],
+        subspecializations: ['Log Onboarding', 'Data Pipeline Support', 'Agent Deployment', 'Automation Basics'],
+        responsibilities: [
+            'Onboard new log sources into the SIEM',
+            'Maintain data parsers and ingest pipelines',
+            'Deploy and update security agents (Elastic Agent, Beats)',
+            'Configure basic SIEM dashboards and visualizations',
+            'Troubleshoot data ingestion and parsing issues',
+            'Support SOC analysts with tooling and access',
+        ],
+        skills: ['SIEM Configuration', 'Log Parsing', 'Linux Administration', 'Basic Python/Bash', 'Elastic Stack Basics', 'Agent Deployment', 'Syslog/Beats', 'Networking Fundamentals'],
+        certs: [
+            { name: 'CompTIA Security+', provider: 'CompTIA', price: 330, difficulty: 'beginner' },
+            { name: 'Elastic Certified Analyst', provider: 'Elastic', price: 300, difficulty: 'beginner' },
+            { name: 'Splunk Core Certified User', provider: 'Splunk', price: 105, difficulty: 'beginner' },
+            { name: 'CompTIA Linux+', provider: 'CompTIA', price: 330, difficulty: 'intermediate' },
+        ],
+        pathways: [
+            { name: 'Direct', steps: ['l1-analyst', 'soc-engineer'] },
+        ],
+    },
+    'senior-engineer': {
+        title: 'Senior SOC Engineer (L2)',
+        tier: 3,
+        tierLabel: 'Specialist & Leadership',
+        ukcsc: 'Principal',
+        sfia: 5,
+        csGrade: 'SEO / G7',
+        dcaTrain: 'DC2+',
+        govProf: 'Practitioner',
+        icon: '\u{2699}',
+        experience: '3-5 years',
+        description: 'Handles detection engineering, data pipeline architecture, Elastic cluster management, and advanced SIEM operations. Senior Engineers build the detection logic and data infrastructure that powers the SOC.',
+        prerequisites: [
+            '1-2 years as SOC Engineer or Detection Engineer',
+            'Proficiency with Elastic or Splunk administration',
+            'Experience with CI/CD pipelines',
+            'Strong scripting and automation skills (Python, Go)',
+        ],
+        subspecializations: ['Detection Engineering', 'Pipeline Architecture', 'SIEM Administration', 'SOAR Development'],
+        responsibilities: [
+            'Build and maintain detection rules and analytics',
+            'Manage Elastic clusters and index lifecycle policies',
+            'Design data enrichment and normalization pipelines',
+            'Implement detection-as-code workflows with CI/CD',
+            'Optimize SIEM performance and query efficiency',
+            'Mentor L1 engineers on platform operations',
+        ],
+        skills: ['Elastic Administration', 'Detection-as-Code', 'CI/CD Pipelines', 'Python/Go', 'Index Lifecycle Management', 'Logstash/Ingest Pipelines', 'Performance Tuning', 'Git/Version Control'],
+        certs: [
+            { name: 'Elastic Certified Engineer', provider: 'Elastic', price: 300, difficulty: 'intermediate' },
+            { name: 'Elastic Certified Observability Engineer', provider: 'Elastic', price: 300, difficulty: 'intermediate' },
+            { name: 'Splunk Enterprise Certified Admin', provider: 'Splunk', price: 105, difficulty: 'intermediate' },
+            { name: 'GCIA', provider: 'GIAC / SANS', price: 7900, difficulty: 'advanced' },
+        ],
+        pathways: [
+            { name: 'Engineering Track', steps: ['l1-analyst', 'soc-engineer', 'senior-engineer'] },
+            { name: 'Detection Track', steps: ['l1-analyst', 'l2-analyst', 'detection-engineer', 'senior-engineer'] },
+        ],
+    },
+    'elastic-engineer': {
+        title: 'Elastic / SIEM Engineer',
+        tier: 3,
+        tierLabel: 'Specialist & Leadership',
+        ukcsc: 'Principal',
+        sfia: 5,
+        csGrade: 'SEO / G7',
+        dcaTrain: 'DC2+',
+        govProf: 'Practitioner',
+        icon: '\u{1F4BE}',
+        experience: '3-6 years',
+        description: 'Deep specialist in the Elastic Stack (Elasticsearch, Kibana, Logstash, Beats, Fleet). Manages cluster health, designs index strategies, builds custom integrations, and optimizes search performance for security operations at scale.',
+        prerequisites: [
+            '1-2 years as SOC Engineer or sysadmin with Elastic experience',
+            'Strong understanding of Elasticsearch internals (shards, replicas, mappings)',
+            'Experience with log ingestion at scale (1TB+/day)',
+            'Familiarity with Fleet and Elastic Agent management',
+        ],
+        subspecializations: ['Cluster Architecture', 'Ingest Pipeline Design', 'Elastic Security', 'Fleet & Agent Management'],
+        responsibilities: [
+            'Design and manage multi-node Elasticsearch clusters',
+            'Build custom ingest pipelines and enrichment processors',
+            'Optimize index mappings and search performance',
+            'Manage Elastic Security detection rules and exceptions',
+            'Administer Fleet server and agent policies',
+            'Monitor cluster health, capacity plan, and scale',
+        ],
+        skills: ['Elasticsearch Internals', 'Kibana Development', 'Logstash/Beats', 'Index Lifecycle Management', 'Cluster Tuning', 'EQL/ES|QL', 'Fleet/Agent Policies', 'Watcher/Alerting'],
+        certs: [
+            { name: 'Elastic Certified Engineer', provider: 'Elastic', price: 300, difficulty: 'intermediate' },
+            { name: 'Elastic Certified Analyst', provider: 'Elastic', price: 300, difficulty: 'beginner' },
+            { name: 'Elastic Certified Observability Engineer', provider: 'Elastic', price: 300, difficulty: 'intermediate' },
+            { name: 'Elastic Certified SIEM Analyst', provider: 'Elastic', price: 300, difficulty: 'intermediate' },
+        ],
+        pathways: [
+            { name: 'Engineering Track', steps: ['l1-analyst', 'soc-engineer', 'elastic-engineer'] },
+            { name: 'Detection Track', steps: ['l1-analyst', 'l2-analyst', 'detection-engineer', 'elastic-engineer'] },
+            { name: 'Senior Track', steps: ['l1-analyst', 'soc-engineer', 'senior-engineer', 'elastic-engineer'] },
+        ],
+    },
+    'platform-engineer': {
+        title: 'Platform Engineer (L3)',
+        tier: 3,
+        tierLabel: 'Specialist & Leadership',
+        ukcsc: 'Principal',
+        sfia: 5,
+        csGrade: 'SEO / G7',
+        dcaTrain: 'DC2+',
+        govProf: 'Practitioner',
+        icon: '\u{1F3D7}',
+        experience: '4-7 years',
+        description: 'Owns the security platform infrastructure at scale. Platform Engineers manage Kubernetes orchestration, multi-cluster Elastic deployments, infrastructure-as-code, and ensure reliability of the entire security tooling stack.',
+        prerequisites: [
+            '2+ years as Senior SOC Engineer or Security Engineer',
+            'Kubernetes and container orchestration experience',
+            'IaC proficiency (Terraform, Ansible)',
+            'Cloud platform experience (AWS/Azure/GCP)',
+        ],
+        subspecializations: ['Infrastructure Engineering', 'Security Platform Architecture', 'Observability Engineering', 'SRE for Security'],
+        responsibilities: [
+            'Design and maintain security platform infrastructure',
+            'Manage multi-cluster Elastic deployments',
+            'Implement infrastructure-as-code for security tooling',
+            'Build observability and monitoring for SOC platforms',
+            'Capacity planning and horizontal/vertical scaling',
+            'Disaster recovery and business continuity for security systems',
+        ],
+        skills: ['Kubernetes', 'Terraform/Ansible', 'Docker', 'Cloud Platforms (AWS/Azure)', 'Elastic Cluster Architecture', 'Prometheus/Grafana', 'CI/CD for Infrastructure', 'Capacity Planning'],
+        certs: [
+            { name: 'Elastic Certified Engineer', provider: 'Elastic', price: 300, difficulty: 'intermediate' },
+            { name: 'CKA', provider: 'CNCF', price: 295, difficulty: 'intermediate' },
+            { name: 'AWS Security Specialty', provider: 'Amazon', price: 240, difficulty: 'advanced' },
+            { name: 'Terraform Associate', provider: 'HashiCorp', price: 65, difficulty: 'beginner' },
+        ],
+        pathways: [
+            { name: 'Engineering Track', steps: ['l1-analyst', 'soc-engineer', 'senior-engineer', 'platform-engineer'] },
+            { name: 'Security Engineering Track', steps: ['l1-analyst', 'l2-analyst', 'security-engineer', 'platform-engineer'] },
+            { name: 'Elastic Track', steps: ['l1-analyst', 'soc-engineer', 'elastic-engineer', 'platform-engineer'] },
+        ],
+    },
+    'siem-architect': {
+        title: 'SIEM / Data Architect',
+        tier: 4,
+        tierLabel: 'Expert',
+        ukcsc: 'Chartered',
+        sfia: 6,
+        csGrade: 'G7 / G6',
+        dcaTrain: 'MSc / Specialist',
+        govProf: 'Expert',
+        icon: '\u{1F3DB}',
+        experience: '6-10 years',
+        description: 'Designs enterprise SIEM architecture, data lake strategies, and multi-tenant security platforms. Responsible for long-term data strategy, vendor evaluation, and aligning security data infrastructure with organizational requirements at petabyte scale.',
+        prerequisites: [
+            'Extensive experience with Elastic or Splunk at scale',
+            'Cloud architecture and data engineering background',
+            'Understanding of event streaming (Kafka, Kinesis)',
+            'Experience with capacity planning for petabyte-scale data',
+        ],
+        subspecializations: ['Enterprise SIEM Design', 'Security Data Lake', 'Multi-Tenant Architecture', 'Event Streaming (Kafka/Kinesis)'],
+        responsibilities: [
+            'Design enterprise SIEM architecture and data flows',
+            'Define data retention and lifecycle strategies',
+            'Evaluate and select security data platforms',
+            'Architect multi-tenant security deployments',
+            'Lead SIEM migration and consolidation projects',
+            'Define standards for log format, data quality, and compliance',
+        ],
+        skills: ['Enterprise Data Architecture', 'Elastic at Scale', 'Kafka/Event Streaming', 'Data Lake Design', 'Cost Optimization', 'Multi-Tenancy', 'Compliance-Aware Retention', 'Technical Leadership'],
+        certs: [
+            { name: 'Elastic Certified Engineer', provider: 'Elastic', price: 300, difficulty: 'intermediate' },
+            { name: 'Elastic Certified Observability Engineer', provider: 'Elastic', price: 300, difficulty: 'intermediate' },
+            { name: 'TOGAF', provider: 'The Open Group', price: 550, difficulty: 'advanced' },
+            { name: 'CISSP', provider: 'ISC2', price: 610, difficulty: 'expert' },
+        ],
+        pathways: [
+            { name: 'Engineering Track', steps: ['l1-analyst', 'soc-engineer', 'senior-engineer', 'siem-architect'] },
+            { name: 'Elastic Track', steps: ['l1-analyst', 'soc-engineer', 'elastic-engineer', 'siem-architect'] },
+            { name: 'Platform Track', steps: ['l1-analyst', 'soc-engineer', 'senior-engineer', 'platform-engineer', 'siem-architect'] },
+        ],
+    },
 };
 
 // Short display names for step indicators
@@ -3519,6 +3801,11 @@ const SHORT_NAMES = {
     'cloud-security': 'Cloud Security',
     'security-architect': 'Sec Architect',
     'grc': 'GRC',
+    'soc-engineer': 'SOC Eng',
+    'senior-engineer': 'Sr Engineer',
+    'elastic-engineer': 'Elastic Eng',
+    'platform-engineer': 'Platform Eng',
+    'siem-architect': 'SIEM Architect',
 };
 
 // =========================================================================

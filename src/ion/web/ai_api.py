@@ -470,7 +470,8 @@ async def pull_model(
 ):
     """Pull/download a model (streaming progress)."""
     # Check if user has admin role
-    if "admin" not in current_user.roles and "engineering" not in current_user.roles:
+    eng_roles = {"admin", "engineering", "senior_engineer", "platform_engineer"}
+    if not eng_roles.intersection(current_user.roles):
         raise HTTPException(status_code=403, detail="Admin or engineering role required")
 
     service = get_ollama_service()

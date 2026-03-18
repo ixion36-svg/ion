@@ -188,7 +188,7 @@ function updateNavForPermissions() {
     const roles = currentUserData.focus_role ? [currentUserData.focus_role] : currentUserData.roles;
 
     const isAdmin = roles.includes('admin');
-    const isEngineer = ['engineering', 'admin'].some(r => roles.includes(r));
+    const isEngineer = ['engineering', 'soc_engineer', 'senior_engineer', 'platform_engineer', 'admin'].some(r => roles.includes(r));
 
     // Permission-based nav visibility — security links shown if user has security:read
     ['nav-security-link', 'nav-topology-link'].forEach(id => {
