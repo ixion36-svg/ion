@@ -26,9 +26,60 @@ echo "  Data directory: ${DATA_DIR}"
 # Create config directory if needed
 mkdir -p "${CONFIG_DIR}"
 
+# =============================================================================
+# Fresh database option: ION_FRESH_DB=true wipes existing data
+# =============================================================================
+if [ "${ION_FRESH_DB:-false}" = "true" ]; then
+    echo ""
+    echo "============================================"
+    echo "  ION_FRESH_DB=true — wiping database"
+    echo "============================================"
+    if [ -f "${SQLITE_DB}" ]; then
+        echo "  Removing SQLite database: ${SQLITE_DB}"
+        rm -f "${SQLITE_DB}"
+    fi
+    if [ -f "${MIGRATED_MARKER}" ]; then
+        rm -f "${MIGRATED_MARKER}"
+    fi
+    # Drop and recreate PostgreSQL database if configured
+    if [ -n "${ION_DATABASE_URL}" ]; then
+        echo "  Dropping all PostgreSQL tables..."
+        python -c "
+from sqlalchemy import create_engine, text, inspect
+import os
+url = os.environ['ION_DATABASE_URL']
+engine = create_engine(url)
+with engine.connect() as conn:
+    # Get all table names and drop them
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    if tables:
+        conn.execute(text('DROP SCHEMA public CASCADE'))
+        conn.execute(text('CREATE SCHEMA public'))
+        conn.commit()
+        print(f'  Dropped {len(tables)} tables')
+    else:
+        print('  No existing tables to drop')
+" 2>/dev/null || echo "  (PostgreSQL not yet available — tables will be created fresh)"
+    fi
+    # Remove seeder marker so KB/playbooks get re-seeded
+    rm -f "${CONFIG_DIR}/.seeded"*
+    echo "  Database wiped — starting fresh"
+    echo ""
+fi
+
 # Determine database backend
 if [ -n "${ION_DATABASE_URL}" ]; then
     echo "  Database: PostgreSQL"
+
+    # Warn if SQLite database still exists alongside PostgreSQL
+    if [ -f "${SQLITE_DB}" ]; then
+        echo ""
+        echo "  WARNING: SQLite database found at ${SQLITE_DB}"
+        echo "  PostgreSQL is configured — SQLite will NOT be used."
+        echo "  Set ION_FRESH_DB=true to remove it, or delete manually."
+        echo ""
+    fi
 
     # Wait for PostgreSQL to be ready (in case healthcheck hasn't caught up)
     echo "Waiting for database..."
