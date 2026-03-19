@@ -275,7 +275,7 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: user_sessions.active_role_id")
 
-    # Migration for users.gitlab_username (v0.9.13+)
+    # Migration for users.gitlab_username, elastic_uid (v0.9.13+)
     if insp.has_table("users"):
         existing = {col["name"] for col in insp.get_columns("users")}
         if "gitlab_username" not in existing:
@@ -284,6 +284,12 @@ def _run_migrations(engine: Engine) -> None:
                     text("ALTER TABLE users ADD COLUMN gitlab_username VARCHAR(255)")
                 )
                 logger.info("Migrated: users.gitlab_username")
+        if "elastic_uid" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE users ADD COLUMN elastic_uid VARCHAR(255)")
+                )
+                logger.info("Migrated: users.elastic_uid")
 
     # Migration for chat_messages.reply_to_id (v0.9.16+)
     if insp.has_table("chat_messages"):

@@ -171,6 +171,8 @@ class UserUpdate(BaseModel):
     display_name: Optional[str] = None
     is_active: Optional[bool] = None
     employment_type: Optional[str] = None
+    gitlab_username: Optional[str] = None
+    elastic_uid: Optional[str] = None
 
 
 class UserRolesUpdate(BaseModel):
@@ -718,6 +720,8 @@ async def get_user(
         "last_login": user.last_login.isoformat() if user.last_login else None,
         "roles": [r.name for r in user.roles],
         "employment_type": getattr(user, "employment_type", None) or "cs",
+        "gitlab_username": getattr(user, "gitlab_username", None) or "",
+        "elastic_uid": getattr(user, "elastic_uid", None) or "",
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "updated_at": user.updated_at.isoformat() if user.updated_at else None,
     }
@@ -761,6 +765,11 @@ async def update_user(
     # Update employment type if provided
     if user_update.employment_type and user_update.employment_type in ("cs", "contractor", "military", "other"):
         user.employment_type = user_update.employment_type
+    # Update external service identifiers
+    if user_update.gitlab_username is not None:
+        user.gitlab_username = user_update.gitlab_username or None
+    if user_update.elastic_uid is not None:
+        user.elastic_uid = user_update.elastic_uid or None
 
     audit_repo.create(
         user_id=current_user.id,
@@ -3602,6 +3611,26 @@ async def create_case(
 
     await _sync_case_to_es(new_case, session)
 
+    # Resolve Kibana assignee UID for case creation
+    create_assignee_uid = None
+    if data.assigned_to_id:
+        assignee_user = session.query(User).filter_by(id=data.assigned_to_id).first()
+        if assignee_user:
+            if assignee_user.elastic_uid:
+                create_assignee_uid = assignee_user.elastic_uid
+            else:
+                try:
+                    from ion.services.kibana_cases_service import get_kibana_cases_service
+                    kb_svc = get_kibana_cases_service()
+                    if kb_svc.enabled:
+                        uid = kb_svc.resolve_user_uid(assignee_user.username)
+                        if uid:
+                            create_assignee_uid = uid
+                            assignee_user.elastic_uid = uid
+                            session.commit()
+                except Exception:
+                    pass
+
     # Sync to Kibana Cases if enabled
     kibana_url = None
     kibana_result = sync_new_case_to_kibana(
@@ -3615,6 +3644,7 @@ async def create_case(
         observables=case_observables,
         alert_ids=data.alert_ids,
         triggered_rules=data.triggered_rules,
+        assignee_elastic_uid=create_assignee_uid,
     )
     if kibana_result:
         new_case.kibana_case_id = kibana_result["kibana_case_id"]
@@ -3890,6 +3920,28 @@ async def update_case(
         except Exception as e:
             logger.warning(f"Failed to sync alert workflow_status on case update: {e}")
 
+    # Resolve Kibana assignee UID if assignee changed
+    assignee_elastic_uid = None
+    if data.assigned_to_id is not None and case.kibana_case_id:
+        assignee = session.query(User).filter_by(id=data.assigned_to_id).first()
+        if assignee:
+            # Use cached elastic_uid, or look it up from Kibana and cache it
+            if assignee.elastic_uid:
+                assignee_elastic_uid = assignee.elastic_uid
+            else:
+                try:
+                    from ion.services.kibana_cases_service import get_kibana_cases_service
+                    kb_service = get_kibana_cases_service()
+                    if kb_service.enabled:
+                        uid = kb_service.resolve_user_uid(assignee.username)
+                        if uid:
+                            assignee_elastic_uid = uid
+                            assignee.elastic_uid = uid
+                            session.commit()
+                            logger.info("Cached elastic_uid for user %s: %s", assignee.username, uid)
+                except Exception as e:
+                    logger.debug("Failed to resolve Kibana UID for %s: %s", assignee.username, e)
+
     # Sync updates to Kibana
     new_version, kibana_url = sync_case_update_to_kibana(
         kibana_case_id=case.kibana_case_id,
@@ -3898,6 +3950,7 @@ async def update_case(
         description=data.description,
         status=data.status,
         severity=data.severity,
+        assignee_elastic_uid=assignee_elastic_uid,
     )
     if new_version:
         case.kibana_case_version = new_version

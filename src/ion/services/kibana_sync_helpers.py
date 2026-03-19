@@ -24,6 +24,7 @@ def sync_new_case_to_kibana(
     observables: Optional[List[Dict[str, Any]]],
     alert_ids: Optional[List[str]],
     triggered_rules: Optional[List[str]],
+    assignee_elastic_uid: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Sync a newly created case to Kibana.
 
@@ -45,11 +46,14 @@ def sync_new_case_to_kibana(
             triggered_rules=triggered_rules,
         )
 
+        assignees = [{"uid": assignee_elastic_uid}] if assignee_elastic_uid else None
+
         kibana_case = service.create_case(
             title=f"[{case_number}] {title}",
             description=kibana_desc.strip(),
             severity=severity or "low",
             tags=[case_number, "ion"],
+            assignees=assignees,
         )
         if not kibana_case:
             return None
@@ -106,8 +110,13 @@ def sync_case_update_to_kibana(
     description: Optional[str] = None,
     status: Optional[str] = None,
     severity: Optional[str] = None,
+    assignee_elastic_uid: Optional[str] = None,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Sync case updates to Kibana.
+
+    Args:
+        assignee_elastic_uid: Elastic user profile UID for the assignee.
+            If provided, the Kibana case assignees list will be set to this user.
 
     Returns (kibana_case_version, kibana_url) or (None, None) if skipped/failed.
     """
@@ -129,6 +138,11 @@ def sync_case_update_to_kibana(
             }
             kibana_status = status_map.get(status)
 
+        # Build assignees payload if UID provided
+        assignees = None
+        if assignee_elastic_uid is not None:
+            assignees = [{"uid": assignee_elastic_uid}]
+
         # Get current version from Kibana
         kibana_case = service.get_case(kibana_case_id)
         version = None
@@ -141,6 +155,7 @@ def sync_case_update_to_kibana(
                 description=description,
                 status=kibana_status,
                 severity=severity,
+                assignees=assignees,
             )
             if updated:
                 version = updated.get("version")

@@ -103,6 +103,14 @@
                 </label>
             </div>
             <div class="form-group">
+                <label for="edit-gitlab-username">GitLab Username</label>
+                <input type="text" id="edit-gitlab-username" placeholder="GitLab username for issue filtering">
+            </div>
+            <div class="form-group">
+                <label for="edit-elastic-uid">Elastic UID</label>
+                <input type="text" id="edit-elastic-uid" placeholder="Auto-resolved from Kibana on case assign">
+            </div>
+            <div class="form-group">
                 <label>Roles</label>
                 <div id="edit-user-roles" class="checkbox-group"></div>
             </div>
@@ -263,6 +271,8 @@ async function showEditUserModal(userId) {
         document.getElementById('edit-username').value = user.username;
         document.getElementById('edit-email').value = user.email;
         document.getElementById('edit-display-name').value = user.display_name || '';
+        document.getElementById('edit-gitlab-username').value = user.gitlab_username || '';
+        document.getElementById('edit-elastic-uid').value = user.elastic_uid || '';
         document.getElementById('edit-is-active').checked = user.is_active;
 
         // Set role checkboxes
@@ -287,7 +297,9 @@ async function updateUser(event) {
         username: document.getElementById('edit-username').value,
         email: document.getElementById('edit-email').value,
         display_name: document.getElementById('edit-display-name').value || null,
-        is_active: document.getElementById('edit-is-active').checked
+        is_active: document.getElementById('edit-is-active').checked,
+        gitlab_username: document.getElementById('edit-gitlab-username').value || null,
+        elastic_uid: document.getElementById('edit-elastic-uid').value || null,
     };
 
     try {

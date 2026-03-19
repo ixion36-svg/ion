@@ -59,6 +59,8 @@ class User(Base, TimestampMixin):
 
     # External service usernames for integration filtering
     gitlab_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # Elastic/Kibana user profile UID for case assignment sync
+    elastic_uid: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Relationships
     roles: Mapped[List["Role"]] = relationship(

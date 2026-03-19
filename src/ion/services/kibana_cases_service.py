@@ -426,6 +426,53 @@ class KibanaCasesService:
             logger.error(f"Error deleting Kibana case: {e}")
             return False
 
+    def suggest_user_profiles(self, name: str) -> List[Dict[str, Any]]:
+        """Look up Kibana/Elastic user profile UIDs by username.
+
+        Uses the Kibana internal security API to find user profiles.
+        Returns list of profiles with 'uid', 'user.username', etc.
+        """
+        if not self.enabled:
+            return []
+
+        try:
+            # Try Kibana's internal suggest endpoint (works on 8.x and 9.x)
+            response = self.client.post(
+                "/internal/security/user_profile/_suggest",
+                json={"name": name, "size": 5},
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return data if isinstance(data, list) else data.get("profiles", [])
+
+            # Fallback: try the public suggest endpoint (Kibana 9.x)
+            response = self.client.post(
+                "/api/security/user_profile/_suggest",
+                json={"name": name, "size": 5},
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return data if isinstance(data, list) else data.get("profiles", [])
+
+            logger.debug("Kibana user profile suggest returned %d", response.status_code)
+            return []
+        except Exception as e:
+            logger.debug("Failed to suggest Kibana user profiles: %s", e)
+            return []
+
+    def resolve_user_uid(self, username: str) -> Optional[str]:
+        """Resolve an ION username to a Kibana/Elastic user profile UID.
+
+        Returns the profile UID string, or None if not found.
+        """
+        profiles = self.suggest_user_profiles(username)
+        for profile in profiles:
+            # Match exact username
+            profile_user = profile.get("user", {})
+            if isinstance(profile_user, dict) and profile_user.get("username") == username:
+                return profile.get("uid")
+        return None
+
     def get_case_url(self, case_id: str) -> str:
         """Get the Kibana UI URL for a case."""
         base_url = self.config.get("url", "").rstrip("/")
