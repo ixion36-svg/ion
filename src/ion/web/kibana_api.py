@@ -92,16 +92,39 @@ async def get_kibana_status(
 @router.get("/cases")
 async def list_kibana_cases(
     status: Optional[str] = None,
+    include_closed: bool = False,
     page: int = 1,
     per_page: int = 20,
     current_user: User = Depends(get_current_user),
 ):
-    """List cases from Kibana."""
+    """List cases from Kibana.
+
+    By default excludes closed cases to avoid exposing completed investigation data.
+    Pass include_closed=true to see all cases including closed ones.
+    """
     service = get_kibana_cases_service()
     if not service.enabled:
         raise HTTPException(status_code=503, detail="Kibana Cases integration not enabled")
 
-    result = service.list_cases(status=status, page=page, per_page=per_page)
+    if status:
+        # Explicit status filter overrides include_closed
+        result = service.list_cases(status=status, page=page, per_page=per_page)
+    elif include_closed:
+        # All statuses
+        result = service.list_cases(page=page, per_page=per_page)
+    else:
+        # Default: only open + in-progress (fetch both and merge)
+        result_open = service.list_cases(status="open", page=page, per_page=per_page)
+        result_inprog = service.list_cases(status="in-progress", page=page, per_page=per_page)
+        combined = result_open.get("cases", []) + result_inprog.get("cases", [])
+        # Sort by updated_at desc
+        combined.sort(key=lambda c: c.get("updated_at", ""), reverse=True)
+        result = {
+            "cases": combined[:per_page],
+            "total": result_open.get("total", 0) + result_inprog.get("total", 0),
+            "page": page,
+            "per_page": per_page,
+        }
     if "error" in result and result.get("error"):
         raise HTTPException(status_code=502, detail=result["error"])
 

@@ -223,25 +223,35 @@ class ElasticsearchService:
         severity: Optional[str] = None,
         status: Optional[str] = None,
         limit: int = 50,
+        include_closed: bool = False,
+        time_from: Optional[str] = None,
+        time_to: Optional[str] = None,
     ) -> List[ElasticsearchAlert]:
         """Fetch alerts from Elasticsearch.
 
         Args:
-            hours: Number of hours to look back
+            hours: Number of hours to look back (ignored if time_from is set)
             severity: Filter by severity (critical, high, medium, low, info)
-            status: Filter by status (open, acknowledged, resolved)
+            status: Filter by status (open, acknowledged, closed)
             limit: Maximum number of alerts to return
+            include_closed: Include closed/resolved alerts (default False).
+                When False, alerts with workflow_status=closed are excluded
+                to avoid exposing data from completed investigations.
+            time_from: Absolute start time (ISO 8601). Overrides hours param.
+            time_to: Absolute end time (ISO 8601). Defaults to now.
         """
-        # Build query
+        # Build query — use absolute range if provided, otherwise relative hours
+        if time_from:
+            time_range = {"gte": time_from}
+            if time_to:
+                time_range["lte"] = time_to
+            else:
+                time_range["lte"] = "now"
+        else:
+            time_range = {"gte": f"now-{hours}h", "lte": "now"}
+
         must_clauses = [
-            {
-                "range": {
-                    "@timestamp": {
-                        "gte": f"now-{hours}h",
-                        "lte": "now"
-                    }
-                }
-            }
+            {"range": {"@timestamp": time_range}}
         ]
 
         if severity:
@@ -270,15 +280,25 @@ class ElasticsearchService:
                 }
             })
 
+        must_not_clauses = [
+            {"exists": {"field": "kibana.alert.building_block_type"}}
+        ]
+
+        # Exclude closed alerts by default to avoid exposing completed investigations
+        if not include_closed and not status:
+            must_not_clauses.extend([
+                {"term": {"kibana.alert.workflow_status": "closed"}},
+                {"term": {"status": "closed"}},
+                {"term": {"status": "resolved"}},
+            ])
+
         query = {
             "size": limit,
             "sort": [{"@timestamp": {"order": "desc"}}],
             "query": {
                 "bool": {
                     "must": must_clauses,
-                    "must_not": [
-                        {"exists": {"field": "kibana.alert.building_block_type"}}
-                    ]
+                    "must_not": must_not_clauses,
                 }
             }
         }
@@ -1864,4 +1884,178 @@ class ElasticsearchService:
             "total_searched": len(results),
             "found_count": found_count,
             "not_found_count": not_found_count,
+        }
+
+    # =========================================================================
+    # Engineering System Analytics
+    # =========================================================================
+
+    async def get_system_analytics(
+        self,
+        hours: int = 24,
+        index_pattern: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Aggregate alert/event metrics per system using data_stream.namespace and _index.
+
+        Uses ES aggregations so all computation happens server-side.
+        Returns per-system alert counts, severity breakdown, top rules, and time histograms.
+        """
+        if not self.is_configured:
+            return {"error": "Elasticsearch is not configured", "systems": []}
+
+        pattern = index_pattern or self.alert_index
+
+        # Pick histogram interval based on window
+        if hours <= 6:
+            interval = "15m"
+        elif hours <= 48:
+            interval = "1h"
+        elif hours <= 168:
+            interval = "6h"
+        else:
+            interval = "1d"
+
+        query = {
+            "size": 0,
+            "query": {
+                "bool": {
+                    "must": [
+                        {"range": {"@timestamp": {"gte": f"now-{hours}h", "lte": "now"}}}
+                    ],
+                    "must_not": [
+                        {"term": {"kibana.alert.building_block_type": "default"}}
+                    ]
+                }
+            },
+            "aggs": {
+                # Primary aggregation: by data_stream.namespace
+                "by_namespace": {
+                    "terms": {"field": "data_stream.namespace", "size": 50, "missing": "_unknown_"},
+                    "aggs": {
+                        "by_severity": {
+                            "terms": {"field": "kibana.alert.severity", "size": 10, "missing": "unknown"}
+                        },
+                        "by_status": {
+                            "terms": {"field": "kibana.alert.workflow_status", "size": 10, "missing": "open"}
+                        },
+                        "top_rules": {
+                            "terms": {"field": "kibana.alert.rule.name", "size": 10}
+                        },
+                        "over_time": {
+                            "date_histogram": {
+                                "field": "@timestamp",
+                                "fixed_interval": interval,
+                                "min_doc_count": 0,
+                                "extended_bounds": {
+                                    "min": f"now-{hours}h",
+                                    "max": "now"
+                                }
+                            }
+                        },
+                        "unique_hosts": {
+                            "cardinality": {"field": "host.name"}
+                        },
+                        "unique_users": {
+                            "cardinality": {"field": "user.name"}
+                        },
+                        "by_dataset": {
+                            "terms": {"field": "data_stream.dataset", "size": 20}
+                        }
+                    }
+                },
+                # Secondary: by index name (captures non-data-stream indices)
+                "by_index": {
+                    "terms": {"field": "_index", "size": 50},
+                    "aggs": {
+                        "by_severity": {
+                            "terms": {"field": "kibana.alert.severity", "size": 10, "missing": "unknown"}
+                        }
+                    }
+                },
+                # Overall severity breakdown
+                "total_by_severity": {
+                    "terms": {"field": "kibana.alert.severity", "size": 10, "missing": "unknown"}
+                },
+                # Overall time histogram
+                "total_over_time": {
+                    "date_histogram": {
+                        "field": "@timestamp",
+                        "fixed_interval": interval,
+                        "min_doc_count": 0,
+                        "extended_bounds": {
+                            "min": f"now-{hours}h",
+                            "max": "now"
+                        }
+                    }
+                }
+            }
+        }
+
+        try:
+            encoded = pattern.replace(",", "%2C")
+            result = await self._request("POST", f"/{encoded}/_search", json=query)
+        except ElasticsearchError as e:
+            if "index_not_found" in str(e).lower():
+                return {"systems": [], "indices": [], "total": 0, "error": None}
+            return {"error": str(e), "systems": [], "indices": [], "total": 0}
+
+        total = result.get("hits", {}).get("total", {})
+        if isinstance(total, dict):
+            total = total.get("value", 0)
+
+        aggs = result.get("aggregations", {})
+
+        # Parse namespace buckets into system entries
+        systems = []
+        ns_buckets = aggs.get("by_namespace", {}).get("buckets", [])
+        for b in ns_buckets:
+            namespace = b["key"]
+            severity_map = {sb["key"]: sb["doc_count"] for sb in b.get("by_severity", {}).get("buckets", [])}
+            status_map = {sb["key"]: sb["doc_count"] for sb in b.get("by_status", {}).get("buckets", [])}
+            top_rules = [{"rule": rb["key"], "count": rb["doc_count"]} for rb in b.get("top_rules", {}).get("buckets", [])]
+            timeline = [{"timestamp": tb["key_as_string"], "count": tb["doc_count"]} for tb in b.get("over_time", {}).get("buckets", [])]
+            datasets = [{"dataset": db["key"], "count": db["doc_count"]} for db in b.get("by_dataset", {}).get("buckets", [])]
+
+            systems.append({
+                "system": namespace,
+                "alert_count": b["doc_count"],
+                "severity": severity_map,
+                "status": status_map,
+                "top_rules": top_rules,
+                "timeline": timeline,
+                "datasets": datasets,
+                "unique_hosts": b.get("unique_hosts", {}).get("value", 0),
+                "unique_users": b.get("unique_users", {}).get("value", 0),
+            })
+
+        # Sort by alert count descending
+        systems.sort(key=lambda s: s["alert_count"], reverse=True)
+
+        # Parse index buckets
+        indices = []
+        idx_buckets = aggs.get("by_index", {}).get("buckets", [])
+        for b in idx_buckets:
+            severity_map = {sb["key"]: sb["doc_count"] for sb in b.get("by_severity", {}).get("buckets", [])}
+            indices.append({
+                "index": b["key"],
+                "count": b["doc_count"],
+                "severity": severity_map,
+            })
+        indices.sort(key=lambda x: x["count"], reverse=True)
+
+        # Total severity
+        total_severity = {sb["key"]: sb["doc_count"] for sb in aggs.get("total_by_severity", {}).get("buckets", [])}
+
+        # Total timeline
+        total_timeline = [{"timestamp": tb["key_as_string"], "count": tb["doc_count"]} for tb in aggs.get("total_over_time", {}).get("buckets", [])]
+
+        return {
+            "systems": systems,
+            "indices": indices,
+            "total": total,
+            "total_severity": total_severity,
+            "total_timeline": total_timeline,
+            "hours": hours,
+            "interval": interval,
+            "error": None,
         }

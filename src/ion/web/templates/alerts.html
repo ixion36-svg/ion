@@ -163,13 +163,22 @@
 
 <!-- Filters -->
 <div class="alerts-filters">
-    <select id="alert-time-range" onchange="loadAlerts()">
+    <select id="alert-time-range" onchange="handleTimeRangeChange()">
         <option value="1">Last Hour</option>
+        <option value="4">Last 4 Hours</option>
+        <option value="12">Last 12 Hours</option>
         <option value="24" selected>Last 24 Hours</option>
         <option value="72">Last 3 Days</option>
         <option value="168">Last 7 Days</option>
         <option value="720">Last 30 Days</option>
+        <option value="custom">Custom Range...</option>
     </select>
+    <div id="custom-time-range" class="custom-time-range" style="display:none;">
+        <input type="datetime-local" id="custom-time-from" class="custom-time-input" title="From">
+        <span class="custom-time-sep">&rarr;</span>
+        <input type="datetime-local" id="custom-time-to" class="custom-time-input" title="To">
+        <button class="btn btn-sm btn-primary" onclick="applyCustomTimeRange()">Apply</button>
+    </div>
     <select id="alert-severity-filter" onchange="applyFilters()">
         <option value="">All Severities</option>
         <option value="critical">Critical</option>
@@ -178,11 +187,12 @@
         <option value="low">Low</option>
         <option value="info">Info</option>
     </select>
-    <select id="alert-status-filter" onchange="applyFilters()">
-        <option value="">All Statuses</option>
-        <option value="open">Open</option>
-        <option value="acknowledged">Acknowledged</option>
+    <select id="alert-status-filter" onchange="handleStatusFilterChange()">
+        <option value="">Active (Open + Ack)</option>
+        <option value="open">Open Only</option>
+        <option value="acknowledged">Acknowledged Only</option>
         <option value="closed">Closed</option>
+        <option value="all">All Statuses</option>
     </select>
     <input type="text" id="alert-search" class="search-input" placeholder="Search alerts..." oninput="debouncedSearch()">
     <button class="btn btn-secondary" onclick="clearAllFilters()">Clear</button>
@@ -423,6 +433,25 @@
 .alerts-filters .search-input {
     flex: 1;
     min-width: 200px;
+}
+
+.custom-time-range {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.custom-time-input {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.8125rem;
+    background: var(--bg-card);
+    color: var(--text);
+    font-family: inherit;
+}
+.custom-time-sep {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
 }
 
 /* Alert Stats Bar */
@@ -2965,12 +2994,26 @@ function formatAIContent(text) {
 // Data Loading
 // =========================================================================
 async function loadAlerts() {
-    const hours = document.getElementById('alert-time-range').value;
+    const timeVal = document.getElementById('alert-time-range').value;
+    const statusFilter = document.getElementById('alert-status-filter').value;
     const tbody = document.getElementById('alerts-tbody');
     tbody.innerHTML = '<tr><td colspan="11" class="loading">Loading alerts...</td></tr>';
 
     try {
-        const params = new URLSearchParams({ hours, limit: 200 });
+        const params = new URLSearchParams({ limit: 500 });
+        if (timeVal === 'custom') {
+            const from = document.getElementById('custom-time-from').value;
+            const to = document.getElementById('custom-time-to').value;
+            if (from) params.set('time_from', new Date(from).toISOString());
+            if (to) params.set('time_to', new Date(to).toISOString());
+            if (!from) params.set('hours', '24');  // fallback
+        } else {
+            params.set('hours', timeVal);
+        }
+        // Include closed alerts only when user explicitly requests them
+        if (statusFilter === 'closed' || statusFilter === 'all') {
+            params.set('include_closed', 'true');
+        }
         const response = await fetch(`/api/elasticsearch/alerts?${params}`);
         if (!response.ok) {
             if (response.status === 401) {
@@ -3019,7 +3062,8 @@ let detectedPatterns = [];
 async function loadPatternDetections() {
     if (sessionStorage.getItem('ion_patterns_dismissed')) return;
 
-    const hours = document.getElementById('alert-time-range').value;
+    const timeVal = document.getElementById('alert-time-range').value;
+    const hours = timeVal === 'custom' ? '720' : timeVal;  // fallback to 30d for custom range
     try {
         const resp = await fetch(`/api/alerts/host-patterns?hours=${hours}`);
         if (!resp.ok) return;
@@ -6066,18 +6110,84 @@ async function addCaseNote(caseId) {
 }
 
 // =========================================================================
+// Time Range
+// =========================================================================
+function getEffectiveHours() {
+    const val = document.getElementById('alert-time-range').value;
+    if (val === 'custom') {
+        const from = document.getElementById('custom-time-from').value;
+        const to = document.getElementById('custom-time-to').value;
+        if (from) {
+            const ms = (to ? new Date(to).getTime() : Date.now()) - new Date(from).getTime();
+            return Math.max(1, Math.round(ms / 3600000));
+        }
+        return 24;
+    }
+    return parseInt(val) || 24;
+}
+
+function handleTimeRangeChange() {
+    const val = document.getElementById('alert-time-range').value;
+    const customDiv = document.getElementById('custom-time-range');
+    if (val === 'custom') {
+        customDiv.style.display = 'flex';
+        // Pre-fill with sensible defaults if empty
+        const fromInput = document.getElementById('custom-time-from');
+        const toInput = document.getElementById('custom-time-to');
+        if (!fromInput.value) {
+            const now = new Date();
+            const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            fromInput.value = dayAgo.toISOString().slice(0, 16);
+            toInput.value = now.toISOString().slice(0, 16);
+        }
+        // Don't reload yet — wait for Apply click
+    } else {
+        customDiv.style.display = 'none';
+        loadAlerts();
+    }
+}
+
+function applyCustomTimeRange() {
+    const from = document.getElementById('custom-time-from').value;
+    if (!from) { showToast('Select a start time', true); return; }
+    loadAlerts();
+}
+
+// =========================================================================
 // Filtering
 // =========================================================================
+function handleStatusFilterChange() {
+    const val = document.getElementById('alert-status-filter').value;
+    // If switching to/from closed or all, we need to reload from ES (server-side filter)
+    if (val === 'closed' || val === 'all') {
+        loadAlerts();
+    } else if (_lastIncludedClosed) {
+        // Previously loaded with closed, reload without them
+        loadAlerts();
+    } else {
+        applyFilters();
+    }
+}
+let _lastIncludedClosed = false;
+
 function applyFilters() {
     const severity = document.getElementById('alert-severity-filter').value;
-    const status = document.getElementById('alert-status-filter').value;
+    const statusFilter = document.getElementById('alert-status-filter').value;
     const search = document.getElementById('alert-search').value.toLowerCase().trim();
+
+    // Track whether we loaded with closed alerts
+    _lastIncludedClosed = (statusFilter === 'closed' || statusFilter === 'all');
 
     filteredAlerts = allAlerts.filter(a => {
         if (severity && a.severity !== severity) return false;
         // Prefer ION triage status over raw ES status
         const effectiveStatus = (triageCache[a.id] && triageCache[a.id].status) || a.status;
-        if (status && effectiveStatus !== status) return false;
+        // "Active" (default empty) = open + acknowledged; "all" = everything
+        if (statusFilter === '' || statusFilter === undefined) {
+            if (effectiveStatus === 'closed') return false;
+        } else if (statusFilter !== 'all' && statusFilter && effectiveStatus !== statusFilter) {
+            return false;
+        }
         if (entityFilter) {
             if (entityFilter.type === 'host' && a.host !== entityFilter.value) return false;
             if (entityFilter.type === 'user' && a.user !== entityFilter.value) return false;
@@ -6117,6 +6227,8 @@ function clearAllFilters() {
     document.getElementById('alert-severity-filter').value = '';
     document.getElementById('alert-status-filter').value = '';
     document.getElementById('alert-search').value = '';
+    document.getElementById('alert-time-range').value = '24';
+    document.getElementById('custom-time-range').style.display = 'none';
     clearEntityFilter();
 }
 
@@ -6481,7 +6593,7 @@ function renderTrendChart() {
     }
 
     // Determine bucket size based on time range
-    const hours = parseInt(document.getElementById('alert-time-range').value) || 24;
+    const hours = getEffectiveHours();
     let bucketMs, bucketCount, labelFn;
     if (hours <= 1) {
         bucketMs = 5 * 60 * 1000; bucketCount = 12;
@@ -6947,7 +7059,7 @@ function renderKeyMetrics() {
     if (!container) return;
 
     const now = Date.now();
-    const hours = parseInt(document.getElementById('alert-time-range')?.value) || 24;
+    const hours = getEffectiveHours();
     const windowMs = hours * 3600000;
 
     // MTTR: mean time to resolve (from alert timestamp to triage resolved/closed timestamp)
@@ -7676,6 +7788,8 @@ function saveSavedFilters(filters) {
 function getCurrentFilterState() {
     return {
         timeRange: document.getElementById('alert-time-range').value,
+        customFrom: document.getElementById('custom-time-from').value,
+        customTo: document.getElementById('custom-time-to').value,
         triageStatus: document.getElementById('alert-status-filter').value,
         severity: document.getElementById('alert-severity-filter').value,
         status: document.getElementById('alert-status-filter').value,
@@ -7686,6 +7800,13 @@ function getCurrentFilterState() {
 
 function applyFilterState(state) {
     document.getElementById('alert-time-range').value = state.timeRange || '24';
+    if (state.timeRange === 'custom') {
+        document.getElementById('custom-time-range').style.display = 'flex';
+        document.getElementById('custom-time-from').value = state.customFrom || '';
+        document.getElementById('custom-time-to').value = state.customTo || '';
+    } else {
+        document.getElementById('custom-time-range').style.display = 'none';
+    }
     document.getElementById('alert-status-filter').value = state.triageStatus || '';
     document.getElementById('alert-severity-filter').value = state.severity || '';
     document.getElementById('alert-status-filter').value = state.status || '';

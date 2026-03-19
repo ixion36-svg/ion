@@ -103,6 +103,11 @@ from ion.models.social import (
     SocialComment,
     SocialReaction,
 )
+from ion.models.analytics import (
+    AnalyticsJob,
+    AnalyticsJobType,
+    AnalyticsSnapshot,
+)
 from ion.models.forensics import (
     ForensicCase,
     ForensicCaseStatus,
@@ -209,6 +214,10 @@ __all__ = [
     # Analyst notepad
     "AnalystNote",
     "NoteFolder",
+    # Analytics Engine models
+    "AnalyticsJob",
+    "AnalyticsJobType",
+    "AnalyticsSnapshot",
     # Forensic investigation models
     "ForensicCase",
     "ForensicCaseStatus",

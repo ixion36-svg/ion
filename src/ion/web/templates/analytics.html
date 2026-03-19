@@ -1,0 +1,1081 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics Engine - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Analytics Engine</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="loadDashboard()">Refresh</button>
+        <button class="btn btn-primary" onclick="runAllJobs()">Run All Jobs</button>
+    </div>
+</div>
+
+<!-- Summary Stats Bar -->
+<div class="analytics-stats-bar" id="analytics-stats">
+    <div class="astat-card" data-tab="entity_risk">
+        <div class="astat-value" id="astat-entities">-</div>
+        <div class="astat-label">Entities at Risk</div>
+    </div>
+    <div class="astat-card" data-tab="repeat_offenders">
+        <div class="astat-value" id="astat-offenders">-</div>
+        <div class="astat-label">Repeat Offenders</div>
+    </div>
+    <div class="astat-card" data-tab="rule_noise">
+        <div class="astat-value" id="astat-noisy">-</div>
+        <div class="astat-label">Noisy Rules</div>
+    </div>
+    <div class="astat-card" data-tab="case_metrics">
+        <div class="astat-value" id="astat-mttr">-</div>
+        <div class="astat-label">MTTR (hrs)</div>
+    </div>
+    <div class="astat-card" data-tab="observable_velocity">
+        <div class="astat-value" id="astat-velocity">-</div>
+        <div class="astat-label">IOCs (7d)</div>
+    </div>
+    <div class="astat-card" data-tab="stale_investigations">
+        <div class="astat-value" id="astat-stale">-</div>
+        <div class="astat-label">Stale Items</div>
+    </div>
+</div>
+
+<!-- Tab Navigation -->
+<div class="analytics-tabs">
+    <button class="analytics-tab active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+    <button class="analytics-tab" data-tab="entity_risk" onclick="switchTab('entity_risk')">Entity Risk</button>
+    <button class="analytics-tab" data-tab="repeat_offenders" onclick="switchTab('repeat_offenders')">Repeat Offenders</button>
+    <button class="analytics-tab" data-tab="rule_noise" onclick="switchTab('rule_noise')">Rule Noise</button>
+    <button class="analytics-tab" data-tab="observable_velocity" onclick="switchTab('observable_velocity')">Observables</button>
+    <button class="analytics-tab" data-tab="case_metrics" onclick="switchTab('case_metrics')">Case Metrics</button>
+    <button class="analytics-tab" data-tab="stale_investigations" onclick="switchTab('stale_investigations')">Stale</button>
+    <button class="analytics-tab" data-tab="config" onclick="switchTab('config')">Job Config</button>
+</div>
+
+<!-- Tab Content -->
+
+<!-- Overview -->
+<div id="tab-overview" class="analytics-tab-content active">
+    <div class="analytics-grid" id="overview-grid">
+        <div class="loading-state">Loading analytics...</div>
+    </div>
+</div>
+
+<!-- Entity Risk -->
+<div id="tab-entity_risk" class="analytics-tab-content">
+    <div class="analytics-section">
+        <div class="section-header"><h2>Entity Risk Scores</h2><span class="section-sub">Top hosts and users by aggregate risk</span></div>
+        <div id="entity-risk-content"><div class="loading-state">Run the job to see results</div></div>
+    </div>
+</div>
+
+<!-- Repeat Offenders -->
+<div id="tab-repeat_offenders" class="analytics-tab-content">
+    <div class="analytics-section">
+        <div class="section-header"><h2>Repeat Offenders</h2><span class="section-sub">Entities appearing in 3+ alerts over 30 days</span></div>
+        <div id="repeat-offenders-content"><div class="loading-state">Run the job to see results</div></div>
+    </div>
+</div>
+
+<!-- Rule Noise -->
+<div id="tab-rule_noise" class="analytics-tab-content">
+    <div class="analytics-section">
+        <div class="section-header"><h2>Rule Noise Analysis</h2><span class="section-sub">Detection rules by alert volume and false positive rate</span></div>
+        <div id="rule-noise-content"><div class="loading-state">Run the job to see results</div></div>
+    </div>
+</div>
+
+<!-- Observable Velocity -->
+<div id="tab-observable_velocity" class="analytics-tab-content">
+    <div class="analytics-section">
+        <div class="section-header"><h2>Observable Velocity</h2><span class="section-sub">IOC ingestion rate, threat levels, and stale indicators</span></div>
+        <div id="observable-velocity-content"><div class="loading-state">Run the job to see results</div></div>
+    </div>
+</div>
+
+<!-- Case Metrics -->
+<div id="tab-case_metrics" class="analytics-tab-content">
+    <div class="analytics-section">
+        <div class="section-header"><h2>Case Metrics</h2><span class="section-sub">Resolution times, closure reasons, and volume trends</span></div>
+        <div id="case-metrics-content"><div class="loading-state">Run the job to see results</div></div>
+    </div>
+</div>
+
+<!-- Stale Investigations -->
+<div id="tab-stale_investigations" class="analytics-tab-content">
+    <div class="analytics-section">
+        <div class="section-header"><h2>Stale Investigations</h2><span class="section-sub">Open items with no recent activity</span></div>
+        <div id="stale-content"><div class="loading-state">Run the job to see results</div></div>
+    </div>
+</div>
+
+<!-- Job Config -->
+<div id="tab-config" class="analytics-tab-content">
+    <div class="analytics-section">
+        <div class="section-header"><h2>Job Configuration</h2><span class="section-sub">Enable, disable, and schedule analytics jobs</span></div>
+        <div id="config-content"><div class="loading-state">Loading...</div></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* =========================================================================
+   Analytics Stats Bar — matches stat-card pattern from style.css
+   ========================================================================= */
+.analytics-stats-bar {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+.astat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: var(--shadow-card);
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
+}
+.astat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary), var(--neon-purple));
+}
+.astat-card:hover {
+    border-color: var(--border-bright);
+    box-shadow: var(--shadow-card), var(--glow-sm);
+    transform: translateY(-2px);
+}
+.astat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary);
+    text-shadow: var(--glow-sm);
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.2;
+}
+.astat-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.375rem;
+}
+
+/* =========================================================================
+   Tabs
+   ========================================================================= */
+.analytics-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+    overflow-x: auto;
+}
+.analytics-tab {
+    padding: 0.75rem 1.125rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.2s, border-color 0.2s;
+}
+.analytics-tab:hover { color: var(--text-primary); }
+.analytics-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 600;
+    text-shadow: 0 0 8px var(--primary-glow);
+}
+
+/* Tab Content */
+.analytics-tab-content { display: none; }
+.analytics-tab-content.active { display: block; }
+
+/* Section Headers */
+.analytics-section .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+.analytics-section .section-header h2 {
+    margin: 0;
+    font-size: 1.125rem;
+    color: var(--text-bright);
+}
+.section-sub { color: var(--text-muted); font-size: 0.8125rem; }
+
+/* =========================================================================
+   Overview Grid
+   ========================================================================= */
+.analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+.overview-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    cursor: pointer;
+    box-shadow: var(--shadow-card);
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.overview-card:hover {
+    border-color: var(--border-bright);
+    box-shadow: var(--shadow-card), 0 0 20px rgba(0, 212, 255, 0.08);
+}
+.overview-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+.overview-card-title { font-weight: 600; font-size: 0.9375rem; color: var(--text-primary); }
+.overview-card-status {
+    font-size: 0.6875rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 99px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+.overview-card-status.ok { background: rgba(16,185,129,0.15); color: var(--neon-green); }
+.overview-card-status.stale { background: rgba(251,191,36,0.15); color: var(--neon-yellow); }
+.overview-card-status.error { background: rgba(239,68,68,0.15); color: var(--neon-red); }
+.overview-card-status.pending { background: rgba(139,148,158,0.15); color: var(--text-muted); }
+.overview-card-body { color: var(--text-secondary); }
+.overview-card-metric {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 0.25rem;
+}
+.overview-card-detail { font-size: 0.75rem; color: var(--text-muted); }
+.overview-card-footer { margin-top: 0.75rem; font-size: 0.6875rem; color: var(--text-muted); border-top: 1px solid var(--border); padding-top: 0.625rem; }
+
+/* =========================================================================
+   Data Tables
+   ========================================================================= */
+.analytics-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+}
+.analytics-table th {
+    text-align: left;
+    padding: 0.625rem 0.75rem;
+    border-bottom: 2px solid var(--border);
+    font-weight: 600;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+.analytics-table td {
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    color: var(--text-secondary);
+}
+.analytics-table tr:hover td { background: var(--primary-dim); }
+.analytics-table a { color: var(--primary); text-decoration: none; }
+.analytics-table a:hover { text-decoration: underline; }
+
+/* =========================================================================
+   Risk Bars
+   ========================================================================= */
+.risk-bar-container {
+    width: 100%;
+    background: var(--bg-elevated);
+    border-radius: 3px;
+    height: 6px;
+}
+.risk-bar { height: 6px; border-radius: 3px; transition: width 0.4s ease; }
+.risk-bar.critical { background: var(--neon-red); box-shadow: 0 0 6px rgba(239,68,68,0.4); }
+.risk-bar.high { background: var(--neon-orange); box-shadow: 0 0 6px rgba(249,115,22,0.3); }
+.risk-bar.medium { background: var(--neon-yellow); }
+.risk-bar.low { background: var(--neon-green); }
+
+/* =========================================================================
+   Rule Noise Bar Chart
+   ========================================================================= */
+.noise-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+.noise-bar-label {
+    width: 280px;
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.noise-bar-track {
+    flex: 1;
+    height: 20px;
+    background: var(--bg-elevated);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.noise-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+.noise-bar-count { width: 50px; text-align: right; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
+.fp-low { background: linear-gradient(90deg, var(--neon-green), #059669); }
+.fp-med { background: linear-gradient(90deg, var(--neon-yellow), var(--neon-orange)); }
+.fp-high { background: linear-gradient(90deg, var(--neon-red), #dc2626); }
+
+/* =========================================================================
+   Sparkline (pure CSS bars)
+   ========================================================================= */
+.sparkline {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 60px;
+    padding: 0 2px;
+}
+.sparkline-bar {
+    flex: 1;
+    background: var(--primary);
+    border-radius: 2px 2px 0 0;
+    min-width: 3px;
+    opacity: 0.6;
+    transition: opacity 0.2s, box-shadow 0.2s;
+}
+.sparkline-bar:hover {
+    opacity: 1;
+    box-shadow: 0 0 6px var(--primary-glow);
+}
+
+/* =========================================================================
+   Chart Containers
+   ========================================================================= */
+.velocity-chart-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    box-shadow: var(--shadow-card);
+}
+.velocity-chart-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+}
+
+/* =========================================================================
+   Threat Level Distribution
+   ========================================================================= */
+.threat-dist-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.threat-dist-label { width: 80px; font-size: 0.8125rem; font-weight: 500; color: var(--text-secondary); text-transform: capitalize; }
+.threat-dist-count { width: 40px; text-align: right; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
+.tl-critical { background: var(--neon-red); box-shadow: 0 0 4px rgba(239,68,68,0.3); }
+.tl-high { background: var(--neon-orange); }
+.tl-medium { background: var(--neon-yellow); }
+.tl-low { background: var(--neon-green); }
+.tl-benign { background: var(--text-muted); }
+.tl-unknown { background: var(--bg-elevated); }
+
+/* =========================================================================
+   Case Metrics Cards
+   ========================================================================= */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.metric-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    text-align: center;
+    box-shadow: var(--shadow-card);
+    position: relative;
+    overflow: hidden;
+}
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--primary), var(--neon-purple));
+}
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.2;
+}
+.metric-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 0.375rem;
+}
+
+/* =========================================================================
+   Closure Reason Bars
+   ========================================================================= */
+.closure-bars { margin-top: 1rem; }
+.closure-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.closure-label { width: 160px; font-size: 0.8125rem; color: var(--text-secondary); }
+.closure-bar-track { flex: 1; height: 18px; background: var(--bg-elevated); border-radius: 4px; overflow: hidden; }
+.closure-bar-fill { height: 100%; border-radius: 4px; }
+.closure-count { width: 35px; text-align: right; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
+.cl-true_positive { background: var(--neon-green); }
+.cl-false_positive { background: var(--neon-red); }
+.cl-benign_true_positive { background: var(--neon-yellow); }
+.cl-duplicate { background: var(--text-muted); }
+.cl-insufficient_data { background: var(--neon-purple); }
+.cl-not_applicable { background: var(--bg-elevated); }
+.cl-unspecified { background: var(--bg-elevated); }
+
+/* =========================================================================
+   Severity Badges (local — matches alerts.html pattern)
+   ========================================================================= */
+.severity-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.severity-critical, .severity-badge.severity-critical { background: rgba(239,68,68,0.2); color: var(--neon-red); }
+.severity-high, .severity-badge.severity-high { background: rgba(249,115,22,0.2); color: var(--neon-orange); }
+.severity-medium, .severity-badge.severity-medium { background: rgba(251,191,36,0.2); color: var(--neon-yellow); }
+.severity-low, .severity-badge.severity-low { background: rgba(16,185,129,0.2); color: var(--neon-green); }
+.severity-info, .severity-badge.severity-info { background: rgba(14,165,233,0.2); color: var(--neon-blue); }
+.severity-unknown, .severity-badge.severity-unknown { background: rgba(139,148,158,0.15); color: var(--text-muted); }
+
+/* =========================================================================
+   Stale Items
+   ========================================================================= */
+.stale-section { margin-bottom: 1.5rem; }
+.stale-section h3 {
+    font-size: 0.9375rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-primary);
+}
+.stale-badge {
+    font-size: 0.6875rem;
+    background: rgba(239,68,68,0.15);
+    color: var(--neon-red);
+    padding: 0.15rem 0.5rem;
+    border-radius: 99px;
+    font-weight: 600;
+}
+.days-stale { font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.days-stale.warn { color: var(--neon-yellow); }
+.days-stale.danger { color: var(--neon-red); text-shadow: 0 0 6px rgba(239,68,68,0.3); }
+
+/* =========================================================================
+   Entity Type Badges
+   ========================================================================= */
+.entity-type-badge {
+    font-size: 0.6875rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.entity-type-badge.host { background: rgba(14,165,233,0.15); color: var(--neon-blue); }
+.entity-type-badge.user { background: rgba(168,85,247,0.15); color: var(--neon-purple); }
+
+/* =========================================================================
+   Config Table
+   ========================================================================= */
+.config-table { width: 100%; border-collapse: collapse; }
+.config-table th {
+    text-align: left;
+    padding: 0.75rem;
+    border-bottom: 2px solid var(--border);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+.config-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    color: var(--text-secondary);
+}
+.config-table tr:hover td { background: var(--primary-dim); }
+.config-toggle {
+    cursor: pointer;
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    border: none;
+    position: relative;
+    transition: background 0.2s;
+}
+.config-toggle.on { background: var(--neon-green); box-shadow: 0 0 8px rgba(16,185,129,0.3); }
+.config-toggle.off { background: var(--bg-elevated); }
+.config-toggle::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    transition: left 0.2s;
+}
+.config-toggle.on::after { left: 20px; }
+.config-toggle.off::after { left: 2px; }
+.schedule-input {
+    width: 64px;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.8125rem;
+    text-align: center;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+}
+.schedule-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 2px var(--primary-dim); }
+.run-time { font-size: 0.75rem; color: var(--text-muted); }
+
+/* =========================================================================
+   Loading / Empty States
+   ========================================================================= */
+.loading-state, .empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+/* =========================================================================
+   Responsive
+   ========================================================================= */
+@media (max-width: 1100px) {
+    .analytics-stats-bar { grid-template-columns: repeat(3, 1fr); }
+    .analytics-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+    .analytics-stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .analytics-grid { grid-template-columns: 1fr; }
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    .noise-bar-label { width: 150px; }
+}
+</style>
+<script>
+let dashboardData = null;
+let jobsList = [];
+
+// =========================================================================
+// Init
+// =========================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    loadDashboard();
+});
+
+// Stat card clicks switch tab
+document.querySelectorAll('.astat-card[data-tab]').forEach(card => {
+    card.addEventListener('click', () => switchTab(card.dataset.tab));
+});
+
+// =========================================================================
+// Data Loading
+// =========================================================================
+async function loadDashboard() {
+    try {
+        const [dashResp, jobsResp] = await Promise.all([
+            fetch('/api/analytics/dashboard'),
+            fetch('/api/analytics/jobs'),
+        ]);
+        if (dashResp.status === 401 || jobsResp.status === 401) { window.location.href = '/login?redirect=/analytics'; return; }
+        dashboardData = await dashResp.json();
+        const jobsData = await jobsResp.json();
+        jobsList = jobsData.jobs || [];
+        renderDashboard();
+    } catch (e) {
+        console.error('Failed to load analytics:', e);
+        document.getElementById('overview-grid').innerHTML = '<div class="empty-state">Failed to load analytics data</div>';
+    }
+}
+
+// =========================================================================
+// Rendering
+// =========================================================================
+function renderDashboard() {
+    if (!dashboardData) return;
+    const s = dashboardData.summary || {};
+    const jobs = dashboardData.jobs || {};
+
+    // Summary stats
+    setText('astat-entities', s.entities_at_risk || 0);
+    setText('astat-offenders', s.repeat_offenders || 0);
+    setText('astat-noisy', s.noisy_rules || 0);
+    setText('astat-mttr', s.mttr_hours != null ? s.mttr_hours : '-');
+    setText('astat-velocity', s.observable_velocity || 0);
+    setText('astat-stale', (s.stale_cases || 0) + (s.stale_alerts || 0));
+
+    renderOverview(jobs);
+    renderEntityRisk(jobs.entity_risk_score);
+    renderRepeatOffenders(jobs.repeat_offenders);
+    renderRuleNoise(jobs.rule_noise);
+    renderObservableVelocity(jobs.observable_velocity);
+    renderCaseMetrics(jobs.case_metrics);
+    renderStaleInvestigations(jobs.stale_investigations);
+    renderConfig();
+}
+
+function renderOverview(jobs) {
+    const grid = document.getElementById('overview-grid');
+    const cards = Object.entries(jobs).map(([type, job]) => {
+        const result = job.result || {};
+        const status = getJobStatus(job);
+        const metric = getOverviewMetric(type, result);
+
+        return `<div class="overview-card" onclick="switchTab('${type === 'entity_risk_score' ? 'entity_risk' : type === 'repeat_offenders' ? 'repeat_offenders' : type}')">
+            <div class="overview-card-header">
+                <span class="overview-card-title">${esc(job.display_name)}</span>
+                <span class="overview-card-status ${status.cls}">${status.label}</span>
+            </div>
+            <div class="overview-card-body">
+                <div class="overview-card-metric">${metric.value}</div>
+                <div class="overview-card-detail">${metric.detail}</div>
+            </div>
+            <div class="overview-card-footer">${job.last_run_at ? 'Last run: ' + timeAgo(job.last_run_at) : 'Never run'} ${job.last_duration_ms ? '(' + job.last_duration_ms + 'ms)' : ''}</div>
+        </div>`;
+    });
+    grid.innerHTML = cards.join('');
+}
+
+function getJobStatus(job) {
+    if (job.last_error) return { cls: 'error', label: 'Error' };
+    if (!job.last_run_at) return { cls: 'pending', label: 'Pending' };
+    const age = Date.now() - new Date(job.last_run_at).getTime();
+    if (age > 2 * 3600000) return { cls: 'stale', label: 'Stale' };
+    return { cls: 'ok', label: 'OK' };
+}
+
+function getOverviewMetric(type, result) {
+    switch (type) {
+        case 'entity_risk_score': {
+            const top = (result.entities || [])[0];
+            return { value: result.total_scored || 0, detail: top ? `Top: ${top.entity} (${top.risk_score})` : 'No entities scored' };
+        }
+        case 'repeat_offenders':
+            return { value: result.total_flagged || 0, detail: `Threshold: ${result.threshold || 3}+ alerts in 30d` };
+        case 'rule_noise': {
+            const noisy = (result.rules || []).filter(r => r.fp_ratio > 0.5).length;
+            return { value: noisy, detail: `${result.total_rules || 0} rules analyzed` };
+        }
+        case 'observable_velocity':
+            return { value: result.velocity_7d || 0, detail: `Change: ${result.velocity_change > 0 ? '+' : ''}${result.velocity_change || 0} vs prev week` };
+        case 'case_metrics':
+            return { value: result.mttr_hours != null ? result.mttr_hours + 'h' : '-', detail: `${result.open_cases || 0} open / ${result.closed_cases || 0} closed` };
+        case 'stale_investigations':
+            return { value: (result.total_stale_cases || 0) + (result.total_stale_alerts || 0), detail: `${result.total_stale_cases || 0} cases, ${result.total_stale_alerts || 0} alerts` };
+        default:
+            return { value: '-', detail: '' };
+    }
+}
+
+function renderEntityRisk(job) {
+    const container = document.getElementById('entity-risk-content');
+    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
+    const entities = job.result.entities || [];
+    if (!entities.length) { container.innerHTML = '<div class="empty-state">No entities with risk scores in the last 30 days</div>'; return; }
+
+    const maxScore = entities[0]?.risk_score || 1;
+
+    container.innerHTML = `<table class="analytics-table">
+        <thead><tr><th>Entity</th><th>Type</th><th>Risk Score</th><th></th><th>Alerts</th><th>Open Cases</th><th>Top Rules</th></tr></thead>
+        <tbody>${entities.map(e => {
+            const pct = Math.min(100, Math.round((e.risk_score / maxScore) * 100));
+            const cls = e.risk_score >= 100 ? 'critical' : e.risk_score >= 50 ? 'high' : e.risk_score >= 20 ? 'medium' : 'low';
+            return `<tr>
+                <td><strong>${esc(e.entity)}</strong></td>
+                <td><span class="entity-type-badge ${e.type}">${e.type}</span></td>
+                <td style="font-weight:700;color:var(--text)">${e.risk_score}</td>
+                <td style="width:120px"><div class="risk-bar-container"><div class="risk-bar ${cls}" style="width:${pct}%"></div></div></td>
+                <td>${e.alert_count}</td>
+                <td>${e.open_cases}</td>
+                <td style="font-size:0.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc((e.rules || []).join(', '))}">${esc((e.rules || []).slice(0, 2).join(', '))}</td>
+            </tr>`;
+        }).join('')}</tbody>
+    </table>`;
+}
+
+function renderRepeatOffenders(job) {
+    const container = document.getElementById('repeat-offenders-content');
+    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
+    const offenders = job.result.offenders || [];
+    if (!offenders.length) { container.innerHTML = '<div class="empty-state">No repeat offenders detected in the last 30 days</div>'; return; }
+
+    container.innerHTML = `<table class="analytics-table">
+        <thead><tr><th>Entity</th><th>Type</th><th>Alerts (7d)</th><th>Alerts (30d)</th><th>Worst Severity</th><th>Distinct Rules</th></tr></thead>
+        <tbody>${offenders.map(o => `<tr>
+            <td><strong>${esc(o.entity)}</strong></td>
+            <td><span class="entity-type-badge ${o.type}">${o.type}</span></td>
+            <td style="font-weight:600">${o.count_7d}</td>
+            <td style="font-weight:600">${o.count_30d}</td>
+            <td><span class="severity-badge severity-${o.top_severity || 'unknown'}">${o.top_severity || '-'}</span></td>
+            <td style="font-size:0.75rem" title="${esc((o.rules || []).join(', '))}">${(o.rules || []).length} rules</td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+function renderRuleNoise(job) {
+    const container = document.getElementById('rule-noise-content');
+    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
+    const rules = job.result.rules || [];
+    if (!rules.length) { container.innerHTML = '<div class="empty-state">No rule data available</div>'; return; }
+
+    const maxCount = Math.max(...rules.map(r => r.alert_count), 1);
+
+    container.innerHTML = `
+        <div style="margin-bottom:0.75rem;font-size:0.75rem;color:var(--text-muted)">
+            Bar color: <span style="color:#22c55e">low FP</span> | <span style="color:#eab308">medium FP</span> | <span style="color:#ef4444">high FP (&gt;50%)</span>
+        </div>
+        ${rules.map(r => {
+            const pct = Math.round((r.alert_count / maxCount) * 100);
+            const fpClass = r.fp_ratio > 0.5 ? 'fp-high' : r.fp_ratio > 0.2 ? 'fp-med' : 'fp-low';
+            return `<div class="noise-bar-row">
+                <span class="noise-bar-label" title="${esc(r.rule_name)}">${esc(r.rule_name)}</span>
+                <div class="noise-bar-track"><div class="noise-bar-fill ${fpClass}" style="width:${pct}%"></div></div>
+                <span class="noise-bar-count">${r.alert_count}</span>
+                <span class="noise-bar-count" style="width:65px" title="FP ratio">${Math.round(r.fp_ratio * 100)}% FP</span>
+            </div>`;
+        }).join('')}
+    `;
+}
+
+function renderObservableVelocity(job) {
+    const container = document.getElementById('observable-velocity-content');
+    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
+    const r = job.result;
+
+    // Sparkline
+    const dailyCounts = r.daily_counts || [];
+    const maxDay = Math.max(...dailyCounts.map(d => d.count), 1);
+
+    // Threat distribution
+    const dist = r.threat_distribution || {};
+    const totalObs = Object.values(dist).reduce((a, b) => a + b, 0) || 1;
+
+    const staleList = (r.stale_iocs || []).map(s => `<tr>
+        <td>${esc(s.value)}</td>
+        <td><span class="entity-type-badge host">${s.type}</span></td>
+        <td><span class="severity-badge severity-${s.threat_level}">${s.threat_level}</span></td>
+        <td class="days-stale ${s.days_stale > 21 ? 'danger' : 'warn'}">${s.days_stale}d</td>
+    </tr>`).join('');
+
+    container.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+            <div class="velocity-chart-container">
+                <div class="velocity-chart-title">New Observables / Day (30d)</div>
+                <div class="sparkline">${dailyCounts.map(d => {
+                    const h = Math.max(2, Math.round((d.count / maxDay) * 56));
+                    return `<div class="sparkline-bar" style="height:${h}px" title="${d.date}: ${d.count}"></div>`;
+                }).join('')}</div>
+                <div style="display:flex;justify-content:space-between;font-size:0.6875rem;color:var(--text-muted);margin-top:0.375rem;">
+                    <span>${dailyCounts[0]?.date || ''}</span><span>${dailyCounts[dailyCounts.length - 1]?.date || ''}</span>
+                </div>
+            </div>
+            <div class="velocity-chart-container">
+                <div class="velocity-chart-title">Threat Level Distribution</div>
+                ${['critical','high','medium','low','benign','unknown'].map(level => {
+                    const count = dist[level] || 0;
+                    const pct = Math.round((count / totalObs) * 100);
+                    return `<div class="threat-dist-row">
+                        <span class="threat-dist-label">${level}</span>
+                        <div style="flex:1;background:var(--bg-code, rgba(0,0,0,0.08));border-radius:3px;height:14px;overflow:hidden;">
+                            <div class="threat-dist-bar tl-${level}" style="width:${pct}%;height:100%"></div>
+                        </div>
+                        <span class="threat-dist-count">${count}</span>
+                    </div>`;
+                }).join('')}
+                <div style="margin-top:0.5rem;font-size:0.75rem;color:var(--text-muted)">Total: ${r.total_observables || 0} | Watched: ${r.total_watched || 0}</div>
+            </div>
+        </div>
+        <div style="display:flex;gap:1rem;margin-bottom:1rem;">
+            <div class="metric-card" style="flex:1"><div class="metric-value">${r.velocity_7d || 0}</div><div class="metric-label">New IOCs (7d)</div></div>
+            <div class="metric-card" style="flex:1"><div class="metric-value">${r.velocity_prev_7d || 0}</div><div class="metric-label">Previous 7d</div></div>
+            <div class="metric-card" style="flex:1"><div class="metric-value" style="color:${(r.velocity_change || 0) > 0 ? '#ef4444' : '#22c55e'}">${(r.velocity_change || 0) > 0 ? '+' : ''}${r.velocity_change || 0}</div><div class="metric-label">Change</div></div>
+        </div>
+        ${staleList ? `<h3 style="font-size:0.9375rem;margin-bottom:0.5rem;">Stale Watched IOCs</h3>
+        <table class="analytics-table"><thead><tr><th>Value</th><th>Type</th><th>Threat Level</th><th>Days Stale</th></tr></thead>
+        <tbody>${staleList}</tbody></table>` : ''}
+    `;
+}
+
+function renderCaseMetrics(job) {
+    const container = document.getElementById('case-metrics-content');
+    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
+    const r = job.result;
+
+    // Closure reasons
+    const reasons = r.closure_reasons || {};
+    const totalClosed = Object.values(reasons).reduce((a, b) => a + b, 0) || 1;
+
+    // Daily trend sparkline
+    const trend = r.daily_trend || [];
+    const maxTrend = Math.max(...trend.map(d => d.count), 1);
+
+    container.innerHTML = `
+        <div class="metrics-grid">
+            <div class="metric-card"><div class="metric-value">${r.mttr_hours != null ? r.mttr_hours : '-'}</div><div class="metric-label">MTTR (hours)</div></div>
+            <div class="metric-card"><div class="metric-value">${r.total_cases || 0}</div><div class="metric-label">Total Cases (30d)</div></div>
+            <div class="metric-card"><div class="metric-value" style="color:#eab308">${r.open_cases || 0}</div><div class="metric-label">Open</div></div>
+            <div class="metric-card"><div class="metric-value" style="color:#22c55e">${r.closed_cases || 0}</div><div class="metric-label">Closed</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+            <div class="velocity-chart-container">
+                <div class="velocity-chart-title">Cases Created / Day</div>
+                <div class="sparkline">${trend.map(d => {
+                    const h = Math.max(2, Math.round((d.count / maxTrend) * 56));
+                    return `<div class="sparkline-bar" style="height:${h}px;background:#8b5cf6;" title="${d.date}: ${d.count}"></div>`;
+                }).join('')}</div>
+                <div style="display:flex;justify-content:space-between;font-size:0.6875rem;color:var(--text-muted);margin-top:0.375rem;">
+                    <span>${trend[0]?.date || ''}</span><span>${trend[trend.length - 1]?.date || ''}</span>
+                </div>
+            </div>
+            <div class="velocity-chart-container">
+                <div class="velocity-chart-title">Closure Reasons</div>
+                <div class="closure-bars">${Object.entries(reasons).sort((a, b) => b[1] - a[1]).map(([reason, count]) => {
+                    const pct = Math.round((count / totalClosed) * 100);
+                    return `<div class="closure-row">
+                        <span class="closure-label">${formatReason(reason)}</span>
+                        <div class="closure-bar-track"><div class="closure-bar-fill cl-${reason}" style="width:${pct}%"></div></div>
+                        <span class="closure-count">${count}</span>
+                    </div>`;
+                }).join('')}</div>
+            </div>
+        </div>
+        ${renderSeverityBreakdown(r.by_severity || {})}
+    `;
+}
+
+function renderSeverityBreakdown(bySev) {
+    const entries = Object.entries(bySev);
+    if (!entries.length) return '';
+    return `<div style="margin-top:1rem;">
+        <h3 style="font-size:0.9375rem;margin-bottom:0.5rem;">Cases by Severity</h3>
+        <table class="analytics-table"><thead><tr><th>Severity</th><th>Open</th><th>Closed</th><th>Total</th></tr></thead>
+        <tbody>${entries.sort((a, b) => {
+            const order = ['critical','high','medium','low','info'];
+            return order.indexOf(a[0]) - order.indexOf(b[0]);
+        }).map(([sev, data]) => `<tr>
+            <td><span class="severity-badge severity-${sev}">${sev}</span></td>
+            <td>${data.open || 0}</td>
+            <td>${data.closed || 0}</td>
+            <td style="font-weight:600">${data.total || 0}</td>
+        </tr>`).join('')}</tbody></table>
+    </div>`;
+}
+
+function renderStaleInvestigations(job) {
+    const container = document.getElementById('stale-content');
+    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
+    const r = job.result;
+    const staleCases = r.stale_cases || [];
+    const staleAlerts = r.stale_alerts || [];
+
+    if (!staleCases.length && !staleAlerts.length) {
+        container.innerHTML = '<div class="empty-state">No stale investigations found. All items have recent activity.</div>';
+        return;
+    }
+
+    let html = '';
+
+    if (staleCases.length) {
+        html += `<div class="stale-section">
+            <h3>Stale Cases <span class="stale-badge">${staleCases.length}</span></h3>
+            <table class="analytics-table"><thead><tr><th>Case</th><th>Title</th><th>Severity</th><th>Assigned To</th><th>Last Activity</th><th>Days Stale</th></tr></thead>
+            <tbody>${staleCases.map(c => `<tr>
+                <td><a href="/cases">${esc(c.case_number)}</a></td>
+                <td>${esc(c.title)}</td>
+                <td><span class="severity-badge severity-${c.severity || 'medium'}">${c.severity || '-'}</span></td>
+                <td>${esc(c.assigned_to || 'Unassigned')}</td>
+                <td class="run-time">${timeAgo(c.last_activity)}</td>
+                <td class="days-stale ${c.days_stale > 7 ? 'danger' : 'warn'}">${c.days_stale}d</td>
+            </tr>`).join('')}</tbody></table>
+        </div>`;
+    }
+
+    if (staleAlerts.length) {
+        html += `<div class="stale-section">
+            <h3>Stale Alerts (uncased) <span class="stale-badge">${staleAlerts.length}</span></h3>
+            <table class="analytics-table"><thead><tr><th>Alert ID</th><th>Status</th><th>Assigned To</th><th>Last Activity</th><th>Days Stale</th></tr></thead>
+            <tbody>${staleAlerts.map(a => `<tr>
+                <td style="font-size:0.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${esc(a.es_alert_id)}">${esc(a.es_alert_id.substring(0, 20))}...</td>
+                <td>${a.status}</td>
+                <td>${esc(a.assigned_to || 'Unassigned')}</td>
+                <td class="run-time">${timeAgo(a.last_activity)}</td>
+                <td class="days-stale ${a.days_stale > 10 ? 'danger' : 'warn'}">${a.days_stale}d</td>
+            </tr>`).join('')}</tbody></table>
+        </div>`;
+    }
+
+    container.innerHTML = html;
+}
+
+function renderConfig() {
+    const container = document.getElementById('config-content');
+    if (!jobsList.length) { container.innerHTML = '<div class="empty-state">No jobs configured</div>'; return; }
+
+    container.innerHTML = `<table class="config-table">
+        <thead><tr><th>Job</th><th>Enabled</th><th>Schedule (min)</th><th>Last Run</th><th>Next Run</th><th>Runs</th><th>Duration</th><th>Status</th><th></th></tr></thead>
+        <tbody>${jobsList.map(j => `<tr>
+            <td><strong>${esc(j.display_name)}</strong><div style="font-size:0.6875rem;color:var(--text-muted)">${j.job_type}</div></td>
+            <td><button class="config-toggle ${j.enabled ? 'on' : 'off'}" onclick="toggleJob('${j.job_type}', ${!j.enabled})"></button></td>
+            <td><input type="number" class="schedule-input" value="${j.schedule_minutes}" min="5" onchange="updateSchedule('${j.job_type}', this.value)"></td>
+            <td class="run-time">${j.last_run_at ? timeAgo(j.last_run_at) : 'Never'}</td>
+            <td class="run-time">${j.next_run_at ? timeAgo(j.next_run_at) : '-'}</td>
+            <td>${j.run_count}</td>
+            <td class="run-time">${j.last_duration_ms != null ? j.last_duration_ms + 'ms' : '-'}</td>
+            <td>${j.last_error ? '<span style="color:#ef4444" title="' + esc(j.last_error) + '">Error</span>' : (j.has_results ? '<span style="color:#22c55e">OK</span>' : '<span style="color:var(--text-muted)">Pending</span>')}</td>
+            <td><button class="btn btn-sm btn-secondary" onclick="runJob('${j.job_type}')">Run Now</button></td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+// =========================================================================
+// Actions
+// =========================================================================
+async function runJob(jobType) {
+    try {
+        const resp = await fetch(`/api/analytics/jobs/${jobType}/run`, { method: 'POST' });
+        if (!resp.ok) throw new Error('Failed');
+        showToast('Job completed');
+        loadDashboard();
+    } catch (e) {
+        showToast('Job failed: ' + e.message, true);
+    }
+}
+
+async function runAllJobs() {
+    const btn = document.querySelector('.header-actions .btn-primary');
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+    try {
+        const types = jobsList.filter(j => j.enabled).map(j => j.job_type);
+        for (const type of types) {
+            await fetch(`/api/analytics/jobs/${type}/run`, { method: 'POST' });
+        }
+        showToast('All jobs completed');
+        await loadDashboard();
+    } catch (e) {
+        showToast('Some jobs failed', true);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run All Jobs';
+    }
+}
+
+async function toggleJob(jobType, enabled) {
+    try {
+        await fetch(`/api/analytics/jobs/${jobType}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled }),
+        });
+        loadDashboard();
+    } catch (e) { showToast('Failed to update job', true); }
+}
+
+async function updateSchedule(jobType, minutes) {
+    minutes = parseInt(minutes);
+    if (isNaN(minutes) || minutes < 5) { showToast('Minimum schedule is 5 minutes', true); return; }
+    try {
+        await fetch(`/api/analytics/jobs/${jobType}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ schedule_minutes: minutes }),
+        });
+        showToast('Schedule updated');
+    } catch (e) { showToast('Failed to update schedule', true); }
+}
+
+// =========================================================================
+// Tab Switching
+// =========================================================================
+function switchTab(tab) {
+    document.querySelectorAll('.analytics-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.analytics-tab-content').forEach(c => c.classList.remove('active'));
+
+    const tabBtn = document.querySelector(`.analytics-tab[data-tab="${tab}"]`);
+    const tabContent = document.getElementById(`tab-${tab}`);
+    if (tabBtn) tabBtn.classList.add('active');
+    if (tabContent) tabContent.classList.add('active');
+}
+
+// =========================================================================
+// Utilities
+// =========================================================================
+function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
+function esc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+function timeAgo(isoStr) {
+    if (!isoStr) return '';
+    const diff = Date.now() - new Date(isoStr).getTime();
+    if (diff < 0) {
+        const absDiff = -diff;
+        if (absDiff < 60000) return 'in <1m';
+        if (absDiff < 3600000) return `in ${Math.floor(absDiff / 60000)}m`;
+        return `in ${Math.floor(absDiff / 3600000)}h`;
+    }
+    if (diff < 60000) return '<1m ago';
+    if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+    return Math.floor(diff / 86400000) + 'd ago';
+}
+
+function formatReason(reason) {
+    return reason.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function showToast(msg, isError) {
+    // Re-use global toast if available, else simple alert
+    if (window.showToast && window.showToast !== arguments.callee) {
+        window.showToast(msg, isError);
+        return;
+    }
+    const toast = document.createElement('div');
+    toast.style.cssText = `position:fixed;bottom:1rem;right:1rem;padding:0.75rem 1.25rem;border-radius:var(--radius,6px);font-size:0.875rem;z-index:9999;color:white;background:${isError ? '#ef4444' : '#22c55e'};box-shadow:0 4px 12px rgba(0,0,0,0.2);`;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+</script>
+{% endblock %}

@@ -27,6 +27,8 @@ from ion.web.pcap_api import router as pcap_router
 from ion.web.forensics_api import router as forensics_router
 from ion.web.notification_api import router as notification_router
 from ion.web.social_api import router as social_router
+from ion.web.analytics_api import router as analytics_router
+from ion.web.engineering_analytics_api import router as engineering_analytics_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -170,6 +172,8 @@ app.include_router(pcap_router, prefix="/api/pcap")
 app.include_router(forensics_router, prefix="/api/forensics")
 app.include_router(notification_router, prefix="/api")
 app.include_router(social_router, prefix="/api/social")
+app.include_router(analytics_router, prefix="/api/analytics")
+app.include_router(engineering_analytics_router, prefix="/api/engineering/analytics")
 
 
 @app.on_event("startup")
@@ -280,6 +284,24 @@ async def startup_event():
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"Failed to create skills snapshot: {e}")
+
+    # Start Analytics Engine background loop
+    try:
+        from ion.services.analytics_engine import get_analytics_engine, seed_default_jobs
+
+        engine = get_engine(config.db_path)
+        factory = get_session_factory(engine)
+        session = factory()
+        try:
+            seed_default_jobs(session)
+        finally:
+            session.close()
+
+        analytics = get_analytics_engine()
+        analytics.start_background_loop()
+        logger.info("Analytics Engine background loop started")
+    except Exception as e:
+        logger.warning(f"Failed to start Analytics Engine: {e}")
 
     # Version compatibility checks for connectors that declare supported ranges
     try:
@@ -484,10 +506,22 @@ async def forensics_page(request: Request, user: User = Depends(require_page_per
     return templates.TemplateResponse("forensics.html", {"request": request})
 
 
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Analytics Engine dashboard."""
+    return templates.TemplateResponse("analytics.html", {"request": request})
+
+
 @app.get("/social", response_class=HTMLResponse)
 async def social_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the Social Hub page."""
     return templates.TemplateResponse("social.html", {"request": request})
+
+
+@app.get("/engineering-analytics", response_class=HTMLResponse)
+async def engineering_analytics_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Engineering System Analytics page."""
+    return templates.TemplateResponse("engineering_analytics.html", {"request": request})
 
 
 @app.get("/topology", response_class=HTMLResponse)

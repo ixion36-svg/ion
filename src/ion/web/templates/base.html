@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ION{% endblock %}</title>
     <link rel="icon" type="image/png" href="/static/img/ion-logo.png">
-    <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.22">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.9.22">
-    <link rel="stylesheet" href="/static/css/chat.css?v=0.9.22">
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.9.22">
+    <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.27">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.9.27">
+    <link rel="stylesheet" href="/static/css/chat.css?v=0.9.27">
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.9.27">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
     <script src="/static/js/theme-init.js"></script>
 </head>
@@ -36,7 +36,7 @@
             </li>
 
             <!-- Analyst dropdown -->
-            <li class="nav-dropdown{% if '/alerts' in request.url.path or '/cases' in request.url.path or '/observables' in request.url.path or '/pcap' in request.url.path or '/analyst' in request.url.path or '/chat' in request.url.path or '/discover' in request.url.path or '/tools' in request.url.path %} has-active{% endif %}">
+            <li class="nav-dropdown{% if '/alerts' in request.url.path or '/cases' in request.url.path or '/observables' in request.url.path or '/pcap' in request.url.path or '/analyst' in request.url.path or '/chat' in request.url.path or '/discover' in request.url.path or '/analytics' in request.url.path or '/tools' in request.url.path %} has-active{% endif %}">
                 <a href="/analyst" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Analyst <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
                     <li><a href="/analyst" class="{% if '/analyst' in request.url.path or '/tools' in request.url.path %}active{% endif %}">SOC Dashboard</a></li>
@@ -46,15 +46,17 @@
                     <li><a href="/pcap" class="{% if '/pcap' in request.url.path %}active{% endif %}">PCAP</a></li>
                     <li><a href="/chat" class="{% if '/chat' in request.url.path %}active{% endif %}">AI Chat</a></li>
                     <li><a href="/discover" class="{% if '/discover' in request.url.path %}active{% endif %}">Discover</a></li>
+                    <li><a href="/analytics" class="{% if '/analytics' in request.url.path %}active{% endif %}">Analytics</a></li>
                 </ul>
             </li>
 
             <!-- Engineering dropdown -->
-            <li class="nav-dropdown{% if '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
+            <li class="nav-dropdown{% if '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path or '/engineering-analytics' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
                 <a href="/topology" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Engineering <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
                     <li id="nav-topology-link" style="display: none;"><a href="/topology" class="{% if '/topology' in request.url.path %}active{% endif %}">Topology</a></li>
                     <li id="nav-architecture-link" style="display: none;"><a href="/architecture" class="{% if '/architecture' in request.url.path %}active{% endif %}">Architecture</a></li>
+                    <li><a href="/engineering-analytics" class="{% if '/engineering-analytics' in request.url.path %}active{% endif %}">System Analytics</a></li>
                     <li><a href="/gitlab" class="{% if '/gitlab' in request.url.path %}active{% endif %}">GitLab</a></li>
                     <li id="nav-security-link" style="display: none;"><a href="/security" class="{% if '/security' in request.url.path %}active{% endif %}">Security</a></li>
                     <li id="nav-integrations-link" style="display: none;"><a href="/integrations" class="{% if '/integrations' in request.url.path %}active{% endif %}">Integrations</a></li>
@@ -269,11 +271,11 @@
     <!-- Markdown parser + sanitizer -->
     <script src="/static/js/marked.min.js"></script>
     <script src="/static/js/purify.min.js"></script>
-    <script src="/static/js/app.js?v=0.9.22"></script>
-    <script src="/static/js/chat.js?v=0.9.22"></script>
-    <script src="/static/js/ai-chat.js?v=0.9.22"></script>
+    <script src="/static/js/app.js?v=0.9.27"></script>
+    <script src="/static/js/chat.js?v=0.9.27"></script>
+    <script src="/static/js/ai-chat.js?v=0.9.27"></script>
     <script src="/static/js/quill.js"></script>
-    <script src="/static/js/notepad.js?v=0.9.22"></script>
+    <script src="/static/js/notepad.js?v=0.9.27"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

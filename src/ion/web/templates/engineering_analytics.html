@@ -1,0 +1,788 @@
+{% extends "base.html" %}
+
+{% block title %}System Analytics - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>System Analytics</h1>
+    <div class="header-actions">
+        <select id="time-range" onchange="loadSystemAnalytics()">
+            <option value="1">Last Hour</option>
+            <option value="4">Last 4 Hours</option>
+            <option value="12">Last 12 Hours</option>
+            <option value="24" selected>Last 24 Hours</option>
+            <option value="72">Last 3 Days</option>
+            <option value="168">Last 7 Days</option>
+            <option value="720">Last 30 Days</option>
+        </select>
+        <button class="btn btn-secondary" onclick="loadSystemAnalytics()">Refresh</button>
+    </div>
+</div>
+
+<!-- Summary stats -->
+<div class="eng-stats-bar" id="eng-stats">
+    <div class="eng-stat">
+        <div class="eng-stat-value" id="stat-total">-</div>
+        <div class="eng-stat-label">Total Alerts</div>
+    </div>
+    <div class="eng-stat">
+        <div class="eng-stat-value" id="stat-systems">-</div>
+        <div class="eng-stat-label">Systems</div>
+    </div>
+    <div class="eng-stat">
+        <div class="eng-stat-value severity-critical" id="stat-critical">-</div>
+        <div class="eng-stat-label">Critical</div>
+    </div>
+    <div class="eng-stat">
+        <div class="eng-stat-value severity-high" id="stat-high">-</div>
+        <div class="eng-stat-label">High</div>
+    </div>
+    <div class="eng-stat">
+        <div class="eng-stat-value severity-medium" id="stat-medium">-</div>
+        <div class="eng-stat-label">Medium</div>
+    </div>
+    <div class="eng-stat">
+        <div class="eng-stat-value" id="stat-indices">-</div>
+        <div class="eng-stat-label">Indices</div>
+    </div>
+</div>
+
+<!-- Total timeline -->
+<div class="eng-section">
+    <div class="eng-section-header">
+        <h2>Alert Volume Over Time</h2>
+        <span class="eng-section-sub" id="timeline-interval"></span>
+    </div>
+    <div class="eng-timeline-chart" id="total-timeline">
+        <div class="loading-state">Loading...</div>
+    </div>
+</div>
+
+<!-- Per-system cards -->
+<div class="eng-section">
+    <div class="eng-section-header">
+        <h2>Per-System Breakdown</h2>
+        <span class="eng-section-sub" id="systems-count"></span>
+    </div>
+    <div id="systems-grid" class="eng-systems-grid">
+        <div class="loading-state">Loading system analytics...</div>
+    </div>
+</div>
+
+<!-- Index breakdown -->
+<div class="eng-section">
+    <div class="eng-section-header">
+        <h2>Index Breakdown</h2>
+        <span class="eng-section-sub">Alert counts by Elasticsearch index</span>
+    </div>
+    <div id="index-table-container">
+        <div class="loading-state">Loading...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* =========================================================================
+   Engineering Analytics — ION dark cyber/neon theme
+   ========================================================================= */
+
+/* Stats bar */
+.eng-stats-bar {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+.eng-stat {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1rem;
+    text-align: center;
+    box-shadow: var(--shadow-card);
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.eng-stat::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+}
+.eng-stat:hover {
+    border-color: var(--border-bright);
+    box-shadow: var(--shadow-card), var(--glow-sm);
+}
+.eng-stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary);
+    text-shadow: var(--glow-sm);
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.2;
+}
+.eng-stat-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.375rem;
+}
+
+/* Sections */
+.eng-section {
+    margin-bottom: 2rem;
+}
+.eng-section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+.eng-section-header h2 {
+    margin: 0;
+    font-size: 1.125rem;
+    color: var(--text-bright);
+}
+.eng-section-sub {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+}
+
+/* Timeline chart container */
+.eng-timeline-chart {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    box-shadow: var(--shadow-card);
+    min-height: 120px;
+    position: relative;
+    overflow: hidden;
+}
+.eng-timeline-chart::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple), var(--neon-cyan));
+}
+
+/* SVG sparkline styling */
+.eng-timeline-chart svg {
+    width: 100%;
+    display: block;
+}
+.timeline-area {
+    fill: url(#timeline-gradient);
+    opacity: 0.3;
+}
+.timeline-line {
+    fill: none;
+    stroke: var(--neon-cyan);
+    stroke-width: 2;
+    filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.5));
+}
+.timeline-dot {
+    fill: var(--neon-cyan);
+    filter: drop-shadow(0 0 3px rgba(0, 212, 255, 0.7));
+}
+
+/* Systems grid */
+.eng-systems-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 1.25rem;
+}
+
+/* System card */
+.system-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
+}
+.system-card:hover {
+    border-color: var(--border-bright);
+    box-shadow: var(--shadow-card), 0 0 20px rgba(0, 212, 255, 0.08);
+    transform: translateY(-2px);
+}
+
+/* Card header */
+.system-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+}
+.system-card-header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+}
+.system-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-bright);
+    font-family: 'JetBrains Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.system-name .system-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--bg-primary);
+}
+.system-alert-count {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary);
+    font-family: 'JetBrains Mono', monospace;
+    text-shadow: var(--glow-sm);
+}
+
+/* Card body */
+.system-card-body {
+    padding: 1rem 1.25rem;
+}
+
+/* Severity row */
+.severity-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+.sev-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+}
+.sev-pill.crit { background: rgba(255, 69, 58, 0.15); color: var(--severity-critical-color, #ff453a); border: 1px solid rgba(255, 69, 58, 0.3); }
+.sev-pill.high { background: rgba(255, 149, 0, 0.15); color: var(--severity-high-color, #ff9500); border: 1px solid rgba(255, 149, 0, 0.3); }
+.sev-pill.med  { background: rgba(255, 214, 10, 0.15); color: var(--severity-medium-color, #ffd60a); border: 1px solid rgba(255, 214, 10, 0.3); }
+.sev-pill.low  { background: rgba(48, 209, 88, 0.15); color: var(--severity-low-color, #30d158); border: 1px solid rgba(48, 209, 88, 0.3); }
+
+/* Mini sparkline inside card */
+.system-sparkline {
+    margin: 0.5rem 0;
+    height: 40px;
+}
+.system-sparkline svg {
+    width: 100%;
+    height: 40px;
+    display: block;
+}
+.spark-area { opacity: 0.2; }
+.spark-line {
+    fill: none;
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 2px rgba(0, 212, 255, 0.4));
+}
+
+/* Meta row */
+.system-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+.system-meta span {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Top rules */
+.system-rules {
+    margin-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.75rem;
+}
+.system-rules-title {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.375rem;
+}
+.rule-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0;
+    font-size: 0.75rem;
+}
+.rule-name {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 280px;
+}
+.rule-count {
+    color: var(--primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 0.7rem;
+}
+
+/* Datasets */
+.dataset-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.5rem;
+}
+.dataset-tag {
+    padding: 0.15rem 0.5rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Index table */
+.eng-index-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-card);
+}
+.eng-index-table thead th {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.eng-index-table tbody td {
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+}
+.eng-index-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.eng-index-table tbody tr:hover {
+    background: var(--bg-elevated);
+}
+.idx-name {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--neon-cyan);
+    font-size: 0.75rem;
+}
+.idx-bar-container {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-elevated);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.idx-bar {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+    transition: width 0.4s ease;
+}
+.idx-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--primary);
+    font-size: 0.8125rem;
+}
+.idx-sev-pills {
+    display: flex;
+    gap: 0.375rem;
+}
+
+/* Loading / empty states */
+.loading-state, .empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+.empty-state .empty-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.4;
+}
+
+/* No ES config banner */
+.es-not-configured {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 3rem;
+    text-align: center;
+    box-shadow: var(--shadow-card);
+}
+.es-not-configured h3 {
+    color: var(--text-bright);
+    margin-bottom: 0.5rem;
+}
+.es-not-configured p {
+    color: var(--text-muted);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .eng-stats-bar { grid-template-columns: repeat(3, 1fr); }
+    .eng-systems-grid { grid-template-columns: 1fr; }
+}
+</style>
+
+<script>
+let systemData = null;
+
+async function loadSystemAnalytics() {
+    const hours = document.getElementById('time-range').value;
+    try {
+        const resp = await fetch(`/api/engineering/analytics/systems?hours=${hours}`, {
+            credentials: 'include'
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            if (resp.status === 400 && (err.detail || '').includes('not configured')) {
+                showNotConfigured();
+                return;
+            }
+            throw new Error(err.detail || resp.statusText);
+        }
+        systemData = await resp.json();
+        renderDashboard(systemData);
+    } catch (e) {
+        console.error('Failed to load system analytics:', e);
+        document.getElementById('systems-grid').innerHTML =
+            `<div class="empty-state"><div class="empty-icon">&#x26A0;</div>Failed to load: ${escapeHtml(e.message)}</div>`;
+    }
+}
+
+function showNotConfigured() {
+    const grid = document.getElementById('systems-grid');
+    grid.innerHTML = `
+        <div class="es-not-configured" style="grid-column: 1/-1;">
+            <h3>Elasticsearch Not Connected</h3>
+            <p>Configure your Elasticsearch connection in Settings to see per-system analytics.</p>
+        </div>`;
+    document.getElementById('total-timeline').innerHTML = '';
+    document.getElementById('index-table-container').innerHTML = '';
+}
+
+function renderDashboard(data) {
+    // Stats
+    const sev = data.total_severity || {};
+    document.getElementById('stat-total').textContent = (data.total || 0).toLocaleString();
+    document.getElementById('stat-systems').textContent = (data.systems || []).length;
+    document.getElementById('stat-critical').textContent = (sev.critical || 0).toLocaleString();
+    document.getElementById('stat-high').textContent = (sev.high || 0).toLocaleString();
+    document.getElementById('stat-medium').textContent = (sev.medium || 0).toLocaleString();
+    document.getElementById('stat-indices').textContent = (data.indices || []).length;
+
+    // Total timeline
+    renderTotalTimeline(data.total_timeline || [], data.interval);
+
+    // Per-system cards
+    renderSystemCards(data.systems || []);
+
+    // Index table
+    renderIndexTable(data.indices || [], data.total || 1);
+}
+
+// =========================================================================
+// Total Timeline
+// =========================================================================
+function renderTotalTimeline(timeline, interval) {
+    const container = document.getElementById('total-timeline');
+    const intervalLabel = document.getElementById('timeline-interval');
+    if (intervalLabel) intervalLabel.textContent = `Interval: ${interval}`;
+
+    if (!timeline.length) {
+        container.innerHTML = '<div class="empty-state">No data for this time range</div>';
+        return;
+    }
+
+    const W = container.clientWidth - 40;
+    const H = 100;
+    const maxVal = Math.max(...timeline.map(t => t.count), 1);
+
+    const points = timeline.map((t, i) => ({
+        x: 20 + (i / Math.max(timeline.length - 1, 1)) * W,
+        y: H - 10 - ((t.count / maxVal) * (H - 30)),
+        count: t.count,
+        ts: t.timestamp
+    }));
+
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+    const areaPath = linePath + ` L${points[points.length - 1].x},${H - 10} L${points[0].x},${H - 10} Z`;
+
+    let svg = `<svg viewBox="0 0 ${W + 40} ${H}" preserveAspectRatio="none">
+        <defs>
+            <linearGradient id="timeline-gradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.4"/>
+                <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
+            </linearGradient>
+        </defs>
+        <path d="${areaPath}" class="timeline-area"/>
+        <path d="${linePath}" class="timeline-line"/>`;
+
+    // Dots on peaks
+    const peakThreshold = maxVal * 0.6;
+    points.forEach(p => {
+        if (p.count >= peakThreshold && p.count > 0) {
+            svg += `<circle cx="${p.x}" cy="${p.y}" r="3" class="timeline-dot">
+                <title>${p.count} alerts</title>
+            </circle>`;
+        }
+    });
+
+    // Y-axis labels
+    svg += `<text x="2" y="20" fill="var(--text-muted)" font-size="9" font-family="JetBrains Mono">${maxVal}</text>`;
+    svg += `<text x="2" y="${H - 10}" fill="var(--text-muted)" font-size="9" font-family="JetBrains Mono">0</text>`;
+
+    svg += '</svg>';
+    container.innerHTML = svg;
+}
+
+// =========================================================================
+// System Cards
+// =========================================================================
+function renderSystemCards(systems) {
+    const grid = document.getElementById('systems-grid');
+    const countEl = document.getElementById('systems-count');
+    if (countEl) countEl.textContent = `${systems.length} system${systems.length !== 1 ? 's' : ''} detected`;
+
+    if (!systems.length) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">&#x1F50D;</div>No systems found in this time range</div>`;
+        return;
+    }
+
+    grid.innerHTML = systems.map(sys => renderSystemCard(sys)).join('');
+}
+
+function renderSystemCard(sys) {
+    const sev = sys.severity || {};
+    const icon = getSystemIcon(sys.system);
+    const iconColor = getSystemColor(sys.system);
+
+    // Severity pills
+    let sevHtml = '';
+    if (sev.critical) sevHtml += `<span class="sev-pill crit">C ${sev.critical}</span>`;
+    if (sev.high) sevHtml += `<span class="sev-pill high">H ${sev.high}</span>`;
+    if (sev.medium) sevHtml += `<span class="sev-pill med">M ${sev.medium}</span>`;
+    if (sev.low) sevHtml += `<span class="sev-pill low">L ${sev.low}</span>`;
+    if (!sevHtml) sevHtml = '<span class="sev-pill" style="color:var(--text-muted);">No severity data</span>';
+
+    // Sparkline
+    const sparkHtml = renderMiniSparkline(sys.timeline || [], iconColor);
+
+    // Top rules (max 5)
+    const rules = (sys.top_rules || []).slice(0, 5);
+    let rulesHtml = '';
+    if (rules.length) {
+        rulesHtml = `
+        <div class="system-rules">
+            <div class="system-rules-title">Top Rules</div>
+            ${rules.map(r => `
+                <div class="rule-item">
+                    <span class="rule-name" title="${escapeHtml(r.rule)}">${escapeHtml(r.rule)}</span>
+                    <span class="rule-count">${r.count}</span>
+                </div>
+            `).join('')}
+        </div>`;
+    }
+
+    // Datasets
+    const datasets = (sys.datasets || []).slice(0, 8);
+    let dsHtml = '';
+    if (datasets.length) {
+        dsHtml = `<div class="dataset-tags">${datasets.map(d =>
+            `<span class="dataset-tag">${escapeHtml(d.dataset)} (${d.count})</span>`
+        ).join('')}</div>`;
+    }
+
+    return `
+    <div class="system-card">
+        <div class="system-card-header">
+            <div class="system-name">
+                <span class="system-icon" style="background:${iconColor};">${icon}</span>
+                ${escapeHtml(sys.system)}
+            </div>
+            <div class="system-alert-count">${sys.alert_count.toLocaleString()}</div>
+        </div>
+        <div class="system-card-body">
+            <div class="severity-row">${sevHtml}</div>
+            <div class="system-sparkline">${sparkHtml}</div>
+            <div class="system-meta">
+                <span title="Unique hosts">&#x1F4BB; ${sys.unique_hosts} hosts</span>
+                <span title="Unique users">&#x1F464; ${sys.unique_users} users</span>
+                <span title="Status">&#x25CF; ${formatStatus(sys.status)}</span>
+            </div>
+            ${dsHtml}
+            ${rulesHtml}
+        </div>
+    </div>`;
+}
+
+function renderMiniSparkline(timeline, color) {
+    if (!timeline.length) return '';
+    const W = 360;
+    const H = 40;
+    const maxVal = Math.max(...timeline.map(t => t.count), 1);
+
+    const points = timeline.map((t, i) => ({
+        x: (i / Math.max(timeline.length - 1, 1)) * W,
+        y: H - 4 - ((t.count / maxVal) * (H - 8))
+    }));
+
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+    const areaPath = linePath + ` L${W},${H - 4} L0,${H - 4} Z`;
+
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <defs>
+            <linearGradient id="sg-${color.replace('#','')}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+            </linearGradient>
+        </defs>
+        <path d="${areaPath}" class="spark-area" fill="url(#sg-${color.replace('#','')})"/>
+        <path d="${linePath}" class="spark-line" stroke="${color}"/>
+    </svg>`;
+}
+
+function formatStatus(status) {
+    if (!status || !Object.keys(status).length) return '-';
+    const parts = [];
+    if (status.open) parts.push(`${status.open} open`);
+    if (status.acknowledged) parts.push(`${status.acknowledged} ack`);
+    if (status.closed) parts.push(`${status.closed} closed`);
+    return parts.join(', ') || '-';
+}
+
+// =========================================================================
+// Index Table
+// =========================================================================
+function renderIndexTable(indices, total) {
+    const container = document.getElementById('index-table-container');
+    if (!indices.length) {
+        container.innerHTML = '<div class="empty-state">No indices found</div>';
+        return;
+    }
+
+    const maxCount = Math.max(...indices.map(i => i.count), 1);
+
+    let rows = indices.map(idx => {
+        const sev = idx.severity || {};
+        const pct = Math.round((idx.count / maxCount) * 100);
+        let sevPills = '';
+        if (sev.critical) sevPills += `<span class="sev-pill crit">C ${sev.critical}</span>`;
+        if (sev.high) sevPills += `<span class="sev-pill high">H ${sev.high}</span>`;
+        if (sev.medium) sevPills += `<span class="sev-pill med">M ${sev.medium}</span>`;
+        if (sev.low) sevPills += `<span class="sev-pill low">L ${sev.low}</span>`;
+
+        return `<tr>
+            <td><span class="idx-name">${escapeHtml(idx.index)}</span></td>
+            <td><span class="idx-count">${idx.count.toLocaleString()}</span></td>
+            <td>
+                <div class="idx-bar-container">
+                    <div class="idx-bar" style="width:${pct}%"></div>
+                </div>
+            </td>
+            <td><div class="idx-sev-pills">${sevPills || '-'}</div></td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+        <table class="eng-index-table">
+            <thead>
+                <tr>
+                    <th>Index</th>
+                    <th>Count</th>
+                    <th>Volume</th>
+                    <th>Severity</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+}
+
+// =========================================================================
+// Helpers
+// =========================================================================
+function getSystemIcon(name) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('windows') || n === 'default') return 'W';
+    if (n.includes('linux')) return 'L';
+    if (n.includes('network') || n.includes('firewall') || n.includes('fw')) return 'N';
+    if (n.includes('cloud') || n.includes('aws') || n.includes('azure') || n.includes('gcp')) return 'C';
+    if (n.includes('endpoint') || n.includes('edr')) return 'E';
+    if (n.includes('mail') || n.includes('email') || n.includes('exchange')) return 'M';
+    if (n.includes('dns')) return 'D';
+    if (n.includes('web') || n.includes('http') || n.includes('proxy')) return 'P';
+    if (n.includes('auth') || n.includes('identity') || n.includes('ad')) return 'A';
+    if (n.includes('db') || n.includes('sql') || n.includes('database')) return 'B';
+    return name ? name.charAt(0).toUpperCase() : '?';
+}
+
+function getSystemColor(name) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('windows') || n === 'default') return '#00a4ef';
+    if (n.includes('linux')) return '#fcc624';
+    if (n.includes('network') || n.includes('firewall')) return '#00d4ff';
+    if (n.includes('cloud') || n.includes('aws')) return '#ff9900';
+    if (n.includes('azure')) return '#0078d4';
+    if (n.includes('gcp')) return '#4285f4';
+    if (n.includes('endpoint') || n.includes('edr')) return '#9b59b6';
+    if (n.includes('mail') || n.includes('email')) return '#e74c3c';
+    if (n.includes('dns')) return '#2ecc71';
+    if (n.includes('web') || n.includes('proxy')) return '#f39c12';
+    if (n.includes('auth') || n.includes('identity')) return '#e91e63';
+    // Generate a consistent color from the name hash
+    let hash = 0;
+    for (let i = 0; i < n.length; i++) hash = n.charCodeAt(i) + ((hash << 5) - hash);
+    const hue = Math.abs(hash % 360);
+    return `hsl(${hue}, 70%, 55%)`;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// Initial load
+document.addEventListener('DOMContentLoaded', loadSystemAnalytics);
+</script>
+{% endblock %}

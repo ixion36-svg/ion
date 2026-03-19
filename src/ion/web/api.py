@@ -3003,16 +3003,22 @@ async def get_es_alerts(
     hours: int = 24,
     severity: Optional[str] = None,
     status: Optional[str] = None,
-    limit: int = 50,
+    limit: int = 500,
+    include_closed: bool = False,
+    time_from: Optional[str] = None,
+    time_to: Optional[str] = None,
     current_user: User = Depends(require_permission("alert:read")),
 ):
     """Fetch alerts from Elasticsearch.
 
     Args:
-        hours: Number of hours to look back (default 24)
+        hours: Number of hours to look back (default 24, ignored if time_from set)
         severity: Filter by severity (critical, high, medium, low, info)
-        status: Filter by status (open, acknowledged, resolved)
-        limit: Maximum number of alerts (default 50)
+        status: Filter by status (open, acknowledged, closed)
+        limit: Maximum number of alerts (default 500)
+        include_closed: Include closed/resolved alerts (default False)
+        time_from: Absolute start time (ISO 8601). Overrides hours.
+        time_to: Absolute end time (ISO 8601). Defaults to now.
     """
     config = get_elasticsearch_config()
     if not config.get("enabled"):
@@ -3028,6 +3034,9 @@ async def get_es_alerts(
             severity=severity,
             status=status,
             limit=limit,
+            include_closed=include_closed,
+            time_from=time_from,
+            time_to=time_to,
         )
         return {
             "alerts": [a.to_dict() for a in alerts],

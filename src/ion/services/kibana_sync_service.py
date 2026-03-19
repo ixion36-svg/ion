@@ -300,9 +300,11 @@ class KibanaSyncService:
         errors = []
 
         try:
-            # Get all cases from Kibana
-            kibana_cases = self.kibana_service.list_cases(per_page=100)
-            cases_list = kibana_cases.get("cases", [])
+            # Get only open + in-progress cases from Kibana (skip closed investigations)
+            cases_list = []
+            for case_status in ("open", "in-progress"):
+                result = self.kibana_service.list_cases(status=case_status, per_page=100)
+                cases_list.extend(result.get("cases", []))
 
             # Get existing Kibana case IDs in ION
             existing_kibana_ids = {
@@ -546,9 +548,11 @@ class KibanaSyncService:
         session = factory()
 
         try:
-            # Get all cases from Kibana
-            kibana_cases = self.kibana_service.list_cases(per_page=100)
-            cases_list = kibana_cases.get("cases", [])
+            # Get only open + in-progress cases from Kibana (skip closed investigations)
+            cases_list = []
+            for case_status in ("open", "in-progress"):
+                result = self.kibana_service.list_cases(status=case_status, per_page=100)
+                cases_list.extend(result.get("cases", []))
 
             # Get existing Kibana case IDs in ION
             existing_kibana_ids = {
