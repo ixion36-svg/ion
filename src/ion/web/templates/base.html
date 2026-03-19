@@ -50,10 +50,11 @@
             </li>
 
             <!-- Engineering dropdown -->
-            <li class="nav-dropdown{% if '/gitlab' in request.url.path or '/topology' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
+            <li class="nav-dropdown{% if '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
                 <a href="/topology" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Engineering <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
                     <li id="nav-topology-link" style="display: none;"><a href="/topology" class="{% if '/topology' in request.url.path %}active{% endif %}">Topology</a></li>
+                    <li id="nav-architecture-link" style="display: none;"><a href="/architecture" class="{% if '/architecture' in request.url.path %}active{% endif %}">Architecture</a></li>
                     <li><a href="/gitlab" class="{% if '/gitlab' in request.url.path %}active{% endif %}">GitLab</a></li>
                     <li id="nav-security-link" style="display: none;"><a href="/security" class="{% if '/security' in request.url.path %}active{% endif %}">Security</a></li>
                     <li id="nav-integrations-link" style="display: none;"><a href="/integrations" class="{% if '/integrations' in request.url.path %}active{% endif %}">Integrations</a></li>

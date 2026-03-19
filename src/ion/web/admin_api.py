@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from ion.web.api import limiter
-from ion.auth.dependencies import require_admin, require_permission
+from ion.auth.dependencies import require_admin, require_permission, get_current_user
 from ion.models.user import User
 from ion.core.config import get_config, set_config, Config
 from ion.core.url_validator import validate_integration_url
@@ -1944,3 +1944,64 @@ async def get_system_logs(
     )
 
     return {"logs": logs, "total": len(logs)}
+
+
+# =============================================================================
+# Architecture Health (module-level health from log analysis)
+# =============================================================================
+
+@router.get("/architecture-health")
+async def get_architecture_health(
+    minutes: int = 5,
+    current_user: User = Depends(get_current_user),
+):
+    """Get per-module health status derived from recent log analysis.
+
+    Returns internal module health and external connector status.
+    Accessible by engineering+ roles (not admin-only).
+    """
+    from ion.core.logging import get_memory_handler
+
+    # Permission check: engineering or admin
+    eng_roles = {"admin", "engineering", "soc_engineer", "senior_engineer", "platform_engineer"}
+    user_roles = {r.name if hasattr(r, "name") else r for r in current_user.roles}
+    if not eng_roles.intersection(user_roles):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    minutes = max(1, min(minutes, 60))
+
+    # Module health from logs
+    handler = get_memory_handler()
+    module_health = handler.get_module_health(minutes=minutes) if handler else {}
+
+    # External connector health via registry
+    connectors = {}
+    try:
+        from ion.services.connectors.registry import get_connector_registry
+        registry = get_connector_registry()
+        check_results = await registry.healthcheck_all()
+        for svc_name, result in check_results.items():
+            connectors[svc_name] = {
+                "status": result.status.value if hasattr(result.status, "value") else str(result.status),
+                "message": result.message or "",
+                "version": getattr(result, "version", None),
+            }
+    except Exception:
+        pass
+
+    # Recent log stats
+    recent_logs = handler.get_logs(limit=500) if handler else []
+    error_count = sum(1 for l in recent_logs if l["level"] in ("ERROR", "CRITICAL"))
+    warning_count = sum(1 for l in recent_logs if l["level"] == "WARNING")
+
+    return {
+        "modules": module_health,
+        "connectors": connectors,
+        "summary": {
+            "total_errors": error_count,
+            "total_warnings": warning_count,
+            "log_entries": len(recent_logs),
+            "minutes": minutes,
+        },
+    }

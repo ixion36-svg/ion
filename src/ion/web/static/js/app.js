@@ -191,7 +191,7 @@ function updateNavForPermissions() {
     const isEngineer = ['engineering', 'soc_engineer', 'senior_engineer', 'platform_engineer', 'admin'].some(r => roles.includes(r));
 
     // Permission-based nav visibility — security links shown if user has security:read
-    ['nav-security-link', 'nav-topology-link'].forEach(id => {
+    ['nav-security-link', 'nav-topology-link', 'nav-architecture-link'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = perms.has('security:read') ? '' : 'none';
     });

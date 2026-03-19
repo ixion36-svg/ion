@@ -496,6 +496,12 @@ async def topology_page(request: Request, user: User = Depends(require_page_perm
     return templates.TemplateResponse("topology.html", {"request": request})
 
 
+@app.get("/architecture", response_class=HTMLResponse)
+async def architecture_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
+    """Render the system architecture flow diagram page."""
+    return templates.TemplateResponse("architecture.html", {"request": request})
+
+
 def main():
     """Run the web server."""
     import argparse

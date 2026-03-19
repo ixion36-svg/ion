@@ -457,6 +457,72 @@ class MemoryLogHandler(logging.Handler):
         except Exception:
             self.handleError(record)
 
+    def get_module_health(self, minutes: int = 5) -> Dict[str, Dict[str, Any]]:
+        """Aggregate error/warning counts per logger-prefix module.
+
+        Returns a dict keyed by module id with counts and last error info.
+        """
+        from datetime import timedelta
+
+        MODULE_PREFIXES = {
+            "auth": ["ion.auth"],
+            "database": ["ion.storage", "sqlalchemy"],
+            "api": ["ion.web.api", "ion.web.server"],
+            "templates": ["ion.services.template_service", "ion.services.render_service"],
+            "ai_chat": ["ion.services.ollama_service", "ion.services.ai_"],
+            "alerts": ["ion.services.elasticsearch_service"],
+            "cases": ["ion.services.kibana_cases", "ion.services.kibana_sync"],
+            "observables": ["ion.services.observable", "ion.services.opencti"],
+            "pcap": ["ion.services.pcap_service"],
+            "forensics": ["ion.services.forensic", "ion.web.forensics_api"],
+            "knowledge_base": ["ion.services.kb_seed", "ion.data.kb_"],
+            "security": ["ion.web.security_middleware", "ion.services.security_service"],
+            "gitlab": ["ion.services.gitlab_service"],
+            "logging": ["ion.core.logging", "ion.web.logging_middleware"],
+            "chat": ["ion.services.chat", "ion.web.ai_api"],
+            "skills": ["ion.web.skills_api", "ion.services.skills"],
+            "notifications": ["ion.web.notification"],
+        }
+
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+        cutoff_iso = cutoff.isoformat()
+
+        # Init result
+        result = {mid: {"errors": 0, "warnings": 0, "last_error": None, "last_error_msg": None}
+                  for mid in MODULE_PREFIXES}
+
+        with self._lock:
+            entries = list(self._buffer)
+
+        for entry in entries:
+            if entry["timestamp"] < cutoff_iso:
+                continue
+            lvl = entry["level"]
+            if lvl not in ("ERROR", "CRITICAL", "WARNING"):
+                continue
+            logger = entry["logger"]
+            for mid, prefixes in MODULE_PREFIXES.items():
+                if any(logger.startswith(p) for p in prefixes):
+                    if lvl in ("ERROR", "CRITICAL"):
+                        result[mid]["errors"] += 1
+                        if not result[mid]["last_error"] or entry["timestamp"] > result[mid]["last_error"]:
+                            result[mid]["last_error"] = entry["timestamp"]
+                            result[mid]["last_error_msg"] = entry["message"][:200]
+                    else:
+                        result[mid]["warnings"] += 1
+                    break
+
+        # Compute status per module
+        for mid, data in result.items():
+            if data["errors"] > 0:
+                data["status"] = "error"
+            elif data["warnings"] > 0:
+                data["status"] = "warning"
+            else:
+                data["status"] = "healthy"
+
+        return result
+
     def get_logs(
         self,
         limit: int = 200,

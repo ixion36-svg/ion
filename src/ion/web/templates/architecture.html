@@ -1,0 +1,1342 @@
+{% extends "base.html" %}
+
+{% block title %}System Architecture - ION{% endblock %}
+
+{% block content %}
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   ION System Architecture — Interactive Flow & Health Diagram
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Break out of .container ───────────────────────────────── */
+.arch-page-wrap {
+    width: 100vw; position: relative; left: 50%; right: 50%;
+    margin-left: -50vw; margin-right: -50vw;
+    padding: 0 2rem;
+    box-sizing: border-box;
+}
+.arch-page { display: flex; flex-direction: column; gap: 20px; padding-bottom: 40px; max-width: 100%; }
+
+/* ── Header ────────────────────────────────────────────────── */
+.arch-header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+}
+.arch-header h1 { margin: 0; font-size: 1.4rem; display: flex; align-items: center; gap: 10px; }
+.arch-header h1 i { color: var(--primary); }
+.arch-header-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ── Health Banner ─────────────────────────────────────────── */
+.arch-health-banner {
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 20px; border-radius: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    position: relative; overflow: hidden;
+}
+.arch-health-banner::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--primary), #a855f7, #22c55e);
+}
+.arch-health-ring {
+    width: 68px; height: 68px; flex-shrink: 0; position: relative;
+}
+.arch-health-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.arch-health-ring-bg { fill: none; stroke: var(--border-color); stroke-width: 5; }
+.arch-health-ring-fill { fill: none; stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset .8s ease, stroke .4s; }
+.arch-health-pct {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; font-weight: 800; font-family: 'JetBrains Mono', monospace;
+    color: var(--text-primary);
+}
+.arch-health-info { flex: 1; }
+.arch-health-title { font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 2px; }
+.arch-health-subtitle { font-size: .8rem; color: var(--text-secondary); }
+.arch-health-stats { display: flex; gap: 18px; margin-top: 6px; }
+.arch-health-stat { display: flex; align-items: center; gap: 5px; font-size: .78rem; }
+.arch-health-stat .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.arch-health-stat .dot.green { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,.5); }
+.arch-health-stat .dot.yellow { background: #eab308; box-shadow: 0 0 8px rgba(234,179,8,.4); }
+.arch-health-stat .dot.red { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,.5); }
+.arch-health-stat .count { font-weight: 700; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; }
+.arch-health-stat .label { color: var(--text-secondary); }
+
+/* ── Tab Bar ───────────────────────────────────────────────── */
+.arch-tabs {
+    display: flex; gap: 4px; background: var(--bg-secondary);
+    border: 1px solid var(--border-color); border-radius: 8px;
+    padding: 4px; flex-wrap: wrap;
+}
+.arch-tab {
+    padding: 8px 16px; border-radius: 6px; cursor: pointer;
+    font-size: .82rem; font-weight: 600; color: var(--text-secondary);
+    transition: all .2s; border: none; background: none;
+    display: flex; align-items: center; gap: 6px;
+}
+.arch-tab:hover { color: var(--text-primary); background: var(--bg-primary); }
+.arch-tab.active {
+    color: var(--primary); background: var(--bg-primary);
+    box-shadow: 0 0 12px var(--primary-dim);
+}
+.arch-tab .tab-badge {
+    font-size: .65rem; padding: 1px 6px; border-radius: 10px;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700;
+}
+.arch-tab .tab-badge.errors { background: rgba(239,68,68,.2); color: #ef4444; }
+.arch-tab .tab-badge.warnings { background: rgba(234,179,8,.2); color: #eab308; }
+
+/* ── Tab Panels ────────────────────────────────────────────── */
+.arch-panel { display: none; }
+.arch-panel.active { display: block; }
+
+/* ═══════════════════════════════════════════════════════════════
+   Section 1: Architecture Diagram (SVG-based hub + rings)
+   ═══════════════════════════════════════════════════════════════ */
+.arch-diagram-wrap {
+    position: relative;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.arch-diagram-wrap::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(circle at 50% 50%, var(--primary-dim) 0%, transparent 60%);
+    opacity: .2;
+}
+.arch-diagram {
+    position: relative;
+    width: 100%; height: 640px;
+    display: flex; align-items: center; justify-content: center;
+}
+.arch-diagram-legend {
+    position: absolute; bottom: 12px; left: 16px;
+    display: flex; gap: 16px; z-index: 20;
+    font-size: .72rem; color: var(--text-secondary);
+}
+.arch-diagram-legend .legend-item {
+    display: flex; align-items: center; gap: 5px;
+}
+.arch-diagram-legend .legend-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+}
+.arch-diagram-legend .legend-dot.int { background: var(--primary); opacity: .7; }
+.arch-diagram-legend .legend-dot.ext { background: #a855f7; opacity: .7; }
+.arch-diagram-legend .legend-dot.db { background: #f59e0b; opacity: .7; }
+
+/* SVG layer */
+.arch-svg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 1;
+}
+.arch-conn { stroke-width: 1.5; fill: none; opacity: .3; }
+.arch-conn.active { opacity: .6; }
+.arch-conn-glow { stroke-width: 4; fill: none; opacity: 0; filter: blur(3px); }
+.arch-conn-glow.active { animation: arch-line-pulse 3s ease-in-out infinite; }
+@keyframes arch-line-pulse { 0%,100% { opacity: 0; } 50% { opacity: .25; } }
+
+/* Particle on connection */
+.arch-particle { r: 3; opacity: 0; }
+.arch-particle.active { animation: arch-particle-flow 3s linear infinite; }
+
+/* Central hub */
+.arch-hub {
+    position: absolute; z-index: 15;
+    width: 110px; height: 110px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--primary-dim) 0%, transparent 70%);
+    cursor: pointer;
+    transition: transform .2s;
+}
+.arch-hub:hover { transform: scale(1.05); }
+.arch-hub-inner {
+    width: 86px; height: 86px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: var(--bg-primary);
+    border: 2px solid var(--primary);
+    box-shadow: var(--glow-md), inset 0 0 20px var(--primary-dim);
+    position: relative;
+}
+.arch-hub-ring {
+    position: absolute; inset: -8px; border-radius: 50%;
+    border: 1px solid var(--primary); opacity: .25;
+    animation: arch-hub-pulse 3s ease-in-out infinite;
+}
+.arch-hub-ring:nth-child(2) { inset: -18px; animation-delay: 1s; opacity: .12; }
+@keyframes arch-hub-pulse { 0%,100% { opacity: .25; transform: scale(1); } 50% { opacity: .08; transform: scale(1.03); } }
+.arch-hub-logo {
+    font-size: 1.1rem; font-weight: 900; color: var(--primary);
+    text-shadow: var(--glow-sm); letter-spacing: 2px;
+}
+.arch-hub-sub { font-size: .6rem; color: var(--text-secondary); margin-top: 1px; }
+
+/* Module / Service nodes */
+.arch-node {
+    position: absolute; z-index: 10;
+    display: flex; flex-direction: column; align-items: center;
+    cursor: pointer; transition: transform .2s;
+    text-decoration: none; gap: 4px;
+}
+.arch-node:hover { transform: scale(1.08); }
+.arch-node:hover .arch-node-card { border-color: var(--primary); box-shadow: 0 0 16px var(--primary-dim); }
+.arch-node.selected .arch-node-card { border-color: var(--primary); box-shadow: var(--glow-md); }
+
+.arch-node-card {
+    width: 108px; padding: 10px 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    text-align: center;
+    transition: all .25s;
+    position: relative;
+    overflow: hidden;
+}
+.arch-node-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    transition: background .4s;
+}
+.arch-node-card.healthy::before { background: #22c55e; }
+.arch-node-card.warning::before { background: #eab308; }
+.arch-node-card.error::before { background: #ef4444; }
+.arch-node-card.disabled::before { background: #6b7280; }
+.arch-node-card.checking::before { background: #eab308; animation: arch-check 1s infinite; }
+@keyframes arch-check { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+.arch-node-icon {
+    width: 32px; height: 32px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 5px; font-size: 1rem;
+}
+.arch-node-icon.healthy { background: rgba(34,197,94,.12); color: #22c55e; }
+.arch-node-icon.warning { background: rgba(234,179,8,.12); color: #eab308; }
+.arch-node-icon.error { background: rgba(239,68,68,.12); color: #ef4444; }
+.arch-node-icon.disabled { background: rgba(107,114,128,.12); color: #6b7280; }
+.arch-node-icon.checking { background: rgba(234,179,8,.12); color: #eab308; }
+
+/* Brand color overrides for external services */
+.arch-node[data-type="external"][data-id="elasticsearch"] .arch-node-icon.healthy { background: rgba(0,191,179,.12); color: #00bfb3; }
+.arch-node[data-type="external"][data-id="kibana"] .arch-node-icon.healthy { background: rgba(0,191,179,.12); color: #00bfb3; }
+.arch-node[data-type="external"][data-id="gitlab"] .arch-node-icon.healthy { background: rgba(252,109,38,.12); color: #fc6d26; }
+.arch-node[data-type="external"][data-id="opencti"] .arch-node-icon.healthy { background: rgba(99,102,241,.12); color: #6366f1; }
+.arch-node[data-type="external"][data-id="ollama"] .arch-node-icon.healthy { background: rgba(168,85,247,.12); color: #a855f7; }
+.arch-node[data-type="external"][data-id="dfir_iris"] .arch-node-icon.healthy { background: rgba(59,130,246,.12); color: #3b82f6; }
+
+.arch-node-name {
+    font-size: .72rem; font-weight: 700; color: var(--text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 100px;
+}
+.arch-node-meta {
+    font-size: .6rem; color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+}
+.arch-node-badge {
+    position: absolute; top: -4px; right: -4px; width: 16px; height: 16px;
+    border-radius: 50%; z-index: 2; font-size: .55rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+}
+.arch-node-badge.error-badge {
+    background: #ef4444; color: #fff;
+    box-shadow: 0 0 8px rgba(239,68,68,.6);
+    animation: arch-badge-pulse 2s ease-in-out infinite;
+}
+.arch-node-badge.warn-badge {
+    background: #eab308; color: #000;
+}
+@keyframes arch-badge-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+
+/* Ring labels */
+.arch-ring-label {
+    position: absolute; z-index: 5;
+    font-size: .6rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-secondary); opacity: .4;
+    pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Section 2: Data Flow Pipelines
+   ═══════════════════════════════════════════════════════════════ */
+.arch-flows-section { margin-top: 0; }
+.arch-section-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.arch-section-header h2 { margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
+.arch-section-header h2 i { color: var(--primary); }
+
+.arch-flow-tabs {
+    display: flex; gap: 4px; margin-bottom: 12px;
+}
+.arch-flow-tab {
+    padding: 6px 14px; border-radius: 6px; cursor: pointer;
+    font-size: .78rem; font-weight: 600; color: var(--text-secondary);
+    background: var(--bg-secondary); border: 1px solid var(--border-color);
+    transition: all .2s;
+}
+.arch-flow-tab:hover { color: var(--text-primary); border-color: var(--primary); }
+.arch-flow-tab.active { color: var(--primary); border-color: var(--primary); background: var(--bg-primary); box-shadow: 0 0 8px var(--primary-dim); }
+
+.arch-flow-wrap {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px; overflow-x: auto; overflow-y: hidden;
+    position: relative;
+}
+.arch-flow-wrap::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 40%, var(--primary-dim) 0%, transparent 50%);
+    opacity: .1;
+}
+.arch-flow {
+    display: flex; align-items: center;
+    padding: 28px 24px; min-width: max-content;
+    position: relative; z-index: 1;
+}
+
+/* Flow stage cards */
+.arch-flow-stage {
+    display: flex; flex-direction: column; align-items: center;
+    cursor: pointer; transition: transform .2s;
+}
+.arch-flow-stage:hover { transform: translateY(-3px); }
+.arch-flow-stage:hover .arch-flow-card { border-color: var(--primary); box-shadow: 0 4px 16px var(--primary-dim); }
+
+.arch-flow-card {
+    width: 130px; padding: 12px 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px; text-align: center;
+    transition: all .2s; position: relative;
+}
+.arch-flow-card.active-step { border-color: var(--primary); box-shadow: var(--glow-sm); }
+.arch-flow-card.active-step::after {
+    content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px; border-radius: 50%; background: var(--primary);
+    box-shadow: var(--glow-sm);
+}
+.arch-flow-icon {
+    width: 34px; height: 34px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 6px; font-size: 1rem;
+}
+.arch-flow-name { font-size: .78rem; font-weight: 700; color: var(--text-primary); }
+.arch-flow-desc { font-size: .64rem; color: var(--text-secondary); margin-top: 2px; line-height: 1.2; }
+
+/* Flow arrow */
+.arch-flow-arrow {
+    display: flex; align-items: center; width: 40px; flex-shrink: 0; position: relative;
+}
+.arch-flow-arrow-line { flex: 1; height: 2px; opacity: .35; }
+.arch-flow-arrow-head {
+    width: 0; height: 0; flex-shrink: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    opacity: .4;
+}
+.arch-flow-arrow-dot {
+    position: absolute; width: 5px; height: 5px;
+    border-radius: 50%; top: 50%; transform: translateY(-50%);
+    opacity: 0; animation: arch-flow-dot 2.5s ease-in-out infinite;
+}
+@keyframes arch-flow-dot {
+    0% { left: 4px; opacity: 0; }
+    15% { opacity: .7; }
+    85% { opacity: .7; }
+    100% { left: calc(100% - 9px); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Section 3: Live Log Stream + Module Error Map
+   ═══════════════════════════════════════════════════════════════ */
+.arch-logs-section { display: flex; gap: 14px; min-height: 420px; }
+
+/* Error map sidebar */
+.arch-error-map {
+    width: 240px; flex-shrink: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px; padding: 14px;
+    display: flex; flex-direction: column; gap: 6px;
+    overflow-y: auto; max-height: 500px;
+}
+.arch-error-map-title {
+    font-size: .82rem; font-weight: 700; color: var(--text-primary);
+    margin-bottom: 6px; display: flex; align-items: center; gap: 6px;
+}
+.arch-error-map-title i { color: var(--primary); }
+
+.arch-module-pill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 6px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    cursor: pointer; transition: all .2s;
+    font-size: .75rem;
+}
+.arch-module-pill:hover { border-color: var(--primary); }
+.arch-module-pill.active { border-color: var(--primary); background: var(--primary-dim); }
+.arch-module-pill.has-errors { border-left: 3px solid #ef4444; }
+.arch-module-pill.has-warnings { border-left: 3px solid #eab308; }
+.arch-module-pill .pill-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.arch-module-pill .pill-dot.healthy { background: #22c55e; }
+.arch-module-pill .pill-dot.warning { background: #eab308; }
+.arch-module-pill .pill-dot.error { background: #ef4444; }
+.arch-module-pill .pill-name { flex: 1; color: var(--text-primary); font-weight: 600; }
+.arch-module-pill .pill-count {
+    font-family: 'JetBrains Mono', monospace; font-size: .65rem; font-weight: 700;
+}
+.arch-module-pill .pill-count.err { color: #ef4444; }
+.arch-module-pill .pill-count.warn { color: #eab308; }
+
+/* Log stream */
+.arch-log-stream {
+    flex: 1;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+}
+.arch-log-toolbar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+.arch-log-toolbar .log-filter-label {
+    font-size: .72rem; color: var(--text-secondary); font-weight: 600;
+}
+.arch-log-toolbar select, .arch-log-toolbar input {
+    padding: 4px 8px; font-size: .75rem;
+    background: var(--bg-primary); color: var(--text-primary);
+    border: 1px solid var(--border-color); border-radius: 4px;
+}
+.arch-log-toolbar .log-auto-refresh {
+    margin-left: auto; display: flex; align-items: center; gap: 4px;
+    font-size: .72rem; color: var(--text-secondary);
+}
+.arch-log-toolbar .log-live-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+    animation: arch-live-pulse 1.5s ease-in-out infinite;
+}
+@keyframes arch-live-pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+.arch-log-body {
+    flex: 1; overflow-y: auto; padding: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .72rem; line-height: 1.6;
+    max-height: 440px;
+}
+.arch-log-entry {
+    display: flex; gap: 8px; padding: 4px 14px;
+    border-bottom: 1px solid rgba(255,255,255,.03);
+    transition: background .15s;
+}
+.arch-log-entry:hover { background: rgba(255,255,255,.03); }
+.arch-log-entry.level-ERROR, .arch-log-entry.level-CRITICAL {
+    background: rgba(239,68,68,.06);
+    border-left: 2px solid #ef4444;
+}
+.arch-log-entry.level-WARNING {
+    background: rgba(234,179,8,.04);
+    border-left: 2px solid rgba(234,179,8,.4);
+}
+.arch-log-ts { color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; width: 80px; }
+.arch-log-level {
+    width: 52px; flex-shrink: 0; font-weight: 700; text-align: center;
+    border-radius: 3px; padding: 0 4px;
+}
+.arch-log-level.INFO { color: #22c55e; }
+.arch-log-level.DEBUG { color: #6b7280; }
+.arch-log-level.WARNING { color: #eab308; }
+.arch-log-level.ERROR { color: #ef4444; }
+.arch-log-level.CRITICAL { color: #ef4444; font-weight: 900; }
+.arch-log-logger { color: var(--primary); opacity: .7; width: 180px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arch-log-msg { color: var(--text-primary); flex: 1; word-break: break-word; }
+.arch-log-empty {
+    padding: 40px; text-align: center; color: var(--text-secondary);
+    font-size: .85rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Section 4: Module Health Grid
+   ═══════════════════════════════════════════════════════════════ */
+.arch-health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+}
+.arch-health-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px; padding: 16px;
+    position: relative; overflow: hidden;
+    transition: all .25s; cursor: pointer;
+}
+.arch-health-card::before {
+    content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
+}
+.arch-health-card.healthy::before { background: #22c55e; }
+.arch-health-card.warning::before { background: #eab308; }
+.arch-health-card.error::before { background: #ef4444; }
+.arch-health-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+
+.arch-health-card-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.arch-health-card-icon {
+    width: 38px; height: 38px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem; flex-shrink: 0;
+}
+.arch-health-card-icon.healthy { background: rgba(34,197,94,.12); color: #22c55e; }
+.arch-health-card-icon.warning { background: rgba(234,179,8,.12); color: #eab308; }
+.arch-health-card-icon.error { background: rgba(239,68,68,.12); color: #ef4444; }
+.arch-health-card-title { font-size: .88rem; font-weight: 700; color: var(--text-primary); }
+.arch-health-card-status {
+    font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
+}
+.arch-health-card-status.healthy { color: #22c55e; }
+.arch-health-card-status.warning { color: #eab308; }
+.arch-health-card-status.error { color: #ef4444; }
+
+.arch-health-card-metrics {
+    display: flex; gap: 12px; margin-top: 8px;
+}
+.arch-health-metric {
+    padding: 6px 10px; background: var(--bg-primary);
+    border-radius: 5px; border: 1px solid var(--border-color);
+    flex: 1;
+}
+.arch-health-metric-label { font-size: .62rem; color: var(--text-secondary); text-transform: uppercase; }
+.arch-health-metric-value {
+    font-size: .85rem; font-weight: 700; font-family: 'JetBrains Mono', monospace;
+    color: var(--text-primary); margin-top: 2px;
+}
+.arch-health-card-error {
+    margin-top: 8px; padding: 6px 10px;
+    background: rgba(239,68,68,.08);
+    border-radius: 5px; border: 1px solid rgba(239,68,68,.2);
+    font-size: .68rem; color: #ef4444;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.3; word-break: break-word;
+}
+
+/* ── Loading ───────────────────────────────────────────────── */
+.arch-loading {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 60px; gap: 12px;
+}
+.arch-spinner {
+    width: 40px; height: 40px; border: 3px solid var(--border-color);
+    border-top-color: var(--primary); border-radius: 50%;
+    animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+    .arch-diagram { height: 540px; }
+    .arch-node-card { width: 92px; padding: 8px 6px; }
+    .arch-node-icon { width: 28px; height: 28px; }
+    .arch-node-name { font-size: .65rem; }
+}
+@media (max-width: 900px) {
+    .arch-logs-section { flex-direction: column; }
+    .arch-error-map { width: 100%; max-height: 200px; flex-direction: row; flex-wrap: wrap; }
+    .arch-diagram { height: 460px; }
+}
+@media (max-width: 768px) {
+    .arch-diagram { height: 400px; }
+    .arch-node-card { width: 80px; padding: 6px 4px; }
+    .arch-health-grid { grid-template-columns: 1fr; }
+}
+</style>
+
+<div class="arch-page-wrap">
+<div class="arch-page">
+
+<!-- ── Header ────────────────────────────────────────── -->
+<div class="arch-header">
+    <h1><i class="lucide-network"></i> System Architecture</h1>
+    <div class="arch-header-actions">
+        <button class="btn btn-sm" onclick="refreshArchHealth()" title="Refresh health data">
+            <i class="lucide-refresh-cw"></i> Refresh
+        </button>
+    </div>
+</div>
+
+<!-- ── Health Banner ─────────────────────────────────── -->
+<div class="arch-health-banner">
+    <div class="arch-health-ring">
+        <svg viewBox="0 0 36 36">
+            <circle class="arch-health-ring-bg" cx="18" cy="18" r="15.9"/>
+            <circle class="arch-health-ring-fill" id="arch-health-circle" cx="18" cy="18" r="15.9"
+                    stroke-dasharray="100" stroke-dashoffset="100" stroke="var(--primary)"/>
+        </svg>
+        <div class="arch-health-pct" id="arch-health-pct">--%</div>
+    </div>
+    <div class="arch-health-info">
+        <div class="arch-health-title">Platform Health</div>
+        <div class="arch-health-subtitle" id="arch-health-subtitle">Checking modules and connectors...</div>
+        <div class="arch-health-stats" id="arch-health-stats">
+            <div class="arch-health-stat"><span class="dot green"></span><span class="count" id="arch-stat-healthy">-</span><span class="label">Healthy</span></div>
+            <div class="arch-health-stat"><span class="dot yellow"></span><span class="count" id="arch-stat-warnings">-</span><span class="label">Warnings</span></div>
+            <div class="arch-health-stat"><span class="dot red"></span><span class="count" id="arch-stat-errors">-</span><span class="label">Errors</span></div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Tabs ───────────────────────────────────────────── -->
+<div class="arch-tabs">
+    <button class="arch-tab active" onclick="switchArchTab('diagram', this)"><i class="lucide-git-branch"></i> Architecture Map</button>
+    <button class="arch-tab" onclick="switchArchTab('flows', this)"><i class="lucide-arrow-right-left"></i> Data Flows</button>
+    <button class="arch-tab" onclick="switchArchTab('logs', this)">
+        <i class="lucide-terminal"></i> Live Logs
+        <span class="tab-badge errors" id="arch-log-error-badge" style="display:none">0</span>
+    </button>
+    <button class="arch-tab" onclick="switchArchTab('health', this)"><i class="lucide-activity"></i> Module Health</button>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- TAB 1: Architecture Diagram                                 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="arch-panel active" id="arch-panel-diagram">
+    <div class="arch-diagram-wrap">
+        <div class="arch-diagram" id="arch-diagram">
+            <svg class="arch-svg" id="arch-svg"></svg>
+
+            <!-- Central Hub -->
+            <div class="arch-hub" id="arch-hub" onclick="selectArchNode(null)">
+                <div class="arch-hub-inner">
+                    <div class="arch-hub-ring"></div>
+                    <div class="arch-hub-ring"></div>
+                    <div class="arch-hub-logo">ION</div>
+                    <div class="arch-hub-sub">Core Platform</div>
+                </div>
+            </div>
+
+            <!-- Ring labels -->
+            <div class="arch-ring-label" id="arch-label-inner" style="top:42px;left:50%;transform:translateX(-50%)">INTERNAL MODULES</div>
+            <div class="arch-ring-label" id="arch-label-outer" style="top:8px;left:50%;transform:translateX(-50%)">EXTERNAL SERVICES</div>
+        </div>
+
+        <div class="arch-diagram-legend">
+            <div class="legend-item"><div class="legend-dot int"></div> Internal Module</div>
+            <div class="legend-item"><div class="legend-dot ext"></div> External Service</div>
+            <div class="legend-item"><div class="legend-dot db"></div> Database</div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- TAB 2: Data Flow Pipelines                                  -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="arch-panel" id="arch-panel-flows">
+    <div class="arch-flow-tabs">
+        <button class="arch-flow-tab active" onclick="switchFlowPipeline('alert', this)">Alert Pipeline</button>
+        <button class="arch-flow-tab" onclick="switchFlowPipeline('enrichment', this)">Enrichment Pipeline</button>
+        <button class="arch-flow-tab" onclick="switchFlowPipeline('response', this)">Response Pipeline</button>
+        <button class="arch-flow-tab" onclick="switchFlowPipeline('ai', this)">AI Pipeline</button>
+    </div>
+
+    <div class="arch-flow-wrap">
+        <div class="arch-flow" id="arch-flow-container">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- TAB 3: Live Log Stream + Error Map                          -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="arch-panel" id="arch-panel-logs">
+    <div class="arch-logs-section">
+        <!-- Error map sidebar -->
+        <div class="arch-error-map" id="arch-error-map">
+            <div class="arch-error-map-title"><i class="lucide-shield-alert"></i> Module Status</div>
+            <!-- Populated by JS -->
+        </div>
+
+        <!-- Log stream -->
+        <div class="arch-log-stream">
+            <div class="arch-log-toolbar">
+                <span class="log-filter-label">Level:</span>
+                <select id="arch-log-level" onchange="loadArchLogs()">
+                    <option value="">All</option>
+                    <option value="DEBUG">DEBUG</option>
+                    <option value="INFO" selected>INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                </select>
+                <span class="log-filter-label">Search:</span>
+                <input type="text" id="arch-log-search" placeholder="Filter messages..." style="width:160px" oninput="debounce(loadArchLogs, 300)()">
+                <div class="log-auto-refresh">
+                    <div class="log-live-dot" id="arch-live-dot"></div>
+                    <label><input type="checkbox" id="arch-log-auto" checked onchange="toggleLogAutoRefresh()"> Auto-refresh</label>
+                </div>
+            </div>
+            <div class="arch-log-body" id="arch-log-body">
+                <div class="arch-log-empty">Loading logs...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- TAB 4: Module Health Grid                                   -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="arch-panel" id="arch-panel-health">
+    <div class="arch-health-grid" id="arch-health-grid">
+        <!-- Populated by JS -->
+    </div>
+</div>
+
+</div><!-- .arch-page -->
+</div><!-- .arch-page-wrap -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+// =============================================================================
+// ION Architecture Visualizer
+// =============================================================================
+
+// ── Module & Service Definitions ───────────────────────────────────────────
+
+const INTERNAL_MODULES = [
+    { id: 'auth',          name: 'Auth',           icon: 'lucide-lock',           desc: 'Authentication, RBAC, sessions, OIDC' },
+    { id: 'database',      name: 'Database',       icon: 'lucide-database',       desc: 'SQLite/PostgreSQL storage, migrations' },
+    { id: 'api',           name: 'API Router',     icon: 'lucide-route',          desc: 'FastAPI request routing, middleware' },
+    { id: 'alerts',        name: 'Alerts Engine',  icon: 'lucide-bell',           desc: 'ES alert ingestion, triage, workflow sync' },
+    { id: 'cases',         name: 'Case Manager',   icon: 'lucide-folder-open',    desc: 'Case CRUD, Kibana sync, escalation' },
+    { id: 'observables',   name: 'Observables',    icon: 'lucide-eye',            desc: 'IOC tracking, enrichment, watchlist' },
+    { id: 'ai_chat',       name: 'AI Engine',      icon: 'lucide-bot',            desc: 'Ollama LLM chat, analysis, triage suggestions' },
+    { id: 'pcap',          name: 'PCAP Analyzer',  icon: 'lucide-file-scan',      desc: '12 heuristic detectors, verdict scoring' },
+    { id: 'forensics',     name: 'Forensics',      icon: 'lucide-search',         desc: 'Investigations, evidence, chain of custody' },
+    { id: 'knowledge_base',name: 'Knowledge Base', icon: 'lucide-book-open',      desc: '392+ SOC reference articles' },
+    { id: 'security',      name: 'Security Mon',   icon: 'lucide-shield',         desc: 'Attack detection, rate limiting, blocked IPs' },
+    { id: 'templates',     name: 'Templates',      icon: 'lucide-file-text',      desc: 'Document templates, versioning, rendering' },
+    { id: 'chat',          name: 'Team Chat',      icon: 'lucide-message-circle', desc: 'Chat rooms, memes, reactions' },
+    { id: 'skills',        name: 'Training',       icon: 'lucide-graduation-cap', desc: 'Skills assessment, career pathways' },
+    { id: 'notifications', name: 'Notifications',  icon: 'lucide-bell-ring',      desc: 'Alert notifications, polling' },
+    { id: 'logging',       name: 'Logging',        icon: 'lucide-scroll-text',    desc: 'ECS structured logs, ES shipping' },
+];
+
+const EXTERNAL_SERVICES = [
+    { id: 'elasticsearch', name: 'Elasticsearch',  icon: 'lucide-database',    color: '#00bfb3' },
+    { id: 'kibana',        name: 'Kibana',         icon: 'lucide-layout-dashboard', color: '#00bfb3' },
+    { id: 'ollama',        name: 'Ollama',         icon: 'lucide-brain',       color: '#a855f7' },
+    { id: 'gitlab',        name: 'GitLab',         icon: 'lucide-git-merge',   color: '#fc6d26' },
+    { id: 'opencti',       name: 'OpenCTI',        icon: 'lucide-globe',       color: '#6366f1' },
+    { id: 'dfir_iris',     name: 'DFIR-IRIS',      icon: 'lucide-shield-check',color: '#3b82f6' },
+];
+
+// Connections: [fromId, toId]
+const CONNECTIONS = [
+    // Internal ↔ External
+    ['alerts', 'elasticsearch'],
+    ['cases', 'kibana'],
+    ['observables', 'opencti'],
+    ['ai_chat', 'ollama'],
+    ['cases', 'dfir_iris'],
+    ['templates', 'gitlab'],
+    // Internal ↔ Internal (key data flows)
+    ['api', 'auth'],
+    ['api', 'alerts'],
+    ['api', 'cases'],
+    ['api', 'observables'],
+    ['api', 'ai_chat'],
+    ['alerts', 'cases'],
+    ['alerts', 'observables'],
+    ['cases', 'observables'],
+    ['observables', 'ai_chat'],
+    ['api', 'database'],
+    ['auth', 'database'],
+    ['logging', 'elasticsearch'],
+    ['security', 'api'],
+    ['forensics', 'cases'],
+    ['knowledge_base', 'database'],
+];
+
+// Data flow pipeline definitions
+const PIPELINES = {
+    alert: {
+        title: 'Alert Detection & Triage Pipeline',
+        steps: [
+            { name: 'Detection',    icon: 'lucide-radar',        desc: 'ES detection rules',    bg: 'rgba(0,191,179,.12)', color: '#00bfb3' },
+            { name: 'Ingestion',    icon: 'lucide-download',     desc: 'Pull from .alerts-*',   bg: 'rgba(0,191,179,.12)', color: '#00bfb3' },
+            { name: 'Parse & Map',  icon: 'lucide-code-2',       desc: 'ECS → ION format',      bg: 'rgba(34,197,94,.12)', color: '#22c55e' },
+            { name: 'Triage',       icon: 'lucide-filter',       desc: 'Analyst review',        bg: 'rgba(234,179,8,.12)', color: '#eab308' },
+            { name: 'Auto-Extract', icon: 'lucide-scan',         desc: 'IPs, domains, hashes',  bg: 'rgba(168,85,247,.12)', color: '#a855f7' },
+            { name: 'Case Create',  icon: 'lucide-folder-plus',  desc: 'Link alerts → case',    bg: 'rgba(59,130,246,.12)', color: '#3b82f6' },
+            { name: 'Kibana Sync',  icon: 'lucide-refresh-cw',   desc: 'Bidirectional sync',    bg: 'rgba(0,191,179,.12)', color: '#00bfb3' },
+        ],
+    },
+    enrichment: {
+        title: 'Observable Enrichment Pipeline',
+        steps: [
+            { name: 'Extract IOCs', icon: 'lucide-scan-text',    desc: 'From alerts & cases',   bg: 'rgba(34,197,94,.12)', color: '#22c55e' },
+            { name: 'Deduplicate',  icon: 'lucide-copy-minus',   desc: 'Merge duplicates',      bg: 'rgba(34,197,94,.12)', color: '#22c55e' },
+            { name: 'OpenCTI',      icon: 'lucide-globe',        desc: 'Threat intel lookup',   bg: 'rgba(99,102,241,.12)', color: '#6366f1' },
+            { name: 'Score',        icon: 'lucide-gauge',        desc: 'Threat level calc',     bg: 'rgba(234,179,8,.12)', color: '#eab308' },
+            { name: 'Watchlist',    icon: 'lucide-eye',          desc: 'Monitor recurrence',    bg: 'rgba(239,68,68,.12)', color: '#ef4444' },
+            { name: 'Graph Link',   icon: 'lucide-share-2',      desc: 'Co-occurring IOCs',     bg: 'rgba(168,85,247,.12)', color: '#a855f7' },
+        ],
+    },
+    response: {
+        title: 'Incident Response Pipeline',
+        steps: [
+            { name: 'Case Open',    icon: 'lucide-folder-open',  desc: 'Alert escalation',      bg: 'rgba(59,130,246,.12)', color: '#3b82f6' },
+            { name: 'Playbook',     icon: 'lucide-list-checks',  desc: 'Guided response',       bg: 'rgba(34,197,94,.12)', color: '#22c55e' },
+            { name: 'Investigate',  icon: 'lucide-search',       desc: 'Evidence collection',   bg: 'rgba(168,85,247,.12)', color: '#a855f7' },
+            { name: 'DFIR Escalate',icon: 'lucide-shield-check', desc: 'Push to DFIR-IRIS',     bg: 'rgba(59,130,246,.12)', color: '#3b82f6' },
+            { name: 'Report',       icon: 'lucide-file-check',   desc: 'Auto-generate report',  bg: 'rgba(34,197,94,.12)', color: '#22c55e' },
+            { name: 'Close',        icon: 'lucide-check-circle', desc: 'Resolution & metrics',  bg: 'rgba(34,197,94,.12)', color: '#22c55e' },
+        ],
+    },
+    ai: {
+        title: 'AI Analysis Pipeline',
+        steps: [
+            { name: 'Context Build',icon: 'lucide-layers',       desc: 'Gather alert/case data',bg: 'rgba(168,85,247,.12)', color: '#a855f7' },
+            { name: 'Prompt',       icon: 'lucide-message-square',desc: 'Build system prompt',   bg: 'rgba(168,85,247,.12)', color: '#a855f7' },
+            { name: 'Ollama LLM',   icon: 'lucide-brain',        desc: 'llama3.1:8b inference', bg: 'rgba(168,85,247,.12)', color: '#a855f7' },
+            { name: 'Stream',       icon: 'lucide-radio',        desc: 'Token-by-token output', bg: 'rgba(34,197,94,.12)', color: '#22c55e' },
+            { name: 'Suggestions',  icon: 'lucide-lightbulb',    desc: 'Triage recommendations',bg: 'rgba(234,179,8,.12)', color: '#eab308' },
+            { name: 'Feedback',     icon: 'lucide-thumbs-up',    desc: 'User rating & tuning',  bg: 'rgba(59,130,246,.12)', color: '#3b82f6' },
+        ],
+    },
+};
+
+// ── State ──────────────────────────────────────────────────────────────────
+let archHealthData = null;
+let archSelectedModule = null;
+let archLogInterval = null;
+let archCurrentPipeline = 'alert';
+
+// ── Tab Switching ──────────────────────────────────────────────────────────
+function switchArchTab(tabId, btn) {
+    document.querySelectorAll('.arch-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.arch-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('arch-panel-' + tabId).classList.add('active');
+
+    if (tabId === 'logs') {
+        loadArchLogs();
+        startLogAutoRefresh();
+    } else {
+        stopLogAutoRefresh();
+    }
+
+    if (tabId === 'diagram') {
+        requestAnimationFrame(() => { positionNodes(); drawConnections(); });
+    }
+}
+
+// ── Health Data Fetch ──────────────────────────────────────────────────────
+async function refreshArchHealth() {
+    try {
+        const data = await api.get('/api/admin/architecture-health?minutes=5');
+        archHealthData = data;
+        updateHealthBanner(data);
+        updateDiagramNodes(data);
+        renderErrorMap(data);
+        renderHealthGrid(data);
+        updateLogBadge(data);
+    } catch (e) {
+        console.error('Failed to load architecture health:', e);
+    }
+}
+
+function updateHealthBanner(data) {
+    const modules = data.modules || {};
+    const connectors = data.connectors || {};
+    const summary = data.summary || {};
+
+    let totalItems = Object.keys(modules).length + Object.keys(connectors).length;
+    let healthyCount = 0;
+    let warningCount = 0;
+    let errorCount = 0;
+
+    Object.values(modules).forEach(m => {
+        if (m.status === 'healthy') healthyCount++;
+        else if (m.status === 'warning') warningCount++;
+        else errorCount++;
+    });
+    Object.values(connectors).forEach(c => {
+        const st = c.status || 'unknown';
+        if (st === 'healthy' || st === 'connected') healthyCount++;
+        else if (st === 'disabled' || st === 'not_configured') { /* neutral */ }
+        else errorCount++;
+    });
+
+    const pct = totalItems > 0 ? Math.round((healthyCount / totalItems) * 100) : 0;
+    const circle = document.getElementById('arch-health-circle');
+    circle.setAttribute('stroke-dashoffset', 100 - pct);
+    circle.setAttribute('stroke', pct >= 80 ? '#22c55e' : pct >= 50 ? '#eab308' : '#ef4444');
+    document.getElementById('arch-health-pct').textContent = pct + '%';
+
+    document.getElementById('arch-stat-healthy').textContent = healthyCount;
+    document.getElementById('arch-stat-warnings').textContent = warningCount + (summary.total_warnings || 0);
+    document.getElementById('arch-stat-errors').textContent = errorCount + (summary.total_errors || 0);
+
+    document.getElementById('arch-health-subtitle').textContent =
+        `${Object.keys(modules).length} internal modules · ${Object.keys(connectors).length} external services · ${summary.log_entries || 0} log entries (${summary.minutes || 5}m)`;
+}
+
+function updateLogBadge(data) {
+    const badge = document.getElementById('arch-log-error-badge');
+    const errCount = (data.summary || {}).total_errors || 0;
+    if (errCount > 0) {
+        badge.textContent = errCount;
+        badge.style.display = '';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+// ── Diagram: Position Nodes ────────────────────────────────────────────────
+function positionNodes() {
+    const diagram = document.getElementById('arch-diagram');
+    const rect = diagram.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+
+    // Remove old nodes
+    diagram.querySelectorAll('.arch-node').forEach(n => n.remove());
+
+    // Inner ring: internal modules
+    const innerRadius = Math.min(cx, cy) * 0.48;
+    INTERNAL_MODULES.forEach((mod, i) => {
+        const angle = (2 * Math.PI * i) / INTERNAL_MODULES.length - Math.PI / 2;
+        const x = cx + innerRadius * Math.cos(angle) - 54;
+        const y = cy + innerRadius * Math.sin(angle) - 32;
+
+        const status = getModuleStatus(mod.id);
+        const health = archHealthData?.modules?.[mod.id] || {};
+
+        let badge = '';
+        if (health.errors > 0) badge = `<div class="arch-node-badge error-badge">${health.errors}</div>`;
+        else if (health.warnings > 0) badge = `<div class="arch-node-badge warn-badge">${health.warnings}</div>`;
+
+        const node = document.createElement('div');
+        node.className = 'arch-node' + (archSelectedModule === mod.id ? ' selected' : '');
+        node.dataset.id = mod.id;
+        node.dataset.type = 'internal';
+        node.style.left = x + 'px';
+        node.style.top = y + 'px';
+        node.onclick = () => selectArchNode(mod.id);
+        node.innerHTML = `
+            <div class="arch-node-card ${status}">
+                ${badge}
+                <div class="arch-node-icon ${status}"><i class="${mod.icon}"></i></div>
+                <div class="arch-node-name">${mod.name}</div>
+                <div class="arch-node-meta">${status}</div>
+            </div>
+        `;
+        diagram.appendChild(node);
+    });
+
+    // Outer ring: external services
+    const outerRadius = Math.min(cx, cy) * 0.82;
+    EXTERNAL_SERVICES.forEach((svc, i) => {
+        const angle = (2 * Math.PI * i) / EXTERNAL_SERVICES.length - Math.PI / 2 + Math.PI / EXTERNAL_SERVICES.length;
+        const x = cx + outerRadius * Math.cos(angle) - 54;
+        const y = cy + outerRadius * Math.sin(angle) - 32;
+
+        const status = getConnectorStatus(svc.id);
+
+        const node = document.createElement('div');
+        node.className = 'arch-node';
+        node.dataset.id = svc.id;
+        node.dataset.type = 'external';
+        node.style.left = x + 'px';
+        node.style.top = y + 'px';
+        node.innerHTML = `
+            <div class="arch-node-card ${status}">
+                <div class="arch-node-icon ${status}"><i class="${svc.icon}"></i></div>
+                <div class="arch-node-name">${svc.name}</div>
+                <div class="arch-node-meta">${status}</div>
+            </div>
+        `;
+        diagram.appendChild(node);
+    });
+}
+
+function getModuleStatus(moduleId) {
+    if (!archHealthData) return 'checking';
+    const m = archHealthData.modules?.[moduleId];
+    return m ? m.status : 'healthy';
+}
+
+function getConnectorStatus(connId) {
+    if (!archHealthData) return 'checking';
+    const c = archHealthData.connectors?.[connId];
+    if (!c) return 'disabled';
+    const st = c.status || '';
+    if (st === 'healthy' || st === 'connected') return 'healthy';
+    if (st === 'disabled' || st === 'not_configured') return 'disabled';
+    return 'error';
+}
+
+// ── Diagram: Draw SVG Connections ──────────────────────────────────────────
+function drawConnections() {
+    const svg = document.getElementById('arch-svg');
+    const diagram = document.getElementById('arch-diagram');
+    const rect = diagram.getBoundingClientRect();
+    svg.innerHTML = '';
+
+    CONNECTIONS.forEach(([fromId, toId]) => {
+        const fromNode = diagram.querySelector(`.arch-node[data-id="${fromId}"]`);
+        const toNode = diagram.querySelector(`.arch-node[data-id="${toId}"]`);
+        if (!fromNode || !toNode) return;
+
+        const fromRect = fromNode.getBoundingClientRect();
+        const toRect = toNode.getBoundingClientRect();
+
+        const x1 = fromRect.left - rect.left + fromRect.width / 2;
+        const y1 = fromRect.top - rect.top + fromRect.height / 2;
+        const x2 = toRect.left - rect.left + toRect.width / 2;
+        const y2 = toRect.top - rect.top + toRect.height / 2;
+
+        const fromStatus = getModuleStatus(fromId) || getConnectorStatus(fromId);
+        const toStatus = getModuleStatus(toId) || getConnectorStatus(toId);
+        const isHealthy = fromStatus !== 'error' && toStatus !== 'error';
+        const isDisabled = fromStatus === 'disabled' || toStatus === 'disabled';
+        const cls = isDisabled ? 'disabled' : (isHealthy ? 'healthy' : 'error');
+
+        // Glow line
+        const glow = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        glow.setAttribute('x1', x1); glow.setAttribute('y1', y1);
+        glow.setAttribute('x2', x2); glow.setAttribute('y2', y2);
+        glow.setAttribute('class', 'arch-conn-glow ' + (cls === 'healthy' ? 'active' : ''));
+        glow.setAttribute('stroke', cls === 'healthy' ? '#22c55e' : cls === 'error' ? '#ef4444' : '#6b7280');
+        svg.appendChild(glow);
+
+        // Main line
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('class', 'arch-conn active');
+        line.setAttribute('stroke', cls === 'healthy' ? '#22c55e' : cls === 'error' ? '#ef4444' : '#6b7280');
+        if (isDisabled) line.setAttribute('stroke-dasharray', '6 3');
+        svg.appendChild(line);
+
+        // Particle dot on healthy connections
+        if (cls === 'healthy' && Math.random() > 0.3) {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('r', '2.5');
+            circle.setAttribute('fill', '#22c55e');
+            // Animate along the line
+            const animate = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
+            animate.setAttribute('dur', (2 + Math.random() * 2) + 's');
+            animate.setAttribute('repeatCount', 'indefinite');
+            animate.setAttribute('path', `M${x1},${y1} L${x2},${y2}`);
+            const animateOpacity = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+            animateOpacity.setAttribute('attributeName', 'opacity');
+            animateOpacity.setAttribute('values', '0;.6;.6;0');
+            animateOpacity.setAttribute('dur', (2 + Math.random() * 2) + 's');
+            animateOpacity.setAttribute('repeatCount', 'indefinite');
+            circle.appendChild(animate);
+            circle.appendChild(animateOpacity);
+            svg.appendChild(circle);
+        }
+    });
+
+    // Hub connections to API
+    const hub = document.getElementById('arch-hub');
+    const apiNode = diagram.querySelector('.arch-node[data-id="api"]');
+    if (hub && apiNode) {
+        const hubRect = hub.getBoundingClientRect();
+        const apiRect = apiNode.getBoundingClientRect();
+        const hx = hubRect.left - rect.left + hubRect.width / 2;
+        const hy = hubRect.top - rect.top + hubRect.height / 2;
+        const ax = apiRect.left - rect.left + apiRect.width / 2;
+        const ay = apiRect.top - rect.top + apiRect.height / 2;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', hx); line.setAttribute('y1', hy);
+        line.setAttribute('x2', ax); line.setAttribute('y2', ay);
+        line.setAttribute('class', 'arch-conn active');
+        line.setAttribute('stroke', 'var(--primary)');
+        line.setAttribute('stroke-width', '2.5');
+        line.setAttribute('opacity', '.5');
+        svg.appendChild(line);
+    }
+}
+
+function updateDiagramNodes(data) {
+    positionNodes();
+    drawConnections();
+}
+
+function selectArchNode(moduleId) {
+    archSelectedModule = moduleId;
+    document.querySelectorAll('.arch-node').forEach(n => {
+        n.classList.toggle('selected', n.dataset.id === moduleId);
+    });
+    // If logs tab is visible, filter logs
+    if (document.getElementById('arch-panel-logs').classList.contains('active')) {
+        loadArchLogs();
+    }
+}
+
+// ── Data Flow Pipelines ────────────────────────────────────────────────────
+function switchFlowPipeline(pipelineId, btn) {
+    archCurrentPipeline = pipelineId;
+    document.querySelectorAll('.arch-flow-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    renderFlowPipeline(pipelineId);
+}
+
+function renderFlowPipeline(pipelineId) {
+    const pipeline = PIPELINES[pipelineId];
+    if (!pipeline) return;
+
+    const container = document.getElementById('arch-flow-container');
+    let html = '';
+
+    pipeline.steps.forEach((step, i) => {
+        if (i > 0) {
+            html += `
+                <div class="arch-flow-arrow">
+                    <div class="arch-flow-arrow-line" style="background:var(--text-secondary)"></div>
+                    <div class="arch-flow-arrow-head" style="border-left-color:var(--text-secondary)"></div>
+                    <div class="arch-flow-arrow-dot" style="background:${step.color};animation-delay:${i * 0.3}s"></div>
+                </div>
+            `;
+        }
+        html += `
+            <div class="arch-flow-stage">
+                <div class="arch-flow-card">
+                    <div class="arch-flow-icon" style="background:${step.bg};color:${step.color}">
+                        <i class="${step.icon}"></i>
+                    </div>
+                    <div class="arch-flow-name">${step.name}</div>
+                    <div class="arch-flow-desc">${step.desc}</div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+// ── Live Log Stream ────────────────────────────────────────────────────────
+let _logFilterModule = null;
+
+async function loadArchLogs() {
+    const level = document.getElementById('arch-log-level').value;
+    const search = document.getElementById('arch-log-search').value;
+    const body = document.getElementById('arch-log-body');
+
+    let url = `/api/admin/logs?limit=200`;
+    if (level) url += `&level=${level}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (_logFilterModule) url += `&logger_name=${encodeURIComponent(_logFilterModule)}`;
+
+    try {
+        const data = await api.get(url);
+        const logs = data.logs || [];
+
+        if (!logs.length) {
+            body.innerHTML = '<div class="arch-log-empty">No log entries match the current filter</div>';
+            return;
+        }
+
+        body.innerHTML = logs.map(l => {
+            const ts = l.timestamp ? l.timestamp.substring(11, 19) : '';
+            const logger = (l.logger || '').replace('ion.', '');
+            return `<div class="arch-log-entry level-${l.level}">
+                <span class="arch-log-ts">${escapeHtml(ts)}</span>
+                <span class="arch-log-level ${l.level}">${l.level}</span>
+                <span class="arch-log-logger" title="${escapeHtml(l.logger || '')}">${escapeHtml(logger)}</span>
+                <span class="arch-log-msg">${escapeHtml(l.message || '')}</span>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        body.innerHTML = `<div class="arch-log-empty">Failed to load logs: ${escapeHtml(e.message)}</div>`;
+    }
+}
+
+function filterLogsByModule(moduleId, prefixes) {
+    _logFilterModule = prefixes ? prefixes[0] : null;
+    // Highlight active pill
+    document.querySelectorAll('.arch-module-pill').forEach(p => {
+        p.classList.toggle('active', p.dataset.module === moduleId);
+    });
+    loadArchLogs();
+}
+
+function startLogAutoRefresh() {
+    stopLogAutoRefresh();
+    if (document.getElementById('arch-log-auto')?.checked) {
+        archLogInterval = setInterval(loadArchLogs, 5000);
+    }
+}
+
+function stopLogAutoRefresh() {
+    if (archLogInterval) {
+        clearInterval(archLogInterval);
+        archLogInterval = null;
+    }
+}
+
+function toggleLogAutoRefresh() {
+    const liveDot = document.getElementById('arch-live-dot');
+    if (document.getElementById('arch-log-auto').checked) {
+        startLogAutoRefresh();
+        if (liveDot) liveDot.style.display = '';
+    } else {
+        stopLogAutoRefresh();
+        if (liveDot) liveDot.style.display = 'none';
+    }
+}
+
+// ── Error Map Sidebar ──────────────────────────────────────────────────────
+const MODULE_LOGGER_MAP = {
+    auth:          ['ion.auth'],
+    database:      ['ion.storage', 'sqlalchemy'],
+    api:           ['ion.web.api', 'ion.web.server'],
+    templates:     ['ion.services.template_service'],
+    ai_chat:       ['ion.services.ollama_service', 'ion.services.ai_'],
+    alerts:        ['ion.services.elasticsearch_service'],
+    cases:         ['ion.services.kibana_cases', 'ion.services.kibana_sync'],
+    observables:   ['ion.services.observable', 'ion.services.opencti'],
+    pcap:          ['ion.services.pcap_service'],
+    forensics:     ['ion.services.forensic'],
+    knowledge_base:['ion.services.kb_seed', 'ion.data.kb_'],
+    security:      ['ion.web.security_middleware'],
+    chat:          ['ion.services.chat', 'ion.web.ai_api'],
+    skills:        ['ion.web.skills_api'],
+    notifications: ['ion.web.notification'],
+    logging:       ['ion.core.logging'],
+    gitlab:        ['ion.services.gitlab_service'],
+};
+
+function renderErrorMap(data) {
+    const container = document.getElementById('arch-error-map');
+    const modules = data.modules || {};
+
+    // Sort: errors first, then warnings, then healthy
+    const sorted = Object.entries(modules).sort((a, b) => {
+        const order = { error: 0, warning: 1, healthy: 2 };
+        return (order[a[1].status] || 2) - (order[b[1].status] || 2);
+    });
+
+    let html = '<div class="arch-error-map-title"><i class="lucide-shield-alert"></i> Module Status</div>';
+    html += `<div class="arch-module-pill${!_logFilterModule ? ' active' : ''}" data-module="all" onclick="filterLogsByModule('all', null)">
+        <span class="pill-dot healthy"></span>
+        <span class="pill-name">All Modules</span>
+    </div>`;
+
+    sorted.forEach(([mid, health]) => {
+        const mod = INTERNAL_MODULES.find(m => m.id === mid);
+        const name = mod ? mod.name : mid;
+        const cls = health.errors > 0 ? 'has-errors' : health.warnings > 0 ? 'has-warnings' : '';
+        const prefixes = MODULE_LOGGER_MAP[mid] || ['ion.' + mid];
+        const isActive = _logFilterModule && prefixes.includes(_logFilterModule);
+
+        let counts = '';
+        if (health.errors > 0) counts += `<span class="pill-count err">${health.errors}E</span>`;
+        if (health.warnings > 0) counts += `<span class="pill-count warn">${health.warnings}W</span>`;
+
+        html += `<div class="arch-module-pill ${cls}${isActive ? ' active' : ''}" data-module="${mid}" onclick="filterLogsByModule('${mid}', ${JSON.stringify(prefixes)})">
+            <span class="pill-dot ${health.status}"></span>
+            <span class="pill-name">${escapeHtml(name)}</span>
+            ${counts}
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+// ── Health Grid ────────────────────────────────────────────────────────────
+function renderHealthGrid(data) {
+    const grid = document.getElementById('arch-health-grid');
+    const modules = data.modules || {};
+    const connectors = data.connectors || {};
+
+    let html = '';
+
+    // Internal modules
+    INTERNAL_MODULES.forEach(mod => {
+        const health = modules[mod.id] || { status: 'healthy', errors: 0, warnings: 0 };
+        html += renderHealthCard(mod.name, mod.icon, mod.desc, health, 'internal');
+    });
+
+    // External services
+    EXTERNAL_SERVICES.forEach(svc => {
+        const conn = connectors[svc.id] || {};
+        const status = conn.status === 'healthy' || conn.status === 'connected' ? 'healthy' :
+                       conn.status === 'disabled' || conn.status === 'not_configured' ? 'disabled' : 'error';
+        const health = { status, errors: status === 'error' ? 1 : 0, warnings: 0,
+                         last_error_msg: conn.message || null };
+        html += renderHealthCard(svc.name, svc.icon, conn.message || status, health, 'external');
+    });
+
+    grid.innerHTML = html;
+}
+
+function renderHealthCard(name, icon, desc, health, type) {
+    const st = health.status || 'healthy';
+    return `
+        <div class="arch-health-card ${st}">
+            <div class="arch-health-card-head">
+                <div class="arch-health-card-icon ${st}"><i class="${icon}"></i></div>
+                <div>
+                    <div class="arch-health-card-title">${escapeHtml(name)}</div>
+                    <div class="arch-health-card-status ${st}">${st.toUpperCase()}</div>
+                </div>
+            </div>
+            <div style="font-size:.72rem;color:var(--text-secondary);margin-bottom:8px">${escapeHtml(desc || '')}</div>
+            <div class="arch-health-card-metrics">
+                <div class="arch-health-metric">
+                    <div class="arch-health-metric-label">Errors</div>
+                    <div class="arch-health-metric-value" style="color:${health.errors > 0 ? '#ef4444' : 'var(--text-primary)'}">${health.errors || 0}</div>
+                </div>
+                <div class="arch-health-metric">
+                    <div class="arch-health-metric-label">Warnings</div>
+                    <div class="arch-health-metric-value" style="color:${health.warnings > 0 ? '#eab308' : 'var(--text-primary)'}">${health.warnings || 0}</div>
+                </div>
+            </div>
+            ${health.last_error_msg ? `<div class="arch-health-card-error">${escapeHtml(health.last_error_msg)}</div>` : ''}
+        </div>
+    `;
+}
+
+// ── Window Resize Handler ──────────────────────────────────────────────────
+let _resizeTimer;
+window.addEventListener('resize', () => {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(() => {
+        if (document.getElementById('arch-panel-diagram').classList.contains('active')) {
+            positionNodes();
+            drawConnections();
+        }
+    }, 200);
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async function() {
+    // Render initial flow pipeline
+    renderFlowPipeline('alert');
+
+    // Position diagram nodes
+    positionNodes();
+
+    // Load health data
+    await refreshArchHealth();
+
+    // Auto-refresh health every 30 seconds
+    setInterval(refreshArchHealth, 30000);
+});
+</script>
+{% endblock %}
