@@ -104,7 +104,7 @@ class ElasticsearchService:
         self.api_key = api_key or config.get("api_key", "")
         self.username = username or config.get("username", "")
         self.password = password or config.get("password", "")
-        self.alert_index = alert_index or config.get("alert_index", ".alerts-security.alerts-production,alerts-*")
+        self.alert_index = alert_index or config.get("alert_index", ".alerts-security.alerts-*,alerts-*")
         self.case_index = case_index or config.get("case_index", "ion-cases")
         self.kfp_index = config.get("kfp_index", "ion-kfp")
         self.verify_ssl = verify_ssl if verify_ssl is not None else config.get("verify_ssl", True)
@@ -143,9 +143,10 @@ class ElasticsearchService:
         url = f"{self.url}/{endpoint.lstrip('/')}"
 
         # For search requests on multi-index patterns, skip missing indices
+        # expand_wildcards=open,hidden ensures .alerts-* (system/hidden) indices are matched
         if "/_search" in endpoint:
             sep = "&" if "?" in url else "?"
-            url += f"{sep}ignore_unavailable=true&allow_no_indices=true"
+            url += f"{sep}ignore_unavailable=true&allow_no_indices=true&expand_wildcards=open,hidden"
 
         try:
             async with httpx.AsyncClient(
@@ -328,16 +329,41 @@ class ElasticsearchService:
                 alerts.append(alert)
         return alerts
 
+    @staticmethod
+    def _get_field(source: Dict[str, Any], dotted_path: str, default=None):
+        """Get a field value from ES _source using dotted path.
+
+        Handles both flat dotted keys (ES 8.x: {"kibana.alert.rule.name": "..."})
+        and nested objects (ES 9.x: {"kibana": {"alert": {"rule": {"name": "..."}}}}).
+        """
+        # First try flat dotted key (most common in ES 8.x alert indices)
+        val = source.get(dotted_path)
+        if val is not None:
+            return val
+
+        # Then try nested object traversal (ES 9.x may use this format)
+        parts = dotted_path.split(".")
+        current = source
+        for part in parts:
+            if isinstance(current, dict):
+                current = current.get(part)
+                if current is None:
+                    return default
+            else:
+                return default
+        return current if current is not None else default
+
     def _parse_alert(self, alert_id: str, source: Dict[str, Any]) -> Optional[ElasticsearchAlert]:
         """Parse an alert from various Elasticsearch formats."""
         # Try to extract common fields from different alert formats
         # Supports: Elastic Security (SIEM), Watcher, and custom formats
+        _f = self._get_field  # shorthand
 
         # Timestamp
         timestamp_str = (
             source.get("@timestamp") or
             source.get("timestamp") or
-            source.get("kibana.alert.start") or
+            _f(source, "kibana.alert.start") or
             datetime.utcnow().isoformat()
         )
         try:
@@ -356,20 +382,20 @@ class ElasticsearchService:
 
         # Title - try multiple fields
         title = (
-            source.get("kibana.alert.rule.name") or
-            source.get("signal", {}).get("rule", {}).get("name") or
-            source.get("rule", {}).get("name") or
+            _f(source, "kibana.alert.rule.name") or
+            _f(source, "signal.rule.name") or
+            _f(source, "rule.name") or
             source.get("alert_type") or
-            source.get("event", {}).get("action") or
+            _f(source, "event.action") or
             source.get("message", "")[:100] or
             "Unknown Alert"
         )
 
         # Severity
         severity = (
-            source.get("kibana.alert.severity") or
-            source.get("event", {}).get("severity") or
-            source.get("signal", {}).get("rule", {}).get("severity") or
+            _f(source, "kibana.alert.severity") or
+            _f(source, "event.severity") or
+            _f(source, "signal.rule.severity") or
             source.get("severity") or
             source.get("level") or
             "medium"
@@ -386,8 +412,8 @@ class ElasticsearchService:
 
         # Status — prefer workflow_status (what ION syncs) over alert status
         status = (
-            source.get("kibana.alert.workflow_status") or
-            source.get("kibana.alert.status") or
+            _f(source, "kibana.alert.workflow_status") or
+            _f(source, "kibana.alert.status") or
             source.get("status") or
             source.get("state") or
             "open"
@@ -401,27 +427,27 @@ class ElasticsearchService:
 
         # Source type
         alert_source = "custom"
-        if "kibana.alert" in str(source):
+        if _f(source, "kibana.alert.rule.name") or "kibana.alert" in str(source):
             alert_source = "siem"
         elif "watcher" in str(source) or source.get("watch_id"):
             alert_source = "watcher"
-        elif source.get("signal"):
+        elif source.get("signal") or _f(source, "signal.rule.name"):
             alert_source = "siem"
 
         # Message
         message = (
             source.get("message") or
-            source.get("kibana.alert.reason") or
-            source.get("signal", {}).get("rule", {}).get("description") or
-            source.get("rule", {}).get("description") or
+            _f(source, "kibana.alert.reason") or
+            _f(source, "signal.rule.description") or
+            _f(source, "rule.description") or
             title
         )
 
         # Host
         host = (
-            source.get("host", {}).get("name") or
-            source.get("host", {}).get("hostname") or
-            source.get("agent", {}).get("hostname") or
+            _f(source, "host.name") or
+            _f(source, "host.hostname") or
+            _f(source, "agent.hostname") or
             source.get("hostname")
         )
         if isinstance(host, dict):
@@ -429,9 +455,9 @@ class ElasticsearchService:
 
         # User
         user = (
-            source.get("user", {}).get("name") or
+            _f(source, "user.name") or
             source.get("user_name") or
-            source.get("winlog", {}).get("user", {}).get("name")
+            _f(source, "winlog.user.name")
         )
         if isinstance(user, dict):
             user = user.get("name")
@@ -474,9 +500,9 @@ class ElasticsearchService:
 
         # Rule name
         rule_name = (
-            source.get("kibana.alert.rule.name") or
-            source.get("signal", {}).get("rule", {}).get("name") or
-            source.get("rule", {}).get("name") or
+            _f(source, "kibana.alert.rule.name") or
+            _f(source, "signal.rule.name") or
+            _f(source, "rule.name") or
             source.get("rule_name")
         )
 
@@ -523,15 +549,15 @@ class ElasticsearchService:
 
         # Fallback: dot-notation keys (Kibana Security alert format)
         if not mitre_technique_id:
-            mitre_technique_id = _first(source.get("threat.technique.id"))
+            mitre_technique_id = _first(_f(source, "threat.technique.id"))
         if not mitre_technique_name:
-            mitre_technique_name = _first(source.get("threat.technique.name"))
+            mitre_technique_name = _first(_f(source, "threat.technique.name"))
         if not mitre_tactic_name:
-            mitre_tactic_name = _first(source.get("threat.tactic.name"))
+            mitre_tactic_name = _first(_f(source, "threat.tactic.name"))
 
-        # Fallback: kibana.alert.rule.parameters.threat (Elastic Security 8.x rule config)
+        # Fallback: kibana.alert.rule.parameters.threat (Elastic Security 8.x/9.x rule config)
         if not mitre_technique_id:
-            params_threat = source.get("kibana.alert.rule.parameters", {}).get("threat", [])
+            params_threat = _f(source, "kibana.alert.rule.parameters.threat", [])
             if isinstance(params_threat, list) and params_threat:
                 pt = params_threat[0] if isinstance(params_threat[0], dict) else {}
                 pt_techniques = pt.get("technique", [])
@@ -545,7 +571,7 @@ class ElasticsearchService:
 
         # Fallback: signal.rule.threat[0].technique[0] (Elastic SIEM format)
         if not mitre_technique_id:
-            signal_threats = source.get("signal", {}).get("rule", {}).get("threat", [])
+            signal_threats = _f(source, "signal.rule.threat", [])
             if isinstance(signal_threats, list) and signal_threats:
                 first_threat = signal_threats[0]
                 if isinstance(first_threat, dict):
@@ -924,10 +950,13 @@ class ElasticsearchService:
                 return False
 
             space_id = kibana_config.get("space_id", "default") if kibana_config.get("enabled") else "default"
-            if space_id and space_id != "default":
-                api_path = f"/s/{space_id}/api/detection_engine/signals/status"
-            else:
-                api_path = "/api/detection_engine/signals/status"
+            space_prefix = f"/s/{space_id}" if space_id and space_id != "default" else ""
+
+            # Try both old (8.x) and new (9.x) API paths
+            api_paths = [
+                f"{space_prefix}/api/detection_engine/signals/status",
+                f"{space_prefix}/api/detection_engine/alerts/status",
+            ]
 
             # Use Kibana auth if available, otherwise fall back to ES credentials
             auth = None
@@ -949,27 +978,27 @@ class ElasticsearchService:
                 verify=get_ssl_verify(verify_ssl),
                 timeout=httpx.Timeout(30.0, connect=10.0),
             ) as client:
-                response = await client.post(
-                    f"{kibana_url}{api_path}",
-                    json=body,
-                    headers={
-                        "kbn-xsrf": "true",
-                        "Content-Type": "application/json",
-                    },
-                )
+                for api_path in api_paths:
+                    response = await client.post(
+                        f"{kibana_url}{api_path}",
+                        json=body,
+                        headers={
+                            "kbn-xsrf": "true",
+                            "Content-Type": "application/json",
+                        },
+                    )
+                    if response.status_code == 200:
+                        logger.info(
+                            "Updated workflow_status to '%s' for %d alerts via Kibana API (%s)",
+                            workflow_status, len(alert_ids), api_path,
+                        )
+                        return True
+                    logger.debug(
+                        "Kibana API %s returned %d: %s",
+                        api_path, response.status_code, response.text[:200],
+                    )
 
-            if response.status_code == 200:
-                logger.info(
-                    "Updated workflow_status to '%s' for %d alerts via Kibana API",
-                    workflow_status, len(alert_ids),
-                )
-                return True
-            else:
-                logger.debug(
-                    "Kibana API returned %d for workflow_status update: %s",
-                    response.status_code, response.text[:200],
-                )
-                return False
+            return False
 
         except Exception as e:
             logger.debug("Kibana API workflow_status update failed: %s", e)
@@ -1002,7 +1031,7 @@ class ElasticsearchService:
             # Use comma-separated index pattern directly (no URL encoding needed)
             result = await self._request(
                 "POST",
-                f"/{self.alert_index}/_update_by_query?conflicts=proceed&ignore_unavailable=true",
+                f"/{self.alert_index}/_update_by_query?conflicts=proceed&ignore_unavailable=true&expand_wildcards=open,hidden",
                 json=body,
             )
             updated = result.get("updated", 0)

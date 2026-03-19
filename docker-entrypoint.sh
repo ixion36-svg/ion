@@ -140,6 +140,7 @@ if not config_path.exists():
         elasticsearch_username=os.environ.get('ION_ELASTICSEARCH_USERNAME', ''),
         elasticsearch_password=os.environ.get('ION_ELASTICSEARCH_PASSWORD', ''),
         elasticsearch_api_key=os.environ.get('ION_ELASTICSEARCH_API_KEY', ''),
+        elasticsearch_alert_index=os.environ.get('ION_ELASTICSEARCH_ALERT_INDEX', '.alerts-security.alerts-*,alerts-*'),
     )
     config.to_file(config_path)
     print('Config initialized from environment')

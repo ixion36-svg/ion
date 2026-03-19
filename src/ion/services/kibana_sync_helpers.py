@@ -63,10 +63,12 @@ def sync_new_case_to_kibana(
         # Attach alerts to Kibana case if using securitySolution owner
         if alert_ids and service.config.get("case_owner") == "securitySolution":
             try:
+                space_id = service.config.get("space_id", "default")
+                alert_index = f".alerts-security.alerts-{space_id}"
                 service.attach_alerts_to_case(
                     case_id=kibana_case.get("id"),
                     alert_ids=alert_ids,
-                    alert_index=".alerts-security.alerts-default",
+                    alert_index=alert_index,
                 )
             except Exception as attach_err:
                 logger.warning("Failed to attach alerts to Kibana case: %s", attach_err)

@@ -62,7 +62,7 @@ class Config:
     elasticsearch_api_key: str = ""  # API key (preferred over username/password)
     elasticsearch_username: str = ""  # Basic auth username
     elasticsearch_password: str = ""  # Basic auth password
-    elasticsearch_alert_index: str = ".alerts-security.alerts-production,alerts-*"  # Alert index pattern
+    elasticsearch_alert_index: str = ".alerts-security.alerts-*,alerts-*"  # Alert index pattern
     elasticsearch_case_index: str = "ion-cases"  # Index for synced case documents
     elasticsearch_verify_ssl: bool = True
 
@@ -152,7 +152,7 @@ class Config:
             elasticsearch_api_key=data.get("elasticsearch_api_key", ""),
             elasticsearch_username=data.get("elasticsearch_username", ""),
             elasticsearch_password=data.get("elasticsearch_password", ""),
-            elasticsearch_alert_index=data.get("elasticsearch_alert_index", ".alerts-security.alerts-production,alerts-*"),
+            elasticsearch_alert_index=data.get("elasticsearch_alert_index", ".alerts-security.alerts-*,alerts-*"),
             elasticsearch_case_index=data.get("elasticsearch_case_index", "ion-cases"),
             elasticsearch_verify_ssl=data.get("elasticsearch_verify_ssl", True),
             # Ollama AI integration
