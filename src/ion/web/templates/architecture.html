@@ -106,7 +106,7 @@
 }
 .arch-diagram {
     position: relative;
-    width: 100%; height: 640px;
+    width: 100%; height: 920px;
     display: flex; align-items: center; justify-content: center;
 }
 .arch-diagram-legend {
@@ -256,6 +256,25 @@
     text-transform: uppercase; letter-spacing: 1px;
     color: var(--text-secondary); opacity: .4;
     pointer-events: none;
+}
+
+/* Hub node emphasis (high-connection modules) */
+.arch-node-card.hub-node {
+    border: 2px solid var(--primary);
+    box-shadow: 0 0 16px var(--primary-dim);
+}
+.arch-node-card.hub-node .arch-node-name { color: var(--primary); }
+.arch-node-conns {
+    font-size: .55rem; color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace; opacity: .6;
+}
+
+/* Cluster labels (floating text annotations) */
+.arch-cluster-label {
+    position: absolute; z-index: 4;
+    font-size: .52rem; font-weight: 700; letter-spacing: 2.5px;
+    text-transform: uppercase; color: var(--text-secondary); opacity: .3;
+    pointer-events: none; white-space: nowrap;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -542,19 +561,20 @@
 
 /* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 1200px) {
-    .arch-diagram { height: 540px; }
-    .arch-node-card { width: 92px; padding: 8px 6px; }
+    .arch-diagram { height: 780px; }
+    .arch-node-card { width: 94px; padding: 8px 6px; }
     .arch-node-icon { width: 28px; height: 28px; }
     .arch-node-name { font-size: .65rem; }
 }
 @media (max-width: 900px) {
     .arch-logs-section { flex-direction: column; }
     .arch-error-map { width: 100%; max-height: 200px; flex-direction: row; flex-wrap: wrap; }
-    .arch-diagram { height: 460px; }
+    .arch-diagram { height: 680px; }
+    .arch-cluster-label { display: none; }
 }
 @media (max-width: 768px) {
-    .arch-diagram { height: 400px; }
-    .arch-node-card { width: 80px; padding: 6px 4px; }
+    .arch-diagram { height: 580px; }
+    .arch-node-card { width: 82px; padding: 6px 4px; }
     .arch-health-grid { grid-template-columns: 1fr; }
 }
 </style>
@@ -628,9 +648,9 @@
         </div>
 
         <div class="arch-diagram-legend">
+            <div class="legend-item"><div class="legend-dot int" style="border:2px solid var(--primary);box-sizing:border-box;"></div> Hub Node</div>
             <div class="legend-item"><div class="legend-dot int"></div> Internal Module</div>
             <div class="legend-item"><div class="legend-dot ext"></div> External Service</div>
-            <div class="legend-item"><div class="legend-dot db"></div> Database</div>
         </div>
     </div>
 </div>
@@ -902,22 +922,71 @@ function updateLogBadge(data) {
     }
 }
 
-// ── Diagram: Position Nodes ────────────────────────────────────────────────
+// ── Diagram: Position Nodes (Grid Topology Layout) ──────────────────────
+// 4×4 grid: hub nodes (API, Alerts, Cases, Observables) in center columns
+// of rows 2 & 3 — acting as connection bridges. Satellites align in rows.
+// External services at the perimeter near their connected module.
 function positionNodes() {
     const diagram = document.getElementById('arch-diagram');
     const rect = diagram.getBoundingClientRect();
     const cx = rect.width / 2;
     const cy = rect.height / 2;
 
-    // Remove old nodes
-    diagram.querySelectorAll('.arch-node').forEach(n => n.remove());
+    // Remove old dynamic elements
+    diagram.querySelectorAll('.arch-node, .arch-cluster-label').forEach(n => n.remove());
 
-    // Inner ring: internal modules
-    const innerRadius = Math.min(cx, cy) * 0.48;
-    INTERNAL_MODULES.forEach((mod, i) => {
-        const angle = (2 * Math.PI * i) / INTERNAL_MODULES.length - Math.PI / 2;
-        const x = cx + innerRadius * Math.cos(angle) - 54;
-        const y = cy + innerRadius * Math.sin(angle) - 32;
+    // Hide static ring labels
+    ['arch-label-inner', 'arch-label-outer'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
+    const nodeW = 108, nodeH = 68;
+
+    // Count connections per module
+    function connCount(id) {
+        return CONNECTIONS.filter(([a, b]) => a === id || b === id).length;
+    }
+
+    // ── 4×4 Internal Grid + Outer External Ring ────────────
+    // Internal modules in a spacious 4×4 grid around the ION hub.
+    // Hub nodes (API, Alerts, Cases, Observables) in center columns.
+    // External services pushed to an outer rectangle frame.
+
+    const MODULE_LAYOUT = {
+        // Row 1
+        auth:           { x: -0.36, y: -0.40 },
+        database:       { x: -0.12, y: -0.40 },
+        security:       { x:  0.12, y: -0.40 },
+        logging:        { x:  0.36, y: -0.40 },
+
+        // Row 2 (hub nodes in center)
+        ai_chat:        { x: -0.36, y: -0.16 },
+        api:            { x: -0.12, y: -0.16, hub: true },
+        alerts:         { x:  0.12, y: -0.16, hub: true },
+        pcap:           { x:  0.36, y: -0.16 },
+
+        // Row 3 (hub nodes in center)
+        chat:           { x: -0.36, y:  0.16 },
+        observables:    { x: -0.12, y:  0.16, hub: true },
+        cases:          { x:  0.12, y:  0.16, hub: true },
+        forensics:      { x:  0.36, y:  0.16 },
+
+        // Row 4
+        skills:         { x: -0.36, y:  0.40 },
+        notifications:  { x: -0.12, y:  0.40 },
+        knowledge_base: { x:  0.12, y:  0.40 },
+        templates:      { x:  0.36, y:  0.40 },
+    };
+
+    // ── Render internal module nodes ────────────────────────
+    INTERNAL_MODULES.forEach(mod => {
+        const layout = MODULE_LAYOUT[mod.id];
+        if (!layout) return;
+
+        const x = cx + layout.x * cx - nodeW / 2;
+        const y = cy + layout.y * cy - nodeH / 2;
+        const isHub = !!layout.hub;
 
         const status = getModuleStatus(mod.id);
         const health = archHealthData?.modules?.[mod.id] || {};
@@ -925,6 +994,8 @@ function positionNodes() {
         let badge = '';
         if (health.errors > 0) badge = `<div class="arch-node-badge error-badge">${health.errors}</div>`;
         else if (health.warnings > 0) badge = `<div class="arch-node-badge warn-badge">${health.warnings}</div>`;
+
+        const links = connCount(mod.id);
 
         const node = document.createElement('div');
         node.className = 'arch-node' + (archSelectedModule === mod.id ? ' selected' : '');
@@ -934,22 +1005,33 @@ function positionNodes() {
         node.style.top = y + 'px';
         node.onclick = () => selectArchNode(mod.id);
         node.innerHTML = `
-            <div class="arch-node-card ${status}">
+            <div class="arch-node-card ${status}${isHub ? ' hub-node' : ''}">
                 ${badge}
                 <div class="arch-node-icon ${status}"><i class="${mod.icon}"></i></div>
                 <div class="arch-node-name">${mod.name}</div>
-                <div class="arch-node-meta">${status}</div>
+                ${isHub
+                    ? `<div class="arch-node-conns">${links} connections</div>`
+                    : `<div class="arch-node-meta">${status}</div>`
+                }
             </div>
         `;
         diagram.appendChild(node);
     });
 
-    // Outer ring: external services
-    const outerRadius = Math.min(cx, cy) * 0.82;
-    EXTERNAL_SERVICES.forEach((svc, i) => {
-        const angle = (2 * Math.PI * i) / EXTERNAL_SERVICES.length - Math.PI / 2 + Math.PI / EXTERNAL_SERVICES.length;
-        const x = cx + outerRadius * Math.cos(angle) - 54;
-        const y = cy + outerRadius * Math.sin(angle) - 32;
+    // ── External Services — outer rectangle frame ──────────
+    const SERVICE_POS = {
+        elasticsearch: { fx:  0.00, fy: -0.82 },  // top center
+        ollama:        { fx: -0.72, fy:  0.00 },  // left center
+        dfir_iris:     { fx:  0.72, fy: -0.18 },  // right upper
+        kibana:        { fx:  0.72, fy:  0.22 },  // right lower
+        opencti:       { fx: -0.24, fy:  0.82 },  // bottom left
+        gitlab:        { fx:  0.24, fy:  0.82 },  // bottom right
+    };
+
+    EXTERNAL_SERVICES.forEach(svc => {
+        const pos = SERVICE_POS[svc.id] || { fx: 0, fy: 0 };
+        const x = cx + pos.fx * cx - nodeW / 2;
+        const y = cy + pos.fy * cy - nodeH / 2;
 
         const status = getConnectorStatus(svc.id);
 
