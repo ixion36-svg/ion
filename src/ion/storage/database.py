@@ -290,6 +290,19 @@ def _run_migrations(engine: Engine) -> None:
                     text("ALTER TABLE users ADD COLUMN elastic_uid VARCHAR(255)")
                 )
                 logger.info("Migrated: users.elastic_uid")
+        # v0.9.28: elastic_username and keycloak_sub for identity mapping
+        if "elastic_username" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE users ADD COLUMN elastic_username VARCHAR(255)")
+                )
+                logger.info("Migrated: users.elastic_username")
+        if "keycloak_sub" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE users ADD COLUMN keycloak_sub VARCHAR(255)")
+                )
+                logger.info("Migrated: users.keycloak_sub")
 
     # Migration for chat_messages.reply_to_id (v0.9.16+)
     if insp.has_table("chat_messages"):

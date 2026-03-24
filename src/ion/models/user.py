@@ -57,10 +57,11 @@ class User(Base, TimestampMixin):
     # Employment classification (cs = civil servant, contractor, military, other)
     employment_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default="cs")
 
-    # External service usernames for integration filtering
+    # External service identity mapping
     gitlab_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    # Elastic/Kibana user profile UID for case assignment sync
+    elastic_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     elastic_uid: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    keycloak_sub: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Relationships
     roles: Mapped[List["Role"]] = relationship(

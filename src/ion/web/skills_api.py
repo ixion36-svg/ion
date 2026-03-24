@@ -296,6 +296,40 @@ def unlock_assessment(
     return {"status": "ok", "is_locked": False}
 
 
+@router.delete("/assessment/reset")
+def delete_assessment(
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Delete current user's entire self-assessment (ratings, career goal, review cycle)."""
+    ratings_deleted = (
+        session.query(SkillAssessment)
+        .filter(SkillAssessment.user_id == current_user.id)
+        .delete()
+    )
+    goal_deleted = (
+        session.query(UserCareerGoal)
+        .filter(UserCareerGoal.user_id == current_user.id)
+        .delete()
+    )
+    cycle_deleted = (
+        session.query(AssessmentReviewCycle)
+        .filter(AssessmentReviewCycle.user_id == current_user.id)
+        .delete()
+    )
+    session.commit()
+    logger.info(
+        "User %s deleted self-assessment: %d ratings, %d goal, %d cycle",
+        current_user.username, ratings_deleted, goal_deleted, cycle_deleted,
+    )
+    return {
+        "status": "ok",
+        "ratings_deleted": ratings_deleted,
+        "goal_deleted": goal_deleted,
+        "cycle_deleted": cycle_deleted,
+    }
+
+
 @router.get("/team-overview")
 def get_team_overview(
     current_user: User = Depends(require_permission("security:read")),

@@ -173,6 +173,8 @@ class UserUpdate(BaseModel):
     employment_type: Optional[str] = None
     gitlab_username: Optional[str] = None
     elastic_uid: Optional[str] = None
+    elastic_username: Optional[str] = None
+    keycloak_sub: Optional[str] = None
 
 
 class UserRolesUpdate(BaseModel):
@@ -320,6 +322,10 @@ async def get_current_user_info(
         "permissions": list(set(
             p.name for r in current_user.effective_roles for p in r.permissions
         )),
+        "gitlab_username": getattr(current_user, "gitlab_username", None),
+        "elastic_username": getattr(current_user, "elastic_username", None),
+        "elastic_uid": getattr(current_user, "elastic_uid", None),
+        "keycloak_sub": getattr(current_user, "keycloak_sub", None),
     }
 
 
@@ -368,6 +374,185 @@ async def set_focus_mode(
     return {
         "focus_role": target_role.name,
         "permissions": list(set(p.name for p in target_role.permissions)),
+    }
+
+
+class ProfileUpdate(BaseModel):
+    """Self-service identity mapping update."""
+    display_name: Optional[str] = None
+    elastic_username: Optional[str] = None
+    gitlab_username: Optional[str] = None
+
+
+@router.put("/auth/profile")
+async def update_own_profile(
+    data: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Update the current user's own profile and identity mappings."""
+    # Re-fetch from injected session to ensure change tracking works
+    user = session.query(User).filter_by(id=current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    changes = {}
+    if data.display_name is not None:
+        user.display_name = data.display_name
+        changes["display_name"] = data.display_name
+    if data.elastic_username is not None:
+        user.elastic_username = data.elastic_username or None
+        user.elastic_uid = None
+        changes["elastic_username"] = data.elastic_username
+    if data.gitlab_username is not None:
+        user.gitlab_username = data.gitlab_username or None
+        changes["gitlab_username"] = data.gitlab_username
+
+    if changes:
+        session.commit()
+        from ion.storage.auth_repository import AuditLogRepository
+        try:
+            AuditLogRepository(session).create(
+                user_id=user.id,
+                action="profile_updated",
+                resource_type="user",
+                resource_id=user.id,
+                details=changes,
+            )
+            session.commit()
+        except Exception:
+            pass
+
+    return {
+        "message": "Profile updated",
+        "elastic_username": user.elastic_username,
+        "elastic_uid": user.elastic_uid,
+        "gitlab_username": user.gitlab_username,
+    }
+
+
+@router.post("/auth/profile/resolve-elastic")
+async def resolve_elastic_uid(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Resolve the current user's Elastic/Kibana user profile UID.
+
+    Tries: elastic_username → ION username → email prefix.
+    Queries Kibana's user profile suggest API.
+    """
+    from ion.services.kibana_cases_service import get_kibana_cases_service
+
+    kb_svc = get_kibana_cases_service()
+    if not kb_svc.enabled:
+        raise HTTPException(status_code=400, detail="Kibana integration is not configured")
+
+    # Try each candidate username in order
+    candidates = []
+    if getattr(current_user, "elastic_username", None):
+        candidates.append(current_user.elastic_username)
+    candidates.append(current_user.username)
+    if current_user.email:
+        candidates.append(current_user.email.split("@")[0])
+    if current_user.display_name:
+        candidates.append(current_user.display_name)
+
+    resolved_uid = None
+    matched_username = None
+    all_profiles = []
+
+    for candidate in candidates:
+        profiles = kb_svc.suggest_user_profiles(candidate)
+        for profile in profiles:
+            profile_user = profile.get("user", {})
+            p_username = profile_user.get("username", "") if isinstance(profile_user, dict) else ""
+            p_email = profile_user.get("email", "") if isinstance(profile_user, dict) else ""
+            p_full = profile_user.get("full_name", "") if isinstance(profile_user, dict) else ""
+            all_profiles.append({
+                "uid": profile.get("uid"),
+                "username": p_username,
+                "email": p_email,
+                "full_name": p_full,
+            })
+
+            # Exact match on username
+            if p_username == candidate:
+                resolved_uid = profile.get("uid")
+                matched_username = p_username
+                break
+            # Match on email
+            if p_email and p_email == current_user.email:
+                resolved_uid = profile.get("uid")
+                matched_username = p_username
+                break
+
+        if resolved_uid:
+            break
+
+    if resolved_uid:
+        user = session.query(User).filter_by(id=current_user.id).first()
+        if user:
+            user.elastic_uid = resolved_uid
+            if matched_username and not getattr(user, "elastic_username", None):
+                user.elastic_username = matched_username
+            session.commit()
+
+    return {
+        "resolved": resolved_uid is not None,
+        "elastic_uid": resolved_uid,
+        "matched_username": matched_username,
+        "candidates_tried": candidates,
+        "profiles_found": all_profiles,
+    }
+
+
+@router.post("/admin/users/resolve-elastic", dependencies=[Depends(require_permission("user:update"))])
+async def bulk_resolve_elastic_uids(
+    session: Session = Depends(get_db_session),
+):
+    """Admin: Resolve Elastic UIDs for all users that don't have one yet."""
+    from ion.services.kibana_cases_service import get_kibana_cases_service
+
+    kb_svc = get_kibana_cases_service()
+    if not kb_svc.enabled:
+        raise HTTPException(status_code=400, detail="Kibana integration is not configured")
+
+    users = session.query(User).filter(
+        User.is_active == True,  # noqa: E712
+        User.elastic_uid == None,  # noqa: E711
+    ).all()
+
+    resolved = []
+    failed = []
+
+    for user in users:
+        candidates = []
+        if getattr(user, "elastic_username", None):
+            candidates.append(user.elastic_username)
+        candidates.append(user.username)
+        if user.email:
+            candidates.append(user.email.split("@")[0])
+
+        uid = None
+        for candidate in candidates:
+            uid = kb_svc.resolve_user_uid(candidate)
+            if uid:
+                user.elastic_uid = uid
+                if not getattr(user, "elastic_username", None):
+                    user.elastic_username = candidate
+                resolved.append({"user": user.username, "uid": uid, "matched_via": candidate})
+                break
+
+        if not uid:
+            failed.append({"user": user.username, "candidates_tried": candidates})
+
+    session.commit()
+
+    return {
+        "resolved_count": len(resolved),
+        "failed_count": len(failed),
+        "resolved": resolved,
+        "failed": failed,
     }
 
 
@@ -546,6 +731,25 @@ async def oidc_callback(
         session.commit()
         logger.info(f"OIDC callback: user synced — {user.username} (id={user.id})")
 
+        # Auto-resolve Elastic UID on login if not cached
+        if not getattr(user, 'elastic_uid', None):
+            try:
+                from ion.services.kibana_cases_service import get_kibana_cases_service
+                kb_svc = get_kibana_cases_service()
+                if kb_svc.enabled:
+                    lookup = getattr(user, 'elastic_username', None) or user.username
+                    uid = kb_svc.resolve_user_uid(lookup)
+                    if not uid and lookup != user.username:
+                        uid = kb_svc.resolve_user_uid(user.username)
+                    if uid:
+                        user.elastic_uid = uid
+                        if not getattr(user, 'elastic_username', None):
+                            user.elastic_username = lookup
+                        session.commit()
+                        logger.info(f"OIDC callback: resolved elastic_uid for {user.username}: {uid}")
+            except Exception as e:
+                logger.debug(f"OIDC callback: elastic_uid resolve skipped: {e}")
+
         # Create a ION session for the user
         ip_address = get_client_ip(request)
         user_agent = request.headers.get("User-Agent")
@@ -721,7 +925,9 @@ async def get_user(
         "roles": [r.name for r in user.roles],
         "employment_type": getattr(user, "employment_type", None) or "cs",
         "gitlab_username": getattr(user, "gitlab_username", None) or "",
+        "elastic_username": getattr(user, "elastic_username", None) or "",
         "elastic_uid": getattr(user, "elastic_uid", None) or "",
+        "keycloak_sub": getattr(user, "keycloak_sub", None) or "",
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "updated_at": user.updated_at.isoformat() if user.updated_at else None,
     }
@@ -768,8 +974,14 @@ async def update_user(
     # Update external service identifiers
     if user_update.gitlab_username is not None:
         user.gitlab_username = user_update.gitlab_username or None
+    if user_update.elastic_username is not None:
+        user.elastic_username = user_update.elastic_username or None
+        # Clear cached UID when username changes
+        user.elastic_uid = None
     if user_update.elastic_uid is not None:
         user.elastic_uid = user_update.elastic_uid or None
+    if user_update.keycloak_sub is not None:
+        user.keycloak_sub = user_update.keycloak_sub or None
 
     audit_repo.create(
         user_id=current_user.id,
@@ -3632,7 +3844,11 @@ async def create_case(
                     from ion.services.kibana_cases_service import get_kibana_cases_service
                     kb_svc = get_kibana_cases_service()
                     if kb_svc.enabled:
-                        uid = kb_svc.resolve_user_uid(assignee_user.username)
+                        # Try elastic_username first, then ION username
+                        lookup_name = getattr(assignee_user, 'elastic_username', None) or assignee_user.username
+                        uid = kb_svc.resolve_user_uid(lookup_name)
+                        if not uid and lookup_name != assignee_user.username:
+                            uid = kb_svc.resolve_user_uid(assignee_user.username)
                         if uid:
                             create_assignee_uid = uid
                             assignee_user.elastic_uid = uid
@@ -3942,7 +4158,10 @@ async def update_case(
                     from ion.services.kibana_cases_service import get_kibana_cases_service
                     kb_service = get_kibana_cases_service()
                     if kb_service.enabled:
-                        uid = kb_service.resolve_user_uid(assignee.username)
+                        lookup_name = getattr(assignee, 'elastic_username', None) or assignee.username
+                        uid = kb_service.resolve_user_uid(lookup_name)
+                        if not uid and lookup_name != assignee.username:
+                            uid = kb_service.resolve_user_uid(assignee.username)
                         if uid:
                             assignee_elastic_uid = uid
                             assignee.elastic_uid = uid

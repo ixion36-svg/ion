@@ -107,8 +107,16 @@
                 <input type="text" id="edit-gitlab-username" placeholder="GitLab username for issue filtering">
             </div>
             <div class="form-group">
+                <label for="edit-elastic-username">Elastic Username</label>
+                <input type="text" id="edit-elastic-username" placeholder="Kibana/ES username (if different from ION)">
+            </div>
+            <div class="form-group">
                 <label for="edit-elastic-uid">Elastic UID</label>
-                <input type="text" id="edit-elastic-uid" placeholder="Auto-resolved from Kibana on case assign">
+                <input type="text" id="edit-elastic-uid" placeholder="Auto-resolved from Kibana" readonly style="opacity:0.7">
+            </div>
+            <div class="form-group">
+                <label for="edit-keycloak-sub">Keycloak Subject ID</label>
+                <input type="text" id="edit-keycloak-sub" placeholder="Auto-set on OIDC login" readonly style="opacity:0.7">
             </div>
             <div class="form-group">
                 <label>Roles</label>
@@ -272,7 +280,9 @@ async function showEditUserModal(userId) {
         document.getElementById('edit-email').value = user.email;
         document.getElementById('edit-display-name').value = user.display_name || '';
         document.getElementById('edit-gitlab-username').value = user.gitlab_username || '';
+        document.getElementById('edit-elastic-username').value = user.elastic_username || '';
         document.getElementById('edit-elastic-uid').value = user.elastic_uid || '';
+        document.getElementById('edit-keycloak-sub').value = user.keycloak_sub || '';
         document.getElementById('edit-is-active').checked = user.is_active;
 
         // Set role checkboxes
@@ -299,7 +309,7 @@ async function updateUser(event) {
         display_name: document.getElementById('edit-display-name').value || null,
         is_active: document.getElementById('edit-is-active').checked,
         gitlab_username: document.getElementById('edit-gitlab-username').value || null,
-        elastic_uid: document.getElementById('edit-elastic-uid').value || null,
+        elastic_username: document.getElementById('edit-elastic-username').value || null,
     };
 
     try {

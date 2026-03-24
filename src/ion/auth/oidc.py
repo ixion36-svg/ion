@@ -319,6 +319,11 @@ class OIDCUserSync:
             # Update existing user's last login
             self.user_repo.update_last_login(user)
 
+        # Store Keycloak subject identifier (immutable)
+        if token_data.sub and getattr(user, 'keycloak_sub', None) != token_data.sub:
+            user.keycloak_sub = token_data.sub
+            logger.debug(f"Stored keycloak_sub for {user.username}: {token_data.sub}")
+
         # Sync roles from Keycloak
         self._sync_roles(user, token_data.roles)
 

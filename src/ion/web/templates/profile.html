@@ -19,6 +19,40 @@
         </div>
     </div>
 
+    <div class="card">
+        <div class="card-header">
+            <h2>Identity Mapping</h2>
+        </div>
+        <div class="card-body">
+            <p style="color:var(--text-muted); font-size:0.8125rem; margin-bottom:1rem;">
+                Map your ION account to external services. These are used to sync case assignments to Kibana and filter GitLab issues.
+            </p>
+            <form id="identity-mapping-form" onsubmit="saveIdentityMapping(event)">
+                <div class="form-group">
+                    <label for="id-elastic-username">Elastic / Kibana Username</label>
+                    <input type="text" id="id-elastic-username" placeholder="Your Kibana username (if different from ION)">
+                </div>
+                <div class="form-group">
+                    <label for="id-gitlab-username">GitLab Username</label>
+                    <input type="text" id="id-gitlab-username" placeholder="Your GitLab username for 'My Issues' filtering">
+                </div>
+                <div class="form-group">
+                    <label>Elastic UID <span style="color:var(--text-muted); font-weight:normal;">(auto-resolved)</span></label>
+                    <div style="display:flex; gap:0.5rem; align-items:center;">
+                        <input type="text" id="id-elastic-uid" readonly style="opacity:0.7; flex:1;">
+                        <button type="button" class="btn btn-secondary" onclick="resolveElasticUid()" id="resolve-btn" style="white-space:nowrap;">Resolve</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Keycloak Subject ID <span style="color:var(--text-muted); font-weight:normal;">(auto-set on OIDC login)</span></label>
+                    <input type="text" id="id-keycloak-sub" readonly style="opacity:0.7;">
+                </div>
+                <div id="resolve-result" style="display:none; margin-bottom:1rem;"></div>
+                <button type="submit" class="btn btn-primary">Save Mappings</button>
+            </form>
+        </div>
+    </div>
+
     <div class="card" id="change-password-card">
         <div class="card-header">
             <h2>Change Password</h2>
@@ -163,6 +197,12 @@ function renderProfile() {
 
     // Update session info
     document.getElementById('current-browser').textContent = navigator.userAgent.split(' ').slice(-2).join(' ');
+
+    // Populate identity mapping fields
+    document.getElementById('id-elastic-username').value = currentUser.elastic_username || '';
+    document.getElementById('id-gitlab-username').value = currentUser.gitlab_username || '';
+    document.getElementById('id-elastic-uid').value = currentUser.elastic_uid || '';
+    document.getElementById('id-keycloak-sub').value = currentUser.keycloak_sub || '';
 }
 
 async function changePassword(event) {
@@ -258,6 +298,83 @@ function loadTheme() {
     document.querySelectorAll('.mode-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === savedMode);
     });
+}
+
+// Identity mapping
+async function saveIdentityMapping(event) {
+    event.preventDefault();
+    try {
+        const response = await fetch('/api/auth/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                elastic_username: document.getElementById('id-elastic-username').value || null,
+                gitlab_username: document.getElementById('id-gitlab-username').value || null,
+            })
+        });
+        const result = await response.json();
+        if (response.ok) {
+            showToast('Identity mappings saved', 'success');
+            // Update UID field (cleared when username changes)
+            document.getElementById('id-elastic-uid').value = result.elastic_uid || '';
+            loadProfile();
+        } else {
+            showToast(result.detail || 'Error saving mappings', 'error');
+        }
+    } catch (error) {
+        showToast('Error saving mappings', 'error');
+    }
+}
+
+async function resolveElasticUid() {
+    const btn = document.getElementById('resolve-btn');
+    const resultDiv = document.getElementById('resolve-result');
+    btn.disabled = true;
+    btn.textContent = 'Resolving...';
+    resultDiv.style.display = 'none';
+
+    try {
+        const response = await fetch('/api/auth/profile/resolve-elastic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        const result = await response.json();
+
+        if (response.ok) {
+            if (result.resolved) {
+                document.getElementById('id-elastic-uid').value = result.elastic_uid;
+                if (result.matched_username) {
+                    document.getElementById('id-elastic-username').value = result.matched_username;
+                }
+                showToast(`Resolved Elastic UID via "${result.matched_username}"`, 'success');
+                resultDiv.innerHTML = `<div class="alert alert-success" style="font-size:0.8125rem;">
+                    Matched as <strong>${escapeHtml(result.matched_username)}</strong>
+                    &mdash; UID: <code>${escapeHtml(result.elastic_uid)}</code>
+                </div>`;
+            } else {
+                showToast('Could not resolve Elastic UID', 'error');
+                let profilesHtml = '';
+                if (result.profiles_found && result.profiles_found.length) {
+                    profilesHtml = '<p style="margin-top:0.5rem;">Available profiles found:</p><ul style="margin:0.25rem 0 0 1rem;">' +
+                        result.profiles_found.map(p =>
+                            `<li><strong>${escapeHtml(p.username)}</strong> (${escapeHtml(p.full_name || p.email || '')})</li>`
+                        ).join('') + '</ul><p style="margin-top:0.5rem;">Set your <em>Elastic Username</em> to one of these and try again.</p>';
+                }
+                resultDiv.innerHTML = `<div class="alert alert-warning" style="font-size:0.8125rem;">
+                    No exact match found. Tried: ${result.candidates_tried.map(c => `"${escapeHtml(c)}"`).join(', ')}
+                    ${profilesHtml}
+                </div>`;
+            }
+            resultDiv.style.display = 'block';
+        } else {
+            showToast(result.detail || 'Error resolving', 'error');
+        }
+    } catch (error) {
+        showToast('Error resolving Elastic UID', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Resolve';
+    }
 }
 
 // Initialize
