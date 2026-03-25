@@ -152,6 +152,7 @@ class Variable(Base):
     required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     default_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    options: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array of select options
 
     # Relationships
     template: Mapped["Template"] = relationship("Template", back_populates="variables")

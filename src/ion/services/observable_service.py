@@ -58,6 +58,9 @@ LEGACY_TYPE_MAP = {
     "file-sha256": ObservableType.FILE_HASH_SHA256,
     "file-sha1": ObservableType.FILE_HASH_SHA1,
     "file-md5": ObservableType.FILE_HASH_MD5,
+    # File names
+    "filename": ObservableType.FILE_NAME,
+    "file_name": ObservableType.FILE_NAME,
     # Email
     "email": ObservableType.EMAIL,
     "email-addr": ObservableType.EMAIL,
@@ -507,6 +510,11 @@ class ObservableService:
                     self.auto_enrich_new_observable(observable)
                 except Exception as e:
                     logger.warning(f"Auto-enrichment failed for {observable.id}: {e}")
+            elif not created:
+                # Existing observable — check if its enrichment matches a watched APT
+                self._check_existing_enrichment_for_watches(
+                    observable, triggered_by_alert_id=alert_triage_id
+                )
 
             observables.append(observable)
 
@@ -1017,6 +1025,15 @@ class ObservableService:
 
             # Update observable threat level based on enrichment
             self._update_threat_level(observable, enrichment)
+
+            # Check enrichment against watched threat actors
+            if threat_actors_data:
+                try:
+                    from ion.services.threat_intel_service import ThreatIntelService
+                    ti_service = ThreatIntelService(self.session)
+                    ti_service.check_enrichment_for_watched_actors(enrichment, observable)
+                except Exception as e:
+                    logger.warning("Threat intel watch check failed: %s", e)
 
         return enrichment
 
@@ -1670,6 +1687,39 @@ class ObservableService:
             },
             triggered_by_alert_id=triggered_by_alert_id,
         )
+
+    def _check_existing_enrichment_for_watches(
+        self,
+        observable: Observable,
+        triggered_by_alert_id: Optional[int] = None,
+    ) -> None:
+        """For existing observables linked to a new alert, check if their
+        enrichment data already contains threat actors matching a ThreatIntelWatch.
+
+        This covers the case where an observable was enriched in the past and
+        linked to a watched APT, then appears again in a new alert.
+        """
+        enrichment = observable.latest_enrichment
+        if not enrichment or not enrichment.threat_actors:
+            return
+
+        try:
+            from ion.services.threat_intel_service import ThreatIntelService
+            ti_service = ThreatIntelService(self.session)
+            alerts = ti_service.check_enrichment_for_watched_actors(
+                enrichment, observable
+            )
+            if alerts:
+                # Update the triggered_by_alert_id on each created alert
+                for alert in alerts:
+                    alert.triggered_by_alert_id = triggered_by_alert_id
+                logger.info(
+                    "Threat intel watch matched for observable %s in alert %s: %d matches",
+                    observable.value, triggered_by_alert_id, len(alerts),
+                )
+        except Exception as e:
+            logger.warning("Threat intel watch check failed for existing observable %s: %s",
+                          observable.value, e)
 
     # =========================================================================
     # Timeline/Sighting History
@@ -2335,6 +2385,7 @@ class ObservableService:
             ObservableType.FILE_HASH_SHA1: "file-sha1",
             ObservableType.FILE_HASH_SHA256: "file-sha256",
             ObservableType.USER_ACCOUNT: "user_account",
+            ObservableType.FILE_NAME: "file-name",
             ObservableType.MAC_ADDRESS: "mac-addr",
             ObservableType.CVE: "vulnerability",
         }

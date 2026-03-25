@@ -65,6 +65,10 @@ class Config:
     elasticsearch_alert_index: str = ".alerts-security.alerts-*,alerts-*"  # Alert index pattern
     elasticsearch_case_index: str = "ion-cases"  # Index for synced case documents
     elasticsearch_verify_ssl: bool = True
+    # User mapping for alert assignment
+    elasticsearch_user_index: str = ""  # ES index containing user profiles (e.g., ion-users)
+    elasticsearch_user_field: str = ""  # Field in user index with display names (e.g., ion.user)
+    elasticsearch_assignment_field: str = "kibana.alert.workflow_user"  # Field on alerts to write assignment
 
     # Ollama AI integration
     ollama_enabled: bool = True
@@ -155,6 +159,9 @@ class Config:
             elasticsearch_alert_index=data.get("elasticsearch_alert_index", ".alerts-security.alerts-*,alerts-*"),
             elasticsearch_case_index=data.get("elasticsearch_case_index", "ion-cases"),
             elasticsearch_verify_ssl=data.get("elasticsearch_verify_ssl", True),
+            elasticsearch_user_index=data.get("elasticsearch_user_index", ""),
+            elasticsearch_user_field=data.get("elasticsearch_user_field", ""),
+            elasticsearch_assignment_field=data.get("elasticsearch_assignment_field", "kibana.alert.workflow_user"),
             # Ollama AI integration
             ollama_enabled=data.get("ollama_enabled", True),
             ollama_url=data.get("ollama_url", "http://localhost:11434"),
@@ -233,6 +240,9 @@ class Config:
                     "elasticsearch_alert_index": self.elasticsearch_alert_index,
                     "elasticsearch_case_index": self.elasticsearch_case_index,
                     "elasticsearch_verify_ssl": self.elasticsearch_verify_ssl,
+                    "elasticsearch_user_index": self.elasticsearch_user_index,
+                    "elasticsearch_user_field": self.elasticsearch_user_field,
+                    "elasticsearch_assignment_field": self.elasticsearch_assignment_field,
                     # Ollama AI integration
                     "ollama_enabled": self.ollama_enabled,
                     "ollama_url": self.ollama_url,
@@ -517,6 +527,9 @@ def get_elasticsearch_config() -> dict:
         "alert_index": config.elasticsearch_alert_index,
         "case_index": config.elasticsearch_case_index,
         "verify_ssl": config.elasticsearch_verify_ssl,
+        "user_index": config.elasticsearch_user_index,
+        "user_field": config.elasticsearch_user_field,
+        "assignment_field": config.elasticsearch_assignment_field,
     }
 
 

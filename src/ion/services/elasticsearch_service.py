@@ -108,6 +108,10 @@ class ElasticsearchService:
         self.case_index = case_index or config.get("case_index", "ion-cases")
         self.kfp_index = config.get("kfp_index", "ion-kfp")
         self.verify_ssl = verify_ssl if verify_ssl is not None else config.get("verify_ssl", True)
+        # User mapping for alert assignment
+        self.user_index = config.get("user_index", "")
+        self.user_field = config.get("user_field", "")
+        self.assignment_field = config.get("assignment_field", "kibana.alert.workflow_user")
 
     @property
     def is_configured(self) -> bool:
@@ -1064,6 +1068,139 @@ class ElasticsearchService:
             logger.warning(
                 "Failed to update alert workflow_status in ES: %s", e,
             )
+            return False
+
+    # =========================================================================
+    # User Mapping for Alert Assignment
+    # =========================================================================
+
+    @property
+    def user_mapping_configured(self) -> bool:
+        """Check if ES user mapping is configured."""
+        return bool(self.user_index) and bool(self.user_field)
+
+    async def get_assignment_users(self, search: str = "") -> List[Dict[str, str]]:
+        """Fetch user names from the configured ES user index.
+
+        Returns a list of {"name": "...", "value": "..."} for the assignment dropdown.
+        """
+        if not self.is_configured or not self.user_mapping_configured:
+            return []
+
+        try:
+            body: Dict[str, Any] = {"size": 200}
+
+            if search:
+                body["query"] = {
+                    "wildcard": {
+                        self.user_field: {
+                            "value": f"*{search}*",
+                            "case_insensitive": True,
+                        }
+                    }
+                }
+            else:
+                body["query"] = {"match_all": {}}
+
+            # Sort by the user field for consistent ordering
+            body["sort"] = [{self.user_field + ".keyword": {"order": "asc", "unmapped_type": "keyword"}}]
+            body["_source"] = [self.user_field]
+
+            result = await self._request(
+                "POST",
+                f"/{self.user_index}/_search",
+                json=body,
+            )
+
+            users = []
+            seen = set()
+            for hit in result.get("hits", {}).get("hits", []):
+                source = hit.get("_source", {})
+                # Navigate nested field path (e.g., "ion.user" → source["ion"]["user"])
+                value = source
+                for part in self.user_field.split("."):
+                    if isinstance(value, dict):
+                        value = value.get(part)
+                    else:
+                        value = None
+                        break
+
+                if value and isinstance(value, str) and value not in seen:
+                    seen.add(value)
+                    users.append({"name": value, "value": value})
+
+            logger.info("Fetched %d assignment users from ES index '%s'", len(users), self.user_index)
+            return users
+
+        except ElasticsearchError as e:
+            logger.warning("Failed to fetch assignment users from ES: %s", e)
+            return []
+
+    async def update_alert_assignment(
+        self,
+        alert_ids: List[str],
+        assigned_user: Optional[str],
+    ) -> bool:
+        """Write the assigned user name to the configured field on alert documents in ES."""
+        if not self.is_configured or not self.assignment_field:
+            return False
+
+        try:
+            field = self.assignment_field
+            if assigned_user:
+                # Set the assignment field
+                script_source = (
+                    f"ctx._source['{field}'] = params.user; "
+                )
+                # Also handle nested dotted fields (e.g., kibana.alert.workflow_user)
+                parts = field.split(".")
+                if len(parts) > 1:
+                    nested_lines = []
+                    for i in range(len(parts) - 1):
+                        path = ".".join(parts[:i + 1])
+                        accessor = "ctx._source" + "".join(f"['{p}']" for p in parts[:i + 1])
+                        nested_lines.append(
+                            f"if ({accessor} == null) {{ {accessor} = new HashMap(); }}"
+                        )
+                    nested_accessor = "ctx._source" + "".join(f"['{p}']" for p in parts)
+                    nested_lines.append(f"{nested_accessor} = params.user;")
+                    script_source = " ".join(nested_lines)
+
+                params = {"user": assigned_user}
+            else:
+                # Clear the assignment field
+                script_source = f"ctx._source.remove('{field}'); "
+                parts = field.split(".")
+                if len(parts) > 1:
+                    nested_accessor = "ctx._source" + "".join(f"['{p}']" for p in parts[:-1])
+                    script_source = (
+                        f"if ({nested_accessor} != null) {{ {nested_accessor}.remove('{parts[-1]}'); }}"
+                    )
+                params = {}
+
+            body = {
+                "query": {"ids": {"values": alert_ids}},
+                "script": {
+                    "source": script_source,
+                    "lang": "painless",
+                    "params": params,
+                },
+            }
+
+            result = await self._request(
+                "POST",
+                f"/{self.alert_index}/_update_by_query?conflicts=proceed&ignore_unavailable=true&expand_wildcards=open,hidden",
+                json=body,
+            )
+            updated = result.get("updated", 0)
+            logger.info(
+                "Updated assignment to '%s' for %d/%d alerts in ES",
+                assigned_user or "(unassigned)", updated, len(alert_ids),
+            )
+            return True
+
+        except ElasticsearchError as e:
+            logger.warning("Failed to update alert assignment in ES: %s", e)
             return False
 
     async def get_cluster_health(self) -> Dict[str, Any]:

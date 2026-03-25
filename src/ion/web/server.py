@@ -25,7 +25,9 @@ from ion.web.skills_api import router as skills_router
 from ion.web.notes_api import router as notes_router
 from ion.web.pcap_api import router as pcap_router
 from ion.web.forensics_api import router as forensics_router
+from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.notification_api import router as notification_router
+from ion.web.cyab_api import router as cyab_router
 from ion.web.social_api import router as social_router
 from ion.web.analytics_api import router as analytics_router
 from ion.web.engineering_analytics_api import router as engineering_analytics_router
@@ -174,6 +176,8 @@ app.include_router(notification_router, prefix="/api")
 app.include_router(social_router, prefix="/api/social")
 app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(engineering_analytics_router, prefix="/api/engineering/analytics")
+app.include_router(cyab_router, prefix="/api/cyab")
+app.include_router(threat_intel_router, prefix="/api/threat-intel")
 
 
 @app.on_event("startup")
@@ -303,6 +307,51 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"Failed to start Analytics Engine: {e}")
 
+    # Check CyAB review reminders and notify leads
+    try:
+        from ion.web.cyab_api import check_review_reminders as _cyab_check
+        from ion.storage.database import get_engine as _ge, get_session_factory as _gsf
+
+        _eng = _ge(config.db_path)
+        _fac = _gsf(_eng)
+        _sess = _fac()
+        try:
+            from ion.models.cyab import CyabSystem
+            from datetime import date as _date, timedelta as _td
+            from sqlalchemy import select as _sel
+            due = _sess.execute(
+                _sel(CyabSystem).where(CyabSystem.next_review_date <= _date.today() + _td(days=7))
+            ).scalars().all()
+            if due:
+                from ion.models.user import User as _U, Role as _R, user_roles as _ur
+                leads = _sess.execute(
+                    _sel(_U)
+                    .join(_ur, _ur.c.user_id == _U.id)
+                    .join(_R, _R.id == _ur.c.role_id)
+                    .where(_R.name.in_(["lead", "admin", "principal_analyst"]))
+                    .where(_U.is_active == True)
+                ).scalars().all()
+                sent = 0
+                for sys in due:
+                    is_overdue = sys.next_review_date < _date.today()
+                    label = "OVERDUE" if is_overdue else "Due soon"
+                    for u in leads:
+                        create_notification(
+                            session=_sess, user_id=u.id,
+                            source="cyab_review", source_id=str(sys.id),
+                            title=f"CyAB Review {label}: {sys.name}",
+                            body=f"{sys.department} — {sys.sal_tier}",
+                            url=f"/cyab#{sys.id}",
+                        )
+                        sent += 1
+                _sess.commit()
+                if sent:
+                    logger.info("CyAB review reminders: %d notifications sent for %d systems", sent, len(due))
+        finally:
+            _sess.close()
+    except Exception as e:
+        logger.warning(f"CyAB review reminder check failed: {e}")
+
     # Version compatibility checks for connectors that declare supported ranges
     try:
         from ion.services.connectors import get_connector_registry
@@ -339,201 +388,213 @@ async def startup_event():
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request, user: User = Depends(require_page_auth)):
     """Render the main dashboard."""
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="index.html")
 
 
 @app.get("/templates", response_class=HTMLResponse)
 async def templates_page(request: Request, user: User = Depends(require_page_permission("template:read"))):
     """Render the templates page."""
-    return templates.TemplateResponse("templates.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="templates.html")
 
 
 @app.get("/templates/new", response_class=HTMLResponse)
 async def new_template_page(request: Request, user: User = Depends(require_page_permission("template:read"))):
     """Render the new template page."""
-    return templates.TemplateResponse("template_form.html", {"request": request, "template": None})
+    return templates.TemplateResponse(request=request, name="template_form.html", context={"template": None})
 
 
 @app.get("/templates/{template_id}", response_class=HTMLResponse)
 async def view_template_page(request: Request, template_id: int, user: User = Depends(require_page_permission("template:read"))):
     """Render the template view page."""
-    return templates.TemplateResponse("template_view.html", {"request": request, "template_id": template_id})
+    return templates.TemplateResponse(request=request, name="template_view.html", context={"template_id": template_id})
 
 
 @app.get("/templates/{template_id}/edit", response_class=HTMLResponse)
 async def edit_template_page(request: Request, template_id: int, user: User = Depends(require_page_permission("template:read"))):
     """Render the template edit page."""
-    return templates.TemplateResponse("template_form.html", {"request": request, "template_id": template_id})
+    return templates.TemplateResponse(request=request, name="template_form.html", context={"template_id": template_id})
 
 
 @app.get("/templates/{template_id}/render", response_class=HTMLResponse)
 async def render_template_page(request: Request, template_id: int, user: User = Depends(require_page_permission("template:read"))):
     """Render the template rendering page."""
-    return templates.TemplateResponse("template_render.html", {"request": request, "template_id": template_id})
+    return templates.TemplateResponse(request=request, name="template_render.html", context={"template_id": template_id})
 
 
 @app.get("/templates/{template_id}/versions", response_class=HTMLResponse)
 async def versions_page(request: Request, template_id: int, user: User = Depends(require_page_permission("template:read"))):
     """Render the versions page."""
-    return templates.TemplateResponse("versions.html", {"request": request, "template_id": template_id})
+    return templates.TemplateResponse(request=request, name="versions.html", context={"template_id": template_id})
 
 
 @app.get("/documents", response_class=HTMLResponse)
 async def documents_page(request: Request, user: User = Depends(require_page_permission("document:read"))):
     """Render the documents page."""
-    return templates.TemplateResponse("documents.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="documents.html")
 
 
 
 @app.get("/gitlab", response_class=HTMLResponse)
 async def gitlab_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the GitLab integration page."""
-    return templates.TemplateResponse("gitlab.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="gitlab.html")
 
 
 # Auth page routes
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     """Render the login page."""
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="login.html")
 
 
 @app.get("/profile", response_class=HTMLResponse)
 async def profile_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the user profile page."""
-    return templates.TemplateResponse("profile.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="profile.html")
 
 
 @app.get("/users", response_class=HTMLResponse)
 async def users_page(request: Request, user: User = Depends(require_page_permission("user:read"))):
     """Render the user management page (admin only)."""
-    return templates.TemplateResponse("users.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="users.html")
 
 
 @app.get("/audit-logs", response_class=HTMLResponse)
 async def audit_logs_page(request: Request, user: User = Depends(require_page_permission("system:audit_view"))):
     """Render the audit logs page (admin only)."""
-    return templates.TemplateResponse("audit_logs.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="audit_logs.html")
 
 
 @app.get("/security", response_class=HTMLResponse)
 async def security_dashboard_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
     """Render the security dashboard page."""
-    return templates.TemplateResponse("security_dashboard.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="security_dashboard.html")
 
 
 @app.get("/alerts", response_class=HTMLResponse)
 async def alerts_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the alerts investigation page."""
-    return templates.TemplateResponse("alerts.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="alerts.html")
 
 
 @app.get("/cases", response_class=HTMLResponse)
 async def cases_page(request: Request, user: User = Depends(require_page_permission("case:read"))):
     """Render the cases management page."""
-    return templates.TemplateResponse("cases.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="cases.html")
 
 
 @app.get("/observables", response_class=HTMLResponse)
 async def observables_page(request: Request, user: User = Depends(require_page_permission("observable:read"))):
     """Render the observables tracking page."""
-    return templates.TemplateResponse("observables.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="observables.html")
+
+
+@app.get("/threat-intel", response_class=HTMLResponse)
+async def threat_intel_page(request: Request, user: User = Depends(require_page_permission("observable:read"))):
+    """Render the threat intel page."""
+    return templates.TemplateResponse(request=request, name="threat_intel.html")
 
 
 @app.get("/tools", response_class=HTMLResponse)
 async def tools_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the document tools page."""
-    return templates.TemplateResponse("tools.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="tools.html")
+
+
+@app.get("/cyab", response_class=HTMLResponse)
+async def cyab_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the CyAB Ingestion SLA page."""
+    return templates.TemplateResponse(request=request, name="cyab.html")
 
 
 @app.get("/discover", response_class=HTMLResponse)
 async def discover_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the discover and hunt page for analysts."""
-    return templates.TemplateResponse("discover.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="discover.html")
 
 
 @app.get("/analyst", response_class=HTMLResponse)
 async def analyst_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the unified analyst workspace page."""
-    return templates.TemplateResponse("analyst.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="analyst.html")
 
 
 @app.get("/integrations", response_class=HTMLResponse)
 async def integrations_page(request: Request, user: User = Depends(require_page_permission("integration:read"))):
     """Render the integrations management page."""
-    return templates.TemplateResponse("integrations.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="integrations.html")
 
 
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, user: User = Depends(require_page_permission("system:settings"))):
     """Render the system settings page."""
-    return templates.TemplateResponse("settings.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="settings.html")
 
 
 @app.get("/playbooks", response_class=HTMLResponse)
 async def playbooks_page(request: Request, user: User = Depends(require_page_permission("playbook:read"))):
     """Render the playbooks management page."""
-    return templates.TemplateResponse("playbooks.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="playbooks.html")
 
 
 @app.get("/chat", response_class=HTMLResponse)
 async def chat_page(request: Request, user: User = Depends(require_page_permission("ai:chat"))):
     """Render the AI chat page."""
-    return templates.TemplateResponse("chat.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="chat.html")
 
 
 @app.get("/training", response_class=HTMLResponse)
 async def training_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the training pathways page."""
-    return templates.TemplateResponse("training.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="training.html")
 
 
 @app.get("/notes", response_class=HTMLResponse)
 async def notes_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the full-page notes view."""
-    return templates.TemplateResponse("notes.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="notes.html")
 
 
 @app.get("/pcap", response_class=HTMLResponse)
 async def pcap_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the PCAP analyzer page."""
-    return templates.TemplateResponse("pcap.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="pcap.html")
 
 
 @app.get("/forensics", response_class=HTMLResponse)
 async def forensics_page(request: Request, user: User = Depends(require_page_permission("forensic:read"))):
     """Render the forensic investigations page."""
-    return templates.TemplateResponse("forensics.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="forensics.html")
 
 
 @app.get("/analytics", response_class=HTMLResponse)
 async def analytics_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the Analytics Engine dashboard."""
-    return templates.TemplateResponse("analytics.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="analytics.html")
 
 
 @app.get("/social", response_class=HTMLResponse)
 async def social_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the Social Hub page."""
-    return templates.TemplateResponse("social.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="social.html")
 
 
 @app.get("/engineering-analytics", response_class=HTMLResponse)
 async def engineering_analytics_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the Engineering System Analytics page."""
-    return templates.TemplateResponse("engineering_analytics.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="engineering_analytics.html")
 
 
 @app.get("/topology", response_class=HTMLResponse)
 async def topology_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
     """Render the network topology visualization page."""
-    return templates.TemplateResponse("topology.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="topology.html")
 
 
 @app.get("/architecture", response_class=HTMLResponse)
 async def architecture_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
     """Render the system architecture flow diagram page."""
-    return templates.TemplateResponse("architecture.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="architecture.html")
 
 
 def main():

@@ -34,6 +34,7 @@ class OpenCTIService:
         "file-sha1": {"entity_type": "StixFile", "filter_key": "hashes.SHA-1"},
         "file-md5": {"entity_type": "StixFile", "filter_key": "hashes.MD5"},
         "email-addr": {"entity_type": "Email-Addr", "filter_key": "value"},
+        "file-name": {"entity_type": "StixFile", "filter_key": "name"},
         # Aliases for convenience
         "ip": {"entity_type": "IPv4-Addr", "filter_key": "value"},
         "domain": {"entity_type": "Domain-Name", "filter_key": "value"},
@@ -493,6 +494,519 @@ class OpenCTIService:
                     existing_actor_ids.add(target["id"])
         except OpenCTIError as e:
             logger.debug("Threat actor enrichment query failed: %s", e)
+
+    async def search_threat_actors(
+        self, search: str, first: int = 20, after: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Search OpenCTI for threat actors — queries both threatActorsGroup
+        and intrusionSets since most APT groups are stored as intrusion sets.
+
+        Args:
+            search: Search term
+            first: Max results per page
+            after: Cursor for pagination
+
+        Returns:
+            Dict with pageInfo and list of threat actor nodes.
+        """
+        # Query both entity types in parallel via a single GraphQL request
+        query = """
+        query SearchThreatActors($search: String, $first: Int, $after: ID) {
+            threatActorsGroup(search: $search, first: $first, after: $after, orderBy: name, orderMode: asc) {
+                pageInfo { hasNextPage endCursor }
+                edges {
+                    node {
+                        id
+                        name
+                        description
+                        aliases
+                        threat_actor_types
+                        first_seen
+                        last_seen
+                        confidence
+                        objectLabel { value color }
+                    }
+                }
+            }
+            intrusionSets(search: $search, first: $first, after: $after, orderBy: name, orderMode: asc) {
+                pageInfo { hasNextPage endCursor }
+                edges {
+                    node {
+                        id
+                        name
+                        description
+                        aliases
+                        first_seen
+                        last_seen
+                        confidence
+                        objectLabel { value color }
+                    }
+                }
+            }
+        }
+        """
+        variables: Dict[str, Any] = {"search": search, "first": first}
+        if after:
+            variables["after"] = after
+
+        data = await self._graphql(query, variables)
+
+        actors = []
+        seen_ids: set = set()
+
+        # Parse threat actor groups
+        ta_container = data.get("threatActorsGroup", {})
+        for edge in ta_container.get("edges", []):
+            node = edge.get("node", {})
+            nid = node.get("id")
+            if nid in seen_ids:
+                continue
+            seen_ids.add(nid)
+            actors.append({
+                "id": nid,
+                "name": node.get("name"),
+                "description": node.get("description"),
+                "aliases": node.get("aliases") or [],
+                "threat_actor_types": node.get("threat_actor_types") or [],
+                "entity_class": "threat_actor_group",
+                "first_seen": node.get("first_seen"),
+                "last_seen": node.get("last_seen"),
+                "confidence": node.get("confidence"),
+                "labels": [
+                    {"value": l.get("value"), "color": l.get("color")}
+                    for l in (node.get("objectLabel") or [])
+                ],
+            })
+
+        # Parse intrusion sets (most APT groups live here)
+        is_container = data.get("intrusionSets", {})
+        for edge in is_container.get("edges", []):
+            node = edge.get("node", {})
+            nid = node.get("id")
+            if nid in seen_ids:
+                continue
+            seen_ids.add(nid)
+            actors.append({
+                "id": nid,
+                "name": node.get("name"),
+                "description": node.get("description"),
+                "aliases": node.get("aliases") or [],
+                "threat_actor_types": ["intrusion-set"],
+                "entity_class": "intrusion_set",
+                "first_seen": node.get("first_seen"),
+                "last_seen": node.get("last_seen"),
+                "confidence": node.get("confidence"),
+                "labels": [
+                    {"value": l.get("value"), "color": l.get("color")}
+                    for l in (node.get("objectLabel") or [])
+                ],
+            })
+
+        # Sort by name
+        actors.sort(key=lambda a: (a.get("name") or "").lower())
+
+        # Merge page_info — has more pages if either source does
+        ta_pi = ta_container.get("pageInfo", {})
+        is_pi = is_container.get("pageInfo", {})
+        page_info = {
+            "hasNextPage": ta_pi.get("hasNextPage", False) or is_pi.get("hasNextPage", False),
+            "endCursor": ta_pi.get("endCursor") or is_pi.get("endCursor") or "",
+        }
+
+        return {"actors": actors, "page_info": page_info}
+
+    async def search_campaigns(
+        self, search: str, first: int = 20, after: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Search OpenCTI for campaigns.
+
+        Args:
+            search: Search term
+            first: Max results per page
+            after: Cursor for pagination
+
+        Returns:
+            Dict with pageInfo and list of campaign nodes.
+        """
+        query = """
+        query SearchCampaigns($search: String, $first: Int, $after: ID) {
+            campaigns(search: $search, first: $first, after: $after, orderBy: name, orderMode: asc) {
+                pageInfo { hasNextPage endCursor }
+                edges {
+                    node {
+                        id
+                        name
+                        description
+                        aliases
+                        first_seen
+                        last_seen
+                        confidence
+                        objectLabel { value color }
+                    }
+                }
+            }
+        }
+        """
+        variables: Dict[str, Any] = {"search": search, "first": first}
+        if after:
+            variables["after"] = after
+
+        data = await self._graphql(query, variables)
+        container = data.get("campaigns", {})
+        page_info = container.get("pageInfo", {})
+        campaigns = []
+        for edge in container.get("edges", []):
+            node = edge.get("node", {})
+            campaigns.append({
+                "id": node.get("id"),
+                "name": node.get("name"),
+                "description": node.get("description"),
+                "aliases": node.get("aliases") or [],
+                "first_seen": node.get("first_seen"),
+                "last_seen": node.get("last_seen"),
+                "confidence": node.get("confidence"),
+                "labels": [
+                    {"value": l.get("value"), "color": l.get("color")}
+                    for l in (node.get("objectLabel") or [])
+                ],
+            })
+        return {"campaigns": campaigns, "page_info": page_info}
+
+    async def get_entity_detail(
+        self, entity_id: str, entity_type: str
+    ) -> Dict[str, Any]:
+        """Get detailed information about a threat actor, intrusion set, or campaign.
+
+        Args:
+            entity_id: OpenCTI internal ID
+            entity_type: "threat_actor", "intrusion_set", or "campaign"
+
+        Returns:
+            Dict with entity details including related entities.
+        """
+        if entity_type in ("threat_actor", "intrusion_set"):
+            return await self._get_threat_actor_detail(entity_id, entity_type)
+        elif entity_type == "campaign":
+            return await self._get_campaign_detail(entity_id)
+        return {"error": f"Unknown entity type: {entity_type}"}
+
+    async def _get_threat_actor_detail(
+        self, entity_id: str, entity_type: str = "threat_actor"
+    ) -> Dict[str, Any]:
+        """Get threat actor or intrusion set with campaigns, TTPs, and indicators."""
+        # Try both entity types — most APTs are intrusion sets
+        if entity_type == "intrusion_set":
+            query = """
+            query IntrusionSetDetail($id: String!) {
+                intrusionSet(id: $id) {
+                    id name description aliases first_seen last_seen confidence
+                    objectLabel { value color }
+                }
+            }
+            """
+            data = await self._graphql(query, {"id": entity_id})
+            actor = data.get("intrusionSet")
+        else:
+            query = """
+            query ThreatActorDetail($id: String!) {
+                threatActorGroup(id: $id) {
+                    id name description aliases threat_actor_types
+                    first_seen last_seen confidence
+                    objectLabel { value color }
+                }
+            }
+            """
+            data = await self._graphql(query, {"id": entity_id})
+            actor = data.get("threatActorGroup")
+            # Fallback to intrusion set if not found as threat actor group
+            if not actor:
+                query2 = """
+                query IntrusionSetDetail($id: String!) {
+                    intrusionSet(id: $id) {
+                        id name description aliases first_seen last_seen confidence
+                        objectLabel { value color }
+                    }
+                }
+                """
+                data2 = await self._graphql(query2, {"id": entity_id})
+                actor = data2.get("intrusionSet")
+
+        if not actor:
+            return {"error": "Threat actor not found"}
+
+        result: Dict[str, Any] = {
+            "id": actor.get("id"),
+            "name": actor.get("name"),
+            "description": actor.get("description"),
+            "aliases": actor.get("aliases") or [],
+            "threat_actor_types": actor.get("threat_actor_types") or [],
+            "first_seen": actor.get("first_seen"),
+            "last_seen": actor.get("last_seen"),
+            "confidence": actor.get("confidence"),
+            "labels": [
+                {"value": l.get("value"), "color": l.get("color")}
+                for l in (actor.get("objectLabel") or [])
+            ],
+            "campaigns": [],
+            "ttps": [],
+            "indicators": [],
+        }
+
+        # Fetch related campaigns (attributed-to relationships)
+        try:
+            rel_query = """
+            query ActorCampaigns($filters: FilterGroup) {
+                stixCoreRelationships(filters: $filters, first: 50) {
+                    edges {
+                        node {
+                            relationship_type
+                            to {
+                                ... on Campaign {
+                                    id name description first_seen last_seen
+                                }
+                            }
+                            from {
+                                ... on Campaign {
+                                    id name description first_seen last_seen
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            """
+            rel_filters = {
+                "mode": "or",
+                "filters": [
+                    {"key": "fromId", "values": [entity_id], "operator": "eq", "mode": "or"},
+                    {"key": "toId", "values": [entity_id], "operator": "eq", "mode": "or"},
+                ],
+                "filterGroups": [],
+            }
+            rel_data = await self._graphql(rel_query, {"filters": rel_filters})
+            for edge in rel_data.get("stixCoreRelationships", {}).get("edges", []):
+                node = edge.get("node", {})
+                rel_type = node.get("relationship_type", "")
+                if rel_type in ("attributed-to", "related-to"):
+                    for side in ("to", "from"):
+                        target = node.get(side) or {}
+                        if target.get("id") and target["id"] != entity_id and target.get("name"):
+                            result["campaigns"].append({
+                                "id": target["id"],
+                                "name": target.get("name"),
+                                "description": target.get("description"),
+                                "first_seen": target.get("first_seen"),
+                                "last_seen": target.get("last_seen"),
+                            })
+        except OpenCTIError as e:
+            logger.debug("Failed to fetch campaigns for actor %s: %s", entity_id, e)
+
+        # Fetch TTPs (uses relationships to attack-patterns)
+        try:
+            ttp_query = """
+            query ActorTTPs($filters: FilterGroup) {
+                stixCoreRelationships(filters: $filters, first: 100) {
+                    edges {
+                        node {
+                            to {
+                                ... on AttackPattern {
+                                    id name description x_mitre_id
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            """
+            ttp_filters = {
+                "mode": "and",
+                "filters": [
+                    {"key": "fromId", "values": [entity_id], "operator": "eq", "mode": "or"},
+                    {"key": "relationship_type", "values": ["uses"], "operator": "eq", "mode": "or"},
+                ],
+                "filterGroups": [],
+            }
+            ttp_data = await self._graphql(ttp_query, {"filters": ttp_filters})
+            for edge in ttp_data.get("stixCoreRelationships", {}).get("edges", []):
+                target = edge.get("node", {}).get("to") or {}
+                if target.get("id") and target.get("name"):
+                    result["ttps"].append({
+                        "id": target["id"],
+                        "name": target.get("name"),
+                        "description": target.get("description"),
+                        "mitre_id": target.get("x_mitre_id"),
+                    })
+        except OpenCTIError as e:
+            logger.debug("Failed to fetch TTPs for actor %s: %s", entity_id, e)
+
+        # Fetch indicators
+        try:
+            ind_query = """
+            query ActorIndicators($filters: FilterGroup) {
+                stixCoreRelationships(filters: $filters, first: 50) {
+                    edges {
+                        node {
+                            from {
+                                ... on Indicator {
+                                    id name pattern indicator_types valid_from valid_until x_opencti_score
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            """
+            ind_filters = {
+                "mode": "and",
+                "filters": [
+                    {"key": "toId", "values": [entity_id], "operator": "eq", "mode": "or"},
+                    {"key": "relationship_type", "values": ["indicates"], "operator": "eq", "mode": "or"},
+                ],
+                "filterGroups": [],
+            }
+            ind_data = await self._graphql(ind_query, {"filters": ind_filters})
+            for edge in ind_data.get("stixCoreRelationships", {}).get("edges", []):
+                ind = edge.get("node", {}).get("from") or {}
+                if ind.get("id") and ind.get("name"):
+                    result["indicators"].append({
+                        "id": ind["id"],
+                        "name": ind.get("name"),
+                        "pattern": ind.get("pattern"),
+                        "indicator_types": ind.get("indicator_types") or [],
+                        "valid_from": ind.get("valid_from"),
+                        "valid_until": ind.get("valid_until"),
+                        "score": ind.get("x_opencti_score"),
+                    })
+        except OpenCTIError as e:
+            logger.debug("Failed to fetch indicators for actor %s: %s", entity_id, e)
+
+        return result
+
+    async def _get_campaign_detail(self, entity_id: str) -> Dict[str, Any]:
+        """Get campaign with related threat actors and indicators."""
+        query = """
+        query CampaignDetail($id: String!) {
+            campaign(id: $id) {
+                id
+                name
+                description
+                aliases
+                first_seen
+                last_seen
+                confidence
+                objectLabel { value color }
+            }
+        }
+        """
+        data = await self._graphql(query, {"id": entity_id})
+        campaign = data.get("campaign")
+        if not campaign:
+            return {"error": "Campaign not found"}
+
+        result: Dict[str, Any] = {
+            "id": campaign.get("id"),
+            "name": campaign.get("name"),
+            "description": campaign.get("description"),
+            "aliases": campaign.get("aliases") or [],
+            "first_seen": campaign.get("first_seen"),
+            "last_seen": campaign.get("last_seen"),
+            "confidence": campaign.get("confidence"),
+            "labels": [
+                {"value": l.get("value"), "color": l.get("color")}
+                for l in (campaign.get("objectLabel") or [])
+            ],
+            "threat_actors": [],
+            "indicators": [],
+        }
+
+        # Related threat actors
+        try:
+            rel_query = """
+            query CampaignActors($filters: FilterGroup) {
+                stixCoreRelationships(filters: $filters, first: 50) {
+                    edges {
+                        node {
+                            relationship_type
+                            to {
+                                ... on ThreatActorGroup {
+                                    id name description threat_actor_types
+                                }
+                            }
+                            from {
+                                ... on ThreatActorGroup {
+                                    id name description threat_actor_types
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            """
+            rel_filters = {
+                "mode": "or",
+                "filters": [
+                    {"key": "fromId", "values": [entity_id], "operator": "eq", "mode": "or"},
+                    {"key": "toId", "values": [entity_id], "operator": "eq", "mode": "or"},
+                ],
+                "filterGroups": [],
+            }
+            rel_data = await self._graphql(rel_query, {"filters": rel_filters})
+            for edge in rel_data.get("stixCoreRelationships", {}).get("edges", []):
+                node = edge.get("node", {})
+                for side in ("to", "from"):
+                    target = node.get(side) or {}
+                    if target.get("id") and target["id"] != entity_id and target.get("name"):
+                        result["threat_actors"].append({
+                            "id": target["id"],
+                            "name": target.get("name"),
+                            "description": target.get("description"),
+                            "types": target.get("threat_actor_types") or [],
+                        })
+        except OpenCTIError as e:
+            logger.debug("Failed to fetch actors for campaign %s: %s", entity_id, e)
+
+        # Indicators
+        try:
+            ind_query = """
+            query CampaignIndicators($filters: FilterGroup) {
+                stixCoreRelationships(filters: $filters, first: 50) {
+                    edges {
+                        node {
+                            from {
+                                ... on Indicator {
+                                    id name pattern indicator_types valid_from valid_until x_opencti_score
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            """
+            ind_filters = {
+                "mode": "and",
+                "filters": [
+                    {"key": "toId", "values": [entity_id], "operator": "eq", "mode": "or"},
+                    {"key": "relationship_type", "values": ["indicates"], "operator": "eq", "mode": "or"},
+                ],
+                "filterGroups": [],
+            }
+            ind_data = await self._graphql(ind_query, {"filters": ind_filters})
+            for edge in ind_data.get("stixCoreRelationships", {}).get("edges", []):
+                ind = edge.get("node", {}).get("from") or {}
+                if ind.get("id") and ind.get("name"):
+                    result["indicators"].append({
+                        "id": ind["id"],
+                        "name": ind.get("name"),
+                        "pattern": ind.get("pattern"),
+                        "indicator_types": ind.get("indicator_types") or [],
+                        "valid_from": ind.get("valid_from"),
+                        "valid_until": ind.get("valid_until"),
+                        "score": ind.get("x_opencti_score"),
+                    })
+        except OpenCTIError as e:
+            logger.debug("Failed to fetch indicators for campaign %s: %s", entity_id, e)
+
+        return result
 
     async def enrich_batch(
         self, observables: List[Dict[str, str]]

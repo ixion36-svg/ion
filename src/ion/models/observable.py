@@ -33,6 +33,7 @@ class WatchlistAlertType(str, Enum):
     THREAT_LEVEL_CHANGE = "threat_level_change"  # Threat level changed
     NEW_ENRICHMENT = "new_enrichment"  # New enrichment data available
     PATTERN_MATCH = "pattern_match"    # Observable matched a pattern
+    THREAT_ACTOR_MATCH = "threat_actor_match"  # Matched a watched threat actor
 
 
 class ObservableType(str, Enum):
@@ -47,6 +48,7 @@ class ObservableType(str, Enum):
     FILE_HASH_MD5 = "md5"
     FILE_HASH_SHA1 = "sha1"
     FILE_HASH_SHA256 = "sha256"
+    FILE_NAME = "filename"
     USER_ACCOUNT = "user_account"
     MAC_ADDRESS = "mac"
     CVE = "cve"
@@ -193,6 +195,9 @@ class Observable(Base, TimestampMixin):
         elif obs_type == ObservableType.USER_ACCOUNT:
             # User accounts: lowercase
             normalized = normalized.lower()
+        elif obs_type == ObservableType.FILE_NAME:
+            # File names: preserve case but strip whitespace
+            normalized = normalized.strip()
         elif obs_type == ObservableType.CVE:
             # CVE: uppercase
             normalized = normalized.upper()

@@ -91,6 +91,7 @@ class TemplateUpdate(BaseModel):
 class RenderRequest(BaseModel):
     data: dict = {}
     output_format: Optional[str] = None
+    content_override: Optional[str] = None
 
 
 class CheckpointCreate(BaseModel):
@@ -1638,6 +1639,10 @@ async def render_template(
             output_format=render_request.output_format,
             document_name=document_name,
         )
+        # If the user edited sections in the UI, override the rendered content
+        if render_request.content_override and document:
+            document.content = render_request.content_override
+            content = render_request.content_override
         services.session.commit()
 
         return {
@@ -1737,17 +1742,25 @@ async def get_template_variables(template_id: int, services: Services = Depends(
         renderer = TemplateRenderer()
         extracted = renderer.extract_variables(t.content)
 
+        import json as _json
+        defined = []
+        for v in t.variables:
+            d = {
+                "name": v.name,
+                "var_type": v.var_type,
+                "required": v.required,
+                "default_value": v.default_value,
+            }
+            if v.options:
+                try:
+                    d["options"] = _json.loads(v.options)
+                except (ValueError, TypeError):
+                    pass
+            defined.append(d)
+
         return {
             "extracted": list(extracted),
-            "defined": [
-                {
-                    "name": v.name,
-                    "var_type": v.var_type,
-                    "required": v.required,
-                    "default_value": v.default_value,
-                }
-                for v in t.variables
-            ],
+            "defined": defined,
         }
     except TemplateNotFoundError:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -1811,6 +1824,36 @@ async def upload_document(
         "collection_id": document.collection_id,
         "tags": [t.name for t in document.tags],
         "current_version": document.current_version,
+        "created_at": document.created_at.isoformat() if document.created_at else None,
+    }
+
+
+class DocumentCreateRequest(BaseModel):
+    name: str
+    content: str
+    output_format: str = "markdown"
+    tags: Optional[List[str]] = None
+    collection_id: Optional[int] = None
+
+
+@router.post("/documents/create", dependencies=[Depends(require_permission("document:create"))])
+async def create_document(req: DocumentCreateRequest, services: Services = Depends(get_services)):
+    """Create a document from content (no file upload needed)."""
+    document = services.document_repo.create(
+        name=req.name,
+        rendered_content=req.content,
+        output_format=req.output_format,
+    )
+    if req.collection_id:
+        document.collection_id = req.collection_id
+        services.session.flush()
+    if req.tags:
+        services.document_repo.set_tags(document, req.tags)
+    services.session.commit()
+    return {
+        "id": document.id,
+        "name": document.name,
+        "output_format": document.output_format,
         "created_at": document.created_at.isoformat() if document.created_at else None,
     }
 
@@ -3355,6 +3398,7 @@ OBSERVABLE_TYPES = {"hostname", "source_ip", "destination_ip", "url", "domain", 
 class TriageUpdate(BaseModel):
     status: Optional[str] = None
     assigned_to_id: Optional[int] = None
+    assigned_to_name: Optional[str] = None  # ES user name (used when ES user mapping is configured)
     priority: Optional[str] = None
     case_id: Optional[int] = None
     analyst_notes: Optional[str] = None
@@ -3380,6 +3424,7 @@ class BulkTriageUpdate(BaseModel):
     alert_ids: List[str]
     status: Optional[str] = None
     assigned_to_id: Optional[int] = None
+    assigned_to_name: Optional[str] = None  # ES user name (used when ES user mapping is configured)
     priority: Optional[str] = None
     case_id: Optional[int] = None
     add_to_new_case: Optional[bool] = False
@@ -4809,6 +4854,21 @@ async def get_batch_triage(
     return {"triage": result}
 
 
+@router.get("/elasticsearch/assignment_users")
+async def get_assignment_users(
+    q: str = "",
+    current_user: User = Depends(require_permission("alert:read")),
+):
+    """Get users available for alert assignment from the configured ES index."""
+    from ion.services.elasticsearch_service import ElasticsearchService
+    es = ElasticsearchService()
+    if not es.is_configured or not es.user_mapping_configured:
+        return {"users": [], "source": "none", "configured": False}
+
+    users = await es.get_assignment_users(search=q)
+    return {"users": users, "source": "elasticsearch", "configured": True}
+
+
 @router.post("/elasticsearch/alerts-triage/bulk-update")
 async def bulk_update_triage(
     data: BulkTriageUpdate,
@@ -4871,6 +4931,23 @@ async def bulk_update_triage(
                 await es.update_alert_workflow_status(data.alert_ids, data.status)
         except Exception as e:
             logger.warning(f"Failed to sync bulk workflow_status to ES: {e}")
+
+    # Sync assignment to Elasticsearch when bulk-updating assignee
+    if data.assigned_to_name is not None or data.assigned_to_id is not None:
+        try:
+            from ion.services.elasticsearch_service import ElasticsearchService
+            es = ElasticsearchService()
+            if es.is_configured and es.assignment_field:
+                if data.assigned_to_name:
+                    user_name = data.assigned_to_name
+                elif data.assigned_to_id and data.assigned_to_id > 0:
+                    assignee = session.query(User).get(data.assigned_to_id)
+                    user_name = assignee.display_name or assignee.username if assignee else None
+                else:
+                    user_name = None
+                await es.update_alert_assignment(data.alert_ids, user_name)
+        except Exception as e:
+            logger.warning(f"Failed to sync bulk assignment to ES: {e}")
 
     result = {
         "updated": updated,
@@ -5006,6 +5083,25 @@ async def update_alert_triage(
                 await es.update_alert_workflow_status([alert_id], data.status)
         except Exception as e:
             logger.warning(f"Failed to sync workflow_status to ES for {alert_id}: {e}")
+
+    # Sync assignment to Elasticsearch when assignee changes
+    if data.assigned_to_name is not None or data.assigned_to_id is not None:
+        try:
+            from ion.services.elasticsearch_service import ElasticsearchService
+            es = ElasticsearchService()
+            if es.is_configured and es.assignment_field:
+                if data.assigned_to_name:
+                    # ES user name provided directly
+                    user_name = data.assigned_to_name
+                elif data.assigned_to_id and data.assigned_to_id > 0:
+                    # Resolve ION user ID to display name
+                    assignee = session.query(User).get(data.assigned_to_id)
+                    user_name = assignee.display_name or assignee.username if assignee else None
+                else:
+                    user_name = None  # Unassign
+                await es.update_alert_assignment([alert_id], user_name)
+        except Exception as e:
+            logger.warning(f"Failed to sync assignment to ES for {alert_id}: {e}")
 
     return {
         "id": triage.id,

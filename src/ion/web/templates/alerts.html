@@ -1603,6 +1603,15 @@ kbd {
 .observable-badge.url          { background: #1e5f2e; color: #7df098; }
 .observable-badge.domain       { background: #3a1e5f; color: #a87df0; }
 .observable-badge.user_account { background: #1e5f5f; color: #7df0f0; }
+.observable-badge.ipv4,
+.observable-badge.ipv6         { background: #5f1e1e; color: #f07d7d; }
+.observable-badge.email        { background: #5f4a1e; color: #f0c87d; }
+.observable-badge.sha256,
+.observable-badge.sha1,
+.observable-badge.md5          { background: #3a3a3a; color: #b0b0b0; }
+.observable-badge.filename     { background: #4a3a1e; color: #f0d87d; }
+.observable-badge.mac          { background: #4a1e5f; color: #c87df0; }
+.observable-badge.cve          { background: #5f1e4a; color: #f07dc8; }
 
 .observable-row {
     display: flex;
@@ -2834,7 +2843,7 @@ let cachedGeoPoints = null;
 const SEVERITY_ORDER = { critical: 1, high: 2, medium: 3, low: 4, info: 5 };
 const TRIAGE_STATUSES = ['open', 'acknowledged', 'closed'];
 const PRIORITIES = ['critical', 'high', 'medium', 'low'];
-const OBSERVABLE_TYPES = ['hostname', 'source_ip', 'destination_ip', 'url', 'domain', 'user_account'];
+const OBSERVABLE_TYPES = ['hostname', 'source_ip', 'destination_ip', 'url', 'domain', 'user_account', 'ipv4', 'ipv6', 'email', 'sha256', 'sha1', 'md5', 'filename', 'mac', 'cve'];
 
 // MITRE ATT&CK Tactics (in kill chain order)
 const MITRE_TACTICS = [
@@ -8081,10 +8090,17 @@ async function contextMenuAction(action, value) {
 
 async function quickAssignToMe(alertId) {
     try {
+        const payload = {};
+        if (assignmentUsersSource === 'elasticsearch') {
+            // Use the current user's display name for ES assignment
+            payload.assigned_to_name = currentUserData?.display_name || currentUserData?.username || '';
+        } else {
+            payload.assigned_to_id = currentUserData?.id || null;
+        }
         const resp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assigned_to_id: currentUserData?.id || null })
+            body: JSON.stringify(payload)
         });
 
         if (!resp.ok) throw new Error('Failed to assign alert');
@@ -8218,7 +8234,18 @@ async function applyBulkAction() {
     };
 
     if (status) payload.status = status;
-    if (assignee) payload.assigned_to_id = assignee === '-1' ? null : parseInt(assignee);
+    if (assignee) {
+        if (assignee === '-1') {
+            // Unassign — clear both fields
+            payload.assigned_to_name = '';
+        } else if (assignmentUsersSource === 'elasticsearch') {
+            // ES user mapping — send name string
+            payload.assigned_to_name = assignee;
+        } else {
+            // ION internal user — send user ID
+            payload.assigned_to_id = parseInt(assignee);
+        }
+    }
     if (priority) payload.priority = priority;
 
     try {
@@ -8497,9 +8524,32 @@ async function confirmAddToCase() {
     }
 }
 
-// Populate bulk assign dropdown with users
+// Populate bulk assign dropdown with users from ES user index (or fallback to ION users)
+let assignmentUsersSource = 'ion';  // 'elasticsearch' or 'ion'
+let esAssignmentUsers = [];  // Cache ES users for reuse
+
 async function loadBulkAssignOptions() {
     try {
+        // Try ES user index first
+        const esResp = await fetch('/api/elasticsearch/assignment_users');
+        if (esResp.ok) {
+            const esData = await esResp.json();
+            if (esData.configured && esData.users && esData.users.length > 0) {
+                assignmentUsersSource = 'elasticsearch';
+                esAssignmentUsers = esData.users;
+                const select = document.getElementById('bulk-assign');
+                esData.users.forEach(u => {
+                    const opt = document.createElement('option');
+                    opt.value = u.value;
+                    opt.textContent = u.name;
+                    select.appendChild(opt);
+                });
+                return;
+            }
+        }
+
+        // Fallback: ION internal users
+        assignmentUsersSource = 'ion';
         const resp = await fetch('/api/chat/users');
         if (!resp.ok) return;
         const data = await resp.json();

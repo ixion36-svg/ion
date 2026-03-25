@@ -19,9 +19,21 @@
         </div>
 
         <div id="form-tab" class="tab-content active">
-            <h3>Fill in the Sections</h3>
+            <h3>Template Variables</h3>
             <div id="variables-form" class="variables-form">
                 <p class="loading">Loading template variables...</p>
+            </div>
+
+            <div id="sections-area" style="display:none;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin:1.5rem 0 0.75rem;">
+                    <h3 style="margin:0;">Document Sections</h3>
+                    <div style="display:flex;gap:0.5rem;">
+                        <button type="button" class="btn btn-sm" id="expand-all-btn" title="Expand all sections">Expand All</button>
+                        <button type="button" class="btn btn-sm" id="collapse-all-btn" title="Collapse all sections">Collapse All</button>
+                    </div>
+                </div>
+                <p class="muted" style="margin:-0.5rem 0 0.75rem;font-size:0.8rem;">Click any section to expand it. Use the Edit tab to modify content before saving.</p>
+                <div id="section-cards"></div>
             </div>
         </div>
 
@@ -40,7 +52,7 @@
     </div>
 
     <div class="render-output">
-        <h3>Output Preview</h3>
+        <h3 style="margin-bottom:0.5rem;">Output Preview</h3>
         <div id="output-container" class="output-box">
             <p class="muted">Fill in the fields and click "Preview" to see the rendered output</p>
         </div>
@@ -82,6 +94,36 @@
         </div>
     </div>
 </div>
+<style>
+.se-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:0.75rem;overflow:hidden;transition:border-color .2s}
+.se-card.se-editing{border-color:var(--primary)}
+.se-header{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 1rem;cursor:pointer;user-select:none;gap:0.5rem}
+.se-header:hover{background:var(--bg-secondary)}
+.se-title{font-weight:600;font-size:0.9rem;color:var(--text-primary);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.se-num{background:var(--primary-dim);color:var(--primary);font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:var(--radius);min-width:1.8rem;text-align:center;flex-shrink:0}
+.se-chevron{color:var(--text-muted);transition:transform .2s;flex-shrink:0}
+.se-card.se-open .se-chevron{transform:rotate(180deg)}
+.se-body{display:none;border-top:1px solid var(--border)}
+.se-card.se-open .se-body{display:block}
+.se-edit-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;padding:0.1rem 0.4rem;border-radius:var(--radius);transition:all .15s;flex-shrink:0}
+.se-edit-btn:hover{color:var(--primary);background:var(--primary-dim)}
+.se-card.se-editing .se-edit-btn{color:var(--primary)}
+.se-rendered{padding:1rem;max-height:600px;overflow-y:auto}
+.se-rendered table{width:100%;border-collapse:collapse;font-size:0.82rem;margin:0.5rem 0}
+.se-rendered th,.se-rendered td{padding:0.35rem 0.6rem;border:1px solid var(--border);text-align:left}
+.se-rendered th{background:var(--bg-secondary);font-weight:600;white-space:nowrap}
+.se-rendered h3,.se-rendered h4{margin:0.8rem 0 0.4rem;color:var(--primary)}
+.se-rendered p{margin:0.3rem 0;line-height:1.5}
+.se-rendered ul,.se-rendered ol{padding-left:1.5rem;margin:0.3rem 0}
+.se-edit-area{display:none;padding:0.75rem}
+.se-edit-area textarea{width:100%;min-height:200px;max-height:600px;resize:vertical;font-family:var(--font-mono,'Consolas','Monaco',monospace);font-size:0.82rem;line-height:1.5;background:var(--bg-deep);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;tab-size:4}
+.se-edit-area textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-dim)}
+.se-meta-header{padding:0}
+.se-meta-header .se-rendered{padding:1rem}
+.se-meta-header .rendered-content{font-size:0.85rem}
+#sections-area{border-top:2px solid var(--border);padding-top:1rem;margin-top:1rem}
+.btn-sm{padding:0.25rem 0.6rem;font-size:0.75rem}
+</style>
 {% endblock %}
 
 {% block scripts %}
@@ -116,6 +158,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         buildVariablesForm(templateVariables, varsData.defined);
         autoFillDefaults();
+
+        // Auto-load sections into form view
+        await loadSections();
     } catch (e) {
         showToast('Failed to load template', 'error');
     }
@@ -220,6 +265,11 @@ function detectFieldType(varName) {
 function buildInputForField(varName, fieldType, meta) {
     const placeholder = meta.default_value || 'Enter ' + formatLabel(varName).toLowerCase() + '...';
 
+    // If variable definition has options array, always render as select
+    if (meta.options && Array.isArray(meta.options) && meta.options.length > 0) {
+        return buildOptionsSelect(varName, meta.options, meta.default_value);
+    }
+
     switch (fieldType.inputType) {
         case 'date':
             return '<input type="date" id="var-' + varName + '" name="' + varName + '" class="variable-input">';
@@ -236,6 +286,18 @@ function buildInputForField(varName, fieldType, meta) {
         default:
             return '<input type="text" id="var-' + varName + '" name="' + varName + '" placeholder="' + escapeHtml(placeholder) + '" class="variable-input">';
     }
+}
+
+function buildOptionsSelect(varName, options, defaultVal) {
+    const label = formatLabel(varName);
+    let html = '<select id="var-' + varName + '" name="' + varName + '" class="variable-input">';
+    html += '<option value="">-- Select ' + escapeHtml(label) + ' --</option>';
+    options.forEach(function(opt) {
+        const selected = (opt === defaultVal) ? ' selected' : '';
+        html += '<option value="' + escapeHtml(opt) + '"' + selected + '>' + escapeHtml(opt) + '</option>';
+    });
+    html += '</select>';
+    return html;
 }
 
 function buildSelectField(varName, type) {
@@ -448,6 +510,138 @@ document.getElementById('render-btn').addEventListener('click', async () => {
     }
 });
 
+// ---------- Section editing (in form view) ----------
+let renderedSections = [];   // [{title, num, md, html}]
+let lastRenderedMarkdown = '';
+let sectionsLoaded = false;
+
+function splitMarkdownSections(md) {
+    const parts = [];
+    const lines = md.split('\n');
+    let current = { title: 'Document Header', num: '', lines: [] };
+
+    for (let i = 0; i < lines.length; i++) {
+        const m = lines[i].match(/^## (\d+)\.\s+(.+)/);
+        if (m) {
+            parts.push(current);
+            current = { title: m[2].trim(), num: m[1], lines: [lines[i]] };
+        } else {
+            current.lines.push(lines[i]);
+        }
+    }
+    parts.push(current);
+
+    return parts.map(function(p) {
+        const md = p.lines.join('\n').trim();
+        return {
+            title: p.title,
+            num: p.num,
+            md: md,
+            html: (typeof safeMarkdown === 'function') ? safeMarkdown(md) : '<pre>' + escapeHtml(md) + '</pre>'
+        };
+    }).filter(function(s) { return s.md.length > 0; });
+}
+
+function buildSectionCards(sections) {
+    renderedSections = sections;
+    const container = document.getElementById('section-cards');
+    let html = '';
+
+    sections.forEach(function(sec, idx) {
+        const label = sec.num ? ('S' + sec.num) : 'HDR';
+        const isHeader = !sec.num;
+        const openClass = isHeader ? ' se-open' : '';
+        html += '<div class="se-card' + openClass + '" data-idx="' + idx + '">';
+        html += '<div class="se-header" onclick="toggleSection(this)">';
+        html += '<span class="se-num">' + label + '</span>';
+        html += '<span class="se-title">' + escapeHtml(sec.title) + '</span>';
+        // Edit pencil icon
+        html += '<button type="button" class="se-edit-btn" onclick="event.stopPropagation();toggleEdit(this)" title="Edit section">&#9998;</button>';
+        html += '<svg class="se-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+        html += '</div>';
+        html += '<div class="se-body">';
+        // Preview (default visible)
+        html += '<div class="se-rendered rendered-content" data-pane="rendered">' + sec.html + '</div>';
+        // Edit textarea (hidden by default)
+        html += '<div class="se-edit-area" data-pane="edit"><textarea data-idx="' + idx + '">' + escapeHtml(sec.md) + '</textarea></div>';
+        html += '</div></div>';
+    });
+
+    container.innerHTML = html;
+    document.getElementById('sections-area').style.display = 'block';
+    sectionsLoaded = true;
+
+    // Wire up textarea → live preview sync
+    container.querySelectorAll('textarea').forEach(function(ta) {
+        ta.addEventListener('input', function() {
+            const i = parseInt(this.getAttribute('data-idx'));
+            renderedSections[i].md = this.value;
+            const card = this.closest('.se-card');
+            const rendered = card.querySelector('[data-pane="rendered"]');
+            if (rendered) {
+                renderedSections[i].html = safeMarkdown(this.value);
+                rendered.innerHTML = renderedSections[i].html;
+            }
+        });
+    });
+}
+
+function toggleSection(header) {
+    header.closest('.se-card').classList.toggle('se-open');
+}
+
+function toggleEdit(btn) {
+    const card = btn.closest('.se-card');
+    const rendered = card.querySelector('[data-pane="rendered"]');
+    const edit = card.querySelector('[data-pane="edit"]');
+    const isEditing = card.classList.toggle('se-editing');
+
+    // Ensure card is open
+    if (!card.classList.contains('se-open')) card.classList.add('se-open');
+
+    if (isEditing) {
+        if (rendered) rendered.style.display = 'none';
+        if (edit) {
+            edit.style.display = 'block';
+            const ta = edit.querySelector('textarea');
+            if (ta) {
+                ta.style.height = 'auto';
+                ta.style.height = Math.min(Math.max(ta.scrollHeight, 200), 600) + 'px';
+                ta.focus();
+            }
+        }
+    } else {
+        if (rendered) rendered.style.display = 'block';
+        if (edit) edit.style.display = 'none';
+    }
+}
+
+function getAssembledMarkdown() {
+    if (!renderedSections.length) return lastRenderedMarkdown;
+    return renderedSections.map(function(s) { return s.md; }).join('\n\n');
+}
+
+// Expand / Collapse all
+document.getElementById('expand-all-btn').addEventListener('click', function() {
+    document.querySelectorAll('#section-cards .se-card').forEach(function(c) { c.classList.add('se-open'); });
+});
+document.getElementById('collapse-all-btn').addEventListener('click', function() {
+    document.querySelectorAll('#section-cards .se-card').forEach(function(c) { c.classList.remove('se-open'); });
+});
+
+async function loadSections() {
+    const data = getFormData();
+    try {
+        const result = await api.post('/api/templates/' + templateId + '/preview', { data: data });
+        lastRenderedMarkdown = result.rendered || '';
+        const sections = splitMarkdownSections(result.rendered);
+        buildSectionCards(sections);
+    } catch (e) {
+        document.getElementById('section-cards').innerHTML = '<p class="muted">Could not load sections. Click Preview to try again.</p>';
+        document.getElementById('sections-area').style.display = 'block';
+    }
+}
+
 async function renderTemplate(save, documentName) {
     const activeTab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
     let data;
@@ -465,19 +659,30 @@ async function renderTemplate(save, documentName) {
 
     try {
         let result;
-        if (save) {
+        if (save && sectionsLoaded && renderedSections.length) {
+            // Always use assembled markdown from section cards when saving
+            const assembled = getAssembledMarkdown();
+            result = await api.post('/api/templates/' + templateId + '/render?document_name=' + encodeURIComponent(documentName), { data: data, content_override: assembled });
+            showToast('Document saved (ID: ' + result.document_id + ')', 'success');
+        } else if (save) {
             result = await api.post('/api/templates/' + templateId + '/render?document_name=' + encodeURIComponent(documentName), { data: data });
             showToast('Document saved (ID: ' + result.document_id + ')', 'success');
         } else {
             result = await api.post('/api/templates/' + templateId + '/preview', { data: data });
         }
 
-        // Render markdown in preview
+        lastRenderedMarkdown = result.rendered || '';
+
+        // Update output preview
         if (typeof marked !== 'undefined' && templateInfo && templateInfo.format === 'markdown') {
             document.getElementById('output-container').innerHTML = '<div class="rendered-content">' + safeMarkdown(result.rendered) + '</div>';
         } else {
             document.getElementById('output-container').innerHTML = '<pre class="rendered-output">' + escapeHtml(result.rendered) + '</pre>';
         }
+
+        // Refresh section cards in form view
+        const sections = splitMarkdownSections(result.rendered);
+        buildSectionCards(sections);
     } catch (e) {
         showToast(e.message || 'Render failed', 'error');
         document.getElementById('output-container').innerHTML = '<p class="error">' + escapeHtml(e.message || 'Render failed') + '</p>';

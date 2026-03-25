@@ -162,6 +162,7 @@ class TemplateRepository:
         required: bool = True,
         default_value: str | None = None,
         description: str | None = None,
+        options: str | None = None,
     ) -> Variable:
         """Add a variable to a template."""
         variable = Variable(
@@ -171,6 +172,7 @@ class TemplateRepository:
             required=required,
             default_value=default_value,
             description=description,
+            options=options,
         )
         self.session.add(variable)
         self.session.flush()

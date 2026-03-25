@@ -343,6 +343,10 @@
 .role-card.t2 .card-fw { color: #60a5fa; }
 .role-card.t3 .card-fw { color: #a78bfa; }
 .role-card.t4 .card-fw { color: #fb923c; }
+.role-card .card-mod {
+    font-size: 0.44rem; text-transform: uppercase; letter-spacing: 0.02em;
+    font-weight: 600; margin-top: 0.1rem; opacity: 0.6; color: #fbbf24; line-height: 1.3;
+}
 /* Framework tag in pathway steps */
 .pathway-step .step-fw {
     display: block;
@@ -818,6 +822,21 @@
 }
 
 /* =========================================================================
+   MOD — Shared styles for military role detail overlay
+   ========================================================================= */
+.mod-unit-badge {
+    font-size: 0.6rem; background: var(--primary-dim); border: 1px solid var(--border);
+    padding: 0.12rem 0.5rem; border-radius: 999px; color: var(--text-secondary);
+    display: inline-block;
+}
+.mod-detail-units { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
+.mod-detail-pills { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem; }
+.mod-detail-pill {
+    font-size: 0.65rem; background: var(--primary-dim); border: 1px solid var(--border);
+    padding: 0.15rem 0.5rem; border-radius: 999px; color: var(--text-secondary);
+}
+
+/* =========================================================================
    Tab System
    ========================================================================= */
 .training-tabs {
@@ -827,7 +846,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
-    max-width: 750px;
+    max-width: 860px;
     margin-left: auto;
     margin-right: auto;
 }
@@ -3188,6 +3207,7 @@
 </div>
 
 
+
 <script>
 // =========================================================================
 // Role Data (15 roles — expanded with experience, prerequisites,
@@ -4001,15 +4021,667 @@ const SHORT_NAMES = {
 };
 
 // =========================================================================
+// MOD — British Army Cyber Career Framework
+// =========================================================================
+const MOD_ROLES = {
+    // ====== SOLDIER TRACK (Other Ranks) ======
+    'mod-or1': {
+        title: 'Signaller (Trainee)',
+        track: 'soldier',
+        nato: 'OR-1/2',
+        armyRank: 'Private / Signaller',
+        tradeClass: 'Phase 1 + 2 Trainee',
+        sfia: '1-2',
+        sfiaNum: 1.5,
+        vetting: 'CTC',
+        csGrade: 'AA / AO',
+        ukcsc: '-',
+        description: 'Phase 1 basic military training followed by Phase 2 trade training at the Royal School of Signals, Blandford. Learns fundamental signals, networking, and introductory cyber concepts. Achieves Class 3 trade qualification and Level 3 Cyber Technician Apprenticeship on completion.',
+        dcaCourses: ['Cyber 101'],
+        aldp: [],
+        units: ['AFC Harrogate', '11 Sig Regt (RSS Blandford)', 'ITC Catterick'],
+        certs: [
+            { name: 'CompTIA IT Fundamentals+', provider: 'CompTIA', price: 130, difficulty: 'beginner' },
+        ],
+        skills: ['Basic Networking', 'Signals Equipment', 'Radio Procedures', 'Basic IT', 'Windows/Linux Fundamentals'],
+        responsibilities: [
+            'Complete Phase 1 basic military training',
+            'Complete Phase 2 trade training (Combat Cyber Operator)',
+            'Achieve Class 3 trade qualification',
+            'Learn fundamental signals and communications',
+            'Support section-level tasks under close supervision',
+        ],
+        prerequisites: [
+            'British citizen or eligible Commonwealth national',
+            'Minimum 3 GCSEs grade 4/C (Maths, Science, English)',
+            'BARB score meeting Royal Signals threshold',
+            'Basic fitness: ACFT pass',
+        ],
+        subspecializations: ['Comms Operator', 'Trainee Cyber Operator'],
+        pathways: [],
+    },
+    'mod-or3': {
+        title: 'LCpl \u2014 Class 2 Cyber Op',
+        track: 'soldier',
+        nato: 'OR-3',
+        armyRank: 'Lance Corporal',
+        tradeClass: 'Class 2',
+        sfia: '2-3',
+        sfiaNum: 2.5,
+        vetting: 'SC',
+        csGrade: 'AO / EO',
+        ukcsc: 'Associate',
+        description: 'First leadership appointment. Class 2 trade qualified after upgrade course \u2014 operates independently on cyber tasks. Supports SOC-equivalent functions within a cyber section. First posting typically to 13 Signal Regiment.',
+        dcaCourses: ['Cyber 101', 'Foundation Module 0', 'Foundation Modules 1-3'],
+        aldp: ['LCpl ALDP (10 days)'],
+        units: ['13 Sig Regt', '224 Sig Sqn'],
+        certs: [
+            { name: 'CompTIA Security+', provider: 'CompTIA', price: 330, difficulty: 'beginner' },
+        ],
+        skills: ['Alert Triage', 'Log Review', 'Network Monitoring', 'SIEM Basics', 'Basic Scripting', 'Signals Equipment'],
+        responsibilities: [
+            'Monitor and triage security alerts',
+            'Operate defensive cyber tools under supervision',
+            'Maintain shift logs and handover notes',
+            'Support senior operators during incident response',
+            'Lead small teams in field signals tasks',
+        ],
+        prerequisites: [
+            'Class 3 trade qualification',
+            'LCpl ALDP completion',
+            'SC clearance obtained',
+            '~1 year operational experience',
+        ],
+        subspecializations: ['SOC Operator', 'Network Monitor', 'Signals Specialist'],
+        pathways: [
+            { name: 'Standard', steps: ['mod-or1', 'mod-or3'] },
+        ],
+    },
+    'mod-or4': {
+        title: 'Cpl \u2014 Class 1 Cyber Op',
+        track: 'soldier',
+        nato: 'OR-4',
+        armyRank: 'Corporal',
+        tradeClass: 'Class 1 / Team 2IC',
+        sfia: '3',
+        sfiaNum: 3,
+        vetting: 'SC',
+        csGrade: 'EO',
+        ukcsc: 'Associate',
+        description: 'Class 1 trade qualified \u2014 the backbone of Army cyber capability. Acts as team second-in-command. Qualified to conduct defensive cyber operations independently and mentor junior operators. First rank eligible for CyDE lateral entry.',
+        dcaCourses: ['Foundation Modules 0-6', 'DC1 (Defence Cyber Analyst)'],
+        aldp: ['Cpl ALDP (7 days)'],
+        units: ['13 Sig Regt', '224 Sig Sqn', 'ACyISOC / 233 Sig Sqn'],
+        certs: [
+            { name: 'CompTIA Security+', provider: 'CompTIA', price: 330, difficulty: 'beginner' },
+            { name: 'CompTIA CySA+', provider: 'CompTIA', price: 392, difficulty: 'intermediate' },
+            { name: 'BTL1', provider: 'Security Blue Team', price: 400, difficulty: 'intermediate' },
+        ],
+        skills: ['SIEM Operations', 'Alert Triage', 'Log Analysis', 'Packet Analysis', 'Basic Scripting', 'Incident Response Basics', 'MITRE ATT&CK', 'Network Defence'],
+        responsibilities: [
+            'Conduct independent cyber defence operations',
+            'Mentor and supervise Class 2/3 operators',
+            'Act as team 2IC during shift operations',
+            'Perform detailed log and PCAP analysis',
+            'Contribute to incident reports and after-action reviews',
+            'Maintain operational security tools and configurations',
+        ],
+        prerequisites: [
+            'Class 2 trade qualification',
+            'Cpl ALDP completion',
+            '~2 years operational experience',
+            'DC1 (Defence Cyber Analyst) course',
+        ],
+        subspecializations: ['Cyber Defence Operator', 'SOC Analyst', 'Network Defender'],
+        pathways: [
+            { name: 'Standard', steps: ['mod-or1', 'mod-or3', 'mod-or4'] },
+        ],
+    },
+    'mod-or5': {
+        title: 'Sgt \u2014 Cyber Team Leader',
+        track: 'soldier',
+        nato: 'OR-5',
+        armyRank: 'Sergeant',
+        tradeClass: 'Cyber Team Leader',
+        sfia: '4',
+        sfiaNum: 4,
+        vetting: 'DV',
+        csGrade: 'HEO',
+        ukcsc: 'Practitioner',
+        description: 'Commands a cyber team or SOC shift. Responsible for operational output, team welfare, and first-line management. Qualified for deployable Cyber Protection Team roles. DV cleared for sensitive operations including NCF tasking.',
+        dcaCourses: ['DC1', 'Foundation Modules 0-6', 'Specialist electives'],
+        aldp: ['Sgt ALDP (7 days)'],
+        units: ['13 Sig Regt', '224 Sig Sqn (CPTs)', 'NCF Samlesbury'],
+        certs: [
+            { name: 'CompTIA CySA+', provider: 'CompTIA', price: 392, difficulty: 'intermediate' },
+            { name: 'BTL1', provider: 'Security Blue Team', price: 400, difficulty: 'intermediate' },
+            { name: 'GCIH', provider: 'GIAC / SANS', price: 7900, difficulty: 'advanced' },
+        ],
+        skills: ['Team Leadership', 'Incident Management', 'Advanced SIEM', 'Threat Hunting Basics', 'Detection Engineering', 'Briefing & Reporting', 'Operational Planning', 'Mentoring'],
+        responsibilities: [
+            'Command cyber team / SOC shift operations',
+            'Brief and debrief operational activities',
+            'Manage team training and development',
+            'Lead incident containment and response',
+            'Coordinate with higher formation staff',
+            'Deployable CPT team leader role',
+        ],
+        prerequisites: [
+            'Class 1 trade qualification',
+            'Sgt ALDP completion',
+            'DV clearance',
+            '~4-6 years total service',
+            'Recommended: DC1 course',
+        ],
+        subspecializations: ['CPT Team Leader', 'SOC Shift Lead', 'NCF Operator'],
+        pathways: [
+            { name: 'Standard', steps: ['mod-or1', 'mod-or3', 'mod-or4', 'mod-or5'] },
+        ],
+    },
+    'mod-or6': {
+        title: 'SSgt \u2014 Senior Cyber Analyst',
+        track: 'soldier',
+        nato: 'OR-6',
+        armyRank: 'Staff Sergeant',
+        tradeClass: 'Senior Analyst / Section Leader',
+        sfia: '4-5',
+        sfiaNum: 4.5,
+        vetting: 'DV',
+        csGrade: 'SEO',
+        ukcsc: 'Practitioner',
+        description: 'Senior technical authority at sub-unit level. Manages multiple cyber teams or a specialist section. Provides technical oversight, quality assurance on intelligence products, and mentors junior NCOs. May serve as Foreman of Signals (FofS) or Yeoman of Signals (YofS) equivalent in cyber.',
+        dcaCourses: ['DC1+', 'MSc pathway modules', 'Specialist courses'],
+        aldp: [],
+        units: ['13 Sig Regt', 'NCF Samlesbury', '1 Sig Bde HQ'],
+        certs: [
+            { name: 'GCIH', provider: 'GIAC / SANS', price: 7900, difficulty: 'advanced' },
+            { name: 'BTL2', provider: 'Security Blue Team', price: 400, difficulty: 'advanced' },
+            { name: 'GCTI', provider: 'GIAC / SANS', price: 7900, difficulty: 'advanced' },
+        ],
+        skills: ['Technical Leadership', 'Advanced Threat Hunting', 'Detection Engineering', 'Malware Triage', 'Intelligence Production', 'Training Delivery', 'Quality Assurance', 'Stakeholder Management'],
+        responsibilities: [
+            'Technical oversight of multiple cyber teams',
+            'Quality assure intelligence and incident reports',
+            'Develop and deliver specialist training',
+            'Manage section-level operations and tasking',
+            'Advise OC on technical matters',
+            'Coordinate with external agencies (NCSC, NCF)',
+        ],
+        prerequisites: [
+            'Successful Sgt tour',
+            'DV clearance maintained',
+            'Demonstrated technical depth',
+            '~8-10 years total service',
+        ],
+        subspecializations: ['Foreman of Signals (Cyber)', 'Senior Threat Analyst', 'Training SNCO'],
+        pathways: [
+            { name: 'Standard', steps: ['mod-or1', 'mod-or3', 'mod-or4', 'mod-or5', 'mod-or6'] },
+        ],
+    },
+    'mod-or7': {
+        title: 'WO2 \u2014 Cyber Ops Manager',
+        track: 'soldier',
+        nato: 'OR-7',
+        armyRank: 'Warrant Officer Class 2',
+        tradeClass: 'Cyber Operations Manager',
+        sfia: '5',
+        sfiaNum: 5,
+        vetting: 'DV',
+        csGrade: 'SEO / G7',
+        ukcsc: 'Principal',
+        description: 'Sub-unit operations manager and senior technical advisor. Manages all cyber operations within a squadron-level element. Responsible for operational planning, capability development, and personnel management. Bridge between technical delivery and command chain.',
+        dcaCourses: ['MSc pathway', 'Strategic/specialist courses'],
+        aldp: [],
+        units: ['NCF Samlesbury', '13 Sig Regt', 'Army Cyber HQ'],
+        certs: [
+            { name: 'CISSP', provider: 'ISC2', price: 610, difficulty: 'expert' },
+            { name: 'GIAC GSOM', provider: 'GIAC / SANS', price: 7900, difficulty: 'expert' },
+        ],
+        skills: ['Operations Management', 'Capability Planning', 'Risk Management', 'Strategic Briefing', 'Personnel Management', 'Budget Awareness', 'Cross-Agency Coordination', 'Doctrine Development'],
+        responsibilities: [
+            'Manage squadron-level cyber operations',
+            'Operational planning and capability development',
+            'Senior advisor to Officer Commanding',
+            'Personnel management and career development for NCOs',
+            'Cross-formation coordination and liaison',
+            'Contribute to cyber doctrine and policy',
+        ],
+        prerequisites: [
+            'Successful SSgt tour',
+            'DV clearance maintained',
+            'Board selection for WO2',
+            '~12-15 years total service',
+        ],
+        subspecializations: ['Ops Manager', 'Capability Planner', 'NCF Senior Operator'],
+        pathways: [
+            { name: 'Standard', steps: ['mod-or1', 'mod-or3', 'mod-or4', 'mod-or5', 'mod-or6', 'mod-or7'] },
+        ],
+    },
+    'mod-or89': {
+        title: 'WO1 / Conductor',
+        track: 'soldier',
+        nato: 'OR-8/9',
+        armyRank: 'Warrant Officer Class 1',
+        tradeClass: 'Senior Technical Authority',
+        sfia: '5-6',
+        sfiaNum: 5.5,
+        vetting: 'eDV',
+        csGrade: 'G7',
+        ukcsc: 'Principal',
+        description: 'Most senior soldier rank. Regimental or Corps-level technical authority on cyber matters. Advises Commanding Officers and formation staff. The Conductor appointment (unique to Royal Signals and REME) is the pinnacle of the soldier career and carries significant strategic influence.',
+        dcaCourses: ['MSc Cyber Defence', 'Strategic leadership courses'],
+        aldp: [],
+        units: ['NCF', 'Army HQ', '1 Sig Bde', 'CSOC HQ'],
+        certs: [
+            { name: 'CISSP', provider: 'ISC2', price: 610, difficulty: 'expert' },
+            { name: 'SABSA', provider: 'SABSA Institute', price: 3500, difficulty: 'expert' },
+        ],
+        skills: ['Strategic Advice', 'Doctrine Development', 'Organisational Leadership', 'Policy Influence', 'Cross-Government Liaison', 'Capability Advocacy', 'Risk Governance', 'Senior Mentoring'],
+        responsibilities: [
+            'Corps-level technical authority for cyber',
+            'Strategic advice to CO and formation commanders',
+            'Shape cyber doctrine and policy at Army/Defence level',
+            'Represent Army cyber at cross-government forums',
+            'Senior mentor for all cyber NCOs and WOs',
+            'Capability advocacy and strategic planning',
+        ],
+        prerequisites: [
+            'Successful WO2 tour',
+            'Board selection for WO1',
+            'eDV clearance',
+            '~18-22+ years total service',
+        ],
+        subspecializations: ['RSM (Cyber)', 'Conductor', 'Strategic Advisor'],
+        pathways: [
+            { name: 'Full Soldier', steps: ['mod-or1', 'mod-or3', 'mod-or4', 'mod-or5', 'mod-or6', 'mod-or7', 'mod-or89'] },
+        ],
+    },
+
+    // ====== OFFICER TRACK ======
+    'mod-of1': {
+        title: '2Lt / Lt \u2014 Troop Commander',
+        track: 'officer',
+        nato: 'OF-1',
+        armyRank: 'Second Lieutenant / Lieutenant',
+        tradeClass: 'Troop Commander / Jr Cyber Planner',
+        sfia: '3-4',
+        sfiaNum: 3.5,
+        vetting: 'SC',
+        csGrade: 'EO / HEO',
+        ukcsc: 'Associate',
+        description: 'First commissioned appointment after RMAS (Sandhurst). Commands a troop of ~30 soldiers in 13 Signal Regiment. Learns the craft of command while developing technical awareness of cyber operations. Completes JOTAC as prerequisite for Captain.',
+        dcaCourses: ['Cyber 101', 'Foundation Module 0', 'Foundation Modules 1-3'],
+        aldp: ['RMAS (44 weeks)', 'JOTAC (4 weeks)'],
+        units: ['13 Sig Regt', '224 Sig Sqn'],
+        certs: [
+            { name: 'CompTIA Security+', provider: 'CompTIA', price: 330, difficulty: 'beginner' },
+        ],
+        skills: ['Troop Command', 'Operational Planning', 'Brief Writing', 'Basic Cyber Awareness', 'Personnel Management', 'Signals Procedures'],
+        responsibilities: [
+            'Command a troop of ~30 soldiers',
+            'Plan and execute troop-level tasks',
+            'Welfare and administration of soldiers',
+            'Develop understanding of cyber operations',
+            'Brief chain of command on troop activities',
+            'Complete JOTAC for Captain eligibility',
+        ],
+        prerequisites: [
+            'RMAS Commissioning Course (44 weeks)',
+            'SC clearance',
+            'Selection for Royal Signals',
+        ],
+        subspecializations: ['Troop Commander', 'Adjutant (junior)', 'Junior Staff Officer'],
+        pathways: [],
+    },
+    'mod-of2': {
+        title: 'Capt \u2014 CPT Commander',
+        track: 'officer',
+        nato: 'OF-2',
+        armyRank: 'Captain',
+        tradeClass: 'Cyber Protection Team Commander',
+        sfia: '4-5',
+        sfiaNum: 4.5,
+        vetting: 'DV',
+        csGrade: 'HEO / SEO',
+        ukcsc: 'Practitioner',
+        description: 'Commands a Cyber Protection Team (CPT) or serves as a staff officer. DV cleared for sensitive operations. Leads deployable cyber teams providing defensive cyber support to formations. Completes MK courses as prerequisite for Major.',
+        dcaCourses: ['DC1', 'Foundation Modules 0-6', 'Specialist electives'],
+        aldp: ['MK 1-3 (distance learning)'],
+        units: ['13 Sig Regt', '224 Sig Sqn (CPTs)', 'ACyISOC / 233 Sig Sqn'],
+        certs: [
+            { name: 'CompTIA CySA+', provider: 'CompTIA', price: 392, difficulty: 'intermediate' },
+            { name: 'GCIH', provider: 'GIAC / SANS', price: 7900, difficulty: 'advanced' },
+        ],
+        skills: ['Team Command', 'Incident Management', 'Operational Planning', 'Threat Briefing', 'Stakeholder Management', 'Technical Assessment', 'Resource Coordination'],
+        responsibilities: [
+            'Command Cyber Protection Team (8-12 personnel)',
+            'Plan and lead deployable cyber operations',
+            'Incident command during cyber events',
+            'Liaise with formation G6/J6 staff',
+            'Produce operational threat assessments',
+            'Manage team training and readiness',
+        ],
+        prerequisites: [
+            'JOTAC completion',
+            'DV clearance',
+            '~3-5 years commissioned service',
+            'MK modules for Major eligibility',
+        ],
+        subspecializations: ['CPT Commander', 'Ops Officer', 'Staff Officer (Cyber)', 'SO3 Cyber'],
+        pathways: [
+            { name: 'Standard', steps: ['mod-of1', 'mod-of2'] },
+        ],
+    },
+    'mod-of3': {
+        title: 'Maj \u2014 Sqn OC / Cyber Planner',
+        track: 'officer',
+        nato: 'OF-3',
+        armyRank: 'Major',
+        tradeClass: 'Squadron OC / Cyber Ops Planner',
+        sfia: '5-6',
+        sfiaNum: 5.5,
+        vetting: 'DV',
+        csGrade: 'G7',
+        ukcsc: 'Principal',
+        description: 'Commands a squadron (~120 personnel) or serves as a senior staff officer in cyber planning. Completes ICSC(L) at the Joint Services Command and Staff College, Shrivenham. Shapes operational cyber plans at formation level. Key decision-maker for cyber capability employment.',
+        dcaCourses: ['DC1+', 'MSc Cyber Defence pathway'],
+        aldp: ['CWC (8 weeks)', 'ICSC(L) (30 weeks)'],
+        units: ['13 Sig Regt', 'NCF', 'PJHQ', 'CSOC HQ'],
+        certs: [
+            { name: 'CISSP', provider: 'ISC2', price: 610, difficulty: 'expert' },
+            { name: 'CISM', provider: 'ISACA', price: 575, difficulty: 'advanced' },
+        ],
+        skills: ['Squadron Command', 'Strategic Planning', 'Capability Management', 'Joint Operations', 'Risk Assessment', 'Budgeting', 'Cross-Govt Coordination', 'Policy Development'],
+        responsibilities: [
+            'Command a cyber squadron (~120 personnel)',
+            'Develop operational cyber plans at formation level',
+            'Manage squadron budget and resources',
+            'Brief senior commanders on cyber posture',
+            'Coordinate with NCSC, NCF, and allied partners',
+            'Shape unit training programme and operational readiness',
+        ],
+        prerequisites: [
+            'CWC completion',
+            'ICSC(L) at JSCSC Shrivenham',
+            'DV clearance maintained',
+            '~8-12 years commissioned service',
+        ],
+        subspecializations: ['Squadron OC', 'SO2 Cyber Plans', 'NCF Operations', 'Capability Manager'],
+        pathways: [
+            { name: 'Standard', steps: ['mod-of1', 'mod-of2', 'mod-of3'] },
+        ],
+    },
+    'mod-of4': {
+        title: 'Lt Col \u2014 CO / Senior Staff',
+        track: 'officer',
+        nato: 'OF-4',
+        armyRank: 'Lieutenant Colonel',
+        tradeClass: 'Commanding Officer / Staff Officer',
+        sfia: '6',
+        sfiaNum: 6,
+        vetting: 'eDV',
+        csGrade: 'G6',
+        ukcsc: 'Chartered',
+        description: 'Commands a regiment (e.g., 13 Signal Regiment, ~650 personnel) or serves as a senior staff officer at Army/Defence level. Completes ACSC. Sets unit strategy, manages significant budgets, and represents Army cyber at Defence and inter-agency forums.',
+        dcaCourses: ['MSc Cyber Defence'],
+        aldp: ['ACSC (46 weeks)'],
+        units: ['13 Sig Regt (CO)', 'Army HQ', 'NCSC', 'CSOC HQ'],
+        certs: [
+            { name: 'CISSP', provider: 'ISC2', price: 610, difficulty: 'expert' },
+        ],
+        skills: ['Regimental Command', 'Strategy Development', 'Defence Engagement', 'Budget Management', 'Organisational Design', 'Crisis Leadership', 'Alliance Coordination', 'Governance'],
+        responsibilities: [
+            'Command a regiment (~650 personnel)',
+            'Set unit strategic direction and priorities',
+            'Manage regimental budget and resources',
+            'Represent Army cyber at Defence/inter-agency level',
+            'Lead organisational change and capability development',
+            'Accountable for operational output and readiness',
+        ],
+        prerequisites: [
+            'ACSC completion',
+            'eDV clearance',
+            'Board selection for command',
+            '~16-18 years commissioned service',
+        ],
+        subspecializations: ['Commanding Officer', 'SO1 Cyber', 'Defence Engagement', 'Programme Director'],
+        pathways: [
+            { name: 'Standard', steps: ['mod-of1', 'mod-of2', 'mod-of3', 'mod-of4'] },
+        ],
+    },
+    'mod-of5': {
+        title: 'Col \u2014 Branch Head / Policy',
+        track: 'officer',
+        nato: 'OF-5',
+        armyRank: 'Colonel',
+        tradeClass: 'Branch Head / Cyber Policy Lead',
+        sfia: '6-7',
+        sfiaNum: 6.5,
+        vetting: 'eDV',
+        csGrade: 'G6 / SCS1',
+        ukcsc: 'Chartered',
+        description: 'Branch head or senior policy officer at Army HQ, MOD, or NCSC. Shapes Defence-wide cyber policy, leads capability programmes, and represents UK cyber at NATO and Five Eyes forums. Bridges military operations and political/strategic direction.',
+        dcaCourses: ['Strategic leadership courses'],
+        aldp: ['ACSC/RCDS pathway'],
+        units: ['Army HQ', 'MOD Main Building', 'NCSC', 'NATO'],
+        certs: [],
+        skills: ['Policy Development', 'Strategic Leadership', 'International Engagement', 'Capability Sponsorship', 'Programme Management', 'Ministerial Briefing', 'Alliance Diplomacy'],
+        responsibilities: [
+            'Lead Defence cyber policy development',
+            'Manage major capability programmes',
+            'Brief ministers and senior officials',
+            'Represent UK at NATO and Five Eyes cyber forums',
+            'Shape Defence cyber investment strategy',
+            'Mentor and develop future senior leaders',
+        ],
+        prerequisites: [
+            'Successful regimental command',
+            'eDV clearance maintained',
+            '~20-22 years commissioned service',
+        ],
+        subspecializations: ['Cyber Policy Lead', 'Capability Sponsor', 'NATO Liaison', 'Programme Director'],
+        pathways: [
+            { name: 'Standard', steps: ['mod-of1', 'mod-of2', 'mod-of3', 'mod-of4', 'mod-of5'] },
+        ],
+    },
+    'mod-of6': {
+        title: 'Brig+ \u2014 Strategic Command',
+        track: 'officer',
+        nato: 'OF-6+',
+        armyRank: 'Brigadier / Major General+',
+        tradeClass: 'Formation Commander / Strategic',
+        sfia: '7',
+        sfiaNum: 7,
+        vetting: 'eDV',
+        csGrade: 'SCS1 / SCS2+',
+        ukcsc: 'Chartered',
+        description: 'Formation-level commander or director within CSOC, Army HQ, or MOD. Sets strategic direction for Defence cyber at the highest level. Typically commands 1st Signal Brigade, leads CSOC directorates, or holds Director-level appointments. RCDS graduate.',
+        dcaCourses: ['Strategic / RCDS'],
+        aldp: ['RCDS (45 weeks)'],
+        units: ['1 Sig Bde', 'CSOC HQ Northwood', 'Army HQ', 'MOD'],
+        certs: [],
+        skills: ['Strategic Command', 'Defence Strategy', 'Political Engagement', 'Organisational Transformation', 'International Diplomacy', 'Investment Strategy', 'Senior Governance'],
+        responsibilities: [
+            'Command formation-level cyber capability',
+            'Set Defence cyber strategic direction',
+            'Engage with ministers and senior civil servants',
+            'Lead organisational transformation programmes',
+            'Represent UK at strategic international forums',
+            'Shape long-term Defence cyber investment',
+        ],
+        prerequisites: [
+            'RCDS or equivalent strategic education',
+            'eDV clearance maintained',
+            'Board selection for General Officer',
+            '~25+ years commissioned service',
+        ],
+        subspecializations: ['Brigade Commander', 'Director Cyber', 'CSOC Leadership', 'Strategic Advisor'],
+        pathways: [
+            { name: 'Full Officer', steps: ['mod-of1', 'mod-of2', 'mod-of3', 'mod-of4', 'mod-of5', 'mod-of6'] },
+        ],
+    },
+};
+
+const MOD_SHORT_NAMES = {
+    'mod-or1': 'Sig', 'mod-or3': 'LCpl', 'mod-or4': 'Cpl', 'mod-or5': 'Sgt',
+    'mod-or6': 'SSgt', 'mod-or7': 'WO2', 'mod-or89': 'WO1',
+    'mod-of1': '2Lt/Lt', 'mod-of2': 'Capt', 'mod-of3': 'Maj',
+    'mod-of4': 'Lt Col', 'mod-of5': 'Col', 'mod-of6': 'Brig+',
+};
+
+const MOD_SOLDIER_ORDER = ['mod-or1','mod-or3','mod-or4','mod-or5','mod-or6','mod-or7','mod-or89'];
+const MOD_OFFICER_ORDER = ['mod-of1','mod-of2','mod-of3','mod-of4','mod-of5','mod-of6'];
+
+// =========================================================================
+// SFIA Cross-Reference — primary alignment axis across all employment types
+// Maps SFIA levels to CS grades, contractor equivalents, military ranks, and ION roles
+// =========================================================================
+const SFIA_CROSS_REF = [
+    {
+        sfia: 1, label: 'Follow',
+        ukcsc: '\u2014',
+        cs: 'AA / AO',
+        contractor: 'Junior / Trainee',
+        soldier: [{ id: 'mod-or1', label: 'Sig (OR-1/2)', sub: 'Phase 1+2 Trainee' }],
+        officer: [],
+        roles: [],
+        vetting: 'BPSS / CTC',
+        quals: ['CompTIA ITF+'],
+    },
+    {
+        sfia: 2, label: 'Assist',
+        ukcsc: '\u2014',
+        cs: 'AO / EO',
+        contractor: 'Junior',
+        soldier: [{ id: 'mod-or3', label: 'LCpl (OR-3)', sub: 'Class 2 Cyber Op' }],
+        officer: [],
+        roles: [],
+        vetting: 'SC',
+        quals: ['CompTIA Security+'],
+    },
+    {
+        sfia: 3, label: 'Apply',
+        ukcsc: 'Associate',
+        cs: 'EO',
+        contractor: 'Mid-Level',
+        soldier: [{ id: 'mod-or4', label: 'Cpl (OR-4)', sub: 'Class 1 / Team 2IC' }],
+        officer: [{ id: 'mod-of1', label: '2Lt / Lt (OF-1)', sub: 'Troop Commander' }],
+        roles: [
+            { id: 'l1-analyst', label: 'L1 SOC Analyst' },
+        ],
+        vetting: 'SC',
+        quals: ['CompTIA Security+', 'CySA+', 'BTL1', 'DC1'],
+    },
+    {
+        sfia: 4, label: 'Enable',
+        ukcsc: 'Practitioner',
+        cs: 'HEO',
+        contractor: 'Senior',
+        soldier: [{ id: 'mod-or5', label: 'Sgt (OR-5)', sub: 'Cyber Team Leader' }],
+        officer: [{ id: 'mod-of2', label: 'Capt (OF-2)', sub: 'CPT Commander' }],
+        roles: [
+            { id: 'l2-analyst', label: 'L2 SOC Analyst' },
+            { id: 'soc-engineer', label: 'SOC Engineer (L1)' },
+        ],
+        vetting: 'SC / DV',
+        quals: ['CySA+', 'GCIH', 'BTL1/2', 'DC1', 'Foundation Modules'],
+    },
+    {
+        sfia: 5, label: 'Ensure, Advise',
+        ukcsc: 'Principal',
+        cs: 'SEO / G7',
+        contractor: 'Lead / Principal',
+        soldier: [
+            { id: 'mod-or6', label: 'SSgt (OR-6)', sub: 'Senior Analyst' },
+            { id: 'mod-or7', label: 'WO2 (OR-7)', sub: 'Cyber Ops Manager' },
+        ],
+        officer: [{ id: 'mod-of3', label: 'Maj (OF-3)', sub: 'Sqn OC / Cyber Planner' }],
+        roles: [
+            { id: 'l3-analyst', label: 'L3 / Senior Analyst' },
+            { id: 'incident-responder', label: 'Incident Responder' },
+            { id: 'threat-hunter', label: 'Threat Hunter' },
+            { id: 'threat-intel', label: 'Threat Intel Analyst' },
+            { id: 'detection-engineer', label: 'Detection Engineer' },
+            { id: 'security-engineer', label: 'Security Engineer' },
+            { id: 'senior-engineer', label: 'Senior Engineer' },
+        ],
+        vetting: 'DV',
+        quals: ['GCIH', 'GCTI', 'CISSP', 'CISM', 'MSc pathway'],
+    },
+    {
+        sfia: 6, label: 'Initiate, Influence',
+        ukcsc: 'Chartered',
+        cs: 'G7 / G6',
+        contractor: 'Director / Head of',
+        soldier: [{ id: 'mod-or89', label: 'WO1 (OR-8/9)', sub: 'Senior Technical Authority' }],
+        officer: [{ id: 'mod-of4', label: 'Lt Col (OF-4)', sub: 'CO / Senior Staff' }],
+        roles: [
+            { id: 'soc-lead', label: 'SOC Lead' },
+            { id: 'malware-analyst', label: 'Malware Analyst' },
+            { id: 'digital-forensics', label: 'Digital Forensics' },
+            { id: 'pen-tester', label: 'Penetration Tester' },
+            { id: 'cloud-security', label: 'Cloud Security' },
+            { id: 'security-architect', label: 'Security Architect' },
+            { id: 'grc', label: 'GRC' },
+            { id: 'siem-architect', label: 'SIEM Architect' },
+        ],
+        vetting: 'DV / eDV',
+        quals: ['CISSP', 'SABSA', 'CISM', 'MSc Cyber Defence', 'ACSC'],
+    },
+    {
+        sfia: 7, label: 'Set Strategy',
+        ukcsc: 'Chartered (Fellow)',
+        cs: 'SCS1 / SCS2+',
+        contractor: 'C-Level / Partner',
+        soldier: [],
+        officer: [
+            { id: 'mod-of5', label: 'Col (OF-5)', sub: 'Branch Head / Policy' },
+            { id: 'mod-of6', label: 'Brig+ (OF-6+)', sub: 'Strategic Command' },
+        ],
+        roles: [],
+        vetting: 'eDV',
+        quals: ['RCDS', 'Strategic leadership'],
+    },
+];
+
+// Reverse lookup: given a civilian role id, find matching MOD equivalents
+function getModEquivalents(roleId) {
+    const role = ROLES[roleId];
+    if (!role) return null;
+    const sfiaLevel = role.sfia;
+    const row = SFIA_CROSS_REF.find(r => r.sfia === sfiaLevel);
+    if (!row) return null;
+    return { sfia: row.sfia, label: row.label, cs: row.cs, soldier: row.soldier, officer: row.officer, vetting: row.vetting };
+}
+
+// Reverse lookup: given a MOD role id, find matching civilian roles
+function getCivilianEquivalents(modRoleId) {
+    const role = MOD_ROLES[modRoleId];
+    if (!role) return null;
+    const sfiaNum = role.sfiaNum;
+    // Find rows where this role's SFIA range overlaps
+    const matches = [];
+    SFIA_CROSS_REF.forEach(row => {
+        if (Math.abs(row.sfia - sfiaNum) <= 0.5) {
+            row.roles.forEach(r => matches.push(r));
+        }
+    });
+    return matches;
+}
+
+// =========================================================================
 // State
 // =========================================================================
 let activeRole = null;
 let activePathwayIndex = 0;
 let viewMode = 'to'; // 'to' = paths to this role, 'from' = explore from this role
-let certFilter = 'all'; // 'all', 'cs' (civil servant), 'contractor'
+let certFilter = 'all'; // 'all', 'cs' (civil servant), 'contractor', 'mod' (service personnel)
 
 // Civil servant funded providers
 const CS_FUNDED_PROVIDERS = new Set(['CompTIA', 'GIAC / SANS']);
+
+// MOD-funded providers — Defence funds CompTIA and certain vendor certs through ELCAS / Unit Training Budgets
+const MOD_FUNDED_PROVIDERS = new Set(['CompTIA', 'GIAC / SANS', 'EC-Council', 'ISC²']);
 
 function getCertFunding(cert) {
     return CS_FUNDED_PROVIDERS.has(cert.provider) ? 'cs' : 'self';
@@ -4019,6 +4691,7 @@ function certPassesFilter(cert) {
     if (certFilter === 'all') return true;
     const funding = getCertFunding(cert);
     if (certFilter === 'cs') return funding === 'cs';
+    if (certFilter === 'mod') return MOD_FUNDED_PROVIDERS.has(cert.provider);
     // Contractors can access anything, but flag SANS as uncommon
     return true;
 }
@@ -4446,12 +5119,15 @@ function renderDetailPanel() {
             <button class="cert-filter-btn ${certFilter === 'all' ? 'active' : ''}" onclick="switchCertFilter('all')">All</button>
             <button class="cert-filter-btn ${certFilter === 'cs' ? 'active' : ''}" onclick="switchCertFilter('cs')">Civil Servant</button>
             <button class="cert-filter-btn ${certFilter === 'contractor' ? 'active' : ''}" onclick="switchCertFilter('contractor')">Contractor</button>
+            <button class="cert-filter-btn ${certFilter === 'mod' ? 'active' : ''}" onclick="switchCertFilter('mod')" style="${certFilter === 'mod' ? '' : 'border-color:rgba(251,191,36,0.3);'}color:${certFilter === 'mod' ? '' : '#fbbf24'};">MOD</button>
         </div>
         <div class="cert-note">${
             certFilter === 'cs'
                 ? 'Showing certs funded for civil servants (CompTIA + SANS/GIAC).'
                 : certFilter === 'contractor'
                 ? 'Contractors can pursue any certification. SANS/GIAC are uncommon due to cost (~\u00a37,900 course + exam, self-funded).'
+                : certFilter === 'mod'
+                ? 'Showing certs available through Defence funding (ELCAS / Unit Training Budget). Includes CompTIA, SANS/GIAC, EC-Council, ISC\u00b2.'
                 : 'Showing all certifications. Use filters to see availability by employment type.'
         }</div>`;
 
@@ -4501,6 +5177,17 @@ function renderDetailPanel() {
             <span title="Defence Cyber Academy training stage">DCA: ${esc(role.dcaTrain)}</span>
             <span title="Gov Security Profession proficiency">GSP: ${esc(role.govProf)}</span>
         </div>
+        ${(() => {
+            const modEq = getModEquivalents(activeRole);
+            if (!modEq) return '';
+            const soldierHtml = modEq.soldier.map(s => `<span class="mod-detail-pill" style="cursor:pointer;" onclick="modShowDetail('${s.id}')" title="${s.sub}">${esc(s.label)}</span>`).join('');
+            const officerHtml = modEq.officer.map(o => `<span class="mod-detail-pill" style="cursor:pointer;" onclick="modShowDetail('${o.id}')" title="${o.sub}">${esc(o.label)}</span>`).join('');
+            if (!soldierHtml && !officerHtml) return '';
+            return `<div class="detail-fw-equiv" style="margin-top:0;">
+                <span style="font-size:0.58rem;color:var(--text-muted);margin-right:0.2rem;" title="Military equivalent at SFIA ${modEq.sfia}">MOD:</span>
+                ${soldierHtml}${officerHtml}
+            </div>`;
+        })()}
 
         ${kpiHtml}
         ${pathwaySectionHtml}
@@ -4544,7 +5231,7 @@ function renderDetailPanel() {
             <button class="tp-btn tp-btn-primary" style="width:100%;padding:0.75rem;font-size:0.9rem;" onclick="tpCreateFromPathway()">
                 Create "${esc(role.title)}" Training Plan (${filteredKpiCerts.length} certs, ~\u00a3${filteredKpiCost.toLocaleString()})
             </button>
-            <p style="text-align:center;font-size:0.7rem;color:var(--text-muted);margin-top:0.5rem;">Auto-creates a plan named after this role with all ${certFilter !== 'all' ? (certFilter === 'cs' ? 'CS-funded' : 'contractor') + ' ' : ''}certs</p>
+            <p style="text-align:center;font-size:0.7rem;color:var(--text-muted);margin-top:0.5rem;">Auto-creates a plan named after this role with all ${certFilter !== 'all' ? (certFilter === 'cs' ? 'CS-funded' : certFilter === 'mod' ? 'MOD-funded' : 'contractor') + ' ' : ''}certs</p>
         </div>
     `;
 
@@ -4607,6 +5294,167 @@ function switchTab(tabId) {
     if (tabId === 'tab-myplan') tpInit();
     if (tabId === 'tab-calendar') initCalendar();
     if (tabId === 'tab-certroadmap') crInit();
+}
+
+// =========================================================================
+// MOD Detail — Show detail panel for a military role (used from card tooltips)
+// =========================================================================
+function modShowDetail(roleId) {
+    const role = MOD_ROLES[roleId];
+    if (!role) return;
+
+    // Detail rendering
+
+    // Build pathway steps
+    let pathwayHtml = '';
+    if (role.pathways && role.pathways.length > 0) {
+        const steps = role.pathways[0].steps;
+        const stepsHtml = steps.map((s, i) => {
+            const isLast = i === steps.length - 1;
+            const cls = isLast ? 'pathway-step current' : 'pathway-step';
+            const arrow = i < steps.length - 1 ? '<span class="pathway-arrow">\u2192</span>' : '';
+            const sr = MOD_ROLES[s];
+            const fw = sr ? `SFIA ${sr.sfia}` : '';
+            return `<span class="${cls}" onclick="modShowDetail('${s}')" style="cursor:pointer;">${esc(MOD_SHORT_NAMES[s] || s)}<span class="step-fw" style="display:block;font-size:0.5rem;opacity:0.6;">${fw}</span></span>${arrow}`;
+        }).join('');
+        pathwayHtml = `
+            <div class="detail-section">
+                <h3>Career Progression</h3>
+                <div class="pathway-steps" style="display:flex;flex-wrap:wrap;align-items:center;gap:0.35rem;">${stepsHtml}</div>
+            </div>`;
+    } else {
+        pathwayHtml = `
+            <div class="detail-section">
+                <h3>Career Progression</h3>
+                <p class="detail-desc" style="font-style:italic;color:var(--text-muted);">Entry point for the ${role.track === 'soldier' ? 'Soldier' : 'Officer'} track.</p>
+            </div>`;
+    }
+
+    // Cert cards
+    let certsHtml = '';
+    if (role.certs && role.certs.length > 0) {
+        certsHtml = role.certs.map(c => {
+            const inPlan = (typeof tpIsCertInActivePlan === 'function') && tpIsCertInActivePlan(c.name);
+            const addCls = inPlan ? 'cert-add-plan added' : 'cert-add-plan';
+            const addTxt = inPlan ? 'In Plan' : '+ Plan';
+            const certData = btoa(JSON.stringify({name:c.name,provider:c.provider,price:c.price,difficulty:c.difficulty}));
+            return `<div class="cert-card">
+                <button class="${addCls}" data-cert="${certData}" onclick="event.stopPropagation();tpAddCertFromCardBtn(this)">${addTxt}</button>
+                <div class="cert-header">
+                    <span class="cert-name">${esc(c.name)}</span>
+                    <span class="cert-price">~\u00a3${c.price.toLocaleString()}</span>
+                </div>
+                <div class="cert-meta-row">
+                    <span class="cert-provider">${esc(c.provider)}</span>
+                </div>
+                <span class="cert-difficulty ${c.difficulty}">${c.difficulty}</span>
+            </div>`;
+        }).join('');
+    } else {
+        certsHtml = '<p class="detail-desc" style="font-style:italic;color:var(--text-muted);">No specific certifications at this level \u2014 focus is on strategic leadership and governance.</p>';
+    }
+
+    const html = `
+        <div class="detail-title">${esc(role.title)}</div>
+        <div class="detail-fw-row">
+            <span class="detail-fw-badge" style="color:#fbbf24;border:1px solid rgba(251,191,36,0.5);">${esc(role.nato)}</span>
+            <span class="detail-fw-badge fw-sfia">SFIA ${esc(role.sfia)}</span>
+            ${role.ukcsc !== '-' ? `<span class="detail-fw-badge fw-ukcsc">UKCSC ${esc(role.ukcsc)}</span>` : ''}
+        </div>
+        <div class="detail-fw-equiv">
+            <span title="Army rank">${esc(role.armyRank)}</span>
+            <span title="Trade classification">${esc(role.tradeClass)}</span>
+            <span title="Civil Service equivalent">CS: ${esc(role.csGrade)}</span>
+        </div>
+        ${(() => {
+            const civRoles = getCivilianEquivalents(roleId);
+            if (!civRoles || civRoles.length === 0) return '<div class="detail-fw-equiv" style="margin-top:0;"><span style="font-size:0.58rem;color:var(--text-muted);">Equivalent Roles:</span> <span style="font-size:0.58rem;color:var(--text-muted);font-style:italic;">No direct civilian SOC role at this level</span></div>';
+            return '<div class="detail-fw-equiv" style="margin-top:0;"><span style="font-size:0.58rem;color:var(--text-muted);margin-right:0.2rem;">Equivalent Roles:</span>' +
+                civRoles.map(r => `<span class="mod-detail-pill" style="cursor:pointer;" onclick="switchTab('tab-pathways');setTimeout(()=>showRoleDetail('${r.id}'),100);">${esc(r.label)}</span>`).join('') +
+                '</div>';
+        })()}
+
+        <div class="detail-kpis">
+            <div class="detail-kpi">
+                <div class="kpi-value">${role.dcaCourses.length}</div>
+                <div class="kpi-label">DCA Courses</div>
+            </div>
+            <div class="detail-kpi">
+                <div class="kpi-value">${role.aldp.length}</div>
+                <div class="kpi-label">${role.track === 'soldier' ? 'ALDP' : 'PME'}</div>
+            </div>
+            <div class="detail-kpi">
+                <div class="kpi-value">${role.certs.length}</div>
+                <div class="kpi-label">Certs</div>
+            </div>
+            <div class="detail-kpi">
+                <div class="kpi-value">${role.units.length}</div>
+                <div class="kpi-label">Key Units</div>
+            </div>
+        </div>
+
+        ${pathwayHtml}
+
+        <div class="detail-section">
+            <h3>Overview</h3>
+            <p class="detail-desc">${esc(role.description)}</p>
+        </div>
+
+        ${role.dcaCourses.length ? `
+        <div class="detail-section">
+            <h3>DCA Training</h3>
+            <div class="mod-detail-pills">${role.dcaCourses.map(c => `<span class="mod-detail-pill">${esc(c)}</span>`).join('')}</div>
+        </div>` : ''}
+
+        ${role.aldp.length ? `
+        <div class="detail-section">
+            <h3>${role.track === 'soldier' ? 'ALDP Milestones' : 'Professional Military Education'}</h3>
+            <div class="mod-detail-pills">${role.aldp.map(a => `<span class="mod-detail-pill">${esc(a)}</span>`).join('')}</div>
+        </div>` : ''}
+
+        ${role.subspecializations && role.subspecializations.length ? `
+        <div class="detail-section">
+            <h3>Sub-Specializations</h3>
+            <div class="mod-detail-pills">${role.subspecializations.map(s => `<span class="mod-detail-pill">${esc(s)}</span>`).join('')}</div>
+        </div>` : ''}
+
+        <div class="detail-section">
+            <h3>Key Responsibilities</h3>
+            <ul class="resp-list">${role.responsibilities.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+        </div>
+
+        ${role.prerequisites && role.prerequisites.length ? `
+        <div class="detail-section">
+            <h3>Prerequisites</h3>
+            <ul class="prereq-list">${role.prerequisites.map(p => `<li>${esc(p)}</li>`).join('')}</ul>
+        </div>` : ''}
+
+        <div class="detail-section">
+            <h3>Key Skills</h3>
+            <div class="skill-pills">${role.skills.map(s => `<span class="skill-pill">${esc(s)}</span>`).join('')}</div>
+        </div>
+
+        <div class="detail-section">
+            <h3>Recommended Certifications</h3>
+            ${certsHtml}
+        </div>
+
+        <div class="detail-section">
+            <h3>Key Units / Postings</h3>
+            <div class="mod-detail-units">${role.units.map(u => `<span class="mod-unit-badge">${esc(u)}</span>`).join('')}</div>
+        </div>
+
+        ${role.certs && role.certs.length > 0 ? `
+        <div class="detail-section" style="border-top:1px solid var(--border);padding-top:1rem;margin-top:1rem;">
+            <button class="tp-btn tp-btn-primary" style="width:100%;padding:0.75rem;font-size:0.9rem;" onclick="tpCreateFromModRole('${roleId}')">
+                Create "${esc(role.title)}" Training Plan (${role.certs.length} certs, ~\u00a3${role.certs.reduce((s,c)=>s+c.price,0).toLocaleString()})
+            </button>
+            <p style="text-align:center;font-size:0.7rem;color:var(--text-muted);margin-top:0.5rem;">Auto-creates a plan with all MOD-funded certifications for this role</p>
+        </div>` : ''}
+    `;
+
+    document.getElementById('detail-content').innerHTML = html;
+    document.getElementById('detail-overlay').classList.add('open');
 }
 
 // =========================================================================
@@ -6824,12 +7672,26 @@ async function tpInit() {
     // Populate role dropdown in create modal
     const roleSelect = document.getElementById('tp-new-role');
     if (roleSelect && roleSelect.options.length <= 1) {
+        // Civilian roles
+        const civGroup = document.createElement('optgroup');
+        civGroup.label = 'Civilian Roles';
         Object.entries(ROLES).forEach(([id, r]) => {
             const opt = document.createElement('option');
             opt.value = id;
             opt.textContent = r.title;
-            roleSelect.appendChild(opt);
+            civGroup.appendChild(opt);
         });
+        roleSelect.appendChild(civGroup);
+        // Service Personnel roles
+        const modGroup = document.createElement('optgroup');
+        modGroup.label = 'Service Personnel (Army)';
+        Object.entries(MOD_ROLES).forEach(([id, r]) => {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = r.title + (r.armyRank ? ` (${r.armyRank})` : '');
+            modGroup.appendChild(opt);
+        });
+        roleSelect.appendChild(modGroup);
     }
     await tpLoadPlans();
 }
@@ -7056,16 +7918,37 @@ function tpShowCreateModal() {
     // Populate role multi-select checkboxes
     const multiDiv = document.getElementById('tp-new-roles-multi');
     if (multiDiv && multiDiv.children.length === 0) {
-        const tiers = { 1: 'Foundation', 2: 'Intermediate', 3: 'Advanced', 4: 'Leadership' };
+        const cbStyle = 'display:flex;align-items:center;gap:0.35rem;font-size:0.78rem;color:var(--text-primary);cursor:pointer;padding:0.2rem 0.5rem;border-radius:4px;background:var(--bg-primary);border:1px solid var(--border);white-space:nowrap;';
+        // Civilian roles header
+        const civHeader = document.createElement('div');
+        civHeader.style.cssText = 'font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;padding:0.3rem 0.2rem 0.1rem;grid-column:1/-1;';
+        civHeader.textContent = 'Civilian Roles';
+        multiDiv.appendChild(civHeader);
         Object.entries(ROLES).forEach(([id, r]) => {
             const label = document.createElement('label');
-            label.style.cssText = 'display:flex;align-items:center;gap:0.35rem;font-size:0.78rem;color:var(--text-primary);cursor:pointer;padding:0.2rem 0.5rem;border-radius:4px;background:var(--bg-primary);border:1px solid var(--border);white-space:nowrap;';
+            label.style.cssText = cbStyle;
             const cb = document.createElement('input');
             cb.type = 'checkbox';
             cb.value = id;
             cb.className = 'tp-role-cb';
             label.appendChild(cb);
             label.appendChild(document.createTextNode(r.title));
+            multiDiv.appendChild(label);
+        });
+        // Service Personnel header
+        const modHeader = document.createElement('div');
+        modHeader.style.cssText = 'font-size:0.7rem;font-weight:600;color:#fbbf24;text-transform:uppercase;letter-spacing:0.05em;padding:0.5rem 0.2rem 0.1rem;grid-column:1/-1;border-top:1px solid var(--border);margin-top:0.3rem;';
+        modHeader.textContent = 'Service Personnel (Army)';
+        multiDiv.appendChild(modHeader);
+        Object.entries(MOD_ROLES).forEach(([id, r]) => {
+            const label = document.createElement('label');
+            label.style.cssText = cbStyle;
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = id;
+            cb.className = 'tp-role-cb';
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(r.title + (r.armyRank ? ` (${r.armyRank})` : '')));
             multiDiv.appendChild(label);
         });
     } else if (multiDiv) {
@@ -7096,12 +7979,12 @@ async function tpCreatePlan() {
         if (!resp.ok) throw new Error('Create failed');
         let plan = await resp.json();
 
-        // Auto-add certs from selected roles (deduplicated)
+        // Auto-add certs from selected roles (deduplicated — supports both civilian and MOD roles)
         if (selectedRoles.length > 0) {
             const seenCerts = new Set();
             const items = [];
             selectedRoles.forEach(roleId => {
-                const role = ROLES[roleId];
+                const role = ROLES[roleId] || MOD_ROLES[roleId];
                 if (!role) return;
                 (role.certs || []).forEach(c => {
                     if (!seenCerts.has(c.name)) {
@@ -7250,6 +8133,54 @@ async function tpCreateFromPathway() {
         switchTab('tab-myplan');
     } catch (e) {
         console.error('Failed to create plan from pathway:', e);
+        alert('Failed to create plan: ' + e.message);
+    }
+}
+
+// Create plan from MOD role detail panel
+async function tpCreateFromModRole(roleId) {
+    const role = MOD_ROLES[roleId];
+    if (!role || !role.certs || role.certs.length === 0) return;
+
+    const planName = `${role.title} — Training Plan`;
+
+    try {
+        const createResp = await fetch('/api/skills/training-plans', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: planName, target_role: roleId }),
+        });
+        if (!createResp.ok) {
+            const err = await createResp.json().catch(() => ({}));
+            if (createResp.status === 409) {
+                alert(`A plan named "${planName}" already exists. Delete it first or add certs individually via the "+ Plan" buttons.`);
+                return;
+            }
+            throw new Error(err.detail || 'Create failed');
+        }
+        const plan = await createResp.json();
+
+        const items = role.certs.map(c => ({
+            cert_name: c.name,
+            provider: c.provider,
+            price: c.price,
+            difficulty: c.difficulty,
+        }));
+        const addResp = await fetch(`/api/skills/training-plans/${plan.id}/items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items }),
+        });
+        if (!addResp.ok) throw new Error('Add items failed');
+        const fullPlan = await addResp.json();
+
+        tpPlans.unshift(fullPlan);
+        tpActivePlanId = fullPlan.id;
+
+        closeDetail();
+        switchTab('tab-myplan');
+    } catch (e) {
+        console.error('Failed to create plan from MOD role:', e);
         alert('Failed to create plan: ' + e.message);
     }
 }
@@ -7505,7 +8436,7 @@ async function tpLoadForecast() {
 
         let rows = data.forecasts.map(f => {
             const pct = f.item_count > 0 ? Math.round(f.completed_count / f.item_count * 100) : 0;
-            const targetTitle = f.target_role && ROLES[f.target_role] ? ROLES[f.target_role].title : (f.target_role || '-');
+            const targetTitle = f.target_role && (ROLES[f.target_role] || MOD_ROLES[f.target_role]) ? (ROLES[f.target_role] || MOD_ROLES[f.target_role]).title : (f.target_role || '-');
             const empLabel = EMP_TYPE_LABELS[f.employment_type] || f.employment_type || 'CS';
             const empColor = EMP_TYPE_COLORS[f.employment_type] || '#8b949e';
             return `<tr>
@@ -7864,8 +8795,38 @@ function crCloseDetail() {
 // =========================================================================
 // Init
 // =========================================================================
+// Inject MOD rank equivalents onto career pathway cards
+function injectModLabels() {
+    document.querySelectorAll('.role-card[data-role]').forEach(card => {
+        const roleId = card.getAttribute('data-role');
+        const modEq = getModEquivalents(roleId);
+        if (!modEq) return;
+        const parts = [];
+        modEq.soldier.forEach(s => parts.push(s.label));
+        modEq.officer.forEach(o => parts.push(o.label));
+        if (parts.length === 0) return;
+        // Add MOD line after card-fw if not already present
+        if (card.querySelector('.card-mod')) return;
+        const modDiv = document.createElement('div');
+        modDiv.className = 'card-mod';
+        modDiv.textContent = 'MOD: ' + parts.join(' / ');
+        const fwEl = card.querySelector('.card-fw');
+        if (fwEl) fwEl.after(modDiv);
+        // Also add to tooltip
+        const tooltip = card.querySelector('.card-tooltip');
+        if (tooltip && !tooltip.querySelector('.tt-mod')) {
+            const ttMod = document.createElement('div');
+            ttMod.className = 'tt-mod tt-meta';
+            ttMod.style.color = '#fbbf24';
+            ttMod.textContent = 'MOD: ' + parts.join(' / ');
+            tooltip.appendChild(ttMod);
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(drawConnectors, 100);
+    injectModLabels();
     await loadAssessmentData();
     populateRoleDropdowns();
     checkTeamTabAccess();

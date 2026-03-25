@@ -160,6 +160,28 @@
                     <span class="form-help">Disable for self-signed certificates (not recommended for production)</span>
                 </div>
 
+                <h3 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">User Assignment Mapping</h3>
+                <p class="section-description">Map an Elasticsearch index containing user profiles for alert assignment. When analysts assign alerts, the user name is written back to the configured field on the alert document.</p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="elasticsearch_user_index">User Index</label>
+                        <input type="text" id="elasticsearch_user_index" name="elasticsearch_user_index" placeholder="e.g. ion-users">
+                        <span class="form-help">ES index containing user profiles</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="elasticsearch_user_field">User Name Field</label>
+                        <input type="text" id="elasticsearch_user_field" name="elasticsearch_user_field" placeholder="e.g. ion.user">
+                        <span class="form-help">Field path containing display names</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="elasticsearch_assignment_field">Alert Assignment Field</label>
+                    <input type="text" id="elasticsearch_assignment_field" name="elasticsearch_assignment_field" placeholder="kibana.alert.workflow_user">
+                    <span class="form-help">Field on alert documents to write the assigned user name to</span>
+                </div>
+
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="testConnection('elasticsearch')">Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -1842,6 +1864,9 @@ function populateForms(config) {
     document.getElementById('elasticsearch_alert_index').value = config.elasticsearch.elasticsearch_alert_index || '';
     document.getElementById('elasticsearch_case_index').value = config.elasticsearch.elasticsearch_case_index || '';
     document.getElementById('elasticsearch_verify_ssl').checked = config.elasticsearch.elasticsearch_verify_ssl;
+    document.getElementById('elasticsearch_user_index').value = config.elasticsearch.elasticsearch_user_index || '';
+    document.getElementById('elasticsearch_user_field').value = config.elasticsearch.elasticsearch_user_field || '';
+    document.getElementById('elasticsearch_assignment_field').value = config.elasticsearch.elasticsearch_assignment_field || 'kibana.alert.workflow_user';
     updateSecretStatus('elasticsearch_password', config.elasticsearch.elasticsearch_password_set);
     updateSecretStatus('elasticsearch_api_key', config.elasticsearch.elasticsearch_api_key_set);
 
@@ -1923,6 +1948,9 @@ async function saveSettings(event, section) {
         data.elasticsearch_alert_index = form.elasticsearch_alert_index.value;
         data.elasticsearch_case_index = form.elasticsearch_case_index.value;
         data.elasticsearch_verify_ssl = form.elasticsearch_verify_ssl.checked;
+        data.elasticsearch_user_index = form.elasticsearch_user_index.value;
+        data.elasticsearch_user_field = form.elasticsearch_user_field.value;
+        data.elasticsearch_assignment_field = form.elasticsearch_assignment_field.value;
     } else if (section === 'gitlab') {
         data.gitlab_enabled = form.gitlab_enabled.checked;
         data.gitlab_url = form.gitlab_url.value;

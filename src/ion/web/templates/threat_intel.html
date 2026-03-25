@@ -1,0 +1,592 @@
+{% extends "base.html" %}
+{% block title %}ION - Threat Intel{% endblock %}
+{% block content %}
+<style>
+.ti-page { max-width: 1400px; margin: 0 auto; }
+.ti-header { margin-bottom: 24px; }
+.ti-header h1 { font-size: 1.5rem; margin: 0 0 4px; }
+.ti-header p { color: var(--text-secondary); font-size: .85rem; margin: 0; }
+
+/* Tabs */
+.ti-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border-color, #30363d); margin-bottom: 24px; }
+.ti-tab {
+    padding: 10px 20px; background: transparent; border: none; border-bottom: 2px solid transparent;
+    color: var(--text-secondary, #8b949e); cursor: pointer; font-size: .85rem; font-weight: 600;
+    transition: color .15s, border-color .15s;
+}
+.ti-tab:hover { color: var(--text-primary, #f0f6fc); }
+.ti-tab.active { color: var(--accent, #00e5ff); border-bottom-color: var(--accent, #00e5ff); }
+.ti-panel { display: none; }
+.ti-panel.active { display: block; }
+
+/* Stat cards */
+.ti-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.ti-stat-card {
+    background: var(--bg-secondary, #161b22); border: 1px solid var(--border-color, #30363d);
+    border-radius: 8px; padding: 16px 20px; text-align: center;
+}
+.ti-stat-value { font-size: 1.8rem; font-weight: 700; color: var(--accent, #00e5ff); }
+.ti-stat-label { font-size: .78rem; color: var(--text-secondary); margin-top: 4px; }
+
+/* Search bar */
+.ti-search-bar { display: flex; gap: 10px; margin-bottom: 20px; }
+.ti-search-input {
+    flex: 1; padding: 8px 14px; background: var(--bg-secondary, #161b22);
+    border: 1px solid var(--border-color, #30363d); border-radius: 6px;
+    color: var(--text-primary, #f0f6fc); font-size: .85rem;
+}
+.ti-search-input::placeholder { color: var(--text-secondary); }
+.ti-search-input:focus { outline: none; border-color: var(--accent, #00e5ff); }
+.ti-btn {
+    padding: 8px 16px; background: var(--accent, #00e5ff); color: #000; border: none;
+    border-radius: 6px; cursor: pointer; font-size: .82rem; font-weight: 600; white-space: nowrap;
+}
+.ti-btn:hover { opacity: .85; }
+.ti-btn:disabled { opacity: .4; cursor: not-allowed; }
+.ti-btn-outline {
+    padding: 6px 14px; background: transparent; border: 1px solid var(--border-color, #30363d);
+    border-radius: 6px; color: var(--text-secondary); cursor: pointer; font-size: .8rem;
+}
+.ti-btn-outline:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+.ti-btn-danger { background: #f85149; color: #fff; }
+.ti-btn-sm { padding: 4px 10px; font-size: .78rem; }
+.ti-btn-watch { background: #da8b45; }
+.ti-btn-watched { background: transparent; border: 1px solid #3fb950; color: #3fb950; }
+
+/* Tables */
+.ti-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.ti-table th {
+    text-align: left; padding: 10px 12px; color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color, #30363d); font-weight: 600; font-size: .78rem;
+    text-transform: uppercase; letter-spacing: .5px;
+}
+.ti-table td { padding: 10px 12px; border-bottom: 1px solid var(--border-color, #30363d); vertical-align: top; }
+.ti-table tr:hover td { background: rgba(255,255,255,.02); }
+.ti-table .ti-name-cell { cursor: pointer; color: var(--accent, #00e5ff); font-weight: 600; }
+.ti-table .ti-name-cell:hover { text-decoration: underline; }
+
+/* Detail row */
+.ti-detail-row { display: none; }
+.ti-detail-row.open { display: table-row; }
+.ti-detail-row td { padding: 16px 20px; background: var(--bg-secondary, #161b22); }
+.ti-detail-section { margin-bottom: 12px; }
+.ti-detail-section h4 { font-size: .82rem; color: var(--text-secondary); margin: 0 0 6px; text-transform: uppercase; letter-spacing: .5px; }
+.ti-detail-section p { margin: 0; font-size: .82rem; line-height: 1.5; color: var(--text-primary); }
+.ti-detail-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.ti-tag {
+    display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: .72rem; font-weight: 600;
+    background: rgba(0,229,255,.12); color: var(--accent, #00e5ff);
+}
+.ti-ttp-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.ti-ttp {
+    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .72rem;
+    background: rgba(210,153,34,.12); color: #d29922; border: 1px solid rgba(210,153,34,.25);
+}
+
+/* Labels */
+.ti-label {
+    display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: .7rem; font-weight: 600;
+    margin-right: 3px; margin-bottom: 2px;
+}
+
+/* Confidence badge */
+.ti-confidence { font-size: .75rem; font-weight: 600; }
+.ti-confidence.high { color: #f85149; }
+.ti-confidence.medium { color: #d29922; }
+.ti-confidence.low { color: #3fb950; }
+
+/* Loading / empty states */
+.ti-loading, .ti-empty { text-align: center; padding: 40px; color: var(--text-secondary); font-size: .85rem; }
+.ti-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border-color); border-top-color: var(--accent); border-radius: 50%; animation: ti-spin .6s linear infinite; margin-right: 8px; vertical-align: middle; }
+@keyframes ti-spin { to { transform: rotate(360deg); } }
+
+/* Unread indicator */
+.ti-unread td { border-left: 3px solid var(--accent, #00e5ff); }
+.ti-badge { display: inline-block; min-width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 10px; background: #f85149; color: #fff; font-size: .7rem; font-weight: 700; padding: 0 5px; margin-left: 6px; }
+</style>
+
+<div class="ti-page">
+    <div class="ti-header">
+        <h1>Threat Intel</h1>
+        <p>Search OpenCTI for threat actors and campaigns, manage your watchlist, and monitor enrichment matches.</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="ti-tabs" id="ti-tabs">
+        <button class="ti-tab active" data-panel="overview">Overview</button>
+        <button class="ti-tab" data-panel="actors">Threat Actors</button>
+        <button class="ti-tab" data-panel="campaigns">Campaigns</button>
+        <button class="ti-tab" data-panel="watchlist">Watchlist <span id="ti-unread-badge" class="ti-badge" style="display:none">0</span></button>
+    </div>
+
+    <!-- Overview Panel -->
+    <div class="ti-panel active" id="panel-overview">
+        <div class="ti-stats" id="ti-stats">
+            <div class="ti-stat-card"><div class="ti-stat-value" id="stat-actors">-</div><div class="ti-stat-label">Watched Actors</div></div>
+            <div class="ti-stat-card"><div class="ti-stat-value" id="stat-campaigns">-</div><div class="ti-stat-label">Watched Campaigns</div></div>
+            <div class="ti-stat-card"><div class="ti-stat-value" id="stat-matches">-</div><div class="ti-stat-label">Matches (7d)</div></div>
+            <div class="ti-stat-card"><div class="ti-stat-value" id="stat-unread">-</div><div class="ti-stat-label">Unread Alerts</div></div>
+        </div>
+        <h3 style="font-size:.95rem;margin:0 0 12px;">Recent Matches</h3>
+        <table class="ti-table" id="overview-matches-table">
+            <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Type</th><th>Actions</th></tr></thead>
+            <tbody id="overview-matches-body"><tr><td colspan="5" class="ti-empty">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- Threat Actors Panel -->
+    <div class="ti-panel" id="panel-actors">
+        <div class="ti-search-bar">
+            <input type="text" class="ti-search-input" id="actor-search" placeholder="Search threat actors in OpenCTI (e.g. APT, Lazarus, FIN7)...">
+            <button class="ti-btn" id="actor-search-btn" onclick="searchActors()">Search</button>
+        </div>
+        <div id="actor-results">
+            <div class="ti-empty">Enter a search term to query OpenCTI for threat actors.</div>
+        </div>
+    </div>
+
+    <!-- Campaigns Panel -->
+    <div class="ti-panel" id="panel-campaigns">
+        <div class="ti-search-bar">
+            <input type="text" class="ti-search-input" id="campaign-search" placeholder="Search campaigns in OpenCTI (e.g. SolarWinds, NotPetya)...">
+            <button class="ti-btn" id="campaign-search-btn" onclick="searchCampaigns()">Search</button>
+        </div>
+        <div id="campaign-results">
+            <div class="ti-empty">Enter a search term to query OpenCTI for campaigns.</div>
+        </div>
+    </div>
+
+    <!-- Watchlist Panel -->
+    <div class="ti-panel" id="panel-watchlist">
+        <h3 style="font-size:.95rem;margin:0 0 16px;">Active Watches</h3>
+        <table class="ti-table" id="watchlist-table">
+            <thead><tr><th>Name</th><th>Type</th><th>Matches</th><th>Last Match</th><th>Watched By</th><th>Reason</th><th>Actions</th></tr></thead>
+            <tbody id="watchlist-body"><tr><td colspan="7" class="ti-empty">Loading...</td></tr></tbody>
+        </table>
+
+        <h3 style="font-size:.95rem;margin:24px 0 12px;">
+            Match Alerts
+            <button class="ti-btn-outline ti-btn-sm" style="margin-left:10px;" id="match-filter-btn" onclick="toggleMatchFilter()">Show Unread Only</button>
+        </h3>
+        <table class="ti-table" id="matches-table">
+            <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="matches-body"><tr><td colspan="5" class="ti-empty">Loading...</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+    const API = '/api/threat-intel';
+    let watchedIds = new Set();
+    let matchUnreadOnly = false;
+
+    // ── Tab switching ──────────────────────────
+    document.getElementById('ti-tabs').addEventListener('click', function(e) {
+        const tab = e.target.closest('.ti-tab');
+        if (!tab) return;
+        document.querySelectorAll('.ti-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.ti-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        const panel = document.getElementById('panel-' + tab.dataset.panel);
+        if (panel) panel.classList.add('active');
+
+        if (tab.dataset.panel === 'overview') loadOverview();
+        if (tab.dataset.panel === 'watchlist') { loadWatches(); loadMatches(); }
+    });
+
+    // ── Enter key on search ──────────────────
+    document.getElementById('actor-search').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchActors(); });
+    document.getElementById('campaign-search').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchCampaigns(); });
+
+    // ── Overview ──────────────────────────────
+    async function loadOverview() {
+        try {
+            const [stats, matches] = await Promise.all([
+                fetch(API + '/overview').then(r => r.json()),
+                fetch(API + '/matches?limit=10').then(r => r.json()),
+            ]);
+            document.getElementById('stat-actors').textContent = stats.watched_actors;
+            document.getElementById('stat-campaigns').textContent = stats.watched_campaigns;
+            document.getElementById('stat-matches').textContent = stats.matches_7d;
+            document.getElementById('stat-unread').textContent = stats.unread_alerts;
+
+            if (stats.unread_alerts > 0) {
+                const badge = document.getElementById('ti-unread-badge');
+                badge.textContent = stats.unread_alerts;
+                badge.style.display = 'inline-block';
+            } else {
+                document.getElementById('ti-unread-badge').style.display = 'none';
+            }
+
+            renderMatchRows('overview-matches-body', matches.matches || [], true);
+        } catch(e) {
+            console.error('Failed to load overview', e);
+        }
+    }
+
+    function renderMatchRows(tbodyId, matches, showType) {
+        const tbody = document.getElementById(tbodyId);
+        if (!matches.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="ti-empty">No matches found.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = matches.map(m => {
+            const d = m.details || {};
+            const cls = m.is_read ? '' : ' class="ti-unread"';
+            const time = m.created_at ? new Date(m.created_at).toLocaleString() : '-';
+            const entityName = d.watch_name || '-';
+            const entityType = d.entity_type ? d.entity_type.replace('_', ' ') : '-';
+            const readBtn = m.is_read ? '<span style="color:var(--text-secondary);font-size:.75rem">Read</span>' :
+                `<button class="ti-btn-outline ti-btn-sm" onclick="markRead(${m.id})">Mark Read</button>`;
+            return `<tr${cls}>
+                <td>${esc(time)}</td>
+                <td><code>${esc(m.observable_value || '-')}</code> <span style="color:var(--text-secondary);font-size:.72rem">(${esc(m.observable_type || '')})</span></td>
+                <td>${esc(entityName)}</td>
+                ${showType ? `<td>${esc(entityType)}</td>` : ''}
+                <td>${readBtn}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    window.markRead = async function(id) {
+        await fetch(API + '/matches/' + id + '/read', { method: 'POST' });
+        loadOverview();
+        loadMatches();
+    };
+
+    // ── Actors ────────────────────────────────
+    window.searchActors = async function() {
+        const q = document.getElementById('actor-search').value.trim();
+        if (!q) return;
+        const container = document.getElementById('actor-results');
+        container.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span> Searching OpenCTI...</div>';
+
+        try {
+            const data = await fetch(API + '/actors?search=' + encodeURIComponent(q) + '&first=30').then(r => r.json());
+            if (data.detail) { container.innerHTML = `<div class="ti-empty">${esc(data.detail)}</div>`; return; }
+            const actors = data.actors || [];
+            if (!actors.length) { container.innerHTML = '<div class="ti-empty">No threat actors found.</div>'; return; }
+
+            // Refresh watched IDs
+            await refreshWatchedIds();
+
+            let html = '<table class="ti-table"><thead><tr><th>Name</th><th>Types</th><th>Aliases</th><th>Confidence</th><th>First Seen</th><th>Last Seen</th><th>Labels</th><th>Watch</th></tr></thead><tbody>';
+            actors.forEach((a, idx) => {
+                const aliases = (a.aliases || []).slice(0, 3).join(', ');
+                const moreAliases = (a.aliases || []).length > 3 ? ` +${a.aliases.length - 3}` : '';
+                const labels = (a.labels || []).map(l => `<span class="ti-label" style="background:${l.color || '#30363d'}22;color:${l.color || '#8b949e'}">${esc(l.value)}</span>`).join('');
+                const types = (a.threat_actor_types || []).map(t => t === 'intrusion-set' ? 'Intrusion Set' : t).join(', ') || '-';
+                const conf = a.confidence != null ? a.confidence : '-';
+                const confCls = conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low';
+                const isWatched = watchedIds.has(a.id);
+                const watchBtn = isWatched
+                    ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
+                    : `<button class="ti-btn ti-btn-sm ti-btn-watch" onclick="watchActor(${idx})">Watch</button>`;
+                html += `<tr>
+                    <td class="ti-name-cell" onclick="toggleActorDetail(${idx})">${esc(a.name)}</td>
+                    <td>${esc(types)}</td>
+                    <td>${esc(aliases)}${moreAliases ? `<span style="color:var(--text-secondary)">${moreAliases}</span>` : ''}</td>
+                    <td><span class="ti-confidence ${confCls}">${conf}</span></td>
+                    <td>${formatDate(a.first_seen)}</td>
+                    <td>${formatDate(a.last_seen)}</td>
+                    <td>${labels || '-'}</td>
+                    <td>${watchBtn}</td>
+                </tr>`;
+                html += `<tr class="ti-detail-row" id="actor-detail-${idx}"><td colspan="8"><div class="ti-loading"><span class="ti-spinner"></span> Loading detail...</div></td></tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+            container._actors = actors;
+        } catch(e) {
+            container.innerHTML = `<div class="ti-empty">Error: ${esc(e.message)}</div>`;
+        }
+    };
+
+    window.toggleActorDetail = async function(idx) {
+        const row = document.getElementById('actor-detail-' + idx);
+        if (!row) return;
+        if (row.classList.contains('open')) { row.classList.remove('open'); return; }
+        row.classList.add('open');
+
+        const actors = document.getElementById('actor-results')._actors;
+        if (!actors || !actors[idx]) return;
+        const a = actors[idx];
+
+        try {
+            const ec = a.entity_class || 'threat_actor';
+            const detail = await fetch(API + '/actors/' + encodeURIComponent(a.id) + '?entity_class=' + ec).then(r => r.json());
+            let html = '<td colspan="8">';
+
+            if (detail.description) {
+                html += `<div class="ti-detail-section"><h4>Description</h4><p>${esc(detail.description)}</p></div>`;
+            }
+            if (detail.campaigns && detail.campaigns.length) {
+                html += `<div class="ti-detail-section"><h4>Related Campaigns (${detail.campaigns.length})</h4><div class="ti-detail-tags">`;
+                detail.campaigns.forEach(c => { html += `<span class="ti-tag">${esc(c.name)}</span>`; });
+                html += '</div></div>';
+            }
+            if (detail.ttps && detail.ttps.length) {
+                html += `<div class="ti-detail-section"><h4>MITRE ATT&CK TTPs (${detail.ttps.length})</h4><div class="ti-ttp-list">`;
+                detail.ttps.forEach(t => {
+                    const label = t.mitre_id ? `${t.mitre_id}: ${t.name}` : t.name;
+                    html += `<span class="ti-ttp" title="${esc(t.description || '')}">${esc(label)}</span>`;
+                });
+                html += '</div></div>';
+            }
+            if (detail.indicators && detail.indicators.length) {
+                html += `<div class="ti-detail-section"><h4>Indicators (${detail.indicators.length})</h4><div class="ti-detail-tags">`;
+                detail.indicators.forEach(i => { html += `<span class="ti-tag">${esc(i.name)}</span>`; });
+                html += '</div></div>';
+            }
+            if (!detail.description && !(detail.campaigns||[]).length && !(detail.ttps||[]).length && !(detail.indicators||[]).length) {
+                html += '<div class="ti-empty" style="padding:10px">No additional detail available.</div>';
+            }
+            html += '</td>';
+            row.innerHTML = html;
+        } catch(e) {
+            row.innerHTML = `<td colspan="8"><div class="ti-empty">Failed to load detail.</div></td>`;
+        }
+    };
+
+    window.watchActor = async function(idx) {
+        const actors = document.getElementById('actor-results')._actors;
+        if (!actors || !actors[idx]) return;
+        const a = actors[idx];
+        const reason = prompt('Why are you watching this actor? (optional)');
+        if (reason === null) return; // cancelled
+
+        try {
+            await fetch(API + '/watches', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    entity_type: 'threat_actor',
+                    opencti_id: a.id,
+                    name: a.name,
+                    description: a.description,
+                    aliases: a.aliases,
+                    labels: (a.labels || []).map(l => l.value),
+                    reason: reason || null,
+                }),
+            });
+            watchedIds.add(a.id);
+            searchActors(); // refresh
+            if (typeof showToast === 'function') showToast('Added to watchlist: ' + a.name, 'success');
+        } catch(e) {
+            if (typeof showToast === 'function') showToast('Failed to add watch', 'error');
+        }
+    };
+
+    // ── Campaigns ─────────────────────────────
+    window.searchCampaigns = async function() {
+        const q = document.getElementById('campaign-search').value.trim();
+        if (!q) return;
+        const container = document.getElementById('campaign-results');
+        container.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span> Searching OpenCTI...</div>';
+
+        try {
+            const data = await fetch(API + '/campaigns?search=' + encodeURIComponent(q) + '&first=30').then(r => r.json());
+            if (data.detail) { container.innerHTML = `<div class="ti-empty">${esc(data.detail)}</div>`; return; }
+            const campaigns = data.campaigns || [];
+            if (!campaigns.length) { container.innerHTML = '<div class="ti-empty">No campaigns found.</div>'; return; }
+
+            await refreshWatchedIds();
+
+            let html = '<table class="ti-table"><thead><tr><th>Name</th><th>Aliases</th><th>Confidence</th><th>First Seen</th><th>Last Seen</th><th>Labels</th><th>Watch</th></tr></thead><tbody>';
+            campaigns.forEach((c, idx) => {
+                const aliases = (c.aliases || []).slice(0, 3).join(', ');
+                const labels = (c.labels || []).map(l => `<span class="ti-label" style="background:${l.color || '#30363d'}22;color:${l.color || '#8b949e'}">${esc(l.value)}</span>`).join('');
+                const conf = c.confidence != null ? c.confidence : '-';
+                const confCls = conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low';
+                const isWatched = watchedIds.has(c.id);
+                const watchBtn = isWatched
+                    ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
+                    : `<button class="ti-btn ti-btn-sm ti-btn-watch" onclick="watchCampaign(${idx})">Watch</button>`;
+                html += `<tr>
+                    <td class="ti-name-cell" onclick="toggleCampaignDetail(${idx})">${esc(c.name)}</td>
+                    <td>${esc(aliases)}</td>
+                    <td><span class="ti-confidence ${confCls}">${conf}</span></td>
+                    <td>${formatDate(c.first_seen)}</td>
+                    <td>${formatDate(c.last_seen)}</td>
+                    <td>${labels || '-'}</td>
+                    <td>${watchBtn}</td>
+                </tr>`;
+                html += `<tr class="ti-detail-row" id="campaign-detail-${idx}"><td colspan="7"><div class="ti-loading"><span class="ti-spinner"></span> Loading detail...</div></td></tr>`;
+            });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+            container._campaigns = campaigns;
+        } catch(e) {
+            container.innerHTML = `<div class="ti-empty">Error: ${esc(e.message)}</div>`;
+        }
+    };
+
+    window.toggleCampaignDetail = async function(idx) {
+        const row = document.getElementById('campaign-detail-' + idx);
+        if (!row) return;
+        if (row.classList.contains('open')) { row.classList.remove('open'); return; }
+        row.classList.add('open');
+
+        const campaigns = document.getElementById('campaign-results')._campaigns;
+        if (!campaigns || !campaigns[idx]) return;
+        const c = campaigns[idx];
+
+        try {
+            const detail = await fetch(API + '/campaigns/' + encodeURIComponent(c.id)).then(r => r.json());
+            let html = '<td colspan="7">';
+
+            if (detail.description) {
+                html += `<div class="ti-detail-section"><h4>Description</h4><p>${esc(detail.description)}</p></div>`;
+            }
+            if (detail.threat_actors && detail.threat_actors.length) {
+                html += `<div class="ti-detail-section"><h4>Related Threat Actors (${detail.threat_actors.length})</h4><div class="ti-detail-tags">`;
+                detail.threat_actors.forEach(a => { html += `<span class="ti-tag">${esc(a.name)}</span>`; });
+                html += '</div></div>';
+            }
+            if (detail.indicators && detail.indicators.length) {
+                html += `<div class="ti-detail-section"><h4>Indicators (${detail.indicators.length})</h4><div class="ti-detail-tags">`;
+                detail.indicators.forEach(i => { html += `<span class="ti-tag">${esc(i.name)}</span>`; });
+                html += '</div></div>';
+            }
+            if (!detail.description && !(detail.threat_actors||[]).length && !(detail.indicators||[]).length) {
+                html += '<div class="ti-empty" style="padding:10px">No additional detail available.</div>';
+            }
+            html += '</td>';
+            row.innerHTML = html;
+        } catch(e) {
+            row.innerHTML = `<td colspan="7"><div class="ti-empty">Failed to load detail.</div></td>`;
+        }
+    };
+
+    window.watchCampaign = async function(idx) {
+        const campaigns = document.getElementById('campaign-results')._campaigns;
+        if (!campaigns || !campaigns[idx]) return;
+        const c = campaigns[idx];
+        const reason = prompt('Why are you watching this campaign? (optional)');
+        if (reason === null) return;
+
+        try {
+            await fetch(API + '/watches', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    entity_type: 'campaign',
+                    opencti_id: c.id,
+                    name: c.name,
+                    description: c.description,
+                    aliases: c.aliases,
+                    labels: (c.labels || []).map(l => l.value),
+                    reason: reason || null,
+                }),
+            });
+            watchedIds.add(c.id);
+            searchCampaigns();
+            if (typeof showToast === 'function') showToast('Added to watchlist: ' + c.name, 'success');
+        } catch(e) {
+            if (typeof showToast === 'function') showToast('Failed to add watch', 'error');
+        }
+    };
+
+    // ── Watchlist ─────────────────────────────
+    async function loadWatches() {
+        try {
+            const data = await fetch(API + '/watches?limit=200').then(r => r.json());
+            const watches = data.watches || [];
+            const tbody = document.getElementById('watchlist-body');
+            if (!watches.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="ti-empty">No active watches. Search for actors or campaigns and add them.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = watches.map(w => {
+                const type = (w.entity_type || '').replace('_', ' ');
+                const lastSeen = w.last_seen_at ? new Date(w.last_seen_at).toLocaleString() : 'Never';
+                return `<tr>
+                    <td style="font-weight:600">${esc(w.name)}</td>
+                    <td>${esc(type)}</td>
+                    <td>${w.match_count}</td>
+                    <td>${esc(lastSeen)}</td>
+                    <td>${esc(w.watched_by)}</td>
+                    <td>${esc(w.watch_reason || '-')}</td>
+                    <td><button class="ti-btn-outline ti-btn-sm ti-btn-danger" onclick="removeWatch(${w.id},'${esc(w.name)}')">Remove</button></td>
+                </tr>`;
+            }).join('');
+        } catch(e) {
+            document.getElementById('watchlist-body').innerHTML = '<tr><td colspan="7" class="ti-empty">Failed to load watches.</td></tr>';
+        }
+    }
+
+    async function loadMatches() {
+        try {
+            const url = API + '/matches?limit=50' + (matchUnreadOnly ? '&unread_only=true' : '');
+            const data = await fetch(url).then(r => r.json());
+            const tbody = document.getElementById('matches-body');
+            const matches = data.matches || [];
+            if (!matches.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="ti-empty">No match alerts.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = matches.map(m => {
+                const d = m.details || {};
+                const cls = m.is_read ? '' : ' class="ti-unread"';
+                const time = m.created_at ? new Date(m.created_at).toLocaleString() : '-';
+                const readBtn = m.is_read ? '<span style="color:var(--text-secondary);font-size:.75rem">Read</span>' :
+                    `<button class="ti-btn-outline ti-btn-sm" onclick="markRead(${m.id})">Mark Read</button>`;
+                return `<tr${cls}>
+                    <td>${esc(time)}</td>
+                    <td><code>${esc(m.observable_value || '-')}</code></td>
+                    <td>${esc(d.watch_name || '-')}</td>
+                    <td>${m.is_read ? 'Read' : '<strong style="color:var(--accent)">Unread</strong>'}</td>
+                    <td>${readBtn}</td>
+                </tr>`;
+            }).join('');
+        } catch(e) {
+            document.getElementById('matches-body').innerHTML = '<tr><td colspan="5" class="ti-empty">Failed to load matches.</td></tr>';
+        }
+    }
+
+    window.removeWatch = async function(id, name) {
+        if (!confirm('Remove watch for "' + name + '"?')) return;
+        try {
+            await fetch(API + '/watches/' + id, { method: 'DELETE' });
+            loadWatches();
+            if (typeof showToast === 'function') showToast('Removed: ' + name, 'success');
+        } catch(e) {
+            if (typeof showToast === 'function') showToast('Failed to remove', 'error');
+        }
+    };
+
+    window.toggleMatchFilter = function() {
+        matchUnreadOnly = !matchUnreadOnly;
+        document.getElementById('match-filter-btn').textContent = matchUnreadOnly ? 'Show All' : 'Show Unread Only';
+        loadMatches();
+    };
+
+    // ── Helpers ───────────────────────────────
+    async function refreshWatchedIds() {
+        try {
+            const data = await fetch(API + '/watches?limit=1000').then(r => r.json());
+            watchedIds = new Set((data.watches || []).map(w => w.opencti_id));
+        } catch(e) { /* ignore */ }
+    }
+
+    function formatDate(iso) {
+        if (!iso) return '-';
+        try { return new Date(iso).toLocaleDateString(); } catch(e) { return iso; }
+    }
+
+    function esc(s) {
+        if (s == null) return '';
+        const d = document.createElement('div');
+        d.textContent = String(s);
+        return d.innerHTML;
+    }
+
+    // ── Init ──────────────────────────────────
+    loadOverview();
+})();
+</script>
+{% endblock %}

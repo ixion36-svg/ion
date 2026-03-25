@@ -108,6 +108,8 @@ from ion.models.analytics import (
     AnalyticsJobType,
     AnalyticsSnapshot,
 )
+from ion.models.cyab import CyabSystem, CyabDataSource, CyabSnapshot
+from ion.models.threat_intel import ThreatIntelWatch
 from ion.models.forensics import (
     ForensicCase,
     ForensicCaseStatus,
@@ -232,6 +234,12 @@ __all__ = [
     "ForensicPlaybookStep",
     "ForensicCaseStep",
     "ForensicTimelineEntry",
+    # CyAB models
+    "CyabSystem",
+    "CyabDataSource",
+    "CyabSnapshot",
+    # Threat Intel watch model
+    "ThreatIntelWatch",
     # Notification model
     "Notification",
     # Social Hub models

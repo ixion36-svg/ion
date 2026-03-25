@@ -1,0 +1,1667 @@
+{% extends "base.html" %}
+{% block title %}CyAB — Cyber Assurance Baseline{% endblock %}
+
+{% block content %}
+
+<!-- ======================== DASHBOARD VIEW ======================== -->
+<div id="cyab-dashboard">
+    <div class="cyab-dash-header">
+        <div>
+            <h1 class="cyab-dash-title">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                Cyber Assurance Baseline
+            </h1>
+            <p class="cyab-dash-sub">Data source ingestion SLAs across all departments</p>
+        </div>
+        <button class="btn btn-primary" onclick="openNewSystem()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:4px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New System
+        </button>
+    </div>
+
+    <!-- Aggregate metrics -->
+    <div class="cyab-dash-metrics" id="dash-metrics">
+        <div class="cyab-dm-card">
+            <span class="cyab-dm-icon" style="background:rgba(59,130,246,0.12);color:var(--primary);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </span>
+            <span class="cyab-dm-val" id="dm-total">0</span>
+            <span class="cyab-dm-label">Total Systems</span>
+        </div>
+        <div class="cyab-dm-card">
+            <span class="cyab-dm-icon" style="background:rgba(16,185,129,0.12);color:var(--success);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </span>
+            <span class="cyab-dm-val" id="dm-readiness">0%</span>
+            <span class="cyab-dm-label">Avg Readiness</span>
+        </div>
+        <div class="cyab-dm-card">
+            <span class="cyab-dm-icon" style="background:rgba(16,185,129,0.12);color:var(--success);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </span>
+            <span class="cyab-dm-val" id="dm-sal-pass">0</span>
+            <span class="cyab-dm-label">SAL Compliant</span>
+        </div>
+        <div class="cyab-dm-card">
+            <span class="cyab-dm-icon" style="background:rgba(239,68,68,0.12);color:var(--danger);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </span>
+            <span class="cyab-dm-val" id="dm-risk-high">0</span>
+            <span class="cyab-dm-label">High Risk</span>
+        </div>
+        <div class="cyab-dm-card">
+            <span class="cyab-dm-icon" style="background:rgba(249,115,22,0.12);color:var(--neon-orange);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </span>
+            <span class="cyab-dm-val" id="dm-due">0</span>
+            <span class="cyab-dm-label">Due / Overdue</span>
+        </div>
+    </div>
+
+    <!-- Department breakdown + due reviews row -->
+    <div class="cyab-dash-row">
+        <div class="cyab-dash-panel" style="flex:2;">
+            <h3 class="cyab-dash-panel-title">Department Readiness</h3>
+            <div id="dept-bars" class="cyab-dept-bars"></div>
+            <p id="dept-empty" class="cyab-dash-empty" style="display:none;">No systems registered yet. Click <strong>New System</strong> to add your first data source.</p>
+        </div>
+        <div class="cyab-dash-panel" style="flex:1;">
+            <h3 class="cyab-dash-panel-title">Due for Review</h3>
+            <div id="due-list" class="cyab-due-list"></div>
+            <p id="due-empty" class="cyab-dash-empty" style="display:none;">No reviews due in the next 30 days.</p>
+        </div>
+    </div>
+
+    <!-- Systems table -->
+    <div class="cyab-dash-panel" style="margin-top:1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+            <h3 class="cyab-dash-panel-title" style="margin:0;">All Systems</h3>
+            <input type="text" id="sys-search" placeholder="Search systems..." class="cyab-search-input" oninput="filterSystems()">
+        </div>
+        <div class="cyab-sys-table-wrap">
+            <table class="cyab-sys-table" id="sys-table">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable(0)">System</th>
+                        <th onclick="sortTable(1)">Department</th>
+                        <th onclick="sortTable(2)">Sources</th>
+                        <th onclick="sortTable(3)">Readiness</th>
+                        <th onclick="sortTable(4)">Risk</th>
+                        <th onclick="sortTable(5)">Next Review</th>
+                        <th onclick="sortTable(6)">Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="sys-tbody"></tbody>
+            </table>
+        </div>
+        <p id="sys-empty" class="cyab-dash-empty" style="display:none;">No systems found.</p>
+    </div>
+</div>
+
+<!-- ======================== DETAIL VIEW ======================== -->
+<div id="cyab-detail" class="cyab-layout" style="display:none;">
+    <!-- Sidebar -->
+    <aside class="cyab-sidebar no-print">
+        <div class="cyab-sidebar-brand">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+            <span>SOC CyAB</span>
+        </div>
+        <button class="btn btn-secondary cyab-back-btn" onclick="showDashboard()" style="width:100%;margin-bottom:1rem;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            All Systems
+        </button>
+        <nav class="cyab-nav">
+            <p class="cyab-nav-label">Sections</p>
+            <a href="#summary" class="cyab-nav-link active" data-section="summary">1. Executive Summary</a>
+            <a href="#metrics" class="cyab-nav-link" data-section="metrics">2. Readiness Metrics</a>
+            <a href="#demarcation" class="cyab-nav-link" data-section="demarcation">3. Demarcation Point</a>
+            <a href="#sal-tiers" class="cyab-nav-link" data-section="sal-tiers">4. Assurance Levels</a>
+            <a href="#field-mapping" class="cyab-nav-link" data-section="field-mapping">5. Field Mapping</a>
+            <a href="#use-cases" class="cyab-nav-link" data-section="use-cases">6. Use Case Status</a>
+            <a href="#governance" class="cyab-nav-link" data-section="governance">7. Governance & Storage</a>
+            <a href="#sign-off" class="cyab-nav-link" data-section="sign-off">8. Authorization</a>
+        </nav>
+        <div class="cyab-sidebar-actions">
+            <button class="btn btn-primary" onclick="saveSystem()" style="width:100%">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save CyAB
+            </button>
+            <button class="btn btn-primary" onclick="saveAsPdf()" style="width:100%;background:var(--neon-orange);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                Export PDF
+            </button>
+            <button class="btn btn-secondary" onclick="saveAsDocument()" style="width:100%">Export Markdown</button>
+        </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="cyab-main">
+        <div class="cyab-paper">
+
+            <!-- 1. Header / Summary -->
+            <header id="summary" class="cyab-section">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
+                    <div>
+                        <h1 class="cyab-title">Cyber Assurance Baseline (CyAB)</h1>
+                        <p class="cyab-subtitle">Internal SOC Ingestion Service Level Agreement</p>
+                    </div>
+                    <div class="cyab-meta-block">
+                        <div class="cyab-meta-row"><span>VERSION</span><input type="text" id="meta-version" value="1.0" class="cyab-meta-input"></div>
+                        <div class="cyab-meta-row"><span>STATUS</span><select id="meta-status" class="cyab-meta-input"><option>DRAFT</option><option>OFFICIAL</option><option>SUPERSEDED</option></select></div>
+                        <div class="cyab-meta-row"><span>REF</span><input type="text" id="meta-ref" value="" class="cyab-meta-input" readonly></div>
+                        <div class="cyab-meta-row"><span>DATE</span><input type="date" id="meta-date" class="cyab-meta-input"></div>
+                        <div class="cyab-meta-row"><span>REVIEW</span><input type="date" id="meta-next-review" class="cyab-meta-input" title="Next review date"></div>
+                    </div>
+                </div>
+                <div class="cyab-callout">
+                    <p>"The SOC cannot provide <strong>Detection as a Service</strong> without <strong>Data as a Service</strong> from the System Owner. This document defines the technical and operational handshake between departments."</p>
+                </div>
+
+                <div class="form-row" style="margin-top:1rem;">
+                    <div class="form-group" style="flex:2;"><label>System Name</label><input type="text" id="sys-name" placeholder="e.g. IT Infrastructure — Domain Controllers"></div>
+                </div>
+                <div class="form-row" style="margin-top:0.75rem;">
+                    <div class="form-group"><label>System Icon</label>
+                        <div class="cyab-icon-picker" id="icon-picker"></div>
+                        <input type="hidden" id="meta-icon" value="monitor">
+                    </div>
+                    <div class="form-group"><label>Tags (comma-separated)</label><input type="text" id="meta-tags" placeholder="e.g. critical, windows, tier-1"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>SOC Team</label><input type="text" id="meta-soc-team" value="Security Operations Center"></div>
+                    <div class="form-group"><label>SOC Lead</label><input type="text" id="meta-soc-lead" placeholder="SOC Manager name"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Department / Data Provider</label><input type="text" id="meta-dept" placeholder="e.g. IT Infrastructure"></div>
+                    <div class="form-group"><label>Department Lead</label><input type="text" id="meta-dept-lead" placeholder="Department Manager name"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Review Cadence</label>
+                        <select id="meta-cadence">
+                            <option value="30">Monthly (30 days)</option>
+                            <option value="90" selected>Quarterly (90 days)</option>
+                            <option value="180">Bi-annual (180 days)</option>
+                            <option value="365">Annual (365 days)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Data Sources panel -->
+                <div style="margin-top:1.5rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+                        <h3 style="font-size:0.9rem;font-weight:700;color:var(--text-bright);margin:0;">Data Sources</h3>
+                        <button class="btn btn-primary" onclick="addDataSource()" style="padding:0.3rem 0.75rem;font-size:0.75rem;" id="btn-add-ds">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Add Source
+                        </button>
+                    </div>
+                    <div id="ds-list" class="cyab-ds-list"></div>
+                    <p id="ds-empty" class="cyab-dash-empty" style="display:none;padding:1rem;">No data sources yet. Save the system first, then add data sources.</p>
+                </div>
+
+                <!-- History timeline -->
+                <div style="margin-top:1.5rem;" id="history-section">
+                    <h3 style="font-size:0.9rem;font-weight:700;color:var(--text-bright);margin:0 0 0.75rem;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        Change History
+                    </h3>
+                    <div id="history-chart" class="cyab-history-chart"></div>
+                    <div id="history-timeline" class="cyab-history-timeline"></div>
+                    <p id="history-empty" class="cyab-dash-empty" style="display:none;padding:0.5rem;">No history yet. Changes are tracked automatically when data sources are updated.</p>
+                </div>
+            </header>
+
+            <!-- 2. Readiness Metrics Dashboard -->
+            <section id="metrics" class="cyab-section">
+                <h2 class="cyab-heading"><span class="cyab-hnum">2</span>CyAB Readiness Dashboard</h2>
+                <div class="cyab-metrics-top">
+                    <div class="cyab-metric-card cyab-metric-main">
+                        <div class="cyab-ring-wrap">
+                            <svg class="cyab-ring" viewBox="0 0 120 120">
+                                <circle cx="60" cy="60" r="52" fill="none" stroke="var(--bg-deep)" stroke-width="10"/>
+                                <circle id="ring-progress" cx="60" cy="60" r="52" fill="none" stroke="var(--primary)" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" transform="rotate(-90 60 60)" style="transition:stroke-dashoffset .6s ease,stroke .3s"/>
+                            </svg>
+                            <span class="cyab-ring-value" id="readiness-score">0<small>%</small></span>
+                        </div>
+                        <p class="cyab-metric-name">Overall Readiness</p>
+                        <p class="cyab-metric-hint">Composite of field mapping, mandatory coverage, use-case status &amp; SAL alignment</p>
+                    </div>
+                    <div class="cyab-metric-card">
+                        <span class="cyab-metric-icon" style="background:rgba(239,68,68,0.12);color:var(--danger);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+                        <span class="cyab-metric-val" id="metric-mandatory">0 / 0</span>
+                        <p class="cyab-metric-name">Mandatory Fields</p>
+                        <span class="cyab-metric-badge" id="metric-mandatory-badge">&mdash;</span>
+                    </div>
+                    <div class="cyab-metric-card">
+                        <span class="cyab-metric-icon" style="background:rgba(59,130,246,0.12);color:var(--primary);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+                        <span class="cyab-metric-val" id="metric-detections">0</span>
+                        <p class="cyab-metric-name">Detection Unlocks</p>
+                        <span class="cyab-metric-sub" id="metric-detections-sub">rules enabled by mapped fields</span>
+                    </div>
+                    <div class="cyab-metric-card">
+                        <span class="cyab-metric-icon" style="background:rgba(249,115,22,0.12);color:var(--neon-orange);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+                        <span class="cyab-metric-val" id="metric-risk">&mdash;</span>
+                        <p class="cyab-metric-name">Risk Rating</p>
+                        <span class="cyab-metric-sub" id="metric-risk-sub">based on unmapped mandatory fields</span>
+                    </div>
+                    <div class="cyab-metric-card">
+                        <span class="cyab-metric-icon" style="background:rgba(16,185,129,0.12);color:var(--success);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
+                        <span class="cyab-metric-val" id="metric-sal-compliance">&mdash;</span>
+                        <p class="cyab-metric-name">SAL Compliance</p>
+                        <span class="cyab-metric-sub" id="metric-sal-sub">minimum threshold for selected tier</span>
+                    </div>
+                </div>
+                <h3 style="font-size:0.9rem;font-weight:700;color:var(--text-bright);margin:1.5rem 0 0.75rem;">Category Coverage Breakdown</h3>
+                <div class="cyab-cat-grid" id="cat-bars"></div>
+                <div class="cyab-blindspots" id="blindspots-area" style="display:none;">
+                    <h4 style="font-size:0.8rem;font-weight:700;color:var(--danger);margin:0 0 0.5rem;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                        Detection Blind Spots
+                    </h4>
+                    <div id="blindspots-list" class="cyab-blindspots-list"></div>
+                </div>
+            </section>
+
+            <!-- 3. Demarcation -->
+            <section id="demarcation" class="cyab-section">
+                <h2 class="cyab-heading"><span class="cyab-hnum">3</span>The Ingestion Demarcation Point</h2>
+                <div class="cyab-demarcation">
+                    <div class="cyab-zone cyab-zone-dept">
+                        <p class="cyab-zone-label">Department Zone</p>
+                        <h3>System Source</h3>
+                        <p class="cyab-zone-sub">Agent Config &bull; Local Audit Policy &bull; Connectivity</p>
+                    </div>
+                    <div class="cyab-demarcation-line">
+                        <span class="cyab-demarcation-badge">INGESTION POINT</span>
+                    </div>
+                    <div class="cyab-zone cyab-zone-soc">
+                        <p class="cyab-zone-label">SOC Zone</p>
+                        <h3>SIEM / Data Lake</h3>
+                        <p class="cyab-zone-sub">Storage &bull; Indexing &bull; Analysis &bull; Alerting</p>
+                    </div>
+                </div>
+                <div class="cyab-resp-grid">
+                    <div class="cyab-resp-card">
+                        <h4>Department Accountability</h4>
+                        <ul>
+                            <li>Ensuring logs are generated and sent</li>
+                            <li>Maintaining source agent health</li>
+                            <li>Accurate time synchronisation (NTP)</li>
+                            <li>Notifying SOC of maintenance / outages</li>
+                            <li>Providing access for agent deployment</li>
+                        </ul>
+                    </div>
+                    <div class="cyab-resp-card cyab-resp-soc">
+                        <h4>SOC Accountability</h4>
+                        <ul>
+                            <li>Data persistence &amp; searchability</li>
+                            <li>Detection logic (rules) &amp; parsing</li>
+                            <li>Availability of ingestion gateway</li>
+                            <li>Monitoring data source health</li>
+                            <li>Reporting on coverage &amp; gaps</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. SAL Tiers -->
+            <section id="sal-tiers" class="cyab-section">
+                <h2 class="cyab-heading"><span class="cyab-hnum">4</span>Security Assurance Levels (SAL)</h2>
+                <div id="ds-edit-banner" class="cyab-ds-edit-banner" style="display:none;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="flex-shrink:0;"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    <span>Editing: <strong id="ds-edit-name"></strong></span>
+                    <button class="btn btn-primary" onclick="saveActiveDataSource()" style="margin-left:auto;padding:0.2rem 0.6rem;font-size:0.7rem;">Save Source</button>
+                </div>
+                <div id="ds-no-source" style="display:none;background:var(--bg-secondary);border:1px dashed var(--border);border-radius:var(--radius);padding:2rem;text-align:center;margin-bottom:1rem;">
+                    <p style="color:var(--text-muted);font-size:0.85rem;margin:0;">Save the system first, then add a data source to configure SAL tiers, field mapping, and use cases.</p>
+                </div>
+                <p id="sal-intro" style="color:var(--text-secondary);margin-bottom:1rem;font-size:0.85rem;">Select the SAL tier for the data source covered by this agreement.</p>
+                <div class="cyab-sal-grid">
+                    <label class="cyab-sal-card" data-sal="1">
+                        <input type="radio" name="sal_tier" value="SAL-1" class="cyab-sal-radio">
+                        <div class="cyab-sal-badge">OPTIMISED</div>
+                        <h3>SAL-1</h3>
+                        <p class="cyab-sal-desc">Highest Fidelity</p>
+                        <ul class="cyab-sal-features">
+                            <li class="cyab-sal-highlight">Active Response (SOAR)</li>
+                            <li>&lt; 1 min Latency</li>
+                            <li>Full ECS field mapping</li>
+                            <li>24/7 monitoring + hunting</li>
+                        </ul>
+                        <p class="cyab-sal-use">"Critical servers, identity providers, crown jewels."</p>
+                    </label>
+                    <label class="cyab-sal-card" data-sal="2">
+                        <input type="radio" name="sal_tier" value="SAL-2" checked class="cyab-sal-radio">
+                        <div class="cyab-sal-badge" style="background:var(--bg-elevated);color:var(--text-secondary);">FUNCTIONAL</div>
+                        <h3>SAL-2</h3>
+                        <p class="cyab-sal-desc">Standard Coverage</p>
+                        <ul class="cyab-sal-features">
+                            <li>Human Triage (business hours)</li>
+                            <li>&lt; 15 min Latency</li>
+                            <li>Core fields mapped</li>
+                            <li>Business hours alerting</li>
+                        </ul>
+                        <p class="cyab-sal-use">"Standard business applications and infrastructure."</p>
+                    </label>
+                    <label class="cyab-sal-card" data-sal="3">
+                        <input type="radio" name="sal_tier" value="SAL-3" class="cyab-sal-radio">
+                        <div class="cyab-sal-badge" style="background:var(--bg-elevated);color:var(--text-muted);">BASIC</div>
+                        <h3>SAL-3</h3>
+                        <p class="cyab-sal-desc">Audit / Search Only</p>
+                        <ul class="cyab-sal-features">
+                            <li>No active alerting</li>
+                            <li>Best-effort latency</li>
+                            <li>Minimal field mapping</li>
+                            <li>Available for search/forensics</li>
+                        </ul>
+                        <p class="cyab-sal-use">"Legacy systems, low-risk audit logs."</p>
+                    </label>
+                </div>
+                <div class="form-row" style="margin-top:1.5rem;">
+                    <div class="form-group"><label>Data Source Name</label><input type="text" id="ds-name" placeholder="e.g. Windows Event Logs — Domain Controllers"></div>
+                    <div class="form-group"><label>Data Source Type</label>
+                        <select id="ds-type">
+                            <option>Endpoint</option><option>Network</option><option>Identity / Auth</option>
+                            <option>Cloud</option><option>Email / Web Proxy</option><option>DNS</option>
+                            <option>Firewall / IDS</option><option>Application</option><option>Database</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Uptime Target</label>
+                        <select id="ds-uptime">
+                            <option>99.9% (&lt; 8.7 hrs/year)</option>
+                            <option selected>99.5% (&lt; 1.8 days/year)</option>
+                            <option>99% (&lt; 3.65 days/year)</option>
+                            <option>95% (&lt; 18.25 days/year)</option>
+                            <option>Best Effort</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Max Ingest Latency</label>
+                        <select id="ds-latency">
+                            <option>&lt; 1 minute (real-time)</option>
+                            <option selected>&lt; 5 minutes</option>
+                            <option>&lt; 15 minutes</option>
+                            <option>&lt; 1 hour</option>
+                            <option>&lt; 24 hours (batch)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Retention (Hot / Cold)</label>
+                        <select id="ds-retention">
+                            <option>30 days hot</option>
+                            <option selected>90 days hot / 1 year cold</option>
+                            <option>180 days hot / 1 year cold</option>
+                            <option>1 year hot / 7 years cold</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Response SLA (P1 Critical)</label>
+                        <select id="ds-p1">
+                            <option>15 minutes</option><option selected>30 minutes</option>
+                            <option>1 hour</option><option>4 hours</option><option>Next business day</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. Field Mapping -->
+            <section id="field-mapping" class="cyab-section">
+                <h2 class="cyab-heading"><span class="cyab-hnum">5</span>Field Mapping Specification</h2>
+                <p style="color:var(--text-secondary);margin-bottom:0.5rem;font-size:0.85rem;">Tick each field that is present and correctly mapped in the data source. The score updates automatically.</p>
+                <div class="cyab-score-bar">
+                    <div class="cyab-score-fill" id="score-fill" style="width:0%"></div>
+                    <span class="cyab-score-text" id="score-text">0 / 0 fields &mdash; 0%</span>
+                </div>
+                <div class="cyab-field-table">
+                    <div class="cyab-ft-header">
+                        <span class="cyab-ft-check"></span>
+                        <span class="cyab-ft-cat">Category</span>
+                        <span class="cyab-ft-field">ECS Field</span>
+                        <span class="cyab-ft-unlock">Detection Unlock</span>
+                        <span class="cyab-ft-pri">Priority</span>
+                    </div>
+                    <!-- Identity -->
+                    <div class="cyab-ft-row" data-cat="Identity"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="user.name"></label><span class="cyab-ft-cat">Identity</span><span class="cyab-ft-field"><code>user.name</code></span><span class="cyab-ft-unlock">Account compromise, lateral movement</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-mandatory">Mandatory</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="user.domain"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>user.domain</code></span><span class="cyab-ft-unlock">Cross-domain attack detection</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-high">High</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="user.id"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>user.id</code></span><span class="cyab-ft-unlock">Correlation across sources</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-high">High</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="source.user.name"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>source.user.name</code></span><span class="cyab-ft-unlock">Auth event source identity</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-medium">Medium</span></span></div>
+                    <!-- Event Metadata -->
+                    <div class="cyab-ft-row" data-cat="Event"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="@timestamp"></label><span class="cyab-ft-cat">Event Metadata</span><span class="cyab-ft-field"><code>@timestamp</code></span><span class="cyab-ft-unlock">All temporal correlation</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-mandatory">Mandatory</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="event.action"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>event.action</code></span><span class="cyab-ft-unlock">Behavioural detection rules</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-mandatory">Mandatory</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="event.category"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>event.category</code></span><span class="cyab-ft-unlock">Alert categorisation</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-high">High</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="event.outcome"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>event.outcome</code></span><span class="cyab-ft-unlock">Success/failure brute-force detection</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-mandatory">Mandatory</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="host.name"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>host.name</code></span><span class="cyab-ft-unlock">Asset-based correlation</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-mandatory">Mandatory</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="agent.name"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>agent.name</code></span><span class="cyab-ft-unlock">Agent health monitoring</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-medium">Medium</span></span></div>
+                    <!-- Execution -->
+                    <div class="cyab-ft-row" data-cat="Process"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="process.name"></label><span class="cyab-ft-cat">Execution</span><span class="cyab-ft-field"><code>process.name</code></span><span class="cyab-ft-unlock">Malicious process detection</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-mandatory">Mandatory</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="process.command_line"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>process.command_line</code></span><span class="cyab-ft-unlock">Living-off-the-Land (LotL) detection</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-mandatory">Mandatory</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="process.parent.name"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>process.parent.name</code></span><span class="cyab-ft-unlock">Malicious spawn chain detection</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-high">High</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="process.hash.sha256"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>process.hash.sha256</code></span><span class="cyab-ft-unlock">IOC hash matching, threat intel</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-high">High</span></span></div>
+                    <!-- Network -->
+                    <div class="cyab-ft-row" data-cat="Network"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="source.ip"></label><span class="cyab-ft-cat">Network</span><span class="cyab-ft-field"><code>source.ip</code></span><span class="cyab-ft-unlock">Source attribution, geo-blocking</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-mandatory">Mandatory</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="destination.ip"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>destination.ip</code></span><span class="cyab-ft-unlock">C2 beacon detection, IOC matching</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-mandatory">Mandatory</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="source.port"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>source.port</code> / <code>destination.port</code></span><span class="cyab-ft-unlock">Port scan detection, service ID</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-high">High</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="dns.question.name"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>dns.question.name</code></span><span class="cyab-ft-unlock">DNS tunnelling, DGA detection</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-high">High</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="network.bytes"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>network.bytes</code> / <code>source.bytes</code></span><span class="cyab-ft-unlock">Data exfiltration detection</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-high">High</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="url.full"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>url.full</code> / <code>url.domain</code></span><span class="cyab-ft-unlock">Malicious URL / phishing detection</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-medium">Medium</span></span></div>
+                    <!-- File -->
+                    <div class="cyab-ft-row" data-cat="File"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="file.name"></label><span class="cyab-ft-cat">File</span><span class="cyab-ft-field"><code>file.name</code> / <code>file.path</code></span><span class="cyab-ft-unlock">Ransomware file activity, dropper detection</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-high">High</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="file.hash.sha256"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>file.hash.sha256</code></span><span class="cyab-ft-unlock">Malware IOC hash lookups</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-high">High</span></span></div>
+                    <!-- Enrichment -->
+                    <div class="cyab-ft-row" data-cat="Enrichment"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="source.geo.country_name"></label><span class="cyab-ft-cat">Enrichment</span><span class="cyab-ft-field"><code>source.geo.country_name</code></span><span class="cyab-ft-unlock">Impossible travel, geo-anomaly</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-medium">Medium</span></span></div>
+                    <div class="cyab-ft-row"><label class="cyab-ft-check"><input type="checkbox" class="field-check" data-field="threat.indicator.ip"></label><span class="cyab-ft-cat"></span><span class="cyab-ft-field"><code>threat.indicator.*</code></span><span class="cyab-ft-unlock">Threat intel enrichment matching</span><span class="cyab-ft-pri"><span class="cyab-pill cyab-medium">Medium</span></span></div>
+                </div>
+                <div class="form-group" style="margin-top:1rem;">
+                    <label>Field Mapping Notes (gaps, workarounds, custom fields)</label>
+                    <textarea id="field-notes" rows="3" placeholder="e.g. process.command_line not available from this source — compensating with Sysmon deployment planned Q2..."></textarea>
+                </div>
+            </section>
+
+            <!-- 6. Use Cases -->
+            <section id="use-cases" class="cyab-section">
+                <h2 class="cyab-heading"><span class="cyab-hnum">6</span>Use Case Coverage Status</h2>
+                <div class="cyab-callout" style="margin-bottom:1rem;">
+                    <p>Use cases are defined and tracked in <strong>TIDE</strong>. This section records the review status against this data source.</p>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>TIDE Review Status</label>
+                        <select id="uc-status" style="font-size:0.9rem;">
+                            <option value="Not Yet Reviewed">Not Yet Reviewed</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Reviewed — Fully Covered">Reviewed — Fully Covered</option>
+                            <option value="Reviewed — Known Gaps">Reviewed — Known Gaps</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Last Reviewed Date</label><input type="date" id="uc-review-date"></div>
+                </div>
+                <div class="form-group"><label>Known Gaps (use cases that cannot be covered with current data)</label>
+                    <textarea id="uc-gaps" rows="4" placeholder="e.g.&#10;- UC-014 Lateral Movement: Missing process.parent fields&#10;- UC-031 DNS Tunnelling: DNS logs not yet onboarded"></textarea>
+                </div>
+                <div class="form-group"><label>Gap Remediation Plan</label>
+                    <textarea id="uc-remediation" rows="3" placeholder="e.g. Sysmon deployment to DCs scheduled for 2026-Q2. DNS logging to be enabled via GPO by end of sprint 14."></textarea>
+                </div>
+            </section>
+
+            <!-- 7. Governance -->
+            <section id="governance" class="cyab-section">
+                <h2 class="cyab-heading"><span class="cyab-hnum">7</span>Governance &amp; Storage</h2>
+                <div class="cyab-resp-grid">
+                    <div class="cyab-resp-card"><h4>Data Stewardship</h4><p>Departments retain <strong>ownership</strong> of their data. The SOC acts as <strong>custodian</strong>. Responsibility for data accuracy, classification, and lawful basis remains with the Department.</p></div>
+                    <div class="cyab-resp-card"><h4>Retention Cap</h4><p>SOC provides <strong>hot storage</strong> per the retention selected in Section 4. Compliance archiving beyond this period must be managed by the Department. Cold storage is read-only and may have slower query times.</p></div>
+                    <div class="cyab-resp-card"><h4>SLA Breach Process</h4><p>If data drops below the agreed uptime target or field quality degrades, the SOC will raise a ticket. If unresolved within <strong>2 review cycles</strong>, escalation to CISO.</p></div>
+                    <div class="cyab-resp-card"><h4>Review Cadence</h4><p>This agreement is reviewed per the cadence set in Section 1. Both parties meet to review data health, field mapping score, use case coverage, and gap remediation progress.</p></div>
+                </div>
+            </section>
+
+            <!-- 8. Sign-off -->
+            <section id="sign-off" class="cyab-section">
+                <h2 class="cyab-heading"><span class="cyab-hnum">8</span>Authorization</h2>
+                <div class="cyab-sign-grid">
+                    <div class="cyab-sign-box">
+                        <p class="cyab-sign-label">DEPARTMENT LEAD</p>
+                        <div class="cyab-sign-line"></div>
+                        <input type="text" id="sign-dept" placeholder="Print name" style="border:none;background:transparent;width:100%;font-size:0.85rem;color:var(--text-primary);padding:0;">
+                        <input type="date" id="sign-dept-date" style="margin-top:0.5rem;">
+                    </div>
+                    <div class="cyab-sign-box">
+                        <p class="cyab-sign-label">SOC MANAGER</p>
+                        <div class="cyab-sign-line"></div>
+                        <input type="text" id="sign-soc" placeholder="Print name" style="border:none;background:transparent;width:100%;font-size:0.85rem;color:var(--text-primary);padding:0;">
+                        <input type="date" id="sign-soc-date" style="margin-top:0.5rem;">
+                    </div>
+                </div>
+                <div class="cyab-warning">
+                    Notice: Failure to provide SAL-1 mandatory fields results in exclusion from automated defence playbooks. The SOC cannot guarantee detection coverage without the required data.
+                </div>
+            </section>
+
+        </div>
+    </main>
+</div>
+
+<!-- Data Source Picker Modal -->
+<div class="modal" id="ds-picker-modal">
+    <div class="modal-content" style="max-width:560px;">
+        <div class="modal-header">
+            <h2>Add Data Sources</h2>
+            <button class="modal-close" onclick="closeDsPicker()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 1rem;">Select the data sources this system ingests. You can add multiple at once.</p>
+            <div class="cyab-dsp-grid" id="ds-picker-grid"></div>
+            <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);">
+                <label class="checkbox-label" style="margin-bottom:0.5rem;">
+                    <input type="checkbox" id="ds-picker-other-check" onchange="document.getElementById('ds-picker-other-name').disabled=!this.checked;if(this.checked)document.getElementById('ds-picker-other-name').focus();">
+                    Other (custom)
+                </label>
+                <input type="text" id="ds-picker-other-name" placeholder="Custom data source name..." disabled style="width:100%;padding:0.5rem 0.75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:0.85rem;margin-top:0.25rem;">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeDsPicker()">Cancel</button>
+            <button class="btn btn-primary" onclick="confirmDsPicker()">Add Selected</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ======================== DASHBOARD STYLES ======================== */
+#cyab-dashboard{padding:0.5rem}
+.cyab-dash-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.25rem}
+.cyab-dash-title{display:flex;align-items:center;gap:0.5rem;font-size:1.4rem;font-weight:700;color:var(--text-bright);margin:0}
+.cyab-dash-sub{font-size:0.8rem;color:var(--text-muted);margin:0.2rem 0 0}
+.cyab-dash-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:0.75rem;margin-bottom:1.25rem}
+.cyab-dm-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;display:flex;flex-direction:column;align-items:center;text-align:center;gap:0.25rem}
+.cyab-dm-icon{width:36px;height:36px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center}
+.cyab-dm-val{font-size:1.4rem;font-weight:800;color:var(--text-bright)}
+.cyab-dm-label{font-size:0.65rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em}
+.cyab-dash-row{display:flex;gap:1rem}
+.cyab-dash-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem}
+.cyab-dash-panel-title{font-size:0.85rem;font-weight:700;color:var(--text-bright);margin:0 0 0.75rem}
+.cyab-dash-empty{font-size:0.8rem;color:var(--text-muted);text-align:center;padding:2rem 0}
+.cyab-dept-bars{display:flex;flex-direction:column;gap:0.5rem}
+.cyab-dept-row{display:flex;align-items:center;gap:0.75rem}
+.cyab-dept-name{font-size:0.75rem;font-weight:600;color:var(--text-primary);min-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cyab-dept-bar-wrap{flex:1;height:8px;background:var(--bg-deep);border-radius:4px;overflow:hidden}
+.cyab-dept-bar-fill{height:100%;border-radius:4px;transition:width .4s ease}
+.cyab-dept-pct{font-size:0.7rem;font-weight:700;color:var(--text-secondary);min-width:32px;text-align:right}
+.cyab-dept-count{font-size:0.6rem;color:var(--text-muted);min-width:20px}
+.cyab-due-list{display:flex;flex-direction:column;gap:0.4rem;max-height:200px;overflow-y:auto}
+.cyab-due-item{display:flex;align-items:center;gap:0.5rem;padding:0.5rem;border:1px solid var(--border);border-radius:var(--radius);font-size:0.75rem;cursor:pointer;transition:background .15s}
+.cyab-due-item:hover{background:var(--bg-secondary)}
+.cyab-due-item.overdue{border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.05)}
+.cyab-due-badge{font-size:0.55rem;font-weight:700;padding:0.1rem 0.4rem;border-radius:9999px;text-transform:uppercase;white-space:nowrap}
+.cyab-due-badge.overdue{background:rgba(239,68,68,0.15);color:var(--danger)}
+.cyab-due-badge.due-soon{background:rgba(249,115,22,0.15);color:var(--neon-orange)}
+.cyab-search-input{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.4rem 0.75rem;font-size:0.8rem;color:var(--text-primary);width:220px}
+.cyab-sys-table-wrap{overflow-x:auto}
+.cyab-sys-table{width:100%;border-collapse:collapse;font-size:0.8rem}
+.cyab-sys-table th{padding:0.5rem 0.6rem;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);border-bottom:2px solid var(--border);cursor:pointer;white-space:nowrap;user-select:none}
+.cyab-sys-table th:hover{color:var(--text-primary)}
+.cyab-sys-table td{padding:0.55rem 0.6rem;border-bottom:1px solid var(--border);color:var(--text-primary)}
+.cyab-sys-table tr:hover td{background:var(--bg-secondary)}
+.cyab-sys-table tr{cursor:pointer}
+.cyab-readiness-mini{display:inline-flex;align-items:center;gap:0.4rem}
+.cyab-readiness-mini-bar{width:50px;height:6px;background:var(--bg-deep);border-radius:3px;overflow:hidden}
+.cyab-readiness-mini-fill{height:100%;border-radius:3px}
+.cyab-risk-badge{font-size:0.6rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:9999px;text-transform:uppercase}
+.cyab-status-badge{font-size:0.6rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:9999px;text-transform:uppercase}
+.cyab-back-btn{font-size:0.8rem}
+/* Icon picker */
+.cyab-icon-picker{display:flex;flex-wrap:wrap;gap:0.35rem}
+.cyab-icon-btn{width:32px;height:32px;border:2px solid var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--bg-secondary);transition:all .15s;color:var(--text-secondary)}
+.cyab-icon-btn:hover{border-color:var(--primary);color:var(--primary)}
+.cyab-icon-btn.active{border-color:var(--primary);background:var(--primary-dim);color:var(--primary)}
+/* Data source list */
+.cyab-ds-list{display:flex;flex-direction:column;gap:0.5rem}
+.cyab-ds-card{display:flex;align-items:center;gap:0.75rem;padding:0.75rem;border:1px solid var(--border);border-radius:var(--radius-lg);background:var(--bg-secondary);cursor:pointer;transition:all .15s}
+.cyab-ds-card:hover{border-color:var(--primary);background:var(--primary-dim)}
+.cyab-ds-card.active{border-color:var(--primary);box-shadow:var(--glow-sm)}
+.cyab-ds-icon{width:36px;height:36px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cyab-ds-info{flex:1;min-width:0}
+.cyab-ds-name{font-size:0.8rem;font-weight:700;color:var(--text-bright);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cyab-ds-meta{font-size:0.65rem;color:var(--text-muted);display:flex;gap:0.75rem;margin-top:0.15rem}
+.cyab-ds-score{text-align:right;flex-shrink:0}
+.cyab-ds-score-val{font-size:1rem;font-weight:800;color:var(--text-bright)}
+.cyab-ds-score-label{font-size:0.55rem;color:var(--text-muted);text-transform:uppercase}
+/* History */
+.cyab-history-chart{height:100px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:0.75rem;position:relative;overflow:hidden;padding:0.5rem}
+.cyab-history-chart svg{width:100%;height:100%}
+.cyab-history-timeline{display:flex;flex-direction:column;gap:0.35rem;max-height:200px;overflow-y:auto}
+.cyab-ht-item{display:flex;align-items:flex-start;gap:0.5rem;font-size:0.75rem;padding:0.4rem 0}
+.cyab-ht-dot{width:8px;height:8px;border-radius:50%;background:var(--primary);flex-shrink:0;margin-top:0.3rem}
+.cyab-ht-date{font-size:0.6rem;color:var(--text-muted);min-width:70px;flex-shrink:0}
+.cyab-ht-text{color:var(--text-secondary);flex:1}
+.cyab-ht-scores{font-size:0.6rem;color:var(--text-muted);display:flex;gap:0.5rem;flex-shrink:0}
+.cyab-sys-icon{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:var(--radius);margin-right:0.5rem;flex-shrink:0}
+.cyab-ds-edit-banner{background:var(--primary-dim);border:1px solid var(--primary);border-radius:var(--radius);padding:0.5rem 0.75rem;margin-bottom:1rem;font-size:0.8rem;display:flex;align-items:center;gap:0.5rem}
+.cyab-dsp-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem}
+.cyab-dsp-item{display:flex;align-items:center;gap:0.6rem;padding:0.65rem 0.75rem;border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .15s;font-size:0.85rem;color:var(--text-primary)}
+.cyab-dsp-item:hover{border-color:var(--primary);background:var(--primary-dim)}
+.cyab-dsp-item.selected{border-color:var(--primary);background:var(--primary-dim);box-shadow:var(--glow-sm)}
+.cyab-dsp-item input[type="checkbox"]{accent-color:var(--primary);width:1rem;height:1rem;flex-shrink:0}
+.cyab-dsp-icon{color:var(--text-muted);flex-shrink:0;display:flex}
+
+/* ======================== DETAIL VIEW STYLES ======================== */
+.cyab-layout{display:flex;min-height:calc(100vh - 60px);margin:-1rem -1rem 0}
+.cyab-sidebar{width:240px;flex-shrink:0;background:var(--bg-deep);border-right:1px solid var(--border);padding:1.5rem 1rem;display:flex;flex-direction:column;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto}
+.cyab-sidebar-brand{display:flex;align-items:center;gap:0.6rem;font-weight:700;font-size:1.1rem;color:var(--text-bright);margin-bottom:1rem}
+.cyab-nav{flex:1}
+.cyab-nav-label{font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.5rem;padding-left:0.5rem}
+.cyab-nav-link{display:block;padding:0.4rem 0.75rem;font-size:0.8rem;color:var(--text-secondary);border-radius:var(--radius);text-decoration:none;margin-bottom:0.15rem;transition:background .15s}
+.cyab-nav-link:hover{background:var(--bg-secondary);color:var(--text-primary)}
+.cyab-nav-link.active{background:var(--primary-dim);color:var(--primary);font-weight:600}
+.cyab-sidebar-actions{display:flex;flex-direction:column;gap:0.5rem;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border)}
+.cyab-main{flex:1;padding:2rem;overflow-y:auto}
+.cyab-paper{max-width:900px;margin:0 auto;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2.5rem;box-shadow:var(--shadow-card)}
+.cyab-section{margin-bottom:3rem;padding-bottom:2rem;border-bottom:1px solid var(--border)}
+.cyab-section:last-child{border-bottom:none;margin-bottom:0}
+.cyab-title{font-size:1.8rem;font-weight:700;color:var(--text-bright);margin:0}
+.cyab-subtitle{color:var(--text-muted);font-size:0.9rem;margin-top:0.25rem}
+.cyab-heading{display:flex;align-items:center;gap:0.6rem;font-size:1.15rem;font-weight:700;color:var(--text-bright);margin-bottom:1rem}
+.cyab-hnum{background:var(--bg-deep);color:var(--text-secondary);width:1.8rem;height:1.8rem;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.8rem;flex-shrink:0}
+.cyab-callout{background:var(--primary-dim);border-left:3px solid var(--primary);padding:0.75rem 1rem;border-radius:0 var(--radius) var(--radius) 0;font-size:0.85rem;color:var(--text-primary);line-height:1.5}
+.cyab-meta-block{display:flex;flex-direction:column;gap:0.3rem}
+.cyab-meta-row{display:flex;align-items:center;gap:0.5rem;font-size:0.7rem}
+.cyab-meta-row span{font-weight:700;color:var(--text-muted);min-width:4rem;text-align:right}
+.cyab-meta-input{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:0.75rem;padding:0.2rem 0.4rem;width:140px}
+/* Demarcation */
+.cyab-demarcation{display:flex;align-items:center;justify-content:center;gap:0;background:var(--bg-secondary);border-radius:var(--radius-lg);padding:2rem 1.5rem;border:1px solid var(--border);flex-wrap:wrap}
+.cyab-zone{text-align:center;padding:1.25rem;border-radius:var(--radius-lg);flex:1;min-width:200px}
+.cyab-zone h3{font-size:1rem;margin:0.25rem 0}
+.cyab-zone-label{font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.3rem}
+.cyab-zone-sub{font-size:0.7rem;color:var(--text-muted);margin-top:0.3rem}
+.cyab-zone-dept{background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary)}
+.cyab-zone-dept .cyab-zone-label{color:var(--text-muted)}
+.cyab-zone-soc{background:var(--primary);color:#fff}
+.cyab-zone-soc .cyab-zone-label{color:rgba(255,255,255,0.7)}
+.cyab-zone-soc .cyab-zone-sub{color:rgba(255,255,255,0.6)}
+.cyab-demarcation-line{display:flex;flex-direction:column;align-items:center;padding:0 0.5rem}
+.cyab-demarcation-badge{background:var(--danger);color:#fff;font-size:0.6rem;font-weight:700;padding:0.25rem 0.6rem;border-radius:var(--radius);letter-spacing:0.05em;white-space:nowrap}
+.cyab-resp-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem}
+.cyab-resp-card{padding:1rem;border:1px solid var(--border);border-radius:var(--radius-lg);font-size:0.82rem;color:var(--text-secondary);line-height:1.5}
+.cyab-resp-card h4{font-size:0.85rem;color:var(--text-primary);margin:0 0 0.5rem;font-weight:700}
+.cyab-resp-card ul{margin:0;padding-left:1.2rem}
+.cyab-resp-card li{margin-bottom:0.3rem}
+.cyab-resp-soc{border-color:var(--primary);background:var(--primary-dim)}
+.cyab-resp-soc h4{color:var(--primary)}
+/* SAL Cards */
+.cyab-sal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.cyab-sal-card{display:block;background:var(--bg-secondary);border:2px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;cursor:pointer;position:relative;transition:all .2s;overflow:hidden}
+.cyab-sal-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-card)}
+.cyab-sal-card:has(:checked){border-color:var(--primary);box-shadow:var(--glow-sm)}
+.cyab-sal-radio{position:absolute;opacity:0;pointer-events:none}
+.cyab-sal-badge{font-size:0.55rem;font-weight:700;letter-spacing:0.1em;background:var(--primary);color:#fff;padding:0.15rem 0.5rem;border-radius:var(--radius);display:inline-block;margin-bottom:0.5rem}
+.cyab-sal-card h3{font-size:1.1rem;color:var(--text-bright);margin:0}
+.cyab-sal-desc{font-size:0.75rem;color:var(--text-muted);margin:0.2rem 0 0.75rem}
+.cyab-sal-features{list-style:none;padding:0;margin:0 0 0.75rem;font-size:0.78rem;color:var(--text-secondary)}
+.cyab-sal-features li{padding:0.2rem 0;padding-left:1rem;position:relative}
+.cyab-sal-features li::before{content:"";position:absolute;left:0;top:0.55rem;width:6px;height:6px;border-radius:50%;background:var(--border)}
+.cyab-sal-highlight{color:var(--primary);font-weight:600}
+.cyab-sal-highlight::before{background:var(--primary) !important}
+.cyab-sal-use{font-size:0.7rem;color:var(--text-muted);font-style:italic;background:var(--bg-deep);padding:0.4rem 0.6rem;border-radius:var(--radius);margin:0}
+/* Field Mapping */
+.cyab-score-bar{position:relative;height:2rem;background:var(--bg-secondary);border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--border);margin-bottom:1rem}
+.cyab-score-fill{height:100%;background:linear-gradient(90deg,var(--danger),var(--warning),var(--success));transition:width .4s ease;border-radius:var(--radius-lg)}
+.cyab-score-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:0.75rem;font-weight:700;color:var(--text-bright);text-shadow:0 1px 3px rgba(0,0,0,0.5)}
+.cyab-field-table{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.cyab-ft-header{display:grid;grid-template-columns:2.5rem 6rem 1fr 1fr 5.5rem;gap:0.5rem;padding:0.75rem 1rem;background:var(--bg-secondary);font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary);align-items:center}
+.cyab-ft-row{display:grid;grid-template-columns:2.5rem 6rem 1fr 1fr 5.5rem;gap:0.5rem;padding:0.6rem 1rem;border-top:1px solid var(--border);font-size:0.85rem;align-items:center;transition:all .15s;color:var(--text-primary)}
+.cyab-ft-row:hover{background:var(--primary-dim)}
+.cyab-ft-row:has(input:checked){background:rgba(59,130,246,0.06)}
+.cyab-ft-check{display:flex;align-items:center;justify-content:center}
+.cyab-ft-check input{width:1.1rem;height:1.1rem;accent-color:var(--primary);cursor:pointer}
+.cyab-ft-cat{font-size:0.75rem;font-weight:600;color:var(--text-secondary)}
+.cyab-ft-field{font-size:0.85rem;color:var(--text-primary)}
+.cyab-ft-field code{background:var(--bg-elevated);padding:0.15rem 0.4rem;border-radius:var(--radius);font-size:0.8rem;color:var(--primary);border:1px solid var(--border)}
+.cyab-ft-unlock{font-size:0.8rem;color:var(--text-secondary)}
+.cyab-ft-pri{font-size:0.75rem}
+.cyab-pill{padding:0.15rem 0.55rem;border-radius:9999px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em}
+.cyab-mandatory{background:rgba(239,68,68,0.15);color:var(--danger)}
+.cyab-high{background:rgba(249,115,22,0.15);color:var(--neon-orange)}
+.cyab-medium{background:rgba(251,191,36,0.15);color:var(--neon-yellow)}
+/* Metrics Dashboard */
+.cyab-metrics-top{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;gap:0.75rem;margin-bottom:1.5rem}
+.cyab-metric-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;display:flex;flex-direction:column;align-items:center;text-align:center;gap:0.25rem;position:relative;overflow:hidden}
+.cyab-metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--border)}
+.cyab-metric-main{grid-row:1/3;justify-content:center}
+.cyab-metric-main::before{background:var(--primary)}
+.cyab-ring-wrap{position:relative;width:110px;height:110px}
+.cyab-ring{width:100%;height:100%}
+.cyab-ring-value{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.6rem;font-weight:800;color:var(--text-bright);line-height:1}
+.cyab-ring-value small{font-size:0.7rem;font-weight:600}
+.cyab-metric-icon{width:36px;height:36px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;margin-bottom:0.15rem}
+.cyab-metric-val{font-size:1.3rem;font-weight:800;color:var(--text-bright);line-height:1.1}
+.cyab-metric-name{font-size:0.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin:0}
+.cyab-metric-hint{font-size:0.65rem;color:var(--text-muted);margin:0;max-width:160px;line-height:1.3}
+.cyab-metric-badge{font-size:0.6rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:9999px;text-transform:uppercase;letter-spacing:0.04em}
+.cyab-metric-badge.badge-pass{background:rgba(16,185,129,0.15);color:var(--success)}
+.cyab-metric-badge.badge-warn{background:rgba(251,191,36,0.15);color:var(--neon-yellow)}
+.cyab-metric-badge.badge-fail{background:rgba(239,68,68,0.15);color:var(--danger)}
+.cyab-metric-sub{font-size:0.6rem;color:var(--text-muted);margin:0}
+.cyab-cat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem}
+.cyab-cat-item{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem}
+.cyab-cat-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem}
+.cyab-cat-name{font-size:0.75rem;font-weight:700;color:var(--text-primary)}
+.cyab-cat-pct{font-size:0.75rem;font-weight:800;color:var(--text-bright)}
+.cyab-cat-bar{height:6px;background:var(--bg-deep);border-radius:3px;overflow:hidden}
+.cyab-cat-fill{height:100%;border-radius:3px;transition:width .4s ease;min-width:0}
+.cyab-cat-count{font-size:0.6rem;color:var(--text-muted);margin-top:0.3rem}
+.cyab-blindspots{margin-top:1rem;padding:0.75rem 1rem;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.15);border-radius:var(--radius)}
+.cyab-blindspots-list{display:flex;flex-wrap:wrap;gap:0.4rem}
+.cyab-blindspot-tag{font-size:0.65rem;padding:0.2rem 0.5rem;border-radius:var(--radius);background:rgba(239,68,68,0.1);color:var(--danger);font-weight:600;border:1px solid rgba(239,68,68,0.2)}
+/* Sign-off */
+.cyab-sign-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
+.cyab-sign-box{padding:1.25rem}
+.cyab-sign-label{font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--text-muted);margin-bottom:0.75rem}
+.cyab-sign-line{height:0;border-bottom:2px solid var(--border);margin-bottom:0.75rem}
+.cyab-warning{margin-top:1.5rem;padding:0.75rem 1rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius);font-size:0.75rem;font-weight:600;color:var(--danger);text-transform:uppercase;letter-spacing:0.02em;line-height:1.5}
+/* Print */
+@media print{
+    .cyab-sidebar,.no-print,#cyab-dashboard{display:none !important}
+    #cyab-detail{display:flex !important}
+    .cyab-layout{display:block}
+    .cyab-main{padding:0}
+    .cyab-paper{box-shadow:none;border:none;padding:1rem}
+    body{background:#fff;color:#000}
+    .cyab-paper,.cyab-zone-dept,.cyab-resp-card,.cyab-sal-card,.cyab-ft-row,.cyab-ft-header,.cyab-metric-card,.cyab-cat-item{background:#fff !important;color:#000 !important;border-color:#ccc !important}
+    .cyab-zone-soc{background:#2563eb !important;color:#fff !important}
+    .cyab-metrics-top{grid-template-columns:1fr 1fr 1fr !important}
+    .cyab-metric-main{grid-row:auto !important}
+    .cyab-ring-value,.cyab-metric-val{color:#000 !important}
+}
+/* Responsive */
+@media(max-width:768px){
+    .cyab-sidebar{display:none}
+    .cyab-layout{display:block}
+    .cyab-dash-metrics{grid-template-columns:1fr 1fr}
+    .cyab-dash-row{flex-direction:column}
+    .cyab-metrics-top{grid-template-columns:1fr 1fr}
+    .cyab-metric-main{grid-row:auto}
+    .cyab-cat-grid{grid-template-columns:1fr}
+    .cyab-sal-grid{grid-template-columns:1fr}
+    .cyab-resp-grid,.cyab-sign-grid{grid-template-columns:1fr}
+    .cyab-demarcation{flex-direction:column}
+    .cyab-ft-header,.cyab-ft-row{grid-template-columns:2rem 1fr 4.5rem;font-size:0.75rem}
+    .cyab-ft-cat,.cyab-ft-unlock{display:none}
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/html2pdf.bundle.min.js"></script>
+<script>
+{% raw %}
+// ======================== STATE ========================
+var currentSystemId = null;
+var currentSystem = null;
+var currentDataSources = [];
+var activeDataSourceId = null;
+var allSystems = [];
+
+// ======================== ICONS ========================
+var ICON_SVGS = {
+    server: '<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+    shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>',
+    key: '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>',
+    cloud: '<path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/>',
+    mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
+    database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
+    search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+    code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+    monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+    'hard-drive': '<line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/>',
+    wifi: '<path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>',
+    lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>',
+    cpu: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>'
+};
+var ICON_LABELS = {server:"Server / Endpoint",shield:"Firewall / IDS",globe:"Network",key:"Identity / Auth",cloud:"Cloud",mail:"Email",database:"Database",search:"DNS",code:"Application",monitor:"Generic","hard-drive":"Storage",wifi:"Wireless",lock:"Security",cpu:"Infrastructure"};
+
+function iconSvg(name, size) {
+    size = size || 16;
+    var paths = ICON_SVGS[name] || ICON_SVGS.monitor;
+    return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+paths+'</svg>';
+}
+
+// ======================== CONSTANTS ========================
+var CATEGORIES = {
+    'Identity':       { fields: ['user.name','user.domain','user.id','source.user.name'], color: 'var(--primary)' },
+    'Event Metadata': { fields: ['@timestamp','event.action','event.category','event.outcome','host.name','agent.name'], color: 'var(--neon-cyan, #06b6d4)' },
+    'Execution':      { fields: ['process.name','process.command_line','process.parent.name','process.hash.sha256'], color: 'var(--neon-orange)' },
+    'Network':        { fields: ['source.ip','destination.ip','source.port','dns.question.name','network.bytes','url.full'], color: 'var(--neon-yellow)' },
+    'File':           { fields: ['file.name','file.hash.sha256'], color: 'var(--neon-pink, #ec4899)' },
+    'Enrichment':     { fields: ['source.geo.country_name','threat.indicator.ip'], color: 'var(--success)' }
+};
+var MANDATORY_FIELDS = ['user.name','@timestamp','event.action','event.outcome','host.name','process.name','process.command_line','source.ip','destination.ip'];
+var SAL_THRESHOLDS = { 'SAL-1': 90, 'SAL-2': 65, 'SAL-3': 35 };
+
+// ======================== DASHBOARD ========================
+async function loadDashboard() {
+    try {
+        var [systems, metrics, dueReviews] = await Promise.all([
+            api.get('/api/cyab/systems'),
+            api.get('/api/cyab/dashboard'),
+            api.get('/api/cyab/due-reviews')
+        ]);
+        allSystems = systems;
+        renderDashMetrics(metrics);
+        renderDeptBars(metrics.by_department);
+        renderDueList(dueReviews);
+        renderSystemsTable(systems);
+    } catch (e) {
+        console.error('Failed to load CyAB dashboard:', e);
+    }
+}
+
+function renderDashMetrics(m) {
+    document.getElementById('dm-total').textContent = m.total_systems;
+    document.getElementById('dm-readiness').textContent = m.avg_readiness + '%';
+    document.getElementById('dm-sal-pass').textContent = m.sal_compliance_pass;
+    document.getElementById('dm-risk-high').textContent = m.risk_high;
+    document.getElementById('dm-due').textContent = m.due_for_review + (m.overdue ? ' (' + m.overdue + ' overdue)' : '');
+}
+
+function renderDeptBars(depts) {
+    var c = document.getElementById('dept-bars');
+    var empty = document.getElementById('dept-empty');
+    if (!depts || depts.length === 0) { c.innerHTML = ''; empty.style.display = ''; return; }
+    empty.style.display = 'none';
+    c.innerHTML = depts.map(function(d) {
+        var color = d.avg_readiness >= 70 ? 'var(--success)' : d.avg_readiness >= 40 ? 'var(--neon-yellow)' : 'var(--danger)';
+        return '<div class="cyab-dept-row">' +
+            '<span class="cyab-dept-name" title="' + d.department + '">' + d.department + '</span>' +
+            '<div class="cyab-dept-bar-wrap"><div class="cyab-dept-bar-fill" style="width:' + d.avg_readiness + '%;background:' + color + '"></div></div>' +
+            '<span class="cyab-dept-pct">' + d.avg_readiness + '%</span>' +
+            '<span class="cyab-dept-count">(' + d.count + ')</span>' +
+            '</div>';
+    }).join('');
+}
+
+function renderDueList(items) {
+    var c = document.getElementById('due-list');
+    var empty = document.getElementById('due-empty');
+    if (!items || items.length === 0) { c.innerHTML = ''; empty.style.display = ''; return; }
+    empty.style.display = 'none';
+    c.innerHTML = items.map(function(s) {
+        var cls = s.is_overdue ? 'overdue' : 'due-soon';
+        var label = s.is_overdue ? 'OVERDUE' : s.days_until_review + 'd';
+        return '<div class="cyab-due-item ' + (s.is_overdue ? 'overdue' : '') + '" onclick="openSystem(' + s.id + ')">' +
+            '<span class="cyab-due-badge ' + cls + '">' + label + '</span>' +
+            '<span style="flex:1;font-weight:600;">' + escapeHtml(s.name) + '</span>' +
+            '<span style="color:var(--text-muted);">' + escapeHtml(s.department) + '</span>' +
+            '</div>';
+    }).join('');
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderSystemsTable(systems) {
+    var tbody = document.getElementById('sys-tbody');
+    var empty = document.getElementById('sys-empty');
+    if (!systems || systems.length === 0) { tbody.innerHTML = ''; empty.style.display = ''; return; }
+    empty.style.display = 'none';
+    tbody.innerHTML = systems.map(function(s) {
+        var rColor = s.readiness_score >= 70 ? 'var(--success)' : s.readiness_score >= 40 ? 'var(--neon-yellow)' : 'var(--danger)';
+        var riskColor = s.risk_rating === 'LOW' ? 'var(--success)' : s.risk_rating === 'MEDIUM' ? 'var(--neon-yellow)' : s.risk_rating ? 'var(--danger)' : 'var(--text-muted)';
+        var riskBg = s.risk_rating === 'LOW' ? 'rgba(16,185,129,0.15)' : s.risk_rating === 'MEDIUM' ? 'rgba(251,191,36,0.15)' : s.risk_rating ? 'rgba(239,68,68,0.15)' : 'rgba(128,128,128,0.1)';
+        var statusColor = s.status === 'OFFICIAL' ? 'var(--success)' : s.status === 'SUPERSEDED' ? 'var(--text-muted)' : 'var(--neon-orange)';
+        var statusBg = s.status === 'OFFICIAL' ? 'rgba(16,185,129,0.15)' : s.status === 'SUPERSEDED' ? 'rgba(128,128,128,0.15)' : 'rgba(249,115,22,0.15)';
+        var reviewStr = s.next_review_date || '\u2014';
+        var sysIcon = iconSvg(s.icon || 'monitor', 18);
+        return '<tr onclick="openSystem(' + s.id + ')">' +
+            '<td><div style="display:flex;align-items:center;gap:0.5rem;"><span class="cyab-sys-icon" style="background:rgba(59,130,246,0.12);color:var(--primary)">' + sysIcon + '</span><strong>' + escapeHtml(s.name) + '</strong></div></td>' +
+            '<td>' + escapeHtml(s.department) + '</td>' +
+            '<td style="text-align:center;font-weight:700;">' + (s.data_source_count || 0) + '</td>' +
+            '<td><span class="cyab-readiness-mini"><span class="cyab-readiness-mini-bar"><span class="cyab-readiness-mini-fill" style="width:' + s.readiness_score + '%;background:' + rColor + '"></span></span>' + s.readiness_score + '%</span></td>' +
+            '<td><span class="cyab-risk-badge" style="background:' + riskBg + ';color:' + riskColor + '">' + (s.risk_rating || '\u2014') + '</span></td>' +
+            '<td>' + reviewStr + '</td>' +
+            '<td><span class="cyab-status-badge" style="background:' + statusBg + ';color:' + statusColor + '">' + s.status + '</span></td>' +
+            '<td><button class="btn btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.65rem;" onclick="event.stopPropagation();deleteSystem(' + s.id + ',\'' + escapeHtml(s.name).replace(/'/g,"\\'") + '\')">Delete</button></td>' +
+            '</tr>';
+    }).join('');
+}
+
+function filterSystems() {
+    var q = document.getElementById('sys-search').value.toLowerCase();
+    var filtered = allSystems.filter(function(s) {
+        return s.name.toLowerCase().includes(q) || s.department.toLowerCase().includes(q) || (s.tags || []).join(' ').toLowerCase().includes(q) || (s.status || '').toLowerCase().includes(q);
+    });
+    renderSystemsTable(filtered);
+}
+
+var sortDir = {};
+function sortTable(col) {
+    var keys = ['name','department','data_source_count','readiness_score','risk_rating','next_review_date','status'];
+    var key = keys[col];
+    sortDir[key] = !sortDir[key];
+    allSystems.sort(function(a, b) {
+        var va = a[key] || '', vb = b[key] || '';
+        if (typeof va === 'number') return sortDir[key] ? va - vb : vb - va;
+        return sortDir[key] ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+    });
+    renderSystemsTable(allSystems);
+}
+
+async function deleteSystem(id, name) {
+    if (!confirm('Delete CyAB for "' + name + '"? This cannot be undone.')) return;
+    try {
+        await api.delete('/api/cyab/systems/' + id);
+        showToast('Deleted: ' + name, 'success');
+        loadDashboard();
+    } catch (e) {
+        showToast(e.message || 'Delete failed', 'error');
+    }
+}
+
+// ======================== VIEW SWITCHING ========================
+function showDashboard() {
+    document.getElementById('cyab-dashboard').style.display = '';
+    document.getElementById('cyab-detail').style.display = 'none';
+    currentSystemId = null;
+    loadDashboard();
+}
+
+function showDetail() {
+    document.getElementById('cyab-dashboard').style.display = 'none';
+    document.getElementById('cyab-detail').style.display = 'flex';
+    updateScore();
+}
+
+function openNewSystem() {
+    currentSystemId = null;
+    currentSystem = null;
+    currentDataSources = [];
+    activeDataSourceId = null;
+    resetForm();
+    renderIconPicker('monitor');
+    renderDataSources();
+    renderHistory([]);
+    setDataSourceSections(false);
+    showDetail();
+}
+
+async function openSystem(id) {
+    try {
+        var [sys, history] = await Promise.all([
+            api.get('/api/cyab/systems/' + id),
+            api.get('/api/cyab/systems/' + id + '/history')
+        ]);
+        currentSystemId = id;
+        currentSystem = sys;
+        currentDataSources = sys.data_sources || [];
+        populateForm(sys);
+        renderIconPicker(sys.icon || 'monitor');
+        renderDataSources();
+        renderHistory(history);
+        if (currentDataSources.length > 0) {
+            activateDataSource(currentDataSources[0].id);
+        } else {
+            activeDataSourceId = null;
+            setDataSourceSections(false);
+        }
+        showDetail();
+    } catch (e) {
+        console.error(e);
+        showToast('Failed to load system', 'error');
+    }
+}
+
+// ======================== FORM HELPERS ========================
+function resetForm() {
+    // System-level fields
+    document.getElementById('sys-name').value = '';
+    document.getElementById('meta-version').value = '1.0';
+    document.getElementById('meta-status').value = 'DRAFT';
+    document.getElementById('meta-ref').value = '';
+    document.getElementById('meta-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('meta-next-review').value = '';
+    document.getElementById('meta-icon').value = 'monitor';
+    document.getElementById('meta-tags').value = '';
+    document.getElementById('meta-soc-team').value = 'Security Operations Center';
+    document.getElementById('meta-soc-lead').value = '';
+    document.getElementById('meta-dept').value = '';
+    document.getElementById('meta-dept-lead').value = '';
+    document.getElementById('meta-cadence').value = '90';
+    document.getElementById('sign-dept').value = '';
+    document.getElementById('sign-dept-date').value = '';
+    document.getElementById('sign-soc').value = '';
+    document.getElementById('sign-soc-date').value = '';
+    // Data source fields (cleared)
+    resetDataSourceForm();
+    updateScore();
+}
+
+function resetDataSourceForm() {
+    document.getElementById('ds-name').value = '';
+    document.getElementById('ds-type').value = 'Endpoint';
+    document.getElementById('ds-uptime').selectedIndex = 1;
+    document.getElementById('ds-latency').selectedIndex = 1;
+    document.getElementById('ds-retention').selectedIndex = 1;
+    document.getElementById('ds-p1').selectedIndex = 1;
+    var sal2 = document.querySelector('input[name="sal_tier"][value="SAL-2"]');
+    if (sal2) sal2.checked = true;
+    document.querySelectorAll('.field-check').forEach(function(cb) { cb.checked = false; });
+    document.getElementById('field-notes').value = '';
+    document.getElementById('uc-status').value = 'Not Yet Reviewed';
+    document.getElementById('uc-review-date').value = '';
+    document.getElementById('uc-gaps').value = '';
+    document.getElementById('uc-remediation').value = '';
+}
+
+function populateForm(sys) {
+    // System-level fields
+    document.getElementById('sys-name').value = sys.name || '';
+    document.getElementById('meta-version').value = sys.version || '1.0';
+    document.getElementById('meta-status').value = sys.status || 'DRAFT';
+    document.getElementById('meta-ref').value = sys.reference || '';
+    document.getElementById('meta-date').value = sys.created_at ? sys.created_at.split('T')[0] : '';
+    document.getElementById('meta-next-review').value = sys.next_review_date || '';
+    document.getElementById('meta-icon').value = sys.icon || 'monitor';
+    document.getElementById('meta-tags').value = (sys.tags || []).join(', ');
+    document.getElementById('meta-soc-team').value = sys.soc_team || 'Security Operations Center';
+    document.getElementById('meta-soc-lead').value = sys.soc_lead || '';
+    document.getElementById('meta-dept').value = sys.department || '';
+    document.getElementById('meta-dept-lead').value = sys.department_lead || '';
+    document.getElementById('meta-cadence').value = String(sys.review_cadence_days || 90);
+    document.getElementById('sign-dept').value = sys.sign_dept_name || '';
+    document.getElementById('sign-dept-date').value = sys.sign_dept_date || '';
+    document.getElementById('sign-soc').value = sys.sign_soc_name || '';
+    document.getElementById('sign-soc-date').value = sys.sign_soc_date || '';
+    // Data source fields are populated via activateDataSource()
+    updateScore();
+}
+
+function populateDataSourceForm(ds) {
+    document.getElementById('ds-name').value = ds.name || '';
+    setSelect('ds-type', ds.data_source_type);
+    setSelect('ds-uptime', ds.uptime_target);
+    setSelect('ds-latency', ds.max_latency);
+    setSelect('ds-retention', ds.retention);
+    setSelect('ds-p1', ds.p1_sla);
+    var salRadio = document.querySelector('input[name="sal_tier"][value="' + (ds.sal_tier || 'SAL-2') + '"]');
+    if (salRadio) salRadio.checked = true;
+    var fm = ds.field_mapping || {};
+    document.querySelectorAll('.field-check').forEach(function(cb) {
+        cb.checked = !!fm[cb.getAttribute('data-field')];
+    });
+    document.getElementById('field-notes').value = ds.field_notes || '';
+    document.getElementById('uc-status').value = ds.use_case_status || 'Not Yet Reviewed';
+    document.getElementById('uc-review-date').value = ds.use_case_review_date || '';
+    document.getElementById('uc-gaps').value = ds.use_case_gaps || '';
+    document.getElementById('uc-remediation').value = ds.use_case_remediation || '';
+    updateScore();
+}
+
+function setSelect(id, val) {
+    if (!val) return;
+    var el = document.getElementById(id);
+    for (var i = 0; i < el.options.length; i++) {
+        if (el.options[i].text === val || el.options[i].value === val) {
+            el.selectedIndex = i; return;
+        }
+    }
+}
+
+function gatherSystemData() {
+    var tagsRaw = document.getElementById('meta-tags').value;
+    var tags = tagsRaw ? tagsRaw.split(',').map(function(t) { return t.trim(); }).filter(Boolean) : [];
+    return {
+        name: document.getElementById('sys-name').value || 'Unnamed System',
+        department: document.getElementById('meta-dept').value || 'Unknown',
+        department_lead: document.getElementById('meta-dept-lead').value,
+        soc_team: document.getElementById('meta-soc-team').value,
+        soc_lead: document.getElementById('meta-soc-lead').value,
+        reference: document.getElementById('meta-ref').value || undefined,
+        version: document.getElementById('meta-version').value,
+        status: document.getElementById('meta-status').value,
+        icon: document.getElementById('meta-icon').value || 'monitor',
+        tags: tags.length ? tags : undefined,
+        review_cadence_days: parseInt(document.getElementById('meta-cadence').value) || 90,
+        next_review_date: document.getElementById('meta-next-review').value || null,
+        sign_dept_name: document.getElementById('sign-dept').value,
+        sign_dept_date: document.getElementById('sign-dept-date').value || null,
+        sign_soc_name: document.getElementById('sign-soc').value,
+        sign_soc_date: document.getElementById('sign-soc-date').value || null,
+    };
+}
+
+function gatherDataSourceData() {
+    var fm = {};
+    document.querySelectorAll('.field-check').forEach(function(cb) {
+        fm[cb.getAttribute('data-field')] = cb.checked;
+    });
+    var checks = document.querySelectorAll('.field-check');
+    var total = checks.length, mapped = 0;
+    checks.forEach(function(cb) { if (cb.checked) mapped++; });
+    var pct = total > 0 ? Math.round(mapped / total * 100) : 0;
+    var mandMapped = 0;
+    MANDATORY_FIELDS.forEach(function(f) { if (fm[f]) mandMapped++; });
+    var mandPct = Math.round(mandMapped / MANDATORY_FIELDS.length * 100);
+    var salRadio = document.querySelector('input[name="sal_tier"]:checked');
+    var sal = salRadio ? salRadio.value : 'SAL-2';
+    var threshold = SAL_THRESHOLDS[sal] || 65;
+    var salPass = pct >= threshold ? 'PASS' : 'FAIL';
+    var unmandatory = MANDATORY_FIELDS.length - mandMapped;
+    var risk = unmandatory === 0 ? 'LOW' : unmandatory <= 3 ? 'MEDIUM' : 'HIGH';
+    var ucStatus = document.getElementById('uc-status').value;
+    var ucWeight = ucStatus.includes('Fully') ? 100 : ucStatus.includes('Known Gaps') ? 60 : ucStatus.includes('Progress') ? 30 : 0;
+    var salScore = pct >= threshold ? 100 : Math.round(pct / threshold * 100);
+    var readiness = Math.min(100, Math.round(pct * 0.35 + mandPct * 0.30 + ucWeight * 0.20 + salScore * 0.15));
+    return {
+        name: document.getElementById('ds-name').value || 'Unnamed Source',
+        data_source_type: document.getElementById('ds-type').value,
+        sal_tier: sal,
+        uptime_target: document.getElementById('ds-uptime').value,
+        max_latency: document.getElementById('ds-latency').value,
+        retention: document.getElementById('ds-retention').value,
+        p1_sla: document.getElementById('ds-p1').value,
+        field_mapping: fm,
+        field_mapping_score: pct,
+        mandatory_score: mandPct,
+        readiness_score: readiness,
+        risk_rating: risk,
+        sal_compliance: salPass,
+        field_notes: document.getElementById('field-notes').value,
+        use_case_status: ucStatus,
+        use_case_review_date: document.getElementById('uc-review-date').value || null,
+        use_case_gaps: document.getElementById('uc-gaps').value,
+        use_case_remediation: document.getElementById('uc-remediation').value,
+    };
+}
+
+// ======================== SAVE ========================
+async function saveSystem() {
+    var sysData = gatherSystemData();
+    try {
+        var result;
+        if (currentSystemId) {
+            result = await api.put('/api/cyab/systems/' + currentSystemId, sysData);
+            showToast('System updated: ' + result.name, 'success');
+        } else {
+            result = await api.post('/api/cyab/systems', sysData);
+            currentSystemId = result.id;
+            showToast('System created: ' + result.name, 'success');
+        }
+        currentSystem = result;
+        currentDataSources = result.data_sources || [];
+        document.getElementById('meta-ref').value = result.reference || '';
+        document.getElementById('meta-next-review').value = result.next_review_date || '';
+        renderDataSources();
+        // Also save active data source if one is selected
+        if (activeDataSourceId) {
+            await saveActiveDataSource();
+        }
+        // Enable add-source button now that system is saved
+        document.getElementById('btn-add-ds').disabled = false;
+    } catch (e) {
+        showToast(e.message || 'Failed to save', 'error');
+    }
+}
+
+async function saveActiveDataSource() {
+    if (!activeDataSourceId || !currentSystemId) return;
+    var dsData = gatherDataSourceData();
+    try {
+        var result = await api.put('/api/cyab/sources/' + activeDataSourceId, dsData);
+        showToast('Data source saved: ' + result.name, 'success');
+        // Update local cache
+        var idx = currentDataSources.findIndex(function(d) { return d.id === activeDataSourceId; });
+        if (idx >= 0) currentDataSources[idx] = result;
+        renderDataSources();
+        // Refresh system aggregates
+        var sys = await api.get('/api/cyab/systems/' + currentSystemId);
+        currentSystem = sys;
+        currentDataSources = sys.data_sources || [];
+        renderDataSources();
+    } catch (e) {
+        showToast(e.message || 'Failed to save data source', 'error');
+    }
+}
+
+// Predefined data sources grouped by category
+var PREDEFINED_SOURCES = [
+    { name: 'Windows Event Logs', type: 'Endpoint', icon: 'server' },
+    { name: 'Sysmon', type: 'Endpoint', icon: 'server' },
+    { name: 'Linux Audit (auditd)', type: 'Endpoint', icon: 'server' },
+    { name: 'EDR / Endpoint Detection', type: 'Endpoint', icon: 'shield' },
+    { name: 'Firewall Logs', type: 'Firewall / IDS', icon: 'shield' },
+    { name: 'IDS/IPS (Suricata/Snort)', type: 'Firewall / IDS', icon: 'shield' },
+    { name: 'Web Proxy Logs', type: 'Email / Web Proxy', icon: 'globe' },
+    { name: 'DNS Logs', type: 'DNS', icon: 'search' },
+    { name: 'Email Gateway', type: 'Email / Web Proxy', icon: 'mail' },
+    { name: 'Active Directory', type: 'Identity / Auth', icon: 'key' },
+    { name: 'Azure AD / Entra ID', type: 'Identity / Auth', icon: 'key' },
+    { name: 'VPN Logs', type: 'Network', icon: 'lock' },
+    { name: 'Network Flow (NetFlow)', type: 'Network', icon: 'globe' },
+    { name: 'DHCP Logs', type: 'Network', icon: 'wifi' },
+    { name: 'AWS CloudTrail', type: 'Cloud', icon: 'cloud' },
+    { name: 'Azure Activity Logs', type: 'Cloud', icon: 'cloud' },
+    { name: 'Office 365 Audit', type: 'Cloud', icon: 'cloud' },
+    { name: 'Database Audit Logs', type: 'Database', icon: 'database' },
+    { name: 'Application Logs', type: 'Application', icon: 'code' },
+    { name: 'Container / Kubernetes', type: 'Application', icon: 'cpu' },
+];
+
+async function addDataSource() {
+    if (!currentSystemId) {
+        var sysData = gatherSystemData();
+        try {
+            var result = await api.post('/api/cyab/systems', sysData);
+            currentSystemId = result.id;
+            currentSystem = result;
+            document.getElementById('meta-ref').value = result.reference || '';
+            document.getElementById('meta-next-review').value = result.next_review_date || '';
+            showToast('System saved: ' + result.name, 'success');
+        } catch (e) {
+            showToast('Save system first: ' + (e.message || 'Failed'), 'error');
+            return;
+        }
+    }
+    openDsPicker();
+}
+
+function openDsPicker() {
+    // Filter out already-added sources
+    var existingNames = new Set(currentDataSources.map(function(d) { return d.name; }));
+    var grid = document.getElementById('ds-picker-grid');
+    grid.innerHTML = PREDEFINED_SOURCES.map(function(src) {
+        var disabled = existingNames.has(src.name);
+        return '<label class="cyab-dsp-item' + (disabled ? ' selected' : '') + '"' + (disabled ? ' style="opacity:0.5;pointer-events:none;"' : '') + '>' +
+            '<input type="checkbox" value="' + escapeHtml(src.name) + '" data-type="' + escapeHtml(src.type) + '" data-icon="' + src.icon + '"' + (disabled ? ' checked disabled' : '') + '>' +
+            '<span class="cyab-dsp-icon">' + iconSvg(src.icon, 16) + '</span>' +
+            '<span>' + escapeHtml(src.name) + '</span>' +
+            '</label>';
+    }).join('');
+    // Reset "Other"
+    document.getElementById('ds-picker-other-check').checked = false;
+    document.getElementById('ds-picker-other-name').value = '';
+    document.getElementById('ds-picker-other-name').disabled = true;
+    // Click handler for visual selection
+    grid.querySelectorAll('.cyab-dsp-item:not([style*="pointer-events"])').forEach(function(item) {
+        var cb = item.querySelector('input');
+        cb.addEventListener('change', function() {
+            item.classList.toggle('selected', cb.checked);
+        });
+    });
+    document.getElementById('ds-picker-modal').classList.add('show');
+}
+
+function closeDsPicker() {
+    document.getElementById('ds-picker-modal').classList.remove('show');
+}
+
+async function confirmDsPicker() {
+    var selected = [];
+    document.querySelectorAll('#ds-picker-grid input[type="checkbox"]:checked:not(:disabled)').forEach(function(cb) {
+        selected.push({
+            name: cb.value,
+            data_source_type: cb.getAttribute('data-type') || 'Endpoint',
+            icon: cb.getAttribute('data-icon') || 'monitor',
+        });
+    });
+    // "Other" custom source
+    var otherCheck = document.getElementById('ds-picker-other-check');
+    var otherName = document.getElementById('ds-picker-other-name').value.trim();
+    if (otherCheck.checked && otherName) {
+        selected.push({ name: otherName, data_source_type: 'Application', icon: 'monitor' });
+    }
+    if (selected.length === 0) {
+        showToast('Select at least one data source', 'error');
+        return;
+    }
+    closeDsPicker();
+    var lastId = null;
+    for (var i = 0; i < selected.length; i++) {
+        try {
+            var ds = await api.post('/api/cyab/systems/' + currentSystemId + '/sources', selected[i]);
+            lastId = ds.id;
+        } catch (e) {
+            showToast('Failed: ' + selected[i].name + ' — ' + (e.message || ''), 'error');
+        }
+    }
+    showToast(selected.length + ' data source(s) added', 'success');
+    // Refresh
+    try {
+        var sys = await api.get('/api/cyab/systems/' + currentSystemId);
+        currentSystem = sys;
+        currentDataSources = sys.data_sources || [];
+        renderDataSources();
+        if (lastId) activateDataSource(lastId);
+    } catch (e) { console.error(e); }
+}
+
+async function deleteDataSourceById(id, name) {
+    if (!confirm('Delete data source "' + name + '"?')) return;
+    try {
+        await api.delete('/api/cyab/sources/' + id);
+        showToast('Deleted: ' + name, 'success');
+        var sys = await api.get('/api/cyab/systems/' + currentSystemId);
+        currentSystem = sys;
+        currentDataSources = sys.data_sources || [];
+        renderDataSources();
+        if (activeDataSourceId === id) {
+            activeDataSourceId = null;
+            if (currentDataSources.length > 0) {
+                activateDataSource(currentDataSources[0].id);
+            } else {
+                resetDataSourceForm();
+                setDataSourceSections(false);
+            }
+        }
+    } catch (e) {
+        showToast(e.message || 'Failed to delete', 'error');
+    }
+}
+
+// ======================== SCORE / METRICS (detail view) ========================
+function updateScore() {
+    var checks = document.querySelectorAll('.field-check');
+    var total = checks.length, mapped = 0;
+    checks.forEach(function(cb) { if (cb.checked) mapped++; });
+    var pct = total > 0 ? Math.round(mapped / total * 100) : 0;
+    document.getElementById('score-fill').style.width = pct + '%';
+    document.getElementById('score-text').textContent = mapped + ' / ' + total + ' fields \u2014 ' + pct + '%';
+    updateDetailMetrics();
+}
+
+function updateDetailMetrics() {
+    var checks = document.querySelectorAll('.field-check');
+    var checkedFields = new Set();
+    checks.forEach(function(cb) { if (cb.checked) checkedFields.add(cb.getAttribute('data-field')); });
+    var total = checks.length, mapped = checkedFields.size;
+    var pct = total > 0 ? Math.round(mapped / total * 100) : 0;
+    var mandatoryMapped = 0;
+    MANDATORY_FIELDS.forEach(function(f) { if (checkedFields.has(f)) mandatoryMapped++; });
+    var mandatoryTotal = MANDATORY_FIELDS.length;
+    var mandatoryPct = Math.round(mandatoryMapped / mandatoryTotal * 100);
+    document.getElementById('metric-mandatory').textContent = mandatoryMapped + ' / ' + mandatoryTotal;
+    var mandBadge = document.getElementById('metric-mandatory-badge');
+    if (mandatoryPct === 100) { mandBadge.textContent = 'ALL MAPPED'; mandBadge.className = 'cyab-metric-badge badge-pass'; }
+    else if (mandatoryPct >= 60) { mandBadge.textContent = 'GAPS'; mandBadge.className = 'cyab-metric-badge badge-warn'; }
+    else { mandBadge.textContent = 'CRITICAL'; mandBadge.className = 'cyab-metric-badge badge-fail'; }
+    document.getElementById('metric-detections').textContent = mapped;
+    document.getElementById('metric-detections-sub').textContent = mapped + ' of ' + total + ' detection capabilities enabled';
+    var unmappedMandatory = mandatoryTotal - mandatoryMapped;
+    var riskEl = document.getElementById('metric-risk');
+    var riskSub = document.getElementById('metric-risk-sub');
+    if (unmappedMandatory === 0) { riskEl.textContent = 'LOW'; riskEl.style.color = 'var(--success)'; riskSub.textContent = 'all mandatory fields present'; }
+    else if (unmappedMandatory <= 3) { riskEl.textContent = 'MEDIUM'; riskEl.style.color = 'var(--neon-yellow)'; riskSub.textContent = unmappedMandatory + ' mandatory field(s) missing'; }
+    else { riskEl.textContent = 'HIGH'; riskEl.style.color = 'var(--danger)'; riskSub.textContent = unmappedMandatory + ' mandatory fields missing'; }
+    var salRadio = document.querySelector('input[name="sal_tier"]:checked');
+    var salTier = salRadio ? salRadio.value : 'SAL-2';
+    var threshold = SAL_THRESHOLDS[salTier] || 65;
+    var salEl = document.getElementById('metric-sal-compliance');
+    var salSub = document.getElementById('metric-sal-sub');
+    if (pct >= threshold) { salEl.textContent = 'PASS'; salEl.style.color = 'var(--success)'; salSub.textContent = salTier + ' requires ' + threshold + '% \u2014 you have ' + pct + '%'; }
+    else { salEl.textContent = 'FAIL'; salEl.style.color = 'var(--danger)'; salSub.textContent = salTier + ' requires ' + threshold + '% \u2014 need ' + (threshold - pct) + '% more'; }
+    var ucStatus = document.getElementById('uc-status').value;
+    var ucWeight = ucStatus.includes('Fully') ? 100 : ucStatus.includes('Known Gaps') ? 60 : ucStatus.includes('Progress') ? 30 : 0;
+    var salPass = pct >= threshold ? 100 : Math.round(pct / threshold * 100);
+    var composite = Math.min(100, Math.round(pct * 0.35 + mandatoryPct * 0.30 + ucWeight * 0.20 + salPass * 0.15));
+    document.getElementById('readiness-score').innerHTML = composite + '<small>%</small>';
+    var circumference = 2 * Math.PI * 52;
+    var offset = circumference - (composite / 100) * circumference;
+    var ring = document.getElementById('ring-progress');
+    ring.style.strokeDashoffset = offset;
+    if (composite >= 80) ring.style.stroke = 'var(--success)';
+    else if (composite >= 50) ring.style.stroke = 'var(--neon-yellow)';
+    else ring.style.stroke = 'var(--danger)';
+    // Category bars
+    var catContainer = document.getElementById('cat-bars');
+    catContainer.innerHTML = '';
+    var blindspots = [];
+    Object.keys(CATEGORIES).forEach(function(cat) {
+        var info = CATEGORIES[cat];
+        var catMapped = 0, catTotal = info.fields.length;
+        info.fields.forEach(function(f) { if (checkedFields.has(f)) catMapped++; });
+        var catPct = catTotal > 0 ? Math.round(catMapped / catTotal * 100) : 0;
+        if (catPct === 0) blindspots.push(cat);
+        var barColor = catPct >= 80 ? 'var(--success)' : catPct >= 50 ? 'var(--neon-yellow)' : catPct > 0 ? 'var(--neon-orange)' : 'var(--danger)';
+        catContainer.innerHTML += '<div class="cyab-cat-item"><div class="cyab-cat-head"><span class="cyab-cat-name">' + cat + '</span><span class="cyab-cat-pct" style="color:' + barColor + '">' + catPct + '%</span></div><div class="cyab-cat-bar"><div class="cyab-cat-fill" style="width:' + catPct + '%;background:' + barColor + '"></div></div><p class="cyab-cat-count">' + catMapped + ' / ' + catTotal + ' fields mapped</p></div>';
+    });
+    var bsArea = document.getElementById('blindspots-area');
+    var bsList = document.getElementById('blindspots-list');
+    if (blindspots.length > 0) {
+        bsArea.style.display = 'block';
+        bsList.innerHTML = blindspots.map(function(c) { return '<span class="cyab-blindspot-tag">' + c + ' \u2014 0% coverage</span>'; }).join('');
+    } else { bsArea.style.display = 'none'; }
+}
+
+// ======================== ICON PICKER ========================
+function renderIconPicker(selected) {
+    var picker = document.getElementById('icon-picker');
+    picker.innerHTML = '';
+    Object.keys(ICON_SVGS).forEach(function(name) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'cyab-icon-btn' + (name === selected ? ' active' : '');
+        btn.title = ICON_LABELS[name] || name;
+        btn.innerHTML = iconSvg(name, 18);
+        btn.onclick = function() { selectIcon(name); };
+        picker.appendChild(btn);
+    });
+}
+
+function selectIcon(name) {
+    document.getElementById('meta-icon').value = name;
+    document.querySelectorAll('.cyab-icon-btn').forEach(function(b) { b.classList.remove('active'); });
+    var btns = document.querySelectorAll('.cyab-icon-btn');
+    var names = Object.keys(ICON_SVGS);
+    var idx = names.indexOf(name);
+    if (idx >= 0 && btns[idx]) btns[idx].classList.add('active');
+}
+
+// ======================== DATA SOURCE LIST ========================
+function renderDataSources() {
+    var list = document.getElementById('ds-list');
+    var empty = document.getElementById('ds-empty');
+    if (!currentDataSources || currentDataSources.length === 0) {
+        list.innerHTML = '';
+        empty.style.display = '';
+        empty.textContent = currentSystemId ? 'No data sources yet. Click "Add Source" to add one.' : 'Save the system first, then add data sources.';
+        return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = currentDataSources.map(function(ds) {
+        var isActive = ds.id === activeDataSourceId;
+        var dsIconName = ds.icon || (ds.data_source_type === 'Network' ? 'globe' : ds.data_source_type === 'Endpoint' ? 'server' : ds.data_source_type === 'Cloud' ? 'cloud' : ds.data_source_type === 'Identity / Auth' ? 'key' : ds.data_source_type === 'Email / Web Proxy' ? 'mail' : ds.data_source_type === 'DNS' ? 'search' : ds.data_source_type === 'Firewall / IDS' ? 'shield' : ds.data_source_type === 'Database' ? 'database' : 'monitor');
+        var dsIcon = iconSvg(dsIconName, 18);
+        var rColor = ds.readiness_score >= 70 ? 'var(--success)' : ds.readiness_score >= 40 ? 'var(--neon-yellow)' : 'var(--danger)';
+        return '<div class="cyab-ds-card' + (isActive ? ' active' : '') + '" onclick="activateDataSource(' + ds.id + ')">' +
+            '<span class="cyab-ds-icon" style="background:rgba(59,130,246,0.12);color:var(--primary)">' + dsIcon + '</span>' +
+            '<div class="cyab-ds-info">' +
+                '<div class="cyab-ds-name">' + escapeHtml(ds.name) + '</div>' +
+                '<div class="cyab-ds-meta"><span>' + (ds.sal_tier || 'SAL-2') + '</span><span>' + (ds.data_source_type || 'Unknown') + '</span></div>' +
+            '</div>' +
+            '<div class="cyab-ds-score"><div class="cyab-ds-score-val" style="color:' + rColor + '">' + (ds.readiness_score || 0) + '%</div><div class="cyab-ds-score-label">Ready</div></div>' +
+            '<button class="btn btn-secondary" style="padding:0.15rem 0.4rem;font-size:0.6rem;flex-shrink:0;" onclick="event.stopPropagation();deleteDataSourceById(' + ds.id + ',\'' + escapeHtml(ds.name).replace(/'/g,"\\'") + '\')">×</button>' +
+            '</div>';
+    }).join('');
+}
+
+function activateDataSource(id) {
+    activeDataSourceId = id;
+    var ds = currentDataSources.find(function(d) { return d.id === id; });
+    if (!ds) return;
+    populateDataSourceForm(ds);
+    setDataSourceSections(true);
+    // Update banner
+    document.getElementById('ds-edit-name').textContent = ds.name;
+    // Highlight active card
+    document.querySelectorAll('.cyab-ds-card').forEach(function(c) { c.classList.remove('active'); });
+    var cards = document.querySelectorAll('.cyab-ds-card');
+    var idx = currentDataSources.findIndex(function(d) { return d.id === id; });
+    if (idx >= 0 && cards[idx]) cards[idx].classList.add('active');
+}
+
+function setDataSourceSections(visible) {
+    var banner = document.getElementById('ds-edit-banner');
+    var noSource = document.getElementById('ds-no-source');
+    var salIntro = document.getElementById('sal-intro');
+    // Elements in sections 4-6 that should be hidden when no source
+    var salGrid = document.querySelector('.cyab-sal-grid');
+    var salFormRows = document.querySelectorAll('#sal-tiers .form-row');
+    var fieldSection = document.getElementById('field-mapping');
+    var ucSection = document.getElementById('use-cases');
+    if (visible) {
+        banner.style.display = 'flex';
+        noSource.style.display = 'none';
+        if (salIntro) salIntro.style.display = '';
+        if (salGrid) salGrid.style.display = '';
+        salFormRows.forEach(function(r) { r.style.display = ''; });
+        if (fieldSection) fieldSection.style.opacity = '';
+        if (ucSection) ucSection.style.opacity = '';
+    } else {
+        banner.style.display = 'none';
+        noSource.style.display = currentSystemId ? '' : 'none';
+        if (salIntro) salIntro.style.display = 'none';
+        if (salGrid) salGrid.style.display = 'none';
+        salFormRows.forEach(function(r) { r.style.display = 'none'; });
+        if (fieldSection) fieldSection.style.opacity = '';
+        if (ucSection) ucSection.style.opacity = '';
+    }
+}
+
+// ======================== HISTORY ========================
+function renderHistory(snapshots) {
+    var chart = document.getElementById('history-chart');
+    var timeline = document.getElementById('history-timeline');
+    var empty = document.getElementById('history-empty');
+    if (!snapshots || snapshots.length === 0) {
+        chart.innerHTML = '';
+        timeline.innerHTML = '';
+        empty.style.display = '';
+        return;
+    }
+    empty.style.display = 'none';
+    // Sparkline SVG
+    var sorted = snapshots.slice().reverse(); // chronological
+    if (sorted.length > 1) {
+        var maxScore = 100;
+        var w = 100, h = 100;
+        var step = w / (sorted.length - 1);
+        var points = sorted.map(function(s, i) {
+            var x = i * step;
+            var y = h - (s.readiness_score / maxScore) * h;
+            return x.toFixed(1) + ',' + y.toFixed(1);
+        });
+        var polyline = points.join(' ');
+        var areaPoints = '0,' + h + ' ' + polyline + ' ' + ((sorted.length - 1) * step).toFixed(1) + ',' + h;
+        chart.innerHTML = '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:100%;">' +
+            '<polygon points="' + areaPoints + '" fill="rgba(59,130,246,0.1)" />' +
+            '<polyline points="' + polyline + '" fill="none" stroke="var(--primary)" stroke-width="2" vector-effect="non-scaling-stroke"/>' +
+            sorted.map(function(s, i) {
+                var x = i * step, y = h - (s.readiness_score / maxScore) * h;
+                return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3" fill="var(--primary)" vector-effect="non-scaling-stroke"/>';
+            }).join('') +
+            '</svg>';
+    } else {
+        chart.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.75rem;">Single snapshot — chart needs 2+ data points</div>';
+    }
+    // Timeline list (most recent first)
+    timeline.innerHTML = snapshots.slice(0, 20).map(function(s) {
+        var dotColor = s.readiness_score >= 70 ? 'var(--success)' : s.readiness_score >= 40 ? 'var(--neon-yellow)' : 'var(--danger)';
+        return '<div class="cyab-ht-item">' +
+            '<span class="cyab-ht-dot" style="background:' + dotColor + '"></span>' +
+            '<span class="cyab-ht-date">' + (s.snapshot_date || '') + '</span>' +
+            '<span class="cyab-ht-text">' + escapeHtml(s.notes || 'Snapshot') + '</span>' +
+            '<span class="cyab-ht-scores">' +
+                '<span>Ready: ' + s.readiness_score + '%</span>' +
+                '<span>FM: ' + s.field_mapping_score + '%</span>' +
+                '<span>Risk: ' + (s.risk_rating || '\u2014') + '</span>' +
+                '<span>DS: ' + s.total_data_sources + '</span>' +
+            '</span>' +
+            '</div>';
+    }).join('');
+}
+
+// Event listeners
+document.querySelectorAll('.field-check').forEach(function(cb) { cb.addEventListener('change', updateScore); });
+document.querySelectorAll('input[name="sal_tier"]').forEach(function(r) { r.addEventListener('change', updateDetailMetrics); });
+document.getElementById('uc-status').addEventListener('change', updateDetailMetrics);
+
+// ======================== SCROLL SPY ========================
+var sections = document.querySelectorAll('.cyab-section');
+var navLinks = document.querySelectorAll('.cyab-nav-link');
+var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+            navLinks.forEach(function(l) { l.classList.remove('active'); });
+            var id = entry.target.id;
+            var link = document.querySelector('.cyab-nav-link[href="#' + id + '"]');
+            if (link) link.classList.add('active');
+        }
+    });
+}, { threshold: 0.3, rootMargin: '-80px 0px -60% 0px' });
+sections.forEach(function(s) { observer.observe(s); });
+
+// ======================== PDF EXPORT ========================
+async function saveAsPdf() {
+    var d = gatherSystemData();
+    var docName = 'CyAB_' + d.name.replace(/[^a-zA-Z0-9]/g, '_');
+    var confirmName = prompt('PDF document name:', docName);
+    if (!confirmName) return;
+    showToast('Generating PDF...', 'info');
+    var paper = document.querySelector('.cyab-paper');
+    var sidebar = document.querySelector('.cyab-sidebar');
+    if (sidebar) sidebar.style.display = 'none';
+    try {
+        var opt = { margin: [10,10,10,10], filename: confirmName + '.pdf', image: { type: 'jpeg', quality: 0.95 }, html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: null }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['avoid-all','css','legacy'] } };
+        var pdfBlob = await html2pdf().set(opt).from(paper).outputPdf('blob');
+        var formData = new FormData();
+        formData.append('file', new File([pdfBlob], confirmName + '.pdf', { type: 'application/pdf' }));
+        formData.append('name', confirmName);
+        formData.append('output_format', 'pdf');
+        formData.append('tags', ['CyAB','SLA','PDF'].join(','));
+        var response = await fetch('/api/documents/upload', { method: 'POST', body: formData });
+        if (!response.ok) { var err = await response.json(); throw new Error(err.detail || 'Upload failed'); }
+        var result = await response.json();
+        showToast('PDF saved to Documents (ID: ' + result.id + ')', 'success');
+        var link = document.createElement('a');
+        link.href = URL.createObjectURL(pdfBlob);
+        link.download = confirmName + '.pdf';
+        link.click();
+        URL.revokeObjectURL(link.href);
+    } catch (e) { console.error(e); showToast(e.message || 'PDF failed', 'error'); }
+    finally { if (sidebar) sidebar.style.display = ''; }
+}
+
+// ======================== MARKDOWN EXPORT ========================
+async function saveAsDocument() {
+    var d = gatherSystemData();
+    var ref = document.getElementById('meta-ref').value;
+    var md = '# ' + (ref || 'CyAB') + ' \u2014 CyAB Ingestion SLA\n\n';
+    md += '| Field | Value |\n|-------|-------|\n';
+    md += '| **System** | ' + d.name + ' |\n| **Reference** | ' + (ref || '') + ' |\n| **Version** | ' + d.version + ' |\n| **Status** | ' + d.status + ' |\n| **Department** | ' + d.department + ' |\n| **SOC Lead** | ' + (d.soc_lead || '') + ' |\n| **Dept Lead** | ' + (d.department_lead || '') + ' |\n\n';
+    // Include each data source
+    currentDataSources.forEach(function(ds) {
+        md += '## Data Source: ' + ds.name + '\n\n| Param | Value |\n|---|---|\n';
+        md += '| **Type** | ' + (ds.data_source_type || '') + ' |\n| **SAL** | ' + (ds.sal_tier || '') + ' |\n| **Uptime** | ' + (ds.uptime_target || '') + ' |\n| **Latency** | ' + (ds.max_latency || '') + ' |\n| **Retention** | ' + (ds.retention || '') + ' |\n| **P1 SLA** | ' + (ds.p1_sla || '') + ' |\n';
+        md += '| **Readiness** | ' + ds.readiness_score + '% |\n| **Field Mapping** | ' + ds.field_mapping_score + '% |\n| **Risk** | ' + (ds.risk_rating || '\u2014') + ' |\n| **SAL Compliance** | ' + (ds.sal_compliance || '\u2014') + ' |\n\n';
+        if (ds.field_mapping) {
+            md += '### Field Mapping\n\n| Field | Mapped |\n|---|---|\n';
+            Object.keys(ds.field_mapping).forEach(function(f) {
+                md += '| ' + f + ' | ' + (ds.field_mapping[f] ? 'Yes' : 'No') + ' |\n';
+            });
+            md += '\n';
+        }
+        if (ds.field_notes) md += '**Notes:** ' + ds.field_notes + '\n\n';
+        md += '### Use Cases: ' + (ds.use_case_status || 'Not Yet Reviewed') + '\n\n';
+        if (ds.use_case_gaps) md += '**Gaps:**\n' + ds.use_case_gaps + '\n\n';
+        if (ds.use_case_remediation) md += '**Remediation:**\n' + ds.use_case_remediation + '\n\n';
+    });
+    if (currentDataSources.length === 0) {
+        md += '*No data sources configured.*\n\n';
+    }
+    var docName = 'CyAB_' + d.name.replace(/[^a-zA-Z0-9]/g, '_');
+    var confirmName = prompt('Document name:', docName);
+    if (!confirmName) return;
+    try {
+        var result = await api.post('/api/documents/create', { name: confirmName, content: md, output_format: 'markdown', tags: ['CyAB','SLA'] });
+        showToast('Markdown saved (ID: ' + result.id + ')', 'success');
+    } catch (e) { showToast(e.message || 'Failed', 'error'); }
+}
+
+// ======================== INIT ========================
+document.addEventListener('DOMContentLoaded', function() {
+    var today = new Date().toISOString().split('T')[0];
+    document.querySelectorAll('input[type="date"]').forEach(function(d) { if (!d.value) d.value = today; });
+    // Render icon picker with default
+    renderIconPicker('monitor');
+    // Check URL hash for direct system link
+    var hash = window.location.hash.replace('#', '');
+    if (hash && !isNaN(hash)) {
+        openSystem(parseInt(hash));
+    } else {
+        loadDashboard();
+    }
+});
+{% endraw %}
+</script>
+{% endblock %}

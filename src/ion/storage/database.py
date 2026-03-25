@@ -322,6 +322,60 @@ def _run_migrations(engine: Engine) -> None:
                 conn.execute(text("ALTER TABLE chat_rooms ADD COLUMN is_system BOOLEAN DEFAULT FALSE NOT NULL"))
                 logger.info("Migrated: chat_rooms.is_system")
 
+    # Variables: add options column
+    if insp.has_table("variables"):
+        existing = {col["name"] for col in insp.get_columns("variables")}
+        if "options" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE variables ADD COLUMN options TEXT"))
+                logger.info("Migrated: variables.options")
+
+    # CyAB: add icon and tags columns to cyab_systems
+    if insp.has_table("cyab_systems"):
+        existing = {col["name"] for col in insp.get_columns("cyab_systems")}
+        if "icon" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE cyab_systems ADD COLUMN icon VARCHAR(32) DEFAULT 'monitor'"))
+                conn.execute(text("ALTER TABLE cyab_systems ADD COLUMN tags TEXT"))
+                logger.info("Migrated: cyab_systems.icon, cyab_systems.tags")
+
+    # CyAB: migrate existing single-source systems to cyab_data_sources
+    if insp.has_table("cyab_systems") and insp.has_table("cyab_data_sources"):
+        with engine.begin() as conn:
+            # Check if any data sources exist already
+            result = conn.execute(text("SELECT COUNT(*) FROM cyab_data_sources"))
+            ds_count = result.scalar()
+            if ds_count == 0:
+                # Migrate existing systems that have a name (data source) to the new table
+                result = conn.execute(text(
+                    "SELECT id, name, data_source_type, sal_tier, uptime_target, "
+                    "max_latency, retention, p1_sla, field_mapping, field_mapping_score, "
+                    "mandatory_score, readiness_score, risk_rating, sal_compliance, "
+                    "field_notes, use_case_status, use_case_review_date, use_case_gaps, "
+                    "use_case_remediation FROM cyab_systems WHERE name IS NOT NULL"
+                ))
+                rows = result.fetchall()
+                for row in rows:
+                    conn.execute(text(
+                        "INSERT INTO cyab_data_sources "
+                        "(system_id, name, data_source_type, sal_tier, uptime_target, "
+                        "max_latency, retention, p1_sla, field_mapping, field_mapping_score, "
+                        "mandatory_score, readiness_score, risk_rating, sal_compliance, "
+                        "field_notes, use_case_status, use_case_review_date, use_case_gaps, "
+                        "use_case_remediation, created_at, updated_at) "
+                        "VALUES (:sid, :name, :dst, :sal, :uptime, :latency, :ret, :p1, "
+                        ":fm, :fms, :ms, :rs, :rr, :sc, :fn, :ucs, :ucrd, :ucg, :ucr, "
+                        "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+                    ), {
+                        "sid": row[0], "name": row[1], "dst": row[2], "sal": row[3],
+                        "uptime": row[4], "latency": row[5], "ret": row[6], "p1": row[7],
+                        "fm": row[8], "fms": row[9], "ms": row[10], "rs": row[11],
+                        "rr": row[12], "sc": row[13], "fn": row[14], "ucs": row[15],
+                        "ucrd": row[16], "ucg": row[17], "ucr": row[18],
+                    })
+                if rows:
+                    logger.info("Migrated %d existing CyAB systems to data sources", len(rows))
+
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
 

@@ -59,6 +59,9 @@ class ElasticsearchSettingsUpdate(BaseModel):
     elasticsearch_alert_index: Optional[str] = None
     elasticsearch_case_index: Optional[str] = None
     elasticsearch_verify_ssl: Optional[bool] = None
+    elasticsearch_user_index: Optional[str] = None
+    elasticsearch_user_field: Optional[str] = None
+    elasticsearch_assignment_field: Optional[str] = None
 
 
 class OIDCSettingsUpdate(BaseModel):
@@ -165,6 +168,9 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
             "elasticsearch_alert_index": config.elasticsearch_alert_index,
             "elasticsearch_case_index": config.elasticsearch_case_index,
             "elasticsearch_verify_ssl": config.elasticsearch_verify_ssl,
+            "elasticsearch_user_index": config.elasticsearch_user_index,
+            "elasticsearch_user_field": config.elasticsearch_user_field,
+            "elasticsearch_assignment_field": config.elasticsearch_assignment_field,
         },
         "oidc": {
             "base_url": config.base_url,
@@ -317,6 +323,15 @@ async def update_elasticsearch_settings(
 
     if settings.elasticsearch_verify_ssl is not None:
         config.elasticsearch_verify_ssl = settings.elasticsearch_verify_ssl
+
+    if settings.elasticsearch_user_index is not None:
+        config.elasticsearch_user_index = settings.elasticsearch_user_index
+
+    if settings.elasticsearch_user_field is not None:
+        config.elasticsearch_user_field = settings.elasticsearch_user_field
+
+    if settings.elasticsearch_assignment_field is not None:
+        config.elasticsearch_assignment_field = settings.elasticsearch_assignment_field
 
     config.to_file(get_config_path())
     reload_config()
