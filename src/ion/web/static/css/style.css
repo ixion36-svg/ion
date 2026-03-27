@@ -457,7 +457,7 @@ body::before {
     background-size: 50px 50px;
     pointer-events: none;
     z-index: -1;
-    opacity: 0.3;
+    opacity: 0.15;
 }
 
 /* =============================================================================
@@ -682,11 +682,12 @@ body::before {
 
 .footer {
     text-align: center;
-    padding: 1.5rem;
-    color: var(--text-secondary);
+    padding: 1.25rem;
+    color: var(--text-muted);
     border-top: 1px solid var(--border);
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     background: var(--bg-primary);
+    letter-spacing: 0.03em;
 }
 
 /* =============================================================================
@@ -696,20 +697,31 @@ body::before {
 .page-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
+    align-items: flex-start;
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 12px;
 }
 
 .page-header h1 {
-    font-size: 1.75rem;
-    font-weight: 600;
+    font-size: 1.5rem;
+    font-weight: 700;
     color: var(--text-bright);
-    text-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+    margin: 0;
+}
+
+.page-subtitle {
+    font-size: .85rem;
+    color: var(--text-secondary);
+    margin: 2px 0 0;
 }
 
 .header-actions {
     display: flex;
     gap: 0.75rem;
+    align-items: center;
 }
 
 /* =============================================================================
@@ -721,12 +733,13 @@ body::before {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    padding: 0.625rem 1.25rem;
-    border-radius: var(--radius);
-    font-size: 0.875rem;
-    font-weight: 500;
+    padding: 0.5rem 1.125rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.8125rem;
+    font-weight: 600;
     cursor: pointer;
     border: 1px solid var(--border);
+    letter-spacing: 0.02em;
     background: var(--bg-card);
     color: var(--text-primary);
     text-decoration: none;
@@ -800,18 +813,17 @@ body::before {
    ============================================================================= */
 
 .card {
-    background: var(--bg-card);
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
     margin-bottom: 1rem;
-    box-shadow: var(--shadow-card);
-    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: border-color 0.2s ease;
 }
 
 .card:hover {
     border-color: var(--border-bright);
-    box-shadow: var(--shadow-card), 0 0 30px rgba(0, 212, 255, 0.1);
 }
 
 .card-header {
@@ -822,15 +834,14 @@ body::before {
 }
 
 .card-title {
-    font-size: 1.125rem;
-    font-weight: 600;
+    font-size: 1rem;
+    font-weight: 700;
     color: var(--text-bright);
     text-decoration: none;
 }
 
 .card-title:hover {
     color: var(--primary);
-    text-shadow: var(--glow-sm);
 }
 
 .card-body {
@@ -874,14 +885,18 @@ body::before {
 }
 
 .stat-card {
-    background: var(--bg-card);
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    padding: 1.25rem 1.5rem;
     text-align: center;
-    box-shadow: var(--shadow-card);
     position: relative;
     overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.stat-card:hover {
+    border-color: var(--border-bright);
 }
 
 .stat-card::before {
@@ -890,12 +905,13 @@ body::before {
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--primary), var(--neon-purple));
+    height: 2px;
+    background: var(--primary);
+    opacity: 0.6;
 }
 
 .stat-value {
-    font-size: 2.5rem;
+    font-size: 2rem;
     font-weight: 700;
     color: var(--primary);
     text-shadow: var(--glow-sm);
@@ -918,20 +934,20 @@ body::before {
 }
 
 .action-card {
-    background: var(--bg-card);
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
+    padding: 1.25rem;
     text-align: center;
     text-decoration: none;
     color: var(--text-primary);
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
 }
 
 .action-card:hover {
-    border-color: var(--primary);
-    transform: translateY(-4px);
-    box-shadow: var(--glow-md);
+    border-color: var(--border-bright);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .action-icon {
@@ -1097,10 +1113,12 @@ body::before {
 
 .form-group label {
     display: block;
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     margin-bottom: 0.5rem;
-    color: var(--text-primary);
+    color: var(--text-secondary);
 }
 
 .form-group input[type="text"],
@@ -1110,13 +1128,13 @@ body::before {
 .form-group select,
 .form-group textarea {
     width: 100%;
-    padding: 0.75rem 1rem;
+    padding: 0.625rem 0.875rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    font-size: 0.875rem;
-    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    font-size: 0.8125rem;
+    background: var(--bg-primary);
     color: var(--text-primary);
-    transition: all 0.2s ease;
+    transition: border-color 0.2s ease;
 }
 
 .form-group input:focus,
@@ -1124,7 +1142,7 @@ body::before {
 .form-group textarea:focus {
     outline: none;
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-dim), var(--glow-sm);
+    box-shadow: 0 0 0 3px var(--primary-dim);
 }
 
 .form-group textarea {
@@ -1152,7 +1170,7 @@ body::before {
 .table, .data-table {
     width: 100%;
     border-collapse: collapse;
-    background: var(--bg-card);
+    background: transparent;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
@@ -1160,17 +1178,17 @@ body::before {
 
 .table th, .table td,
 .data-table th, .data-table td {
-    padding: 1rem;
+    padding: 0.875rem 1rem;
     text-align: left;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid rgba(99, 110, 123, 0.15);
 }
 
 .table th, .data-table th {
-    font-weight: 600;
+    font-weight: 700;
     background: var(--bg-secondary);
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
     color: var(--text-secondary);
 }
 
@@ -1184,32 +1202,43 @@ body::before {
    ============================================================================= */
 
 .badge {
-    display: inline-block;
-    padding: 0.25rem 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.2rem 0.625rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    border-radius: 4px;
     background: var(--bg-elevated);
     color: var(--text-secondary);
-    border: 1px solid var(--border);
+    border: none;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.badge-primary {
+    background: var(--primary-dim);
+    color: var(--primary);
+}
+
+.badge-info {
+    background: rgba(14, 165, 233, 0.12);
+    color: var(--info);
 }
 
 .badge-success {
-    background: rgba(16, 185, 129, 0.15);
+    background: rgba(16, 185, 129, 0.12);
     color: var(--neon-green);
-    border-color: rgba(16, 185, 129, 0.3);
 }
 
 .badge-warning {
-    background: rgba(251, 191, 36, 0.15);
+    background: rgba(251, 191, 36, 0.12);
     color: var(--neon-yellow);
-    border-color: rgba(251, 191, 36, 0.3);
 }
 
 .badge-danger {
-    background: rgba(239, 68, 68, 0.15);
+    background: rgba(239, 68, 68, 0.12);
     color: var(--neon-red);
-    border-color: rgba(239, 68, 68, 0.3);
 }
 
 .tag {
@@ -1279,10 +1308,10 @@ body::before {
    ============================================================================= */
 
 .code-block {
-    background: var(--bg-deep);
-    color: var(--neon-cyan);
+    background: var(--bg-secondary);
+    color: var(--info);
     padding: 1.25rem;
-    border-radius: var(--radius);
+    border-radius: var(--radius-lg);
     overflow-x: auto;
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
     font-size: 0.8125rem;
@@ -1315,14 +1344,14 @@ body::before {
 }
 
 .modal-content {
-    background: var(--bg-card);
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     width: 90%;
     max-width: 600px;
     max-height: 90vh;
     overflow: auto;
-    box-shadow: var(--glow-lg), 0 25px 50px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 0, 0, 0.3);
 }
 
 .modal-large {
@@ -1521,34 +1550,36 @@ body::before {
    ============================================================================= */
 
 .tabs {
-    display: flex;
-    gap: 0.25rem;
+    display: inline-flex;
+    gap: 2px;
     margin-bottom: 1.5rem;
-    border-bottom: 2px solid var(--border);
-    padding-bottom: 0;
+    background: var(--bg-secondary);
+    padding: 4px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
 }
 
 .tab-btn {
-    padding: 0.75rem 1.5rem;
-    background: none;
+    padding: 0.5rem 1.25rem;
+    background: transparent;
     border: none;
-    border-bottom: 2px solid transparent;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 0.8125rem;
+    font-weight: 600;
     color: var(--text-secondary);
     transition: all 0.2s;
-    margin-bottom: -2px;
 }
 
 .tab-btn:hover {
     color: var(--text-primary);
+    background: var(--bg-card);
 }
 
 .tab-btn.active {
-    color: var(--primary);
-    border-bottom-color: var(--primary);
-    text-shadow: var(--glow-sm);
+    color: var(--bg-deep);
+    background: var(--primary);
+    box-shadow: 0 2px 8px var(--primary-glow);
 }
 
 /* =============================================================================
@@ -1559,17 +1590,16 @@ body::before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 1.25rem;
-    background: var(--bg-card);
+    padding: 0.875rem 1.25rem;
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-bottom: 0.75rem;
-    transition: all 0.2s;
+    border-radius: var(--radius-lg);
+    margin-bottom: 0.5rem;
+    transition: border-color 0.2s;
 }
 
 .list-item:hover {
     border-color: var(--border-bright);
-    box-shadow: var(--glow-sm);
 }
 
 .list-item-title {
@@ -1606,8 +1636,11 @@ body::before {
 }
 
 .section-header h2 {
-    font-size: 1.25rem;
-    color: var(--text-bright);
+    font-size: 0.8125rem;
+    font-weight: 800;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
 }
 
 /* =============================================================================
@@ -2474,3 +2507,241 @@ select option {
     color: var(--text-muted);
     margin-top: 2px;
 }
+
+/* =============================================================================
+   ION Design System v2 — Shared component classes
+   Polished card, toggle, table, badge, metric, and section patterns.
+   Apply these classes to any template for the modern ION aesthetic.
+   ============================================================================= */
+
+/* ── Page Header ─────────────────────────────────────────────────────────── */
+.ion-page { max-width: 1400px; margin: 0 auto; }
+
+.ion-page-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 28px; padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap; gap: 16px;
+}
+.ion-page-header-left { display: flex; flex-direction: column; gap: 4px; }
+.ion-page-label {
+    display: flex; align-items: center; gap: 6px;
+    color: var(--primary); font-size: 10px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 2px;
+}
+.ion-page-title { font-size: 1.5rem; font-weight: 700; color: var(--text-bright); margin: 0; }
+.ion-page-subtitle { font-size: .85rem; color: var(--text-secondary); margin: 2px 0 0; }
+
+/* ── Toggle Button Group ─────────────────────────────────────────────────── */
+.ion-toggle-group {
+    display: flex; align-items: center; gap: 2px;
+    background: var(--bg-secondary); padding: 4px; border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+}
+.ion-toggle-btn {
+    padding: 8px 16px; border-radius: 8px; font-size: 10px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    border: none; cursor: pointer; background: transparent;
+    color: var(--text-secondary); transition: all .2s;
+    display: flex; align-items: center; gap: 6px;
+}
+.ion-toggle-btn:hover { color: var(--text-primary); background: var(--bg-card); }
+.ion-toggle-btn.active {
+    background: var(--primary); color: var(--bg-deep);
+    box-shadow: 0 4px 12px var(--primary-glow);
+}
+.ion-toggle-btn.active-success { background: var(--success); color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,.3); }
+.ion-toggle-btn.active-danger  { background: var(--danger); color: #fff; box-shadow: 0 4px 12px rgba(239,68,68,.3); }
+.ion-toggle-btn.active-info    { background: var(--info); color: #fff; box-shadow: 0 4px 12px rgba(14,165,233,.3); }
+.ion-toggle-btn.active-warning { background: var(--warning); color: var(--bg-deep); box-shadow: 0 4px 12px rgba(251,191,36,.3); }
+
+/* ── Modern Card ─────────────────────────────────────────────────────────── */
+.ion-card {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 24px;
+    transition: border-color .2s;
+}
+.ion-card:hover { border-color: var(--border-bright); }
+.ion-card-flush { padding: 0; }
+.ion-card-dark { background: var(--bg-primary); box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+
+/* Card section header */
+.ion-card-header {
+    font-size: 11px; font-weight: 900; text-transform: uppercase;
+    color: var(--text-secondary); letter-spacing: 1.5px;
+    margin: 0 0 20px; display: flex; align-items: center; gap: 8px;
+}
+.ion-card-header i { color: var(--primary); }
+
+/* ── Modern Table ────────────────────────────────────────────────────────── */
+.ion-table { width: 100%; border-collapse: collapse; }
+.ion-table thead th {
+    font-size: 9px; font-weight: 700; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 1px;
+    text-align: left; padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+}
+.ion-table tbody td {
+    font-size: 12px; padding: 12px; color: var(--text-primary);
+    border-bottom: 1px solid rgba(99,110,123,.12);
+    vertical-align: middle;
+}
+.ion-table tbody tr:hover td { background: var(--primary-dim); }
+.ion-table tbody tr:last-child td { border-bottom: none; }
+
+/* Compact variant */
+.ion-table-compact thead th { padding: 8px 10px; }
+.ion-table-compact tbody td { padding: 8px 10px; font-size: 11px; }
+
+/* ── Status Badges ───────────────────────────────────────────────────────── */
+.ion-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 700; font-family: inherit;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.ion-badge-success { background: rgba(16,185,129,.12); color: var(--success); }
+.ion-badge-danger  { background: rgba(239,68,68,.12); color: var(--danger); }
+.ion-badge-warning { background: rgba(251,191,36,.12); color: var(--warning); }
+.ion-badge-info    { background: rgba(14,165,233,.12); color: var(--info); }
+.ion-badge-primary { background: var(--primary-dim); color: var(--primary); }
+.ion-badge-muted   { background: rgba(99,110,123,.15); color: var(--text-secondary); }
+
+/* ── Metric / Progress Bar ───────────────────────────────────────────────── */
+.ion-metric { margin-bottom: 18px; }
+.ion-metric:last-child { margin-bottom: 0; }
+.ion-metric-header {
+    display: flex; justify-content: space-between;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    color: var(--text-secondary); margin-bottom: 8px; letter-spacing: 0.5px;
+}
+.ion-metric-value { font-weight: 700; }
+.ion-metric-value.success { color: var(--success); }
+.ion-metric-value.danger  { color: var(--danger); }
+.ion-metric-value.warning { color: var(--warning); }
+.ion-metric-value.info    { color: var(--info); }
+
+.ion-bar { height: 4px; width: 100%; background: var(--border); border-radius: 4px; overflow: hidden; }
+.ion-bar-fill {
+    height: 100%; border-radius: 4px;
+    transition: width .8s ease;
+}
+.ion-bar-fill.success { background: var(--success); }
+.ion-bar-fill.danger  { background: var(--danger); }
+.ion-bar-fill.warning { background: var(--warning); }
+.ion-bar-fill.info    { background: var(--info); }
+.ion-bar-fill.primary { background: var(--primary); }
+
+/* Thicker bar variant */
+.ion-bar-lg { height: 6px; }
+
+/* ── Code Block ──────────────────────────────────────────────────────────── */
+.ion-code {
+    background: var(--bg-secondary); border-radius: var(--radius-lg);
+    padding: 20px; border: 1px solid var(--border);
+}
+.ion-code pre {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--info); overflow-x: auto; white-space: pre;
+    line-height: 1.6; margin: 0;
+}
+
+/* ── Notes / Detail Panel ────────────────────────────────────────────────── */
+.ion-detail-row {
+    display: flex; gap: 16px; padding: 16px;
+    background: var(--bg-secondary); border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+}
+.ion-detail-col { flex: 1; }
+.ion-detail-col + .ion-detail-col { border-left: 1px solid var(--border); padding-left: 16px; }
+.ion-detail-col h4 {
+    font-size: 9px; font-weight: 900; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 1px; margin: 0 0 4px;
+}
+.ion-detail-col p { font-size: 12px; color: var(--text-secondary); margin: 0; }
+
+/* ── Section Heading (small uppercase) ───────────────────────────────────── */
+.ion-section-title {
+    font-size: 12px; font-weight: 900; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    margin: 0 0 16px; display: flex; align-items: center; gap: 8px;
+}
+.ion-section-title i { color: var(--primary); }
+
+/* ── Pill Tabs ───────────────────────────────────────────────────────────── */
+.ion-pill-tabs {
+    display: flex; gap: 2px;
+    background: var(--bg-secondary); padding: 4px; border-radius: var(--radius-lg);
+    border: 1px solid var(--border); display: inline-flex;
+}
+.ion-pill-tab {
+    padding: 6px 14px; border-radius: 8px; font-size: 11px; font-weight: 600;
+    border: none; cursor: pointer; background: transparent;
+    color: var(--text-secondary); transition: all .2s;
+}
+.ion-pill-tab:hover { color: var(--text-primary); background: var(--bg-card); }
+.ion-pill-tab.active { background: var(--primary); color: var(--bg-deep); }
+
+/* ── Stat Grid (modernised) ──────────────────────────────────────────────── */
+.ion-stat-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px; margin-bottom: 24px;
+}
+.ion-stat-card {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 20px;
+    display: flex; flex-direction: column; gap: 4px;
+}
+.ion-stat-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    color: var(--text-secondary); letter-spacing: 1px;
+}
+.ion-stat-value {
+    font-size: 1.75rem; font-weight: 700; color: var(--text-bright);
+    font-family: 'JetBrains Mono', monospace;
+}
+.ion-stat-value.primary { color: var(--primary); }
+.ion-stat-value.success { color: var(--success); }
+.ion-stat-value.danger  { color: var(--danger); }
+.ion-stat-value.warning { color: var(--warning); }
+.ion-stat-value.info    { color: var(--info); }
+.ion-stat-sub {
+    font-size: 11px; color: var(--text-muted);
+}
+
+/* ── Empty State ─────────────────────────────────────────────────────────── */
+.ion-empty {
+    text-align: center; padding: 48px 24px;
+    color: var(--text-muted); font-size: 14px;
+}
+.ion-empty i { font-size: 32px; display: block; margin-bottom: 12px; color: var(--text-secondary); }
+.ion-empty p { margin: 4px 0; }
+
+/* ── Alert / Callout Box ─────────────────────────────────────────────────── */
+.ion-callout {
+    padding: 12px 16px; border-radius: var(--radius);
+    font-size: 12px; line-height: 1.5;
+    display: flex; align-items: flex-start; gap: 10px;
+}
+.ion-callout i { flex-shrink: 0; margin-top: 1px; }
+.ion-callout-info    { background: rgba(14,165,233,.08); border: 1px solid rgba(14,165,233,.2); color: var(--info); }
+.ion-callout-success { background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.2); color: var(--success); }
+.ion-callout-warning { background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.2); color: var(--warning); }
+.ion-callout-danger  { background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.2); color: var(--danger); }
+
+/* ── Utility: Grid Layouts ───────────────────────────────────────────────── */
+.ion-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.ion-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.ion-grid-7-5 { display: grid; grid-template-columns: 7fr 5fr; gap: 32px; }
+@media (max-width: 1024px) {
+    .ion-grid-2, .ion-grid-3, .ion-grid-7-5 { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+    .ion-detail-row { flex-direction: column; }
+    .ion-detail-col + .ion-detail-col { border-left: none; padding-left: 0; border-top: 1px solid var(--border); padding-top: 12px; }
+}
+
+/* ── Transition helper ───────────────────────────────────────────────────── */
+.ion-fade-in { animation: ionFadeIn .3s ease; }
+@keyframes ionFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }

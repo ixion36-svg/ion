@@ -7,42 +7,74 @@
     <div class="ai-chat-container">
         <!-- Sidebar -->
         <div class="ai-chat-sidebar">
-            <div class="ai-chat-sidebar-header">
-                <h3>AI Assistant</h3>
-                <button class="ai-new-chat-btn" onclick="clearAIChat()" title="New Chat">
+            <div class="ai-sidebar-brand">
+                <div class="ai-brand-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+                        <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
+                        <circle cx="15" cy="13" r="1.5" fill="currentColor"/>
+                        <path d="M9 17h6"/>
+                    </svg>
+                </div>
+                <div class="ai-brand-text">
+                    <span class="ai-brand-title">ION AI</span>
+                    <span class="ai-brand-sub" id="ai-model-status-dot">
+                        <span class="status-dot"></span>
+                        <span id="ai-model-status-text">Checking...</span>
+                    </span>
+                </div>
+                <button class="ai-new-chat-btn" title="New Chat">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
-                    New Chat
+                </button>
+            </div>
+
+            <!-- Mode Tabs: Chat vs Document Generator -->
+            <div class="ai-mode-tabs">
+                <button class="ai-mode-tab active" data-mode="chat">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    Chat
+                </button>
+                <button class="ai-mode-tab" data-mode="docgen">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="18" x2="12" y2="12"/>
+                        <line x1="9" y1="15" x2="15" y2="15"/>
+                    </svg>
+                    Doc Generator
                 </button>
             </div>
 
             <!-- Context Selector -->
-            <div class="ai-context-section">
-                <label>Context Mode</label>
-                <div class="ai-context-buttons">
-                    <button class="ai-context-btn active" data-context="security" onclick="setAIContext('security')">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <div class="ai-section" id="chat-context-section">
+                <div class="ai-section-label">Context Mode</div>
+                <div class="ai-context-grid">
+                    <button class="ai-ctx-btn active" data-context="security">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                         </svg>
                         Security
                     </button>
-                    <button class="ai-context-btn" data-context="engineering" onclick="setAIContext('engineering')">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="ai-ctx-btn" data-context="engineering">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
                         </svg>
                         Engineering
                     </button>
-                    <button class="ai-context-btn" data-context="coding" onclick="setAIContext('coding')">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="ai-ctx-btn" data-context="coding">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="16 18 22 12 16 6"></polyline>
                             <polyline points="8 6 2 12 8 18"></polyline>
                         </svg>
                         Coding
                     </button>
-                    <button class="ai-context-btn" data-context="general" onclick="setAIContext('general')">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="ai-ctx-btn" data-context="general">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle>
                             <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
                             <line x1="12" y1="17" x2="12.01" y2="17"></line>
@@ -53,126 +85,94 @@
             </div>
 
             <!-- Uploaded Files -->
-            <div class="ai-files-section">
-                <label>Uploaded Files</label>
+            <div class="ai-section" id="chat-files-section">
+                <div class="ai-section-label">Files</div>
                 <div class="ai-files-list" id="ai-files-list">
-                    <div class="ai-files-empty">No files uploaded</div>
+                    <div class="ai-files-empty">No files attached</div>
                 </div>
-                <label class="ai-upload-btn">
+                <label class="ai-upload-area">
                     <input type="file" id="ai-file-input" style="display:none" accept=".txt,.log,.json,.yaml,.yml,.xml,.csv,.py,.js,.ts,.html,.css,.sh,.bash,.ps1,.conf,.cfg,.ini,.toml,.md,.rst,.sql,.kql,.spl,.yar,.yara,.sigma,.rule,.rules">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="17 8 12 3 7 8"></polyline>
-                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
                     </svg>
                     Upload File
                 </label>
             </div>
 
             <!-- AI Knowledge Sources -->
-            <div class="ai-settings-section">
-                <div class="ai-settings-header" onclick="toggleSettingsPanel()">
-                    <label>AI Knowledge Sources</label>
-                    <svg class="ai-settings-chevron" id="ai-settings-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <div class="ai-section" id="chat-rag-section">
+                <div class="ai-section-label ai-collapsible" onclick="toggleSettingsPanel()">
+                    Knowledge Sources
+                    <svg class="ai-chevron" id="ai-settings-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                 </div>
                 <div class="ai-settings-panel" id="ai-settings-panel" style="display: none;">
-                    <div class="ai-toggle">
-                        <input type="checkbox" id="pref-rag-kb" onchange="saveAIPreferences()">
-                        <label for="pref-rag-kb">Knowledge Base articles</label>
-                    </div>
-                    <div class="ai-toggle">
-                        <input type="checkbox" id="pref-rag-notes" onchange="saveAIPreferences()">
-                        <label for="pref-rag-notes">Analyst Notes</label>
-                    </div>
-                    <div class="ai-toggle">
-                        <input type="checkbox" id="pref-rag-playbooks" onchange="saveAIPreferences()">
-                        <label for="pref-rag-playbooks">Playbooks</label>
-                    </div>
-
+                    <label class="ai-check"><input type="checkbox" id="pref-rag-kb" onchange="saveAIPreferences()"> Knowledge Base</label>
+                    <label class="ai-check"><input type="checkbox" id="pref-rag-notes" onchange="saveAIPreferences()"> Analyst Notes</label>
+                    <label class="ai-check"><input type="checkbox" id="pref-rag-playbooks" onchange="saveAIPreferences()"> Playbooks</label>
                     <div class="ai-settings-divider"></div>
-
-                    <label class="ai-settings-sublabel">Response Settings</label>
-                    <div class="ai-toggle">
-                        <input type="checkbox" id="pref-show-citations" checked onchange="saveAIPreferences()">
-                        <label for="pref-show-citations">Show source citations</label>
-                    </div>
-                    <div class="ai-toggle">
-                        <label for="pref-max-refs" style="margin-right: 8px;">Max references:</label>
+                    <label class="ai-check"><input type="checkbox" id="pref-show-citations" checked onchange="saveAIPreferences()"> Show citations</label>
+                    <div class="ai-settings-row">
+                        <span>Max references</span>
                         <select id="pref-max-refs" onchange="saveAIPreferences()">
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3" selected>3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
+                            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option>
                         </select>
                     </div>
-
                     <div class="ai-settings-divider"></div>
-
-                    <label class="ai-settings-sublabel">Custom Instructions</label>
-                    <textarea id="pref-custom-instructions"
-                        maxlength="500"
-                        placeholder="e.g. Always include MITRE ATT&CK technique IDs"
-                        onchange="saveAIPreferences()"
-                        oninput="updateCharCount()"
-                    ></textarea>
+                    <textarea id="pref-custom-instructions" maxlength="500" placeholder="Custom instructions for the AI..." onchange="saveAIPreferences()" oninput="updateCharCount()"></textarea>
                     <div class="ai-char-count" id="ai-char-count">0/500</div>
                 </div>
             </div>
 
-            <!-- Chat History -->
-            <div class="ai-history-section">
-                <label>Recent Chats</label>
-                <div class="ai-history-list" id="ai-history-list">
-                    <!-- Populated by JavaScript -->
-                    <div class="ai-history-empty">No previous chats</div>
-                </div>
-            </div>
-
             <!-- Quick Prompts -->
-            <div class="ai-prompts-section">
-                <label>Quick Prompts</label>
-                <div class="ai-quick-prompts" id="ai-quick-prompts">
-                    <!-- Populated by JavaScript based on context -->
-                </div>
+            <div class="ai-section" id="chat-prompts-section">
+                <div class="ai-section-label">Quick Prompts</div>
+                <div class="ai-quick-list" id="ai-quick-prompts"></div>
             </div>
 
             <!-- Model Info -->
-            <div class="ai-model-section">
-                <label>Model</label>
-                <div class="ai-model-info" id="ai-model-info">
-                    <span class="ai-model-name">Loading...</span>
-                    <span class="ai-model-status" id="ai-model-status">Checking...</span>
-                </div>
+            <div class="ai-model-footer">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
+                    <rect x="9" y="9" width="6" height="6"/>
+                    <line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>
+                    <line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>
+                    <line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/>
+                    <line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
+                </svg>
+                <span class="ai-model-name" id="ai-model-name">Loading...</span>
             </div>
         </div>
 
         <!-- Main Chat Area -->
-        <div class="ai-chat-main">
-            <div class="ai-chat-header">
-                <div class="ai-chat-title">
-                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    </svg>
-                    <span id="ai-chat-context-title">Security Analyst Assistant</span>
+        <div class="ai-main" id="ai-main-chat">
+            <div class="ai-main-header">
+                <div class="ai-header-left">
+                    <div class="ai-header-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </div>
+                    <span id="ai-chat-context-title">Cyber Security Expert</span>
                 </div>
-                <div class="ai-chat-actions">
-                    <button class="ai-action-btn" onclick="exportAIChat()" title="Export Chat">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                <div class="ai-header-actions">
+                    <button class="ai-icon-btn" onclick="exportPageAIChat()" title="Export Chat">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
                         </svg>
                     </button>
                 </div>
             </div>
 
-            <div class="ai-chat-messages" id="ai-page-messages">
-                <div class="ai-welcome-message">
-                    <div class="ai-welcome-icon">
-                        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+            <div class="ai-messages" id="ai-page-messages">
+                <div class="ai-welcome">
+                    <div class="ai-welcome-orb">
+                        <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5">
                             <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
                             <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
                             <circle cx="15" cy="13" r="1.5" fill="currentColor"/>
@@ -180,56 +180,163 @@
                         </svg>
                     </div>
                     <h2>ION AI Assistant</h2>
-                    <p>I'm here to help with security analysis, threat investigation, and technical questions.</p>
-                    <div class="ai-welcome-hints">
-                        <div class="ai-hint" onclick="sendQuickPrompt('Explain common indicators of compromise for ransomware attacks')">
-                            <span class="ai-hint-icon">🔍</span>
-                            <span>Ask about threat indicators</span>
+                    <p>Security analysis, threat investigation, and technical guidance — powered by your local LLM.</p>
+                    <div class="ai-welcome-cards">
+                        <div class="ai-wcard" data-prompt="Explain common indicators of compromise for ransomware attacks">
+                            <div class="ai-wcard-icon">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            </div>
+                            <div class="ai-wcard-text">
+                                <strong>Threat Indicators</strong>
+                                <span>Analyse IOCs and threat intelligence</span>
+                            </div>
                         </div>
-                        <div class="ai-hint" onclick="sendQuickPrompt('Help me write a Python script to parse Windows event logs')">
-                            <span class="ai-hint-icon">💻</span>
-                            <span>Get help with scripts</span>
+                        <div class="ai-wcard" data-prompt="Help me write a Python script to parse Windows event logs">
+                            <div class="ai-wcard-icon">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                            </div>
+                            <div class="ai-wcard-text">
+                                <strong>Script Assistance</strong>
+                                <span>Generate detection scripts and parsers</span>
+                            </div>
                         </div>
-                        <div class="ai-hint" onclick="sendQuickPrompt('What are the MITRE ATT&CK techniques for credential access?')">
-                            <span class="ai-hint-icon">📚</span>
-                            <span>Learn about MITRE ATT&CK</span>
+                        <div class="ai-wcard" data-prompt="What are the MITRE ATT&CK techniques for credential access?">
+                            <div class="ai-wcard-icon">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            </div>
+                            <div class="ai-wcard-text">
+                                <strong>MITRE ATT&CK</strong>
+                                <span>Techniques, tactics, and procedures</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="ai-chat-input-area">
-                <div class="ai-typing-indicator" id="ai-page-typing" style="display: none;">
-                    <span></span><span></span><span></span>
-                    <span class="ai-typing-text">AI is thinking...</span>
+            <div class="ai-input-area">
+                <div class="ai-typing" id="ai-page-typing" style="display: none;">
+                    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                    <span class="ai-typing-label">AI is thinking...</span>
                 </div>
-                <form class="ai-chat-form" onsubmit="sendAIMessage(event)">
-                    <div class="ai-input-wrapper">
-                        <textarea
-                            id="ai-page-input"
-                            placeholder="Ask me anything about security, threats, or technical topics..."
-                            rows="1"
-                            onkeydown="handleAIInputKeydown(event)"
-                            oninput="autoResizeTextarea(this)"
-                        ></textarea>
+                <form class="ai-input-form" id="ai-chat-form">
+                    <div class="ai-input-row">
+                        <textarea id="ai-page-input" placeholder="Ask me anything about security, threats, or technical topics..." rows="1"></textarea>
                         <button type="submit" class="ai-send-btn" id="ai-send-btn">
-                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
                                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                             </svg>
                         </button>
                     </div>
-                    <div class="ai-input-hint">
-                        Press <kbd>Enter</kbd> to send, <kbd>Shift+Enter</kbd> for new line
+                    <div class="ai-input-meta">
+                        <kbd>Enter</kbd> send &middot; <kbd>Shift+Enter</kbd> new line
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Document Generator Panel (hidden by default) -->
+        <div class="ai-main" id="ai-main-docgen" style="display: none;">
+            <div class="ai-main-header">
+                <div class="ai-header-left">
+                    <div class="ai-header-icon docgen">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="18" x2="12" y2="12"/>
+                            <line x1="9" y1="15" x2="15" y2="15"/>
+                        </svg>
+                    </div>
+                    <span>Document Generator</span>
+                </div>
+            </div>
+
+            <div class="docgen-body">
+                <div class="docgen-form-area">
+                    <div class="docgen-section">
+                        <label class="docgen-label">What would you like to generate?</label>
+                        <textarea id="docgen-prompt" class="docgen-textarea" placeholder="e.g. Write an incident response playbook for ransomware attacks, including detection, containment, eradication, and recovery phases..." rows="4"></textarea>
+                    </div>
+
+                    <div class="docgen-options">
+                        <div class="docgen-opt">
+                            <label>Format</label>
+                            <select id="docgen-format">
+                                <option value="markdown">Markdown</option>
+                                <option value="html">HTML</option>
+                                <option value="csv">CSV / Data</option>
+                                <option value="text">Plain Text</option>
+                            </select>
+                        </div>
+                        <div class="docgen-opt">
+                            <label>Style</label>
+                            <select id="docgen-style">
+                                <option value="professional">Professional</option>
+                                <option value="concise">Concise</option>
+                                <option value="formal">Formal</option>
+                                <option value="technical">Technical</option>
+                            </select>
+                        </div>
+                        <div class="docgen-opt">
+                            <label>Document Name</label>
+                            <input type="text" id="docgen-name" placeholder="Auto-generated if blank">
+                        </div>
+                    </div>
+
+                    <div class="docgen-actions">
+                        <button class="btn-gen" id="docgen-stream-btn" onclick="streamGenerateDocument()">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                            </svg>
+                            Generate Preview
+                        </button>
+                        <button class="btn-gen-save" id="docgen-save-btn" onclick="generateAndSaveDocument()" style="display: none;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/>
+                                <polyline points="7 3 7 8 15 8"/>
+                            </svg>
+                            Save as Document
+                        </button>
+                    </div>
+
+                    <div class="docgen-templates">
+                        <div class="ai-section-label">Quick Templates</div>
+                        <div class="docgen-template-grid">
+                            <button class="docgen-tpl" data-prompt="Write an incident response playbook for ransomware attacks. Include detection criteria, initial response steps, containment procedures, eradication steps, recovery procedures, and lessons learned sections." data-format="markdown">IR Playbook</button>
+                            <button class="docgen-tpl" data-prompt="Create a security advisory document for a critical vulnerability. Include executive summary, affected systems, risk assessment, remediation steps, detection signatures, and timeline." data-format="markdown">Security Advisory</button>
+                            <button class="docgen-tpl" data-prompt="Write a post-incident review (after-action report) template. Include incident summary, timeline of events, root cause analysis, impact assessment, response evaluation, and recommendations." data-format="markdown">After-Action Report</button>
+                            <button class="docgen-tpl" data-prompt="Generate a CSV dataset of common MITRE ATT&CK techniques with columns: technique_id, technique_name, tactic, description, detection_method, severity" data-format="csv">ATT&CK CSV</button>
+                            <button class="docgen-tpl" data-prompt="Write a SOC analyst shift handover report template. Include sections for active incidents, pending investigations, escalations, notable events, and action items for the next shift." data-format="markdown">Shift Handover</button>
+                            <button class="docgen-tpl" data-prompt="Create a threat intelligence briefing document covering current threat landscape, active threat actors, recent campaigns, recommended defensive actions, and IOCs to watch." data-format="markdown">Threat Intel Brief</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="docgen-preview-area" id="docgen-preview-area" style="display: none;">
+                    <div class="docgen-preview-header">
+                        <span>Preview</span>
+                        <div class="docgen-preview-actions">
+                            <button class="ai-icon-btn" onclick="copyDocgenContent()" title="Copy to clipboard">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            </button>
+                            <button class="ai-icon-btn" onclick="exportDocgenPdf()" title="Export as PDF">
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="docgen-preview-content" id="docgen-preview-content"></div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <style>
-/* Full-page AI Chat Styles */
+/* =========================================================================
+   AI Chat Page — ION Design System
+   ========================================================================= */
+
 .ai-chat-page {
     height: calc(100vh - 120px);
     margin: -20px;
@@ -239,357 +346,1050 @@
 .ai-chat-container {
     display: flex;
     height: 100%;
-    background: var(--surface);
+    background: var(--bg-secondary);
     border-radius: 12px;
     overflow: hidden;
+    border: 1px solid var(--border);
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
 }
 
-/* Sidebar */
+/* =========================================================================
+   Sidebar
+   ========================================================================= */
+
 .ai-chat-sidebar {
     width: 280px;
-    background: var(--surface-dark);
+    background: var(--bg-deep, var(--bg-primary));
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+}
+
+.ai-sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     padding: 16px;
-}
-
-.ai-chat-sidebar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
     border-bottom: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.05), rgba(168, 85, 247, 0.05));
 }
 
-.ai-chat-sidebar-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-    color: var(--text);
-}
-
-.ai-new-chat-btn {
+.ai-brand-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--primary), var(--neon-purple, #a855f7));
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 12px;
-    background: var(--primary);
-    color: var(--bg);
-    border: none;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s;
+    justify-content: center;
+    color: white;
+    box-shadow: var(--glow-sm);
+    flex-shrink: 0;
 }
 
-.ai-new-chat-btn:hover {
-    background: var(--primary-light);
-    transform: translateY(-1px);
-}
-
-/* Context Section */
-.ai-context-section,
-.ai-prompts-section,
-.ai-model-section {
-    margin-bottom: 20px;
-}
-
-.ai-context-section label,
-.ai-prompts-section label,
-.ai-model-section label {
-    display: block;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-muted);
-    margin-bottom: 8px;
-}
-
-.ai-context-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.ai-context-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 12px;
-    background: var(--surface);
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: left;
-}
-
-.ai-context-btn:hover {
-    background: var(--surface-light);
-    color: var(--text);
-}
-
-.ai-context-btn.active {
-    background: var(--primary);
-    color: var(--bg);
-    border-color: var(--primary);
-}
-
-/* Quick Prompts */
-.ai-quick-prompts {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.ai-quick-prompt {
-    padding: 8px 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: left;
-    line-height: 1.3;
-}
-
-.ai-quick-prompt:hover {
-    background: var(--surface-light);
-    color: var(--text);
-    border-color: var(--primary);
-}
-
-/* Chat History */
-.ai-history-section {
-    margin-bottom: 20px;
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.ai-history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    overflow-y: auto;
-    max-height: 200px;
-}
-
-.ai-history-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.ai-history-item:hover {
-    background: var(--surface-light);
-    border-color: var(--primary);
-}
-
-.ai-history-item.active {
-    background: var(--primary);
-    color: var(--bg);
-    border-color: var(--primary);
-}
-
-.ai-history-item.active .ai-history-meta {
-    color: var(--bg);
-    opacity: 0.8;
-}
-
-.ai-history-content {
+.ai-brand-text {
     flex: 1;
     min-width: 0;
 }
 
-.ai-history-title {
-    font-size: 0.85rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.ai-brand-title {
+    display: block;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
 }
 
-.ai-history-meta {
+.ai-brand-sub {
+    display: flex;
+    align-items: center;
+    gap: 5px;
     font-size: 0.7rem;
     color: var(--text-muted);
 }
 
-.ai-history-delete {
-    padding: 4px;
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: all 0.3s;
+}
+
+.status-dot.online {
+    background: var(--success);
+    box-shadow: 0 0 6px var(--success);
+}
+
+.ai-new-chat-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
     background: transparent;
-    border: none;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     cursor: pointer;
-    border-radius: 4px;
-    opacity: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.ai-new-chat-btn:hover {
+    background: var(--primary);
+    color: var(--bg-primary);
+    border-color: var(--primary);
+    box-shadow: var(--glow-sm);
+}
+
+/* Mode Tabs */
+.ai-mode-tabs {
+    display: flex;
+    padding: 8px;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+}
+
+.ai-mode-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
     transition: all 0.2s;
 }
 
-.ai-history-item:hover .ai-history-delete {
-    opacity: 1;
+.ai-mode-tab:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
 }
 
-.ai-history-delete:hover {
-    background: var(--danger);
-    color: white;
+.ai-mode-tab.active {
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--primary);
+    border-color: rgba(0, 212, 255, 0.3);
 }
 
-.ai-history-empty {
-    padding: 12px;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 0.85rem;
+/* Sidebar Sections */
+.ai-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
 }
 
-/* Uploaded Files */
-.ai-files-section {
-    margin-bottom: 20px;
-}
-
-.ai-files-section label {
-    display: block;
-    font-size: 0.75rem;
+.ai-section-label {
+    font-size: 0.7rem;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-muted);
     margin-bottom: 8px;
 }
 
+.ai-section-label.ai-collapsible {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ai-chevron {
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+
+.ai-chevron.open {
+    transform: rotate(180deg);
+}
+
+/* Context Grid */
+.ai-context-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+}
+
+.ai-ctx-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ai-ctx-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+}
+
+.ai-ctx-btn.active {
+    background: var(--primary);
+    color: var(--bg-primary);
+    border-color: var(--primary);
+    box-shadow: var(--glow-sm);
+}
+
+/* Files */
 .ai-files-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    max-height: 150px;
+    gap: 3px;
+    max-height: 120px;
     overflow-y: auto;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .ai-files-empty {
-    padding: 12px;
-    text-align: center;
+    font-size: 0.78rem;
     color: var(--text-muted);
-    font-size: 0.85rem;
+    text-align: center;
+    padding: 6px;
 }
 
 .ai-file-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    background: var(--surface);
+    gap: 6px;
+    padding: 6px 8px;
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 4px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.15s;
+    font-size: 0.78rem;
 }
 
-.ai-file-item:hover {
-    background: var(--surface-light);
-    border-color: var(--primary);
-}
-
-.ai-file-item.active {
-    border-color: var(--primary);
-    background: rgba(var(--primary-rgb), 0.1);
-}
-
-.ai-file-icon {
-    color: var(--primary);
-}
-
-.ai-file-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.ai-file-name {
-    font-size: 0.85rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.ai-file-meta {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-}
+.ai-file-item:hover { border-color: var(--primary); }
+.ai-file-item .ai-file-icon { color: var(--primary); flex-shrink: 0; }
+.ai-file-item .ai-file-info { flex: 1; min-width: 0; }
+.ai-file-item .ai-file-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-file-item .ai-file-meta { font-size: 0.65rem; color: var(--text-muted); }
 
 .ai-file-delete {
-    padding: 4px;
     background: transparent;
     border: none;
     color: var(--text-muted);
     cursor: pointer;
-    border-radius: 4px;
+    padding: 2px;
+    border-radius: 3px;
     opacity: 0;
-    transition: all 0.2s;
+    transition: all 0.15s;
 }
 
-.ai-file-item:hover .ai-file-delete {
-    opacity: 1;
-}
+.ai-file-item:hover .ai-file-delete { opacity: 1; }
+.ai-file-delete:hover { background: var(--danger); color: white; }
 
-.ai-file-delete:hover {
-    background: var(--danger);
-    color: white;
-}
-
-.ai-upload-btn {
+.ai-upload-area {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 8px 12px;
-    background: var(--surface);
-    color: var(--text-muted);
+    gap: 5px;
+    padding: 6px;
     border: 1px dashed var(--border);
     border-radius: 6px;
-    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-size: 0.78rem;
     cursor: pointer;
     transition: all 0.2s;
-    width: 100%;
 }
 
-.ai-upload-btn:hover {
-    background: var(--surface-light);
-    color: var(--text);
+.ai-upload-area:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(0, 212, 255, 0.03);
+}
+
+/* Settings Panel */
+.ai-settings-panel {
+    padding: 8px 0 0;
+}
+
+.ai-check {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    margin-bottom: 5px;
+}
+
+.ai-check input[type="checkbox"] {
+    accent-color: var(--primary);
+    width: 14px;
+    height: 14px;
+}
+
+.ai-settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+}
+
+.ai-settings-row select {
+    padding: 2px 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.78rem;
+}
+
+.ai-settings-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0;
+}
+
+#pref-custom-instructions {
+    width: 100%;
+    min-height: 50px;
+    padding: 6px 8px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.78rem;
+    resize: vertical;
+    line-height: 1.4;
+}
+
+#pref-custom-instructions:focus { outline: none; border-color: var(--primary); }
+.ai-char-count { font-size: 0.65rem; color: var(--text-muted); text-align: right; }
+
+/* Quick Prompts */
+.ai-quick-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.ai-qp {
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s;
+    line-height: 1.3;
+}
+
+.ai-qp:hover {
+    background: rgba(0, 212, 255, 0.06);
+    color: var(--text-primary);
     border-color: var(--primary);
 }
 
-/* File Preview Modal */
+/* Model Footer */
+.ai-model-footer {
+    margin-top: auto;
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.ai-model-name {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.72rem;
+}
+
+/* =========================================================================
+   Main Area
+   ========================================================================= */
+
+.ai-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--bg-primary);
+}
+
+.ai-main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.03), rgba(168, 85, 247, 0.03));
+}
+
+.ai-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ai-header-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(168, 85, 247, 0.15));
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+}
+
+.ai-header-icon.docgen {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(0, 212, 255, 0.15));
+    border-color: rgba(16, 185, 129, 0.2);
+    color: var(--success);
+}
+
+.ai-icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.ai-icon-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--primary);
+}
+
+/* Messages Area */
+.ai-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Welcome */
+.ai-welcome {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin: auto;
+    max-width: 560px;
+    padding: 40px 20px;
+    animation: fadeInUp 0.4s ease;
+}
+
+.ai-welcome-orb {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(168, 85, 247, 0.1));
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    margin-bottom: 16px;
+    box-shadow: var(--glow-md);
+    animation: orbPulse 3s ease-in-out infinite;
+}
+
+@keyframes orbPulse {
+    0%, 100% { box-shadow: var(--glow-sm); }
+    50% { box-shadow: var(--glow-lg); }
+}
+
+.ai-welcome h2 {
+    margin: 0 0 6px;
+    font-size: 1.4rem;
+    color: var(--text-primary);
+}
+
+.ai-welcome p {
+    color: var(--text-muted);
+    margin: 0 0 24px;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.ai-welcome-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.ai-wcard {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.ai-wcard:hover {
+    border-color: var(--primary);
+    background: rgba(0, 212, 255, 0.04);
+    transform: translateX(4px);
+}
+
+.ai-wcard-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(0, 212, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.ai-wcard-text strong {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    margin-bottom: 1px;
+}
+
+.ai-wcard-text span {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Message Bubbles */
+.ai-msg {
+    display: flex;
+    gap: 10px;
+    max-width: 85%;
+    animation: fadeInUp 0.25s ease;
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.ai-msg.user {
+    margin-left: auto;
+    flex-direction: row-reverse;
+}
+
+.ai-msg-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.ai-msg.user .ai-msg-avatar {
+    background: var(--primary);
+    color: var(--bg-primary);
+}
+
+.ai-msg.assistant .ai-msg-avatar {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(168, 85, 247, 0.15));
+    color: var(--primary);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.ai-msg-body {
+    padding: 10px 14px;
+    border-radius: 12px;
+    line-height: 1.55;
+    font-size: 0.875rem;
+    min-width: 0;
+    overflow-wrap: break-word;
+}
+
+.ai-msg.user .ai-msg-body {
+    background: var(--primary);
+    color: var(--bg-primary);
+    border-bottom-right-radius: 4px;
+}
+
+.ai-msg.assistant .ai-msg-body {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+}
+
+.ai-msg-body pre {
+    background: var(--bg-deep, var(--bg-primary));
+    border: 1px solid var(--border);
+    padding: 10px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 8px 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.78rem;
+}
+
+.ai-msg-body code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85em;
+    background: rgba(0, 212, 255, 0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+.ai-msg-body pre code {
+    background: transparent;
+    padding: 0;
+}
+
+.ai-msg-body table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 0.82rem; }
+.ai-msg-body th, .ai-msg-body td { padding: 6px 10px; border: 1px solid var(--border); text-align: left; }
+.ai-msg-body th { background: var(--bg-deep, var(--bg-primary)); font-weight: 600; }
+
+.ai-msg-body ul, .ai-msg-body ol { margin: 6px 0; padding-left: 20px; }
+.ai-msg-body li { margin-bottom: 3px; }
+.ai-msg-body blockquote { border-left: 3px solid var(--primary); padding-left: 12px; margin: 8px 0; color: var(--text-secondary); }
+.ai-msg-body h1, .ai-msg-body h2, .ai-msg-body h3 { margin: 12px 0 6px; }
+
+/* Streaming cursor */
+.ai-cursor { animation: blink 1s infinite; color: var(--primary); }
+@keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+/* Citations */
+.ai-citations-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+    padding: 6px 0 0;
+    font-size: 0.72rem;
+}
+
+.ai-citations-label { color: var(--text-muted); margin-right: 2px; align-self: center; }
+
+.ai-citation-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    background: rgba(0, 212, 255, 0.08);
+    border-left: 2px solid var(--primary);
+    border-radius: 0 3px 3px 0;
+    color: var(--text-secondary);
+}
+
+/* Feedback */
+.ai-feedback-row {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.ai-fb-btn {
+    padding: 3px 7px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    transition: all 0.15s;
+}
+
+.ai-fb-btn:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.ai-fb-btn.active-up { background: rgba(16, 185, 129, 0.12); border-color: var(--success); color: var(--success); }
+.ai-fb-btn.active-down { background: rgba(239, 68, 68, 0.12); border-color: var(--danger); color: var(--danger); }
+.ai-fb-btn.used { pointer-events: none; opacity: 0.6; }
+
+/* Typing Indicator */
+.ai-typing {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 14px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.ai-typing .dot {
+    width: 5px;
+    height: 5px;
+    background: var(--primary);
+    border-radius: 50%;
+    animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.ai-typing .dot:nth-child(1) { animation-delay: -0.32s; }
+.ai-typing .dot:nth-child(2) { animation-delay: -0.16s; }
+.ai-typing .dot:nth-child(3) { animation-delay: 0s; }
+
+@keyframes typingBounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+}
+
+/* Input Area */
+.ai-input-area {
+    padding: 0 20px 16px;
+    border-top: 1px solid var(--border);
+}
+
+.ai-input-form {
+    padding-top: 12px;
+}
+
+.ai-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 8px 8px 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.ai-input-row:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.1);
+}
+
+.ai-input-row textarea {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    resize: none;
+    max-height: 160px;
+    outline: none;
+}
+
+.ai-input-row textarea::placeholder { color: var(--text-muted); }
+
+.ai-send-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: var(--primary);
+    color: var(--bg-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.ai-send-btn:hover {
+    box-shadow: var(--glow-sm);
+    transform: scale(1.05);
+}
+
+.ai-send-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.ai-input-meta {
+    padding: 4px 4px 0;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
+.ai-input-meta kbd {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 0.65rem;
+}
+
+/* =========================================================================
+   Document Generator
+   ========================================================================= */
+
+.docgen-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.docgen-form-area {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.docgen-section { margin-bottom: 16px; }
+
+.docgen-label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.docgen-textarea {
+    width: 100%;
+    padding: 12px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 80px;
+    transition: border-color 0.2s;
+}
+
+.docgen-textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.1);
+}
+
+.docgen-textarea::placeholder { color: var(--text-muted); }
+
+.docgen-options {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.docgen-opt {
+    flex: 1;
+    min-width: 140px;
+}
+
+.docgen-opt label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.docgen-opt select,
+.docgen-opt input {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.82rem;
+}
+
+.docgen-opt select:focus,
+.docgen-opt input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.docgen-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.btn-gen {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, var(--primary), var(--neon-purple, #a855f7));
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-gen:hover {
+    box-shadow: var(--glow-md);
+    transform: translateY(-1px);
+}
+
+.btn-gen:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-gen-save {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    background: var(--success);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-gen-save:hover {
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.4);
+    transform: translateY(-1px);
+}
+
+/* Templates */
+.docgen-templates { margin-top: 4px; }
+
+.docgen-template-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.docgen-tpl {
+    padding: 8px 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+}
+
+.docgen-tpl:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(0, 212, 255, 0.04);
+}
+
+/* Preview */
+.docgen-preview-area {
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    max-height: 50%;
+    min-height: 200px;
+}
+
+.docgen-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 16px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+
+.docgen-preview-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.docgen-preview-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.docgen-preview-content pre {
+    background: var(--bg-deep, var(--bg-primary));
+    border: 1px solid var(--border);
+    padding: 10px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.78rem;
+}
+
+.docgen-preview-content table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+.docgen-preview-content th, .docgen-preview-content td { padding: 6px 10px; border: 1px solid var(--border); }
+.docgen-preview-content th { background: var(--bg-secondary); font-weight: 600; }
+
+/* File Modal */
 .ai-file-modal {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background: rgba(0, 0, 0, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     padding: 20px;
+    backdrop-filter: blur(4px);
 }
 
 .ai-file-modal-content {
-    background: var(--surface);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
     border-radius: 12px;
-    max-width: 900px;
+    max-width: 800px;
     width: 100%;
     max-height: 80vh;
     display: flex;
@@ -601,32 +1401,25 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border);
 }
 
-.ai-file-modal-header h3 {
-    margin: 0;
-    font-size: 1rem;
-}
+.ai-file-modal-header h3 { margin: 0; font-size: 0.95rem; }
 
-.ai-file-modal-actions {
-    display: flex;
-    gap: 8px;
-}
+.ai-file-modal-actions { display: flex; gap: 6px; }
 
 .ai-file-modal-body {
     flex: 1;
     overflow: auto;
-    padding: 0;
 }
 
 .ai-file-modal-body pre {
     margin: 0;
-    padding: 16px;
-    background: var(--bg);
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 0.85rem;
+    padding: 14px;
+    background: var(--bg-primary);
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.8rem;
     line-height: 1.5;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -636,582 +1429,28 @@
     width: 100%;
     height: 100%;
     min-height: 400px;
-    padding: 16px;
-    background: var(--bg);
-    color: var(--text);
+    padding: 14px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
     border: none;
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 0.85rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.8rem;
     line-height: 1.5;
     resize: none;
 }
 
-.ai-file-modal-body textarea:focus {
-    outline: none;
-}
-
-/* Model Info */
-.ai-model-info {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 10px 12px;
-    background: var(--surface);
-    border-radius: 8px;
-}
-
-.ai-model-name {
-    font-size: 0.9rem;
-    color: var(--text);
-    font-family: monospace;
-}
-
-.ai-model-status {
-    font-size: 0.75rem;
-    color: var(--success);
-}
-
-.ai-model-status.offline {
-    color: var(--danger);
-}
-
-/* Main Chat Area */
-.ai-chat-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
-.ai-chat-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px;
-    background: var(--surface-dark);
-    border-bottom: 1px solid var(--border);
-}
-
-.ai-chat-title {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--text);
-    font-size: 1.1rem;
-    font-weight: 500;
-}
-
-.ai-chat-title svg {
-    color: var(--primary);
-}
-
-.ai-chat-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.ai-action-btn {
-    padding: 8px;
-    background: transparent;
-    color: var(--text-muted);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.ai-action-btn:hover {
-    background: var(--surface-light);
-    color: var(--text);
-}
-
-/* Messages Area */
-.ai-chat-messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-/* Welcome Message */
-.ai-welcome-message {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 40px;
-    margin: auto;
-    max-width: 500px;
-}
-
-.ai-welcome-icon {
-    color: var(--primary);
-    margin-bottom: 16px;
-    opacity: 0.8;
-}
-
-.ai-welcome-message h2 {
-    margin: 0 0 8px 0;
-    color: var(--text);
-    font-size: 1.5rem;
-}
-
-.ai-welcome-message p {
-    color: var(--text-muted);
-    margin: 0 0 24px 0;
-}
-
-.ai-welcome-hints {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 100%;
-}
-
-.ai-hint {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: var(--surface-dark);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: left;
-}
-
-.ai-hint:hover {
-    background: var(--surface-light);
-    border-color: var(--primary);
-}
-
-.ai-hint-icon {
-    font-size: 1.2rem;
-}
-
-.ai-hint span:last-child {
-    color: var(--text-muted);
-    font-size: 0.9rem;
-}
-
-/* Message Bubbles */
-.ai-page-message {
-    display: flex;
-    gap: 12px;
-    max-width: 85%;
-    animation: fadeInUp 0.3s ease;
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.ai-page-message.user {
-    margin-left: auto;
-    flex-direction: row-reverse;
-}
-
-.ai-message-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    font-size: 0.9rem;
-}
-
-.ai-page-message.user .ai-message-avatar {
-    background: var(--primary);
-    color: var(--bg);
-}
-
-.ai-page-message.assistant .ai-message-avatar {
-    background: var(--surface-dark);
-    color: var(--primary);
-    border: 1px solid var(--border);
-}
-
-.ai-message-content {
-    padding: 12px 16px;
-    border-radius: 12px;
-    line-height: 1.5;
-}
-
-.ai-page-message.user .ai-message-content {
-    background: var(--primary);
-    color: var(--bg);
-    border-bottom-right-radius: 4px;
-}
-
-.ai-page-message.assistant .ai-message-content {
-    background: var(--surface-dark);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-bottom-left-radius: 4px;
-}
-
-.ai-message-content pre {
-    background: var(--bg);
-    padding: 12px;
-    border-radius: 6px;
-    overflow-x: auto;
-    margin: 8px 0;
-}
-
-.ai-message-content code {
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 0.85rem;
-}
-
-.ai-message-content p:first-child {
-    margin-top: 0;
-}
-
-.ai-message-content p:last-child {
-    margin-bottom: 0;
-}
-
-/* Input Area */
-.ai-chat-input-area {
-    padding: 16px 20px;
-    background: var(--surface-dark);
-    border-top: 1px solid var(--border);
-}
-
-.ai-typing-indicator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    margin-bottom: 12px;
-    background: var(--surface);
-    border-radius: 8px;
-    width: fit-content;
-}
-
-.ai-typing-indicator span:not(.ai-typing-text) {
-    width: 8px;
-    height: 8px;
-    background: var(--primary);
-    border-radius: 50%;
-    animation: typingBounce 1.4s infinite ease-in-out;
-}
-
-.ai-typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
-.ai-typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
-
-@keyframes typingBounce {
-    0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
-    40% { transform: scale(1); opacity: 1; }
-}
-
-.ai-typing-text {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin-left: 4px;
-}
-
-.ai-chat-form {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.ai-input-wrapper {
-    display: flex;
-    gap: 12px;
-    align-items: flex-end;
-}
-
-.ai-input-wrapper textarea {
-    flex: 1;
-    padding: 12px 16px;
-    background: var(--surface);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    font-size: 0.95rem;
-    font-family: inherit;
-    resize: none;
-    min-height: 48px;
-    max-height: 200px;
-    line-height: 1.5;
-}
-
-.ai-input-wrapper textarea:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
-}
-
-.ai-input-wrapper textarea::placeholder {
-    color: var(--text-muted);
-}
-
-.ai-send-btn {
-    width: 48px;
-    height: 48px;
-    background: var(--primary);
-    color: var(--bg);
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.ai-send-btn:hover {
-    background: var(--primary-light);
-    transform: scale(1.05);
-}
-
-.ai-send-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-}
-
-.ai-input-hint {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    text-align: right;
-}
-
-.ai-input-hint kbd {
-    padding: 2px 6px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    font-family: inherit;
-    font-size: 0.7rem;
-}
-
-/* AI Settings Section */
-.ai-settings-section {
-    margin-bottom: 20px;
-}
-
-.ai-settings-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    padding: 4px 0;
-}
-
-.ai-settings-header label {
-    display: block;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-muted);
-    margin-bottom: 0;
-    cursor: pointer;
-}
-
-.ai-settings-chevron {
-    color: var(--text-muted);
-    transition: transform 0.2s;
-}
-
-.ai-settings-chevron.open {
-    transform: rotate(180deg);
-}
-
-.ai-settings-panel {
-    margin-top: 8px;
-    padding: 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-}
-
-.ai-settings-divider {
-    height: 1px;
-    background: var(--border);
-    margin: 10px 0;
-}
-
-.ai-settings-sublabel {
-    display: block;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-muted);
-    margin-bottom: 6px;
-}
-
-.ai-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-}
-
-.ai-toggle input[type="checkbox"] {
-    accent-color: var(--primary);
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-}
-
-.ai-toggle label {
-    font-size: 0.82rem;
-    color: var(--text);
-    cursor: pointer;
-    margin: 0;
-}
-
-.ai-toggle select {
-    padding: 4px 8px;
-    background: var(--surface-dark);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    font-size: 0.82rem;
-}
-
-#pref-custom-instructions {
-    width: 100%;
-    min-height: 60px;
-    padding: 8px;
-    background: var(--surface-dark);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-family: inherit;
-    font-size: 0.82rem;
-    resize: vertical;
-    line-height: 1.4;
-}
-
-#pref-custom-instructions:focus {
-    outline: none;
-    border-color: var(--primary);
-}
-
-#pref-custom-instructions::placeholder {
-    color: var(--text-muted);
-}
-
-.ai-char-count {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    text-align: right;
-    margin-top: 2px;
-}
-
-/* Citation bar */
-.ai-citations-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 8px;
-    padding: 8px 0 0 0;
-}
-
-.ai-citations-label {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-right: 4px;
-    align-self: center;
-}
-
-.ai-citation-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 8px;
-    background: var(--surface);
-    border-left: 3px solid var(--primary);
-    border-radius: 0 4px 4px 0;
-    font-size: 0.75rem;
-    color: var(--text);
-}
-
-.ai-citation-chip .ai-cite-icon {
-    font-size: 0.8rem;
-}
-
-/* Feedback buttons */
-.ai-feedback-row {
-    display: flex;
-    gap: 6px;
-    margin-top: 6px;
-}
-
-.ai-feedback-btn {
-    padding: 4px 8px;
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 2px;
-}
-
-.ai-feedback-btn:hover {
-    background: var(--surface-light);
-    color: var(--text);
-}
-
-.ai-feedback-btn.active-up {
-    background: rgba(34, 197, 94, 0.15);
-    border-color: #22c55e;
-    color: #22c55e;
-}
-
-.ai-feedback-btn.active-down {
-    background: rgba(239, 68, 68, 0.15);
-    border-color: #ef4444;
-    color: #ef4444;
-}
-
-.ai-feedback-btn.used {
-    pointer-events: none;
-    opacity: 0.7;
-}
+.ai-file-modal-body textarea:focus { outline: none; }
 
 /* Responsive */
 @media (max-width: 768px) {
-    .ai-chat-sidebar {
-        display: none;
-    }
-
-    .ai-chat-page {
-        margin: -10px;
-        padding: 0;
-        height: calc(100vh - 100px);
-    }
-
-    .ai-chat-container {
-        border-radius: 0;
-    }
+    .ai-chat-sidebar { display: none; }
+    .ai-chat-page { margin: -10px; padding: 0; height: calc(100vh - 100px); }
+    .ai-chat-container { border-radius: 0; }
+    .docgen-template-grid { grid-template-columns: repeat(2, 1fr); }
 }
 </style>
 
 <script>
-// AI Chat Page JavaScript - Wrapped in IIFE to avoid conflicts with ai-chat.js
 (function() {
     'use strict';
 
@@ -1219,19 +1458,15 @@
     let aiCurrentContext = 'security';
     let aiIsStreaming = false;
     let currentSessionId = null;
-    let chatSessions = [];
     let uploadedFiles = [];
     let aiPreferences = {};
     let pendingCitations = null;
+    let currentMode = 'chat';
+    let docgenContent = '';
 
-    // Map user roles to default AI context
     const ROLE_TO_CONTEXT = {
-        admin: 'security',
-        analyst: 'security',
-        senior_analyst: 'security',
-        principal_analyst: 'security',
-        lead: 'security',
-        forensic: 'security',
+        admin: 'security', analyst: 'security', senior_analyst: 'security',
+        principal_analyst: 'security', lead: 'security', forensic: 'security',
         engineering: 'engineering',
     };
 
@@ -1273,256 +1508,146 @@
         general: "General Assistant"
     };
 
-    document.addEventListener('DOMContentLoaded', function() {
-        initChatPage();
-    });
+    // =========================================================================
+    // Init
+    // =========================================================================
 
-    function initChatPage() {
-        // Auto-select context based on user's role
+    document.addEventListener('DOMContentLoaded', function() {
+        // Auto-select context from role
         if (typeof currentUserData !== 'undefined' && currentUserData) {
             const role = currentUserData.focus_role || (currentUserData.roles && currentUserData.roles[0]) || 'analyst';
             aiCurrentContext = ROLE_TO_CONTEXT[role] || 'security';
         }
 
-        // Check AI status
-        checkPageAIStatus();
-        updatePageQuickPrompts();
-        loadChatHistory();
+        checkAIStatus();
+        updateQuickPrompts();
         loadAIPreferences();
-
-        // Wire up event handlers
-        const form = document.querySelector('.ai-chat-form');
-        if (form) {
-            form.addEventListener('submit', handleFormSubmit);
-        }
-
-        const input = document.getElementById('ai-page-input');
-        if (input) {
-            input.addEventListener('keydown', handleInputKeydown);
-            input.addEventListener('input', function() {
-                this.style.height = 'auto';
-                this.style.height = Math.min(this.scrollHeight, 200) + 'px';
-            });
-        }
-
-        // Context buttons
-        document.querySelectorAll('.ai-context-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                setPageAIContext(this.dataset.context);
-            });
-        });
-
-        // New chat button
-        const newChatBtn = document.querySelector('.ai-new-chat-btn');
-        if (newChatBtn) {
-            newChatBtn.addEventListener('click', startNewChat);
-        }
-
-        // Export button
-        const exportBtn = document.querySelector('.ai-action-btn');
-        if (exportBtn) {
-            exportBtn.addEventListener('click', exportPageAIChat);
-        }
-
-        // Welcome hints
-        document.querySelectorAll('.ai-hint').forEach(hint => {
-            hint.addEventListener('click', function() {
-                const prompt = this.querySelector('span:last-child').textContent;
-                sendPageQuickPrompt(prompt);
-            });
-        });
-
-        // File upload handler
-        const fileInput = document.getElementById('ai-file-input');
-        if (fileInput) {
-            fileInput.addEventListener('change', handleFileUpload);
-        }
-
-        // Load existing uploaded files
         loadUploadedFiles();
 
-        // Sync UI buttons to match the auto-selected context
-        setPageAIContext(aiCurrentContext);
+        // Form
+        document.getElementById('ai-chat-form').addEventListener('submit', handleFormSubmit);
+        const input = document.getElementById('ai-page-input');
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleFormSubmit(e); }
+        });
+        input.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 160) + 'px';
+        });
+
+        // Context buttons
+        document.querySelectorAll('.ai-ctx-btn').forEach(btn => {
+            btn.addEventListener('click', () => setContext(btn.dataset.context));
+        });
+
+        // Mode tabs
+        document.querySelectorAll('.ai-mode-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchMode(tab.dataset.mode));
+        });
+
+        // New chat
+        document.querySelector('.ai-new-chat-btn').addEventListener('click', startNewChat);
+
+        // Welcome cards
+        document.querySelectorAll('.ai-wcard').forEach(card => {
+            card.addEventListener('click', () => {
+                document.getElementById('ai-page-input').value = card.dataset.prompt;
+                handleFormSubmit(new Event('submit'));
+            });
+        });
+
+        // File upload
+        document.getElementById('ai-file-input').addEventListener('change', handleFileUpload);
+
+        // Doc generator templates
+        document.querySelectorAll('.docgen-tpl').forEach(tpl => {
+            tpl.addEventListener('click', () => {
+                document.getElementById('docgen-prompt').value = tpl.dataset.prompt;
+                if (tpl.dataset.format) document.getElementById('docgen-format').value = tpl.dataset.format;
+            });
+        });
+
+        // Sync context UI
+        setContext(aiCurrentContext);
+    });
+
+    // =========================================================================
+    // Mode Switching
+    // =========================================================================
+
+    function switchMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.ai-mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+        document.getElementById('ai-main-chat').style.display = mode === 'chat' ? 'flex' : 'none';
+        document.getElementById('ai-main-docgen').style.display = mode === 'docgen' ? 'flex' : 'none';
+
+        // Toggle sidebar sections
+        document.getElementById('chat-context-section').style.display = mode === 'chat' ? '' : 'none';
+        document.getElementById('chat-files-section').style.display = mode === 'chat' ? '' : 'none';
+        document.getElementById('chat-rag-section').style.display = mode === 'chat' ? '' : 'none';
+        document.getElementById('chat-prompts-section').style.display = mode === 'chat' ? '' : 'none';
     }
 
-    async function checkPageAIStatus() {
-        try {
-            const response = await fetch('/api/ai/status', {
-                credentials: 'include'
-            });
-            const data = await response.json();
+    // =========================================================================
+    // AI Status
+    // =========================================================================
 
-            const modelName = document.querySelector('.ai-model-name');
-            const modelStatus = document.getElementById('ai-model-status');
+    async function checkAIStatus() {
+        try {
+            const resp = await fetch('/api/ai/status', { credentials: 'include' });
+            const data = await resp.json();
+            const dot = document.querySelector('.status-dot');
+            const text = document.getElementById('ai-model-status-text');
+            const name = document.getElementById('ai-model-name');
 
             if (data.available) {
-                modelName.textContent = data.default_model || 'Unknown';
-                modelStatus.textContent = 'Online';
-                modelStatus.classList.remove('offline');
+                dot.classList.add('online');
+                text.textContent = 'Online';
+                name.textContent = data.default_model || 'Unknown';
             } else {
-                modelName.textContent = 'Not configured';
-                modelStatus.textContent = data.error || 'Offline';
-                modelStatus.classList.add('offline');
+                text.textContent = 'Offline';
+                name.textContent = 'Not connected';
             }
-        } catch (error) {
-            console.error('Failed to check AI status:', error);
-            document.getElementById('ai-model-status').textContent = 'Error';
-            document.getElementById('ai-model-status').classList.add('offline');
-        }
-    }
-
-    function setPageAIContext(context) {
-        aiCurrentContext = context;
-
-        // Update button states
-        document.querySelectorAll('.ai-context-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.context === context);
-        });
-
-        // Update title
-        document.getElementById('ai-chat-context-title').textContent = AI_CONTEXT_TITLES[context];
-
-        // Update prompts
-        updatePageQuickPrompts();
-    }
-
-    function updatePageQuickPrompts() {
-        const container = document.getElementById('ai-quick-prompts');
-        const prompts = AI_QUICK_PROMPTS[aiCurrentContext] || AI_QUICK_PROMPTS.default;
-
-        container.innerHTML = prompts.map(prompt =>
-            `<button class="ai-quick-prompt">${prompt}</button>`
-        ).join('');
-
-        // Wire up click handlers
-        container.querySelectorAll('.ai-quick-prompt').forEach(btn => {
-            btn.addEventListener('click', function() {
-                sendPageQuickPrompt(this.textContent);
-            });
-        });
-    }
-
-    function sendPageQuickPrompt(prompt) {
-        document.getElementById('ai-page-input').value = prompt;
-        handleFormSubmit(new Event('submit'));
-    }
-
-    function handleInputKeydown(event) {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            handleFormSubmit(event);
+        } catch (e) {
+            document.getElementById('ai-model-status-text').textContent = 'Error';
         }
     }
 
     // =========================================================================
-    // Chat History Functions
+    // Context
     // =========================================================================
 
-    async function loadChatHistory() {
-        // History feature disabled temporarily
-        const container = document.getElementById('ai-history-list');
-        if (container) {
-            container.innerHTML = '<div class="ai-history-empty">Chat history coming soon</div>';
-        }
+    function setContext(ctx) {
+        aiCurrentContext = ctx;
+        document.querySelectorAll('.ai-ctx-btn').forEach(b => b.classList.toggle('active', b.dataset.context === ctx));
+        document.getElementById('ai-chat-context-title').textContent = AI_CONTEXT_TITLES[ctx] || ctx;
+        updateQuickPrompts();
     }
 
-    function renderChatHistory() {
-        const container = document.getElementById('ai-history-list');
-        if (!chatSessions || chatSessions.length === 0) {
-            container.innerHTML = '<div class="ai-history-empty">No previous chats</div>';
-            return;
-        }
-
-        container.innerHTML = chatSessions.map(session => `
-            <div class="ai-history-item ${currentSessionId === session.id ? 'active' : ''}"
-                 data-session-id="${session.id}">
-                <div class="ai-history-content">
-                    <div class="ai-history-title">${escapeHtml(session.title || 'Untitled')}</div>
-                    <div class="ai-history-meta">${formatTimeAgo(session.updated_at)}</div>
-                </div>
-                <button class="ai-history-delete" title="Delete">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                </button>
-            </div>
-        `).join('');
-
-        // Wire up click handlers
-        container.querySelectorAll('.ai-history-item').forEach(item => {
-            item.addEventListener('click', function(e) {
-                if (!e.target.closest('.ai-history-delete')) {
-                    loadSession(parseInt(this.dataset.sessionId));
-                }
-            });
-        });
-
-        container.querySelectorAll('.ai-history-delete').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const sessionId = parseInt(this.closest('.ai-history-item').dataset.sessionId);
-                deleteSession(sessionId);
+    function updateQuickPrompts() {
+        const el = document.getElementById('ai-quick-prompts');
+        const prompts = AI_QUICK_PROMPTS[aiCurrentContext] || [];
+        el.innerHTML = prompts.map(p => `<button class="ai-qp">${escapeHtml(p)}</button>`).join('');
+        el.querySelectorAll('.ai-qp').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.getElementById('ai-page-input').value = btn.textContent;
+                handleFormSubmit(new Event('submit'));
             });
         });
     }
 
-    async function loadSession(sessionId) {
-        try {
-            const response = await fetch(`/api/ai/history/sessions/${sessionId}`, {
-                credentials: 'include'
-            });
-            if (response.ok) {
-                const data = await response.json();
-                currentSessionId = sessionId;
-                aiCurrentContext = data.context_type || 'default';
-                aiPageMessages = data.messages.map(m => ({
-                    id: 'msg-' + m.id,
-                    role: m.role,
-                    content: m.content
-                }));
-
-                // Update UI
-                setPageAIContext(aiCurrentContext);
-                renderMessages();
-                renderChatHistory();
-            }
-        } catch (error) {
-            console.error('Failed to load session:', error);
-        }
-    }
-
-    async function deleteSession(sessionId) {
-        if (!confirm('Delete this conversation?')) return;
-
-        try {
-            const response = await fetch(`/api/ai/history/sessions/${sessionId}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-            if (response.ok) {
-                if (currentSessionId === sessionId) {
-                    startNewChat();
-                }
-                loadChatHistory();
-            }
-        } catch (error) {
-            console.error('Failed to delete session:', error);
-        }
-    }
+    // =========================================================================
+    // Chat
+    // =========================================================================
 
     function startNewChat() {
         currentSessionId = null;
         aiPageMessages = [];
-        renderMessages();
-        renderChatHistory();
-
-        // Show welcome message
         const container = document.getElementById('ai-page-messages');
         container.innerHTML = `
-            <div class="ai-welcome-message">
-                <div class="ai-welcome-icon">
-                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+            <div class="ai-welcome">
+                <div class="ai-welcome-orb">
+                    <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
                         <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
                         <circle cx="15" cy="13" r="1.5" fill="currentColor"/>
@@ -1530,473 +1655,88 @@
                     </svg>
                 </div>
                 <h2>ION AI Assistant</h2>
-                <p>I'm here to help with security analysis, threat investigation, and technical questions.</p>
-            </div>
-        `;
+                <p>Security analysis, threat investigation, and technical guidance — powered by your local LLM.</p>
+            </div>`;
     }
-
-    function renderMessages() {
-        const container = document.getElementById('ai-page-messages');
-        if (aiPageMessages.length === 0) {
-            return;
-        }
-
-        container.innerHTML = aiPageMessages.map(msg => {
-            const avatar = msg.role === 'user' ? getPageUserInitial() : '🤖';
-            return `
-                <div class="ai-page-message ${msg.role}">
-                    <div class="ai-message-avatar">${avatar}</div>
-                    <div class="ai-message-content" id="${msg.id}">${formatPageMessage(msg.content)}</div>
-                </div>
-            `;
-        }).join('');
-        scrollPageToBottom();
-    }
-
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    function formatTimeAgo(dateStr) {
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diff = Math.floor((now - date) / 1000);
-
-        if (diff < 60) return 'just now';
-        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-        if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
-        return date.toLocaleDateString();
-    }
-
-    // =========================================================================
-    // File Upload Functions
-    // =========================================================================
-
-    async function loadUploadedFiles() {
-        try {
-            const response = await fetch('/api/ai/files', {
-                credentials: 'include'
-            });
-            if (response.ok) {
-                const data = await response.json();
-                uploadedFiles = data.files || [];
-                renderUploadedFiles();
-            }
-        } catch (error) {
-            console.error('Failed to load uploaded files:', error);
-        }
-    }
-
-    function renderUploadedFiles() {
-        const container = document.getElementById('ai-files-list');
-        if (!container) return;
-
-        if (!uploadedFiles || uploadedFiles.length === 0) {
-            container.innerHTML = '<div class="ai-files-empty">No files uploaded</div>';
-            return;
-        }
-
-        container.innerHTML = uploadedFiles.map(file => `
-            <div class="ai-file-item" data-file-id="${file.id}" title="Click to view/edit">
-                <svg class="ai-file-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                </svg>
-                <div class="ai-file-info">
-                    <div class="ai-file-name">${escapeHtml(file.name)}</div>
-                    <div class="ai-file-meta">${formatFileSize(file.size)} | ${file.lines} lines</div>
-                </div>
-                <button class="ai-file-delete" title="Remove file" onclick="event.stopPropagation(); deleteUploadedFile('${file.id}')">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-        `).join('');
-
-        // Wire up click handlers for viewing files
-        container.querySelectorAll('.ai-file-item').forEach(item => {
-            item.addEventListener('click', function(e) {
-                if (!e.target.closest('.ai-file-delete')) {
-                    showFileModal(this.dataset.fileId);
-                }
-            });
-        });
-    }
-
-    function formatFileSize(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / 1024 / 1024).toFixed(1) + ' MB';
-    }
-
-    async function handleFileUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        // Reset input so same file can be uploaded again
-        event.target.value = '';
-
-        // Check file size (5MB limit)
-        if (file.size > 5 * 1024 * 1024) {
-            if (typeof showToast === 'function') {
-                showToast('File too large. Maximum size is 5MB.', 'error');
-            } else {
-                alert('File too large. Maximum size is 5MB.');
-            }
-            return;
-        }
-
-        // Upload file
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            const response = await fetch('/api/ai/files/upload', {
-                method: 'POST',
-                credentials: 'include',
-                body: formData
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Upload failed');
-            }
-
-            const data = await response.json();
-            if (typeof showToast === 'function') {
-                showToast(`File "${file.name}" uploaded. AI can now read it.`, 'success');
-            }
-
-            // Reload files list
-            loadUploadedFiles();
-
-        } catch (error) {
-            console.error('File upload error:', error);
-            if (typeof showToast === 'function') {
-                showToast(error.message || 'Failed to upload file', 'error');
-            } else {
-                alert(error.message || 'Failed to upload file');
-            }
-        }
-    }
-
-    async function deleteUploadedFile(fileId) {
-        try {
-            const response = await fetch(`/api/ai/files/${fileId}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                loadUploadedFiles();
-                if (typeof showToast === 'function') {
-                    showToast('File removed', 'success');
-                }
-            }
-        } catch (error) {
-            console.error('Failed to delete file:', error);
-        }
-    }
-
-    async function showFileModal(fileId) {
-        try {
-            const response = await fetch(`/api/ai/files/${fileId}`, {
-                credentials: 'include'
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to load file');
-            }
-
-            const file = await response.json();
-
-            // Create modal
-            const modal = document.createElement('div');
-            modal.className = 'ai-file-modal';
-            modal.innerHTML = `
-                <div class="ai-file-modal-content">
-                    <div class="ai-file-modal-header">
-                        <h3>${escapeHtml(file.name)}</h3>
-                        <div class="ai-file-modal-actions">
-                            <button class="btn btn-sm btn-secondary" onclick="toggleFileEdit(this)">
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                </svg>
-                                Edit
-                            </button>
-                            <button class="btn btn-sm btn-primary" onclick="saveFileEdit('${file.id}')" style="display:none" id="save-file-btn">
-                                Save
-                            </button>
-                            <button class="btn btn-sm btn-secondary" onclick="downloadFile('${file.id}')">
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="7 10 12 15 17 10"></polyline>
-                                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                                </svg>
-                                Download
-                            </button>
-                            <button class="btn btn-sm" onclick="closeFileModal()">Close</button>
-                        </div>
-                    </div>
-                    <div class="ai-file-modal-body">
-                        <pre id="file-content-view">${escapeHtml(file.content)}</pre>
-                        <textarea id="file-content-edit" style="display:none">${escapeHtml(file.content)}</textarea>
-                    </div>
-                </div>
-            `;
-
-            // Close on backdrop click
-            modal.addEventListener('click', function(e) {
-                if (e.target === modal) {
-                    closeFileModal();
-                }
-            });
-
-            document.body.appendChild(modal);
-
-        } catch (error) {
-            console.error('Failed to show file:', error);
-            if (typeof showToast === 'function') {
-                showToast('Failed to load file', 'error');
-            }
-        }
-    }
-
-    // Make these functions global so onclick handlers work
-    window.toggleFileEdit = function(btn) {
-        const view = document.getElementById('file-content-view');
-        const edit = document.getElementById('file-content-edit');
-        const saveBtn = document.getElementById('save-file-btn');
-
-        if (view.style.display !== 'none') {
-            view.style.display = 'none';
-            edit.style.display = 'block';
-            saveBtn.style.display = 'inline-flex';
-            btn.innerHTML = `
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-                Cancel
-            `;
-        } else {
-            view.style.display = 'block';
-            edit.style.display = 'none';
-            saveBtn.style.display = 'none';
-            btn.innerHTML = `
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                </svg>
-                Edit
-            `;
-        }
-    };
-
-    window.saveFileEdit = async function(fileId) {
-        const edit = document.getElementById('file-content-edit');
-        const newContent = edit.value;
-
-        try {
-            const response = await fetch(`/api/ai/files/${fileId}/edit`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ content: newContent })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to save');
-            }
-
-            // Update view
-            const view = document.getElementById('file-content-view');
-            view.textContent = newContent;
-
-            // Switch back to view mode
-            document.querySelector('.ai-file-modal-actions button').click();
-
-            if (typeof showToast === 'function') {
-                showToast('File saved', 'success');
-            }
-
-            // Refresh files list
-            loadUploadedFiles();
-
-        } catch (error) {
-            console.error('Failed to save file:', error);
-            if (typeof showToast === 'function') {
-                showToast('Failed to save file', 'error');
-            }
-        }
-    };
-
-    window.downloadFile = async function(fileId) {
-        try {
-            const response = await fetch(`/api/ai/files/${fileId}/download`, {
-                method: 'POST',
-                credentials: 'include'
-            });
-
-            if (!response.ok) {
-                throw new Error('Download failed');
-            }
-
-            // Get filename from header or use default
-            const contentDisposition = response.headers.get('Content-Disposition');
-            let filename = 'download.txt';
-            if (contentDisposition) {
-                const match = contentDisposition.match(/filename="(.+)"/);
-                if (match) filename = match[1];
-            }
-
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.click();
-            URL.revokeObjectURL(url);
-
-        } catch (error) {
-            console.error('Download failed:', error);
-            if (typeof showToast === 'function') {
-                showToast('Download failed', 'error');
-            }
-        }
-    };
-
-    window.closeFileModal = function() {
-        const modal = document.querySelector('.ai-file-modal');
-        if (modal) {
-            modal.remove();
-        }
-    };
-
-    window.deleteUploadedFile = deleteUploadedFile;
-
-    // =========================================================================
-    // Form Submit with History
-    // =========================================================================
 
     async function handleFormSubmit(event) {
         event.preventDefault();
-
         const input = document.getElementById('ai-page-input');
         const message = input.value.trim();
-
         if (!message || aiIsStreaming) return;
 
-        // Hide welcome message
-        const welcome = document.querySelector('.ai-welcome-message');
+        // Hide welcome
+        const welcome = document.querySelector('.ai-welcome');
         if (welcome) welcome.style.display = 'none';
 
-        // Add user message to UI immediately
-        addPageMessage('user', message);
+        addMessage('user', message);
         input.value = '';
         input.style.height = 'auto';
 
-        // Show typing indicator
         aiIsStreaming = true;
         document.getElementById('ai-page-typing').style.display = 'flex';
         document.getElementById('ai-send-btn').disabled = true;
 
         try {
-            // Build messages array for context
-            const messages = aiPageMessages.map(m => ({
-                role: m.role,
-                content: m.content
-            }));
-
-            // Use direct chat API (history disabled for now)
-            const response = await fetch('/api/ai/chat/stream', {
+            const messages = aiPageMessages.map(m => ({ role: m.role, content: m.content }));
+            const resp = await fetch('/api/ai/chat/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({
-                    messages: messages,
-                    context_type: aiCurrentContext,
-                    stream: true
-                })
+                body: JSON.stringify({ messages, context_type: aiCurrentContext, stream: true })
             });
 
-            if (!response.ok) {
-                let detail = `HTTP ${response.status}`;
-                try {
-                    const errBody = await response.json();
-                    if (errBody.detail) detail += `: ${errBody.detail}`;
-                } catch {}
+            if (!resp.ok) {
+                let detail = `HTTP ${resp.status}`;
+                try { const err = await resp.json(); if (err.detail) detail += `: ${err.detail}`; } catch {}
                 throw new Error(detail);
             }
 
-            // Create assistant message container
-            const assistantMsgId = addPageMessage('assistant', '');
-            const contentEl = document.getElementById(assistantMsgId);
+            const msgId = addMessage('assistant', '');
+            const contentEl = document.getElementById(msgId);
             pendingCitations = null;
 
-            // Stream the response
-            const reader = response.body.getReader();
+            const reader = resp.body.getReader();
             const decoder = new TextDecoder();
             let fullResponse = '';
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
-
                 const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const data = line.slice(6);
-                        if (data === '[DONE]') continue;
-
-                        try {
-                            const parsed = JSON.parse(data);
-                            if (parsed.error) {
-                                throw new Error(parsed.error);
-                            } else if (parsed.citations) {
-                                pendingCitations = parsed.citations;
-                            } else if (parsed.content) {
-                                fullResponse += parsed.content;
-                                contentEl.innerHTML = formatPageMessage(fullResponse);
-                                scrollPageToBottom();
-                            }
-                        } catch (e) {
-                            if (e.message && !e.message.includes('JSON')) {
-                                throw e; // Re-throw real errors
-                            }
-                            // Skip invalid JSON
+                for (const line of chunk.split('\n')) {
+                    if (!line.startsWith('data: ')) continue;
+                    const data = line.slice(6);
+                    if (data === '[DONE]') continue;
+                    try {
+                        const parsed = JSON.parse(data);
+                        if (parsed.error) throw new Error(parsed.error);
+                        if (parsed.citations) pendingCitations = parsed.citations;
+                        if (parsed.content) {
+                            fullResponse += parsed.content;
+                            contentEl.innerHTML = formatMessage(fullResponse);
+                            scrollToBottom();
                         }
+                    } catch (e) {
+                        if (e.message && !e.message.includes('JSON')) throw e;
                     }
                 }
             }
 
             // Update stored message
-            const msgIndex = aiPageMessages.findIndex(m => m.id === assistantMsgId);
-            if (msgIndex !== -1) {
-                aiPageMessages[msgIndex].content = fullResponse;
-            }
+            const idx = aiPageMessages.findIndex(m => m.id === msgId);
+            if (idx !== -1) aiPageMessages[idx].content = fullResponse;
 
-            // Render citations and feedback below the message
-            const msgWrapper = contentEl.closest('.ai-page-message');
-            if (msgWrapper) {
+            // Citations + feedback
+            const wrapper = contentEl.closest('.ai-msg');
+            if (wrapper) {
                 if (pendingCitations && pendingCitations.length > 0 && aiPreferences.show_citations !== false) {
-                    msgWrapper.insertAdjacentHTML('beforeend', renderCitations(pendingCitations));
+                    wrapper.insertAdjacentHTML('beforeend', renderCitations(pendingCitations));
                 }
-                msgWrapper.insertAdjacentHTML('beforeend', renderFeedbackButtons(assistantMsgId));
+                wrapper.insertAdjacentHTML('beforeend', renderFeedback(msgId));
             }
-
         } catch (error) {
-            console.error('AI chat error:', error);
-            const errMsg = error.message || 'Unknown error';
-            addPageMessage('assistant', `Sorry, I encountered an error: ${errMsg}`);
+            addMessage('assistant', `Sorry, I encountered an error: ${error.message || 'Unknown error'}`);
         } finally {
             aiIsStreaming = false;
             document.getElementById('ai-page-typing').style.display = 'none';
@@ -2004,36 +1744,25 @@
         }
     }
 
-    function addPageMessage(role, content) {
+    function addMessage(role, content) {
         const container = document.getElementById('ai-page-messages');
         const msgId = 'msg-' + Date.now();
-
         aiPageMessages.push({ id: msgId, role, content });
 
-        const avatar = role === 'user' ? getPageUserInitial() : '🤖';
-
-        const messageHtml = `
-            <div class="ai-page-message ${role}">
-                <div class="ai-message-avatar">${avatar}</div>
-                <div class="ai-message-content" id="${msgId}">${formatPageMessage(content)}</div>
+        const avatar = role === 'user' ? getUserInitial() : '\u{1F916}';
+        container.insertAdjacentHTML('beforeend', `
+            <div class="ai-msg ${role}">
+                <div class="ai-msg-avatar">${avatar}</div>
+                <div class="ai-msg-body" id="${msgId}">${formatMessage(content)}</div>
             </div>
-        `;
-
-        container.insertAdjacentHTML('beforeend', messageHtml);
-        scrollPageToBottom();
-
+        `);
+        scrollToBottom();
         return msgId;
     }
 
-    function formatPageMessage(content) {
+    function formatMessage(content) {
         if (!content) return '<span class="ai-cursor"></span>';
-
-        // Use marked if available, otherwise basic formatting
-        if (typeof marked !== 'undefined') {
-            return safeMarkdown(content);
-        }
-
-        // Basic formatting fallback
+        if (typeof marked !== 'undefined') return safeMarkdown(content);
         return content
             .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>')
             .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -2041,94 +1770,330 @@
             .replace(/\n/g, '<br>');
     }
 
-    function getPageUserInitial() {
-        const userName = document.getElementById('user-name')?.textContent || 'U';
-        return userName.charAt(0).toUpperCase();
+    function getUserInitial() {
+        const el = document.getElementById('user-name');
+        return (el?.textContent || 'U').charAt(0).toUpperCase();
     }
 
-    function scrollPageToBottom() {
-        const container = document.getElementById('ai-page-messages');
-        container.scrollTop = container.scrollHeight;
+    function scrollToBottom() {
+        const c = document.getElementById('ai-page-messages');
+        c.scrollTop = c.scrollHeight;
     }
 
-    function clearPageAIChat() {
-        aiPageMessages = [];
-        const container = document.getElementById('ai-page-messages');
-        container.innerHTML = `
-            <div class="ai-welcome-message">
-                <div class="ai-welcome-icon">
-                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
-                        <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
-                        <circle cx="15" cy="13" r="1.5" fill="currentColor"/>
-                        <path d="M9 17h6"/>
-                    </svg>
-                </div>
-                <h2>ION AI Assistant</h2>
-                <p>I'm here to help with security analysis, threat investigation, and technical questions.</p>
-                <div class="ai-welcome-hints">
-                    <div class="ai-hint">
-                        <span class="ai-hint-icon">🔍</span>
-                        <span>Ask about threat indicators</span>
-                    </div>
-                    <div class="ai-hint">
-                        <span class="ai-hint-icon">💻</span>
-                        <span>Get help with scripts</span>
-                    </div>
-                    <div class="ai-hint">
-                        <span class="ai-hint-icon">📚</span>
-                        <span>Learn about MITRE ATT&CK</span>
-                    </div>
-                </div>
-            </div>
-        `;
-        // Re-wire hint handlers
-        document.querySelectorAll('.ai-hint').forEach(hint => {
-            hint.addEventListener('click', function() {
-                const prompt = this.querySelector('span:last-child').textContent;
-                sendPageQuickPrompt(prompt);
+    function renderCitations(citations) {
+        if (!citations || !citations.length) return '';
+        const icons = { knowledge_base: '\u{1F4C4}', user_note: '\u{1F4DD}', playbook: '\u{1F4CB}' };
+        const labels = { knowledge_base: 'KB', user_note: 'Note', playbook: 'PB' };
+        const chips = citations.map(c =>
+            `<span class="ai-citation-chip">${icons[c.type] || ''} ${escapeHtml(labels[c.type] || c.type)}: ${escapeHtml(c.title)}</span>`
+        ).join('');
+        return `<div class="ai-citations-bar"><span class="ai-citations-label">Sources:</span>${chips}</div>`;
+    }
+
+    function renderFeedback(msgId) {
+        return `<div class="ai-feedback-row" data-msg-id="${msgId}">
+            <button class="ai-fb-btn" onclick="submitFeedback(this, 'up')" title="Good">\u{1F44D}</button>
+            <button class="ai-fb-btn" onclick="submitFeedback(this, 'down')" title="Poor">\u{1F44E}</button>
+        </div>`;
+    }
+
+    window.submitFeedback = async function(btn, rating) {
+        const row = btn.closest('.ai-feedback-row');
+        if (!row || row.classList.contains('submitted')) return;
+        row.classList.add('submitted');
+        row.querySelectorAll('.ai-fb-btn').forEach(b => b.classList.add('used'));
+        btn.classList.add(rating === 'up' ? 'active-up' : 'active-down');
+        try {
+            await fetch('/api/ai/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ rating, context_type: aiCurrentContext, rag_sources_used: pendingCitations ? JSON.stringify(pendingCitations) : null })
             });
+        } catch (e) { console.error('Feedback error:', e); }
+    };
+
+    // =========================================================================
+    // Document Generator
+    // =========================================================================
+
+    window.streamGenerateDocument = async function() {
+        const prompt = document.getElementById('docgen-prompt').value.trim();
+        if (!prompt) { showToast('Enter a prompt first', 'warning'); return; }
+
+        const format = document.getElementById('docgen-format').value;
+        const style = document.getElementById('docgen-style').value;
+        const btn = document.getElementById('docgen-stream-btn');
+        const saveBtn = document.getElementById('docgen-save-btn');
+        const previewArea = document.getElementById('docgen-preview-area');
+        const previewContent = document.getElementById('docgen-preview-content');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span> Generating...';
+        saveBtn.style.display = 'none';
+        previewArea.style.display = 'flex';
+        previewContent.innerHTML = '<span class="ai-cursor"></span>';
+        docgenContent = '';
+
+        try {
+            const resp = await fetch('/api/ai/document/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ prompt, output_format: format, style })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.detail || `HTTP ${resp.status}`);
+            }
+
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                for (const line of decoder.decode(value).split('\n')) {
+                    if (!line.startsWith('data: ')) continue;
+                    const data = line.slice(6);
+                    if (data === '[DONE]') continue;
+                    try {
+                        const parsed = JSON.parse(data);
+                        if (parsed.error) throw new Error(parsed.error);
+                        if (parsed.content) {
+                            docgenContent += parsed.content;
+                            // Render preview based on format
+                            if (format === 'markdown' && typeof marked !== 'undefined') {
+                                previewContent.innerHTML = safeMarkdown(docgenContent);
+                            } else if (format === 'html') {
+                                previewContent.innerHTML = docgenContent;
+                            } else {
+                                previewContent.innerHTML = '<pre>' + escapeHtml(docgenContent) + '</pre>';
+                            }
+                        }
+                    } catch (e) {
+                        if (e.message && !e.message.includes('JSON')) throw e;
+                    }
+                }
+            }
+
+            saveBtn.style.display = 'inline-flex';
+            showToast('Document generated successfully', 'success');
+        } catch (error) {
+            previewContent.innerHTML = `<div style="color: var(--danger); padding: 12px;">Error: ${escapeHtml(error.message)}</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Preview';
+        }
+    };
+
+    window.generateAndSaveDocument = async function() {
+        if (!docgenContent) { showToast('Generate a preview first', 'warning'); return; }
+
+        const format = document.getElementById('docgen-format').value;
+        const docName = document.getElementById('docgen-name').value.trim();
+
+        try {
+            const resp = await fetch('/api/ai/document/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    content: docgenContent,
+                    output_format: format,
+                    document_name: docName || null
+                })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.detail || 'Save failed');
+            }
+
+            const data = await resp.json();
+            showToast(`Document saved: "${data.name}"`, 'success');
+
+            // Offer to navigate
+            if (confirm(`Document "${data.name}" saved. Go to Documents page?`)) {
+                window.location.href = '/documents';
+            }
+        } catch (error) {
+            showToast('Failed to save: ' + error.message, 'error');
+        }
+    };
+
+    window.copyDocgenContent = function() {
+        navigator.clipboard.writeText(docgenContent).then(() => showToast('Copied', 'success'))
+            .catch(() => showToast('Copy failed', 'error'));
+    };
+
+    window.exportDocgenPdf = async function() {
+        if (!docgenContent) { showToast('Nothing to export', 'warning'); return; }
+        showToast('PDF export available after saving the document', 'info');
+    };
+
+    // =========================================================================
+    // Files
+    // =========================================================================
+
+    async function loadUploadedFiles() {
+        try {
+            const resp = await fetch('/api/ai/files', { credentials: 'include' });
+            if (resp.ok) {
+                const data = await resp.json();
+                uploadedFiles = data.files || [];
+                renderFiles();
+            }
+        } catch (e) { console.error('Load files error:', e); }
+    }
+
+    function renderFiles() {
+        const container = document.getElementById('ai-files-list');
+        if (!uploadedFiles.length) {
+            container.innerHTML = '<div class="ai-files-empty">No files attached</div>';
+            return;
+        }
+        container.innerHTML = uploadedFiles.map(f => `
+            <div class="ai-file-item" data-file-id="${f.id}">
+                <svg class="ai-file-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <div class="ai-file-info">
+                    <div class="ai-file-name">${escapeHtml(f.name)}</div>
+                    <div class="ai-file-meta">${formatFileSize(f.size)}</div>
+                </div>
+                <button class="ai-file-delete" onclick="event.stopPropagation(); deleteUploadedFile('${f.id}')">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+        `).join('');
+        container.querySelectorAll('.ai-file-item').forEach(item => {
+            item.addEventListener('click', e => { if (!e.target.closest('.ai-file-delete')) showFileModal(item.dataset.fileId); });
         });
     }
 
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    async function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        event.target.value = '';
+        if (file.size > 5242880) { showToast('Max 5MB', 'error'); return; }
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const resp = await fetch('/api/ai/files/upload', { method: 'POST', credentials: 'include', body: formData });
+            if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail); }
+            showToast(`"${file.name}" uploaded`, 'success');
+            loadUploadedFiles();
+        } catch (e) { showToast(e.message || 'Upload failed', 'error'); }
+    }
+
+    window.deleteUploadedFile = async function(fileId) {
+        try {
+            const resp = await fetch(`/api/ai/files/${fileId}`, { method: 'DELETE', credentials: 'include' });
+            if (resp.ok) { loadUploadedFiles(); showToast('File removed', 'success'); }
+        } catch (e) { console.error(e); }
+    };
+
+    async function showFileModal(fileId) {
+        try {
+            const resp = await fetch(`/api/ai/files/${fileId}`, { credentials: 'include' });
+            if (!resp.ok) throw new Error('Load failed');
+            const file = await resp.json();
+            const modal = document.createElement('div');
+            modal.className = 'ai-file-modal';
+            modal.innerHTML = `
+                <div class="ai-file-modal-content">
+                    <div class="ai-file-modal-header">
+                        <h3>${escapeHtml(file.name)}</h3>
+                        <div class="ai-file-modal-actions">
+                            <button class="btn btn-sm" onclick="toggleFileEdit(this)">Edit</button>
+                            <button class="btn btn-sm btn-primary" onclick="saveFileEdit('${file.id}')" style="display:none" id="save-file-btn">Save</button>
+                            <button class="btn btn-sm" onclick="downloadFile('${file.id}')">Download</button>
+                            <button class="btn btn-sm" onclick="closeFileModal()">Close</button>
+                        </div>
+                    </div>
+                    <div class="ai-file-modal-body">
+                        <pre id="file-content-view">${escapeHtml(file.content)}</pre>
+                        <textarea id="file-content-edit" style="display:none">${escapeHtml(file.content)}</textarea>
+                    </div>
+                </div>`;
+            modal.addEventListener('click', e => { if (e.target === modal) closeFileModal(); });
+            document.body.appendChild(modal);
+        } catch (e) { showToast('Failed to load file', 'error'); }
+    }
+
+    window.toggleFileEdit = function(btn) {
+        const view = document.getElementById('file-content-view');
+        const edit = document.getElementById('file-content-edit');
+        const save = document.getElementById('save-file-btn');
+        if (view.style.display !== 'none') {
+            view.style.display = 'none'; edit.style.display = 'block'; save.style.display = 'inline-flex'; btn.textContent = 'Cancel';
+        } else {
+            view.style.display = 'block'; edit.style.display = 'none'; save.style.display = 'none'; btn.textContent = 'Edit';
+        }
+    };
+
+    window.saveFileEdit = async function(fileId) {
+        try {
+            const resp = await fetch(`/api/ai/files/${fileId}/edit`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+                body: JSON.stringify({ content: document.getElementById('file-content-edit').value })
+            });
+            if (!resp.ok) throw new Error('Save failed');
+            document.getElementById('file-content-view').textContent = document.getElementById('file-content-edit').value;
+            document.querySelector('.ai-file-modal-actions button').click();
+            showToast('Saved', 'success');
+            loadUploadedFiles();
+        } catch (e) { showToast('Save failed', 'error'); }
+    };
+
+    window.downloadFile = async function(fileId) {
+        try {
+            const resp = await fetch(`/api/ai/files/${fileId}/download`, { method: 'POST', credentials: 'include' });
+            if (!resp.ok) throw new Error('Download failed');
+            const disp = resp.headers.get('Content-Disposition');
+            let name = 'download.txt';
+            if (disp) { const m = disp.match(/filename="(.+)"/); if (m) name = m[1]; }
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = name; a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) { showToast('Download failed', 'error'); }
+    };
+
+    window.closeFileModal = function() {
+        const m = document.querySelector('.ai-file-modal');
+        if (m) m.remove();
+    };
+
     // =========================================================================
-    // AI Preferences, Citations, Feedback
+    // Preferences
     // =========================================================================
 
     async function loadAIPreferences() {
         try {
-            const response = await fetch('/api/ai/preferences', {
-                credentials: 'include'
-            });
-            if (response.ok) {
-                aiPreferences = await response.json();
-                applyPreferencesToUI();
-            }
-        } catch (error) {
-            console.error('Failed to load AI preferences:', error);
-        }
+            const resp = await fetch('/api/ai/preferences', { credentials: 'include' });
+            if (resp.ok) { aiPreferences = await resp.json(); applyPrefsUI(); }
+        } catch (e) { console.error(e); }
     }
 
-    function applyPreferencesToUI() {
-        const kb = document.getElementById('pref-rag-kb');
-        const notes = document.getElementById('pref-rag-notes');
-        const playbooks = document.getElementById('pref-rag-playbooks');
-        const citations = document.getElementById('pref-show-citations');
-        const maxRefs = document.getElementById('pref-max-refs');
-        const customInst = document.getElementById('pref-custom-instructions');
-
-        if (kb) kb.checked = !!aiPreferences.rag_knowledge_base;
-        if (notes) notes.checked = !!aiPreferences.rag_user_notes;
-        if (playbooks) playbooks.checked = !!aiPreferences.rag_playbooks;
-        if (citations) citations.checked = aiPreferences.show_citations !== false;
-        if (maxRefs) maxRefs.value = String(aiPreferences.max_context_snippets || 3);
-        if (customInst) {
-            customInst.value = aiPreferences.custom_instructions || '';
-            updateCharCount();
-        }
+    function applyPrefsUI() {
+        const el = (id) => document.getElementById(id);
+        if (el('pref-rag-kb')) el('pref-rag-kb').checked = !!aiPreferences.rag_knowledge_base;
+        if (el('pref-rag-notes')) el('pref-rag-notes').checked = !!aiPreferences.rag_user_notes;
+        if (el('pref-rag-playbooks')) el('pref-rag-playbooks').checked = !!aiPreferences.rag_playbooks;
+        if (el('pref-show-citations')) el('pref-show-citations').checked = aiPreferences.show_citations !== false;
+        if (el('pref-max-refs')) el('pref-max-refs').value = String(aiPreferences.max_context_snippets || 3);
+        if (el('pref-custom-instructions')) { el('pref-custom-instructions').value = aiPreferences.custom_instructions || ''; updateCharCount(); }
     }
 
-    async function saveAIPreferences() {
+    window.saveAIPreferences = async function() {
         const payload = {
             rag_knowledge_base: document.getElementById('pref-rag-kb')?.checked || false,
             rag_user_notes: document.getElementById('pref-rag-notes')?.checked || false,
@@ -2137,133 +2102,65 @@
             max_context_snippets: parseInt(document.getElementById('pref-max-refs')?.value || '3', 10),
             custom_instructions: document.getElementById('pref-custom-instructions')?.value || '',
         };
-
         try {
-            const response = await fetch('/api/ai/preferences', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
+            const resp = await fetch('/api/ai/preferences', {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
                 body: JSON.stringify(payload)
             });
-            if (response.ok) {
-                aiPreferences = await response.json();
-                if (typeof showToast === 'function') {
-                    showToast('AI preferences saved', 'success');
-                }
-            }
-        } catch (error) {
-            console.error('Failed to save AI preferences:', error);
-        }
-    }
+            if (resp.ok) { aiPreferences = await resp.json(); showToast('Preferences saved', 'success'); }
+        } catch (e) { console.error(e); }
+    };
 
-    function updateCharCount() {
-        const textarea = document.getElementById('pref-custom-instructions');
-        const counter = document.getElementById('ai-char-count');
-        if (textarea && counter) {
-            counter.textContent = textarea.value.length + '/500';
-        }
-    }
+    window.updateCharCount = function() {
+        const ta = document.getElementById('pref-custom-instructions');
+        const ct = document.getElementById('ai-char-count');
+        if (ta && ct) ct.textContent = ta.value.length + '/500';
+    };
 
     window.toggleSettingsPanel = function() {
         const panel = document.getElementById('ai-settings-panel');
         const chevron = document.getElementById('ai-settings-chevron');
         if (panel) {
-            const isHidden = panel.style.display === 'none';
-            panel.style.display = isHidden ? 'block' : 'none';
-            if (chevron) chevron.classList.toggle('open', isHidden);
+            const hidden = panel.style.display === 'none';
+            panel.style.display = hidden ? 'block' : 'none';
+            if (chevron) chevron.classList.toggle('open', hidden);
         }
     };
 
-    // Make save callable from inline handlers
-    window.saveAIPreferences = saveAIPreferences;
-    window.updateCharCount = updateCharCount;
+    // =========================================================================
+    // Export
+    // =========================================================================
 
-    function renderCitations(citations) {
-        if (!citations || citations.length === 0) return '';
-        const icons = {
-            knowledge_base: '<span class="ai-cite-icon">&#128196;</span>',
-            user_note: '<span class="ai-cite-icon">&#128221;</span>',  // Analyst Notes
-            playbook: '<span class="ai-cite-icon">&#128203;</span>',
-        };
-        const labels = {
-            knowledge_base: 'KB',
-            user_note: 'Note',
-            playbook: 'PB',
-        };
-        const chips = citations.map(c => {
-            const icon = icons[c.type] || '';
-            const label = labels[c.type] || c.type;
-            return `<span class="ai-citation-chip">${icon} ${escapeHtml(label)}: ${escapeHtml(c.title)}</span>`;
-        }).join('');
-        return `<div class="ai-citations-bar"><span class="ai-citations-label">Sources referenced:</span>${chips}</div>`;
-    }
-
-    function renderFeedbackButtons(msgId) {
-        return `<div class="ai-feedback-row" data-msg-id="${msgId}">
-            <button class="ai-feedback-btn" onclick="submitFeedback(this, 'up')" title="Good response">&#128077;</button>
-            <button class="ai-feedback-btn" onclick="submitFeedback(this, 'down')" title="Poor response">&#128078;</button>
-        </div>`;
-    }
-
-    window.submitFeedback = async function(btn, rating) {
-        const row = btn.closest('.ai-feedback-row');
-        if (!row || row.classList.contains('submitted')) return;
-        row.classList.add('submitted');
-
-        // Highlight selected
-        const buttons = row.querySelectorAll('.ai-feedback-btn');
-        buttons.forEach(b => b.classList.add('used'));
-        btn.classList.add(rating === 'up' ? 'active-up' : 'active-down');
-
-        const citationsJson = pendingCitations ? JSON.stringify(pendingCitations) : null;
-
-        try {
-            await fetch('/api/ai/feedback', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    rating: rating,
-                    context_type: aiCurrentContext,
-                    rag_sources_used: citationsJson,
-                })
-            });
-        } catch (error) {
-            console.error('Failed to submit feedback:', error);
-        }
-    };
-
-    function exportPageAIChat() {
-        if (aiPageMessages.length === 0) {
-            if (typeof showToast === 'function') {
-                showToast('No messages to export', 'warning');
-            }
-            return;
-        }
-
-        let exportText = `ION AI Chat Export\n`;
-        exportText += `Date: ${new Date().toISOString()}\n`;
-        exportText += `Context: ${AI_CONTEXT_TITLES[aiCurrentContext]}\n`;
-        exportText += `${'='.repeat(50)}\n\n`;
-
-        aiPageMessages.forEach(msg => {
-            const role = msg.role === 'user' ? 'You' : 'AI';
-            exportText += `[${role}]\n${msg.content}\n\n`;
-        });
-
-        const blob = new Blob([exportText], { type: 'text/plain' });
+    window.exportPageAIChat = function() {
+        if (!aiPageMessages.length) { showToast('No messages to export', 'warning'); return; }
+        let text = `ION AI Chat Export\nDate: ${new Date().toISOString()}\nContext: ${AI_CONTEXT_TITLES[aiCurrentContext]}\n${'='.repeat(50)}\n\n`;
+        aiPageMessages.forEach(m => { text += `[${m.role === 'user' ? 'You' : 'AI'}]\n${m.content}\n\n`; });
+        const blob = new Blob([text], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `ion-ai-chat-${new Date().toISOString().slice(0,10)}.txt`;
-        a.click();
+        a.href = url; a.download = `ion-ai-chat-${new Date().toISOString().slice(0,10)}.txt`; a.click();
         URL.revokeObjectURL(url);
+        showToast('Chat exported', 'success');
+    };
 
-        if (typeof showToast === 'function') {
-            showToast('Chat exported successfully', 'success');
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Delegate to global showToast from app.js
+    const _globalShowToast = window.showToast;
+    function showToast(msg, type) {
+        if (typeof _globalShowToast === 'function') {
+            _globalShowToast(msg, type);
         }
     }
 
-})(); // End of IIFE
+})();
 </script>
 {% endblock %}

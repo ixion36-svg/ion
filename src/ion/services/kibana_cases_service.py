@@ -382,31 +382,41 @@ class KibanaCasesService:
         if not self.enabled:
             return None
 
-        try:
-            owner = self.config.get("case_owner", "securitySolution")
-
-            payload = {
-                "type": "alert",
-                "alertId": alert_ids,
-                "index": alert_index,
-                "owner": owner,
-                "rule": {
-                    "id": "manual-attachment",
-                    "name": "Manual Alert Attachment",
-                },
-            }
-
-            path = self._get_api_path(f"/api/cases/{case_id}/comments")
-            response = self.client.post(path, json=payload)
-
-            if response.status_code in (200, 201):
-                return response.json()
-            else:
-                logger.error(f"Failed to attach alerts: {response.status_code} - {response.text}")
-                return None
-        except Exception as e:
-            logger.error(f"Error attaching alerts to Kibana case: {e}")
+        if not alert_ids:
             return None
+
+        owner = self.config.get("case_owner", "securitySolution")
+        path = self._get_api_path(f"/api/cases/{case_id}/comments")
+        last_response = None
+
+        # Attach alerts one at a time to avoid ES version_conflict_engine_exception
+        # when Kibana's syncAlerts updates alert documents concurrently.
+        for aid in alert_ids:
+            try:
+                payload = {
+                    "type": "alert",
+                    "alertId": [aid],
+                    "index": [alert_index],
+                    "owner": owner,
+                    "rule": {
+                        "id": "manual-attachment",
+                        "name": "Manual Alert Attachment",
+                    },
+                }
+
+                response = self.client.post(path, json=payload)
+
+                if response.status_code in (200, 201):
+                    last_response = response.json()
+                else:
+                    logger.error(
+                        "Failed to attach alert %s to case %s: %s - %s",
+                        aid, case_id, response.status_code, response.text,
+                    )
+            except Exception as e:
+                logger.error("Error attaching alert %s to Kibana case %s: %s", aid, case_id, e)
+
+        return last_response
 
     def delete_case(self, case_id: str) -> bool:
         """Delete a case."""

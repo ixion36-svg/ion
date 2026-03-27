@@ -243,7 +243,7 @@
 /* Security Dashboard Specific Styles */
 .security-banner {
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     padding: 1.5rem;
     margin-bottom: 1.5rem;
     display: flex;
@@ -267,11 +267,11 @@
     font-weight: 600;
 }
 
-.threat-level.critical { color: #ff4444; }
-.threat-level.high { color: #ff8800; }
-.threat-level.medium { color: #ffbb33; }
-.threat-level.low { color: #00C851; }
-.threat-level.normal { color: #33b5e5; }
+.threat-level.critical { color: var(--danger); }
+.threat-level.high { color: var(--neon-orange); }
+.threat-level.medium { color: var(--warning); }
+.threat-level.low { color: var(--success); }
+.threat-level.normal { color: var(--info); }
 
 .threat-stats {
     display: flex;
@@ -300,17 +300,17 @@
 }
 
 .stat-card {
-    background: var(--card-bg);
-    border-radius: 8px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
     padding: 1.25rem;
     display: flex;
     align-items: center;
     gap: 1rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
 }
 
-.stat-card-critical { border-left: 4px solid #ff4444; }
-.stat-card-high { border-left: 4px solid #ff8800; }
+.stat-card-critical { border-left: 4px solid var(--danger); }
+.stat-card-high { border-left: 4px solid var(--neon-orange); }
 .stat-card-blocked { border-left: 4px solid #9933cc; }
 
 .stat-icon {
@@ -320,7 +320,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     background: var(--bg-secondary);
 }
 
@@ -377,7 +377,7 @@
 }
 
 .list-item-count {
-    background: var(--primary-color);
+    background: var(--primary);
     color: white;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
@@ -397,11 +397,11 @@
     text-transform: uppercase;
 }
 
-.severity-critical { background: #ff4444; color: white; }
-.severity-high { background: #ff8800; color: white; }
-.severity-medium { background: #ffbb33; color: #333; }
-.severity-low { background: #00C851; color: white; }
-.severity-info { background: #33b5e5; color: white; }
+.severity-critical { background: var(--danger); color: white; }
+.severity-high { background: var(--neon-orange); color: white; }
+.severity-medium { background: var(--warning); color: #333; }
+.severity-low { background: var(--success); color: white; }
+.severity-info { background: var(--info); color: white; }
 
 .status-badge {
     padding: 0.25rem 0.5rem;
@@ -460,7 +460,7 @@
 
 .event-patterns-list li {
     padding: 0.25rem 0;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .event-payload {
@@ -468,13 +468,13 @@
     padding: 1rem;
     background: #1a1a2e;
     border-radius: 4px;
-    border-left: 4px solid #ff4444;
+    border-left: 4px solid var(--danger);
 }
 
 .event-payload-title {
     font-weight: 600;
     margin-bottom: 0.75rem;
-    color: #ff6b6b;
+    color: var(--danger);
 }
 
 .event-payload-content {
@@ -513,8 +513,8 @@
 
 .payload-code.highlight-danger {
     background: #2d1a1a;
-    border: 1px solid #ff4444;
-    color: #ff6b6b;
+    border: 1px solid var(--danger);
+    color: var(--danger);
 }
 
 .modal-lg {
@@ -528,7 +528,7 @@
 
 .matched-content code {
     background: #2d1a1a;
-    color: #ff6b6b;
+    color: var(--danger);
     padding: 3px 8px;
     border-radius: 3px;
     font-size: 0.75rem;

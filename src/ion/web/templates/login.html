@@ -36,7 +36,7 @@
         }
 
         .login-container {
-            background: var(--bg-card);
+            background: var(--bg-secondary);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-card);
@@ -254,7 +254,11 @@
                     } else {
                         // Redirect to dashboard or previous page
                         const urlParams = new URLSearchParams(window.location.search);
-                        const redirect = urlParams.get('redirect') || '/';
+                        let redirect = urlParams.get('redirect') || '/';
+                        // Prevent open redirect — only allow relative paths
+                        if (!redirect.startsWith('/') || redirect.startsWith('//') || redirect.includes('://')) {
+                            redirect = '/';
+                        }
                         window.location.href = redirect;
                     }
                 } else {

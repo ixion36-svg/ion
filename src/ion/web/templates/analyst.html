@@ -258,33 +258,32 @@
     align-items: center;
     gap: 0.75rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 1rem 1.25rem;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: border-color 0.2s;
 }
 
 .stat-card:hover {
     border-color: var(--accent-color);
-    transform: translateY(-2px);
 }
 
 .stat-icon { font-size: 1.5rem; }
 .stat-content { display: flex; flex-direction: column; }
 .stat-value { font-size: 1.5rem; font-weight: 600; color: var(--text-primary); }
 .stat-label { font-size: 0.85rem; color: var(--text-secondary); }
-.stat-alerts .stat-value { color: #ef4444; }
-.stat-cases .stat-value { color: #3b82f6; }
-.stat-observables .stat-value { color: #f59e0b; }
-.stat-playbooks .stat-value { color: #10b981; }
+.stat-alerts .stat-value { color: var(--danger); }
+.stat-cases .stat-value { color: var(--info); }
+.stat-observables .stat-value { color: var(--warning); }
+.stat-playbooks .stat-value { color: var(--success); }
 
 /* ── Tab Navigation ────────────────────────────────────── */
 .analyst-tabs {
     display: flex;
     gap: 0;
     margin-bottom: 1.5rem;
-    border-bottom: 2px solid var(--border-color);
+    border-bottom: 2px solid var(--border);
 }
 
 .analyst-tab {
@@ -297,7 +296,7 @@
     font-size: 0.95rem;
     font-weight: 500;
     color: var(--text-secondary);
-    transition: all 0.2s;
+    transition: border-color 0.2s;
 }
 
 .analyst-tab:hover { color: var(--text-primary); }
@@ -311,7 +310,7 @@
     display: inline-block;
     padding: 0.1rem 0.45rem;
     font-size: 0.7rem;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     background: rgba(59, 130, 246, 0.15);
     color: var(--accent-color);
     margin-left: 0.25rem;
@@ -326,17 +325,19 @@
 
 .tools-section {
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 1.5rem;
 }
 
 .section-title {
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: 0.8125rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
     margin-bottom: 1rem;
-    color: var(--text-primary);
-    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
     padding-bottom: 0.5rem;
 }
 
@@ -351,19 +352,19 @@
 }
 
 .tool-card {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 1.25rem;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: border-color 0.2s;
     display: flex;
     flex-direction: column;
 }
 
 .tool-card:hover {
     border-color: var(--accent-color);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .tool-card-sm { padding: 1rem; }
@@ -384,16 +385,16 @@
     color: var(--text-secondary);
 }
 
-.badge-info { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
-.badge-warning { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
-.badge-success { background: rgba(16, 185, 129, 0.2); color: #10b981; }
-.badge-danger { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.badge-info { background: rgba(59, 130, 246, 0.2); color: var(--info); }
+.badge-warning { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+.badge-success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+.badge-danger { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
 
 /* ── Quick Actions ─────────────────────────────────────── */
 .quick-actions-panel {
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 1.25rem 1.5rem;
     margin-top: 1.5rem;
 }
@@ -424,8 +425,8 @@
 
 .modal-content {
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     width: 90%;
     max-width: 500px;
     max-height: 80vh;
@@ -439,7 +440,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .modal-header h3 { margin: 0; font-size: 1.1rem; }
@@ -459,7 +460,7 @@
     justify-content: flex-end;
     gap: 0.5rem;
     padding: 1rem 1.5rem;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border);
 }
 
 /* =============================================================================
@@ -474,8 +475,8 @@
     width: 100%;
     box-sizing: border-box;
     padding: 0.75rem 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     background: var(--bg-secondary);
     color: var(--text-primary);
     font-size: 0.95rem;
@@ -500,8 +501,8 @@
     width: 250px;
     flex-shrink: 0;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 1rem;
     overflow-y: auto;
 }
@@ -514,7 +515,7 @@
     color: var(--text-secondary);
     margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .kb-sidebar-list {
@@ -532,7 +533,7 @@
     cursor: pointer;
     font-size: 0.9rem;
     color: var(--text-secondary);
-    transition: all 0.15s;
+    transition: border-color 0.2s;
 }
 
 .kb-sidebar-item:hover {
@@ -557,8 +558,8 @@
     flex: 1;
     min-width: 0;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 1.5rem;
     overflow-y: auto;
 }
@@ -569,7 +570,7 @@
     color: var(--text-primary);
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .kb-articles-list {
@@ -581,10 +582,10 @@
 .kb-article-item {
     padding: 0.75rem 1rem;
     background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: border-color 0.2s;
 }
 
 .kb-article-item:hover {
@@ -613,7 +614,7 @@
 
 .kb-article-tag {
     font-size: 0.7rem;
-    background: var(--bg-tertiary, var(--border-color));
+    background: var(--bg-tertiary, var(--border));
     color: var(--text-secondary);
     padding: 0.1rem 0.4rem;
     border-radius: 3px;
@@ -625,7 +626,7 @@
     color: var(--text-secondary);
     margin-bottom: 1rem;
     padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .kb-breadcrumb a {
@@ -648,7 +649,7 @@
     margin-top: 0;
     margin-bottom: 0.5rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     color: var(--text-primary);
 }
 
@@ -661,7 +662,7 @@
 
 .kb-reader-body pre {
     background: var(--bg-primary);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     padding: 1rem;
     overflow-x: auto;
@@ -671,12 +672,12 @@
 
 .kb-reader-body code {
     background: var(--bg-primary);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 3px;
     padding: 0.15rem 0.3rem;
     font-family: 'Monaco', 'Courier New', monospace;
     font-size: 0.85rem;
-    color: #d4a574;
+    color: var(--neon-orange);
 }
 
 .kb-reader-body pre code {
@@ -694,7 +695,7 @@
 .kb-reader-body li { margin-bottom: 0.25rem; line-height: 1.6; }
 .kb-reader-body p { line-height: 1.7; margin-bottom: 0.75rem; }
 .kb-reader-body table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
-.kb-reader-body th, .kb-reader-body td { border: 1px solid var(--border-color); padding: 0.5rem 0.75rem; text-align: left; font-size: 0.85rem; }
+.kb-reader-body th, .kb-reader-body td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; font-size: 0.85rem; }
 .kb-reader-body th { background: var(--bg-primary); font-weight: 600; color: var(--text-primary); }
 .kb-reader-body blockquote { border-left: 3px solid var(--accent-color); margin: 1rem 0; padding: 0.5rem 1rem; color: var(--text-secondary); background: var(--bg-primary); border-radius: 0 4px 4px 0; }
 .kb-reader-body .table-wrapper { overflow-x: auto; margin: 1rem 0; }

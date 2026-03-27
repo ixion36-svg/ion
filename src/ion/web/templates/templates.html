@@ -108,7 +108,7 @@
     width: 250px;
     flex-shrink: 0;
     background: var(--bg-secondary);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     padding: 1rem;
 }
 .folder-header h3 {
@@ -129,7 +129,7 @@
     margin-bottom: 2px;
 }
 .folder-item:hover {
-    background: var(--bg-hover);
+    background: var(--primary-dim);
 }
 .folder-item.active {
     background: var(--primary-color);
@@ -146,7 +146,7 @@
 }
 .folder-children {
     margin-left: 1.25rem;
-    border-left: 1px solid var(--border-color);
+    border-left: 1px solid var(--border);
     padding-left: 0.5rem;
 }
 .templates-main {
@@ -202,12 +202,12 @@
     justify-content: space-between;
     align-items: center;
     padding: 0.5rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     margin-bottom: 0.5rem;
 }
 .folder-manage-item:hover {
-    background: var(--bg-secondary);
+    background: var(--primary-dim);
 }
 .folder-manage-info {
     display: flex;
@@ -243,15 +243,15 @@
     color: white;
     margin-left: 0.5rem;
 }
-.doc-type-SOP { background: #3b82f6; }
-.doc-type-SOI { background: #14b8a6; }
+.doc-type-SOP { background: var(--info); }
+.doc-type-SOI { background: var(--success); }
 .doc-type-WI { background: #6366f1; }
-.doc-type-KB { background: #22c55e; }
+.doc-type-KB { background: var(--success); }
 .doc-type-RUNBOOK { background: #a855f7; }
-.doc-type-IRP { background: #ef4444; }
-.doc-type-AAR { background: #f97316; }
-.doc-type-THREAT_ADVISORY { background: #eab308; color: #1a1a1a; }
-.doc-type-DETECTION_RULE { background: #06b6d4; }
+.doc-type-IRP { background: var(--danger); }
+.doc-type-AAR { background: var(--neon-orange); }
+.doc-type-THREAT_ADVISORY { background: var(--warning); color: #1a1a1a; }
+.doc-type-DETECTION_RULE { background: var(--info); }
 </style>
 <script>
 {% raw %}

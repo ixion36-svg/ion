@@ -396,7 +396,7 @@
 .data-table td {
     padding: 0.5rem;
     text-align: left;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .data-table th {
@@ -423,9 +423,9 @@
     font-size: 0.8rem;
 }
 
-.health-green { color: #4caf50; }
-.health-yellow { color: #ff9800; }
-.health-red { color: #f44336; }
+.health-green { color: var(--success); }
+.health-yellow { color: var(--warning); }
+.health-red { color: var(--danger); }
 
 .checkbox-label {
     display: flex;
@@ -481,7 +481,7 @@
     border-radius: 4px;
 }
 
-.found-badge { color: #4caf50; }
+.found-badge { color: var(--success); }
 .not-found-badge { color: var(--text-secondary); }
 
 .histogram-container {
@@ -573,7 +573,7 @@
 }
 
 .saved-search-favorite.active {
-    color: #f1c40f;
+    color: var(--warning);
 }
 
 .saved-search-info {
@@ -615,12 +615,12 @@
 
 .modal-dialog {
     background: var(--bg-primary);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     width: 100%;
     max-width: 500px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
 }
 
 .modal-header {
@@ -628,7 +628,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .modal-header h3 {
@@ -659,7 +659,7 @@
     justify-content: flex-end;
     gap: 0.5rem;
     padding: 1rem 1.5rem;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border);
 }
 
 .empty-searches {

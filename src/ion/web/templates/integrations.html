@@ -300,15 +300,15 @@
 
 .integration-card {
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 1.25rem;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .integration-card:hover {
     border-color: var(--accent-color);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
 }
 
 .integration-card-header {
@@ -321,7 +321,7 @@
 .integration-icon {
     width: 36px;
     height: 36px;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -355,9 +355,9 @@
     flex-shrink: 0;
 }
 
-.status-indicator.healthy { background: #22c55e; animation: pulse-healthy 2s infinite; }
-.status-indicator.degraded { background: #f59e0b; }
-.status-indicator.error { background: #ef4444; }
+.status-indicator.healthy { background: var(--success); animation: pulse-healthy 2s infinite; }
+.status-indicator.degraded { background: var(--warning); }
+.status-indicator.error { background: var(--danger); }
 .status-indicator.disabled { background: #6b7280; }
 .status-indicator.not_configured { background: #9ca3af; }
 
@@ -400,8 +400,8 @@
 
 .metrics-card {
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 1rem;
 }
 
@@ -423,7 +423,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 0.4rem 0;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .metric-row:last-child {
@@ -439,9 +439,9 @@
     color: var(--text-primary);
 }
 
-.metric-value.good { color: #22c55e; }
-.metric-value.warning { color: #f59e0b; }
-.metric-value.error { color: #ef4444; }
+.metric-value.good { color: var(--success); }
+.metric-value.warning { color: var(--warning); }
+.metric-value.error { color: var(--danger); }
 
 .cluster-status {
     display: inline-block;
@@ -452,14 +452,14 @@
     text-transform: uppercase;
 }
 
-.cluster-status.green { background: #dcfce7; color: #166534; }
-.cluster-status.yellow { background: #fef3c7; color: #92400e; }
-.cluster-status.red { background: #fee2e2; color: #991b1b; }
+.cluster-status.green { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+.cluster-status.yellow { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+.cluster-status.red { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
 
 .metric-bar {
     width: 100%;
     height: 6px;
-    background: var(--border-color);
+    background: var(--border);
     border-radius: 3px;
     margin-top: 0.25rem;
     overflow: hidden;
@@ -471,9 +471,9 @@
     transition: width 0.3s ease;
 }
 
-.metric-bar-fill.good { background: #22c55e; }
-.metric-bar-fill.warning { background: #f59e0b; }
-.metric-bar-fill.error { background: #ef4444; }
+.metric-bar-fill.good { background: var(--success); }
+.metric-bar-fill.warning { background: var(--warning); }
+.metric-bar-fill.error { background: var(--danger); }
 
 /* Server Logs Metrics - Horizontal Layout */
 .server-logs-grid {
@@ -506,8 +506,8 @@
 
 .webhook-item {
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 1rem;
     margin-bottom: 0.75rem;
 }
@@ -565,7 +565,7 @@
 
 .filter-controls select {
     padding: 0.4rem 0.75rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--bg-secondary);
     color: var(--text-primary);
@@ -580,16 +580,16 @@
     font-weight: 500;
 }
 
-.status-badge.success { background: #dcfce7; color: #166534; }
-.status-badge.failed { background: #fee2e2; color: #991b1b; }
-.status-badge.active { background: #dbeafe; color: #1e40af; }
-.status-badge.inactive { background: #f3f4f6; color: #6b7280; }
+.status-badge.success { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+.status-badge.failed { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+.status-badge.active { background: rgba(59, 130, 246, 0.15); color: var(--info); }
+.status-badge.inactive { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
 
 /* Log Levels */
 .log-level-debug { color: #6b7280; }
-.log-level-info { color: #3b82f6; }
-.log-level-warning { color: #f59e0b; }
-.log-level-error { color: #ef4444; }
+.log-level-info { color: var(--info); }
+.log-level-warning { color: var(--warning); }
+.log-level-error { color: var(--danger); }
 
 /* Version Badges */
 .version-badge {
@@ -603,17 +603,17 @@
 }
 
 .version-badge.compatible {
-    background: #dcfce7;
-    color: #166534;
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--success);
 }
 
 .version-badge.incompatible {
-    background: #fef3c7;
-    color: #92400e;
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--warning);
 }
 
 .version-warning {
-    color: #92400e;
+    color: var(--warning);
     font-style: italic;
     font-size: 0.75rem;
     margin-top: 0.25rem;
@@ -646,7 +646,7 @@
 
 .modal-content {
     background: var(--bg-primary);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     padding: 1.5rem;
     max-width: 500px;
     width: 90%;
@@ -689,7 +689,7 @@
 .form-group select {
     width: 100%;
     padding: 0.5rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--bg-secondary);
     color: var(--text-primary);

@@ -658,6 +658,120 @@ Request: {description}"""
 
 
 # =============================================================================
+# Document Generation Endpoints
+# =============================================================================
+
+class DocumentGenerateRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=4000)
+    output_format: str = Field(default="markdown", pattern="^(markdown|html|csv|text)$")
+    style: str = Field(default="professional", pattern="^(professional|concise|formal|technical)$")
+    existing_content: Optional[str] = Field(default=None, max_length=16000)
+    document_name: Optional[str] = None
+
+
+DOCUMENT_SYSTEM_PROMPTS = {
+    "markdown": "You are a document writer. Output clean, well-structured Markdown. Use headings (##, ###), bullet points, tables, and code blocks as appropriate. Do NOT wrap output in ```markdown fences — output raw Markdown directly.",
+    "html": "You are a document writer. Output clean, semantic HTML using <h2>, <h3>, <p>, <ul>, <ol>, <table>, <code>, <blockquote> tags. Do NOT include <html>, <head>, or <body> wrappers — output only the body content.",
+    "csv": "You are a data writer. Output valid CSV with a header row. Use commas as delimiters. Quote fields containing commas. Output raw CSV text only, no explanation or fences.",
+    "text": "You are a document writer. Output clean plain text. Use line breaks and indentation for structure. No markup.",
+}
+
+STYLE_INSTRUCTIONS = {
+    "professional": "Write in a clear, professional business tone. Be thorough but concise.",
+    "concise": "Write as briefly as possible. Use short sentences, bullet points, and minimal prose.",
+    "formal": "Write in formal, authoritative language suitable for official documentation or compliance reports.",
+    "technical": "Write with precise technical terminology. Include specific details, configurations, and technical accuracy.",
+}
+
+
+@router.post("/document/generate")
+@limiter.limit("10/minute")
+async def generate_document(
+    request: Request,
+    payload: DocumentGenerateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Generate a document using AI (streaming). Returns SSE stream of content chunks."""
+    service = get_ollama_service()
+
+    if not await service.is_available():
+        raise HTTPException(status_code=503, detail="AI service not available")
+
+    system = DOCUMENT_SYSTEM_PROMPTS.get(payload.output_format, DOCUMENT_SYSTEM_PROMPTS["markdown"])
+    system += f"\n\n{STYLE_INSTRUCTIONS.get(payload.style, STYLE_INSTRUCTIONS['professional'])}"
+
+    if payload.output_format == "csv":
+        system += "\nIMPORTANT: Output ONLY the CSV data. No explanations, no markdown fences."
+
+    user_prompt = payload.prompt
+    if payload.existing_content:
+        user_prompt += f"\n\nHere is the existing document content to improve/extend:\n---\n{payload.existing_content[:8000]}\n---"
+
+    async def generate():
+        try:
+            full_content = ""
+            async for chunk in service.chat_stream(
+                messages=[{"role": "user", "content": user_prompt}],
+                system_prompt=system,
+                context_type="default",
+                temperature=0.4,
+                max_tokens=4096,
+                user_id=current_user.id,
+            ):
+                if chunk.get("error"):
+                    yield f"data: {json.dumps({'error': chunk['error']})}\n\n"
+                    return
+                if chunk.get("content"):
+                    full_content += chunk["content"]
+                    yield f"data: {json.dumps({'content': chunk['content']})}\n\n"
+
+            yield f"data: {json.dumps({'done': True, 'full_content': full_content})}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.error("Document generation error: %s", e, exc_info=True)
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
+class DocumentSaveRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=100000)
+    output_format: str = Field(default="markdown", pattern="^(markdown|html|csv|text)$")
+    document_name: Optional[str] = None
+
+
+@router.post("/document/save")
+@limiter.limit("30/minute")
+async def save_generated_document(
+    request: Request,
+    payload: DocumentSaveRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Save AI-generated content as a document (no re-generation)."""
+    from ion.storage.database import get_session as get_db_session
+    from ion.storage.document_repository import DocumentRepository
+
+    for db in get_db_session():
+        doc_repo = DocumentRepository(db)
+        doc_name = payload.document_name or f"AI Generated Document"
+        document = doc_repo.create(
+            name=doc_name,
+            rendered_content=payload.content,
+            output_format=payload.output_format,
+        )
+        db.commit()
+        return {
+            "document_id": document.id,
+            "name": document.name,
+            "format": payload.output_format,
+        }
+
+
+# =============================================================================
 # Chat History Endpoints
 # =============================================================================
 

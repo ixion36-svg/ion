@@ -196,15 +196,15 @@
 }
 
 .connection-status.connected {
-    background: #d4edda;
-    border: 1px solid #c3e6cb;
-    color: #155724;
+    background: color-mix(in srgb, var(--success) 15%, transparent);
+    border: 1px solid var(--success);
+    color: var(--success);
 }
 
 .connection-status.error {
-    background: #f8d7da;
-    border: 1px solid #f5c6cb;
-    color: #721c24;
+    background: color-mix(in srgb, var(--danger) 15%, transparent);
+    border: 1px solid var(--danger);
+    color: var(--danger);
 }
 
 .status-checking {
@@ -215,7 +215,7 @@
     text-align: center;
     padding: 4rem 2rem;
     background: var(--bg-secondary);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
 }
 
 .empty-state h2 {
@@ -232,9 +232,9 @@
 }
 
 .issue-card {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 1rem 1.5rem;
     margin-bottom: 0.75rem;
     cursor: pointer;
@@ -242,7 +242,7 @@
 }
 
 .issue-card:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
 }
 
 .issue-header {
@@ -269,7 +269,7 @@
 }
 
 .issue-state.opened {
-    background: #28a745;
+    background: var(--success);
     color: white;
 }
 
@@ -337,7 +337,7 @@
     color: var(--text-muted);
     margin-bottom: 1.5rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .issue-description {
@@ -396,7 +396,7 @@
 }
 
 .issue-sidebar {
-    border-left: 1px solid var(--border-color);
+    border-left: 1px solid var(--border);
     padding-left: 1.5rem;
 }
 
@@ -442,13 +442,13 @@
 .search-input {
     flex: 1;
     padding: 0.5rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
 }
 
 .filter-select {
     padding: 0.5rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     min-width: 150px;
 }

@@ -128,7 +128,6 @@
                 <button type="button" class="content-tab-btn active" data-view="rendered">Rendered</button>
                 <button type="button" class="content-tab-btn" data-view="raw">Raw</button>
                 <button type="button" class="content-tab-btn" data-view="edit">Edit</button>
-                <button type="button" class="content-tab-btn" data-view="rewrite">Rewrite</button>
                 <button type="button" class="content-tab-btn" data-view="versions">Version History</button>
             </div>
 
@@ -143,30 +142,6 @@
                 </div>
             </div>
 
-            <div id="rewrite-view" class="document-content" style="display: none;">
-                <div class="rewrite-controls">
-                    <select id="doc-rewrite-style" class="form-control">
-                        <option value="professional">Professional</option>
-                        <option value="concise">Concise</option>
-                        <option value="formal">Formal</option>
-                        <option value="technical">Technical</option>
-                    </select>
-                    <button id="doc-get-suggestions" class="btn">Get Suggestions</button>
-                    <button id="doc-apply-rewrite" class="btn btn-primary" style="display: none;">Apply All Changes</button>
-                </div>
-                <div id="doc-rewrite-suggestions" class="rewrite-results">
-                    <p class="muted">Select a style and click "Get Suggestions" to improve this document.</p>
-                </div>
-                <div id="doc-rewritten-section" style="display: none;">
-                    <h4>Rewritten Text</h4>
-                    <div id="doc-rewrite-stats" class="rewrite-stats"></div>
-                    <pre id="doc-rewritten-text" class="code-block"></pre>
-                    <div class="rewrite-actions">
-                        <button id="doc-copy-rewritten" class="btn">Copy to Clipboard</button>
-                        <button id="doc-apply-to-edit" class="btn btn-primary">Apply to Edit Tab</button>
-                    </div>
-                </div>
-            </div>
 
             <div id="versions-view" class="document-content" style="display: none;">
                 <div id="versions-list" class="versions-list"></div>
@@ -179,7 +154,8 @@
         </div>
         <div class="modal-footer">
             <button id="save-amendment-btn" class="btn btn-success" style="display: none;">Save Amendment</button>
-            <button id="download-btn" class="btn btn-primary">Download</button>
+            <button id="export-pdf-btn" class="btn btn-primary"><i class="icon-file-text"></i> Export PDF</button>
+            <button id="download-btn" class="btn">Download Source</button>
             <button id="delete-doc-btn" class="btn btn-danger">Delete</button>
             <button class="btn" onclick="closeModal()">Close</button>
         </div>
@@ -285,7 +261,7 @@
     width: 250px;
     flex-shrink: 0;
     background: var(--bg-secondary);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     padding: 1rem;
 }
 .folder-header h3 {
@@ -323,7 +299,7 @@
 }
 .folder-children {
     margin-left: 1.25rem;
-    border-left: 1px solid var(--border-color);
+    border-left: 1px solid var(--border);
     padding-left: 0.5rem;
 }
 .documents-main {
@@ -381,7 +357,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 0.5rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     margin-bottom: 0.5rem;
 }
@@ -417,7 +393,7 @@
     font-weight: 500;
     background: var(--bg-hover);
     color: var(--text-primary);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     margin-left: 4px;
 }
 .tags-section {
@@ -465,7 +441,7 @@
     width: 120px;
     padding: 2px 6px;
     font-size: 0.75rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 3px;
     background: var(--bg-primary);
     color: var(--text-primary);
@@ -485,12 +461,12 @@
 .doc-type-SOP { background: #3b82f6; }
 .doc-type-SOI { background: #14b8a6; }
 .doc-type-WI { background: #6366f1; }
-.doc-type-KB { background: #22c55e; }
+.doc-type-KB { background: var(--success); }
 .doc-type-RUNBOOK { background: #a855f7; }
-.doc-type-IRP { background: #ef4444; }
-.doc-type-AAR { background: #f97316; }
-.doc-type-THREAT_ADVISORY { background: #eab308; color: #1a1a1a; }
-.doc-type-DETECTION_RULE { background: #06b6d4; }
+.doc-type-IRP { background: var(--danger); }
+.doc-type-AAR { background: var(--neon-orange); }
+.doc-type-THREAT_ADVISORY { background: var(--warning); color: #1a1a1a; }
+.doc-type-DETECTION_RULE { background: var(--info); }
 .toolbar {
     display: flex;
     gap: 0.5rem;
@@ -498,102 +474,29 @@
 }
 .filter-select {
     padding: 0.5rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--bg-primary);
     color: var(--text-primary);
 }
-/* Rewrite functionality styles */
-.rewrite-controls {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    align-items: center;
-}
-.rewrite-controls .form-control {
-    width: auto;
-}
-.rewrite-results {
-    max-height: 300px;
-    overflow-y: auto;
-}
-.rewrite-item {
-    background: var(--bg-secondary);
-    border-left: 3px solid var(--primary-color);
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
-}
-.rewrite-item .original {
-    color: #e74c3c;
-    text-decoration: line-through;
-}
-.rewrite-item .suggestion {
-    color: #2ecc71;
-    font-weight: bold;
-}
-.rewrite-item .reason {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: 0.25rem;
-}
-.rewrite-item .style-badge {
-    font-size: 0.7rem;
-    padding: 2px 6px;
-    border-radius: 3px;
-    background: var(--primary-color);
-    color: white;
-    margin-left: 0.5rem;
-}
-.rewrite-stats {
-    background: var(--bg-secondary);
-    padding: 0.75rem;
-    border-radius: 4px;
-    margin-bottom: 1rem;
-}
-.changes-list {
-    margin-top: 0.5rem;
-    padding-left: 1.5rem;
-    font-size: 0.875rem;
-}
-.changes-list li {
-    margin-bottom: 0.25rem;
-}
-.changes-list del {
-    color: #e74c3c;
-    text-decoration: line-through;
-}
-.changes-list ins {
-    color: #2ecc71;
-    text-decoration: none;
-    font-weight: bold;
-}
-.rewrite-actions {
-    margin-top: 1rem;
-    display: flex;
-    gap: 0.5rem;
-}
-#doc-rewritten-text {
-    max-height: 300px;
-    overflow-y: auto;
-}
 /* Document Quill editor */
 .doc-quill-wrap { display: flex; flex-direction: column; min-height: 400px; }
-.doc-quill-wrap .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--border-color, #30363d); background: var(--bg-secondary, #161b22); }
+.doc-quill-wrap .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--border); background: var(--bg-secondary); }
 .doc-quill-wrap .ql-container.ql-snow { border: none; flex: 1; overflow-y: auto; max-height: 60vh; }
 .doc-quill-wrap .ql-editor { color: var(--text-primary, #f0f6fc); font-size: 0.875rem; line-height: 1.7; min-height: 300px; }
 .doc-quill-wrap .ql-editor.ql-blank::before { color: var(--text-secondary, #8b949e); font-style: normal; }
 .doc-quill-wrap .ql-snow .ql-stroke { stroke: var(--text-secondary, #8b949e); }
 .doc-quill-wrap .ql-snow .ql-fill { fill: var(--text-secondary, #8b949e); }
 .doc-quill-wrap .ql-snow .ql-picker-label { color: var(--text-secondary, #8b949e); }
-.doc-quill-wrap .ql-snow .ql-picker-options { background: var(--bg-primary, #0d1117); border-color: var(--border-color, #30363d); }
+.doc-quill-wrap .ql-snow .ql-picker-options { background: var(--bg-primary); border-color: var(--border); }
 .doc-quill-wrap .ql-snow .ql-picker-item { color: var(--text-primary, #f0f6fc); }
 .doc-quill-wrap .ql-snow button:hover .ql-stroke { stroke: var(--accent, #00e5ff); }
 .doc-quill-wrap .ql-snow .ql-picker-label:hover { color: var(--accent, #00e5ff); }
 .doc-quill-wrap .ql-editor h1, .doc-quill-wrap .ql-editor h2, .doc-quill-wrap .ql-editor h3 { color: var(--text-primary, #f0f6fc); }
-.doc-quill-wrap .ql-editor pre.ql-syntax { background: var(--bg-secondary, #161b22); border: 1px solid var(--border-color, #30363d); border-radius: 6px; padding: 0.75rem; }
+.doc-quill-wrap .ql-editor pre.ql-syntax { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; }
 .doc-quill-wrap .ql-editor blockquote { border-left: 3px solid var(--accent, #00e5ff); padding-left: 1rem; color: var(--text-secondary, #8b949e); }
 .doc-quill-wrap .ql-editor a { color: var(--accent, #00e5ff); }
-.doc-quill-wrap .ql-editor code { background: var(--bg-secondary, #161b22); padding: 2px 5px; border-radius: 3px; font-size: 0.8125rem; }
+.doc-quill-wrap .ql-editor code { background: var(--bg-secondary); padding: 2px 5px; border-radius: 3px; font-size: 0.8125rem; }
 </style>
 <script>
 {% raw %}
@@ -1000,7 +903,6 @@ function switchTab(view) {
     document.getElementById('rendered-view').style.display = view === 'rendered' ? 'block' : 'none';
     document.getElementById('raw-view').style.display = view === 'raw' ? 'block' : 'none';
     document.getElementById('edit-view').style.display = view === 'edit' ? 'block' : 'none';
-    document.getElementById('rewrite-view').style.display = view === 'rewrite' ? 'block' : 'none';
     document.getElementById('versions-view').style.display = view === 'versions' ? 'block' : 'none';
 
     // Show/hide save amendment button based on edit view
@@ -1347,6 +1249,34 @@ document.querySelectorAll('.content-tab-btn').forEach(function(btn) {
     });
 });
 
+document.getElementById('export-pdf-btn').addEventListener('click', async function() {
+    if (!currentDocId) return;
+    const btn = this;
+    const origText = btn.innerHTML;
+    btn.innerHTML = '<i class="icon-loader"></i> Generating...';
+    btn.disabled = true;
+    try {
+        const response = await fetch('/api/documents/' + currentDocId + '/pdf');
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({ detail: 'PDF generation failed' }));
+            throw new Error(err.detail || 'PDF generation failed');
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = (currentDocName || 'document') + '.pdf';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('PDF exported successfully', 'success');
+    } catch (e) {
+        showToast(e.message || 'PDF export failed', 'error');
+    } finally {
+        btn.innerHTML = origText;
+        btn.disabled = false;
+    }
+});
+
 document.getElementById('download-btn').addEventListener('click', function() {
     let ext = '.txt';
     let mimeType = 'text/plain';
@@ -1599,105 +1529,6 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Document Rewrite functionality
-document.getElementById('doc-get-suggestions').addEventListener('click', async function() {
-    if (!currentDocContent) {
-        showToast('No document content available', 'error');
-        return;
-    }
-
-    const style = document.getElementById('doc-rewrite-style').value;
-
-    try {
-        const response = await api.post('/api/extract/rewrite-suggestions', {
-            text: currentDocContent,
-            style: style
-        });
-
-        const resultsDiv = document.getElementById('doc-rewrite-suggestions');
-        const applyBtn = document.getElementById('doc-apply-rewrite');
-
-        if (response.suggestion_count === 0) {
-            resultsDiv.innerHTML = '<p class="success">No suggestions for this style. Your document looks good!</p>';
-            applyBtn.style.display = 'none';
-        } else {
-            let html = '<p><strong>' + response.suggestion_count + ' suggestions for ' + style + ' style:</strong></p>';
-            response.suggestions.forEach(function(s) {
-                html += '<div class="rewrite-item">';
-                html += '<span class="original">' + escapeHtml(s.original) + '</span>';
-                html += ' → <span class="suggestion">' + escapeHtml(s.suggestion) + '</span>';
-                html += '<span class="style-badge">' + s.style + '</span>';
-                html += '<div class="reason">' + escapeHtml(s.reason) + '</div>';
-                html += '</div>';
-            });
-            resultsDiv.innerHTML = html;
-            applyBtn.style.display = 'inline-block';
-        }
-
-        // Hide previous rewritten text
-        document.getElementById('doc-rewritten-section').style.display = 'none';
-    } catch (e) {
-        showToast('Failed to get suggestions: ' + (e.message || 'Unknown error'), 'error');
-    }
-});
-
-document.getElementById('doc-apply-rewrite').addEventListener('click', async function() {
-    if (!currentDocContent) {
-        showToast('No document content available', 'error');
-        return;
-    }
-
-    const style = document.getElementById('doc-rewrite-style').value;
-
-    try {
-        const response = await api.post('/api/extract/apply-rewrites', {
-            text: currentDocContent,
-            style: style,
-            apply_all: true
-        });
-
-        const rewrittenSection = document.getElementById('doc-rewritten-section');
-        const rewrittenText = document.getElementById('doc-rewritten-text');
-        const statsDiv = document.getElementById('doc-rewrite-stats');
-
-        rewrittenText.textContent = response.rewritten;
-        statsDiv.innerHTML = '<strong>' + response.changes_applied + ' changes applied</strong>';
-
-        if (response.changes && response.changes.length > 0) {
-            let changesHtml = '<ul class="changes-list">';
-            response.changes.forEach(function(c) {
-                changesHtml += '<li><del>' + escapeHtml(c.original) + '</del> → <ins>' + escapeHtml(c.replacement) + '</ins></li>';
-            });
-            changesHtml += '</ul>';
-            statsDiv.innerHTML += changesHtml;
-        }
-
-        rewrittenSection.style.display = 'block';
-        showToast(response.changes_applied + ' changes applied', 'success');
-    } catch (e) {
-        showToast('Failed to apply rewrites: ' + (e.message || 'Unknown error'), 'error');
-    }
-});
-
-document.getElementById('doc-copy-rewritten').addEventListener('click', function() {
-    const text = document.getElementById('doc-rewritten-text').textContent;
-    navigator.clipboard.writeText(text).then(function() {
-        showToast('Copied to clipboard', 'success');
-    }).catch(function() {
-        showToast('Failed to copy', 'error');
-    });
-});
-
-document.getElementById('doc-apply-to-edit').addEventListener('click', function() {
-    const rewrittenText = document.getElementById('doc-rewritten-text').textContent;
-    if (docQuillEditor) {
-        // Convert markdown to HTML, then load into Quill
-        const html = (typeof marked !== 'undefined') ? safeMarkdown(rewrittenText) : rewrittenText;
-        docQuillEditor.root.innerHTML = html;
-    }
-    switchTab('edit');
-    showToast('Rewritten text applied to Edit tab', 'success');
-});
 {% endraw %}
 </script>
 {% endblock %}

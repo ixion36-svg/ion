@@ -23,34 +23,42 @@
 <!-- Stats Bar -->
 <div class="cases-stats-bar" id="cases-stats">
     <div class="cases-stat-card stat-open">
+        <div class="stat-icon-bg stat-icon-info"><i class="icon-folder-open"></i></div>
         <span class="cases-stat-value" id="stat-open">0</span>
         <span class="cases-stat-label">Open Cases</span>
     </div>
     <div class="cases-stat-card stat-acknowledged">
+        <div class="stat-icon-bg stat-icon-warning"><i class="icon-eye"></i></div>
         <span class="cases-stat-value" id="stat-acknowledged">0</span>
         <span class="cases-stat-label">Acknowledged</span>
     </div>
     <div class="cases-stat-card stat-critical">
+        <div class="stat-icon-bg stat-icon-danger"><i class="icon-alert-triangle"></i></div>
         <span class="cases-stat-value" id="stat-critical">0</span>
         <span class="cases-stat-label">Critical Active</span>
     </div>
     <div class="cases-stat-card stat-resolution">
+        <div class="stat-icon-bg stat-icon-success"><i class="icon-clock"></i></div>
         <span class="cases-stat-value" id="stat-resolution">-</span>
         <span class="cases-stat-label">Avg Resolution</span>
     </div>
     <div class="cases-stat-card stat-mttr">
+        <div class="stat-icon-bg stat-icon-purple"><i class="icon-activity"></i></div>
         <span class="cases-stat-value" id="stat-mttr">-</span>
         <span class="cases-stat-label">MTTR (30d)</span>
     </div>
     <div class="cases-stat-card stat-closure-rate">
+        <div class="stat-icon-bg stat-icon-success"><i class="icon-check-circle"></i></div>
         <span class="cases-stat-value" id="stat-closure-rate">-</span>
         <span class="cases-stat-label">Closure Rate (7d)</span>
     </div>
     <div class="cases-stat-card stat-weekly">
+        <div class="stat-icon-bg stat-icon-info"><i class="icon-trending-up"></i></div>
         <span class="cases-stat-value" id="stat-weekly">-</span>
         <span class="cases-stat-label">Created / Closed (7d)</span>
     </div>
     <div class="cases-stat-card stat-unassigned">
+        <div class="stat-icon-bg stat-icon-warning"><i class="icon-user-x"></i></div>
         <span class="cases-stat-value" id="stat-unassigned">0</span>
         <span class="cases-stat-label">Unassigned Cases</span>
     </div>
@@ -105,20 +113,28 @@
     <span class="chevron" id="analytics-chevron"><i class="icon-chevron-down"></i></span>
 </div>
 <div class="analytics-panel" id="analytics-panel-body">
+    <!-- Summary Strip -->
+    <div class="analytics-summary-strip" id="analytics-summary-strip"></div>
+    <div class="analytics-row-donuts">
+        <div class="analytics-card analytics-card-accent-danger">
+            <h4>Severity Distribution</h4>
+            <div id="analytics-severity-donut" class="donut-container"></div>
+        </div>
+        <div class="analytics-card analytics-card-accent-purple">
+            <h4>Closure Reasons</h4>
+            <div id="analytics-closure-donut" class="donut-container"></div>
+        </div>
+        <div class="analytics-card analytics-card-accent-info">
+            <h4>Status Breakdown</h4>
+            <div id="analytics-status-donut" class="donut-container"></div>
+        </div>
+    </div>
     <div class="analytics-grid">
-        <div class="analytics-card">
+        <div class="analytics-card analytics-card-accent-blue">
             <h4>Analyst Workload</h4>
             <div id="analytics-workload"></div>
         </div>
-        <div class="analytics-card">
-            <h4>Closure Reasons</h4>
-            <div id="analytics-closure"></div>
-        </div>
-        <div class="analytics-card">
-            <h4>Severity Distribution</h4>
-            <div id="analytics-severity"></div>
-        </div>
-        <div class="analytics-card">
+        <div class="analytics-card analytics-card-accent-warning">
             <h4>SLA / Case Age</h4>
             <div id="analytics-sla"></div>
         </div>
@@ -231,7 +247,7 @@
 .cases-stats-bar {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
+    gap: 0.75rem;
     margin-bottom: 1rem;
 }
 
@@ -240,16 +256,40 @@
     flex-direction: column;
     align-items: center;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 0.75rem 1rem;
-    border-top: 3px solid var(--border-color);
+    border-top: 3px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.15s, box-shadow 0.15s;
 }
 
-.cases-stat-card.stat-open { border-top-color: #3b82f6; }
-.cases-stat-card.stat-acknowledged { border-top-color: #f59e0b; }
-.cases-stat-card.stat-critical { border-top-color: #ef4444; }
-.cases-stat-card.stat-resolution { border-top-color: #10b981; }
+.cases-stat-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,.2);
+}
+
+.cases-stat-card.stat-open { border-top-color: var(--info); background: linear-gradient(180deg, rgba(59,130,246,.06) 0%, transparent 60%); }
+.cases-stat-card.stat-acknowledged { border-top-color: var(--warning); background: linear-gradient(180deg, rgba(245,158,11,.06) 0%, transparent 60%); }
+.cases-stat-card.stat-critical { border-top-color: var(--danger); background: linear-gradient(180deg, rgba(239,68,68,.06) 0%, transparent 60%); }
+.cases-stat-card.stat-resolution { border-top-color: var(--success); background: linear-gradient(180deg, rgba(76,175,80,.06) 0%, transparent 60%); }
+
+.stat-icon-bg {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.35rem;
+    font-size: 0.9rem;
+}
+.stat-icon-info { background: rgba(59,130,246,.15); color: var(--info); }
+.stat-icon-warning { background: rgba(245,158,11,.15); color: var(--warning); }
+.stat-icon-danger { background: rgba(239,68,68,.15); color: var(--danger); }
+.stat-icon-success { background: rgba(76,175,80,.15); color: var(--success); }
+.stat-icon-purple { background: rgba(139,92,246,.15); color: #8b5cf6; }
 
 .cases-stat-value {
     font-size: 1.5rem;
@@ -257,15 +297,18 @@
     color: var(--text-primary);
 }
 
-.stat-open .cases-stat-value { color: #3b82f6; }
-.stat-acknowledged .cases-stat-value { color: #f59e0b; }
-.stat-critical .cases-stat-value { color: #ef4444; }
-.stat-resolution .cases-stat-value { color: #10b981; }
+.stat-open .cases-stat-value { color: var(--info); }
+.stat-acknowledged .cases-stat-value { color: var(--warning); }
+.stat-critical .cases-stat-value { color: var(--danger); }
+.stat-resolution .cases-stat-value { color: var(--success); }
 
 .cases-stat-label {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
     margin-top: 0.15rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 500;
 }
 
 /* ── Filters Bar ─────────────────────────────────────────── */
@@ -279,8 +322,8 @@
     flex: 1;
     padding: 0.5rem 0.75rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     color: var(--text-primary);
     font-size: 0.85rem;
 }
@@ -291,8 +334,8 @@
 .cases-filter-select {
     padding: 0.5rem 0.75rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     color: var(--text-primary);
     font-size: 0.85rem;
     min-width: 150px;
@@ -310,8 +353,8 @@
 
 .kanban-column {
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     display: flex;
     flex-direction: column;
     min-height: 300px;
@@ -327,26 +370,28 @@
     justify-content: space-between;
     align-items: center;
     padding: 0.75rem 1rem;
-    border-bottom: 2px solid var(--border-color);
+    border-bottom: 2px solid var(--border);
     flex-shrink: 0;
 }
 
-.col-open .kanban-col-title { color: #3b82f6; }
-.col-acknowledged .kanban-col-title { color: #f59e0b; }
+.col-open .kanban-col-title { color: var(--info); }
+.col-acknowledged .kanban-col-title { color: var(--warning); }
 .col-closed .kanban-col-title { color: #6b7280; }
 
-.col-open { border-bottom-color: #3b82f6; }
-.col-acknowledged { border-bottom-color: #f59e0b; }
+.col-open { border-bottom-color: var(--info); }
+.col-acknowledged { border-bottom-color: var(--warning); }
 .col-closed { border-bottom-color: #6b7280; }
 
 .kanban-col-title {
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
 }
 
 .kanban-col-count {
     background: var(--bg-primary);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 10px;
     padding: 0.1rem 0.5rem;
     font-size: 0.75rem;
@@ -366,17 +411,29 @@
 /* ── Kanban Card ─────────────────────────────────────────── */
 .kanban-card {
     background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 0.75rem;
+    padding-left: calc(0.75rem + 4px);
     cursor: pointer;
-    transition: all 0.15s;
-    border-left: 3px solid transparent;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+    position: relative;
+}
+
+.kanban-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    border-radius: var(--radius) 0 0 var(--radius);
 }
 
 .kanban-card:hover {
     border-color: var(--accent-color);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px rgba(0,0,0,.2);
+    transform: translateY(-1px);
 }
 
 .kanban-card.dragging {
@@ -384,10 +441,15 @@
     transform: rotate(2deg);
 }
 
-.kanban-card.sev-critical { border-left-color: #ef4444; }
-.kanban-card.sev-high { border-left-color: #f59e0b; }
-.kanban-card.sev-medium { border-left-color: #3b82f6; }
-.kanban-card.sev-low { border-left-color: #6b7280; }
+.kanban-card.sev-critical { border-color: rgba(239,68,68,.4); }
+.kanban-card.sev-high { border-color: rgba(245,158,11,.4); }
+.kanban-card.sev-medium { border-color: rgba(59,130,246,.4); }
+.kanban-card.sev-low { border-color: rgba(107,114,128,.3); }
+
+.kanban-card.sev-critical::before { background: var(--danger); }
+.kanban-card.sev-high::before { background: var(--warning); }
+.kanban-card.sev-medium::before { background: var(--info); }
+.kanban-card.sev-low::before { background: #6b7280; }
 
 .kcard-header {
     display: flex;
@@ -410,10 +472,10 @@
     border-radius: 3px;
 }
 
-.kcard-severity.sev-critical { background: rgba(239,68,68,0.2); color: #ef4444; }
-.kcard-severity.sev-high { background: rgba(245,158,11,0.2); color: #f59e0b; }
-.kcard-severity.sev-medium { background: rgba(59,130,246,0.2); color: #3b82f6; }
-.kcard-severity.sev-low { background: rgba(107,114,128,0.2); color: #9ca3af; }
+.kcard-severity.sev-critical { background: rgba(239,68,68,.12); color: var(--danger); }
+.kcard-severity.sev-high { background: rgba(245,158,11,.12); color: var(--warning); }
+.kcard-severity.sev-medium { background: rgba(59,130,246,.12); color: var(--info); }
+.kcard-severity.sev-low { background: rgba(107,114,128,.12); color: #9ca3af; }
 
 .kcard-title {
     font-size: 0.85rem;
@@ -451,26 +513,39 @@
 }
 
 .kcard-alert-count {
-    font-size: 0.7rem;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    font-size: 0.65rem;
+    font-weight: 600;
+    background: rgba(59,130,246,.12);
+    color: var(--info);
     border-radius: 3px;
-    padding: 0.05rem 0.3rem;
-    color: var(--text-secondary);
+    padding: 0.1rem 0.35rem;
+}
+
+.kcard-alert-count.has-alerts {
+    background: rgba(245,158,11,.12);
+    color: var(--warning);
 }
 
 .kcard-age {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
+    font-weight: 500;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
     color: var(--text-secondary);
 }
+
+.kcard-age.age-fresh { background: rgba(76,175,80,.1); color: var(--success); }
+.kcard-age.age-normal { color: var(--text-secondary); }
+.kcard-age.age-stale { background: rgba(245,158,11,.1); color: var(--warning); }
+.kcard-age.age-old { background: rgba(239,68,68,.1); color: var(--danger); }
 
 .kcard-integration {
     font-size: 0.6rem;
     font-weight: 700;
     padding: 0.05rem 0.25rem;
     border-radius: 2px;
-    background: rgba(59,130,246,0.15);
-    color: #3b82f6;
+    background: rgba(59,130,246,.12);
+    color: var(--info);
 }
 
 .kcard-closure {
@@ -480,12 +555,12 @@
     border-radius: 2px;
 }
 
-.kcard-closure.reason-true_positive { background: rgba(239,68,68,0.15); color: #ef4444; }
-.kcard-closure.reason-false_positive { background: rgba(107,114,128,0.15); color: #9ca3af; }
-.kcard-closure.reason-benign_true_positive { background: rgba(245,158,11,0.15); color: #f59e0b; }
-.kcard-closure.reason-duplicate { background: rgba(139,92,246,0.15); color: #8b5cf6; }
-.kcard-closure.reason-insufficient_data { background: rgba(107,114,128,0.15); color: #6b7280; }
-.kcard-closure.reason-not_applicable { background: rgba(107,114,128,0.15); color: #6b7280; }
+.kcard-closure.reason-true_positive { background: rgba(239,68,68,.12); color: var(--danger); }
+.kcard-closure.reason-false_positive { background: rgba(107,114,128,.12); color: #9ca3af; }
+.kcard-closure.reason-benign_true_positive { background: rgba(245,158,11,.12); color: var(--warning); }
+.kcard-closure.reason-duplicate { background: rgba(139,92,246,.12); color: #8b5cf6; }
+.kcard-closure.reason-insufficient_data { background: rgba(107,114,128,.12); color: #6b7280; }
+.kcard-closure.reason-not_applicable { background: rgba(107,114,128,.12); color: #6b7280; }
 
 /* ── Case Detail Panel ───────────────────────────────────── */
 .case-panel-overlay {
@@ -511,7 +586,7 @@
     max-width: 95vw;
     height: 100vh;
     background: var(--bg-primary);
-    border-left: 1px solid var(--border-color);
+    border-left: 1px solid var(--border);
     z-index: 1050;
     display: flex;
     flex-direction: column;
@@ -528,7 +603,7 @@
     justify-content: space-between;
     align-items: flex-start;
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
 }
 
@@ -571,14 +646,14 @@
 }
 
 .cpanel-section-title {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
     color: var(--text-secondary);
     margin-bottom: 0.5rem;
     padding-bottom: 0.35rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .cpanel-meta-grid {
@@ -599,7 +674,7 @@
     width: 100%;
     padding: 0.35rem 0.5rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     color: var(--text-primary);
     font-size: 0.85rem;
@@ -619,7 +694,7 @@
     padding: 0.15rem 0.45rem;
     border-radius: 3px;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     color: var(--text-secondary);
 }
 
@@ -628,8 +703,8 @@
     color: var(--text-primary);
     line-height: 1.6;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 0.75rem;
 }
 
@@ -639,7 +714,7 @@
     align-items: center;
     padding: 0.4rem 0.6rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     font-size: 0.8rem;
     margin-bottom: 0.35rem;
@@ -657,8 +732,8 @@
 .cpanel-note {
     padding: 0.6rem 0.75rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     margin-bottom: 0.4rem;
 }
 
@@ -686,7 +761,7 @@
     flex: 1;
     padding: 0.4rem 0.6rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     color: var(--text-primary);
     font-size: 0.85rem;
@@ -703,7 +778,7 @@
     gap: 0.5rem;
     margin-top: 1rem;
     padding-top: 0.75rem;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border);
 }
 
 .cpanel-actions .btn {
@@ -712,7 +787,7 @@
 }
 .cpanel-playbook-browser {
     margin-top: 0.75rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     max-height: 320px;
     overflow-y: auto;
@@ -723,25 +798,25 @@
     z-index: 1;
     padding: 0.375rem 0.5rem;
     background: var(--bg-primary);
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 .cpanel-playbook-browser-search input {
     width: 100%;
     padding: 0.25rem 0.5rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 3px;
     background: var(--bg-secondary);
     color: var(--text-primary);
     font-size: 0.8rem;
 }
 .cpanel-pb-group-header {
-    font-size: 0.6875rem;
+    font-size: 0.625rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.06em;
     padding: 0.375rem 0.5rem;
     background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     position: sticky;
     top: 37px;
     z-index: 1;
@@ -751,7 +826,7 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.4rem 0.5rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     font-size: 0.8125rem;
 }
 .cpanel-pb-item:last-child { border-bottom: none; }
@@ -766,8 +841,191 @@
     font-weight: 600;
     flex-shrink: 0;
 }
-.cpanel-pb-badge.active { background: rgba(76,175,80,0.2); color: #4caf50; }
-.cpanel-pb-badge.inactive { background: rgba(33,150,243,0.2); color: #2196f3; }
+.cpanel-pb-badge.active { background: rgba(76,175,80,.12); color: #4caf50; }
+.cpanel-pb-badge.inactive { background: rgba(33,150,243,.12); color: #2196f3; }
+
+/* ── Observable List (Panel) ─────────────────────────────── */
+.cpanel-obs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.cpanel-obs-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.8rem;
+    transition: border-color 0.15s;
+}
+
+.cpanel-obs-item:hover {
+    border-color: var(--accent-color);
+}
+
+.cpanel-obs-type {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    flex-shrink: 0;
+    letter-spacing: 0.03em;
+}
+
+.cpanel-obs-type.obs-type-ip,
+.cpanel-obs-type.obs-type-ipv4,
+.cpanel-obs-type.obs-type-ipv6 { background: rgba(59,130,246,.12); color: var(--info); }
+.cpanel-obs-type.obs-type-domain { background: rgba(139,92,246,.12); color: #8b5cf6; }
+.cpanel-obs-type.obs-type-url { background: rgba(245,158,11,.12); color: var(--warning); }
+.cpanel-obs-type.obs-type-hash,
+.cpanel-obs-type.obs-type-md5,
+.cpanel-obs-type.obs-type-sha1,
+.cpanel-obs-type.obs-type-sha256 { background: rgba(239,68,68,.12); color: var(--danger); }
+.cpanel-obs-type.obs-type-email { background: rgba(6,182,212,.12); color: #06b6d4; }
+.cpanel-obs-type.obs-type-file { background: rgba(236,72,153,.12); color: #ec4899; }
+.cpanel-obs-type.obs-type-unknown { background: rgba(107,114,128,.12); color: #9ca3af; }
+
+.cpanel-obs-value {
+    flex: 1;
+    font-family: monospace;
+    font-size: 0.78rem;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cpanel-obs-threat {
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+/* ── MITRE Tags ─────────────────────────────────────────── */
+.cpanel-tag-mitre {
+    background: rgba(239,68,68,.08);
+    border: 1px solid rgba(239,68,68,.2);
+    color: #f87171;
+    font-size: 0.7rem;
+    font-family: monospace;
+}
+
+/* ── Alert Cards (Panel) ────────────────────────────────── */
+.cpanel-alert-card {
+    padding: 0.5rem 0.65rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 0.35rem;
+    transition: border-color 0.15s;
+}
+
+.cpanel-alert-card:hover {
+    border-color: var(--accent-color);
+}
+
+.cpanel-alert-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cpanel-alert-badges {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.cpanel-alert-badge {
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+}
+
+.cpanel-alert-card-meta {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+/* ── Kibana Comments ────────────────────────────────────── */
+.cpanel-comment {
+    padding: 0.6rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--info);
+    border-radius: var(--radius);
+    margin-bottom: 0.4rem;
+}
+
+.cpanel-comment-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.cpanel-comment-user {
+    font-weight: 600;
+    color: var(--info);
+}
+
+.cpanel-comment-time {
+    font-size: 0.7rem;
+}
+
+.cpanel-comment-body {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* ── Note User ──────────────────────────────────────────── */
+.cpanel-note-user {
+    font-weight: 600;
+    color: var(--accent-color);
+}
+
+/* ── Section Badge ──────────────────────────────────────── */
+.cpanel-section-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 0.05rem 0.35rem;
+    border-radius: 8px;
+    background: rgba(59,130,246,.12);
+    color: var(--info);
+    margin-left: 0.25rem;
+    vertical-align: middle;
+}
+
+/* ── Empty Hint ─────────────────────────────────────────── */
+.cpanel-empty-hint {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    padding: 0.75rem;
+    text-align: center;
+    background: var(--bg-secondary);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+}
+
+.cpanel-empty-hint i {
+    margin-right: 0.25rem;
+    opacity: 0.6;
+}
 
 /* ── Modal (Create + Closure) ────────────────────────────── */
 .cases-modal-overlay {
@@ -782,12 +1040,13 @@
 
 .cases-modal {
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     width: 90%;
     max-width: 480px;
     max-height: 80vh;
     overflow: auto;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
 }
 
 .cases-modal-header {
@@ -795,7 +1054,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 
 .cases-modal-header h3 { margin: 0; font-size: 1.05rem; }
@@ -824,8 +1083,8 @@
     width: 100%;
     padding: 0.5rem 0.75rem;
     background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     color: var(--text-primary);
     font-size: 0.85rem;
     box-sizing: border-box;
@@ -842,7 +1101,7 @@
     justify-content: flex-end;
     gap: 0.5rem;
     padding: 0.75rem 1.25rem;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border);
 }
 
 /* ── Empty state ─────────────────────────────────────────── */
@@ -879,10 +1138,9 @@
 
 /* ── Attention Banner ───────────────────────────────────── */
 .attn-banner {
-    border: 1px solid #f59e0b;
-    border-left: 4px solid #f59e0b;
+    border: 1px solid var(--warning);
     background: rgba(245, 158, 11, 0.08);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     margin-bottom: 1rem;
     overflow: hidden;
 }
@@ -894,7 +1152,7 @@
     padding: 0.5rem 0.75rem;
     font-size: 0.85rem;
     font-weight: 600;
-    color: #f59e0b;
+    color: var(--warning);
 }
 
 .attn-banner-dismiss {
@@ -936,10 +1194,10 @@
     white-space: nowrap;
 }
 
-.attn-reason-stale { background: rgba(245,158,11,0.2); color: #f59e0b; }
-.attn-reason-unassigned { background: rgba(139,92,246,0.2); color: #8b5cf6; }
-.attn-reason-not-picked-up { background: rgba(239,68,68,0.2); color: #ef4444; }
-.attn-reason-aged { background: rgba(107,114,128,0.2); color: #9ca3af; }
+.attn-reason-stale { background: rgba(245,158,11,.12); color: var(--warning); }
+.attn-reason-unassigned { background: rgba(139,92,246,.12); color: #8b5cf6; }
+.attn-reason-not-picked-up { background: rgba(239,68,68,.12); color: var(--danger); }
+.attn-reason-aged { background: rgba(107,114,128,.12); color: #9ca3af; }
 
 .attn-case-num {
     font-weight: 600;
@@ -956,15 +1214,191 @@
 }
 
 /* ── Stats Row 2 ────────────────────────────────────────── */
-.cases-stat-card.stat-mttr { border-top-color: #8b5cf6; }
-.cases-stat-card.stat-closure-rate { border-top-color: #10b981; }
-.cases-stat-card.stat-weekly { border-top-color: #3b82f6; }
-.cases-stat-card.stat-unassigned { border-top-color: #f59e0b; }
+.cases-stat-card.stat-mttr { border-top-color: #8b5cf6; background: linear-gradient(180deg, rgba(139,92,246,.06) 0%, transparent 60%); }
+.cases-stat-card.stat-closure-rate { border-top-color: var(--success); background: linear-gradient(180deg, rgba(76,175,80,.06) 0%, transparent 60%); }
+.cases-stat-card.stat-weekly { border-top-color: var(--info); background: linear-gradient(180deg, rgba(59,130,246,.06) 0%, transparent 60%); }
+.cases-stat-card.stat-unassigned { border-top-color: var(--warning); background: linear-gradient(180deg, rgba(245,158,11,.06) 0%, transparent 60%); }
 
 .stat-mttr .cases-stat-value { color: #8b5cf6; }
-.stat-closure-rate .cases-stat-value { color: #10b981; }
-.stat-weekly .cases-stat-value { color: #3b82f6; }
-.stat-unassigned .cases-stat-value { color: #f59e0b; }
+.stat-closure-rate .cases-stat-value { color: var(--success); }
+.stat-weekly .cases-stat-value { color: var(--info); }
+.stat-unassigned .cases-stat-value { color: var(--warning); }
+
+/* ── Analytics Summary Strip ────────────────────────────── */
+.analytics-summary-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.summary-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--radius);
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+}
+
+.summary-chip-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.summary-chip-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+.summary-chip-value {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+/* ── Donut Charts ───────────────────────────────────────── */
+.analytics-row-donuts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.donut-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-height: 140px;
+}
+
+.donut-container svg {
+    flex-shrink: 0;
+}
+
+.donut-legend-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1;
+}
+
+.donut-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+}
+
+.donut-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.donut-legend-label {
+    color: var(--text-secondary);
+    flex: 1;
+}
+
+.donut-legend-val {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.donut-center-text {
+    font-size: 14px;
+    font-weight: 700;
+    fill: var(--text-primary);
+}
+
+.donut-center-sub {
+    font-size: 9px;
+    fill: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ── Analytics Card Accents ─────────────────────────────── */
+.analytics-card-accent-danger { border-top: 2px solid var(--danger); }
+.analytics-card-accent-purple { border-top: 2px solid #8b5cf6; }
+.analytics-card-accent-info { border-top: 2px solid var(--info); }
+.analytics-card-accent-blue { border-top: 2px solid #3b82f6; }
+.analytics-card-accent-warning { border-top: 2px solid var(--warning); }
+.analytics-card-accent-success { border-top: 2px solid var(--success); }
+
+/* ── Context Tags (Case Panel) ──────────────────────────── */
+.cpanel-tag-host {
+    background: rgba(59,130,246,.12);
+    color: var(--info);
+    border: none;
+}
+
+.cpanel-tag-user {
+    background: rgba(139,92,246,.12);
+    color: #8b5cf6;
+    border: none;
+}
+
+.cpanel-tag-rule {
+    background: rgba(245,158,11,.12);
+    color: var(--warning);
+    border: none;
+}
+
+.cpanel-tag-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.7;
+    margin-right: 0.15rem;
+}
+
+/* ── Severity Pill (Panel) ──────────────────────────────── */
+.cpanel-sev-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius);
+    margin-bottom: 0.75rem;
+}
+
+.cpanel-sev-strip.sev-critical { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25); }
+.cpanel-sev-strip.sev-high { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25); }
+.cpanel-sev-strip.sev-medium { background: rgba(59,130,246,.1); border: 1px solid rgba(59,130,246,.25); }
+.cpanel-sev-strip.sev-low { background: rgba(107,114,128,.1); border: 1px solid rgba(107,114,128,.25); }
+
+.cpanel-sev-icon {
+    font-size: 1.1rem;
+}
+
+.cpanel-sev-strip.sev-critical .cpanel-sev-icon { color: var(--danger); }
+.cpanel-sev-strip.sev-high .cpanel-sev-icon { color: var(--warning); }
+.cpanel-sev-strip.sev-medium .cpanel-sev-icon { color: var(--info); }
+.cpanel-sev-strip.sev-low .cpanel-sev-icon { color: #6b7280; }
+
+.cpanel-sev-text {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.cpanel-sev-strip.sev-critical .cpanel-sev-text { color: var(--danger); }
+.cpanel-sev-strip.sev-high .cpanel-sev-text { color: var(--warning); }
+.cpanel-sev-strip.sev-medium .cpanel-sev-text { color: var(--info); }
+.cpanel-sev-strip.sev-low .cpanel-sev-text { color: #9ca3af; }
+
+.cpanel-sev-detail {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-left: auto;
+}
 
 /* ── Analytics Panel ────────────────────────────────────── */
 .analytics-toggle {
@@ -974,13 +1408,13 @@
     padding: 0.75rem 1rem;
     margin-top: 1.5rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px 8px 0 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     cursor: pointer;
     user-select: none;
 }
 
-.analytics-toggle:hover { background: var(--bg-primary); }
+.analytics-toggle:hover { background: var(--primary-dim); }
 
 .analytics-toggle h3 {
     margin: 0;
@@ -998,9 +1432,9 @@
 
 .analytics-panel {
     background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-top: none;
-    border-radius: 0 0 8px 8px;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
     padding: 1rem;
     margin-bottom: 1.5rem;
 }
@@ -1016,34 +1450,39 @@
 
 .analytics-card {
     background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 1rem;
+    transition: box-shadow 0.2s;
+}
+
+.analytics-card:hover {
+    box-shadow: 0 2px 12px rgba(0,0,0,.15);
 }
 
 .analytics-card h4 {
     margin: 0 0 0.75rem 0;
-    font-size: 0.85rem;
+    font-size: 0.7rem;
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.06em;
 }
 
 .analytics-card-full {
     background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     padding: 1rem;
 }
 
 .analytics-card-full h4 {
     margin: 0 0 0.75rem 0;
-    font-size: 0.85rem;
+    font-size: 0.7rem;
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.06em;
 }
 
 /* ── Horizontal Bar Charts ──────────────────────────────── */
@@ -1066,9 +1505,10 @@
 .hbar-track {
     flex: 1;
     height: 20px;
-    background: var(--bg-secondary);
+    background: var(--bg-primary);
     border-radius: 4px;
     overflow: hidden;
+    border: 1px solid rgba(99,110,123,.1);
 }
 
 .hbar-fill {
@@ -1143,10 +1583,10 @@
     flex-shrink: 0;
 }
 
-.sla-green { background: #10b981; }
-.sla-yellow { background: #f59e0b; }
-.sla-orange { background: #f97316; }
-.sla-red { background: #ef4444; }
+.sla-green { background: var(--success); }
+.sla-yellow { background: var(--warning); }
+.sla-orange { background: var(--neon-orange); }
+.sla-red { background: var(--danger); }
 
 .sla-case-num {
     font-weight: 600;
@@ -1174,7 +1614,7 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
     font-size: 0.8rem;
 }
 
@@ -1216,8 +1656,23 @@
 }
 
 /* ── Analytics Responsive ───────────────────────────────── */
+@media (max-width: 1100px) {
+    .analytics-row-donuts {
+        grid-template-columns: 1fr 1fr;
+    }
+    .analytics-summary-strip {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 900px) {
     .analytics-grid {
+        grid-template-columns: 1fr;
+    }
+    .analytics-row-donuts {
+        grid-template-columns: 1fr;
+    }
+    .analytics-summary-strip {
         grid-template-columns: 1fr;
     }
 }
@@ -1411,6 +1866,15 @@ function renderBoard() {
     });
 }
 
+function getAgeClass(dateStr) {
+    if (!dateStr) return 'age-normal';
+    const hrs = (Date.now() - new Date(dateStr).getTime()) / 3600000;
+    if (hrs < 24) return 'age-fresh';
+    if (hrs < 72) return 'age-normal';
+    if (hrs < 168) return 'age-stale';
+    return 'age-old';
+}
+
 function renderCard(c) {
     const sev = c.severity || 'medium';
     const integrations = [];
@@ -1423,6 +1887,10 @@ function renderCard(c) {
         closureBadge = '<span class="kcard-closure reason-' + esc(c.closure_reason) + '">' + esc(label) + '</span>';
     }
 
+    const alertCount = c.alert_count || 0;
+    const alertClass = alertCount > 0 ? ' has-alerts' : '';
+    const ageClass = getAgeClass(c.created_at);
+
     return '<div class="kanban-card sev-' + esc(sev) + '" draggable="true"'
         + ' ondragstart="onDragStart(event,' + c.id + ')"'
         + ' ondragend="onDragEnd(event)"'
@@ -1434,11 +1902,11 @@ function renderCard(c) {
         + '</div>'
         + '<div class="kcard-title">' + esc(c.title) + '</div>'
         + '<div class="kcard-meta">'
-        +   '<span class="kcard-assignee">' + esc(c.assigned_to || 'Unassigned') + '</span>'
-        +   '<span class="kcard-age">' + ageLabel(c.created_at) + '</span>'
+        +   '<span class="kcard-assignee">' + (c.assigned_to ? esc(c.assigned_to) : '<em style="opacity:.5">Unassigned</em>') + '</span>'
+        +   '<span class="kcard-age ' + ageClass + '">' + ageLabel(c.created_at) + '</span>'
         + '</div>'
         + '<div class="kcard-footer">'
-        +   '<span class="kcard-alert-count">' + (c.alert_count || 0) + ' alerts</span>'
+        +   '<span class="kcard-alert-count' + alertClass + '">' + alertCount + ' alert' + (alertCount !== 1 ? 's' : '') + '</span>'
         +   integrations.join('')
         +   closureBadge
         + '</div>'
@@ -1576,13 +2044,43 @@ async function openCaseDetail(caseId) {
         document.getElementById('panel-case-title').textContent = c.title || '';
 
         body.innerHTML = renderPanelContent(c);
+
+        // Load Kibana comments async if case is synced
+        if (c.kibana_case_id) {
+            loadKibanaComments(c.kibana_case_id);
+        }
     } catch (e) {
         body.innerHTML = '<p style="color:#ef4444;text-align:center;padding:2rem;">Failed to load case details</p>';
     }
 }
 
+// ── Priority / status colors ───────────────────────────────
+const priorityColors = {
+    critical: { bg: 'rgba(239,68,68,.12)', color: 'var(--danger)' },
+    high: { bg: 'rgba(245,158,11,.12)', color: 'var(--warning)' },
+    medium: { bg: 'rgba(59,130,246,.12)', color: 'var(--info)' },
+    low: { bg: 'rgba(107,114,128,.12)', color: '#9ca3af' },
+};
+
+const statusColors = {
+    open: { bg: 'rgba(59,130,246,.12)', color: 'var(--info)' },
+    acknowledged: { bg: 'rgba(245,158,11,.12)', color: 'var(--warning)' },
+    closed: { bg: 'rgba(107,114,128,.12)', color: '#9ca3af' },
+};
+
 function renderPanelContent(c) {
     let html = '';
+
+    // Severity strip
+    const sev = c.severity || 'medium';
+    const sevIcons = { critical: 'icon-alert-octagon', high: 'icon-alert-triangle', medium: 'icon-info', low: 'icon-minus-circle' };
+    const alertCount = (c.alerts || []).length;
+    const obsCount = (c.observables || []).length;
+    html += '<div class="cpanel-sev-strip sev-' + esc(sev) + '">'
+        + '<span class="cpanel-sev-icon"><i class="' + (sevIcons[sev] || 'icon-info') + '"></i></span>'
+        + '<span class="cpanel-sev-text">' + esc(sev) + ' severity</span>'
+        + '<span class="cpanel-sev-detail">' + alertCount + ' alert' + (alertCount !== 1 ? 's' : '') + ' &middot; ' + obsCount + ' observable' + (obsCount !== 1 ? 's' : '') + ' &middot; ' + ageLabel(c.created_at) + ' old</span>'
+        + '</div>';
 
     // Metadata
     html += '<div class="cpanel-section">';
@@ -1612,7 +2110,7 @@ function renderPanelContent(c) {
         + '<input type="text" value="' + esc(fmtDate(c.created_at)) + '" disabled></div>';
     html += '</div></div>';
 
-    // Context tags
+    // Context tags — colored by type
     const hosts = c.affected_hosts || [];
     const users = c.affected_users || [];
     const rules = c.triggered_rules || [];
@@ -1620,9 +2118,9 @@ function renderPanelContent(c) {
         html += '<div class="cpanel-section">';
         html += '<div class="cpanel-section-title">Context</div>';
         html += '<div class="cpanel-tags">';
-        hosts.forEach(h => { html += '<span class="cpanel-tag" title="Host">' + esc(h) + '</span>'; });
-        users.forEach(u => { html += '<span class="cpanel-tag" title="User">' + esc(u) + '</span>'; });
-        rules.forEach(r => { html += '<span class="cpanel-tag" title="Rule">' + esc(r) + '</span>'; });
+        hosts.forEach(h => { html += '<span class="cpanel-tag cpanel-tag-host" title="Host"><span class="cpanel-tag-label">H</span>' + esc(h) + '</span>'; });
+        users.forEach(u => { html += '<span class="cpanel-tag cpanel-tag-user" title="User"><span class="cpanel-tag-label">U</span>' + esc(u) + '</span>'; });
+        rules.forEach(r => { html += '<span class="cpanel-tag cpanel-tag-rule" title="Rule"><span class="cpanel-tag-label">R</span>' + esc(r) + '</span>'; });
         html += '</div></div>';
     }
 
@@ -1639,24 +2137,116 @@ function renderPanelContent(c) {
         html += '</div>';
     }
 
-    // Linked alerts
+    // ── Observables Section ────────────────────────────────
+    const observables = c.observables || [];
+    // Also gather observables from linked alerts
+    const alertObs = [];
+    (c.alerts || []).forEach(a => {
+        (a.observables || []).forEach(o => {
+            if (!alertObs.find(x => x.value === o.value && x.type === o.type)) {
+                alertObs.push(o);
+            }
+        });
+    });
+    const allObs = [...observables];
+    alertObs.forEach(o => {
+        if (!allObs.find(x => x.value === o.value && x.type === o.type)) {
+            allObs.push(o);
+        }
+    });
+
+    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section-title">Observables (' + allObs.length + ')</div>';
+    if (allObs.length) {
+        html += '<div class="cpanel-obs-list">';
+        allObs.forEach(o => {
+            const type = o.type || 'unknown';
+            const value = o.value || '';
+            const threat = o.threat_level || o.priority || '';
+            const tc = priorityColors[threat] || { bg: 'rgba(107,114,128,.12)', color: '#9ca3af' };
+            html += '<div class="cpanel-obs-item">'
+                + '<span class="cpanel-obs-type obs-type-' + esc(type) + '">' + esc(type) + '</span>'
+                + '<span class="cpanel-obs-value" title="' + esc(value) + '">' + esc(value.length > 45 ? value.substring(0,42) + '...' : value) + '</span>';
+            if (threat) {
+                html += '<span class="cpanel-obs-threat" style="background:' + tc.bg + ';color:' + tc.color + ';">' + esc(threat) + '</span>';
+            }
+            html += '</div>';
+        });
+        html += '</div>';
+    } else {
+        html += '<div class="cpanel-empty-hint"><i class="icon-search"></i> No observables extracted yet</div>';
+    }
+    html += '</div>';
+
+    // ── MITRE Techniques (from alerts) ─────────────────────
+    const allMitre = [];
+    (c.alerts || []).forEach(a => {
+        (a.mitre_techniques || []).forEach(t => {
+            const id = typeof t === 'string' ? t : (t.id || t.technique_id || '');
+            const name = typeof t === 'string' ? t : (t.name || t.technique || id);
+            if (id && !allMitre.find(m => m.id === id)) {
+                allMitre.push({ id, name });
+            }
+        });
+    });
+    if (allMitre.length) {
+        html += '<div class="cpanel-section">';
+        html += '<div class="cpanel-section-title">MITRE ATT&CK (' + allMitre.length + ')</div>';
+        html += '<div class="cpanel-tags">';
+        allMitre.forEach(t => {
+            html += '<span class="cpanel-tag cpanel-tag-mitre" title="' + esc(t.name) + '">' + esc(t.id) + (t.name !== t.id ? ' — ' + esc(t.name) : '') + '</span>';
+        });
+        html += '</div></div>';
+    }
+
+    // ── Linked Alerts (enriched) ───────────────────────────
     const alerts = c.alerts || [];
     html += '<div class="cpanel-section">';
     html += '<div class="cpanel-section-title">Linked Alerts (' + alerts.length + ')</div>';
     if (alerts.length) {
         alerts.forEach(a => {
-            const alertId = a.es_alert_id || a.id || 'unknown';
-            html += '<div class="cpanel-alert-item">'
-                + '<a class="cpanel-alert-id" href="/alerts" title="View in Alerts page">' + esc(String(alertId).substring(0, 20)) + '</a>'
-                + '<span style="font-size:0.75rem;color:var(--text-secondary);">' + esc(a.status || '') + '</span>'
+            const alertId = a.es_alert_id || 'unknown';
+            const st = a.status || 'open';
+            const pr = a.priority || '';
+            const sc = statusColors[st] || statusColors.open;
+            const pc = priorityColors[pr] || null;
+            const obsCount = (a.observables || []).length;
+            const mitreCount = (a.mitre_techniques || []).length;
+
+            html += '<div class="cpanel-alert-card">'
+                + '<div class="cpanel-alert-card-header">'
+                +   '<a class="cpanel-alert-id" href="/alerts" title="View in Alerts page">' + esc(String(alertId).substring(0, 24)) + '</a>'
+                +   '<div class="cpanel-alert-badges">'
+                +     '<span class="cpanel-alert-badge" style="background:' + sc.bg + ';color:' + sc.color + ';">' + esc(st) + '</span>';
+            if (pc) {
+                html +=  '<span class="cpanel-alert-badge" style="background:' + pc.bg + ';color:' + pc.color + ';">' + esc(pr) + '</span>';
+            }
+            html +=   '</div>'
                 + '</div>';
+            // Alert meta row
+            const metaParts = [];
+            if (obsCount) metaParts.push(obsCount + ' observable' + (obsCount !== 1 ? 's' : ''));
+            if (mitreCount) metaParts.push(mitreCount + ' technique' + (mitreCount !== 1 ? 's' : ''));
+            if (a.analyst_notes) metaParts.push('has notes');
+            if (metaParts.length) {
+                html += '<div class="cpanel-alert-card-meta">' + metaParts.join(' &middot; ') + '</div>';
+            }
+            html += '</div>';
         });
     } else {
-        html += '<p style="font-size:0.8rem;color:var(--text-secondary);">No linked alerts</p>';
+        html += '<div class="cpanel-empty-hint"><i class="icon-shield"></i> No linked alerts</div>';
     }
     html += '</div>';
 
-    // Investigation notes
+    // ── Kibana Comments (loaded async) ─────────────────────
+    if (c.kibana_case_id) {
+        html += '<div class="cpanel-section">';
+        html += '<div class="cpanel-section-title">Kibana Comments <span class="cpanel-section-badge" id="kibana-comment-count">...</span></div>';
+        html += '<div id="kibana-comments-container"><p style="font-size:0.8rem;color:var(--text-secondary);">Loading comments...</p></div>';
+        html += '</div>';
+    }
+
+    // ── Investigation Notes ────────────────────────────────
     const notes = c.notes || [];
     html += '<div class="cpanel-section">';
     html += '<div class="cpanel-section-title">Investigation Notes (' + notes.length + ')</div>';
@@ -1664,7 +2254,7 @@ function renderPanelContent(c) {
         notes.forEach(n => {
             html += '<div class="cpanel-note">'
                 + '<div class="cpanel-note-header">'
-                +   '<span>' + esc(n.user || 'Unknown') + '</span>'
+                +   '<span class="cpanel-note-user"><i class="icon-user" style="font-size:0.65rem;margin-right:0.2rem;"></i>' + esc(n.user || 'Unknown') + '</span>'
                 +   '<span>' + fmtDate(n.created_at) + '</span>'
                 + '</div>'
                 + '<div class="cpanel-note-content">' + esc(n.content) + '</div>'
@@ -1692,6 +2282,40 @@ function renderPanelContent(c) {
     html += '<div id="case-playbook-browser-' + c.id + '" style="display:none;"></div>';
 
     return html;
+}
+
+// ── Load Kibana Comments ───────────────────────────────────
+async function loadKibanaComments(kibanaId) {
+    const container = document.getElementById('kibana-comments-container');
+    const badge = document.getElementById('kibana-comment-count');
+    if (!container) return;
+
+    try {
+        const resp = await fetch('/api/kibana/cases/' + kibanaId);
+        if (!resp.ok) throw new Error('Failed');
+        const data = await resp.json();
+        const comments = data.comments || [];
+
+        if (badge) badge.textContent = comments.length;
+
+        if (!comments.length) {
+            container.innerHTML = '<div class="cpanel-empty-hint">No comments in Kibana</div>';
+            return;
+        }
+
+        container.innerHTML = comments.map(cm => {
+            return '<div class="cpanel-comment">'
+                + '<div class="cpanel-comment-header">'
+                +   '<span class="cpanel-comment-user"><i class="icon-message-square" style="font-size:0.65rem;margin-right:0.2rem;"></i>' + esc(cm.created_by || 'kibana') + '</span>'
+                +   '<span class="cpanel-comment-time">' + fmtDate(cm.created_at) + '</span>'
+                + '</div>'
+                + '<div class="cpanel-comment-body">' + esc(cm.comment || '') + '</div>'
+                + '</div>';
+        }).join('');
+    } catch (e) {
+        container.innerHTML = '<div class="cpanel-empty-hint" style="color:var(--text-secondary);">Could not load Kibana comments</div>';
+        if (badge) badge.textContent = '-';
+    }
 }
 
 function closeCasePanel() {
@@ -2034,32 +2658,106 @@ function dismissAttentionBanner() {
 function renderAnalyticsPanel() {
     if (!casesLoaded || !teamMetricsCache) return;
 
+    renderSummaryStrip();
+    renderSeverityDonut();
+    renderClosureDonut();
+    renderStatusDonut();
     renderWorkloadBars();
-    renderClosureReasonBars();
-    renderSeverityBars();
     renderSLAIndicators();
     renderRecentClosures();
 }
 
-function renderWorkloadBars() {
-    const container = document.getElementById('analytics-workload');
+// ── SVG Donut Renderer ─────────────────────────────────────
+function renderDonutChart(containerId, data, colors, centerLabel) {
+    const container = document.getElementById(containerId);
     if (!container) return;
-    const data = teamMetricsCache.cases_by_assignee || [];
-    if (!data.length) {
+
+    const total = data.reduce((s, d) => s + d.value, 0);
+    if (!total) {
         container.innerHTML = '<p style="font-size:0.8rem;color:var(--text-secondary);">No data</p>';
         return;
     }
-    const max = Math.max(...data.map(d => d.open_count), 1);
-    container.innerHTML = data.map(d => {
-        const pct = (d.open_count / max) * 100;
-        return '<div class="hbar-row">'
-            + '<span class="hbar-label" title="' + esc(d.display_name) + '">' + esc(d.display_name) + '</span>'
-            + '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;background:#3b82f6;"></div></div>'
-            + '<span class="hbar-value">' + d.open_count + '</span>'
+
+    const size = 120, cx = 60, cy = 60, r = 45, strokeWidth = 14;
+    const circumference = 2 * Math.PI * r;
+    let offset = 0;
+
+    let arcs = '';
+    data.forEach((d, i) => {
+        if (d.value === 0) return;
+        const pct = d.value / total;
+        const dashLen = circumference * pct;
+        const dashGap = circumference - dashLen;
+        arcs += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" '
+            + 'stroke="' + colors[i] + '" stroke-width="' + strokeWidth + '" '
+            + 'stroke-dasharray="' + dashLen + ' ' + dashGap + '" '
+            + 'stroke-dashoffset="' + (-offset) + '" '
+            + 'transform="rotate(-90 ' + cx + ' ' + cy + ')" '
+            + 'style="transition: stroke-dasharray 0.5s, stroke-dashoffset 0.5s;"/>';
+        offset += dashLen;
+    });
+
+    const svg = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">'
+        + '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="rgba(99,110,123,.15)" stroke-width="' + strokeWidth + '"/>'
+        + arcs
+        + '<text x="' + cx + '" y="' + (cy - 2) + '" text-anchor="middle" dominant-baseline="central" class="donut-center-text">' + total + '</text>'
+        + '<text x="' + cx + '" y="' + (cy + 12) + '" text-anchor="middle" dominant-baseline="central" class="donut-center-sub">' + (centerLabel || 'total') + '</text>'
+        + '</svg>';
+
+    let legend = '<div class="donut-legend-list">';
+    data.forEach((d, i) => {
+        if (d.value === 0) return;
+        const pctLabel = Math.round((d.value / total) * 100);
+        legend += '<div class="donut-legend-item">'
+            + '<span class="donut-legend-dot" style="background:' + colors[i] + ';"></span>'
+            + '<span class="donut-legend-label">' + d.label + '</span>'
+            + '<span class="donut-legend-val">' + d.value + ' <span style="font-weight:400;color:var(--text-secondary);font-size:0.65rem;">' + pctLabel + '%</span></span>'
             + '</div>';
-    }).join('');
+    });
+    legend += '</div>';
+
+    container.innerHTML = svg + legend;
 }
 
+// ── Summary Strip ──────────────────────────────────────────
+function renderSummaryStrip() {
+    const strip = document.getElementById('analytics-summary-strip');
+    if (!strip) return;
+
+    const active = allCases.filter(c => c.status !== 'closed');
+    const critHigh = active.filter(c => c.severity === 'critical' || c.severity === 'high').length;
+    const unassigned = active.filter(c => !c.assigned_to).length;
+    const oldestActive = active.reduce((oldest, c) => {
+        const age = Date.now() - new Date(c.created_at).getTime();
+        return age > oldest ? age : oldest;
+    }, 0);
+    const oldestDays = Math.floor(oldestActive / 86400000);
+    const closedToday = allCases.filter(c => {
+        if (c.status !== 'closed' || !c.closed_at) return false;
+        const d = new Date(c.closed_at);
+        const now = new Date();
+        return d.toDateString() === now.toDateString();
+    }).length;
+
+    strip.innerHTML = ''
+        + '<div class="summary-chip"><span class="summary-chip-dot" style="background:var(--danger);"></span><span class="summary-chip-label">Critical/High Active</span><span class="summary-chip-value" style="color:var(--danger);">' + critHigh + '</span></div>'
+        + '<div class="summary-chip"><span class="summary-chip-dot" style="background:var(--warning);"></span><span class="summary-chip-label">Unassigned</span><span class="summary-chip-value" style="color:var(--warning);">' + unassigned + '</span></div>'
+        + '<div class="summary-chip"><span class="summary-chip-dot" style="background:' + (oldestDays > 7 ? 'var(--danger)' : oldestDays > 3 ? 'var(--warning)' : 'var(--success)') + ';"></span><span class="summary-chip-label">Oldest Active</span><span class="summary-chip-value">' + oldestDays + 'd</span></div>'
+        + '<div class="summary-chip"><span class="summary-chip-dot" style="background:var(--success);"></span><span class="summary-chip-label">Closed Today</span><span class="summary-chip-value" style="color:var(--success);">' + closedToday + '</span></div>';
+}
+
+// ── Severity Donut ─────────────────────────────────────────
+function renderSeverityDonut() {
+    const sev = teamMetricsCache.cases_by_severity || {};
+    renderDonutChart('analytics-severity-donut', [
+        { label: 'Critical', value: sev.critical || 0 },
+        { label: 'High', value: sev.high || 0 },
+        { label: 'Medium', value: sev.medium || 0 },
+        { label: 'Low', value: sev.low || 0 },
+    ], ['#ef4444', '#f59e0b', '#3b82f6', '#6b7280'], 'cases');
+}
+
+// ── Closure Reason Donut ───────────────────────────────────
 const closureReasonColors = {
     true_positive: '#ef4444',
     false_positive: '#9ca3af',
@@ -2079,66 +2777,54 @@ function computeClosureReasonCounts() {
     return counts;
 }
 
-function renderClosureReasonBars() {
-    const container = document.getElementById('analytics-closure');
-    if (!container) return;
+function renderClosureDonut() {
     const counts = computeClosureReasonCounts();
     const entries = Object.entries(counts);
     if (!entries.length) {
-        container.innerHTML = '<p style="font-size:0.8rem;color:var(--text-secondary);">No closed cases</p>';
+        const el = document.getElementById('analytics-closure-donut');
+        if (el) el.innerHTML = '<p style="font-size:0.8rem;color:var(--text-secondary);">No closed cases</p>';
         return;
     }
-    const total = entries.reduce((s, [, v]) => s + v, 0);
-    const max = Math.max(...entries.map(([, v]) => v), 1);
 
-    let html = '<div class="closure-stacked">';
-    entries.forEach(([reason, count]) => {
-        const pct = (count / total) * 100;
-        const color = closureReasonColors[reason] || '#6b7280';
-        html += '<div class="closure-stacked-seg" style="width:' + pct + '%;background:' + color + ';" title="' + esc(reason) + ': ' + count + '"></div>';
-    });
-    html += '</div>';
-
-    html += '<div class="closure-legend">';
-    entries.forEach(([reason, count]) => {
-        const color = closureReasonColors[reason] || '#6b7280';
-        const label = closureReasonLabels[reason] || reason;
-        html += '<span class="closure-legend-item"><span class="closure-legend-dot" style="background:' + color + ';"></span>' + esc(label) + ' (' + count + ')</span>';
-    });
-    html += '</div>';
-
-    entries.forEach(([reason, count]) => {
-        const pct = (count / max) * 100;
-        const color = closureReasonColors[reason] || '#6b7280';
-        const label = closureReasonLabels[reason] || reason;
-        html += '<div class="hbar-row">'
-            + '<span class="hbar-label">' + esc(label) + '</span>'
-            + '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>'
-            + '<span class="hbar-value">' + count + '</span>'
-            + '</div>';
-    });
-
-    container.innerHTML = html;
+    const data = entries.map(([reason, count]) => ({
+        label: closureReasonLabels[reason] || reason,
+        value: count,
+    }));
+    const colors = entries.map(([reason]) => closureReasonColors[reason] || '#6b7280');
+    renderDonutChart('analytics-closure-donut', data, colors, 'closed');
 }
 
-function renderSeverityBars() {
-    const container = document.getElementById('analytics-severity');
+// ── Status Donut ───────────────────────────────────────────
+function renderStatusDonut() {
+    const statusCounts = { open: 0, acknowledged: 0, closed: 0 };
+    allCases.forEach(c => {
+        if (statusCounts.hasOwnProperty(c.status)) statusCounts[c.status]++;
+    });
+    renderDonutChart('analytics-status-donut', [
+        { label: 'Open', value: statusCounts.open },
+        { label: 'Acknowledged', value: statusCounts.acknowledged },
+        { label: 'Closed', value: statusCounts.closed },
+    ], ['#3b82f6', '#f59e0b', '#6b7280'], 'total');
+}
+
+// ── Workload Bars ──────────────────────────────────────────
+function renderWorkloadBars() {
+    const container = document.getElementById('analytics-workload');
     if (!container) return;
-    const sev = teamMetricsCache.cases_by_severity || {};
-    const sevList = [
-        { key: 'critical', label: 'Critical', color: '#ef4444' },
-        { key: 'high', label: 'High', color: '#f59e0b' },
-        { key: 'medium', label: 'Medium', color: '#3b82f6' },
-        { key: 'low', label: 'Low', color: '#6b7280' },
-    ];
-    const max = Math.max(...sevList.map(s => sev[s.key] || 0), 1);
-    container.innerHTML = sevList.map(s => {
-        const count = sev[s.key] || 0;
-        const pct = (count / max) * 100;
+    const data = teamMetricsCache.cases_by_assignee || [];
+    if (!data.length) {
+        container.innerHTML = '<p style="font-size:0.8rem;color:var(--text-secondary);">No data</p>';
+        return;
+    }
+    const max = Math.max(...data.map(d => d.open_count), 1);
+    const barColors = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#f97316'];
+    container.innerHTML = data.map((d, i) => {
+        const pct = (d.open_count / max) * 100;
+        const color = barColors[i % barColors.length];
         return '<div class="hbar-row">'
-            + '<span class="hbar-label">' + s.label + '</span>'
-            + '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;background:' + s.color + ';"></div></div>'
-            + '<span class="hbar-value">' + count + '</span>'
+            + '<span class="hbar-label" title="' + esc(d.display_name) + '">' + esc(d.display_name) + '</span>'
+            + '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>'
+            + '<span class="hbar-value">' + d.open_count + '</span>'
             + '</div>';
     }).join('');
 }
@@ -2163,12 +2849,38 @@ function renderSLAIndicators() {
         return;
     }
 
+    // SLA summary bar at top
     const now = Date.now();
-    container.innerHTML = top8.map(c => {
+    const slaCounts = { green: 0, yellow: 0, orange: 0, red: 0 };
+    active.forEach(c => {
+        const ageMs = now - new Date(c.created_at).getTime();
+        const cls = getSLAColor(ageMs);
+        if (cls === 'sla-green') slaCounts.green++;
+        else if (cls === 'sla-yellow') slaCounts.yellow++;
+        else if (cls === 'sla-orange') slaCounts.orange++;
+        else slaCounts.red++;
+    });
+    const slaTotal = active.length || 1;
+    let slaBar = '<div style="display:flex;gap:0.25rem;margin-bottom:0.75rem;font-size:0.7rem;">';
+    if (slaCounts.green) slaBar += '<div style="flex:' + slaCounts.green + ';background:var(--success);border-radius:3px;height:6px;" title="<24h: ' + slaCounts.green + '"></div>';
+    if (slaCounts.yellow) slaBar += '<div style="flex:' + slaCounts.yellow + ';background:var(--warning);border-radius:3px;height:6px;" title="24-72h: ' + slaCounts.yellow + '"></div>';
+    if (slaCounts.orange) slaBar += '<div style="flex:' + slaCounts.orange + ';background:var(--neon-orange);border-radius:3px;height:6px;" title="72h-7d: ' + slaCounts.orange + '"></div>';
+    if (slaCounts.red) slaBar += '<div style="flex:' + slaCounts.red + ';background:var(--danger);border-radius:3px;height:6px;" title=">7d: ' + slaCounts.red + '"></div>';
+    slaBar += '</div>';
+    slaBar += '<div style="display:flex;gap:0.75rem;margin-bottom:0.5rem;font-size:0.65rem;color:var(--text-secondary);">'
+        + '<span><span class="sla-dot sla-green" style="display:inline-block;width:6px;height:6px;vertical-align:middle;margin-right:2px;"></span>&lt;24h: ' + slaCounts.green + '</span>'
+        + '<span><span class="sla-dot sla-yellow" style="display:inline-block;width:6px;height:6px;vertical-align:middle;margin-right:2px;"></span>1-3d: ' + slaCounts.yellow + '</span>'
+        + '<span><span class="sla-dot sla-orange" style="display:inline-block;width:6px;height:6px;vertical-align:middle;margin-right:2px;"></span>3-7d: ' + slaCounts.orange + '</span>'
+        + '<span><span class="sla-dot sla-red" style="display:inline-block;width:6px;height:6px;vertical-align:middle;margin-right:2px;"></span>&gt;7d: ' + slaCounts.red + '</span>'
+        + '</div>';
+
+    container.innerHTML = slaBar + top8.map(c => {
         const ageMs = now - new Date(c.created_at).getTime();
         const colorClass = getSLAColor(ageMs);
+        const sevBadge = '<span class="kcard-severity sev-' + esc(c.severity || 'medium') + '" style="margin-right:0.25rem;">' + esc(c.severity || 'med') + '</span>';
         return '<div class="sla-row" onclick="openCaseDetail(' + c.id + ')">'
             + '<span class="sla-dot ' + colorClass + '"></span>'
+            + sevBadge
             + '<span class="sla-case-num">' + esc(c.case_number) + '</span>'
             + '<span class="sla-case-title">' + esc(c.title) + '</span>'
             + '<span class="sla-age">' + ageLabel(c.created_at) + '</span>'
@@ -2187,7 +2899,11 @@ function renderRecentClosures() {
     container.innerHTML = closures.map(c => {
         const reasonLabel = closureReasonLabels[c.closure_reason] || c.closure_reason || '-';
         const reasonClass = c.closure_reason ? 'reason-' + c.closure_reason : '';
+        const sevBadge = c.severity
+            ? '<span class="kcard-severity sev-' + esc(c.severity) + '" style="margin-right:0.35rem;">' + esc(c.severity) + '</span>'
+            : '';
         return '<div class="rclosure-row">'
+            + sevBadge
             + '<span class="rclosure-num">' + esc(c.case_number) + '</span>'
             + '<span class="rclosure-title">' + esc(c.title) + '</span>'
             + '<span class="rclosure-reason kcard-closure ' + esc(reasonClass) + '">' + esc(reasonLabel) + '</span>'

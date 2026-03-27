@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libffi-dev \
     libpq-dev \
+    libpango1.0-dev \
+    libcairo2-dev \
+    libgdk-pixbuf-2.0-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create virtual environment
@@ -36,12 +39,19 @@ FROM python:3.14-slim AS runtime
 
 LABEL org.opencontainers.image.title="ION" \
       org.opencontainers.image.description="Intelligent Operating Network - Security Operations Portal" \
-      org.opencontainers.image.version="0.9.31" \
+      org.opencontainers.image.version="0.9.34" \
       org.opencontainers.image.source="https://hub.docker.com/repository/docker/ixion36/ion"
 
-# Install runtime PostgreSQL client library
+# Install runtime libraries (PostgreSQL client + WeasyPrint deps + fonts)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf-2.0-0 \
+    libcairo2 \
+    libglib2.0-0 \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 # Security: Run as non-root user

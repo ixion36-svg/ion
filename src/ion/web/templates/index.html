@@ -692,16 +692,16 @@
 
 <style>
 .welcome-section {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark, #1a5a8a) 100%);
-    color: white;
-    padding: 2rem;
-    border-radius: 8px;
+    padding: 0 0 1.5rem;
     margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
 }
 
 .welcome-section h1 {
     margin: 0;
-    font-size: 1.75rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-bright);
 }
 
 .welcome-meta {
@@ -711,19 +711,15 @@
     gap: 1rem;
 }
 
-.welcome-meta .badge {
-    background: rgba(255,255,255,0.2);
-    color: white;
-}
-
 .welcome-meta .text-muted {
-    opacity: 0.8;
+    color: var(--text-muted);
+    font-size: 0.85rem;
 }
 
 .dashboard-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
+    grid-template-columns: 7fr 5fr;
+    gap: 24px;
 }
 
 @media (max-width: 1024px) {
@@ -744,7 +740,7 @@
 .dashboard-column {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 20px;
 }
 
 .section-actions {
@@ -755,10 +751,10 @@
 
 /* System Status */
 .system-section {
-    background: var(--surface);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
 }
 
 .system-status-grid {
@@ -784,11 +780,10 @@
 
 /* Cases Section */
 .cases-section {
-    background: var(--surface);
-    border: 1px solid var(--border-color);
-    border-left: 4px solid var(--primary);
-    border-radius: 8px;
-    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
 }
 
 .cases-list {
@@ -802,14 +797,15 @@
     align-items: flex-start;
     gap: 0.75rem;
     padding: 0.75rem;
-    background: var(--background);
-    border-radius: 6px;
+    background: var(--bg-primary);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
     cursor: pointer;
-    transition: background 0.2s;
+    transition: border-color 0.2s;
 }
 
 .case-item:hover {
-    background: var(--hover-bg, #f5f5f5);
+    border-color: var(--border-bright);
 }
 
 .case-severity {
@@ -822,10 +818,10 @@
     flex-shrink: 0;
 }
 
-.case-severity.critical { background: #dc3545; }
-.case-severity.high { background: #fd7e14; }
-.case-severity.medium { background: #ffc107; color: #333; }
-.case-severity.low { background: #17a2b8; }
+.case-severity.critical { background: rgba(239,68,68,.15); color: var(--danger); }
+.case-severity.high { background: rgba(249,115,22,.15); color: var(--neon-orange); }
+.case-severity.medium { background: rgba(251,191,36,.15); color: var(--warning); }
+.case-severity.low { background: rgba(14,165,233,.15); color: var(--info); }
 
 .case-content {
     flex: 1;
@@ -854,9 +850,9 @@
     font-weight: 600;
 }
 
-.case-status.open { background: #dc354520; color: #dc3545; }
-.case-status.in_progress { background: #ffc10720; color: #856404; }
-.case-status.closed { background: #28a74520; color: #28a745; }
+.case-status.open { background: rgba(239,68,68,.12); color: var(--danger); }
+.case-status.in_progress { background: rgba(251,191,36,.12); color: var(--warning); }
+.case-status.closed { background: rgba(16,185,129,.12); color: var(--success); }
 
 /* Action Card Variants */
 .action-card-danger {
@@ -887,19 +883,17 @@
 }
 
 .gitlab-section {
-    background: var(--surface);
-    border: 1px solid var(--border-color);
-    border-left: 4px solid #fc6d26;
-    border-radius: 8px;
-    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
 }
 
 .alerts-section {
-    background: var(--surface);
-    border: 1px solid var(--border-color);
-    border-left: 4px solid var(--danger, #dc3545);
-    border-radius: 8px;
-    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
 }
 
 .alerts-section .section-header {
@@ -939,11 +933,11 @@
     align-items: flex-start;
     gap: 0.75rem;
     padding: 0.75rem;
-    background: var(--background);
-    border-radius: 6px;
-    border-left: 3px solid var(--border-color);
+    background: var(--bg-primary);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: border-color 0.2s;
 }
 
 .alert-item:hover {
@@ -1026,24 +1020,24 @@
     font-weight: 600;
 }
 
-.alert-status.status-open { background: #dc354520; color: #dc3545; }
-.alert-status.status-acknowledged { background: #ffc10720; color: #856404; }
-.alert-status.status-resolved { background: #28a74520; color: #28a745; }
+.alert-status.status-open { background: rgba(239,68,68,.12); color: var(--danger); }
+.alert-status.status-acknowledged { background: rgba(251,191,36,.12); color: var(--warning); }
+.alert-status.status-resolved { background: rgba(16,185,129,.12); color: var(--success); }
 
-.stat-card-danger {
-    border-left: 4px solid #dc3545;
+.stat-card-danger::before {
+    background: var(--danger);
 }
 
 .stat-card-danger .stat-value {
-    color: #dc3545;
+    color: var(--danger);
 }
 
-.stat-card-warning {
-    border-left: 4px solid #fd7e14;
+.stat-card-warning::before {
+    background: var(--warning);
 }
 
 .stat-card-warning .stat-value {
-    color: #fd7e14;
+    color: var(--warning);
 }
 
 .gitlab-status {

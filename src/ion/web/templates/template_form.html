@@ -126,15 +126,15 @@
 .se-empty {
     text-align: center;
     padding: 2rem;
-    border: 2px dashed var(--border-color);
-    border-radius: 8px;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-lg);
     color: var(--text-muted);
 }
 
 /* Section card */
 .se-card {
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     margin-bottom: 0.5rem;
     background: var(--bg-secondary);
     transition: box-shadow 0.15s;
@@ -154,7 +154,7 @@
     justify-content: center;
     width: 32px;
     height: 32px;
-    border-radius: 6px;
+    border-radius: var(--radius);
     background: var(--primary-color);
     color: white;
     font-weight: 700;
@@ -170,7 +170,7 @@
 }
 .se-card-actions button {
     background: none;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     color: var(--text-muted);
     cursor: pointer;
     padding: 0.2rem 0.4rem;
@@ -179,17 +179,17 @@
     line-height: 1;
 }
 .se-card-actions button:hover {
-    background: var(--bg-hover);
+    background: var(--primary-dim);
     color: var(--text-color);
 }
 .se-card-actions button.se-delete:hover {
-    background: var(--danger-color, #ef4444);
+    background: var(--danger);
     color: white;
-    border-color: var(--danger-color, #ef4444);
+    border-color: var(--danger);
 }
 .se-card-body {
     padding: 0.75rem;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--border);
 }
 .se-card-body.collapsed { display: none; }
 
@@ -204,7 +204,7 @@
 .se-add-inline:hover { opacity: 1; }
 .se-add-inline button {
     background: none;
-    border: 1px dashed var(--border-color);
+    border: 1px dashed var(--border);
     color: var(--text-muted);
     cursor: pointer;
     padding: 0.15rem 0.75rem;
@@ -230,7 +230,7 @@
 .se-field select {
     width: 100%;
     padding: 0.4rem 0.5rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--bg-primary);
     color: var(--text-color);
@@ -248,7 +248,7 @@
     padding: 0.4rem 0.5rem;
     background: var(--bg-primary);
     border-radius: 4px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
 }
 .se-variable-toggle label {
     font-size: 0.8rem;
@@ -276,7 +276,7 @@
 .se-list-item input {
     flex: 1;
     padding: 0.3rem 0.4rem;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--bg-primary);
     color: var(--text-color);
@@ -284,17 +284,17 @@
 }
 .se-list-item button {
     background: none;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border);
     color: var(--text-muted);
     cursor: pointer;
     padding: 0.2rem 0.35rem;
     border-radius: 4px;
     font-size: 0.75rem;
 }
-.se-list-item button:hover { color: var(--danger-color, #ef4444); }
+.se-list-item button:hover { color: var(--danger); }
 .se-list-add {
     background: none;
-    border: 1px dashed var(--border-color);
+    border: 1px dashed var(--border);
     color: var(--text-muted);
     cursor: pointer;
     padding: 0.25rem 0.6rem;
@@ -327,18 +327,18 @@
     width: 360px;
     height: 100vh;
     background: var(--bg-secondary);
-    border-left: 1px solid var(--border-color);
+    border-left: 1px solid var(--border);
     z-index: 1000;
     display: flex;
     flex-direction: column;
-    box-shadow: -4px 0 20px rgba(0,0,0,0.2);
+    box-shadow: -2px 0 8px rgba(0,0,0,.15);
 }
 .se-library-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 1rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border);
 }
 .se-library-header h3 { margin: 0; }
 .se-library-close {
@@ -368,8 +368,8 @@
     gap: 0.5rem;
 }
 .se-library-item {
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     padding: 0.6rem;
     cursor: pointer;
     text-align: center;
@@ -378,7 +378,7 @@
 }
 .se-library-item:hover {
     border-color: var(--primary-color);
-    background: var(--bg-hover);
+    background: var(--primary-dim);
 }
 .se-library-item-icon {
     display: inline-flex;
@@ -386,7 +386,7 @@
     justify-content: center;
     width: 36px;
     height: 36px;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     background: var(--primary-color);
     color: white;
     font-weight: 700;
@@ -409,8 +409,8 @@
 .se-legacy-notice {
     padding: 0.75rem 1rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--warning-color, #f59e0b);
-    border-radius: 6px;
+    border: 1px solid var(--warning);
+    border-radius: var(--radius);
     margin-bottom: 1rem;
 }
 .se-legacy-notice p { margin: 0 0 0.5rem; font-size: 0.85rem; }

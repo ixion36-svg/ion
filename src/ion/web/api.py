@@ -1655,6 +1655,43 @@ async def render_template(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/templates/{template_id}/render-pdf", dependencies=[Depends(require_permission("template:read"))])
+async def render_template_pdf(
+    template_id: int,
+    render_request: RenderRequest,
+    services: Services = Depends(get_services),
+):
+    """Render a template and return the result as a PDF."""
+    try:
+        result = services.render.preview(template_id, data=render_request.data)
+    except TemplateNotFoundError:
+        raise HTTPException(status_code=404, detail="Template not found")
+    except RenderError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    template = services.template.get_template(template_id)
+    fmt = render_request.output_format or (template.format if template else "markdown")
+    title = template.name if template else "Document"
+
+    try:
+        from ion.services.pdf_export_service import generate_pdf, _content_to_html
+        body_html = _content_to_html(result, fmt)
+        metadata = {
+            "Template": title,
+            "Format": fmt.title(),
+        }
+        pdf_bytes = generate_pdf(body_html, title=title, metadata=metadata)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    safe_name = re.sub(r'[^\w\s\-.]', '', title).strip() or "document"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.pdf"'},
+    )
+
+
 @router.post("/templates/{template_id}/validate", dependencies=[Depends(require_permission("template:read"))])
 async def validate_template_data(
     template_id: int,
@@ -1786,6 +1823,8 @@ async def upload_document(
         collection_id: Optional collection/folder ID.
     """
     content = await file.read()
+    if len(content) > 50 * 1024 * 1024:  # 50 MB
+        raise HTTPException(status_code=400, detail="File too large (max 50 MB)")
     text = content.decode("utf-8", errors="ignore")
 
     # Determine document name
@@ -1979,6 +2018,26 @@ async def get_document(document_id: int, services: Services = Depends(get_servic
     }
 
 
+@router.get("/documents/{document_id}/pdf", dependencies=[Depends(require_permission("document:read"))])
+async def export_document_pdf(document_id: int, services: Services = Depends(get_services)):
+    """Export a document as a professionally styled PDF."""
+    document = services.render.get_document(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    try:
+        from ion.services.pdf_export_service import document_to_pdf
+        pdf_bytes = document_to_pdf(document)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    safe_name = re.sub(r'[^\w\s\-.]', '', document.name).strip() or "document"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.pdf"'},
+    )
+
+
 @router.delete("/documents/{document_id}", dependencies=[Depends(require_permission("document:delete"))])
 async def delete_document(document_id: int, services: Services = Depends(get_services)):
     """Delete a document."""
@@ -2134,7 +2193,11 @@ async def revert_document_to_version(
 @router.get("/health")
 async def health_check():
     """Simple health check for Docker/load balancers."""
-    return {"status": "ok"}
+    from ion.storage.database import get_engine
+    from ion import __version__
+    engine = get_engine()
+    db_type = engine.dialect.name  # "postgresql" or "sqlite"
+    return {"status": "ok", "database": db_type, "version": __version__}
 
 
 # Stats endpoint
@@ -3796,7 +3859,7 @@ async def create_case(
         status=AlertCaseStatus.OPEN,
         severity=data.severity,
         created_by_id=current_user.id,
-        assigned_to_id=data.assigned_to_id,
+        assigned_to_id=data.assigned_to_id if data.assigned_to_id else current_user.id,
         affected_hosts=data.affected_hosts,
         affected_users=data.affected_users,
         triggered_rules=data.triggered_rules,
@@ -4070,6 +4133,9 @@ async def get_case_detail(
                 "es_alert_id": t.es_alert_id,
                 "status": t.status.value if hasattr(t.status, "value") else t.status,
                 "priority": t.priority,
+                "observables": t.observables or [],
+                "mitre_techniques": t.mitre_techniques or [],
+                "analyst_notes": t.analyst_notes,
             }
             for t in case.triage_entries
         ],
@@ -4857,15 +4923,19 @@ async def get_batch_triage(
 @router.get("/elasticsearch/assignment_users")
 async def get_assignment_users(
     q: str = "",
+    refresh: bool = False,
     current_user: User = Depends(require_permission("alert:read")),
 ):
-    """Get users available for alert assignment from the configured ES index."""
+    """Get users available for alert assignment from the configured ES index.
+
+    Results are cached for 5 minutes. Pass ?refresh=true to force a fresh fetch.
+    """
     from ion.services.elasticsearch_service import ElasticsearchService
     es = ElasticsearchService()
     if not es.is_configured or not es.user_mapping_configured:
         return {"users": [], "source": "none", "configured": False}
 
-    users = await es.get_assignment_users(search=q)
+    users = await es.get_assignment_users(search=q, force_refresh=refresh)
     return {"users": users, "source": "elasticsearch", "configured": True}
 
 
@@ -5415,6 +5485,18 @@ async def get_es_alert_stats(
 # ============================================================================
 
 
+_DISCOVER_BLOCKED_PREFIXES = (".kibana", ".security", ".internal", ".tasks", ".apm", ".fleet")
+
+
+def _validate_index_pattern(pattern: str) -> str:
+    """Block access to system/internal ES indices via discover."""
+    lower = pattern.lower().strip()
+    for prefix in _DISCOVER_BLOCKED_PREFIXES:
+        if lower.startswith(prefix):
+            raise ValueError(f"Access to system index '{pattern}' is not permitted")
+    return pattern
+
+
 class DiscoverSearchRequest(BaseModel):
     """Request model for discover search."""
     index_pattern: str = "logs-*"
@@ -5447,6 +5529,11 @@ async def discover_search(
 
     Supports Lucene/KQL query syntax for flexible searching.
     """
+    try:
+        _validate_index_pattern(request.index_pattern)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
     config = get_elasticsearch_config()
     if not config.get("enabled"):
         raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
@@ -5483,6 +5570,11 @@ async def discover_histogram(
     current_user: User = Depends(get_current_user),
 ):
     """Get a time histogram for discover visualization."""
+    try:
+        _validate_index_pattern(request.index_pattern)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
     config = get_elasticsearch_config()
     if not config.get("enabled"):
         raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")

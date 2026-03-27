@@ -335,6 +335,11 @@ async def update_elasticsearch_settings(
 
     config.to_file(get_config_path())
     reload_config()
+
+    # Invalidate assignment users cache when ES config changes
+    from ion.services.elasticsearch_service import ElasticsearchService
+    ElasticsearchService.invalidate_assignment_cache()
+
     return {"status": "updated", "section": "elasticsearch"}
 
 

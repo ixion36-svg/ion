@@ -75,6 +75,12 @@ class ElasticsearchError(Exception):
         self.status_code = status_code
 
 
+# Module-level cache for assignment users (survives across request instances)
+_assignment_users_cache: List[Dict[str, str]] = []
+_assignment_users_cached_at: Optional[datetime] = None
+_ASSIGNMENT_CACHE_TTL = timedelta(minutes=5)
+
+
 class ElasticsearchService:
     """Service for interacting with Elasticsearch."""
 
@@ -1079,62 +1085,111 @@ class ElasticsearchService:
         """Check if ES user mapping is configured."""
         return bool(self.user_index) and bool(self.user_field)
 
-    async def get_assignment_users(self, search: str = "") -> List[Dict[str, str]]:
+    async def get_assignment_users(self, search: str = "", force_refresh: bool = False) -> List[Dict[str, str]]:
         """Fetch user names from the configured ES user index.
 
         Returns a list of {"name": "...", "value": "..."} for the assignment dropdown.
+        Handles both plain keyword fields and multi-fields (text + .keyword).
+
+        Results are cached in memory (5 min TTL).  If ES is unreachable the
+        stale cache is returned so the UI still works.
         """
+        global _assignment_users_cache, _assignment_users_cached_at
+
         if not self.is_configured or not self.user_mapping_configured:
             return []
 
+        # Return cached list for non-search requests when cache is fresh
+        now = datetime.utcnow()
+        cache_valid = (
+            _assignment_users_cached_at is not None
+            and (now - _assignment_users_cached_at) < _ASSIGNMENT_CACHE_TTL
+            and not force_refresh
+        )
+
+        if cache_valid and not search:
+            return list(_assignment_users_cache)
+
+        # If searching against a fresh cache, filter in-memory (no ES round-trip)
+        if cache_valid and search:
+            term = search.lower()
+            return [u for u in _assignment_users_cache if term in u["name"].lower()]
+
+        # Cache miss or expired — fetch from ES
         try:
-            body: Dict[str, Any] = {"size": 200}
+            users = await self._fetch_users_from_es(search)
 
-            if search:
-                body["query"] = {
-                    "wildcard": {
-                        self.user_field: {
-                            "value": f"*{search}*",
-                            "case_insensitive": True,
-                        }
-                    }
-                }
-            else:
-                body["query"] = {"match_all": {}}
+            # Only update the full cache on non-search (complete) fetches
+            if not search:
+                _assignment_users_cache = users
+                _assignment_users_cached_at = now
+                logger.info("Refreshed assignment users cache: %d users from '%s'", len(users), self.user_index)
 
-            # Sort by the user field for consistent ordering
-            body["sort"] = [{self.user_field + ".keyword": {"order": "asc", "unmapped_type": "keyword"}}]
-            body["_source"] = [self.user_field]
-
-            result = await self._request(
-                "POST",
-                f"/{self.user_index}/_search",
-                json=body,
-            )
-
-            users = []
-            seen = set()
-            for hit in result.get("hits", {}).get("hits", []):
-                source = hit.get("_source", {})
-                # Navigate nested field path (e.g., "ion.user" → source["ion"]["user"])
-                value = source
-                for part in self.user_field.split("."):
-                    if isinstance(value, dict):
-                        value = value.get(part)
-                    else:
-                        value = None
-                        break
-
-                if value and isinstance(value, str) and value not in seen:
-                    seen.add(value)
-                    users.append({"name": value, "value": value})
-
-            logger.info("Fetched %d assignment users from ES index '%s'", len(users), self.user_index)
             return users
 
         except ElasticsearchError as e:
             logger.warning("Failed to fetch assignment users from ES: %s", e)
+            # Return stale cache if available (graceful degradation)
+            if _assignment_users_cache:
+                logger.info("Returning stale assignment users cache (%d users)", len(_assignment_users_cache))
+                if search:
+                    term = search.lower()
+                    return [u for u in _assignment_users_cache if term in u["name"].lower()]
+                return list(_assignment_users_cache)
             return []
+
+    @staticmethod
+    def invalidate_assignment_cache():
+        """Clear the assignment users cache (e.g. after config change)."""
+        global _assignment_users_cache, _assignment_users_cached_at
+        _assignment_users_cache = []
+        _assignment_users_cached_at = None
+
+    async def _fetch_users_from_es(self, search: str = "") -> List[Dict[str, str]]:
+        """Query ES for assignment users."""
+        body: Dict[str, Any] = {"size": 200}
+        kw_field = self.user_field + ".keyword"
+
+        if search:
+            body["query"] = {
+                "bool": {
+                    "should": [
+                        {"wildcard": {kw_field: {"value": f"*{search}*", "case_insensitive": True}}},
+                        {"wildcard": {self.user_field: {"value": f"*{search}*", "case_insensitive": True}}},
+                        {"match": {self.user_field: {"query": search, "fuzziness": "AUTO"}}},
+                    ],
+                    "minimum_should_match": 1,
+                }
+            }
+        else:
+            body["query"] = {"match_all": {}}
+
+        body["sort"] = [{kw_field: {"order": "asc", "unmapped_type": "keyword"}}]
+        body["_source"] = [self.user_field]
+
+        result = await self._request(
+            "POST",
+            f"/{self.user_index}/_search",
+            json=body,
+        )
+
+        users = []
+        seen = set()
+        for hit in result.get("hits", {}).get("hits", []):
+            source = hit.get("_source", {})
+            value = source
+            for part in self.user_field.split("."):
+                if isinstance(value, dict):
+                    value = value.get(part)
+                else:
+                    value = None
+                    break
+
+            if value and isinstance(value, str) and value not in seen:
+                seen.add(value)
+                users.append({"name": value, "value": value})
+
+        return users
 
     async def update_alert_assignment(
         self,

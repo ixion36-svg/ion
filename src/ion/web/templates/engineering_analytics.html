@@ -95,12 +95,12 @@
     margin-bottom: 2rem;
 }
 .eng-stat {
-    background: var(--bg-card);
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 1.25rem 1rem;
     text-align: center;
-    box-shadow: var(--shadow-card);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
     position: relative;
     overflow: hidden;
     transition: border-color 0.3s, box-shadow 0.3s;
@@ -114,7 +114,7 @@
 }
 .eng-stat:hover {
     border-color: var(--border-bright);
-    box-shadow: var(--shadow-card), var(--glow-sm);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15), var(--glow-sm);
 }
 .eng-stat-value {
     font-size: 1.75rem;
@@ -154,11 +154,11 @@
 
 /* Timeline chart container */
 .eng-timeline-chart {
-    background: var(--bg-card);
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 1.25rem;
-    box-shadow: var(--shadow-card);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
     min-height: 120px;
     position: relative;
     overflow: hidden;
@@ -200,16 +200,16 @@
 
 /* System card */
 .system-card {
-    background: var(--bg-card);
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-card);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
     overflow: hidden;
     transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
 }
 .system-card:hover {
     border-color: var(--border-bright);
-    box-shadow: var(--shadow-card), 0 0 20px rgba(0, 212, 255, 0.08);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15), 0 0 20px rgba(0, 212, 255, 0.08);
     transform: translateY(-2px);
 }
 
@@ -278,10 +278,10 @@
     font-weight: 600;
     font-family: 'JetBrains Mono', monospace;
 }
-.sev-pill.crit { background: rgba(255, 69, 58, 0.15); color: var(--severity-critical-color, #ff453a); border: 1px solid rgba(255, 69, 58, 0.3); }
-.sev-pill.high { background: rgba(255, 149, 0, 0.15); color: var(--severity-high-color, #ff9500); border: 1px solid rgba(255, 149, 0, 0.3); }
-.sev-pill.med  { background: rgba(255, 214, 10, 0.15); color: var(--severity-medium-color, #ffd60a); border: 1px solid rgba(255, 214, 10, 0.3); }
-.sev-pill.low  { background: rgba(48, 209, 88, 0.15); color: var(--severity-low-color, #30d158); border: 1px solid rgba(48, 209, 88, 0.3); }
+.sev-pill.crit { background: rgba(255, 69, 58, 0.15); color: var(--danger); border: 1px solid rgba(255, 69, 58, 0.3); }
+.sev-pill.high { background: rgba(255, 149, 0, 0.15); color: var(--neon-orange); border: 1px solid rgba(255, 149, 0, 0.3); }
+.sev-pill.med  { background: rgba(255, 214, 10, 0.15); color: var(--warning); border: 1px solid rgba(255, 214, 10, 0.3); }
+.sev-pill.low  { background: rgba(48, 209, 88, 0.15); color: var(--success); border: 1px solid rgba(48, 209, 88, 0.3); }
 
 /* Mini sparkline inside card */
 .system-sparkline {
@@ -369,11 +369,11 @@
 .eng-index-table {
     width: 100%;
     border-collapse: collapse;
-    background: var(--bg-card);
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
-    box-shadow: var(--shadow-card);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
 }
 .eng-index-table thead th {
     background: var(--bg-elevated);
@@ -441,12 +441,12 @@
 
 /* No ES config banner */
 .es-not-configured {
-    background: var(--bg-card);
+    background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 3rem;
     text-align: center;
-    box-shadow: var(--shadow-card);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
 }
 .es-not-configured h3 {
     color: var(--text-bright);

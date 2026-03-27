@@ -561,6 +561,12 @@ async def pcap_page(request: Request, user: User = Depends(require_page_permissi
     return templates.TemplateResponse(request=request, name="pcap.html")
 
 
+@app.get("/data-flow", response_class=HTMLResponse)
+async def data_flow_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the data flow visualization page."""
+    return templates.TemplateResponse(request=request, name="data_flow.html")
+
+
 @app.get("/forensics", response_class=HTMLResponse)
 async def forensics_page(request: Request, user: User = Depends(require_page_permission("forensic:read"))):
     """Render the forensic investigations page."""

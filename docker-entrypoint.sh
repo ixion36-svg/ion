@@ -27,12 +27,17 @@ echo "  Data directory: ${DATA_DIR}"
 mkdir -p "${CONFIG_DIR}"
 
 # =============================================================================
-# Fresh database option: ION_FRESH_DB=true wipes existing data
+# Fresh database option: ION_FRESH_DB=true wipes existing data (ONE-SHOT)
+# After wiping, a marker is written so it won't wipe again on restart.
+# Delete /data/.ion/.fresh_db_done to allow another wipe.
 # =============================================================================
-if [ "${ION_FRESH_DB:-false}" = "true" ]; then
+FRESH_DB_MARKER="${CONFIG_DIR}/.fresh_db_done"
+
+if [ "${ION_FRESH_DB:-false}" = "true" ] && [ ! -f "${FRESH_DB_MARKER}" ]; then
     echo ""
     echo "============================================"
     echo "  ION_FRESH_DB=true — wiping database"
+    echo "  (one-shot: will NOT wipe on next restart)"
     echo "============================================"
     if [ -f "${SQLITE_DB}" ]; then
         echo "  Removing SQLite database: ${SQLITE_DB}"
@@ -64,8 +69,15 @@ with engine.connect() as conn:
     fi
     # Remove seeder marker so KB/playbooks get re-seeded
     rm -f "${CONFIG_DIR}/.seeded"*
+    # Write marker so fresh DB wipe only happens once
+    echo "Wiped at $(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${FRESH_DB_MARKER}"
     echo "  Database wiped — starting fresh"
+    echo "  Marker written: ${FRESH_DB_MARKER}"
+    echo "  To wipe again, remove ${FRESH_DB_MARKER} and restart."
     echo ""
+elif [ "${ION_FRESH_DB:-false}" = "true" ] && [ -f "${FRESH_DB_MARKER}" ]; then
+    echo "  ION_FRESH_DB=true but already wiped (marker: ${FRESH_DB_MARKER})"
+    echo "  Skipping wipe. Remove marker to wipe again."
 fi
 
 # Determine database backend
