@@ -5657,7 +5657,24 @@ function renderAssessmentForm() {
             </div>`;
     });
 
+    // Save which categories are currently open before replacing HTML
+    const openCategories = new Set();
+    container.querySelectorAll('.sa-category.open .sa-cat-title').forEach(el => {
+        openCategories.add(el.textContent.trim());
+    });
+
     container.innerHTML = html;
+
+    // Restore open state for previously-open categories
+    if (assessmentFormRendered && openCategories.size > 0) {
+        container.querySelectorAll('.sa-category').forEach(cat => {
+            const title = cat.querySelector('.sa-cat-title');
+            if (title && openCategories.has(title.textContent.trim())) {
+                cat.classList.add('open');
+            }
+        });
+    }
+
     assessmentFormRendered = true;
     renderForecast();
 }

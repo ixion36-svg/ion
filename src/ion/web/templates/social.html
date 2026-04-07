@@ -323,10 +323,48 @@ function filterPosts(btn, category) {
 
 async function toggleReaction(postId, emoji) {
     try {
-        await api.post('/api/social/' + postId + '/reactions', { emoji });
-        loadFeed();
+        const result = await api.post('/api/social/' + postId + '/reactions', { emoji });
+
+        // Update the local data optimistically instead of reloading entire feed
+        const post = socialPosts.find(p => p.id === postId);
+        if (post) {
+            if (!post.reactions) post.reactions = {};
+            if (result.action === 'added') {
+                if (!post.reactions[emoji]) post.reactions[emoji] = { count: 0, reacted: false };
+                post.reactions[emoji].count++;
+                post.reactions[emoji].reacted = true;
+            } else if (result.action === 'removed') {
+                if (post.reactions[emoji]) {
+                    post.reactions[emoji].count = Math.max(0, post.reactions[emoji].count - 1);
+                    post.reactions[emoji].reacted = false;
+                    if (post.reactions[emoji].count === 0) delete post.reactions[emoji];
+                }
+            }
+            // Re-render just the actions bar for this post
+            const postEl = document.getElementById('social-post-' + postId);
+            if (postEl) {
+                const actionsEl = postEl.querySelector('.social-post-actions');
+                if (actionsEl) {
+                    let reactHtml = '';
+                    for (const [emojiKey, info] of Object.entries(post.reactions || {})) {
+                        const icon = EMOJI_MAP[emojiKey] || emojiKey;
+                        const cls = info.reacted ? ' reacted' : '';
+                        reactHtml += '<button class="social-react-btn' + cls + '" onclick="toggleReaction(' + postId + ', \'' + emojiKey + '\')">' + icon + ' <span class="count">' + info.count + '</span></button>';
+                    }
+                    for (const [key, icon] of Object.entries(EMOJI_MAP)) {
+                        if (!post.reactions || !post.reactions[key]) {
+                            reactHtml += '<button class="social-react-btn" onclick="toggleReaction(' + postId + ', \'' + key + '\')">' + icon + '</button>';
+                        }
+                    }
+                    const commentBtn = '<button class="social-comment-toggle" onclick="toggleComments(' + postId + ')">\ud83d\udcac ' + post.comment_count + ' comments</button>';
+                    const adminBtns = actionsEl.querySelector('.social-post-admin-actions');
+                    actionsEl.innerHTML = reactHtml + commentBtn + (adminBtns ? adminBtns.outerHTML : '');
+                }
+            }
+        }
     } catch (e) {
-        showToast('Failed to react', 'error');
+        console.error('Reaction failed:', e);
+        showToast('Failed to react: ' + (e.message || 'Unknown error'), 'error');
     }
 }
 
