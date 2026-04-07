@@ -528,6 +528,13 @@ async def test_integration_connection(
 # System Information Endpoints
 # =============================================================================
 
+@router.get("/circuit-breakers")
+async def get_circuit_breaker_status(current_user: User = Depends(require_admin)):
+    """Get status of all external service circuit breakers."""
+    from ion.core.circuit_breaker import get_all_breaker_status
+    return {"breakers": get_all_breaker_status()}
+
+
 @router.get("/system/info")
 async def get_system_info(current_user: User = Depends(require_admin)):
     """Get system information."""

@@ -236,9 +236,68 @@ app.include_router(report_scheduler_router, prefix="/api")
 app.include_router(playbook_action_router, prefix="/api")
 
 
+def _validate_startup_config():
+    """Validate critical configuration at startup. Log warnings for optional issues, raise for fatal ones."""
+    import os
+    warnings = []
+    errors = []
+
+    # Database
+    db_url = os.environ.get("ION_DATABASE_URL", "")
+    if not db_url:
+        warnings.append("ION_DATABASE_URL not set — falling back to SQLite (not recommended for production)")
+
+    # Admin password
+    admin_pw = os.environ.get("ION_ADMIN_PASSWORD", "changeme")
+    if admin_pw in ("changeme", "password", "admin"):
+        warnings.append(f"ION_ADMIN_PASSWORD is set to a weak default ('{admin_pw}') — change it for production")
+
+    # Elasticsearch
+    if os.environ.get("ION_ELASTICSEARCH_ENABLED", "").lower() == "true":
+        es_url = os.environ.get("ION_ELASTICSEARCH_URL", "")
+        if not es_url:
+            errors.append("ION_ELASTICSEARCH_ENABLED=true but ION_ELASTICSEARCH_URL is not set")
+        elif "REPLACE_WITH" in es_url:
+            errors.append(f"ION_ELASTICSEARCH_URL contains placeholder: {es_url}")
+
+    # TIDE
+    if os.environ.get("ION_TIDE_ENABLED", "").lower() == "true":
+        tide_url = os.environ.get("ION_TIDE_URL", "")
+        tide_key = os.environ.get("ION_TIDE_API_KEY", "")
+        if not tide_url:
+            warnings.append("ION_TIDE_ENABLED=true but ION_TIDE_URL is not set")
+        if not tide_key:
+            warnings.append("ION_TIDE_ENABLED=true but ION_TIDE_API_KEY is not set")
+
+    # OpenCTI
+    if os.environ.get("ION_OPENCTI_ENABLED", "").lower() == "true":
+        octi_url = os.environ.get("ION_OPENCTI_URL", "")
+        if not octi_url:
+            warnings.append("ION_OPENCTI_ENABLED=true but ION_OPENCTI_URL is not set")
+
+    # Security
+    if os.environ.get("ION_COOKIE_SECURE", "").lower() != "true":
+        warnings.append("ION_COOKIE_SECURE is not true — session cookies won't have Secure flag")
+    if os.environ.get("ION_DEBUG_MODE", "").lower() == "true":
+        warnings.append("ION_DEBUG_MODE=true — /docs and /redoc are publicly accessible")
+
+    # Log results
+    for w in warnings:
+        logger.warning("CONFIG: %s", w)
+    for e in errors:
+        logger.error("CONFIG FATAL: %s", e)
+
+    if errors:
+        logger.error("Startup blocked by %d configuration error(s). Fix .env and restart.", len(errors))
+        raise SystemExit(1)
+
+    logger.info("Configuration validated: %d warning(s), 0 errors", len(warnings))
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize database on startup."""
+    _validate_startup_config()
     config = get_config()
     if not config.db_path.exists():
         config.db_path.parent.mkdir(parents=True, exist_ok=True)

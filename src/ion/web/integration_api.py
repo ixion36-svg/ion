@@ -25,6 +25,7 @@ from ion.models.integration import (
 )
 from ion.services.connectors import get_connector_registry, ConnectorStatus
 from ion.services.webhook_service import get_webhook_service
+from ion.web.api import limiter
 from ion.services.integration_log_service import get_integration_log_service
 
 router = APIRouter(tags=["integrations"])
@@ -367,7 +368,9 @@ async def delete_webhook(
 
 
 @router.post("/webhooks/{webhook_id}/regenerate-token")
+@limiter.limit("3/minute")
 async def regenerate_webhook_token(
+    request: Request,
     webhook_id: int,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_integration_access),

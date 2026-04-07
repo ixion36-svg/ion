@@ -9,6 +9,7 @@ import logging
 import httpx
 
 from ion.core.config import get_opencti_config, get_ssl_verify
+from ion.core.circuit_breaker import opencti_breaker
 from ion.services.country_mapper import get_country_code, get_country_name, country_code_to_flag
 
 logger = logging.getLogger(__name__)
@@ -92,6 +93,9 @@ class OpenCTIService:
         if not self.is_configured:
             raise OpenCTIError("OpenCTI integration is not configured")
 
+        if not opencti_breaker.can_execute():
+            raise OpenCTIError("OpenCTI circuit breaker OPEN — service temporarily unavailable")
+
         graphql_url = f"{self.url}/graphql"
         payload: Dict[str, Any] = {"query": query}
         if variables:
@@ -105,15 +109,20 @@ class OpenCTIService:
             ) as client:
                 response = await client.post(graphql_url, json=payload)
         except httpx.ConnectError as e:
+            opencti_breaker.record_failure()
             raise OpenCTIError(f"Failed to connect to OpenCTI: {e}")
         except httpx.ReadError as e:
+            opencti_breaker.record_failure()
             raise OpenCTIError(f"Connection error reading from OpenCTI: {e}")
         except httpx.TimeoutException as e:
+            opencti_breaker.record_failure()
             raise OpenCTIError(f"Request to OpenCTI timed out: {e}")
         except httpx.HTTPError as e:
+            opencti_breaker.record_failure()
             raise OpenCTIError(f"HTTP error communicating with OpenCTI: {e}")
 
         if response.status_code >= 400:
+            opencti_breaker.record_failure()
             try:
                 error_data = response.json()
                 error_msg = str(error_data.get("errors", error_data))
@@ -129,6 +138,7 @@ class OpenCTIService:
             msg = "; ".join(e.get("message", str(e)) for e in errors)
             raise OpenCTIError(f"OpenCTI GraphQL error: {msg}")
 
+        opencti_breaker.record_success()
         return result.get("data", {})
 
     async def test_connection(self) -> Dict[str, Any]:

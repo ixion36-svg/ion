@@ -4,7 +4,8 @@ import logging
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from ion.web.api import limiter
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -129,7 +130,9 @@ def list_policies(
     "/escalate",
     dependencies=[Depends(require_permission("alert:read"))],
 )
+@limiter.limit("10/minute")
 def escalate(
+    request: Request,
     body: EscalateRequest,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
