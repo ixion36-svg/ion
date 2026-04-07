@@ -101,6 +101,12 @@ class Config:
     abuseipdb_enabled: bool = False
     abuseipdb_api_key: str = ""  # AbuseIPDB API key
 
+    # TIDE integration
+    tide_enabled: bool = False
+    tide_url: str = ""  # e.g., https://tide.example.com
+    tide_api_key: str = ""  # X-TIDE-API-KEY header value
+    tide_verify_ssl: bool = True
+
     @classmethod
     def from_file(cls, path: Path) -> "Config":
         """Load configuration from a JSON file."""
@@ -188,6 +194,11 @@ class Config:
             # AbuseIPDB integration
             abuseipdb_enabled=data.get("abuseipdb_enabled", False),
             abuseipdb_api_key=data.get("abuseipdb_api_key", ""),
+            # TIDE integration
+            tide_enabled=data.get("tide_enabled", False),
+            tide_url=data.get("tide_url", ""),
+            tide_api_key=data.get("tide_api_key", ""),
+            tide_verify_ssl=data.get("tide_verify_ssl", True),
         )
 
     def to_file(self, path: Path) -> None:
@@ -269,6 +280,11 @@ class Config:
                     # AbuseIPDB integration
                     "abuseipdb_enabled": self.abuseipdb_enabled,
                     "abuseipdb_api_key": self.abuseipdb_api_key,
+                    # TIDE integration
+                    "tide_enabled": self.tide_enabled,
+                    "tide_url": self.tide_url,
+                    "tide_api_key": self.tide_api_key,
+                    "tide_verify_ssl": self.tide_verify_ssl,
                 },
                 f,
                 indent=2,
@@ -433,6 +449,16 @@ def get_config() -> Config:
         if os.environ.get("ION_ABUSEIPDB_API_KEY"):
             _config.abuseipdb_api_key = os.environ.get("ION_ABUSEIPDB_API_KEY", "")
 
+        # TIDE environment overrides
+        if os.environ.get("ION_TIDE_ENABLED"):
+            _config.tide_enabled = _get_env_bool("ION_TIDE_ENABLED")
+        if os.environ.get("ION_TIDE_URL"):
+            _config.tide_url = os.environ.get("ION_TIDE_URL", "")
+        if os.environ.get("ION_TIDE_API_KEY"):
+            _config.tide_api_key = os.environ.get("ION_TIDE_API_KEY", "")
+        if os.environ.get("ION_TIDE_VERIFY_SSL"):
+            _config.tide_verify_ssl = _get_env_bool("ION_TIDE_VERIFY_SSL", True)
+
     return _config
 
 
@@ -565,4 +591,15 @@ def get_dfir_iris_config() -> dict:
         "api_key": config.dfir_iris_api_key,
         "verify_ssl": config.dfir_iris_verify_ssl,
         "default_customer": config.dfir_iris_default_customer,
+    }
+
+
+def get_tide_config() -> dict:
+    """Get TIDE configuration from the global config."""
+    config = get_config()
+    return {
+        "enabled": config.tide_enabled,
+        "url": config.tide_url,
+        "api_key": config.tide_api_key,
+        "verify_ssl": config.tide_verify_ssl,
     }
