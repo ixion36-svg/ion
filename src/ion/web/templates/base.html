@@ -23,53 +23,48 @@
         <ul class="nav-links" id="nav-links">
             <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>
 
-            <!-- Knowledge dropdown -->
-            <li class="nav-dropdown{% if '/templates' in request.url.path or '/documents' in request.url.path or '/notes' in request.url.path or '/training' in request.url.path or '/social' in request.url.path or '/cyab' in request.url.path or '/guide' in request.url.path %} has-active{% endif %}">
-                <a href="/social" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Knowledge <span class="nav-chevron"></span></a>
-                <ul class="nav-dropdown-menu">
-                    <li><a href="/social" class="{% if '/social' in request.url.path %}active{% endif %}">Social Hub</a></li>
-                    <li><a href="/cyab" class="{% if '/cyab' in request.url.path %}active{% endif %}">CyAB</a></li>
-                    <li><a href="/templates" class="{% if '/templates' in request.url.path %}active{% endif %}">Templates</a></li>
-                    <li><a href="/documents" class="{% if '/documents' in request.url.path %}active{% endif %}">Documents</a></li>
-                    <li><a href="/notes" class="{% if '/notes' in request.url.path %}active{% endif %}">Notes</a></li>
-                    <li><a href="/training" class="{% if '/training' in request.url.path %}active{% endif %}">Training</a></li>
-                    <li><a href="/guide" class="{% if '/guide' in request.url.path and '/guide/sim' not in request.url.path %}active{% endif %}">ION Guide</a></li>
-                    <li><a href="/guide/sim" class="{% if '/guide/sim' in request.url.path %}active{% endif %}">Training Sim</a></li>
-                </ul>
-            </li>
-
-            <!-- Analyst dropdown -->
-            <li class="nav-dropdown{% if '/alerts' in request.url.path or '/cases' in request.url.path or '/observables' in request.url.path or '/threat-intel' in request.url.path or '/pcap' in request.url.path or '/analyst' in request.url.path or '/chat' in request.url.path or '/discover' in request.url.path or '/analytics' in request.url.path or '/tools' in request.url.path or '/shift-handover' in request.url.path or '/entity-timeline' in request.url.path or '/analyst-efficiency' in request.url.path or '/attack-stories' in request.url.path or '/oncall' in request.url.path %} has-active{% endif %}">
-                <a href="/analyst" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Analyst <span class="nav-chevron"></span></a>
+            <!-- Investigate dropdown — core investigation workflow -->
+            <li class="nav-dropdown{% if '/alerts' in request.url.path or '/cases' in request.url.path or '/observables' in request.url.path or '/threat-intel' in request.url.path or '/analyst' in request.url.path or '/chat' in request.url.path or '/discover' in request.url.path or '/entity-timeline' in request.url.path or '/attack-stories' in request.url.path or '/tools' in request.url.path %} has-active{% endif %}">
+                <a href="/analyst" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Investigate <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
                     <li><a href="/analyst" class="{% if '/analyst' in request.url.path or '/tools' in request.url.path %}active{% endif %}">SOC Dashboard</a></li>
                     <li><a href="/alerts" class="{% if '/alerts' in request.url.path and '/audit' not in request.url.path %}active{% endif %}">Alerts</a></li>
                     <li><a href="/cases" class="{% if '/cases' in request.url.path %}active{% endif %}">Cases</a></li>
                     <li><a href="/observables" class="{% if '/observables' in request.url.path %}active{% endif %}">Observables</a></li>
                     <li><a href="/threat-intel" class="{% if '/threat-intel' in request.url.path %}active{% endif %}">Threat Intel</a></li>
-                    <li><a href="/pcap" class="{% if '/pcap' in request.url.path %}active{% endif %}">PCAP</a></li>
-                    <li><a href="/chat" class="{% if '/chat' in request.url.path %}active{% endif %}">AI Chat</a></li>
-                    <li><a href="/discover" class="{% if '/discover' in request.url.path %}active{% endif %}">Discover</a></li>
-                    <li><a href="/analytics" class="{% if '/analytics' in request.url.path %}active{% endif %}">Analytics</a></li>
                     <li><a href="/entity-timeline" class="{% if '/entity-timeline' in request.url.path %}active{% endif %}">Entity Timeline</a></li>
                     <li><a href="/attack-stories" class="{% if '/attack-stories' in request.url.path %}active{% endif %}">Attack Stories</a></li>
-                    <li><a href="/analyst-efficiency" class="{% if '/analyst-efficiency' in request.url.path %}active{% endif %}">Analyst Efficiency</a></li>
-                    <li><a href="/oncall" class="{% if '/oncall' in request.url.path %}active{% endif %}">On-Call / Duty IM</a></li>
-                    <li><a href="/shift-handover" class="{% if '/shift-handover' in request.url.path %}active{% endif %}">Shift Handover</a></li>
+                    <li><a href="/discover" class="{% if '/discover' in request.url.path %}active{% endif %}">Discover</a></li>
+                    <li><a href="/chat" class="{% if '/chat' in request.url.path %}active{% endif %}">AI Chat</a></li>
                 </ul>
             </li>
 
-            <!-- Engineering dropdown -->
-            <li class="nav-dropdown{% if '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path or '/engineering-analytics' in request.url.path or '/data-flow' in request.url.path or '/detection-engineering' in request.url.path or '/rule-tuning' in request.url.path or '/soc-health' in request.url.path or '/executive-report' in request.url.path or '/service-accounts' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
-                <a href="/topology" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Engineering <span class="nav-chevron"></span></a>
+            <!-- Operations dropdown — day-to-day SOC operations -->
+            <li class="nav-dropdown{% if '/oncall' in request.url.path or '/shift-handover' in request.url.path or '/playbooks' in request.url.path or '/forensics' in request.url.path or '/pcap' in request.url.path or '/analyst-efficiency' in request.url.path or '/analytics' in request.url.path %} has-active{% endif %}">
+                <a href="/oncall" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Operations <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
-                    <li id="nav-topology-link" style="display: none;"><a href="/topology" class="{% if '/topology' in request.url.path %}active{% endif %}">Topology</a></li>
-                    <li id="nav-architecture-link" style="display: none;"><a href="/architecture" class="{% if '/architecture' in request.url.path %}active{% endif %}">Architecture</a></li>
+                    <li><a href="/oncall" class="{% if '/oncall' in request.url.path %}active{% endif %}">On-Call / Duty IM</a></li>
+                    <li><a href="/shift-handover" class="{% if '/shift-handover' in request.url.path %}active{% endif %}">Shift Handover</a></li>
+                    <li><a href="/playbooks" class="{% if '/playbooks' in request.url.path %}active{% endif %}">Playbooks</a></li>
+                    <li id="nav-forensics-link" style="display: none;"><a href="/forensics" class="{% if '/forensics' in request.url.path %}active{% endif %}">Forensics</a></li>
+                    <li><a href="/pcap" class="{% if '/pcap' in request.url.path %}active{% endif %}">PCAP Analyzer</a></li>
+                    <li><a href="/analyst-efficiency" class="{% if '/analyst-efficiency' in request.url.path %}active{% endif %}">Analyst Efficiency</a></li>
+                    <li><a href="/analytics" class="{% if '/analytics' in request.url.path %}active{% endif %}">Analytics Engine</a></li>
+                </ul>
+            </li>
+
+            <!-- Engineering dropdown — detection, reporting, infrastructure -->
+            <li class="nav-dropdown{% if '/detection-engineering' in request.url.path or '/rule-tuning' in request.url.path or '/soc-health' in request.url.path or '/executive-report' in request.url.path or '/service-accounts' in request.url.path or '/cyab' in request.url.path or '/data-flow' in request.url.path or '/engineering-analytics' in request.url.path or '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
+                <a href="/detection-engineering" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Engineering <span class="nav-chevron"></span></a>
+                <ul class="nav-dropdown-menu">
                     <li><a href="/detection-engineering" class="{% if '/detection-engineering' in request.url.path %}active{% endif %}">Detection Engineering</a></li>
                     <li><a href="/rule-tuning" class="{% if '/rule-tuning' in request.url.path %}active{% endif %}">Rule Tuning</a></li>
                     <li><a href="/soc-health" class="{% if '/soc-health' in request.url.path %}active{% endif %}">SOC Health</a></li>
                     <li><a href="/executive-report" class="{% if '/executive-report' in request.url.path %}active{% endif %}">Executive Report</a></li>
                     <li><a href="/service-accounts" class="{% if '/service-accounts' in request.url.path %}active{% endif %}">Service Accounts</a></li>
+                    <li><a href="/cyab" class="{% if '/cyab' in request.url.path %}active{% endif %}">CyAB</a></li>
+                    <li id="nav-topology-link" style="display: none;"><a href="/topology" class="{% if '/topology' in request.url.path %}active{% endif %}">Topology</a></li>
+                    <li id="nav-architecture-link" style="display: none;"><a href="/architecture" class="{% if '/architecture' in request.url.path %}active{% endif %}">Architecture</a></li>
                     <li><a href="/data-flow" class="{% if '/data-flow' in request.url.path %}active{% endif %}">Data Flow</a></li>
                     <li><a href="/engineering-analytics" class="{% if '/engineering-analytics' in request.url.path %}active{% endif %}">System Analytics</a></li>
                     <li><a href="/gitlab" class="{% if '/gitlab' in request.url.path %}active{% endif %}">GitLab</a></li>
@@ -80,12 +75,17 @@
                 </ul>
             </li>
 
-            <!-- DFIR dropdown -->
-            <li class="nav-dropdown{% if '/forensics' in request.url.path or '/playbooks' in request.url.path %} has-active{% endif %}" id="nav-group-dfir">
-                <a href="/forensics" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">DFIR <span class="nav-chevron"></span></a>
+            <!-- Knowledge dropdown — learning, training, documentation -->
+            <li class="nav-dropdown{% if '/social' in request.url.path or '/training' in request.url.path or '/guide' in request.url.path or '/notes' in request.url.path or '/templates' in request.url.path or '/documents' in request.url.path %} has-active{% endif %}">
+                <a href="/social" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Knowledge <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
-                    <li id="nav-forensics-link" style="display: none;"><a href="/forensics" class="{% if '/forensics' in request.url.path %}active{% endif %}">Forensics</a></li>
-                    <li><a href="/playbooks" class="{% if '/playbooks' in request.url.path %}active{% endif %}">Playbooks</a></li>
+                    <li><a href="/social" class="{% if '/social' in request.url.path %}active{% endif %}">Social Hub</a></li>
+                    <li><a href="/guide" class="{% if '/guide' in request.url.path and '/guide/sim' not in request.url.path %}active{% endif %}">ION Guide</a></li>
+                    <li><a href="/guide/sim" class="{% if '/guide/sim' in request.url.path %}active{% endif %}">Training Sim</a></li>
+                    <li><a href="/training" class="{% if '/training' in request.url.path %}active{% endif %}">Skills & Training</a></li>
+                    <li><a href="/notes" class="{% if '/notes' in request.url.path %}active{% endif %}">Notes</a></li>
+                    <li><a href="/templates" class="{% if '/templates' in request.url.path %}active{% endif %}">Templates</a></li>
+                    <li><a href="/documents" class="{% if '/documents' in request.url.path %}active{% endif %}">Documents</a></li>
                 </ul>
             </li>
 
