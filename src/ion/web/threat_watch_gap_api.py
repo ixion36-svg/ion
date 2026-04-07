@@ -97,7 +97,7 @@ async def _check_watch_gaps(session: Session) -> dict:
 
 @router.get("/check")
 async def check_gaps(
-    current_user: User = Depends(require_permission("threat_intel:read")),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     result = await _check_watch_gaps(session)
@@ -113,7 +113,7 @@ async def check_gaps(
 @router.post("/check-and-notify")
 async def check_and_notify(
     body: Optional[CheckAndNotifyRequest] = None,
-    current_user: User = Depends(require_permission("threat_intel:read")),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     min_gap_count = body.min_gap_count if body else 1
