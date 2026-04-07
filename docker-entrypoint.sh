@@ -73,23 +73,31 @@ if not url:
     print('Set it in docker-compose.yml environment or .env file')
     exit(1)
 
-# Extract host from URL for DNS check
-try:
-    host = url.split('@')[1].split(':')[0].split('/')[0]
-    print(f'  Resolving host: {host}')
-    ip = socket.gethostbyname(host)
-    print(f'  Resolved to: {ip}')
-except socket.gaierror:
-    print(f'ERROR: Cannot resolve hostname from DATABASE_URL')
-    print(f'  Make sure PostgreSQL container is running and on the same Docker network')
-    print(f'  Run: docker compose up -d postgres')
-    exit(1)
-except Exception:
-    pass
+# Extract host from URL for DNS + connectivity check
+host = url.split('@')[1].split(':')[0].split('/')[0]
 
 from sqlalchemy import create_engine, text
 
 for attempt in range(30):
+    # Check DNS first — Docker DNS may not be ready on cold start
+    try:
+        ip = socket.gethostbyname(host)
+        if attempt == 0:
+            print(f'  Resolving host: {host}')
+            print(f'  Resolved to: {ip}')
+    except socket.gaierror:
+        if attempt == 0:
+            print(f'  Waiting for DNS resolution of: {host}')
+        if attempt < 29:
+            time.sleep(2)
+            continue
+        else:
+            print(f'ERROR: Cannot resolve hostname \"{host}\" after 60s')
+            print(f'  Make sure PostgreSQL container is running and on the same Docker network')
+            print(f'  Run: docker compose up -d postgres')
+            exit(1)
+
+    # DNS resolved — try connecting
     try:
         engine = create_engine(url)
         with engine.connect() as conn:
