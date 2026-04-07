@@ -31,6 +31,9 @@ services:
       start_period: 10s
       retries: 5
 
+    networks:
+      - ion-net
+
     # Security hardening
     security_opt:
       - no-new-privileges:true
@@ -81,6 +84,9 @@ services:
       - ION_OLLAMA_URL=http://ollama:11434
       # Optional: Trust a self-signed CA for OpenCTI, ES, Keycloak, etc.
       # - ION_CA_BUNDLE=/etc/ssl/certs/custom-ca.pem
+
+    networks:
+      - ion-net
 
     # Security hardening
     security_opt:
@@ -178,10 +184,16 @@ services:
       - .env
     environment:
       - ION_SEED_URL=http://ion:8000
+    networks:
+      - ion-net
     depends_on:
       ion:
         condition: service_healthy
     restart: "no"
+
+networks:
+  ion-net:
+    driver: bridge
 
 volumes:
   postgres-data:

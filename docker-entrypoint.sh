@@ -63,11 +63,32 @@ fi
 # Wait for PostgreSQL
 # =============================================================================
 echo "Waiting for database..."
+echo "  URL: ${ION_DATABASE_URL%@*}@***"
 python -c "
-import time, os
+import time, os, socket
+
+url = os.environ.get('ION_DATABASE_URL', '')
+if not url:
+    print('ERROR: ION_DATABASE_URL is not set')
+    print('Set it in docker-compose.yml environment or .env file')
+    exit(1)
+
+# Extract host from URL for DNS check
+try:
+    host = url.split('@')[1].split(':')[0].split('/')[0]
+    print(f'  Resolving host: {host}')
+    ip = socket.gethostbyname(host)
+    print(f'  Resolved to: {ip}')
+except socket.gaierror:
+    print(f'ERROR: Cannot resolve hostname from DATABASE_URL')
+    print(f'  Make sure PostgreSQL container is running and on the same Docker network')
+    print(f'  Run: docker compose up -d postgres')
+    exit(1)
+except Exception:
+    pass
+
 from sqlalchemy import create_engine, text
 
-url = os.environ['ION_DATABASE_URL']
 for attempt in range(30):
     try:
         engine = create_engine(url)
@@ -80,6 +101,7 @@ for attempt in range(30):
             time.sleep(2)
         else:
             print(f'Database not ready after 60s: {e}')
+            print('Check that PostgreSQL is running: docker compose ps postgres')
             raise
 "
 

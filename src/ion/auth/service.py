@@ -736,12 +736,15 @@ class AuthService:
 
         password_hash = password_hasher.hash(password)
 
+        # Only force password change if using the default password
+        force_change = password in ("changeme", "admin", "password")
+
         user = self.user_repo.create(
             username=username,
             email=email,
             password_hash=password_hash,
             display_name="Administrator",
-            must_change_password=True,
+            must_change_password=force_change,
         )
 
         if admin_role:
