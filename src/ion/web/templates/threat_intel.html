@@ -160,8 +160,8 @@
     <div class="ti-panel" id="panel-watchlist">
         <h3 style="font-size:.95rem;margin:0 0 16px;">Active Watches</h3>
         <table class="ti-table" id="watchlist-table">
-            <thead><tr><th>Name</th><th>Type</th><th>Matches</th><th>Last Match</th><th>Watched By</th><th>Reason</th><th>Actions</th></tr></thead>
-            <tbody id="watchlist-body"><tr><td colspan="7" class="ti-empty">Loading...</td></tr></tbody>
+            <thead><tr><th>Name</th><th>Origin</th><th>Type</th><th>Matches</th><th>Last Match</th><th>Watched By</th><th>Reason</th><th>Actions</th></tr></thead>
+            <tbody id="watchlist-body"><tr><td colspan="8" class="ti-empty">Loading...</td></tr></tbody>
         </table>
 
         <h3 style="font-size:.95rem;margin:24px 0 12px;">
@@ -274,7 +274,7 @@
             // Refresh watched IDs
             await refreshWatchedIds();
 
-            let html = '<table class="ti-table"><thead><tr><th>Name</th><th>Types</th><th>Aliases</th><th>Confidence</th><th>First Seen</th><th>Last Seen</th><th>Labels</th><th>Watch</th></tr></thead><tbody>';
+            let html = '<table class="ti-table"><thead><tr><th>Name</th><th>Origin</th><th>Types</th><th>Aliases</th><th>Confidence</th><th>First Seen</th><th>Last Seen</th><th>Labels</th><th>Watch</th></tr></thead><tbody>';
             actors.forEach((a, idx) => {
                 const aliases = (a.aliases || []).slice(0, 3).join(', ');
                 const moreAliases = (a.aliases || []).length > 3 ? ` +${a.aliases.length - 3}` : '';
@@ -282,12 +282,15 @@
                 const types = (a.threat_actor_types || []).map(t => t === 'intrusion-set' ? 'Intrusion Set' : t).join(', ') || '-';
                 const conf = a.confidence != null ? a.confidence : '-';
                 const confCls = conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low';
+                const flag = a.country_flag || '';
+                const countryName = a.country_name || '';
                 const isWatched = watchedIds.has(a.id);
                 const watchBtn = isWatched
                     ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
                     : `<button class="ti-btn ti-btn-sm ti-btn-watch" onclick="watchActor(${idx})">Watch</button>`;
                 html += `<tr>
                     <td class="ti-name-cell" onclick="toggleActorDetail(${idx})">${esc(a.name)}</td>
+                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span style="color:var(--text-muted)">-</span>'}</td>
                     <td>${esc(types)}</td>
                     <td>${esc(aliases)}${moreAliases ? `<span style="color:var(--text-secondary)">${moreAliases}</span>` : ''}</td>
                     <td><span class="ti-confidence ${confCls}">${conf}</span></td>
@@ -296,7 +299,7 @@
                     <td>${labels || '-'}</td>
                     <td>${watchBtn}</td>
                 </tr>`;
-                html += `<tr class="ti-detail-row" id="actor-detail-${idx}"><td colspan="8"><div class="ti-loading"><span class="ti-spinner"></span> Loading detail...</div></td></tr>`;
+                html += `<tr class="ti-detail-row" id="actor-detail-${idx}"><td colspan="9"><div class="ti-loading"><span class="ti-spinner"></span> Loading detail...</div></td></tr>`;
             });
             html += '</tbody></table>';
             container.innerHTML = html;
@@ -319,7 +322,7 @@
         try {
             const ec = a.entity_class || 'threat_actor';
             const detail = await fetch(API + '/actors/' + encodeURIComponent(a.id) + '?entity_class=' + ec).then(r => r.json());
-            let html = '<td colspan="8">';
+            let html = '<td colspan="9">';
 
             if (detail.description) {
                 html += `<div class="ti-detail-section"><h4>Description</h4><p>${esc(detail.description)}</p></div>`;
@@ -348,7 +351,7 @@
             html += '</td>';
             row.innerHTML = html;
         } catch(e) {
-            row.innerHTML = `<td colspan="8"><div class="ti-empty">Failed to load detail.</div></td>`;
+            row.innerHTML = `<td colspan="9"><div class="ti-empty">Failed to load detail.</div></td>`;
         }
     };
 
@@ -498,14 +501,17 @@
             const watches = data.watches || [];
             const tbody = document.getElementById('watchlist-body');
             if (!watches.length) {
-                tbody.innerHTML = '<tr><td colspan="7" class="ti-empty">No active watches. Search for actors or campaigns and add them.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="ti-empty">No active watches. Search for actors or campaigns and add them.</td></tr>';
                 return;
             }
             tbody.innerHTML = watches.map(w => {
                 const type = (w.entity_type || '').replace('_', ' ');
                 const lastSeen = w.last_seen_at ? new Date(w.last_seen_at).toLocaleString() : 'Never';
+                const flag = w.country_flag || '';
+                const countryName = w.country_name || '';
                 return `<tr>
                     <td style="font-weight:600">${esc(w.name)}</td>
+                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span style="color:var(--text-muted)">-</span>'}</td>
                     <td>${esc(type)}</td>
                     <td>${w.match_count}</td>
                     <td>${esc(lastSeen)}</td>
@@ -515,7 +521,7 @@
                 </tr>`;
             }).join('');
         } catch(e) {
-            document.getElementById('watchlist-body').innerHTML = '<tr><td colspan="7" class="ti-empty">Failed to load watches.</td></tr>';
+            document.getElementById('watchlist-body').innerHTML = '<tr><td colspan="8" class="ti-empty">Failed to load watches.</td></tr>';
         }
     }
 

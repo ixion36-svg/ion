@@ -337,7 +337,7 @@
         if ((d.findings || []).length > 0) {
             fb.style.display = 'inline';
             fb.textContent = d.findings.length;
-            fb.style.cssText = 'display:inline;background:#f85149;color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+            fb.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         } else {
             fb.style.display = 'none';
         }
@@ -493,7 +493,7 @@
         tab.style.display = '';
         const statusClass = s => s.toLowerCase().replace(/\s+/g, '-');
         let rows = items.map(s => {
-            const errStr = (s.errors || []).length ? `<br><span style="color:#f85149;font-size:.75rem">${s.errors.map(esc).join(', ')}</span>` : '';
+            const errStr = (s.errors || []).length ? `<br><span style="color:var(--sev-critical);font-size:.75rem">${s.errors.map(esc).join(', ')}</span>` : '';
             return `<tr>
                 <td><span class="ike-status ${statusClass(s.status)}">${esc(s.status)}</span>${errStr}</td>
                 <td style="font-family:monospace;font-size:.75rem" title="Init: ${esc(s.init_spi)}">${esc(s.initiator || '-')}</td>
@@ -570,16 +570,16 @@
         if (ti.malicious_count > 0) {
             badge.style.display = 'inline';
             badge.textContent = ti.malicious_count;
-            badge.style.cssText = 'display:inline;background:#f85149;color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+            badge.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         }
 
-        const threatColors = { unknown: '#8b949e', benign: '#3fb950', low: '#58a6ff', medium: '#d29922', high: '#f0883e', critical: '#f85149' };
+        const threatColors = { unknown: 'var(--sev-low)', benign: 'var(--mitre-covered)', low: 'var(--info)', medium: 'var(--sev-medium)', high: 'var(--sev-high)', critical: 'var(--sev-critical)' };
 
         let html = `<div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:.85rem;color:var(--text-secondary)">
             <span>IPs checked: <strong>${ti.ips_checked}</strong></span>
             <span>Domains checked: <strong>${ti.domains_checked}</strong></span>
             <span>Total observables: <strong>${ti.total}</strong></span>
-            <span style="color:${ti.malicious_count ? '#f85149' : '#3fb950'}">Malicious hits: <strong>${ti.malicious_count}</strong></span>
+            <span style="color:${ti.malicious_count ? 'var(--sev-critical)' : 'var(--mitre-covered)'}">Malicious hits: <strong>${ti.malicious_count}</strong></span>
         </div>`;
 
         html += '<table class="pcap-table"><thead><tr><th>Type</th><th>Value</th><th>Threat Level</th><th>Score</th><th>Labels</th><th>Threat Actors</th></tr></thead><tbody>';

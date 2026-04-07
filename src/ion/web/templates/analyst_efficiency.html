@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Analyst Efficiency - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-bar-chart-2"></i> Analyst Efficiency Dashboard</h1>
+    <div class="header-actions">
+        <select id="ae-hours" onchange="aeLoad()">
+            <option value="24">Last 24h</option>
+            <option value="72">Last 3 days</option>
+            <option value="168" selected>Last 7 days</option>
+            <option value="336">Last 14 days</option>
+            <option value="720">Last 30 days</option>
+        </select>
+        <button class="btn btn-primary" onclick="aeLoad()">Refresh</button>
+    </div>
+</div>
+
+<div id="ae-content"><div class="ae-loading"><span class="ae-spinner"></span> Loading metrics...</div></div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.ae-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.ae-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:ae-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes ae-spin{to{transform:rotate(360deg)}}
+
+.ae-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.ae-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center;position:relative;overflow:hidden}
+.ae-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary)}
+.ae-stat-val{font-size:1.5rem;font-weight:700;color:var(--primary);font-family:'JetBrains Mono',monospace}
+.ae-stat-label{font-size:.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.ae-stat.crit .ae-stat-val{color:var(--sev-critical)}.ae-stat.crit::before{background:var(--sev-critical)}
+.ae-stat.green .ae-stat-val{color:var(--mitre-covered)}.ae-stat.green::before{background:var(--mitre-covered)}
+.ae-stat.warn .ae-stat-val{color:var(--sev-medium)}.ae-stat.warn::before{background:var(--sev-medium)}
+
+.ae-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
+.ae-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.ae-section-title i{color:var(--primary)}
+
+.ae-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.ae-table th{text-align:left;padding:8px 10px;color:var(--text-secondary);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);cursor:pointer}
+.ae-table th:hover{color:var(--text-primary)}
+.ae-table td{padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.15);color:var(--text-primary)}
+.ae-table tr:hover td{background:rgba(0,212,255,.03)}
+.mono{font-family:'JetBrains Mono',monospace;font-size:.78rem}
+
+.ae-bar{display:inline-flex;height:12px;border-radius:3px;overflow:hidden;background:rgba(99,110,123,.2);min-width:60px;vertical-align:middle}
+.ae-bar-fill{height:100%;border-radius:3px}
+
+.ae-activity-chart{display:flex;align-items:flex-end;gap:2px;height:80px;padding:8px 0}
+.ae-activity-bar{flex:1;min-width:3px;border-radius:2px 2px 0 0;background:var(--primary);opacity:.7;position:relative}
+.ae-activity-bar:hover{opacity:1}
+.ae-activity-bar .tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);padding:3px 8px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;font-size:.68rem;white-space:nowrap;z-index:10}
+.ae-activity-bar:hover .tip{display:block}
+</style>
+<script>
+const API = '/api/analyst-efficiency';
+function $(id){return document.getElementById(id)}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+async function aeLoad(){
+    const hours = $('ae-hours').value;
+    $('ae-content').innerHTML = '<div class="ae-loading"><span class="ae-spinner"></span> Loading metrics...</div>';
+    try {
+        const r = await fetch(API+'/metrics?hours='+hours);
+        if(!r.ok) throw new Error('Failed');
+        renderEfficiency(await r.json());
+    } catch(e) {
+        $('ae-content').innerHTML = `<div class="ae-loading" style="color:var(--sev-critical)">${esc(e.message)}</div>`;
+    }
+}
+
+function renderEfficiency(d) {
+    const s = d.team_summary || {};
+    let html = '';
+
+    // Team summary stats
+    html += '<div class="ae-stats">';
+    html += aeStat(s.total_cases_closed || 0, 'Cases Closed', 'green');
+    html += aeStat(s.total_cases_opened || 0, 'Cases Opened', '');
+    html += aeStat(s.total_alerts_triaged || 0, 'Alerts Triaged', '');
+    html += aeStat(s.overall_fp_rate != null ? s.overall_fp_rate + '%' : '-', 'FP Rate', s.overall_fp_rate > 50 ? 'crit' : s.overall_fp_rate > 30 ? 'warn' : 'green');
+    html += aeStat(s.avg_mttr_hours != null ? s.avg_mttr_hours + 'h' : '-', 'Avg MTTR', '');
+    html += aeStat(esc(s.busiest_analyst || '-'), 'Busiest Analyst', '');
+    html += aeStat(esc(s.most_efficient || '-'), 'Most Efficient', 'green');
+    html += '</div>';
+
+    // Hourly activity chart
+    const hourly = d.hourly_activity || [];
+    if (hourly.length) {
+        html += '<div class="ae-section"><div class="ae-section-title"><i class="icon-activity"></i> Activity Timeline (Last 24h)</div>';
+        const maxVal = Math.max(...hourly.map(h => (h.cases_closed||0) + (h.alerts_triaged||0)), 1);
+        html += '<div class="ae-activity-chart">';
+        for (const h of hourly) {
+            const val = (h.cases_closed||0) + (h.alerts_triaged||0);
+            const pct = Math.max(val / maxVal * 100, 2);
+            const time = new Date(h.hour).toLocaleTimeString(undefined, {hour:'2-digit', minute:'2-digit'});
+            html += `<div class="ae-activity-bar" style="height:${pct}%"><div class="tip">${time}: ${val} actions</div></div>`;
+        }
+        html += '</div></div>';
+    }
+
+    // Per-analyst table
+    const analysts = d.analysts || [];
+    if (analysts.length) {
+        html += '<div class="ae-section"><div class="ae-section-title"><i class="icon-users"></i> Per-Analyst Breakdown</div>';
+        html += '<table class="ae-table"><thead><tr><th>Analyst</th><th>Cases Closed</th><th>Cases Opened</th><th>Alerts Triaged</th><th>True Positives</th><th>False Positives</th><th>FP Rate</th><th>Avg MTTR</th><th>Total Actions</th></tr></thead><tbody>';
+        for (const a of analysts) {
+            const fpColor = a.fp_rate > 50 ? 'var(--sev-critical)' : a.fp_rate > 30 ? 'var(--sev-medium)' : 'var(--text-primary)';
+            html += `<tr>
+                <td style="font-weight:600">${esc(a.username)}</td>
+                <td class="mono">${a.cases_closed}</td>
+                <td class="mono">${a.cases_opened}</td>
+                <td class="mono">${a.alerts_triaged}</td>
+                <td class="mono" style="color:var(--mitre-covered)">${a.true_positives}</td>
+                <td class="mono" style="color:var(--sev-critical)">${a.false_positives}</td>
+                <td class="mono" style="color:${fpColor}">${a.fp_rate}%</td>
+                <td class="mono">${a.avg_mttr_hours != null ? a.avg_mttr_hours + 'h' : '-'}</td>
+                <td class="mono">${a.total_actions}</td>
+            </tr>`;
+        }
+        html += '</tbody></table></div>';
+    } else {
+        html += '<div class="ae-section"><div style="text-align:center;color:var(--text-secondary);padding:20px">No analyst activity in this period.</div></div>';
+    }
+
+    $('ae-content').innerHTML = html;
+}
+
+function aeStat(val, label, cls) {
+    return `<div class="ae-stat ${cls}"><div class="ae-stat-val">${val}</div><div class="ae-stat-label">${label}</div></div>`;
+}
+
+document.addEventListener('DOMContentLoaded', aeLoad);
+</script>
+{% endblock %}

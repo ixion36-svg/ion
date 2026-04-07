@@ -2481,7 +2481,7 @@ async function loadSystemLogs() {
         countEl.textContent = `Showing ${data.logs.length} entries (newest first)`;
 
     } catch (error) {
-        container.innerHTML = `<div style="padding:1rem;color:#f85149;">Failed to load logs: ${escapeHtml(error.message)}</div>`;
+        container.innerHTML = `<div style="padding:1rem;color:var(--sev-critical);">Failed to load logs: ${escapeHtml(error.message)}</div>`;
         countEl.textContent = '';
     }
 

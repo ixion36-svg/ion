@@ -26,11 +26,17 @@ from ion.web.notes_api import router as notes_router
 from ion.web.pcap_api import router as pcap_router
 from ion.web.forensics_api import router as forensics_router
 from ion.web.threat_intel_api import router as threat_intel_router
+from ion.web.threat_watch_gap_api import router as threat_watch_gap_router
 from ion.web.notification_api import router as notification_router
 from ion.web.cyab_api import router as cyab_router
 from ion.web.social_api import router as social_router
 from ion.web.analytics_api import router as analytics_router
 from ion.web.engineering_analytics_api import router as engineering_analytics_router
+from ion.web.shift_handover_api import router as shift_handover_router
+from ion.web.rule_tuning_api import router as rule_tuning_router
+from ion.web.entity_timeline_api import router as entity_timeline_router
+from ion.web.analyst_efficiency_api import router as analyst_efficiency_router
+from ion.web.soc_health_api import router as soc_health_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -178,6 +184,12 @@ app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(engineering_analytics_router, prefix="/api/engineering/analytics")
 app.include_router(cyab_router, prefix="/api/cyab")
 app.include_router(threat_intel_router, prefix="/api/threat-intel")
+app.include_router(threat_watch_gap_router, prefix="/api/threat-intel")
+app.include_router(shift_handover_router, prefix="/api")
+app.include_router(rule_tuning_router, prefix="/api")
+app.include_router(entity_timeline_router, prefix="/api")
+app.include_router(analyst_efficiency_router, prefix="/api")
+app.include_router(soc_health_router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -589,6 +601,42 @@ async def social_page(request: Request, user: User = Depends(require_page_auth))
 async def engineering_analytics_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the Engineering System Analytics page."""
     return templates.TemplateResponse(request=request, name="engineering_analytics.html")
+
+
+@app.get("/detection-engineering", response_class=HTMLResponse)
+async def detection_engineering_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Detection Engineering page (TIDE-powered)."""
+    return templates.TemplateResponse(request=request, name="detection_engineering.html")
+
+
+@app.get("/shift-handover", response_class=HTMLResponse)
+async def shift_handover_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Shift Handover Report page."""
+    return templates.TemplateResponse(request=request, name="shift_handover.html")
+
+
+@app.get("/rule-tuning", response_class=HTMLResponse)
+async def rule_tuning_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Rule Tuning Feedback Loop page."""
+    return templates.TemplateResponse(request=request, name="rule_tuning.html")
+
+
+@app.get("/entity-timeline", response_class=HTMLResponse)
+async def entity_timeline_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Entity Timeline page."""
+    return templates.TemplateResponse(request=request, name="entity_timeline.html")
+
+
+@app.get("/analyst-efficiency", response_class=HTMLResponse)
+async def analyst_efficiency_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Analyst Efficiency Dashboard page."""
+    return templates.TemplateResponse(request=request, name="analyst_efficiency.html")
+
+
+@app.get("/soc-health", response_class=HTMLResponse)
+async def soc_health_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the SOC Health Scorecard page."""
+    return templates.TemplateResponse(request=request, name="soc_health.html")
 
 
 @app.get("/topology", response_class=HTMLResponse)

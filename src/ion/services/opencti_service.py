@@ -9,6 +9,7 @@ import logging
 import httpx
 
 from ion.core.config import get_opencti_config, get_ssl_verify
+from ion.services.country_mapper import get_country_code, get_country_name, country_code_to_flag
 
 logger = logging.getLogger(__name__)
 
@@ -601,6 +602,13 @@ class OpenCTIService:
                     for l in (node.get("objectLabel") or [])
                 ],
             })
+
+        # Enrich with country attribution
+        for actor in actors:
+            code = get_country_code(actor.get("name", ""), actor.get("aliases"))
+            actor["country_code"] = code
+            actor["country_name"] = get_country_name(code)
+            actor["country_flag"] = country_code_to_flag(code)
 
         # Sort by name
         actors.sort(key=lambda a: (a.get("name") or "").lower())

@@ -12,6 +12,7 @@ from ion.auth.dependencies import get_db_session, require_permission
 from ion.models.user import User
 from ion.services.opencti_service import get_opencti_service, OpenCTIError
 from ion.services.threat_intel_service import ThreatIntelService
+from ion.services.country_mapper import get_country_code, get_country_name, country_code_to_flag
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ def _watch_to_dict(w) -> dict:
             labels = json.loads(w.labels)
         except (json.JSONDecodeError, TypeError):
             labels = []
+    code = get_country_code(w.name, aliases)
     return {
         "id": w.id,
         "entity_type": w.entity_type,
@@ -53,6 +55,9 @@ def _watch_to_dict(w) -> dict:
         "description": w.description,
         "aliases": aliases,
         "labels": labels,
+        "country_code": code,
+        "country_name": get_country_name(code),
+        "country_flag": country_code_to_flag(code),
         "last_seen_at": w.last_seen_at.isoformat() if w.last_seen_at else None,
         "match_count": w.match_count,
         "watched_by": w.watched_by,

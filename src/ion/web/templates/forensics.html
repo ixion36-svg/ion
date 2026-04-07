@@ -797,7 +797,7 @@ function fmtLabel(s){return s?s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCa
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function fmtDate(iso){if(!iso)return'-';const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
 function fmtDateTime(iso){if(!iso)return'-';const d=new Date(iso);return fmtDate(iso)+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
-function showToast(msg,err){const d=document.createElement('div');d.textContent=msg;d.style.cssText='position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;z-index:9999;font-size:.9rem;color:#fff;background:'+(err?'#f85149':'#3fb950');document.body.appendChild(d);setTimeout(()=>d.remove(),3000)}
+function showToast(msg,err){const d=document.createElement('div');d.textContent=msg;d.style.cssText='position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;z-index:9999;font-size:.9rem;color:#fff;background:'+(err?'var(--sev-critical)':'var(--mitre-covered)');document.body.appendChild(d);setTimeout(()=>d.remove(),3000)}
 function closeModal(id){document.getElementById(id).style.display='none'}
 function debouncedFilter(){clearTimeout(filterTimeout);filterTimeout=setTimeout(()=>renderCasesTable(),300)}
 
@@ -856,7 +856,7 @@ async function loadCases(){
 function stepProgress(c) {
     if (!c.step_count) return '';
     const pct = c.step_count > 0 ? Math.round((c.steps_completed / c.step_count) * 100) : 0;
-    const color = pct === 100 ? '#3fb950' : pct > 0 ? '#00e5ff' : '#6e7681';
+    const color = pct === 100 ? 'var(--mitre-covered)' : pct > 0 ? 'var(--primary)' : '#6e7681';
     return `<div style="display:flex;align-items:center;gap:6px;" title="${c.steps_completed}/${c.step_count} sections">
         <div style="flex:1;background:var(--border-color,#30363d);border-radius:3px;height:4px;min-width:40px;overflow:hidden;">
             <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;"></div>
@@ -960,7 +960,7 @@ function renderCaseDetail(c){
         document.getElementById('cd-progress-label').textContent = `Sections: ${done}/${steps.length} complete`;
         document.getElementById('cd-progress-pct').textContent = pct + '%';
         document.getElementById('cd-progress-fill').style.width = pct + '%';
-        document.getElementById('cd-progress-fill').style.background = pct === 100 ? '#3fb950' : 'var(--accent,#00e5ff)';
+        document.getElementById('cd-progress-fill').style.background = pct === 100 ? 'var(--mitre-covered)' : 'var(--accent,#00e5ff)';
     } else { progBar.style.display = 'none'; }
     // Render sections, timeline, evidence
     renderSections(steps);
@@ -1092,11 +1092,11 @@ function renderSections(steps) {
                 <div class="section-card-actions">
                     <button class="btn btn-primary" style="padding:6px 16px;" onclick="saveSection(${s.id})">Save</button>
                     ${!s.is_completed
-                        ? '<button class="btn btn-secondary" style="padding:6px 16px;color:#3fb950;" onclick="completeSection('+s.id+')">Mark Complete</button>'
+                        ? '<button class="btn btn-secondary" style="padding:6px 16px;color:var(--mitre-covered);" onclick="completeSection('+s.id+')">Mark Complete</button>'
                         : '<button class="btn btn-secondary" style="padding:6px 16px;color:#f0c000;" onclick="reopenSection('+s.id+')">Reopen</button>'
                     }
                     <button class="btn-extract-ioc" onclick="showIOCExtractModal(${s.id})">&#128269; Extract IOCs</button>
-                    ${!s.playbook_step_id ? '<button class="btn btn-secondary" style="padding:6px 16px;color:#f85149;margin-left:auto;" onclick="deleteSection('+s.id+')">Delete</button>' : ''}
+                    ${!s.playbook_step_id ? '<button class="btn btn-secondary" style="padding:6px 16px;color:var(--sev-critical);margin-left:auto;" onclick="deleteSection('+s.id+')">Delete</button>' : ''}
                 </div>
             </div>
         </div>`;
@@ -1277,8 +1277,8 @@ function renderIOCResults(data) {
     const body = document.getElementById('ioc-results-body');
     const badge = document.getElementById('ioc-total-badge');
     badge.textContent = total + ' found';
-    badge.style.background = total > 0 ? 'rgba(63,185,80,.15)' : 'rgba(248,81,73,.15)';
-    badge.style.color = total > 0 ? '#3fb950' : '#f85149';
+    badge.style.background = total > 0 ? 'var(--mitre-covered-dim)' : 'var(--sev-critical-dim)';
+    badge.style.color = total > 0 ? 'var(--mitre-covered)' : 'var(--sev-critical)';
 
     if (total === 0) {
         body.innerHTML = '<div class="empty-state" style="padding:16px;">No IOCs found in the provided content.</div>';
@@ -1557,7 +1557,7 @@ async function loadPlaybooks(){
 function renderPlaybooksTable(pbs){
     const tbody=document.getElementById('playbooks-tbody'),empty=document.getElementById('playbooks-empty');
     if(!pbs.length){tbody.innerHTML='';empty.style.display='';return}empty.style.display='none';
-    tbody.innerHTML=pbs.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${fmtLabel(p.investigation_type||'Any')}</td><td>${p.step_count}</td><td>${p.is_active?'<span style="color:#3fb950;">Active</span>':'<span style="color:#6e7681;">Inactive</span>'}</td><td>${esc(p.created_by_username||'-')}</td><td><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" onclick="editPlaybook(${p.id})">Edit</button> <button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;color:#f85149;" onclick="deletePlaybook(${p.id})">Delete</button></td></tr>`).join('');
+    tbody.innerHTML=pbs.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${fmtLabel(p.investigation_type||'Any')}</td><td>${p.step_count}</td><td>${p.is_active?'<span style="color:var(--mitre-covered);">Active</span>':'<span style="color:#6e7681;">Inactive</span>'}</td><td>${esc(p.created_by_username||'-')}</td><td><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" onclick="editPlaybook(${p.id})">Edit</button> <button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;color:var(--sev-critical);" onclick="deletePlaybook(${p.id})">Delete</button></td></tr>`).join('');
 }
 function showNewPlaybookModal(){editingPlaybookId=null;document.getElementById('pb-modal-title').textContent='New Forensic Playbook';['pb-name','pb-desc'].forEach(id=>document.getElementById(id).value='');document.getElementById('pb-type').value='';document.getElementById('pb-active').checked=true;document.getElementById('pb-steps-list').innerHTML='';addPlaybookStepRow();document.getElementById('modal-playbook').style.display='flex'}
 async function editPlaybook(id){
@@ -1565,7 +1565,7 @@ async function editPlaybook(id){
 }
 function addPlaybookStepRow(data){
     const div=document.getElementById('pb-steps-list'),idx=div.children.length+1,row=document.createElement('div');row.className='pb-step-row';
-    row.innerHTML=`<span class="pb-step-num">${idx}</span><div style="flex:1;"><input type="text" class="form-input pb-step-title" placeholder="Step title" value="${esc((data&&data.title)||'')}"><textarea class="form-input pb-step-desc" rows="2" placeholder="Description" style="margin-top:4px;">${esc((data&&data.description)||'')}</textarea><div style="display:flex;gap:12px;align-items:center;margin-top:4px;"><label style="margin:0;font-size:.8rem;"><input type="checkbox" class="pb-step-req" ${data&&data.is_required?'checked':''}> Required</label><label style="margin:0;font-size:.8rem;">Est. hours: <input type="number" class="pb-step-hours" style="width:60px;" step="0.5" min="0" value="${(data&&data.expected_duration_hours)||''}"></label></div></div><button class="btn btn-secondary" style="padding:2px 8px;color:#f85149;align-self:flex-start;" onclick="this.parentElement.remove();renumberSteps();">&times;</button>`;
+    row.innerHTML=`<span class="pb-step-num">${idx}</span><div style="flex:1;"><input type="text" class="form-input pb-step-title" placeholder="Step title" value="${esc((data&&data.title)||'')}"><textarea class="form-input pb-step-desc" rows="2" placeholder="Description" style="margin-top:4px;">${esc((data&&data.description)||'')}</textarea><div style="display:flex;gap:12px;align-items:center;margin-top:4px;"><label style="margin:0;font-size:.8rem;"><input type="checkbox" class="pb-step-req" ${data&&data.is_required?'checked':''}> Required</label><label style="margin:0;font-size:.8rem;">Est. hours: <input type="number" class="pb-step-hours" style="width:60px;" step="0.5" min="0" value="${(data&&data.expected_duration_hours)||''}"></label></div></div><button class="btn btn-secondary" style="padding:2px 8px;color:var(--sev-critical);align-self:flex-start;" onclick="this.parentElement.remove();renumberSteps();">&times;</button>`;
     div.appendChild(row);
 }
 function renumberSteps(){document.querySelectorAll('#pb-steps-list .pb-step-num').forEach((el,i)=>el.textContent=i+1)}

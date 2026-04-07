@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}SOC Health - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-heart-pulse"></i> SOC Health Scorecard</h1>
+    <div class="header-actions">
+        <button class="btn btn-primary" onclick="shLoad()">Refresh</button>
+    </div>
+</div>
+
+<div id="sh-content"><div class="sh-loading"><span class="sh-spinner2"></span> Computing scorecard...</div></div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.sh-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.sh-spinner2{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:sh2-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes sh2-spin{to{transform:rotate(360deg)}}
+
+/* Overall score */
+.sh-overall{display:flex;align-items:center;gap:24px;margin-bottom:24px;padding:24px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.sh-grade-ring{width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.sh-grade-inner{width:80px;height:80px;border-radius:50%;background:var(--bg-secondary);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.sh-grade-letter{font-size:2rem;font-weight:700;font-family:'JetBrains Mono',monospace}
+.sh-grade-score{font-size:.75rem;color:var(--text-secondary)}
+.sh-overall-text{flex:1}
+.sh-overall-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:4px}
+.sh-overall-subtitle{font-size:.85rem;color:var(--text-secondary)}
+
+/* Dimension cards */
+.sh-dims{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px}
+.sh-dim{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;position:relative;overflow:hidden}
+.sh-dim::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sh-dim-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sh-dim-label{font-size:.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.sh-dim-score{font-size:1.3rem;font-weight:700;font-family:'JetBrains Mono',monospace}
+.sh-dim-bar{height:6px;background:rgba(99,110,123,.2);border-radius:3px;overflow:hidden;margin-bottom:8px}
+.sh-dim-bar-fill{height:100%;border-radius:3px;transition:width .5s}
+.sh-dim-details{font-size:.75rem;color:var(--text-secondary);line-height:1.6}
+.sh-dim-details strong{color:var(--text-primary)}
+
+/* Recommendations */
+.sh-rec{padding:10px 14px;border-radius:var(--radius);margin-bottom:6px;font-size:.85rem;display:flex;align-items:flex-start;gap:10px}
+.sh-rec.high{background:var(--sev-high-bg);border-left:3px solid var(--sev-high);color:var(--sev-high)}
+.sh-rec.medium{background:var(--sev-medium-bg);border-left:3px solid var(--sev-medium);color:var(--sev-medium)}
+.sh-rec.low{background:var(--sev-low-bg);border-left:3px solid var(--sev-low);color:var(--sev-low)}
+.sh-rec-area{font-size:.68rem;font-weight:700;text-transform:uppercase;padding:2px 6px;border-radius:3px;background:rgba(0,0,0,.2);white-space:nowrap}
+
+.sh-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
+.sh-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.sh-section-title i{color:var(--primary)}
+</style>
+<script>
+const API = '/api/soc-health';
+function $(id){return document.getElementById(id)}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+async function shLoad(){
+    $('sh-content').innerHTML = '<div class="sh-loading"><span class="sh-spinner2"></span> Computing scorecard...</div>';
+    try {
+        const r = await fetch(API+'/scorecard');
+        if(!r.ok) throw new Error('Failed');
+        renderScorecard(await r.json());
+    } catch(e) {
+        $('sh-content').innerHTML = `<div class="sh-loading" style="color:var(--sev-critical)">${esc(e.message)}</div>`;
+    }
+}
+
+function gradeColor(score) {
+    if (score >= 80) return 'var(--mitre-covered)';
+    if (score >= 65) return 'var(--quality-good)';
+    if (score >= 50) return 'var(--sev-medium)';
+    if (score >= 35) return 'var(--sev-high)';
+    return 'var(--sev-critical)';
+}
+
+function renderScorecard(d) {
+    let html = '';
+    const color = gradeColor(d.overall_score);
+
+    // Overall grade
+    html += `<div class="sh-overall">
+        <div class="sh-grade-ring" style="background:conic-gradient(${color} ${d.overall_score}%, rgba(99,110,123,.2) ${d.overall_score}%)">
+            <div class="sh-grade-inner">
+                <div class="sh-grade-letter" style="color:${color}">${esc(d.grade)}</div>
+                <div class="sh-grade-score">${d.overall_score}/100</div>
+            </div>
+        </div>
+        <div class="sh-overall-text">
+            <div class="sh-overall-title">SOC Maturity Score: ${d.overall_score}/100</div>
+            <div class="sh-overall-subtitle">Grade <strong style="color:${color}">${esc(d.grade)}</strong> — ${
+                d.overall_score >= 80 ? 'Excellent maturity across all dimensions' :
+                d.overall_score >= 65 ? 'Good maturity with some areas for improvement' :
+                d.overall_score >= 50 ? 'Moderate maturity — several areas need attention' :
+                d.overall_score >= 35 ? 'Below average — significant improvement needed' :
+                'Critical — immediate action required across multiple dimensions'
+            }</div>
+        </div>
+    </div>`;
+
+    // Dimension cards
+    const dims = d.dimensions || {};
+    const dimOrder = ['detection_coverage', 'operational_efficiency', 'team_readiness', 'knowledge_completeness', 'integration_health'];
+    const dimIcons = {
+        detection_coverage: 'shield', operational_efficiency: 'zap',
+        team_readiness: 'users', knowledge_completeness: 'book-open',
+        integration_health: 'plug'
+    };
+
+    html += '<div class="sh-dims">';
+    for (const key of dimOrder) {
+        const dim = dims[key];
+        if (!dim) continue;
+        const dc = gradeColor(dim.score);
+        const details = dim.details || {};
+        let detailHtml = '';
+        for (const [k, v] of Object.entries(details)) {
+            if (v != null) detailHtml += `<div><strong>${k.replace(/_/g,' ')}:</strong> ${v}</div>`;
+        }
+        html += `<div class="sh-dim" style="--dim-color:${dc}">
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${dc}"></div>
+            <div class="sh-dim-header">
+                <span class="sh-dim-label"><i class="icon-${dimIcons[key] || 'circle'}"></i> ${esc(dim.label)}</span>
+                <span class="sh-dim-score" style="color:${dc}">${dim.score}</span>
+            </div>
+            <div class="sh-dim-bar"><div class="sh-dim-bar-fill" style="width:${dim.score}%;background:${dc}"></div></div>
+            <div class="sh-dim-details">${detailHtml}</div>
+        </div>`;
+    }
+    html += '</div>';
+
+    // Recommendations
+    const recs = d.recommendations || [];
+    if (recs.length) {
+        html += '<div class="sh-section"><div class="sh-section-title"><i class="icon-zap"></i> Improvement Recommendations</div>';
+        for (const rec of recs) {
+            html += `<div class="sh-rec ${rec.priority}">
+                <span class="sh-rec-area">${esc(rec.area)}</span>
+                <span>${esc(rec.message)}</span>
+            </div>`;
+        }
+        html += '</div>';
+    }
+
+    $('sh-content').innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', shLoad);
+</script>
+{% endblock %}

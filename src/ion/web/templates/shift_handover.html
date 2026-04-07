@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}Shift Handover - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-clipboard-list"></i> Shift Handover Report</h1>
+    <div class="header-actions">
+        <select id="sh-hours" class="sh-select">
+            <option value="4">Last 4 hours</option>
+            <option value="8" selected>Last 8 hours</option>
+            <option value="12">Last 12 hours</option>
+            <option value="24">Last 24 hours</option>
+        </select>
+        <button class="btn btn-primary" onclick="shGenerate()">Generate Report</button>
+        <button class="btn btn-secondary" onclick="window.print()"><i class="icon-printer"></i> Print</button>
+    </div>
+</div>
+
+<div id="sh-content">
+    <div class="sh-loading" id="sh-loading"><span class="sh-spinner"></span> Generating shift report...</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Shift Handover ─────────────────────────── */
+.sh-select{padding:7px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:.85rem}
+.sh-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.sh-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:sh-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes sh-spin{to{transform:rotate(360deg)}}
+
+/* Report layout */
+.sh-report{max-width:1100px}
+.sh-meta{display:flex;gap:24px;align-items:center;margin-bottom:20px;padding:12px 16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);font-size:.82rem;color:var(--text-secondary);flex-wrap:wrap}
+.sh-meta strong{color:var(--text-primary)}
+
+/* Highlights banner */
+.sh-highlights{margin-bottom:20px}
+.sh-highlight{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius);margin-bottom:6px;font-size:.85rem;font-weight:600}
+.sh-highlight.critical{background:var(--sev-critical-bg);border-left:3px solid var(--sev-critical);color:var(--sev-critical)}
+.sh-highlight.high{background:var(--sev-high-bg);border-left:3px solid var(--sev-high);color:var(--sev-high)}
+.sh-highlight.warning{background:var(--sev-medium-bg);border-left:3px solid var(--sev-medium);color:var(--sev-medium)}
+.sh-highlight.info{background:var(--sev-info-bg);border-left:3px solid var(--sev-info);color:var(--sev-info)}
+
+/* Stat cards */
+.sh-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.sh-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center;position:relative;overflow:hidden}
+.sh-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary)}
+.sh-stat-val{font-size:1.6rem;font-weight:700;color:var(--primary);font-family:'JetBrains Mono',monospace;line-height:1}
+.sh-stat-label{font-size:.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:6px}
+.sh-stat.crit .sh-stat-val{color:var(--sev-critical)}
+.sh-stat.crit::before{background:var(--sev-critical)}
+.sh-stat.high .sh-stat-val{color:var(--sev-high)}
+.sh-stat.high::before{background:var(--sev-high)}
+.sh-stat.green .sh-stat-val{color:var(--mitre-covered)}
+.sh-stat.green::before{background:var(--mitre-covered)}
+.sh-stat.warn .sh-stat-val{color:var(--sev-medium)}
+.sh-stat.warn::before{background:var(--sev-medium)}
+
+/* Sections */
+.sh-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:900px){.sh-grid{grid-template-columns:1fr}}
+.sh-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
+.sh-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.sh-section-title i{color:var(--primary)}
+
+/* Tables */
+.sh-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.sh-table th{text-align:left;padding:8px 10px;color:var(--text-secondary);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.sh-table td{padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.15);color:var(--text-primary)}
+.sh-table tr:hover td{background:rgba(0,212,255,.03)}
+
+/* Activity bar */
+.sh-activity-bar{display:flex;gap:4px;align-items:flex-end;height:40px;margin-top:4px}
+.sh-activity-bar-seg{flex:1;min-width:3px;border-radius:2px 2px 0 0;transition:height .3s}
+
+/* Badges */
+.sh-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.72rem;font-weight:700;text-transform:uppercase}
+
+/* Print styles */
+@media print{
+    .navbar,.header-actions,.chat-widget,.chat-toggle{display:none!important}
+    body{background:#fff;color:#000}
+    .sh-report{max-width:100%}
+    .sh-section,.sh-stat,.sh-highlight{break-inside:avoid;border-color:#ddd}
+    .sh-stat-val,.sh-section-title i{color:#333!important}
+}
+</style>
+<script>
+const API = '/api/shift-handover';
+function $(id){return document.getElementById(id)}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function fmtTime(iso){if(!iso)return'-';return new Date(iso).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+
+async function shGenerate(){
+    const hours = $('sh-hours').value;
+    $('sh-content').innerHTML = '<div class="sh-loading"><span class="sh-spinner"></span> Generating shift report...</div>';
+    try {
+        const r = await fetch(API+'/report?hours='+hours);
+        if(!r.ok) throw new Error('Failed to generate report');
+        const d = await r.json();
+        renderReport(d);
+    } catch(e) {
+        $('sh-content').innerHTML = `<div class="sh-loading" style="color:var(--sev-critical)">${esc(e.message)}</div>`;
+    }
+}
+
+function renderReport(d) {
+    let html = '<div class="sh-report">';
+
+    // Meta
+    html += `<div class="sh-meta">
+        <span><strong>Shift Period:</strong> ${fmtTime(d.shift_start)} \u2014 ${fmtTime(d.shift_end)}</span>
+        <span><strong>Duration:</strong> ${d.shift_hours}h</span>
+        <span><strong>Generated by:</strong> ${esc(d.generated_by)}</span>
+        <span><strong>Generated at:</strong> ${fmtTime(d.generated_at)}</span>
+    </div>`;
+
+    // Highlights
+    if (d.highlights && d.highlights.length) {
+        html += '<div class="sh-highlights">';
+        for (const h of d.highlights) {
+            const cls = h.level === 'critical' ? 'critical' : h.level === 'high' ? 'high' : h.level === 'warning' ? 'warning' : 'info';
+            const icon = h.level === 'critical' ? 'alert-triangle' : h.level === 'high' ? 'alert-circle' : h.level === 'warning' ? 'info' : 'info';
+            html += `<div class="sh-highlight ${cls}"><i class="icon-${icon}"></i> ${esc(h.message)}</div>`;
+        }
+        html += '</div>';
+    }
+
+    // Key stats
+    const a = d.alerts || {};
+    const c = d.cases || {};
+    const p = d.pending || {};
+
+    html += '<div class="sh-stats">';
+    html += stat(a.total_triaged || 0, 'Alerts Triaged', '');
+    html += stat(c.opened || 0, 'Cases Opened', c.opened > 0 && (c.severity_opened||{}).critical ? 'crit' : '');
+    html += stat(c.closed || 0, 'Cases Closed', 'green');
+    html += stat(c.avg_mttr_hours != null ? c.avg_mttr_hours + 'h' : '-', 'Avg MTTR', '');
+    html += stat(p.open_cases || 0, 'Open Cases', p.open_cases > 10 ? 'warn' : '');
+    html += stat(p.open_alerts || 0, 'Alert Backlog', p.open_alerts > 50 ? 'crit' : p.open_alerts > 20 ? 'warn' : '');
+    html += stat(a.analysts_active || 0, 'Analysts Active', '');
+    html += stat((d.watches||{}).active_count || 0, 'Active Watches', '');
+    html += '</div>';
+
+    // Two-column: Cases Opened + Cases Closed
+    html += '<div class="sh-grid">';
+
+    // Cases opened
+    html += '<div class="sh-section"><div class="sh-section-title"><i class="icon-folder-plus"></i> Cases Opened This Shift</div>';
+    if ((c.cases_opened||[]).length) {
+        html += '<table class="sh-table"><thead><tr><th>Case</th><th>Title</th><th>Severity</th><th>Status</th></tr></thead><tbody>';
+        for (const cs of c.cases_opened) {
+            html += `<tr>
+                <td class="mono">${esc(cs.case_number)}</td>
+                <td>${esc(cs.title)}</td>
+                <td><span class="sh-badge sev-${cs.severity||'low'}">${esc(cs.severity||'unknown')}</span></td>
+                <td>${esc(cs.status)}</td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+    } else {
+        html += '<div style="color:var(--text-secondary);font-size:.85rem;padding:12px">No cases opened.</div>';
+    }
+    html += '</div>';
+
+    // Cases closed
+    html += '<div class="sh-section"><div class="sh-section-title"><i class="icon-check-circle"></i> Cases Closed This Shift</div>';
+    if ((c.cases_closed||[]).length) {
+        html += '<table class="sh-table"><thead><tr><th>Case</th><th>Title</th><th>Severity</th><th>Reason</th></tr></thead><tbody>';
+        for (const cs of c.cases_closed) {
+            const reason = (cs.closure_reason||'').replace(/_/g,' ');
+            html += `<tr>
+                <td class="mono">${esc(cs.case_number)}</td>
+                <td>${esc(cs.title)}</td>
+                <td><span class="sh-badge sev-${cs.severity||'low'}">${esc(cs.severity||'unknown')}</span></td>
+                <td>${esc(reason||'-')}</td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+    } else {
+        html += '<div style="color:var(--text-secondary);font-size:.85rem;padding:12px">No cases closed.</div>';
+    }
+    html += '</div>';
+
+    html += '</div>'; // end grid
+
+    // Closure reason breakdown
+    if (c.closed > 0) {
+        html += '<div class="sh-section"><div class="sh-section-title"><i class="icon-pie-chart"></i> Closure Reasons</div>';
+        html += '<div style="display:flex;gap:16px;flex-wrap:wrap">';
+        const reasons = c.closure_reasons || {};
+        for (const [reason, count] of Object.entries(reasons)) {
+            const label = reason.replace(/_/g, ' ');
+            const pct = Math.round(count / c.closed * 100);
+            const color = reason === 'true_positive' ? 'var(--mitre-covered)' : reason === 'false_positive' ? 'var(--sev-critical)' : 'var(--text-secondary)';
+            html += `<div style="text-align:center">
+                <div style="font-size:1.2rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:${color}">${count}</div>
+                <div style="font-size:.72rem;color:var(--text-secondary);text-transform:capitalize">${esc(label)} (${pct}%)</div>
+            </div>`;
+        }
+        html += '</div></div>';
+    }
+
+    // Pending for incoming shift
+    html += '<div class="sh-section"><div class="sh-section-title"><i class="icon-alert-circle"></i> Pending for Incoming Shift</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">';
+    const sevOrder = ['critical','high','medium','low','unknown'];
+    for (const sev of sevOrder) {
+        const cnt = (p.open_cases_by_severity||{})[sev];
+        if (cnt) {
+            html += `<div style="display:flex;align-items:center;gap:8px">
+                <span class="sh-badge sev-${sev}">${esc(sev)}</span>
+                <span style="font-weight:700;font-family:'JetBrains Mono',monospace">${cnt}</span> open case${cnt>1?'s':''}
+            </div>`;
+        }
+    }
+    if (p.unassigned_cases > 0) {
+        html += `<div style="display:flex;align-items:center;gap:8px;color:var(--sev-medium)">
+            <i class="icon-user-x"></i> <strong>${p.unassigned_cases}</strong> unassigned case${p.unassigned_cases>1?'s':''}
+        </div>`;
+    }
+    html += `<div style="display:flex;align-items:center;gap:8px">
+        <i class="icon-inbox"></i> <strong>${p.open_alerts||0}</strong> open alerts, <strong>${p.in_progress_alerts||0}</strong> in progress
+    </div>`;
+    html += '</div></div>';
+
+    // Analyst activity
+    const activity = d.activity || [];
+    if (activity.length) {
+        html += '<div class="sh-section"><div class="sh-section-title"><i class="icon-users"></i> Analyst Activity</div>';
+        html += '<table class="sh-table"><thead><tr><th>Analyst</th><th>Total Actions</th><th>Top Actions</th></tr></thead><tbody>';
+        for (const a of activity) {
+            const topActions = Object.entries(a.actions||{}).sort((x,y)=>y[1]-x[1]).slice(0,4).map(([k,v])=>`${k}: ${v}`).join(', ');
+            html += `<tr>
+                <td style="font-weight:600">${esc(a.username)}</td>
+                <td class="mono">${a.total}</td>
+                <td style="font-size:.78rem;color:var(--text-secondary)">${esc(topActions)}</td>
+            </tr>`;
+        }
+        html += '</tbody></table></div>';
+    }
+
+    // Recent triage
+    const recent = a.recent || [];
+    if (recent.length) {
+        html += '<div class="sh-section"><div class="sh-section-title"><i class="icon-list-checks"></i> Recent Triage Activity</div>';
+        html += '<table class="sh-table"><thead><tr><th>Alert ID</th><th>Status</th><th>Priority</th><th>Analyst</th><th>Time</th><th>Notes</th></tr></thead><tbody>';
+        for (const t of recent) {
+            html += `<tr>
+                <td class="mono" style="font-size:.75rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.es_alert_id)}">${esc((t.es_alert_id||'').substring(0,24))}...</td>
+                <td><span class="sh-badge ${t.status==='closed'?'sev-low':t.status==='acknowledged'?'sev-medium':'sev-critical'}">${esc(t.status)}</span></td>
+                <td>${esc(t.priority||'-')}</td>
+                <td>${esc(t.analyst)}</td>
+                <td style="font-size:.78rem">${fmtTime(t.updated_at)}</td>
+                <td style="font-size:.78rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(t.notes)}">${esc(t.notes||'-')}</td>
+            </tr>`;
+        }
+        html += '</tbody></table></div>';
+    }
+
+    // Active watches
+    const w = d.watches || {};
+    if ((w.watches||[]).length) {
+        html += '<div class="sh-section"><div class="sh-section-title"><i class="icon-eye"></i> Active Threat Watches</div>';
+        html += '<table class="sh-table"><thead><tr><th>Actor/Campaign</th><th>Type</th><th>Matches</th><th>Watched By</th><th>Last Seen</th></tr></thead><tbody>';
+        for (const watch of w.watches) {
+            html += `<tr>
+                <td style="font-weight:600">${esc(watch.name)}</td>
+                <td>${esc((watch.entity_type||'').replace('_',' '))}</td>
+                <td class="mono">${watch.match_count}</td>
+                <td>${esc(watch.watched_by)}</td>
+                <td style="font-size:.78rem">${fmtTime(watch.last_seen_at)}</td>
+            </tr>`;
+        }
+        html += '</tbody></table></div>';
+    }
+
+    html += '</div>'; // end sh-report
+    $('sh-content').innerHTML = html;
+}
+
+function stat(val, label, cls) {
+    return `<div class="sh-stat ${cls}">
+        <div class="sh-stat-val">${val}</div>
+        <div class="sh-stat-label">${label}</div>
+    </div>`;
+}
+
+// Auto-generate on load
+document.addEventListener('DOMContentLoaded', shGenerate);
+</script>
+{% endblock %}

@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Entity Timeline - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-git-commit"></i> Entity Timeline</h1>
+    <div class="header-actions">
+        <select id="et-hours" class="et-select">
+            <option value="24">Last 24h</option>
+            <option value="168" selected>Last 7 days</option>
+            <option value="720">Last 30 days</option>
+        </select>
+    </div>
+</div>
+
+<div class="et-search-bar">
+    <input type="text" id="et-query" class="et-input" placeholder="Enter IP, hostname, username, domain, or hash..." onkeydown="if(event.key==='Enter')etSearch()">
+    <select id="et-type" class="et-select">
+        <option value="auto">Auto-detect</option>
+        <option value="ip">IP Address</option>
+        <option value="host">Hostname</option>
+        <option value="user">Username</option>
+        <option value="domain">Domain</option>
+        <option value="hash">Hash</option>
+        <option value="email">Email</option>
+    </select>
+    <button class="btn btn-primary" onclick="etSearch()">Search</button>
+</div>
+
+<div id="et-content">
+    <div class="et-empty">
+        <i class="icon-search" style="font-size:2rem;margin-bottom:8px;color:var(--primary)"></i>
+        <div>Search for any entity to see its complete history across all ION data sources.</div>
+        <div style="font-size:.78rem;margin-top:8px;color:var(--text-muted)">Cases, alert triage, observables, enrichments, and audit log entries — all in one timeline.</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.et-search-bar{display:flex;gap:8px;margin-bottom:20px;align-items:center}
+.et-input{flex:1;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-lg);color:var(--text-primary);font-size:.9rem}
+.et-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-dim)}
+.et-input::placeholder{color:var(--text-muted)}
+.et-select{padding:10px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:.85rem}
+.et-empty{text-align:center;padding:60px;color:var(--text-secondary);font-size:.9rem}
+
+/* Entity header */
+.et-header{display:flex;gap:16px;align-items:center;margin-bottom:20px;padding:14px 18px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.et-entity-value{font-size:1.1rem;font-weight:700;color:var(--primary);font-family:'JetBrains Mono',monospace}
+.et-entity-type{font-size:.72rem;font-weight:700;text-transform:uppercase;padding:3px 8px;border-radius:4px;background:var(--primary-dim);color:var(--primary)}
+.et-source-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.68rem;font-weight:700;text-transform:uppercase;margin-right:4px}
+.et-source-case{background:var(--sev-high-bg);color:var(--sev-high)}
+.et-source-triage{background:var(--sev-critical-bg);color:var(--sev-critical)}
+.et-source-observable{background:var(--sev-info-bg);color:var(--sev-info)}
+.et-source-enrichment{background:var(--mitre-covered-bg);color:var(--mitre-covered)}
+.et-source-audit{background:var(--sev-low-bg);color:var(--sev-low)}
+
+/* Timeline */
+.et-timeline{position:relative;padding-left:32px}
+.et-timeline::before{content:'';position:absolute;left:11px;top:0;bottom:0;width:2px;background:var(--border)}
+
+.et-event{position:relative;margin-bottom:12px;padding:12px 16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);transition:border-color .15s}
+.et-event:hover{border-color:var(--primary)}
+.et-event::before{content:'';position:absolute;left:-26px;top:16px;width:12px;height:12px;border-radius:50%;background:var(--bg-secondary);border:2px solid var(--border);z-index:1}
+.et-event.source-case::before{border-color:var(--sev-high);background:var(--sev-high-bg)}
+.et-event.source-triage::before{border-color:var(--sev-critical);background:var(--sev-critical-bg)}
+.et-event.source-observable::before{border-color:var(--sev-info);background:var(--sev-info-bg)}
+.et-event.source-enrichment::before{border-color:var(--mitre-covered);background:var(--mitre-covered-bg)}
+.et-event.source-audit::before{border-color:var(--sev-low);background:var(--sev-low-bg)}
+
+.et-event-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.et-event-title{font-size:.85rem;font-weight:600;color:var(--text-primary);flex:1}
+.et-event-time{font-size:.72rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+.et-event-detail{font-size:.78rem;color:var(--text-secondary);margin-top:4px;line-height:1.5}
+.et-event-meta{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.et-meta-tag{font-size:.68rem;padding:1px 6px;background:var(--bg-card);border:1px solid var(--border);border-radius:3px;color:var(--text-secondary)}
+
+.et-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.et-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:et-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes et-spin{to{transform:rotate(360deg)}}
+
+/* Source filter */
+.et-filters{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.et-filter{padding:4px 12px;border:1px solid var(--border);border-radius:20px;font-size:.75rem;font-weight:600;cursor:pointer;background:transparent;color:var(--text-secondary);transition:all .15s}
+.et-filter:hover{border-color:var(--primary);color:var(--text-primary)}
+.et-filter.active{background:var(--primary-dim);border-color:var(--primary);color:var(--primary)}
+</style>
+<script>
+const API = '/api/entity-timeline';
+function $(id){return document.getElementById(id)}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function fmtTime(iso){if(!iso)return'-';return new Date(iso).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+
+let _timelineData = null;
+let _activeFilters = new Set();
+
+async function etSearch() {
+    const q = $('et-query').value.trim();
+    if (!q) return;
+    const type = $('et-type').value;
+    const hours = $('et-hours').value;
+
+    $('et-content').innerHTML = '<div class="et-loading"><span class="et-spinner"></span> Searching across all data sources...</div>';
+
+    try {
+        const r = await fetch(`${API}/search?q=${encodeURIComponent(q)}&type=${type}&hours=${hours}`);
+        if (!r.ok) throw new Error('Search failed');
+        _timelineData = await r.json();
+        _activeFilters.clear();
+        renderTimeline(_timelineData);
+    } catch(e) {
+        $('et-content').innerHTML = `<div class="et-loading" style="color:var(--sev-critical)">${esc(e.message)}</div>`;
+    }
+}
+
+function renderTimeline(d) {
+    let html = '';
+
+    // Entity header
+    html += `<div class="et-header">
+        <span class="et-entity-type">${esc(d.entity_type)}</span>
+        <span class="et-entity-value">${esc(d.entity_value)}</span>
+        <span style="color:var(--text-secondary);font-size:.82rem">${d.total_events} event${d.total_events!==1?'s':''} found across ${d.sources.length} source${d.sources.length!==1?'s':''}</span>
+    </div>`;
+
+    if (!d.events.length) {
+        html += '<div class="et-empty">No events found for this entity in the selected time window.</div>';
+        $('et-content').innerHTML = html;
+        return;
+    }
+
+    // Source filters
+    const sourceCounts = {};
+    for (const e of d.events) sourceCounts[e.source] = (sourceCounts[e.source]||0) + 1;
+
+    html += '<div class="et-filters">';
+    html += `<button class="et-filter active" onclick="etFilterAll()" id="et-filter-all">All (${d.total_events})</button>`;
+    for (const [src, count] of Object.entries(sourceCounts).sort((a,b)=>b[1]-a[1])) {
+        html += `<button class="et-filter" onclick="etToggleFilter('${src}')" id="et-filter-${src}">
+            <span class="et-source-badge et-source-${src}" style="margin-right:2px">${src}</span> ${count}
+        </button>`;
+    }
+    html += '</div>';
+
+    // Timeline
+    html += '<div class="et-timeline">';
+    for (const e of d.events) {
+        const sevCls = e.severity === 'critical' ? 'sev-critical' : e.severity === 'high' ? 'sev-high' : e.severity === 'medium' ? 'sev-medium' : '';
+        html += `<div class="et-event source-${e.source}" data-source="${e.source}">
+            <div class="et-event-header">
+                <span class="et-source-badge et-source-${e.source}">${esc(e.source)}</span>
+                ${sevCls ? `<span class="sev-badge ${sevCls}">${esc(e.severity)}</span>` : ''}
+                <span class="et-event-title">${esc(e.title)}</span>
+                <span class="et-event-time">${fmtTime(e.timestamp)}</span>
+            </div>
+            ${e.detail ? `<div class="et-event-detail">${esc(e.detail)}</div>` : ''}
+            ${e.meta ? renderMeta(e.meta) : ''}
+        </div>`;
+    }
+    html += '</div>';
+
+    $('et-content').innerHTML = html;
+}
+
+function renderMeta(meta) {
+    const tags = [];
+    for (const [k, v] of Object.entries(meta)) {
+        if (v != null && v !== '') tags.push(`${k}: ${v}`);
+    }
+    if (!tags.length) return '';
+    return '<div class="et-event-meta">' + tags.slice(0,5).map(t => `<span class="et-meta-tag">${esc(t)}</span>`).join('') + '</div>';
+}
+
+function etFilterAll() {
+    _activeFilters.clear();
+    document.querySelectorAll('.et-filter').forEach(f => f.classList.remove('active'));
+    $('et-filter-all').classList.add('active');
+    document.querySelectorAll('.et-event').forEach(e => e.style.display = '');
+}
+
+function etToggleFilter(source) {
+    $('et-filter-all').classList.remove('active');
+    const btn = $('et-filter-'+source);
+
+    if (_activeFilters.has(source)) {
+        _activeFilters.delete(source);
+        btn.classList.remove('active');
+    } else {
+        _activeFilters.add(source);
+        btn.classList.add('active');
+    }
+
+    if (_activeFilters.size === 0) { etFilterAll(); return; }
+
+    document.querySelectorAll('.et-event').forEach(e => {
+        e.style.display = _activeFilters.has(e.dataset.source) ? '' : 'none';
+    });
+}
+
+// Auto-search if URL has query param
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('q')) {
+    $('et-query').value = urlParams.get('q');
+    if (urlParams.get('type')) $('et-type').value = urlParams.get('type');
+    etSearch();
+}
+</script>
+{% endblock %}

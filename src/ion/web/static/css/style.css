@@ -56,6 +56,59 @@
     /* Sizing */
     --radius: 6px;
     --radius-lg: 12px;
+
+    /* ── 5-Severity System (aligned with TIDE) ──────────── */
+    /* Sev-1: Critical (Red) */
+    --sev-critical:      #f85149;
+    --sev-critical-bg:   rgba(248, 81, 73, 0.12);
+    --sev-critical-dim:  rgba(248, 81, 73, 0.2);
+    --sev-critical-glow: rgba(248, 81, 73, 0.18);
+
+    /* Sev-2: High (Orange/Amber) */
+    --sev-high:      #f0883e;
+    --sev-high-bg:   rgba(240, 136, 62, 0.12);
+    --sev-high-dim:  rgba(240, 136, 62, 0.2);
+    --sev-high-glow: rgba(240, 136, 62, 0.18);
+
+    /* Sev-3: Medium (Yellow) */
+    --sev-medium:      #d29922;
+    --sev-medium-bg:   rgba(210, 153, 34, 0.12);
+    --sev-medium-dim:  rgba(210, 153, 34, 0.2);
+    --sev-medium-glow: rgba(210, 153, 34, 0.18);
+
+    /* Sev-4: Low (Muted gray) */
+    --sev-low:      #8b949e;
+    --sev-low-bg:   rgba(139, 148, 158, 0.12);
+    --sev-low-dim:  rgba(139, 148, 158, 0.2);
+    --sev-low-glow: rgba(139, 148, 158, 0.18);
+
+    /* Sev-5: Info (Purple) */
+    --sev-info:      #bc8cff;
+    --sev-info-bg:   rgba(188, 140, 255, 0.12);
+    --sev-info-dim:  rgba(188, 140, 255, 0.2);
+    --sev-info-glow: rgba(188, 140, 255, 0.18);
+
+    /* ── MITRE Coverage Status ──────────────────────────── */
+    --mitre-covered:      #3fb950;
+    --mitre-covered-bg:   rgba(63, 185, 80, 0.12);
+    --mitre-covered-dim:  rgba(63, 185, 80, 0.2);
+    --mitre-covered-glow: rgba(63, 185, 80, 0.18);
+
+    --mitre-gap:      #f85149;
+    --mitre-gap-bg:   rgba(248, 81, 73, 0.12);
+    --mitre-gap-dim:  rgba(248, 81, 73, 0.2);
+    --mitre-gap-glow: rgba(248, 81, 73, 0.18);
+
+    --mitre-partial:      #d29922;
+    --mitre-partial-bg:   rgba(210, 153, 34, 0.12);
+    --mitre-partial-dim:  rgba(210, 153, 34, 0.2);
+    --mitre-partial-glow: rgba(210, 153, 34, 0.18);
+
+    /* ── Quality Score Levels ───────────────────────────── */
+    --quality-excellent: #3fb950;
+    --quality-good:      #56d364;
+    --quality-fair:      #d29922;
+    --quality-poor:      #f85149;
 }
 
 /* Purple/Violet Theme */
@@ -1301,6 +1354,92 @@ body::before {
 .status-badge.status-inactive {
     background: rgba(239, 68, 68, 0.15);
     color: var(--neon-red);
+}
+
+/* =============================================================================
+   Severity Badges (unified system — use these instead of hardcoded colors)
+   ============================================================================= */
+
+.sev-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.sev-critical { background: var(--sev-critical-dim); color: var(--sev-critical); }
+.sev-high     { background: var(--sev-high-dim);     color: var(--sev-high); }
+.sev-medium   { background: var(--sev-medium-dim);   color: var(--sev-medium); }
+.sev-low      { background: var(--sev-low-dim);      color: var(--sev-low); }
+.sev-info     { background: var(--sev-info-dim);      color: var(--sev-info); }
+
+/* Severity accent stripe (top border on cards) */
+.sev-stripe-critical::before { background: var(--sev-critical) !important; }
+.sev-stripe-high::before     { background: var(--sev-high) !important; }
+.sev-stripe-medium::before   { background: var(--sev-medium) !important; }
+.sev-stripe-low::before      { background: var(--sev-low) !important; }
+.sev-stripe-info::before     { background: var(--sev-info) !important; }
+
+/* Severity text color (for stat values, labels, etc.) */
+.sev-text-critical { color: var(--sev-critical); }
+.sev-text-high     { color: var(--sev-high); }
+.sev-text-medium   { color: var(--sev-medium); }
+.sev-text-low      { color: var(--sev-low); }
+.sev-text-info     { color: var(--sev-info); }
+
+/* Alert item left-border severity */
+.sev-border-critical { border-left: 3px solid var(--sev-critical); }
+.sev-border-high     { border-left: 3px solid var(--sev-high); }
+.sev-border-medium   { border-left: 3px solid var(--sev-medium); }
+.sev-border-low      { border-left: 3px solid var(--sev-low); }
+.sev-border-info     { border-left: 3px solid var(--sev-info); }
+
+/* =============================================================================
+   MITRE Coverage Status Badges
+   ============================================================================= */
+
+.mitre-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.mitre-covered { background: var(--mitre-covered-dim); color: var(--mitre-covered); }
+.mitre-gap     { background: var(--mitre-gap-dim);     color: var(--mitre-gap); }
+.mitre-partial { background: var(--mitre-partial-dim); color: var(--mitre-partial); }
+
+/* Quality score badges */
+.quality-excellent { color: var(--quality-excellent); }
+.quality-good      { color: var(--quality-good); }
+.quality-fair      { color: var(--quality-fair); }
+.quality-poor      { color: var(--quality-poor); }
+
+/* =============================================================================
+   Country Flag Utility
+   ============================================================================= */
+
+.country-flag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 1.1em;
+    line-height: 1;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.country-flag-sm {
+    font-size: 0.9em;
+}
+
+.country-flag-lg {
+    font-size: 1.4em;
 }
 
 /* =============================================================================

@@ -14,6 +14,7 @@ from ion.models.cyab import CyabSystem, CyabDataSource, CyabSnapshot, SYSTEM_ICO
 from ion.models.user import User, Role, user_roles
 from ion.web.api import get_db_session
 from ion.web.notification_api import create_notification
+from ion.services.tide_service import get_tide_service, reset_tide_service
 
 router = APIRouter()
 
@@ -80,6 +81,8 @@ class DataSourceRequest(BaseModel):
     use_case_review_date: Optional[str] = None
     use_case_gaps: Optional[str] = None
     use_case_remediation: Optional[str] = None
+    tide_system_id: Optional[str] = None
+    data_namespace: Optional[str] = None
 
 
 class DataSourceUpdateRequest(BaseModel):
@@ -102,6 +105,8 @@ class DataSourceUpdateRequest(BaseModel):
     use_case_review_date: Optional[str] = None
     use_case_gaps: Optional[str] = None
     use_case_remediation: Optional[str] = None
+    tide_system_id: Optional[str] = None
+    data_namespace: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -149,6 +154,8 @@ def _ds_to_dict(ds: CyabDataSource) -> dict:
         "use_case_review_date": ds.use_case_review_date.isoformat() if ds.use_case_review_date else None,
         "use_case_gaps": ds.use_case_gaps,
         "use_case_remediation": ds.use_case_remediation,
+        "tide_system_id": ds.tide_system_id,
+        "data_namespace": ds.data_namespace,
         "created_at": ds.created_at.isoformat() if ds.created_at else None,
         "updated_at": ds.updated_at.isoformat() if ds.updated_at else None,
     }
@@ -497,6 +504,8 @@ async def create_data_source(
         field_notes=req.field_notes, use_case_status=req.use_case_status,
         use_case_review_date=_parse_date(req.use_case_review_date),
         use_case_gaps=req.use_case_gaps, use_case_remediation=req.use_case_remediation,
+        tide_system_id=req.tide_system_id,
+        data_namespace=req.data_namespace,
     )
     session.add(ds)
     session.flush()
@@ -531,7 +540,8 @@ async def update_data_source(
     for f in ["name", "data_source_type", "icon", "sal_tier", "uptime_target",
               "max_latency", "retention", "p1_sla", "field_mapping_score",
               "mandatory_score", "readiness_score", "risk_rating", "sal_compliance",
-              "field_notes", "use_case_status", "use_case_gaps", "use_case_remediation"]:
+              "field_notes", "use_case_status", "use_case_gaps", "use_case_remediation",
+              "tide_system_id", "data_namespace"]:
         if f in data:
             setattr(ds, f, data[f])
     if "field_mapping" in data:
@@ -625,3 +635,1149 @@ async def check_review_reminders(session: Session = Depends(get_db_session)):
             sent += 1
     session.commit()
     return {"notifications_sent": sent, "systems_due": len(due_systems)}
+
+
+# ---------------------------------------------------------------------------
+# TIDE integration endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/tide/status", dependencies=[Depends(require_permission("alert:read"))])
+def tide_status():
+    """Check TIDE connection and return basic stats."""
+    svc = get_tide_service()
+    return svc.test_connection()
+
+
+@router.get("/tide/mitre-coverage", dependencies=[Depends(require_permission("alert:read"))])
+def tide_global_mitre_coverage():
+    """Get global MITRE ATT&CK coverage from TIDE (all systems combined)."""
+    svc = get_tide_service()
+    result = svc.get_global_mitre_coverage()
+    if result is None:
+        return {"enabled": False}
+    result["enabled"] = True
+    return result
+
+
+@router.get("/tide/systems", dependencies=[Depends(require_permission("alert:read"))])
+def tide_systems():
+    """List all systems from TIDE."""
+    svc = get_tide_service()
+    return svc.get_systems()
+
+
+@router.get("/tide/systems/{system_id}", dependencies=[Depends(require_permission("alert:read"))])
+def tide_system_detail(system_id: str):
+    """Get TIDE system with its applied detection rules."""
+    svc = get_tide_service()
+    detail = svc.get_system_detail(system_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="TIDE system not found")
+    return detail
+
+
+@router.get("/tide/systems/{system_id}/mitre", dependencies=[Depends(require_permission("alert:read"))])
+def tide_system_mitre(system_id: str):
+    """Get MITRE ATT&CK coverage for a TIDE system."""
+    svc = get_tide_service()
+    return svc.get_mitre_coverage(system_id)
+
+
+@router.get("/tide/rules", dependencies=[Depends(require_permission("alert:read"))])
+def tide_rules(search: str = "", limit: int = 50):
+    """Search TIDE detection rules."""
+    svc = get_tide_service()
+    return svc.get_detection_rules(search=search, limit=min(limit, 200))
+
+
+@router.get("/tide/systems/{system_id}/alerts", dependencies=[Depends(require_permission("alert:read"))])
+async def tide_system_alerts(system_id: str, namespace: str = "", hours: int = 168):
+    """Cross-reference TIDE detection rules with ES alerts for a namespace.
+
+    Returns which TIDE rules are actively firing (have matching alerts),
+    which are silent, and overall alert statistics.
+    """
+    from ion.services.elasticsearch_service import ElasticsearchService
+
+    # 1. Get TIDE system's applied detection rules
+    tide_svc = get_tide_service()
+    detail = tide_svc.get_system_detail(system_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="TIDE system not found")
+
+    tide_rules_map = {}
+    for d in (detail.get("detections") or []):
+        rule_name = (d.get("name") or "").strip()
+        if rule_name:
+            tide_rules_map[rule_name.lower()] = d
+
+    if not namespace:
+        return {
+            "error": "No namespace specified — set the data namespace on this data source to map alerts",
+            "tide_rules": len(tide_rules_map),
+            "firing_rules": [],
+            "silent_rules": list(tide_rules_map.values()),
+            "unmatched_alerts": [],
+            "alert_stats": {},
+        }
+
+    # 2. Query ES for alerts matching this namespace
+    es = ElasticsearchService()
+    if not es.is_configured:
+        return {
+            "error": "Elasticsearch not configured",
+            "tide_rules": len(tide_rules_map),
+            "firing_rules": [],
+            "silent_rules": list(tide_rules_map.values()),
+            "unmatched_alerts": [],
+            "alert_stats": {},
+        }
+
+    query = {
+        "size": 0,
+        "query": {
+            "bool": {
+                "must": [
+                    {"range": {"@timestamp": {"gte": f"now-{hours}h", "lte": "now"}}},
+                    {"term": {"data_stream.namespace": namespace}},
+                ],
+                "must_not": [
+                    {"term": {"kibana.alert.building_block_type": "default"}}
+                ]
+            }
+        },
+        "aggs": {
+            "by_rule": {
+                "terms": {"field": "kibana.alert.rule.name", "size": 500},
+                "aggs": {
+                    "by_severity": {
+                        "terms": {"field": "kibana.alert.severity", "size": 5}
+                    },
+                    "by_status": {
+                        "terms": {"field": "kibana.alert.workflow_status", "size": 5}
+                    },
+                    "latest": {
+                        "max": {"field": "@timestamp"}
+                    },
+                    "by_mitre": {
+                        "terms": {"field": "threat.technique.id", "size": 20}
+                    }
+                }
+            },
+            "total_by_severity": {
+                "terms": {"field": "kibana.alert.severity", "size": 10}
+            },
+            "total_by_status": {
+                "terms": {"field": "kibana.alert.workflow_status", "size": 10}
+            },
+            "over_time": {
+                "date_histogram": {
+                    "field": "@timestamp",
+                    "fixed_interval": "6h" if hours <= 168 else "1d",
+                    "min_doc_count": 0,
+                    "extended_bounds": {"min": f"now-{hours}h", "max": "now"}
+                }
+            }
+        }
+    }
+
+    try:
+        pattern = es.alert_index
+        encoded = pattern.replace(",", "%2C")
+        result = await es._request("POST", f"/{encoded}/_search", json=query)
+    except Exception as e:
+        return {
+            "error": f"ES query failed: {e}",
+            "tide_rules": len(tide_rules_map),
+            "firing_rules": [],
+            "silent_rules": list(tide_rules_map.values()),
+            "unmatched_alerts": [],
+            "alert_stats": {},
+        }
+
+    total = result.get("hits", {}).get("total", {})
+    if isinstance(total, dict):
+        total = total.get("value", 0)
+
+    aggs = result.get("aggregations", {})
+    rule_buckets = aggs.get("by_rule", {}).get("buckets", [])
+
+    # 3. Cross-reference: match ES alert rule names to TIDE rule names
+    firing_rules = []
+    matched_tide_keys = set()
+    unmatched_alerts = []
+
+    for b in rule_buckets:
+        alert_rule = b["key"]
+        alert_count = b["doc_count"]
+        severity_map = {sb["key"]: sb["doc_count"] for sb in b.get("by_severity", {}).get("buckets", [])}
+        status_map = {sb["key"]: sb["doc_count"] for sb in b.get("by_status", {}).get("buckets", [])}
+        latest = b.get("latest", {}).get("value_as_string")
+        mitre_ids = [mb["key"] for mb in b.get("by_mitre", {}).get("buckets", [])]
+
+        tide_key = alert_rule.strip().lower()
+        if tide_key in tide_rules_map:
+            tide_rule = tide_rules_map[tide_key]
+            matched_tide_keys.add(tide_key)
+            firing_rules.append({
+                "rule_name": alert_rule,
+                "alert_count": alert_count,
+                "severity": severity_map,
+                "status": status_map,
+                "latest_alert": latest,
+                "mitre_ids": mitre_ids,
+                "tide_rule_id": tide_rule.get("rule_id"),
+                "tide_severity": tide_rule.get("severity"),
+                "tide_enabled": tide_rule.get("enabled"),
+                "tide_quality": tide_rule.get("quality_score"),
+                "matched": True,
+            })
+        else:
+            unmatched_alerts.append({
+                "rule_name": alert_rule,
+                "alert_count": alert_count,
+                "severity": severity_map,
+                "status": status_map,
+                "latest_alert": latest,
+                "mitre_ids": mitre_ids,
+                "matched": False,
+            })
+
+    # 4. Silent rules — TIDE rules that have no matching alerts
+    silent_rules = []
+    for key, rule in tide_rules_map.items():
+        if key not in matched_tide_keys:
+            silent_rules.append(rule)
+
+    # Sort: firing by count desc, silent by severity
+    firing_rules.sort(key=lambda r: r["alert_count"], reverse=True)
+    sev_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "informational": 4}
+    silent_rules.sort(key=lambda r: sev_order.get((r.get("severity") or "low").lower(), 5))
+
+    # Overall stats
+    total_severity = {sb["key"]: sb["doc_count"] for sb in aggs.get("total_by_severity", {}).get("buckets", [])}
+    total_status = {sb["key"]: sb["doc_count"] for sb in aggs.get("total_by_status", {}).get("buckets", [])}
+    timeline = [{"timestamp": tb["key_as_string"], "count": tb["doc_count"]}
+                for tb in aggs.get("over_time", {}).get("buckets", [])]
+
+    return {
+        "namespace": namespace,
+        "hours": hours,
+        "total_alerts": total,
+        "tide_rules": len(tide_rules_map),
+        "firing_count": len(firing_rules),
+        "silent_count": len(silent_rules),
+        "unmatched_count": len(unmatched_alerts),
+        "firing_rules": firing_rules,
+        "silent_rules": silent_rules,
+        "unmatched_alerts": unmatched_alerts,
+        "alert_stats": {
+            "severity": total_severity,
+            "status": total_status,
+            "timeline": timeline,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Detection Engineering endpoints (TIDE-powered)
+# ---------------------------------------------------------------------------
+
+@router.get("/tide/de/systems", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_systems():
+    """List all TIDE systems (for dropdown selectors)."""
+    svc = get_tide_service()
+    return svc.get_systems()
+
+
+@router.get("/tide/de/posture", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_posture():
+    """Detection posture overview — totals, severity, quality, coverage."""
+    svc = get_tide_service()
+    result = svc.get_posture_stats()
+    if result is None:
+        return {"enabled": False}
+    result["enabled"] = True
+    return result
+
+
+@router.get("/tide/de/disabled-critical", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_disabled_critical():
+    """Disabled critical/high severity rules."""
+    svc = get_tide_service()
+    return svc.get_disabled_critical_high()
+
+
+@router.get("/tide/de/kill-chains", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_kill_chains():
+    """Playbooks with kill chain steps and technique coverage."""
+    svc = get_tide_service()
+    return svc.get_playbooks_with_kill_chains()
+
+
+@router.get("/tide/de/rules", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_rules(search: str = "", severity: str = "", enabled: str = "",
+                  offset: int = 0, limit: int = 50):
+    """Paginated detection rule browser."""
+    svc = get_tide_service()
+    return svc.get_rules_paginated(
+        search=search, severity=severity, enabled=enabled,
+        offset=offset, limit=min(limit, 200),
+    )
+
+
+@router.get("/tide/de/gaps", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_gaps():
+    """Gap analysis — blind spots by tactic, unmapped rules, quick wins."""
+    svc = get_tide_service()
+    result = svc.get_gaps_analysis()
+    if result is None:
+        return {"enabled": False}
+    result["enabled"] = True
+    return result
+
+
+class ReadinessReportRequest(BaseModel):
+    system_id: Optional[str] = None  # TIDE system UUID or CyAB int ID
+    actor_id: str
+    actor_type: str = "threat_actor"
+    generate_ai: bool = False
+
+
+@router.post("/tide/de/system-readiness", dependencies=[Depends(require_permission("alert:read"))])
+async def tide_de_system_readiness(req: ReadinessReportRequest, session: Session = Depends(get_db_session)):
+    """Per-system detection readiness against a specific threat actor.
+
+    Cross-references CyAB system → TIDE applied rules → actor TTPs from OpenCTI.
+    """
+    from ion.services.opencti_service import get_opencti_service
+
+    tide_svc = get_tide_service()
+    if not tide_svc.enabled:
+        return {"enabled": False, "error": "TIDE not configured"}
+
+    opencti = get_opencti_service()
+    if not opencti.is_configured:
+        return {"enabled": False, "error": "OpenCTI not configured"}
+
+    # 1. Get actor detail from OpenCTI
+    try:
+        actor = await opencti.get_entity_detail(req.actor_id, req.actor_type)
+    except Exception as e:
+        return {"enabled": True, "error": f"OpenCTI failed: {e}"}
+    if not actor:
+        raise HTTPException(status_code=404, detail="Threat actor not found")
+
+    ttps = actor.get("ttps", [])
+    ttp_map = {}
+    for t in ttps:
+        mid = t.get("mitre_id") or ""
+        if mid:
+            ttp_map[mid] = t
+            parent = mid.split(".")[0]
+            if parent != mid:
+                ttp_map.setdefault(parent, t)
+
+    # 2. Get TIDE global coverage for fallback
+    global_cov = tide_svc.get_global_mitre_coverage()
+    global_techs = global_cov.get("techniques", {}) if global_cov else {}
+
+    # 3. If a system is specified, get per-system TIDE rules
+    #    Accepts either a TIDE system UUID or a CyAB integer system ID
+    system_info = None
+    system_rules = []
+    system_technique_ids = set()
+    if req.system_id:
+        # Try as TIDE system UUID first
+        tide_detail = tide_svc.get_system_detail(req.system_id)
+        if tide_detail:
+            system_info = {"name": tide_detail["name"], "classification": tide_detail.get("classification", "")}
+            for d in (tide_detail.get("detections") or []):
+                system_rules.append(d)
+                for mid in (d.get("mitre_ids") or []):
+                    system_technique_ids.add(mid)
+                    system_technique_ids.add(mid.split(".")[0])
+        else:
+            # Fall back to CyAB system ID (integer)
+            try:
+                cyab_id = int(req.system_id)
+                cyab_sys = session.get(CyabSystem, cyab_id)
+            except (ValueError, TypeError):
+                cyab_sys = None
+            if cyab_sys:
+                system_info = _system_to_dict(cyab_sys, include_sources=True)
+                for ds in (cyab_sys.data_sources or []):
+                    if ds.tide_system_id:
+                        detail = tide_svc.get_system_detail(ds.tide_system_id)
+                        if detail:
+                            for d in (detail.get("detections") or []):
+                                system_rules.append(d)
+                                for mid in (d.get("mitre_ids") or []):
+                                    system_technique_ids.add(mid)
+                                    system_technique_ids.add(mid.split(".")[0])
+
+    # 4. Build readiness matrix
+    coverage_matrix = []
+    covered_count = 0
+    gap_count = 0
+    for mid, ttp in ttp_map.items():
+        if "." in mid:
+            continue  # skip sub-technique duplicates, use parent
+
+        parent = mid.split(".")[0]
+        # Check system-specific coverage first, then global
+        if req.system_id and system_rules:
+            has_rules = parent in system_technique_ids or mid in system_technique_ids
+            matching_rules = [r for r in system_rules
+                              if mid in (r.get("mitre_ids") or [])
+                              or parent in (r.get("mitre_ids") or [])]
+            rule_count = len(matching_rules)
+            enabled_count = sum(1 for r in matching_rules if r.get("enabled"))
+        else:
+            gt = global_techs.get(parent) or global_techs.get(mid)
+            has_rules = gt is not None and gt.get("rule_count", 0) > 0
+            rule_count = gt["rule_count"] if gt else 0
+            enabled_count = gt.get("enabled_rules", 0) if gt else 0
+            matching_rules = []
+
+        entry = {
+            "mitre_id": mid,
+            "name": ttp.get("name", ""),
+            "covered": has_rules,
+            "rule_count": rule_count,
+            "enabled_rules": enabled_count,
+        }
+        if has_rules:
+            covered_count += 1
+        else:
+            gap_count += 1
+        coverage_matrix.append(entry)
+
+    coverage_matrix.sort(key=lambda x: (not x["covered"], x["mitre_id"]))
+    total_ttps = covered_count + gap_count
+    readiness_pct = round(covered_count / total_ttps * 100) if total_ttps else 0
+
+    # 5. Optional AI-generated content
+    ai_summary = None
+    ai_recommendations = None
+    if req.generate_ai:
+        try:
+            from ion.services.ollama_service import get_ollama_service
+            ollama = get_ollama_service()
+            if ollama.is_available:
+                actor_name = actor.get("name", "Unknown")
+                sys_name = system_info["name"] if system_info else "All Systems"
+                gap_names = [e["mitre_id"] + " " + e["name"] for e in coverage_matrix if not e["covered"]]
+
+                summary_prompt = (
+                    f"Write a concise executive summary (3-4 sentences) for a detection readiness assessment. "
+                    f"The organisation is assessing detection coverage against threat actor '{actor_name}'. "
+                    f"System: '{sys_name}'. "
+                    f"Coverage: {covered_count}/{total_ttps} TTPs ({readiness_pct}%). "
+                    f"Detection gaps: {', '.join(gap_names[:10])}. "
+                    f"Write in a professional, formal tone suitable for a security report. No markdown."
+                )
+                ai_summary = await ollama.generate(summary_prompt, temperature=0.4)
+
+                rec_prompt = (
+                    f"Write 3-5 prioritised recommendations to improve detection coverage against '{actor_name}'. "
+                    f"Current coverage is {readiness_pct}% ({covered_count}/{total_ttps} TTPs). "
+                    f"Key gaps: {', '.join(gap_names[:8])}. "
+                    f"Focus on actionable steps: enabling disabled rules, writing new detections, deploying sensors. "
+                    f"Write as numbered list in professional tone. No markdown formatting."
+                )
+                ai_recommendations = await ollama.generate(rec_prompt, temperature=0.4)
+        except Exception as e:
+            ai_summary = f"AI generation failed: {e}"
+
+    return {
+        "enabled": True,
+        "actor": {
+            "id": actor.get("id"),
+            "name": actor.get("name"),
+            "description": (actor.get("description") or "")[:500],
+            "aliases": actor.get("aliases") or [],
+            "labels": actor.get("labels") or [],
+        },
+        "system": system_info,
+        "readiness_pct": readiness_pct,
+        "covered_count": covered_count,
+        "gap_count": gap_count,
+        "total_ttps": total_ttps,
+        "coverage_matrix": coverage_matrix,
+        "ai_summary": ai_summary,
+        "ai_recommendations": ai_recommendations,
+    }
+
+
+@router.post("/tide/de/readiness-pdf", dependencies=[Depends(require_permission("alert:read"))])
+async def tide_de_readiness_pdf(req: ReadinessReportRequest, session: Session = Depends(get_db_session)):
+    """Generate a professional PDF report for threat actor detection readiness."""
+    from fastapi.responses import Response
+    import html as html_mod
+
+    # Reuse the readiness computation
+    req.generate_ai = True  # Always generate AI content for PDF
+    data = await tide_de_system_readiness(req, session)
+    if not data.get("enabled"):
+        raise HTTPException(status_code=400, detail=data.get("error", "Not configured"))
+
+    actor = data["actor"]
+    system = data.get("system")
+    matrix = data["coverage_matrix"]
+    h = html_mod.escape
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    sys_name = system["name"] if system else "All Systems (Global)"
+
+    # Build HTML body
+    body = f"""
+    <h2>Executive Summary</h2>
+    <p>{h(data.get('ai_summary') or 'AI summary not available.')}</p>
+
+    <div class="readiness-gauge">
+        <h3>Overall Readiness: {data['readiness_pct']}%</h3>
+        <div class="gauge-bar">
+            <div class="gauge-fill" style="width:{data['readiness_pct']}%"></div>
+        </div>
+        <table class="pdf-meta">
+            <tr><td>Covered Techniques</td><td>{data['covered_count']} of {data['total_ttps']}</td></tr>
+            <tr><td>Detection Gaps</td><td>{data['gap_count']}</td></tr>
+        </table>
+    </div>
+
+    <h2>Threat Actor Profile</h2>
+    <table class="pdf-meta">
+        <tr><td>Name</td><td><strong>{h(actor['name'])}</strong></td></tr>
+        <tr><td>Aliases</td><td>{h(', '.join(actor.get('aliases', [])[:8]) or 'None known')}</td></tr>
+        <tr><td>Known TTPs</td><td>{data['total_ttps']}</td></tr>
+    </table>
+    {f'<p>{h(actor.get("description", ""))}</p>' if actor.get('description') else ''}
+
+    <h2>System Under Assessment</h2>
+    <table class="pdf-meta">
+        <tr><td>System</td><td><strong>{h(sys_name)}</strong></td></tr>
+    """
+    if system:
+        body += f"""
+        <tr><td>Department</td><td>{h(system.get('department', '-'))}</td></tr>
+        <tr><td>Status</td><td>{h(system.get('status', '-'))}</td></tr>
+        <tr><td>Data Sources</td><td>{system.get('data_source_count', 0)}</td></tr>
+        <tr><td>Readiness Score</td><td>{system.get('readiness_score', 0)}%</td></tr>
+        """
+    body += "</table>"
+
+    # Coverage matrix
+    body += """
+    <h2>Detection Coverage Matrix</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>MITRE ID</th>
+                <th>Technique</th>
+                <th>Status</th>
+                <th>Rules</th>
+                <th>Enabled</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    for entry in matrix:
+        status_cls = "covered" if entry["covered"] else "gap"
+        status_text = "COVERED" if entry["covered"] else "GAP"
+        status_color = "#2e7d32" if entry["covered"] else "#c62828"
+        body += f"""
+        <tr>
+            <td><code>{h(entry['mitre_id'])}</code></td>
+            <td>{h(entry['name'])}</td>
+            <td style="color:{status_color};font-weight:bold">{status_text}</td>
+            <td style="text-align:center">{entry['rule_count']}</td>
+            <td style="text-align:center">{entry['enabled_rules']}</td>
+        </tr>
+        """
+    body += "</tbody></table>"
+
+    # Gap analysis
+    gaps = [e for e in matrix if not e["covered"]]
+    if gaps:
+        body += "<h2>Detection Gaps — Priority Actions Required</h2>"
+        body += '<table><thead><tr><th>MITRE ID</th><th>Technique</th></tr></thead><tbody>'
+        for g in gaps:
+            body += f'<tr><td><code>{h(g["mitre_id"])}</code></td><td>{h(g["name"])}</td></tr>'
+        body += "</tbody></table>"
+
+    # AI recommendations
+    if data.get("ai_recommendations"):
+        body += f"""
+        <h2>Recommendations</h2>
+        <p>{h(data['ai_recommendations'])}</p>
+        """
+
+    body += f"""
+    <div style="margin-top:2em;padding-top:1em;border-top:1px solid #ddd;font-size:8pt;color:#888">
+        Report generated by ION Detection Engineering &bull; {now_str} &bull;
+        Data sources: TIDE, OpenCTI, CyAB
+    </div>
+    """
+
+    # Add extra CSS for the gauge
+    gauge_css = """
+    .readiness-gauge { margin: 1em 0; }
+    .gauge-bar { height: 20px; background: #e0e0e0; border-radius: 10px; overflow: hidden; margin: 8px 0; }
+    .gauge-fill { height: 100%; border-radius: 10px; }
+    """
+    readiness = data["readiness_pct"]
+    if readiness >= 75:
+        gauge_css += ".gauge-fill { background: #2e7d32; }"
+    elif readiness >= 50:
+        gauge_css += ".gauge-fill { background: #f57f17; }"
+    else:
+        gauge_css += ".gauge-fill { background: #c62828; }"
+
+    # Build full HTML document
+    from ion.services.pdf_export_service import PDF_CSS
+
+    custom_css = PDF_CSS + gauge_css
+    # Add screen-friendly overrides for HTML fallback
+    screen_css = """
+    @media screen {
+        body { max-width: 900px; margin: 0 auto; padding: 20px 40px; background: #fff; }
+        .pdf-header h1 { font-size: 1.6em; }
+        @page { margin: 0; }
+    }
+    """
+    full_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Detection Readiness — {h(actor['name'])}</title>
+<style>{custom_css}{screen_css}</style></head>
+<body>
+<span class="pdf-title">Detection Readiness Assessment</span>
+<div class="pdf-header">
+    <h1 style="border:none;margin:0;padding:0;">Detection Readiness Assessment</h1>
+    <p class="pdf-subtitle">{h(actor['name'])} vs {h(sys_name)} &bull; {now_str} &bull; ION</p>
+</div>
+{body}
+</body></html>"""
+
+    # Try PDF first, fall back to HTML
+    try:
+        from weasyprint import HTML as WpHTML
+        pdf_bytes = WpHTML(string=full_html).write_pdf()
+        filename = f"readiness_{actor['name'].replace(' ', '_')}_{now_str[:10]}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except (ImportError, OSError):
+        # WeasyPrint not available — return printable HTML
+        return Response(content=full_html, media_type="text/html")
+
+
+@router.get("/tide/de/actor-readiness", dependencies=[Depends(require_permission("alert:read"))])
+async def tide_de_actor_readiness(search: str = "", first: int = 15):
+    """Threat Actor Detection Readiness — cross-reference OpenCTI actors with TIDE coverage.
+
+    For each threat actor, shows which of their known TTPs have TIDE rules
+    and which are blind spots.
+    """
+    from ion.services.opencti_service import get_opencti_service
+
+    tide_svc = get_tide_service()
+    if not tide_svc.enabled:
+        return {"enabled": False, "error": "TIDE not configured"}
+
+    opencti = get_opencti_service()
+    if not opencti.is_configured:
+        return {"enabled": False, "error": "OpenCTI not configured"}
+
+    # 1. Get global TIDE MITRE coverage (cached-friendly)
+    tide_coverage = tide_svc.get_global_mitre_coverage()
+    if not tide_coverage:
+        return {"enabled": False, "error": "Failed to fetch TIDE coverage"}
+    tide_techs = tide_coverage.get("techniques", {})
+
+    # 2. Search threat actors in OpenCTI
+    try:
+        actors_result = await opencti.search_threat_actors(search=search, first=min(first, 30))
+    except Exception as e:
+        return {"enabled": True, "error": f"OpenCTI query failed: {e}", "actors": []}
+
+    actors = actors_result.get("actors", [])
+
+    # 3. For each actor, fetch TTPs and compute readiness
+    readiness_list = []
+    for actor in actors:
+        try:
+            entity_type = actor.get("entity_type", "threat_actor")
+            detail = await opencti.get_entity_detail(actor["id"], entity_type)
+            ttps = detail.get("ttps", [])
+        except Exception:
+            ttps = []
+
+        # Map TTPs to TIDE coverage
+        total_ttps = len(ttps)
+        covered = []
+        gaps = []
+        for ttp in ttps:
+            mitre_id = ttp.get("mitre_id") or ""
+            parent_id = mitre_id.split(".")[0] if mitre_id else ""
+            tide_info = tide_techs.get(parent_id) or tide_techs.get(mitre_id)
+
+            entry = {
+                "mitre_id": mitre_id,
+                "name": ttp.get("name", ""),
+            }
+            if tide_info and tide_info.get("rule_count", 0) > 0:
+                entry["rule_count"] = tide_info["rule_count"]
+                entry["enabled_rules"] = tide_info.get("enabled_rules", 0)
+                entry["avg_quality"] = tide_info.get("avg_quality", 0)
+                covered.append(entry)
+            else:
+                gaps.append(entry)
+
+        readiness_pct = round(len(covered) / total_ttps * 100) if total_ttps else 0
+
+        readiness_list.append({
+            "id": actor["id"],
+            "name": actor.get("name", ""),
+            "description": (actor.get("description") or "")[:200],
+            "aliases": actor.get("aliases") or [],
+            "entity_type": actor.get("entity_type", "threat_actor"),
+            "confidence": actor.get("confidence"),
+            "labels": actor.get("labels") or [],
+            "country_code": actor.get("country_code"),
+            "country_name": actor.get("country_name", ""),
+            "country_flag": actor.get("country_flag", ""),
+            "total_ttps": total_ttps,
+            "covered_count": len(covered),
+            "gap_count": len(gaps),
+            "readiness_pct": readiness_pct,
+            "covered": covered,
+            "gaps": gaps,
+        })
+
+    # Sort by total TTPs descending (most active actors first)
+    readiness_list.sort(key=lambda a: a["total_ttps"], reverse=True)
+
+    return {
+        "enabled": True,
+        "actors": readiness_list,
+        "tide_total_techniques": tide_coverage.get("total_techniques", 0),
+        "tide_covered_techniques": tide_coverage.get("covered_techniques", 0),
+    }
+
+
+@router.get("/tide/de/kill-chain-alerts", dependencies=[Depends(require_permission("alert:read"))])
+async def tide_de_kill_chain_alerts(hours: int = 24):
+    """Kill Chain Progression Detection — detect multi-step attack sequences on hosts.
+
+    Cross-references TIDE playbook kill chain steps with ES alerts grouped by host.
+    Flags hosts where multiple sequential kill chain steps have fired.
+    """
+    from ion.services.elasticsearch_service import ElasticsearchService
+
+    tide_svc = get_tide_service()
+    if not tide_svc.enabled:
+        return {"enabled": False, "error": "TIDE not configured"}
+
+    es = ElasticsearchService()
+    if not es.is_configured:
+        return {"enabled": False, "error": "Elasticsearch not configured"}
+
+    # 1. Get TIDE playbooks with kill chain steps
+    playbooks = tide_svc.get_playbooks_with_kill_chains()
+    if not playbooks:
+        return {"enabled": True, "progressions": [], "playbooks": []}
+
+    # Collect all technique IDs from all playbooks (include sub-technique wildcards)
+    all_technique_ids = set()
+    for pb in playbooks:
+        for step in pb.get("steps", []):
+            all_technique_ids.update(step.get("techniques", []))
+
+    if not all_technique_ids:
+        return {"enabled": True, "progressions": [], "playbooks": playbooks}
+
+    # 2. Query ES for alerts matching any kill chain technique, grouped by host
+    # Use wildcard matching so T1003 matches T1003.001, T1003.006, etc.
+    hours = min(hours, 168)
+
+    # Build should clauses: exact match OR prefix match for sub-techniques
+    technique_should = []
+    for tid in all_technique_ids:
+        technique_should.append({"term": {"threat.technique.id": tid}})
+        technique_should.append({"prefix": {"threat.technique.id": f"{tid}."}})
+
+    query = {
+        "size": 0,
+        "query": {
+            "bool": {
+                "must": [
+                    {"range": {"@timestamp": {"gte": f"now-{hours}h", "lte": "now"}}},
+                    {"bool": {"should": technique_should, "minimum_should_match": 1}},
+                ],
+                "must_not": [
+                    {"term": {"kibana.alert.building_block_type": "default"}}
+                ]
+            }
+        },
+        "aggs": {
+            "by_host": {
+                "terms": {
+                    "field": "host.name",
+                    "size": 100,
+                    "min_doc_count": 1,
+                },
+                "aggs": {
+                    "by_technique": {
+                        "terms": {"field": "threat.technique.id", "size": 50},
+                        "aggs": {
+                            "latest": {"max": {"field": "@timestamp"}},
+                            "earliest": {"min": {"field": "@timestamp"}},
+                            "by_rule": {
+                                "terms": {"field": "kibana.alert.rule.name", "size": 5}
+                            },
+                            "by_severity": {
+                                "terms": {"field": "kibana.alert.severity", "size": 5}
+                            }
+                        }
+                    },
+                    "latest_alert": {"max": {"field": "@timestamp"}},
+                    "earliest_alert": {"min": {"field": "@timestamp"}},
+                }
+            }
+        }
+    }
+
+    try:
+        pattern = es.alert_index
+        encoded = pattern.replace(",", "%2C")
+        result = await es._request("POST", f"/{encoded}/_search", json=query)
+    except Exception as e:
+        return {"enabled": True, "error": f"ES query failed: {e}", "progressions": []}
+
+    aggs = result.get("aggregations", {})
+    host_buckets = aggs.get("by_host", {}).get("buckets", [])
+
+    # 3. For each host, check kill chain progression against each playbook
+    progressions = []
+    for hb in host_buckets:
+        hostname = hb["key"]
+        host_techniques = {}
+        for tb in hb.get("by_technique", {}).get("buckets", []):
+            tid = tb["key"]
+            host_techniques[tid] = {
+                "count": tb["doc_count"],
+                "latest": tb.get("latest", {}).get("value_as_string"),
+                "earliest": tb.get("earliest", {}).get("value_as_string"),
+                "rules": [rb["key"] for rb in tb.get("by_rule", {}).get("buckets", [])],
+                "severity": {sb["key"]: sb["doc_count"]
+                             for sb in tb.get("by_severity", {}).get("buckets", [])},
+            }
+
+        # Check each playbook
+        for pb in playbooks:
+            steps = pb.get("steps", [])
+            if not steps:
+                continue
+
+            matched_steps = []
+            for step in steps:
+                step_techs = step.get("techniques", [])
+                # Check if any of this step's techniques fired on this host
+                # Match both exact (T1003) and sub-techniques (T1003.001)
+                matching_tech = None
+                for tid in step_techs:
+                    if tid in host_techniques:
+                        matching_tech = tid
+                        break
+                    # Check sub-technique match: T1003 matches T1003.001
+                    for alert_tid in host_techniques:
+                        if alert_tid.startswith(tid + ".") or tid.startswith(alert_tid + "."):
+                            matching_tech = alert_tid
+                            break
+                    if matching_tech:
+                        break
+                matched_steps.append({
+                    "order": step["order"],
+                    "name": step["name"],
+                    "tactic": step.get("tactic"),
+                    "techniques": step_techs,
+                    "fired": matching_tech is not None,
+                    "matched_technique": matching_tech,
+                    "alert_data": host_techniques.get(matching_tech) if matching_tech else None,
+                })
+
+            fired_count = sum(1 for s in matched_steps if s["fired"])
+            if fired_count >= 2:  # At least 2 steps = noteworthy
+                # Determine severity based on progression
+                total_steps = len(steps)
+                pct_complete = round(fired_count / total_steps * 100)
+                if pct_complete >= 75:
+                    severity = "critical"
+                elif pct_complete >= 50:
+                    severity = "high"
+                else:
+                    severity = "medium"
+
+                progressions.append({
+                    "host": hostname,
+                    "playbook_name": pb["name"],
+                    "playbook_id": pb["id"],
+                    "total_steps": total_steps,
+                    "fired_steps": fired_count,
+                    "pct_complete": pct_complete,
+                    "severity": severity,
+                    "steps": matched_steps,
+                    "latest_alert": hb.get("latest_alert", {}).get("value_as_string"),
+                    "earliest_alert": hb.get("earliest_alert", {}).get("value_as_string"),
+                })
+
+    # Sort by severity then pct_complete
+    sev_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    progressions.sort(key=lambda p: (sev_order.get(p["severity"], 9), -p["pct_complete"]))
+
+    return {
+        "enabled": True,
+        "hours": hours,
+        "progressions": progressions,
+        "total_hosts_checked": len(host_buckets),
+        "playbook_count": len(playbooks),
+    }
+
+
+@router.get("/tide/de/execution", dependencies=[Depends(require_permission("alert:read"))])
+async def tide_de_execution(hours: int = 168):
+    """Execution metrics — cross-reference TIDE rules with ES alert data.
+
+    Returns firing/silent/noisy rules, volume trends, and efficacy stats.
+    """
+    from ion.services.elasticsearch_service import ElasticsearchService
+
+    es = ElasticsearchService()
+    if not es.is_configured:
+        return {"enabled": False, "error": "Elasticsearch not configured"}
+
+    tide_svc = get_tide_service()
+    if not tide_svc.enabled:
+        return {"enabled": False, "error": "TIDE not configured"}
+
+    # 1. Fetch all TIDE rules (enabled ones) for cross-referencing
+    tide_rules_result = tide_svc.get_rules_paginated(limit=2000)
+    tide_rules_by_name: dict[str, dict] = {}
+    tide_enabled_names: set[str] = set()
+    for r in tide_rules_result.get("rows", []):
+        name_lower = (r.get("name") or "").strip().lower()
+        if name_lower:
+            tide_rules_by_name[name_lower] = r
+            if r.get("enabled"):
+                tide_enabled_names.add(name_lower)
+
+    # 2. Query ES for alert aggregation by rule
+    hours = min(hours, 720)  # Cap at 30 days
+    interval = "6h" if hours <= 168 else "1d"
+
+    query = {
+        "size": 0,
+        "query": {
+            "bool": {
+                "must": [
+                    {"range": {"@timestamp": {"gte": f"now-{hours}h", "lte": "now"}}},
+                ],
+                "must_not": [
+                    {"term": {"kibana.alert.building_block_type": "default"}}
+                ]
+            }
+        },
+        "aggs": {
+            "by_rule": {
+                "terms": {"field": "kibana.alert.rule.name", "size": 1000},
+                "aggs": {
+                    "by_severity": {
+                        "terms": {"field": "kibana.alert.severity", "size": 5}
+                    },
+                    "by_status": {
+                        "terms": {"field": "kibana.alert.workflow_status", "size": 5}
+                    },
+                    "latest": {
+                        "max": {"field": "@timestamp"}
+                    },
+                    "earliest": {
+                        "min": {"field": "@timestamp"}
+                    },
+                    "by_mitre": {
+                        "terms": {"field": "threat.technique.id", "size": 20}
+                    }
+                }
+            },
+            "total_by_severity": {
+                "terms": {"field": "kibana.alert.severity", "size": 10}
+            },
+            "total_by_status": {
+                "terms": {"field": "kibana.alert.workflow_status", "size": 10}
+            },
+            "over_time": {
+                "date_histogram": {
+                    "field": "@timestamp",
+                    "fixed_interval": interval,
+                    "min_doc_count": 0,
+                    "extended_bounds": {"min": f"now-{hours}h", "max": "now"}
+                }
+            },
+            "by_severity_over_time": {
+                "date_histogram": {
+                    "field": "@timestamp",
+                    "fixed_interval": interval,
+                    "min_doc_count": 0,
+                    "extended_bounds": {"min": f"now-{hours}h", "max": "now"}
+                },
+                "aggs": {
+                    "sev": {"terms": {"field": "kibana.alert.severity", "size": 5}}
+                }
+            }
+        }
+    }
+
+    try:
+        pattern = es.alert_index
+        encoded = pattern.replace(",", "%2C")
+        result = await es._request("POST", f"/{encoded}/_search", json=query)
+    except Exception as e:
+        return {"enabled": True, "error": f"ES query failed: {e}", "rules": [], "summary": {}}
+
+    total_alerts = result.get("hits", {}).get("total", {})
+    if isinstance(total_alerts, dict):
+        total_alerts = total_alerts.get("value", 0)
+
+    aggs = result.get("aggregations", {})
+    rule_buckets = aggs.get("by_rule", {}).get("buckets", [])
+
+    # 3. Cross-reference ES rules with TIDE rules
+    firing_rules = []
+    matched_tide_keys = set()
+
+    for b in rule_buckets:
+        rule_name = b["key"]
+        alert_count = b["doc_count"]
+        severity_map = {sb["key"]: sb["doc_count"] for sb in b.get("by_severity", {}).get("buckets", [])}
+        status_map = {sb["key"]: sb["doc_count"] for sb in b.get("by_status", {}).get("buckets", [])}
+        latest = b.get("latest", {}).get("value_as_string")
+        earliest = b.get("earliest", {}).get("value_as_string")
+        mitre_ids = [mb["key"] for mb in b.get("by_mitre", {}).get("buckets", [])]
+
+        # Calculate FP-like rate: closed alerts / total (rough proxy)
+        closed = status_map.get("closed", 0)
+        acked = status_map.get("acknowledged", 0)
+        open_count = status_map.get("open", 0)
+        fp_rate = round(closed / alert_count * 100, 1) if alert_count else 0
+
+        # Match to TIDE
+        tide_key = rule_name.strip().lower()
+        tide_rule = tide_rules_by_name.get(tide_key)
+        matched_tide_keys.add(tide_key)
+
+        entry = {
+            "rule_name": rule_name,
+            "alert_count": alert_count,
+            "severity": severity_map,
+            "status": status_map,
+            "open": open_count,
+            "acknowledged": acked,
+            "closed": closed,
+            "close_rate": fp_rate,
+            "latest_alert": latest,
+            "earliest_alert": earliest,
+            "mitre_ids": mitre_ids,
+            "in_tide": tide_rule is not None,
+            "tide_severity": tide_rule.get("severity") if tide_rule else None,
+            "tide_enabled": tide_rule.get("enabled") if tide_rule else None,
+            "tide_quality": tide_rule.get("quality_score") if tide_rule else None,
+        }
+        firing_rules.append(entry)
+
+    # Sort by alert count descending
+    firing_rules.sort(key=lambda r: r["alert_count"], reverse=True)
+
+    # 4. Noisy rules: high volume + high close rate (>70% closed with >10 alerts)
+    noisy_rules = [r for r in firing_rules if r["alert_count"] >= 10 and r["close_rate"] >= 70]
+    noisy_rules.sort(key=lambda r: r["alert_count"], reverse=True)
+
+    # 5. Silent rules: enabled in TIDE but NOT firing in ES
+    silent_rules = []
+    for name_lower, rule in tide_rules_by_name.items():
+        if name_lower not in matched_tide_keys and rule.get("enabled"):
+            silent_rules.append({
+                "rule_name": rule["name"],
+                "tide_severity": rule.get("severity"),
+                "tide_quality": rule.get("quality_score"),
+                "mitre_ids": rule.get("mitre_ids") or [],
+            })
+    sev_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    silent_rules.sort(key=lambda r: sev_order.get((r.get("tide_severity") or "low").lower(), 5))
+
+    # 6. Global stats
+    total_severity = {sb["key"]: sb["doc_count"] for sb in aggs.get("total_by_severity", {}).get("buckets", [])}
+    total_status = {sb["key"]: sb["doc_count"] for sb in aggs.get("total_by_status", {}).get("buckets", [])}
+    timeline = [{"timestamp": tb["key_as_string"], "count": tb["doc_count"]}
+                for tb in aggs.get("over_time", {}).get("buckets", [])]
+
+    # Severity over time
+    sev_timeline = []
+    for tb in aggs.get("by_severity_over_time", {}).get("buckets", []):
+        entry = {"timestamp": tb["key_as_string"]}
+        for sb in tb.get("sev", {}).get("buckets", []):
+            entry[sb["key"]] = sb["doc_count"]
+        sev_timeline.append(entry)
+
+    # Summary
+    unique_rules = len(rule_buckets)
+    avg_per_rule = round(total_alerts / unique_rules, 1) if unique_rules else 0
+
+    return {
+        "enabled": True,
+        "hours": hours,
+        "summary": {
+            "total_alerts": total_alerts,
+            "unique_rules_firing": unique_rules,
+            "avg_alerts_per_rule": avg_per_rule,
+            "tide_matched": sum(1 for r in firing_rules if r["in_tide"]),
+            "tide_unmatched": sum(1 for r in firing_rules if not r["in_tide"]),
+            "silent_enabled_rules": len(silent_rules),
+            "noisy_rules": len(noisy_rules),
+            "severity": total_severity,
+            "status": total_status,
+        },
+        "top_firing": firing_rules[:50],
+        "noisy_rules": noisy_rules[:20],
+        "silent_rules": silent_rules[:50],
+        "timeline": timeline,
+        "severity_timeline": sev_timeline,
+    }
+
+
+@router.get("/namespaces", dependencies=[Depends(require_permission("alert:read"))])
+async def list_namespaces():
+    """List all data_stream.namespace values from ES for auto-suggestion."""
+    from ion.services.elasticsearch_service import ElasticsearchService
+
+    es = ElasticsearchService()
+    if not es.is_configured:
+        return []
+
+    query = {
+        "size": 0,
+        "aggs": {
+            "namespaces": {
+                "terms": {"field": "data_stream.namespace", "size": 100}
+            }
+        }
+    }
+    try:
+        pattern = es.alert_index
+        encoded = pattern.replace(",", "%2C")
+        result = await es._request("POST", f"/{encoded}/_search", json=query)
+        buckets = result.get("aggregations", {}).get("namespaces", {}).get("buckets", [])
+        return [{"namespace": b["key"], "count": b["doc_count"]} for b in buckets]
+    except Exception:
+        return []
