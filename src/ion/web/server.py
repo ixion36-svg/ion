@@ -37,6 +37,14 @@ from ion.web.rule_tuning_api import router as rule_tuning_router
 from ion.web.entity_timeline_api import router as entity_timeline_router
 from ion.web.analyst_efficiency_api import router as analyst_efficiency_router
 from ion.web.soc_health_api import router as soc_health_router
+from ion.web.attack_story_api import router as attack_story_router
+from ion.web.case_similarity_api import router as case_similarity_router
+from ion.web.triage_suggestion_api import router as triage_suggestion_router
+from ion.web.mitre_navigator_api import router as mitre_navigator_router
+from ion.web.playbook_analytics_api import router as playbook_analytics_router
+from ion.web.alert_pattern_api import router as alert_pattern_router
+from ion.web.executive_report_api import router as executive_report_router
+from ion.web.ioc_staleness_api import router as ioc_staleness_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -190,6 +198,14 @@ app.include_router(rule_tuning_router, prefix="/api")
 app.include_router(entity_timeline_router, prefix="/api")
 app.include_router(analyst_efficiency_router, prefix="/api")
 app.include_router(soc_health_router, prefix="/api")
+app.include_router(attack_story_router, prefix="/api")
+app.include_router(case_similarity_router, prefix="/api")
+app.include_router(triage_suggestion_router, prefix="/api")
+app.include_router(mitre_navigator_router, prefix="/api")
+app.include_router(playbook_analytics_router, prefix="/api")
+app.include_router(alert_pattern_router, prefix="/api")
+app.include_router(executive_report_router, prefix="/api")
+app.include_router(ioc_staleness_router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -637,6 +653,18 @@ async def analyst_efficiency_page(request: Request, user: User = Depends(require
 async def soc_health_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the SOC Health Scorecard page."""
     return templates.TemplateResponse(request=request, name="soc_health.html")
+
+
+@app.get("/attack-stories", response_class=HTMLResponse)
+async def attack_stories_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Attack Stories page."""
+    return templates.TemplateResponse(request=request, name="attack_stories.html")
+
+
+@app.get("/executive-report", response_class=HTMLResponse)
+async def executive_report_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Executive Report page."""
+    return templates.TemplateResponse(request=request, name="executive_report.html")
 
 
 @app.get("/topology", response_class=HTMLResponse)

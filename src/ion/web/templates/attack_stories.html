@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Attack Stories - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-book-open"></i> Attack Stories</h1>
+    <div class="header-actions">
+        <select id="as-hours" onchange="asLoad()">
+            <option value="4">Last 4h</option>
+            <option value="12">Last 12h</option>
+            <option value="24" selected>Last 24h</option>
+            <option value="72">Last 3 days</option>
+            <option value="168">Last 7 days</option>
+        </select>
+        <button class="btn btn-primary" onclick="asLoad()">Refresh</button>
+    </div>
+</div>
+
+<div id="as-content"><div class="as-loading"><span class="as-spinner"></span> Correlating alerts into attack stories...</div></div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.as-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.as-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:as-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes as-spin{to{transform:rotate(360deg)}}
+
+.as-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.as-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;text-align:center;position:relative;overflow:hidden}
+.as-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary)}
+.as-stat-val{font-size:1.4rem;font-weight:700;color:var(--primary);font-family:'JetBrains Mono',monospace}
+.as-stat-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;margin-top:4px}
+.as-stat.crit .as-stat-val{color:var(--sev-critical)}.as-stat.crit::before{background:var(--sev-critical)}
+.as-stat.high .as-stat-val{color:var(--sev-high)}.as-stat.high::before{background:var(--sev-high)}
+.as-stat.green .as-stat-val{color:var(--mitre-covered)}.as-stat.green::before{background:var(--mitre-covered)}
+
+.as-story{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:16px;overflow:hidden}
+.as-story-header{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background .15s}
+.as-story-header:hover{background:rgba(0,212,255,.03)}
+.as-story-score{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'JetBrains Mono',monospace;font-size:.9rem;flex-shrink:0}
+.as-story-entity{font-size:.95rem;font-weight:700;color:var(--text-primary);flex:1}
+.as-story-entity small{font-size:.72rem;color:var(--text-secondary);font-weight:400;margin-left:8px}
+.as-story-meta{display:flex;gap:12px;font-size:.72rem;color:var(--text-secondary);font-family:'JetBrains Mono',monospace}
+.as-story-chevron{color:var(--text-secondary);transition:transform .2s}
+.as-story.open .as-story-chevron{transform:rotate(90deg)}
+
+.as-story-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border)}
+.as-story.open .as-story-body{display:block}
+
+.as-narrative{padding:12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);font-size:.85rem;line-height:1.6;color:var(--text-primary);margin:12px 0}
+
+/* Kill chain progression */
+.as-chain{display:flex;gap:0;align-items:center;overflow-x:auto;padding:8px 0}
+.as-chain-node{padding:6px 12px;border-radius:4px;font-size:.72rem;font-weight:700;text-transform:uppercase;white-space:nowrap}
+.as-chain-node.active{background:var(--sev-critical-dim);color:var(--sev-critical);border:1px solid var(--sev-critical)}
+.as-chain-node.inactive{background:var(--bg-primary);color:var(--text-muted);border:1px dashed var(--border)}
+.as-chain-arrow{padding:0 4px;color:var(--text-muted);font-size:.8rem}
+
+/* Alert timeline within story */
+.as-alert{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.1);font-size:.82rem}
+.as-alert:hover{background:rgba(0,212,255,.03)}
+.as-alert-time{font-size:.72rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;min-width:130px}
+.as-alert-rule{color:var(--text-primary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.as-mitre-chip{display:inline-block;padding:1px 6px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:3px;font-size:.68rem;font-family:'JetBrains Mono',monospace;color:var(--primary);margin-left:4px}
+</style>
+<script>
+const API = '/api/attack-stories';
+function $(id){return document.getElementById(id)}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function fmtTime(iso){if(!iso)return'-';return new Date(iso).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+
+async function asLoad(){
+    $('as-content').innerHTML = '<div class="as-loading"><span class="as-spinner"></span> Correlating alerts into attack stories...</div>';
+    try {
+        const r = await fetch(API+'?hours='+$('as-hours').value);
+        if(!r.ok) throw new Error('Failed');
+        const d = await r.json();
+        if(d.error){$('as-content').innerHTML=`<div class="as-loading" style="color:var(--sev-critical)">${esc(d.error)}</div>`;return}
+        renderStories(d);
+    } catch(e) {
+        $('as-content').innerHTML = `<div class="as-loading" style="color:var(--sev-critical)">${esc(e.message)}</div>`;
+    }
+}
+
+function scoreColor(s){return s>=70?'var(--sev-critical)':s>=50?'var(--sev-high)':s>=30?'var(--sev-medium)':'var(--sev-low)'}
+function scoreBg(s){return s>=70?'var(--sev-critical-dim)':s>=50?'var(--sev-high-dim)':s>=30?'var(--sev-medium-dim)':'var(--sev-low-dim)'}
+
+function renderStories(d){
+    const stories = d.stories || [];
+    const chainOrder = d.kill_chain_order || [];
+    let html = '';
+
+    const critStories = stories.filter(s=>s.severity==='critical').length;
+    const highStories = stories.filter(s=>s.severity==='high').length;
+
+    html += '<div class="as-stats">';
+    html += `<div class="as-stat"><div class="as-stat-val">${d.total_alerts}</div><div class="as-stat-label">Total Alerts</div></div>`;
+    html += `<div class="as-stat${critStories?' crit':''}"><div class="as-stat-val">${critStories}</div><div class="as-stat-label">Critical Stories</div></div>`;
+    html += `<div class="as-stat${highStories?' high':''}"><div class="as-stat-val">${highStories}</div><div class="as-stat-label">High Stories</div></div>`;
+    html += `<div class="as-stat"><div class="as-stat-val">${stories.length}</div><div class="as-stat-label">Total Stories</div></div>`;
+    html += '</div>';
+
+    if(!stories.length){html+='<div class="as-loading">No attack stories detected — alerts did not correlate into multi-step patterns.</div>';$('as-content').innerHTML=html;return}
+
+    for(const s of stories){
+        const color = scoreColor(s.score);
+        const bg = scoreBg(s.score);
+        const tacticsSet = new Set(s.tactics_progression||[]);
+
+        html += `<div class="as-story">
+            <div class="as-story-header" onclick="this.parentElement.classList.toggle('open')">
+                <div class="as-story-score" style="background:${bg};color:${color};border:2px solid ${color}">${s.score}</div>
+                <div>
+                    <div class="as-story-entity">${esc(s.entity)}<small>${esc(s.entity_type)}</small></div>
+                    <div style="font-size:.75rem;color:var(--text-secondary);margin-top:2px">${s.alert_count} alerts, ${(s.unique_techniques||[]).length} techniques, ${s.time_span_hours}h span</div>
+                </div>
+                <div class="as-story-meta">
+                    <span class="sev-badge sev-${s.severity}">${esc(s.severity)}</span>
+                </div>
+                <span class="as-story-chevron">\u25B6</span>
+            </div>
+            <div class="as-story-body">
+                <div class="as-narrative">${esc(s.narrative)}</div>`;
+
+        // Kill chain
+        html += '<div class="as-chain">';
+        for(let i=0;i<chainOrder.length;i++){
+            if(i>0) html += '<span class="as-chain-arrow">\u2192</span>';
+            const active = tacticsSet.has(chainOrder[i]);
+            html += `<span class="as-chain-node ${active?'active':'inactive'}">${esc(chainOrder[i])}</span>`;
+        }
+        html += '</div>';
+
+        // Alerts
+        html += '<div style="margin-top:12px;max-height:300px;overflow-y:auto">';
+        for(const a of s.alerts){
+            const mitre = a.mitre_technique_id ? `<span class="as-mitre-chip">${esc(a.mitre_technique_id)}</span>` : '';
+            html += `<div class="as-alert">
+                <span class="as-alert-time">${fmtTime(a.timestamp)}</span>
+                <span class="sev-badge sev-${a.severity}">${esc(a.severity)}</span>
+                <span class="as-alert-rule">${esc(a.rule_name||a.title)}${mitre}</span>
+            </div>`;
+        }
+        html += '</div></div></div>';
+    }
+
+    $('as-content').innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', asLoad);
+</script>
+{% endblock %}
