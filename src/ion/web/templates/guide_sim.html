@@ -1,0 +1,565 @@
+{% extends "base.html" %}
+
+{% block title %}Training Simulator - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-play-circle"></i> Training Simulator</h1>
+    <div class="header-actions" id="sim-header-actions">
+        <button class="btn btn-secondary" onclick="simBack()" id="sim-back-btn" style="display:none"><i class="icon-arrow-left"></i> Back to Scenarios</button>
+    </div>
+</div>
+<div id="sim-content"><div class="sim-loading"><span class="sim-spinner"></span> Loading scenarios...</div></div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Simulator Core ─────────────────────── */
+.sim-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.sim-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:sim-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes sim-spin{to{transform:rotate(360deg)}}
+
+/* Scenario selection */
+.sim-scenarios{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.sim-scenario-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.sim-scenario-card:hover{border-color:var(--primary);transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.sim-scenario-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sim-scenario-card.beginner::before{background:var(--mitre-covered)}
+.sim-scenario-card.intermediate::before{background:var(--sev-medium)}
+.sim-scenario-card.advanced::before{background:var(--sev-critical)}
+.sim-sc-title{font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:6px}
+.sim-sc-desc{font-size:.82rem;color:var(--text-secondary);line-height:1.5;margin-bottom:12px}
+.sim-sc-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sim-sc-badge{padding:3px 8px;border-radius:4px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.sim-sc-badge.beginner{background:var(--mitre-covered-dim);color:var(--mitre-covered)}
+.sim-sc-badge.intermediate{background:var(--sev-medium-dim);color:var(--sev-medium)}
+.sim-sc-badge.advanced{background:var(--sev-critical-dim);color:var(--sev-critical)}
+.sim-sc-info{font-size:.72rem;color:var(--text-muted)}
+.sim-sc-tag{padding:2px 6px;border-radius:3px;font-size:.65rem;background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary)}
+
+/* Active simulation layout */
+.sim-layout{display:grid;grid-template-columns:1fr 380px;gap:16px;min-height:500px}
+@media(max-width:1000px){.sim-layout{grid-template-columns:1fr}}
+
+/* Left: Alert + Investigation panel */
+.sim-main{display:flex;flex-direction:column;gap:12px}
+.sim-panel{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.sim-panel-header{padding:10px 14px;background:var(--bg-card);font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.sim-panel-header i{color:var(--primary)}
+.sim-panel-body{padding:14px}
+
+/* Alert mockup */
+.sim-alert-title{font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.sim-alert-meta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:.78rem;color:var(--text-secondary)}
+.sim-alert-meta strong{color:var(--text-primary)}
+.sim-alert-message{padding:10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);font-size:.85rem;color:var(--text-primary);line-height:1.6;margin-bottom:12px}
+.sim-raw-data{font-family:'JetBrains Mono',monospace;font-size:.75rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:10px;max-height:200px;overflow-y:auto;color:var(--text-secondary)}
+.sim-raw-key{color:var(--primary)}.sim-raw-val{color:var(--text-primary)}
+
+/* Observables panel */
+.sim-obs{display:flex;flex-direction:column;gap:6px}
+.sim-ob{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .15s}
+.sim-ob:hover{border-color:var(--primary)}
+.sim-ob.enriched{border-color:var(--mitre-covered)}
+.sim-ob-type{font-size:.65rem;font-weight:700;text-transform:uppercase;padding:2px 6px;border-radius:3px;background:var(--primary-dim);color:var(--primary);min-width:50px;text-align:center}
+.sim-ob-value{font-family:'JetBrains Mono',monospace;font-size:.82rem;color:var(--text-primary);flex:1}
+.sim-ob-context{font-size:.72rem;color:var(--text-muted)}
+.sim-ob-enrich-btn{font-size:.68rem;padding:3px 8px;background:var(--primary-dim);border:1px solid var(--primary);border-radius:4px;color:var(--primary);cursor:pointer;font-weight:700;white-space:nowrap}
+.sim-ob-enrich-btn:hover{background:var(--primary);color:var(--bg-deep)}
+.sim-ob-enriched-badge{font-size:.68rem;font-weight:700;color:var(--mitre-covered);white-space:nowrap}
+
+/* Enrichment result panel */
+.sim-enrich-result{padding:10px;background:var(--bg-primary);border:1px solid var(--mitre-covered);border-radius:var(--radius);margin-top:6px;font-size:.82rem;display:none}
+.sim-enrich-result.show{display:block}
+.sim-enrich-source{font-size:.68rem;color:var(--text-muted);margin-bottom:4px}
+.sim-enrich-verdict{font-weight:700;margin-top:4px;padding:4px 8px;border-radius:3px;display:inline-block;font-size:.78rem}
+.sim-enrich-verdict.high{background:var(--sev-critical-dim);color:var(--sev-critical)}
+.sim-enrich-verdict.medium{background:var(--sev-medium-dim);color:var(--sev-medium)}
+.sim-enrich-verdict.low{background:var(--mitre-covered-dim);color:var(--mitre-covered)}
+
+/* Related alerts */
+.sim-related-alert{padding:8px 10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:.82rem}
+.sim-related-alert .sim-ra-title{font-weight:600;color:var(--text-primary)}
+.sim-related-alert .sim-ra-meta{font-size:.72rem;color:var(--text-muted);margin-top:2px}
+
+/* Threat Intel panel */
+.sim-ti{padding:10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);font-size:.82rem}
+.sim-ti-ttps{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.sim-ti-ttp{padding:2px 6px;background:var(--primary-dim);border:1px solid rgba(0,212,255,.25);border-radius:3px;font-size:.68rem;font-family:'JetBrains Mono',monospace;color:var(--primary)}
+
+/* Right: Steps sidebar */
+.sim-sidebar{display:flex;flex-direction:column;gap:12px}
+.sim-progress{padding:14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.sim-progress-title{font-size:.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px}
+.sim-progress-bar{height:8px;background:rgba(99,110,123,.2);border-radius:4px;overflow:hidden;margin-bottom:8px}
+.sim-progress-fill{height:100%;background:var(--primary);border-radius:4px;transition:width .3s}
+.sim-progress-text{font-size:.72rem;color:var(--text-muted)}
+
+/* Step cards */
+.sim-step{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;transition:all .2s}
+.sim-step.active{border-color:var(--primary)}
+.sim-step.completed{border-color:var(--mitre-covered);opacity:.85}
+.sim-step.locked{opacity:.5}
+.sim-step-header{padding:10px 14px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.sim-step-num{width:24px;height:24px;border-radius:50%;background:var(--bg-card);color:var(--text-muted);font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sim-step.active .sim-step-num{background:var(--primary);color:var(--bg-deep)}
+.sim-step.completed .sim-step-num{background:var(--mitre-covered);color:var(--bg-deep)}
+.sim-step-title{font-size:.82rem;font-weight:600;color:var(--text-primary);flex:1}
+.sim-step-body{padding:0 14px 14px;display:none}
+.sim-step.active .sim-step-body{display:block}
+
+.sim-instruction{font-size:.85rem;color:var(--text-secondary);line-height:1.6;margin-bottom:12px;padding:8px 10px;background:var(--bg-primary);border-left:3px solid var(--primary);border-radius:0 var(--radius) var(--radius) 0}
+.sim-hints{margin-bottom:12px}
+.sim-hint{font-size:.78rem;color:var(--sev-medium);padding:4px 0;display:flex;align-items:center;gap:6px}
+.sim-hint::before{content:'\1F4A1';font-size:.85rem}
+.sim-hint.hidden{display:none}
+.sim-show-hints{font-size:.72rem;color:var(--primary);cursor:pointer;text-decoration:underline;margin-bottom:8px}
+
+/* Questions */
+.sim-question{margin-bottom:16px}
+.sim-q-text{font-size:.88rem;font-weight:600;color:var(--text-primary);margin-bottom:8px}
+.sim-q-points{font-size:.68rem;color:var(--text-muted);margin-bottom:8px}
+.sim-option{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:4px;cursor:pointer;transition:all .15s;font-size:.85rem;color:var(--text-secondary)}
+.sim-option:hover{border-color:var(--primary);color:var(--text-primary)}
+.sim-option.selected{border-color:var(--primary);background:var(--primary-dim);color:var(--primary)}
+.sim-option.correct{border-color:var(--mitre-covered);background:var(--mitre-covered-dim);color:var(--mitre-covered)}
+.sim-option.wrong{border-color:var(--sev-critical);background:var(--sev-critical-dim);color:var(--sev-critical)}
+.sim-option-radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center}
+.sim-option.selected .sim-option-radio{border-color:var(--primary)}
+.sim-option.selected .sim-option-radio::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--primary)}
+.sim-option-check{width:16px;height:16px;border-radius:3px;border:2px solid var(--border);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:.7rem}
+.sim-option.selected .sim-option-check{border-color:var(--primary);background:var(--primary);color:var(--bg-deep)}
+
+.sim-feedback{padding:10px;border-radius:var(--radius);font-size:.82rem;margin-top:8px;display:none}
+.sim-feedback.show{display:block}
+.sim-feedback.correct{background:var(--mitre-covered-dim);border:1px solid var(--mitre-covered);color:var(--mitre-covered)}
+.sim-feedback.wrong{background:var(--sev-critical-dim);border:1px solid var(--sev-critical);color:var(--sev-critical)}
+.sim-feedback.partial{background:var(--sev-medium-dim);border:1px solid var(--sev-medium);color:var(--sev-medium)}
+
+.sim-step-actions{display:flex;gap:8px;margin-top:12px}
+.sim-btn{padding:8px 16px;border-radius:var(--radius);font-size:.82rem;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+.sim-btn-primary{background:var(--primary);color:var(--bg-deep)}.sim-btn-primary:hover{opacity:.85}
+.sim-btn-secondary{background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border)}.sim-btn-secondary:hover{border-color:var(--primary)}
+
+/* Score screen */
+.sim-score{text-align:center;padding:40px 20px}
+.sim-score-ring{width:140px;height:140px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+.sim-score-inner{width:100px;height:100px;border-radius:50%;background:var(--bg-secondary);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.sim-score-grade{font-size:2.5rem;font-weight:700;font-family:'JetBrains Mono',monospace}
+.sim-score-pct{font-size:.82rem;color:var(--text-secondary)}
+.sim-score-title{font-size:1.2rem;font-weight:700;color:var(--text-primary);margin-bottom:4px}
+.sim-score-subtitle{font-size:.88rem;color:var(--text-secondary);margin-bottom:24px}
+.sim-score-breakdown{max-width:500px;margin:0 auto;text-align:left}
+.sim-score-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(99,110,123,.1);font-size:.85rem}
+.sim-score-row-q{flex:1;color:var(--text-primary)}
+.sim-score-row-pts{font-family:'JetBrains Mono',monospace;font-weight:700;min-width:60px;text-align:right}
+</style>
+<script>
+const API = '/api/training-sim';
+function $(id){return document.getElementById(id)}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+let currentScenario = null;
+let currentStep = 0;
+let answers = {};
+let enrichedObs = new Set();
+
+async function simInit() {
+    try {
+        const r = await fetch(API+'/scenarios');
+        const d = await r.json();
+        renderScenarioList(d.scenarios);
+    } catch(e) {
+        $('sim-content').innerHTML = '<div class="sim-loading" style="color:var(--sev-critical)">Failed to load scenarios</div>';
+    }
+}
+
+function renderScenarioList(scenarios) {
+    let html = '<div style="margin-bottom:16px"><p style="font-size:.9rem;color:var(--text-secondary)">Choose a training scenario. Each simulation walks you through a realistic SOC investigation with mock data, requiring you to make decisions at each step.</p></div>';
+    html += '<div class="sim-scenarios">';
+    for (const s of scenarios) {
+        html += `<div class="sim-scenario-card ${s.difficulty}" onclick="simStart('${s.id}')">
+            <div class="sim-sc-title">${esc(s.title)}</div>
+            <div class="sim-sc-desc">${esc(s.description)}</div>
+            <div class="sim-sc-meta">
+                <span class="sim-sc-badge ${s.difficulty}">${esc(s.difficulty)}</span>
+                <span class="sim-sc-info">${s.estimated_minutes} min</span>
+                <span class="sim-sc-info">${s.total_steps} steps</span>
+                <span class="sim-sc-info">${s.total_points} pts</span>
+                ${s.tags.map(t=>'<span class="sim-sc-tag">'+esc(t)+'</span>').join('')}
+            </div>
+        </div>`;
+    }
+    html += '</div>';
+    $('sim-content').innerHTML = html;
+    $('sim-back-btn').style.display = 'none';
+}
+
+async function simStart(scenarioId) {
+    $('sim-content').innerHTML = '<div class="sim-loading"><span class="sim-spinner"></span> Loading scenario...</div>';
+    try {
+        const r = await fetch(API+'/scenarios/'+scenarioId);
+        currentScenario = await r.json();
+        currentStep = 0;
+        answers = {};
+        enrichedObs = new Set();
+        $('sim-back-btn').style.display = '';
+        renderSimulation();
+    } catch(e) {
+        $('sim-content').innerHTML = '<div class="sim-loading" style="color:var(--sev-critical)">Failed to load scenario</div>';
+    }
+}
+
+function simBack() {
+    currentScenario = null;
+    simInit();
+}
+
+function renderSimulation() {
+    const s = currentScenario;
+    const a = s.alert;
+    let html = '<div class="sim-layout">';
+
+    // === LEFT: Main investigation area ===
+    html += '<div class="sim-main">';
+
+    // Alert panel
+    html += `<div class="sim-panel">
+        <div class="sim-panel-header"><i class="icon-alert-triangle"></i> Alert Detail</div>
+        <div class="sim-panel-body">
+            <div class="sim-alert-title"><span class="sev-badge sev-${a.severity}">${esc(a.severity)}</span> ${esc(a.title)}</div>
+            <div class="sim-alert-meta">
+                <span><strong>Rule:</strong> ${esc(a.rule_name)}</span>
+                <span><strong>Source:</strong> ${esc(a.source)}</span>
+                ${a.host ? '<span><strong>Host:</strong> '+esc(a.host)+'</span>' : ''}
+                ${a.user ? '<span><strong>User:</strong> '+esc(a.user)+'</span>' : ''}
+                <span><strong>Time:</strong> ${new Date(a.timestamp).toLocaleString()}</span>
+            </div>
+            ${a.mitre_technique_id ? `<div style="margin-bottom:8px"><span style="padding:2px 6px;background:var(--primary-dim);border:1px solid rgba(0,212,255,.25);border-radius:3px;font-size:.72rem;font-family:monospace;color:var(--primary)">${esc(a.mitre_technique_id)}</span> <span style="font-size:.78rem;color:var(--text-secondary)">${esc(a.mitre_technique_name)} (${esc(a.mitre_tactic_name)})</span></div>` : ''}
+            <div class="sim-alert-message">${esc(a.message)}</div>
+            <details><summary style="font-size:.78rem;color:var(--primary);cursor:pointer;margin-bottom:4px">View Raw Data</summary>
+            <div class="sim-raw-data">${Object.entries(a.raw_data||{}).map(([k,v])=>`<div><span class="sim-raw-key">${esc(k)}</span>: <span class="sim-raw-val">${esc(String(v))}</span></div>`).join('')}</div>
+            </details>
+        </div>
+    </div>`;
+
+    // Related alerts (if any)
+    if (s.related_alerts && s.related_alerts.length) {
+        html += '<div class="sim-panel"><div class="sim-panel-header"><i class="icon-link"></i> Related Alerts ('+s.related_alerts.length+')</div><div class="sim-panel-body">';
+        for (const ra of s.related_alerts) {
+            html += `<div class="sim-related-alert">
+                <div class="sim-ra-title"><span class="sev-badge sev-${ra.severity}">${esc(ra.severity)}</span> ${esc(ra.title)}</div>
+                <div class="sim-ra-meta">${esc(ra.rule_name)} | ${esc(ra.host||'')} | ${new Date(ra.timestamp).toLocaleTimeString()} | ${esc(ra.mitre_tactic_name||'')}</div>
+                <div style="font-size:.82rem;color:var(--text-secondary);margin-top:4px">${esc(ra.message)}</div>
+            </div>`;
+        }
+        html += '</div></div>';
+    }
+
+    // Observables panel
+    html += '<div class="sim-panel"><div class="sim-panel-header"><i class="icon-search"></i> Observables</div><div class="sim-panel-body"><div class="sim-obs" id="sim-obs">';
+    for (let i = 0; i < (s.observables||[]).length; i++) {
+        const o = s.observables[i];
+        const isEnriched = enrichedObs.has(o.value);
+        html += `<div>
+            <div class="sim-ob ${isEnriched?'enriched':''}" id="sim-ob-${i}">
+                <span class="sim-ob-type">${esc(o.type)}</span>
+                <div style="flex:1">
+                    <div class="sim-ob-value">${esc(o.value)}</div>
+                    <div class="sim-ob-context">${esc(o.context)}</div>
+                </div>
+                ${isEnriched ? '<span class="sim-ob-enriched-badge">ENRICHED</span>' : `<button class="sim-ob-enrich-btn" onclick="simEnrich(${i})">Enrich</button>`}
+            </div>
+            <div class="sim-enrich-result ${isEnriched?'show':''}" id="sim-enrich-${i}">
+                ${isEnriched ? renderEnrichment(o.value, s) : ''}
+            </div>
+        </div>`;
+    }
+    html += '</div></div></div>';
+
+    // Threat Intel panel (shown when relevant step reached)
+    if (s.threat_intel && currentStep >= 2) {
+        const ti = s.threat_intel;
+        html += `<div class="sim-panel"><div class="sim-panel-header"><i class="icon-eye"></i> Threat Intelligence</div><div class="sim-panel-body">
+            <div class="sim-ti">
+                <div style="font-weight:700;color:var(--text-primary);margin-bottom:4px">${esc(ti.actor)}</div>
+                <div style="font-size:.78rem;color:var(--text-secondary)">Confidence: <strong>${ti.confidence}%</strong></div>
+                <div style="font-size:.82rem;color:var(--text-secondary);margin-top:6px">${esc(ti.context)}</div>
+                <div class="sim-ti-ttps">${(ti.ttps||[]).map(t=>`<span class="sim-ti-ttp">${esc(t)}</span>`).join('')}</div>
+            </div>
+        </div></div>`;
+    }
+
+    html += '</div>'; // end sim-main
+
+    // === RIGHT: Steps sidebar ===
+    html += '<div class="sim-sidebar">';
+
+    // Progress
+    const totalSteps = s.steps.length;
+    const completedSteps = Math.min(currentStep, totalSteps);
+    const pct = Math.round(completedSteps / totalSteps * 100);
+    html += `<div class="sim-progress">
+        <div class="sim-progress-title">${esc(s.title)}</div>
+        <div class="sim-progress-bar"><div class="sim-progress-fill" style="width:${pct}%"></div></div>
+        <div class="sim-progress-text">Step ${Math.min(currentStep+1, totalSteps)} of ${totalSteps} | ${pct}% complete</div>
+    </div>`;
+
+    // Steps
+    for (let i = 0; i < s.steps.length; i++) {
+        const step = s.steps[i];
+        const state = i < currentStep ? 'completed' : i === currentStep ? 'active' : 'locked';
+        html += `<div class="sim-step ${state}" id="sim-step-${i}">
+            <div class="sim-step-header" ${state !== 'locked' ? `onclick="simGoToStep(${i})"` : ''}>
+                <div class="sim-step-num">${state === 'completed' ? '&#10003;' : i+1}</div>
+                <div class="sim-step-title">${esc(step.title)}</div>
+            </div>
+            <div class="sim-step-body">
+                <div class="sim-instruction">${esc(step.instruction)}</div>`;
+
+        // Hints
+        if (step.hints && step.hints.length) {
+            html += `<div class="sim-show-hints" onclick="this.nextElementSibling.querySelectorAll('.sim-hint').forEach(h=>h.classList.remove('hidden'));this.style.display='none'">Show hints (${step.hints.length})</div>`;
+            html += '<div class="sim-hints">';
+            for (const hint of step.hints) {
+                html += `<div class="sim-hint hidden">${esc(hint)}</div>`;
+            }
+            html += '</div>';
+        }
+
+        // Questions
+        for (const q of step.questions || []) {
+            html += renderQuestion(q, i);
+        }
+
+        // Actions
+        if (state === 'active') {
+            html += `<div class="sim-step-actions">
+                <button class="sim-btn sim-btn-primary" onclick="simSubmitStep(${i})">Submit & Continue</button>
+            </div>`;
+        }
+
+        html += '</div></div>';
+    }
+
+    // Score button (shown when all steps completed)
+    if (currentStep >= s.steps.length) {
+        html += `<div style="text-align:center;padding:16px">
+            <button class="sim-btn sim-btn-primary" style="padding:12px 32px;font-size:.95rem" onclick="simScore()">View Score</button>
+        </div>`;
+    }
+
+    html += '</div>'; // end sidebar
+    html += '</div>'; // end layout
+    $('sim-content').innerHTML = html;
+}
+
+function renderQuestion(q, stepIdx) {
+    const answered = answers[q.id] !== undefined;
+    let html = `<div class="sim-question" id="sim-q-${q.id}">
+        <div class="sim-q-text">${esc(q.text)}</div>
+        <div class="sim-q-points">${q.points} points</div>`;
+
+    for (const opt of q.options) {
+        const isSelected = q.type === 'multi_select'
+            ? (answers[q.id] || []).includes(opt.id)
+            : answers[q.id] === opt.id;
+        const indicator = q.type === 'multi_select' ? 'sim-option-check' : 'sim-option-radio';
+        html += `<div class="sim-option ${isSelected?'selected':''}" onclick="simSelectOption('${q.id}','${opt.id}','${q.type}')">
+            <div class="${indicator}">${isSelected && q.type==='multi_select' ? '&#10003;' : ''}</div>
+            <span>${esc(opt.text)}</span>
+        </div>`;
+    }
+
+    html += `<div class="sim-feedback" id="sim-fb-${q.id}"></div>`;
+    html += '</div>';
+    return html;
+}
+
+function renderEnrichment(value, scenario) {
+    const er = (scenario.enrichment_results || {})[value];
+    if (!er) return '<div style="font-size:.82rem;color:var(--text-muted)">No enrichment data available for this observable.</div>';
+    const levelCls = er.threat_level === 'high' ? 'high' : er.threat_level === 'medium' ? 'medium' : 'low';
+    return `<div class="sim-enrich-source">Source: ${esc(er.source)}</div>
+        <div style="font-size:.82rem;color:var(--text-secondary);line-height:1.5">${esc(er.details)}</div>
+        <div class="sim-enrich-verdict ${levelCls}">${esc(er.verdict)}</div>`;
+}
+
+function simEnrich(idx) {
+    const o = currentScenario.observables[idx];
+    enrichedObs.add(o.value);
+    const el = document.getElementById('sim-enrich-'+idx);
+    el.innerHTML = renderEnrichment(o.value, currentScenario);
+    el.classList.add('show');
+    document.getElementById('sim-ob-'+idx).classList.add('enriched');
+    const btn = document.querySelector(`#sim-ob-${idx} .sim-ob-enrich-btn`);
+    if (btn) btn.outerHTML = '<span class="sim-ob-enriched-badge">ENRICHED</span>';
+}
+
+function simSelectOption(qId, optId, type) {
+    if (type === 'multi_select') {
+        if (!answers[qId]) answers[qId] = [];
+        const idx = answers[qId].indexOf(optId);
+        if (idx >= 0) answers[qId].splice(idx, 1);
+        else answers[qId].push(optId);
+    } else {
+        answers[qId] = optId;
+    }
+    // Re-render just the options (toggle selected class)
+    const qEl = document.getElementById('sim-q-'+qId);
+    if (qEl) {
+        qEl.querySelectorAll('.sim-option').forEach(opt => {
+            const thisId = opt.getAttribute('onclick').match(/'([^']+)','([^']+)'/);
+            if (!thisId) return;
+            const isSelected = type === 'multi_select'
+                ? (answers[qId] || []).includes(thisId[2])
+                : answers[qId] === thisId[2];
+            opt.classList.toggle('selected', isSelected);
+            const check = opt.querySelector('.sim-option-check');
+            if (check) check.innerHTML = isSelected ? '&#10003;' : '';
+            const radio = opt.querySelector('.sim-option-radio');
+            if (radio) {
+                if (isSelected) radio.innerHTML = '<div style="width:8px;height:8px;border-radius:50%;background:var(--primary)"></div>';
+                else radio.innerHTML = '';
+            }
+        });
+    }
+}
+
+function simSubmitStep(stepIdx) {
+    const step = currentScenario.steps[stepIdx];
+    let allAnswered = true;
+
+    for (const q of step.questions || []) {
+        if (answers[q.id] === undefined || (Array.isArray(answers[q.id]) && answers[q.id].length === 0)) {
+            allAnswered = false;
+            break;
+        }
+    }
+
+    if (!allAnswered) {
+        alert('Please answer all questions before continuing.');
+        return;
+    }
+
+    // Show feedback for this step
+    for (const q of step.questions || []) {
+        showFeedback(q);
+    }
+
+    // Advance after a short delay
+    setTimeout(() => {
+        currentStep = stepIdx + 1;
+        renderSimulation();
+        // Scroll to active step
+        const activeStep = document.querySelector('.sim-step.active');
+        if (activeStep) activeStep.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 1500);
+}
+
+function showFeedback(q) {
+    const fb = document.getElementById('sim-fb-'+q.id);
+    if (!fb) return;
+
+    if (q.type === 'multiple_choice') {
+        const correct = q.options.find(o => o.correct);
+        const chosen = q.options.find(o => o.id === answers[q.id]);
+        if (chosen && chosen.correct) {
+            fb.className = 'sim-feedback show correct';
+            fb.textContent = chosen.feedback || 'Correct!';
+        } else {
+            fb.className = 'sim-feedback show wrong';
+            fb.textContent = (chosen ? chosen.feedback : 'No answer') || 'Incorrect.';
+        }
+    } else if (q.type === 'multi_select') {
+        const correctIds = new Set(q.options.filter(o => o.correct).map(o => o.id));
+        const selected = new Set(answers[q.id] || []);
+        const allCorrect = [...correctIds].every(id => selected.has(id)) && [...selected].every(id => correctIds.has(id));
+        if (allCorrect) {
+            fb.className = 'sim-feedback show correct';
+            fb.textContent = q.feedback_correct || 'All correct!';
+        } else if ([...selected].some(id => correctIds.has(id))) {
+            fb.className = 'sim-feedback show partial';
+            fb.textContent = q.feedback_partial || 'Partially correct.';
+        } else {
+            fb.className = 'sim-feedback show wrong';
+            fb.textContent = 'Incorrect — review the options.';
+        }
+    }
+
+    // Color the options
+    const qEl = document.getElementById('sim-q-'+q.id);
+    if (qEl) {
+        qEl.querySelectorAll('.sim-option').forEach(opt => {
+            const match = opt.getAttribute('onclick').match(/'([^']+)','([^']+)'/);
+            if (!match) return;
+            const optObj = q.options.find(o => o.id === match[2]);
+            if (optObj && optObj.correct) opt.classList.add('correct');
+            else if (opt.classList.contains('selected')) opt.classList.add('wrong');
+        });
+    }
+}
+
+function simGoToStep(idx) {
+    if (idx <= currentStep) {
+        currentStep = idx;
+        renderSimulation();
+    }
+}
+
+async function simScore() {
+    $('sim-content').innerHTML = '<div class="sim-loading"><span class="sim-spinner"></span> Calculating score...</div>';
+    try {
+        const r = await fetch(API+'/score', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ scenario_id: currentScenario.id, answers }),
+        });
+        const d = await r.json();
+        renderScore(d);
+    } catch(e) {
+        $('sim-content').innerHTML = '<div class="sim-loading" style="color:var(--sev-critical)">Failed to calculate score</div>';
+    }
+}
+
+function renderScore(d) {
+    const color = d.percentage >= 90 ? 'var(--mitre-covered)' : d.percentage >= 75 ? 'var(--quality-good)' : d.percentage >= 60 ? 'var(--sev-medium)' : 'var(--sev-critical)';
+
+    let html = '<div class="sim-score">';
+    html += `<div class="sim-score-ring" style="background:conic-gradient(${color} ${d.percentage}%, rgba(99,110,123,.2) ${d.percentage}%)">
+        <div class="sim-score-inner">
+            <div class="sim-score-grade" style="color:${color}">${d.grade}</div>
+            <div class="sim-score-pct">${d.percentage}%</div>
+        </div>
+    </div>`;
+    html += `<div class="sim-score-title">${d.total_earned} / ${d.total_possible} Points</div>`;
+    html += `<div class="sim-score-subtitle">${
+        d.percentage >= 90 ? 'Outstanding! You handled this scenario like a seasoned analyst.' :
+        d.percentage >= 75 ? 'Great work! Solid investigation skills with room for minor improvement.' :
+        d.percentage >= 60 ? 'Good effort. Review the feedback to strengthen your approach.' :
+        'Keep practicing. Review each step\'s feedback to improve your triage skills.'
+    }</div>`;
+
+    html += '<div class="sim-score-breakdown">';
+    for (const r of d.results) {
+        const icon = r.correct ? '<span style="color:var(--mitre-covered)">&#10003;</span>' : '<span style="color:var(--sev-critical)">&#10007;</span>';
+        html += `<div class="sim-score-row">
+            <span>${icon}</span>
+            <span class="sim-score-row-q">${esc(r.feedback)}</span>
+            <span class="sim-score-row-pts" style="color:${r.correct ? 'var(--mitre-covered)' : 'var(--sev-critical)'}">${r.earned}/${r.possible}</span>
+        </div>`;
+    }
+    html += '</div>';
+
+    html += `<div style="margin-top:24px;display:flex;gap:12px;justify-content:center">
+        <button class="sim-btn sim-btn-primary" onclick="simStart('${currentScenario.id}')">Retry Scenario</button>
+        <button class="sim-btn sim-btn-secondary" onclick="simBack()">All Scenarios</button>
+    </div>`;
+
+    html += '</div>';
+    $('sim-content').innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', simInit);
+</script>
+{% endblock %}

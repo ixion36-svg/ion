@@ -33,7 +33,8 @@
                     <li><a href="/documents" class="{% if '/documents' in request.url.path %}active{% endif %}">Documents</a></li>
                     <li><a href="/notes" class="{% if '/notes' in request.url.path %}active{% endif %}">Notes</a></li>
                     <li><a href="/training" class="{% if '/training' in request.url.path %}active{% endif %}">Training</a></li>
-                    <li><a href="/guide" class="{% if '/guide' in request.url.path %}active{% endif %}">ION Guide</a></li>
+                    <li><a href="/guide" class="{% if '/guide' in request.url.path and '/guide/sim' not in request.url.path %}active{% endif %}">ION Guide</a></li>
+                    <li><a href="/guide/sim" class="{% if '/guide/sim' in request.url.path %}active{% endif %}">Training Sim</a></li>
                 </ul>
             </li>
 

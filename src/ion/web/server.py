@@ -45,6 +45,7 @@ from ion.web.playbook_analytics_api import router as playbook_analytics_router
 from ion.web.alert_pattern_api import router as alert_pattern_router
 from ion.web.executive_report_api import router as executive_report_router
 from ion.web.ioc_staleness_api import router as ioc_staleness_router
+from ion.web.training_sim_api import router as training_sim_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -206,6 +207,7 @@ app.include_router(playbook_analytics_router, prefix="/api")
 app.include_router(alert_pattern_router, prefix="/api")
 app.include_router(executive_report_router, prefix="/api")
 app.include_router(ioc_staleness_router, prefix="/api")
+app.include_router(training_sim_router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -659,6 +661,12 @@ async def soc_health_page(request: Request, user: User = Depends(require_page_pe
 async def guide_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the interactive training guide."""
     return templates.TemplateResponse(request=request, name="guide.html")
+
+
+@app.get("/guide/sim", response_class=HTMLResponse)
+async def guide_sim_page(request: Request, user: User = Depends(require_page_auth)):
+    """Render the interactive training simulator."""
+    return templates.TemplateResponse(request=request, name="guide_sim.html")
 
 
 @app.get("/attack-stories", response_class=HTMLResponse)
