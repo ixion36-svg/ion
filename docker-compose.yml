@@ -48,7 +48,7 @@ services:
   # ION - Main Application
   # =============================================================================
   ion:
-    build: .
+    # build: .  # Uncomment to build from source instead of pulling
     image: ixion36/ion:${ION_VERSION:-0.9.42}
     container_name: ion
     restart: unless-stopped
