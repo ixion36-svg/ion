@@ -39,7 +39,7 @@ FROM python:3.14-slim AS runtime
 
 LABEL org.opencontainers.image.title="ION" \
       org.opencontainers.image.description="Intelligent Operating Network - Security Operations Portal" \
-      org.opencontainers.image.version="0.9.34" \
+      org.opencontainers.image.version="0.9.42" \
       org.opencontainers.image.source="https://hub.docker.com/repository/docker/ixion36/ion"
 
 # Install runtime libraries (PostgreSQL client + WeasyPrint deps + fonts)
@@ -63,10 +63,9 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy application source, seed scripts, migration tool, and entrypoint
+# Copy application source, seed scripts, and entrypoint
 COPY src/ src/
 COPY seed_*.py /app/
-COPY migrate_to_postgres.py /app/
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
@@ -79,6 +78,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV ION_DATA_DIR=/data
 ENV ION_HOST=0.0.0.0
 ENV ION_PORT=8000
+ENV ION_DATABASE_URL=postgresql://ion:ion2025@postgres:5432/ion
 
 # Expose port
 EXPOSE 8000
