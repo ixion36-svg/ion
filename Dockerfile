@@ -78,7 +78,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV ION_DATA_DIR=/data
 ENV ION_HOST=0.0.0.0
 ENV ION_PORT=8000
-ENV ION_DATABASE_URL=postgresql://ion:ion2025@postgres:5432/ion
+# ION_DATABASE_URL is set at runtime via docker-compose or entrypoint default
+# Do NOT set it here — PostgreSQL hostname doesn't exist during build
 
 # Expose port
 EXPOSE 8000
