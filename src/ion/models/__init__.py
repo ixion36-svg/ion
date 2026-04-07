@@ -125,6 +125,15 @@ from ion.models.forensics import (
     ForensicCaseStep,
     ForensicTimelineEntry,
 )
+from ion.models.oncall import (
+    OnCallRoster,
+    EscalationPolicy,
+    EscalationLog,
+    ServiceAccount,
+    UserBookmark,
+    CommTemplate,
+    ChangeLogEntry,
+)
 
 __all__ = [
     "Base",

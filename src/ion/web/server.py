@@ -46,6 +46,13 @@ from ion.web.alert_pattern_api import router as alert_pattern_router
 from ion.web.executive_report_api import router as executive_report_router
 from ion.web.ioc_staleness_api import router as ioc_staleness_router
 from ion.web.training_sim_api import router as training_sim_router
+from ion.web.service_account_api import router as service_account_router
+from ion.web.incident_cost_api import router as incident_cost_router
+from ion.web.compliance_api import router as compliance_router
+from ion.web.comm_template_api import router as comm_template_router
+from ion.web.change_log_api import router as change_log_router
+from ion.web.saved_search_api import router as saved_search_router
+from ion.web.oncall_api import router as oncall_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -208,6 +215,13 @@ app.include_router(alert_pattern_router, prefix="/api")
 app.include_router(executive_report_router, prefix="/api")
 app.include_router(ioc_staleness_router, prefix="/api")
 app.include_router(training_sim_router, prefix="/api")
+app.include_router(service_account_router, prefix="/api")
+app.include_router(incident_cost_router, prefix="/api")
+app.include_router(compliance_router, prefix="/api")
+app.include_router(comm_template_router, prefix="/api")
+app.include_router(change_log_router, prefix="/api")
+app.include_router(saved_search_router, prefix="/api")
+app.include_router(oncall_router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -679,6 +693,18 @@ async def attack_stories_page(request: Request, user: User = Depends(require_pag
 async def executive_report_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the Executive Report page."""
     return templates.TemplateResponse(request=request, name="executive_report.html")
+
+
+@app.get("/oncall", response_class=HTMLResponse)
+async def oncall_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the On-Call / Escalation Manager page."""
+    return templates.TemplateResponse(request=request, name="oncall.html")
+
+
+@app.get("/service-accounts", response_class=HTMLResponse)
+async def service_accounts_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Service Account Tracker page."""
+    return templates.TemplateResponse(request=request, name="service_accounts.html")
 
 
 @app.get("/topology", response_class=HTMLResponse)

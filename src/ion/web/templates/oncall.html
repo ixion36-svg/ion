@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}On-Call / Duty IM - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-phone-call"></i> On-Call & Escalation</h1>
+    <div class="header-actions">
+        <button class="btn btn-primary" onclick="ocLoad()">Refresh</button>
+    </div>
+</div>
+
+<!-- Current Duty IM Banner -->
+<div class="oc-duty-banner" id="oc-duty-banner">
+    <div class="oc-loading"><span class="oc-spinner"></span> Loading on-call roster...</div>
+</div>
+
+<div class="oc-tabs">
+    <button class="oc-tab active" data-tab="roster" onclick="ocSwitch('roster')">Weekly Roster</button>
+    <button class="oc-tab" data-tab="escalate" onclick="ocSwitch('escalate')">Escalate</button>
+    <button class="oc-tab" data-tab="log" onclick="ocSwitch('log')">Escalation Log</button>
+    <button class="oc-tab" data-tab="policies" onclick="ocSwitch('policies')">Policies</button>
+</div>
+
+<div class="oc-panel active" id="oc-panel-roster"></div>
+<div class="oc-panel" id="oc-panel-escalate"></div>
+<div class="oc-panel" id="oc-panel-log"></div>
+<div class="oc-panel" id="oc-panel-policies"></div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.oc-duty-banner{padding:16px 20px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:16px}
+.oc-duty-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.oc-duty-card{background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:14px;position:relative;overflow:hidden}
+.oc-duty-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.oc-duty-card.duty_im::before{background:var(--sev-critical)}
+.oc-duty-card.primary_analyst::before{background:var(--primary)}
+.oc-duty-card.secondary_analyst::before{background:var(--sev-medium)}
+.oc-duty-card.engineer_oncall::before{background:var(--mitre-covered)}
+.oc-duty-role{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:4px}
+.oc-duty-name{font-size:1rem;font-weight:700;color:var(--text-primary)}
+.oc-duty-contact{font-size:.78rem;color:var(--text-secondary);margin-top:4px}
+.oc-duty-empty{font-size:.82rem;color:var(--sev-medium);font-style:italic}
+
+.oc-tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.oc-tab{padding:10px 20px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);cursor:pointer;font-size:.85rem;font-weight:600;transition:all .15s}
+.oc-tab:hover{color:var(--text-primary)}.oc-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.oc-panel{display:none}.oc-panel.active{display:block}
+
+.oc-loading{text-align:center;padding:20px;color:var(--text-secondary)}
+.oc-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:oc-spin .8s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes oc-spin{to{transform:rotate(360deg)}}
+
+.oc-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
+.oc-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.oc-section-title i{color:var(--primary)}
+
+.oc-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.oc-table th{text-align:left;padding:8px 10px;color:var(--text-secondary);font-weight:600;font-size:.72rem;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.oc-table td{padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.15)}
+.oc-table tr:hover td{background:rgba(0,212,255,.03)}
+
+/* Escalation form */
+.oc-esc-form{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.oc-esc-form h3{font-size:.95rem;margin-bottom:12px;color:var(--text-primary)}
+.oc-form-group{margin-bottom:12px}
+.oc-form-group label{font-size:.78rem;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px}
+.oc-form-group select,.oc-form-group input,.oc-form-group textarea{width:100%;padding:8px 10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:.85rem}
+.oc-form-group textarea{min-height:80px;resize:vertical}
+
+/* Escalation log entries */
+.oc-esc-entry{padding:12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;display:flex;gap:12px;align-items:flex-start}
+.oc-esc-entry.pending{border-left:3px solid var(--sev-critical)}
+.oc-esc-entry.acknowledged{border-left:3px solid var(--sev-medium)}
+.oc-esc-entry.resolved{border-left:3px solid var(--mitre-covered)}
+</style>
+<script>
+const API = '/api/oncall';
+function $(id){return document.getElementById(id)}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function fmtTime(iso){if(!iso)return'-';return new Date(iso).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+
+const ROLE_LABELS = {duty_im:'Duty Incident Manager',primary_analyst:'Primary Analyst',secondary_analyst:'Secondary Analyst',engineer_oncall:'Engineer On-Call'};
+
+async function ocLoad(){
+    try {
+        const r = await fetch(API+'/current');
+        const d = await r.json();
+        renderDutyBanner(d);
+    } catch(e) {
+        $('oc-duty-banner').innerHTML = '<div class="oc-duty-empty">Failed to load on-call roster</div>';
+    }
+    loadRoster();
+    loadEscalations();
+}
+
+function renderDutyBanner(d) {
+    const roster = d.roster || {};
+    let html = '<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Currently On Call — '+esc(d.date)+'</div>';
+    html += '<div class="oc-duty-grid">';
+    for (const role of ['duty_im','primary_analyst','secondary_analyst','engineer_oncall']) {
+        const person = roster[role];
+        html += `<div class="oc-duty-card ${role}">
+            <div class="oc-duty-role">${esc(ROLE_LABELS[role]||role)}</div>`;
+        if (person) {
+            html += `<div class="oc-duty-name">${esc(person.display_name||person.username)}</div>
+                <div class="oc-duty-contact">${person.contact_phone ? '<i class="icon-phone"></i> '+esc(person.contact_phone) : ''}${person.contact_alt ? ' | '+esc(person.contact_alt) : ''}</div>
+                ${person.notes ? '<div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">'+esc(person.notes)+'</div>' : ''}`;
+        } else {
+            html += '<div class="oc-duty-empty">Not assigned</div>';
+        }
+        html += '</div>';
+    }
+    html += '</div>';
+    $('oc-duty-banner').innerHTML = html;
+}
+
+async function loadRoster() {
+    try {
+        const r = await fetch(API+'/roster');
+        const d = await r.json();
+        renderRoster(d);
+    } catch(e) {
+        $('oc-panel-roster').innerHTML = '<div class="oc-loading">Failed to load roster</div>';
+    }
+}
+
+function renderRoster(days) {
+    let html = '<div class="oc-section"><div class="oc-section-title"><i class="icon-calendar"></i> Weekly Roster</div>';
+    html += '<table class="oc-table"><thead><tr><th>Date</th><th>Duty IM</th><th>Primary Analyst</th><th>Secondary Analyst</th><th>Engineer</th></tr></thead><tbody>';
+    for (const day of days) {
+        const roles = {};
+        for (const entry of day.entries||[]) {
+            roles[entry.role_type] = entry;
+        }
+        const dateStr = new Date(day.date+'T00:00:00').toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+        const isToday = day.date === new Date().toISOString().slice(0,10);
+        html += `<tr style="${isToday?'background:var(--primary-dim)':''}">
+            <td style="font-weight:${isToday?'700':'400'}">${esc(dateStr)}</td>`;
+        for (const role of ['duty_im','primary_analyst','secondary_analyst','engineer_oncall']) {
+            const e = roles[role];
+            html += `<td>${e ? esc(e.display_name||e.username) : '<span style="color:var(--text-muted)">—</span>'}</td>`;
+        }
+        html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    $('oc-panel-roster').innerHTML = html;
+}
+
+function ocSwitch(tab) {
+    document.querySelectorAll('.oc-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.oc-panel').forEach(p => p.classList.remove('active'));
+    $('oc-panel-'+tab).classList.add('active');
+    if (tab === 'escalate') renderEscalateForm();
+    if (tab === 'log') loadEscalations();
+}
+
+function renderEscalateForm() {
+    $('oc-panel-escalate').innerHTML = `<div class="oc-esc-form">
+        <h3><i class="icon-alert-triangle" style="color:var(--sev-critical)"></i> Escalate to Duty Incident Manager</h3>
+        <div class="oc-form-group"><label>Severity</label>
+            <select id="esc-severity"><option value="critical">Critical</option><option value="high" selected>High</option><option value="medium">Medium</option></select>
+        </div>
+        <div class="oc-form-group"><label>Case Number (optional)</label>
+            <input type="text" id="esc-case" placeholder="CASE-0042">
+        </div>
+        <div class="oc-form-group"><label>Alert ID (optional)</label>
+            <input type="text" id="esc-alert" placeholder="ES alert ID">
+        </div>
+        <div class="oc-form-group"><label>Reason for Escalation</label>
+            <textarea id="esc-reason" placeholder="Describe why this needs Duty IM attention..."></textarea>
+        </div>
+        <button class="btn btn-danger" onclick="submitEscalation()" style="margin-top:8px">Escalate Now</button>
+    </div>`;
+}
+
+async function submitEscalation() {
+    const reason = $('esc-reason').value.trim();
+    if (!reason) { alert('Please provide a reason'); return; }
+    try {
+        const body = {
+            severity: $('esc-severity').value,
+            reason: reason,
+        };
+        const caseNum = $('esc-case').value.trim();
+        if (caseNum) body.case_id = parseInt(caseNum.replace(/\D/g,'')) || undefined;
+        const alertId = $('esc-alert').value.trim();
+        if (alertId) body.alert_id = alertId;
+        const r = await fetch(API+'/escalate', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        const d = await r.json();
+        if (d.error) throw new Error(d.error);
+        showToast('Escalated to Duty IM: '+(d.escalated_to||'pending'), 'success');
+        ocSwitch('log');
+    } catch(e) {
+        showToast('Escalation failed: '+(e.message||'Unknown error'), 'error');
+    }
+}
+
+async function loadEscalations() {
+    try {
+        const r = await fetch(API+'/escalations');
+        const d = await r.json();
+        renderEscalations(d.escalations||d);
+    } catch(e) {
+        $('oc-panel-log').innerHTML = '<div class="oc-loading">Failed to load escalation log</div>';
+    }
+}
+
+function renderEscalations(entries) {
+    if (!entries.length) {
+        $('oc-panel-log').innerHTML = '<div class="oc-section"><div style="text-align:center;color:var(--text-secondary);padding:20px">No escalations recorded.</div></div>';
+        return;
+    }
+    let html = '<div class="oc-section"><div class="oc-section-title"><i class="icon-arrow-up-circle"></i> Recent Escalations</div>';
+    for (const e of entries) {
+        html += `<div class="oc-esc-entry ${e.status}">
+            <div style="flex:1">
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+                    <span class="sev-badge sev-${e.severity}">${esc(e.severity)}</span>
+                    <strong>${esc(e.escalated_by_name||'Analyst')}</strong> &rarr; <strong>${esc(e.escalated_to_name||'Duty IM')}</strong>
+                    <span style="margin-left:auto;font-size:.72rem;color:var(--text-muted)">${fmtTime(e.created_at)}</span>
+                </div>
+                <div style="font-size:.85rem;color:var(--text-secondary)">${esc(e.reason)}</div>
+                ${e.case_id ? '<div style="font-size:.72rem;color:var(--primary);margin-top:2px">Case #'+e.case_id+'</div>' : ''}
+            </div>
+            <div>
+                <span class="sev-badge ${e.status==='pending'?'sev-critical':e.status==='acknowledged'?'sev-medium':'sev-low'}">${esc(e.status)}</span>
+                ${e.status==='pending' ? '<button class="btn btn-sm" style="margin-top:4px" onclick="ackEscalation('+e.id+')">Acknowledge</button>' : ''}
+            </div>
+        </div>`;
+    }
+    html += '</div>';
+    $('oc-panel-log').innerHTML = html;
+}
+
+async function ackEscalation(id) {
+    try {
+        await fetch(API+'/escalations/'+id+'/acknowledge', {method:'POST'});
+        showToast('Escalation acknowledged', 'success');
+        loadEscalations();
+    } catch(e) {
+        showToast('Failed', 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', ocLoad);
+</script>
+{% endblock %}
