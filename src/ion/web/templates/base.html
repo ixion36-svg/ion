@@ -24,7 +24,7 @@
             <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>
 
             <!-- Investigate dropdown — core investigation workflow -->
-            <li class="nav-dropdown{% if '/alerts' in request.url.path or '/cases' in request.url.path or '/observables' in request.url.path or '/threat-intel' in request.url.path or '/analyst' in request.url.path or '/chat' in request.url.path or '/discover' in request.url.path or '/entity-timeline' in request.url.path or '/attack-stories' in request.url.path or '/tools' in request.url.path %} has-active{% endif %}">
+            <li class="nav-dropdown{% if '/alerts' in request.url.path or '/cases' in request.url.path or '/observables' in request.url.path or '/threat-intel' in request.url.path or '/analyst' in request.url.path or '/chat' in request.url.path or '/discover' in request.url.path or '/entity-timeline' in request.url.path or '/attack-stories' in request.url.path or '/tools' in request.url.path or '/threat-hunting' in request.url.path %} has-active{% endif %}">
                 <a href="/analyst" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Investigate <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
                     <li><a href="/analyst" class="{% if '/analyst' in request.url.path or '/tools' in request.url.path %}active{% endif %}">SOC Dashboard</a></li>
@@ -36,6 +36,7 @@
                     <li><a href="/attack-stories" class="{% if '/attack-stories' in request.url.path %}active{% endif %}">Attack Stories</a></li>
                     <li><a href="/discover" class="{% if '/discover' in request.url.path %}active{% endif %}">Discover</a></li>
                     <li><a href="/chat" class="{% if '/chat' in request.url.path %}active{% endif %}">AI Chat</a></li>
+                    <li><a href="/threat-hunting" class="{% if '/threat-hunting' in request.url.path %}active{% endif %}">Threat Hunting</a></li>
                 </ul>
             </li>
 

@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Threat Hunting - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-crosshair"></i> Threat Hunting Workbench</h1>
+    <div class="header-actions">
+        <button class="btn btn-primary" onclick="thNewHunt()">New Hunt</button>
+        <button class="btn btn-secondary" onclick="thLoad()">Refresh</button>
+    </div>
+</div>
+
+<div id="th-stats"></div>
+
+<div class="th-filters">
+    <button class="th-filter active" data-status="" onclick="thFilter('')">All</button>
+    <button class="th-filter" data-status="active" onclick="thFilter('active')">Active</button>
+    <button class="th-filter" data-status="confirmed" onclick="thFilter('confirmed')">Confirmed</button>
+    <button class="th-filter" data-status="refuted" onclick="thFilter('refuted')">Refuted</button>
+    <button class="th-filter" data-status="inconclusive" onclick="thFilter('inconclusive')">Inconclusive</button>
+</div>
+
+<div id="th-content"><div class="th-loading"><span class="th-spinner"></span> Loading hunts...</div></div>
+
+<!-- New Hunt Modal -->
+<div class="th-modal" id="th-modal-new" style="display:none">
+    <div class="th-modal-content">
+        <div class="th-modal-header"><h3>New Threat Hunt</h3><button onclick="$('th-modal-new').style.display='none'" class="th-modal-close">&times;</button></div>
+        <div class="th-modal-body">
+            <div class="th-form-group"><label>Title</label><input type="text" id="th-new-title" placeholder="e.g. APT28 lateral movement in engineering subnet"></div>
+            <div class="th-form-group"><label>Hypothesis</label><textarea id="th-new-hypothesis" rows="3" placeholder="I believe that... because..."></textarea></div>
+            <div class="th-form-group"><label>Priority</label><select id="th-new-priority"><option value="critical">Critical</option><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></div>
+            <div class="th-form-group"><label>Threat Actor (optional)</label><input type="text" id="th-new-actor" placeholder="e.g. APT28, Lazarus Group"></div>
+            <div class="th-form-group"><label>MITRE Techniques (comma-separated)</label><input type="text" id="th-new-mitre" placeholder="e.g. T1059.001, T1003.006"></div>
+        </div>
+        <div class="th-modal-footer"><button class="btn btn-primary" onclick="thCreateHunt()">Create Hunt</button></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.th-loading{text-align:center;padding:40px;color:var(--text-secondary)}
+.th-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:th-spin .8s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes th-spin{to{transform:rotate(360deg)}}
+
+.th-filters{display:flex;gap:4px;margin-bottom:16px}
+.th-filter{padding:6px 14px;border:1px solid var(--border);border-radius:20px;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:.78rem;font-weight:600;transition:all .15s}
+.th-filter:hover{border-color:var(--primary);color:var(--text-primary)}
+.th-filter.active{background:var(--primary-dim);border-color:var(--primary);color:var(--primary)}
+
+.th-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px}
+.th-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center}
+.th-stat-val{font-size:1.3rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--primary)}
+.th-stat-label{font-size:.68rem;color:var(--text-muted);text-transform:uppercase;margin-top:2px}
+
+.th-hunt{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:12px;overflow:hidden}
+.th-hunt-header{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background .15s}
+.th-hunt-header:hover{background:rgba(0,212,255,.03)}
+.th-hunt-title{font-size:.9rem;font-weight:700;color:var(--text-primary);flex:1}
+.th-hunt-meta{display:flex;gap:8px;align-items:center;font-size:.72rem;color:var(--text-muted)}
+.th-hunt-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border)}
+.th-hunt.open .th-hunt-body{display:block}
+.th-hunt-chevron{color:var(--text-muted);transition:transform .2s}
+.th-hunt.open .th-hunt-chevron{transform:rotate(90deg)}
+
+.th-hypothesis{padding:10px;background:var(--bg-primary);border-left:3px solid var(--primary);border-radius:0 var(--radius) var(--radius) 0;font-size:.85rem;color:var(--text-secondary);margin:12px 0;line-height:1.6;font-style:italic}
+.th-section{margin-top:12px}
+.th-section-title{font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px}
+
+.th-status-badge{padding:3px 8px;border-radius:4px;font-size:.68rem;font-weight:700;text-transform:uppercase}
+.th-status-badge.active{background:var(--primary-dim);color:var(--primary)}
+.th-status-badge.confirmed{background:var(--sev-critical-dim);color:var(--sev-critical)}
+.th-status-badge.refuted{background:var(--mitre-covered-dim);color:var(--mitre-covered)}
+.th-status-badge.inconclusive{background:var(--sev-medium-dim);color:var(--sev-medium)}
+
+.th-query{padding:8px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:4px;font-size:.82rem}
+.th-query code{font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--primary)}
+.th-ioc{display:inline-block;padding:2px 6px;background:var(--sev-critical-dim);border:1px solid var(--sev-critical);border-radius:3px;font-size:.72rem;font-family:'JetBrains Mono',monospace;color:var(--sev-critical);margin:2px}
+
+/* Modal */
+.th-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000}
+.th-modal-content{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);width:90%;max-width:550px;max-height:80vh;overflow-y:auto}
+.th-modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+.th-modal-header h3{margin:0;font-size:.95rem}
+.th-modal-close{background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer}
+.th-modal-body{padding:16px}
+.th-modal-footer{padding:12px 16px;border-top:1px solid var(--border);text-align:right}
+.th-form-group{margin-bottom:12px}
+.th-form-group label{display:block;font-size:.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:4px}
+.th-form-group input,.th-form-group textarea,.th-form-group select{width:100%;padding:8px 10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:.85rem}
+</style>
+<script>
+const API = '/api/threat-hunts';
+function $(id){return document.getElementById(id)}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function fmtTime(iso){if(!iso)return'-';return new Date(iso).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+
+let currentFilter = '';
+
+async function thLoad(){
+    try {
+        const [huntsR, statsR] = await Promise.all([
+            fetch(API+(currentFilter?'?status='+currentFilter:'')).then(r=>r.json()),
+            fetch(API+'/stats').then(r=>r.json()),
+        ]);
+        renderStats(statsR);
+        renderHunts(huntsR.hunts||[]);
+    } catch(e) {
+        $('th-content').innerHTML = '<div class="th-loading" style="color:var(--sev-critical)">Failed to load hunts</div>';
+    }
+}
+
+function thFilter(status){
+    currentFilter = status;
+    document.querySelectorAll('.th-filter').forEach(f=>f.classList.toggle('active',f.dataset.status===status));
+    thLoad();
+}
+
+function renderStats(s) {
+    let html = '<div class="th-stats">';
+    html += `<div class="th-stat"><div class="th-stat-val">${s.total||0}</div><div class="th-stat-label">Total Hunts</div></div>`;
+    html += `<div class="th-stat"><div class="th-stat-val" style="color:var(--primary)">${(s.by_status||{}).active||0}</div><div class="th-stat-label">Active</div></div>`;
+    html += `<div class="th-stat"><div class="th-stat-val" style="color:var(--sev-critical)">${(s.by_status||{}).confirmed||0}</div><div class="th-stat-label">Confirmed</div></div>`;
+    html += `<div class="th-stat"><div class="th-stat-val" style="color:var(--mitre-covered)">${(s.by_status||{}).refuted||0}</div><div class="th-stat-label">Refuted</div></div>`;
+    html += '</div>';
+    $('th-stats').innerHTML = html;
+}
+
+function renderHunts(hunts) {
+    if (!hunts.length) { $('th-content').innerHTML = '<div class="th-loading">No threat hunts found. Click "New Hunt" to start one.</div>'; return; }
+
+    let html = '';
+    for (const h of hunts) {
+        const mitre = (h.mitre_techniques||[]).map(t=>`<span style="padding:1px 5px;background:var(--primary-dim);border:1px solid rgba(0,212,255,.25);border-radius:3px;font-size:.68rem;font-family:monospace;color:var(--primary)">${esc(t)}</span>`).join(' ');
+        const iocs = (h.iocs_found||[]).map(i=>`<span class="th-ioc">${esc(i)}</span>`).join(' ');
+        const queries = (h.queries||[]);
+
+        html += `<div class="th-hunt">
+            <div class="th-hunt-header" onclick="this.parentElement.classList.toggle('open')">
+                <span class="th-hunt-chevron">\u25B6</span>
+                <span class="th-status-badge ${h.status}">${esc(h.status)}</span>
+                <span class="sev-badge sev-${h.priority}">${esc(h.priority)}</span>
+                <span class="th-hunt-title">${esc(h.title)}</span>
+                <span class="th-hunt-meta">
+                    ${h.threat_actor ? esc(h.threat_actor)+' | ' : ''}
+                    ${esc(h.created_by||'')} | ${fmtTime(h.created_at)}
+                </span>
+            </div>
+            <div class="th-hunt-body">
+                <div class="th-hypothesis">${esc(h.hypothesis)}</div>
+                ${mitre ? '<div class="th-section"><div class="th-section-title">MITRE Techniques</div>'+mitre+'</div>' : ''}
+                ${queries.length ? '<div class="th-section"><div class="th-section-title">Queries ('+queries.length+')</div>'+queries.map(q=>`<div class="th-query"><code>${esc(q.query)}</code>${q.description?' — '+esc(q.description):''}${q.result_count?' <strong>('+q.result_count+' results)</strong>':''}</div>`).join('')+'</div>' : ''}
+                ${h.findings ? '<div class="th-section"><div class="th-section-title">Findings</div><div style="font-size:.85rem;color:var(--text-secondary);line-height:1.6;white-space:pre-wrap">'+esc(h.findings)+'</div></div>' : ''}
+                ${h.conclusion ? '<div class="th-section"><div class="th-section-title">Conclusion</div><div style="font-size:.85rem;color:var(--text-primary);line-height:1.6">'+esc(h.conclusion)+'</div></div>' : ''}
+                ${iocs ? '<div class="th-section"><div class="th-section-title">IOCs Found</div>'+iocs+'</div>' : ''}
+            </div>
+        </div>`;
+    }
+    $('th-content').innerHTML = html;
+}
+
+function thNewHunt(){ $('th-modal-new').style.display = 'flex'; }
+
+async function thCreateHunt(){
+    const title = $('th-new-title').value.trim();
+    const hypothesis = $('th-new-hypothesis').value.trim();
+    if (!title || !hypothesis) { alert('Title and hypothesis are required'); return; }
+    const mitre = $('th-new-mitre').value.trim().split(',').map(s=>s.trim()).filter(Boolean);
+    try {
+        await fetch(API, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({
+                title, hypothesis,
+                priority: $('th-new-priority').value,
+                threat_actor: $('th-new-actor').value.trim() || null,
+                mitre_techniques: mitre.length ? mitre : null,
+            }),
+        });
+        $('th-modal-new').style.display = 'none';
+        showToast('Hunt created', 'success');
+        thLoad();
+    } catch(e) {
+        showToast('Failed to create hunt', 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', thLoad);
+</script>
+{% endblock %}

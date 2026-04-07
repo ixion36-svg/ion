@@ -53,6 +53,12 @@ from ion.web.comm_template_api import router as comm_template_router
 from ion.web.change_log_api import router as change_log_router
 from ion.web.saved_search_api import router as saved_search_router
 from ion.web.oncall_api import router as oncall_router
+from ion.web.sla_api import router as sla_router
+from ion.web.bulk_ops_api import router as bulk_ops_router
+from ion.web.threat_hunt_api import router as threat_hunt_router
+from ion.web.dashboard_layout_api import router as dashboard_layout_router
+from ion.web.report_scheduler_api import router as report_scheduler_router
+from ion.web.playbook_action_api import router as playbook_action_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -222,6 +228,12 @@ app.include_router(comm_template_router, prefix="/api")
 app.include_router(change_log_router, prefix="/api")
 app.include_router(saved_search_router, prefix="/api")
 app.include_router(oncall_router, prefix="/api")
+app.include_router(sla_router, prefix="/api")
+app.include_router(bulk_ops_router, prefix="/api")
+app.include_router(threat_hunt_router, prefix="/api")
+app.include_router(dashboard_layout_router, prefix="/api")
+app.include_router(report_scheduler_router, prefix="/api")
+app.include_router(playbook_action_router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -693,6 +705,12 @@ async def attack_stories_page(request: Request, user: User = Depends(require_pag
 async def executive_report_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the Executive Report page."""
     return templates.TemplateResponse(request=request, name="executive_report.html")
+
+
+@app.get("/threat-hunting", response_class=HTMLResponse)
+async def threat_hunting_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Threat Hunting Workbench page."""
+    return templates.TemplateResponse(request=request, name="threat_hunting.html")
 
 
 @app.get("/oncall", response_class=HTMLResponse)
