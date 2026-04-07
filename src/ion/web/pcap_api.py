@@ -146,8 +146,8 @@ async def _enrich_pcap_observables(result, is_private_fn) -> dict:
 
         # Sort: malicious first, then by score descending
         enriched.sort(key=lambda x: (
-            -(x.get("enrichment", {}) or {}).get("score", 0) if x.get("enrichment") else 0,
-            0 if (x.get("enrichment", {}) or {}).get("is_malicious") else 1,
+            -((x.get("enrichment") or {}).get("score") or 0),
+            0 if (x.get("enrichment") or {}).get("is_malicious") else 1,
         ))
 
         malicious_count = sum(1 for e in enriched if e.get("enrichment", {}) and e["enrichment"].get("is_malicious"))
