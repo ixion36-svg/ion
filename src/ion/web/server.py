@@ -655,6 +655,12 @@ async def soc_health_page(request: Request, user: User = Depends(require_page_pe
     return templates.TemplateResponse(request=request, name="soc_health.html")
 
 
+@app.get("/guide", response_class=HTMLResponse)
+async def guide_page(request: Request, user: User = Depends(require_page_auth)):
+    """Render the interactive training guide."""
+    return templates.TemplateResponse(request=request, name="guide.html")
+
+
 @app.get("/attack-stories", response_class=HTMLResponse)
 async def attack_stories_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the Attack Stories page."""

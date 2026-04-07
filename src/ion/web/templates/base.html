@@ -24,7 +24,7 @@
             <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>
 
             <!-- Knowledge dropdown -->
-            <li class="nav-dropdown{% if '/templates' in request.url.path or '/documents' in request.url.path or '/notes' in request.url.path or '/training' in request.url.path or '/social' in request.url.path or '/cyab' in request.url.path %} has-active{% endif %}">
+            <li class="nav-dropdown{% if '/templates' in request.url.path or '/documents' in request.url.path or '/notes' in request.url.path or '/training' in request.url.path or '/social' in request.url.path or '/cyab' in request.url.path or '/guide' in request.url.path %} has-active{% endif %}">
                 <a href="/social" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Knowledge <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
                     <li><a href="/social" class="{% if '/social' in request.url.path %}active{% endif %}">Social Hub</a></li>
@@ -33,6 +33,7 @@
                     <li><a href="/documents" class="{% if '/documents' in request.url.path %}active{% endif %}">Documents</a></li>
                     <li><a href="/notes" class="{% if '/notes' in request.url.path %}active{% endif %}">Notes</a></li>
                     <li><a href="/training" class="{% if '/training' in request.url.path %}active{% endif %}">Training</a></li>
+                    <li><a href="/guide" class="{% if '/guide' in request.url.path %}active{% endif %}">ION Guide</a></li>
                 </ul>
             </li>
 

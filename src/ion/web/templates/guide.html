@@ -1,0 +1,676 @@
+{% extends "base.html" %}
+
+{% block title %}ION Guide - Training & Reference{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-book-open"></i> ION Training Guide</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="window.print()"><i class="icon-printer"></i> Print</button>
+    </div>
+</div>
+
+<!-- Role selector -->
+<div class="g-role-bar">
+    <span class="g-role-label">I am a:</span>
+    <button class="g-role-btn active" data-role="all" onclick="gSetRole('all')">Everyone</button>
+    <button class="g-role-btn" data-role="analyst" onclick="gSetRole('analyst')">L1 Analyst</button>
+    <button class="g-role-btn" data-role="senior" onclick="gSetRole('senior')">L2/L3 Analyst</button>
+    <button class="g-role-btn" data-role="lead" onclick="gSetRole('lead')">SOC Lead</button>
+    <button class="g-role-btn" data-role="engineer" onclick="gSetRole('engineer')">Engineer</button>
+    <button class="g-role-btn" data-role="dfir" onclick="gSetRole('dfir')">DFIR</button>
+</div>
+
+<!-- Quick nav -->
+<div class="g-quicknav" id="g-quicknav">
+    <a href="#section-getting-started">Getting Started</a>
+    <a href="#section-dashboard">Dashboard</a>
+    <a href="#section-alerts">Alerts & Triage</a>
+    <a href="#section-cases">Cases</a>
+    <a href="#section-observables">Observables</a>
+    <a href="#section-threat-intel">Threat Intel</a>
+    <a href="#section-attack-stories">Attack Stories</a>
+    <a href="#section-playbooks">Playbooks</a>
+    <a href="#section-detection">Detection Engineering</a>
+    <a href="#section-forensics">DFIR</a>
+    <a href="#section-analytics">Analytics</a>
+    <a href="#section-tools">Tools & Utilities</a>
+    <a href="#section-admin">Admin & Settings</a>
+    <a href="#section-workflows">Key Workflows</a>
+    <a href="#section-shortcuts">Quick Reference</a>
+</div>
+
+<div class="g-content" id="g-content">
+
+<!-- ============================================================ -->
+<!-- GETTING STARTED -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-getting-started" data-roles="all analyst senior lead engineer dfir">
+    <h2 class="g-section-title"><i class="icon-play-circle"></i> Getting Started</h2>
+
+    <div class="g-intro">
+        <p><strong>ION</strong> (Intelligent Operating Network) is a Security Operations Center platform built for the <strong>Guarded Glass</strong> team. It connects your Elasticsearch alerts, OpenCTI threat intelligence, TIDE detection rules, and Ollama AI into a single workspace.</p>
+    </div>
+
+    <div class="g-cards">
+        <div class="g-card">
+            <div class="g-card-icon" style="color:var(--primary)"><i class="icon-log-in"></i></div>
+            <h3>1. Log In</h3>
+            <p>Navigate to ION and enter your credentials. Your dashboard will load based on your role.</p>
+            <div class="g-tip">First login? Your credentials are set by your SOC administrator.</div>
+        </div>
+        <div class="g-card">
+            <div class="g-card-icon" style="color:var(--neon-green)"><i class="icon-layout-dashboard"></i></div>
+            <h3>2. Your Dashboard</h3>
+            <p>The dashboard is role-specific. Analysts see alert queues. Leads see team metrics. Engineers see system status.</p>
+        </div>
+        <div class="g-card">
+            <div class="g-card-icon" style="color:var(--neon-purple)"><i class="icon-users"></i></div>
+            <h3>3. Focus Mode</h3>
+            <p>Have multiple roles? Use the <strong>Focus Mode</strong> pill buttons on the dashboard to switch between role views.</p>
+            <div class="g-tip">Focus mode restricts permissions to one role at a time for clarity.</div>
+        </div>
+        <div class="g-card">
+            <div class="g-card-icon" style="color:var(--neon-orange)"><i class="icon-navigation"></i></div>
+            <h3>4. Navigation</h3>
+            <p>The top nav has dropdown menus: <strong>Knowledge</strong>, <strong>Analyst</strong>, <strong>Engineering</strong>, <strong>DFIR</strong>, and <strong>Settings</strong>. Items show/hide based on your role.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DASHBOARD -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-dashboard" data-roles="all analyst senior lead engineer">
+    <h2 class="g-section-title"><i class="icon-layout-dashboard"></i> Dashboard</h2>
+
+    <!-- Visual mockup -->
+    <div class="g-mockup">
+        <div class="g-mockup-title">Dashboard Overview (Analyst View)</div>
+        <div class="g-mockup-body">
+            <div class="g-mock-stats">
+                <div class="g-mock-stat"><span class="g-mock-val" style="color:var(--sev-critical)">12</span><span class="g-mock-label">Critical Alerts</span></div>
+                <div class="g-mock-stat"><span class="g-mock-val" style="color:var(--sev-high)">28</span><span class="g-mock-label">High Alerts</span></div>
+                <div class="g-mock-stat"><span class="g-mock-val" style="color:var(--mitre-covered)">6</span><span class="g-mock-label">Cases Open</span></div>
+                <div class="g-mock-stat"><span class="g-mock-val">3</span><span class="g-mock-label">Assigned to Me</span></div>
+            </div>
+            <div class="g-mock-grid">
+                <div class="g-mock-panel"><div class="g-mock-panel-title">Recent Alerts</div><div class="g-mock-rows"><div class="g-mock-row"><span class="g-mock-sev crit"></span>Credential Dumping Detected<span class="g-mock-time">2m ago</span></div><div class="g-mock-row"><span class="g-mock-sev high"></span>Suspicious PowerShell Execution<span class="g-mock-time">15m ago</span></div><div class="g-mock-row"><span class="g-mock-sev med"></span>Unusual Login Location<span class="g-mock-time">1h ago</span></div></div></div>
+                <div class="g-mock-panel"><div class="g-mock-panel-title">My Cases</div><div class="g-mock-rows"><div class="g-mock-row">CASE-0042 Ransomware Investigation<span class="g-mock-badge" style="color:var(--sev-critical)">CRITICAL</span></div><div class="g-mock-row">CASE-0041 Phishing Campaign<span class="g-mock-badge" style="color:var(--sev-high)">HIGH</span></div></div></div>
+            </div>
+        </div>
+        <div class="g-mockup-callouts">
+            <div class="g-callout"><span class="g-callout-num">1</span> Stat cards show severity-coded alert counts and your workload</div>
+            <div class="g-callout"><span class="g-callout-num">2</span> Recent alerts auto-refresh and link to the full alert detail</div>
+            <div class="g-callout"><span class="g-callout-num">3</span> Your assigned cases show status and severity at a glance</div>
+        </div>
+    </div>
+
+    <div class="g-role-note lead">
+        <strong>Lead View:</strong> Leads see team metrics — KPIs, analyst workload distribution, severity breakdown, and team schedule.
+    </div>
+    <div class="g-role-note engineer">
+        <strong>Engineer View:</strong> Engineers see system status — integration health, ES connectivity, Kibana sync status, and configuration overview.
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ALERTS & TRIAGE -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-alerts" data-roles="all analyst senior lead">
+    <h2 class="g-section-title"><i class="icon-alert-triangle"></i> Alerts & Triage</h2>
+    <p class="g-desc">The Alerts page (<code>/alerts</code>) is your primary investigation workspace. Alerts flow from Elasticsearch, enriched with MITRE ATT&CK mappings and severity scores.</p>
+
+    <div class="g-mockup">
+        <div class="g-mockup-title">Alerts Workspace</div>
+        <div class="g-mockup-body">
+            <div class="g-mock-toolbar">
+                <span class="g-mock-input">Search alerts...</span>
+                <span class="g-mock-select">Severity: All</span>
+                <span class="g-mock-select">Status: Open</span>
+                <span class="g-mock-btn-primary">Filter</span>
+            </div>
+            <div class="g-mock-table">
+                <div class="g-mock-thead">
+                    <span style="flex:0.5">Severity</span><span style="flex:2">Alert Title</span><span style="flex:1">Rule</span><span style="flex:0.8">Host</span><span style="flex:0.8">Status</span><span style="flex:0.8">Time</span>
+                </div>
+                <div class="g-mock-trow" style="border-left:3px solid var(--sev-critical)">
+                    <span style="flex:0.5" class="sev-badge sev-critical">CRIT</span><span style="flex:2">Credential Dumping via LSASS</span><span style="flex:1;font-size:.72rem">Credential Access</span><span style="flex:0.8;font-family:monospace;font-size:.72rem">SRV-DC01</span><span style="flex:0.8"><span class="sev-badge sev-critical">OPEN</span></span><span style="flex:0.8;font-size:.72rem;color:var(--text-muted)">2 min ago</span>
+                </div>
+                <div class="g-mock-trow" style="border-left:3px solid var(--sev-high)">
+                    <span style="flex:0.5" class="sev-badge sev-high">HIGH</span><span style="flex:2">Suspicious PowerShell Encoded Command</span><span style="flex:1;font-size:.72rem">Execution</span><span style="flex:0.8;font-family:monospace;font-size:.72rem">WS-042</span><span style="flex:0.8"><span class="sev-badge sev-medium">ACK</span></span><span style="flex:0.8;font-size:.72rem;color:var(--text-muted)">15 min ago</span>
+                </div>
+                <div class="g-mock-trow" style="border-left:3px solid var(--sev-medium)">
+                    <span style="flex:0.5" class="sev-badge sev-medium">MED</span><span style="flex:2">Unusual Login from New Geolocation</span><span style="flex:1;font-size:.72rem">Initial Access</span><span style="flex:0.8;font-family:monospace;font-size:.72rem">-</span><span style="flex:0.8"><span class="sev-badge sev-critical">OPEN</span></span><span style="flex:0.8;font-size:.72rem;color:var(--text-muted)">1h ago</span>
+                </div>
+            </div>
+        </div>
+        <div class="g-mockup-callouts">
+            <div class="g-callout"><span class="g-callout-num">1</span> <strong>Filter bar</strong> — search by keyword, filter by severity/status/time range</div>
+            <div class="g-callout"><span class="g-callout-num">2</span> <strong>Severity stripe</strong> — left border color = severity at a glance</div>
+            <div class="g-callout"><span class="g-callout-num">3</span> <strong>Click any alert</strong> to expand the detail panel: raw data, MITRE mapping, triage actions</div>
+        </div>
+    </div>
+
+    <h3>Triage Actions</h3>
+    <div class="g-steps">
+        <div class="g-step"><span class="g-step-num">1</span><div><strong>Acknowledge</strong> — Claim the alert. Status changes to "acknowledged" and syncs to Elasticsearch.</div></div>
+        <div class="g-step"><span class="g-step-num">2</span><div><strong>Investigate</strong> — Check the alert detail, related alerts, observables, and MITRE context.</div></div>
+        <div class="g-step"><span class="g-step-num">3</span><div><strong>Escalate or Close</strong> — Create a case for investigation, or close with a reason (True Positive, False Positive, Benign).</div></div>
+    </div>
+
+    <div class="g-tip-box">
+        <strong>Triage Suggestions:</strong> ION now suggests triage actions based on historical closure data. If a rule was closed as FP 80% of the time, you'll see a suggestion badge. Access via <code>GET /api/triage-suggestions?rule_name=X</code>.
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- CASES -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-cases" data-roles="all analyst senior lead">
+    <h2 class="g-section-title"><i class="icon-folder"></i> Cases</h2>
+    <p class="g-desc">Cases group related alerts into investigations. Create cases from alerts, attach observables, track affected hosts/users, and close with documented reasoning.</p>
+
+    <div class="g-mockup">
+        <div class="g-mockup-title">Case Detail View</div>
+        <div class="g-mockup-body" style="padding:12px">
+            <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+                <span style="font-family:monospace;color:var(--primary);font-weight:700">CASE-0042</span>
+                <span style="font-weight:700;flex:1">Ransomware Precursor Activity on SRV-MAIL01</span>
+                <span class="sev-badge sev-critical">CRITICAL</span>
+                <span class="sev-badge sev-high" style="background:var(--sev-high-dim)">ACKNOWLEDGED</span>
+            </div>
+            <div class="g-mock-grid" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="g-mock-mini-stat"><span style="font-size:.68rem;color:var(--text-muted)">ASSIGNED TO</span><br><strong>analyst1</strong></div>
+                <div class="g-mock-mini-stat"><span style="font-size:.68rem;color:var(--text-muted)">AFFECTED HOSTS</span><br><strong>SRV-MAIL01, WS-042</strong></div>
+                <div class="g-mock-mini-stat"><span style="font-size:.68rem;color:var(--text-muted)">ALERTS</span><br><strong>5 linked</strong></div>
+            </div>
+            <div style="margin-top:12px;padding:10px;background:var(--bg-primary);border-radius:var(--radius);font-size:.82rem;color:var(--text-secondary)">
+                <strong style="color:var(--text-primary)">Notes:</strong> LSASS dump detected followed by lateral movement to mail server. Checking for data exfiltration...
+            </div>
+        </div>
+        <div class="g-mockup-callouts">
+            <div class="g-callout"><span class="g-callout-num">1</span> Case header shows severity, status, and assignment</div>
+            <div class="g-callout"><span class="g-callout-num">2</span> Affected hosts and linked alerts provide investigation context</div>
+            <div class="g-callout"><span class="g-callout-num">3</span> <strong>Similar Cases:</strong> ION finds past cases with matching rules/hosts/observables via <code>/api/case-similarity/{id}</code></div>
+        </div>
+    </div>
+
+    <h3>Closure Reasons</h3>
+    <div class="g-grid-3">
+        <div class="g-mini-card" style="border-left:3px solid var(--mitre-covered)"><strong>True Positive</strong><br><span class="g-muted">Confirmed real attack. Document findings.</span></div>
+        <div class="g-mini-card" style="border-left:3px solid var(--sev-critical)"><strong>False Positive</strong><br><span class="g-muted">Not a real threat. Consider rule tuning.</span></div>
+        <div class="g-mini-card" style="border-left:3px solid var(--sev-medium)"><strong>Benign True Positive</strong><br><span class="g-muted">Real activity but authorized/expected.</span></div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- OBSERVABLES -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-observables" data-roles="all analyst senior lead dfir">
+    <h2 class="g-section-title"><i class="icon-search"></i> Observables (IOC Tracking)</h2>
+    <p class="g-desc">Track IPs, domains, hashes, emails, and URLs across your investigations. Enrich from OpenCTI, track sighting counts, and flag stale IOCs.</p>
+
+    <div class="g-features">
+        <div class="g-feature"><i class="icon-globe" style="color:var(--primary)"></i><div><strong>Batch Enrichment</strong><br>Select multiple observables and enrich them all from OpenCTI in one click.</div></div>
+        <div class="g-feature"><i class="icon-clock" style="color:var(--sev-medium)"></i><div><strong>Staleness Tracking</strong><br>IOCs not re-enriched in 30+ days are flagged. Check <code>/api/ioc-staleness</code>.</div></div>
+        <div class="g-feature"><i class="icon-shield" style="color:var(--mitre-covered)"></i><div><strong>Whitelisting</strong><br>Mark known-good observables to prevent false alerting.</div></div>
+        <div class="g-feature"><i class="icon-link" style="color:var(--neon-purple)"></i><div><strong>Case Linking</strong><br>Observables auto-link to cases and alerts where they appear.</div></div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- THREAT INTEL -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-threat-intel" data-roles="all analyst senior lead">
+    <h2 class="g-section-title"><i class="icon-eye"></i> Threat Intelligence</h2>
+    <p class="g-desc">Search OpenCTI for threat actors and campaigns, add them to your watchlist, and get automatic detection gap alerts when watched actors have TTPs your TIDE rules don't cover.</p>
+
+    <div class="g-mockup">
+        <div class="g-mockup-title">Threat Actor Search with Country Attribution</div>
+        <div class="g-mockup-body">
+            <div class="g-mock-table">
+                <div class="g-mock-thead"><span style="flex:1.5">Name</span><span style="flex:1">Origin</span><span style="flex:1">Type</span><span style="flex:0.8">Confidence</span><span style="flex:0.8">Watch</span></div>
+                <div class="g-mock-trow"><span style="flex:1.5;font-weight:700">APT28</span><span style="flex:1">&#x1F1F7;&#x1F1FA; Russia</span><span style="flex:1;font-size:.78rem">Intrusion Set</span><span style="flex:0.8"><span class="sev-badge sev-high">85</span></span><span style="flex:0.8"><span style="color:var(--mitre-covered);font-weight:700">Watched</span></span></div>
+                <div class="g-mock-trow"><span style="flex:1.5;font-weight:700">Lazarus Group</span><span style="flex:1">&#x1F1F0;&#x1F1F5; North Korea</span><span style="flex:1;font-size:.78rem">Intrusion Set</span><span style="flex:0.8"><span class="sev-badge sev-high">80</span></span><span style="flex:0.8;font-size:.78rem;color:var(--primary);cursor:pointer">+ Watch</span></span></div>
+                <div class="g-mock-trow"><span style="flex:1.5;font-weight:700">Charming Kitten</span><span style="flex:1">&#x1F1EE;&#x1F1F7; Iran</span><span style="flex:1;font-size:.78rem">Threat Actor</span><span style="flex:0.8"><span class="sev-badge sev-medium">65</span></span><span style="flex:0.8;font-size:.78rem;color:var(--primary);cursor:pointer">+ Watch</span></span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="g-tip-box">
+        <strong>Auto-Gap Alerting:</strong> When you watch an actor, ION periodically checks their TTPs against your TIDE rule coverage. If new gaps appear, you get a notification. Trigger manually via <code>POST /api/threat-intel/threat-watch-gaps/check-and-notify</code>.
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ATTACK STORIES -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-attack-stories" data-roles="all analyst senior lead">
+    <h2 class="g-section-title"><i class="icon-book-open"></i> Attack Stories</h2>
+    <p class="g-desc">ION automatically correlates alerts by host/user into "attack stories" — multi-step attack narratives with kill chain visualization. No other SIEM does this.</p>
+
+    <div class="g-mockup">
+        <div class="g-mockup-title">Attack Story: SRV-DC01 (Score: 78/100)</div>
+        <div class="g-mockup-body" style="padding:12px">
+            <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-size:.85rem;margin-bottom:12px">
+                Entity <strong>SRV-DC01</strong> was targeted across <strong>4 stages</strong> of the kill chain over <strong>2.5 hours</strong>. Starting with <em>initial-access</em>, progressing through <em>execution</em> and <em>credential-access</em>, reaching <em>lateral-movement</em>. 5 unique detection rules fired.
+            </div>
+            <div style="display:flex;gap:0;align-items:center;flex-wrap:wrap">
+                <span class="g-kc-node inactive">recon</span><span class="g-kc-arrow">&rarr;</span>
+                <span class="g-kc-node active">initial-access</span><span class="g-kc-arrow">&rarr;</span>
+                <span class="g-kc-node active">execution</span><span class="g-kc-arrow">&rarr;</span>
+                <span class="g-kc-node inactive">persistence</span><span class="g-kc-arrow">&rarr;</span>
+                <span class="g-kc-node inactive">priv-esc</span><span class="g-kc-arrow">&rarr;</span>
+                <span class="g-kc-node inactive">defense-evasion</span><span class="g-kc-arrow">&rarr;</span>
+                <span class="g-kc-node active">credential-access</span><span class="g-kc-arrow">&rarr;</span>
+                <span class="g-kc-node inactive">discovery</span><span class="g-kc-arrow">&rarr;</span>
+                <span class="g-kc-node active">lateral-movement</span>
+            </div>
+        </div>
+    </div>
+    <p>Navigate to <code>/attack-stories</code> and select a time window. Stories are scored 0-100 based on kill chain coverage and alert severity.</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- PLAYBOOKS -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-playbooks" data-roles="all analyst senior lead dfir">
+    <h2 class="g-section-title"><i class="icon-list-checks"></i> Playbooks</h2>
+    <p class="g-desc">Step-by-step response procedures for common scenarios. Execute playbooks during investigations, track step completion, and measure effectiveness.</p>
+
+    <div class="g-steps">
+        <div class="g-step"><span class="g-step-num">1</span><div><strong>Browse Playbooks</strong> — 25+ SOC playbooks across 8 categories (Phishing, Malware, Ransomware, etc.)</div></div>
+        <div class="g-step"><span class="g-step-num">2</span><div><strong>Start Execution</strong> — Link a playbook to a case and work through each step</div></div>
+        <div class="g-step"><span class="g-step-num">3</span><div><strong>Track Progress</strong> — Each step can be marked complete. The playbook tracks overall completion.</div></div>
+        <div class="g-step"><span class="g-step-num">4</span><div><strong>Effectiveness</strong> — Check <code>/api/playbook-analytics</code> to see which playbooks lead to faster case resolution.</div></div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DETECTION ENGINEERING -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-detection" data-roles="all senior lead engineer">
+    <h2 class="g-section-title"><i class="icon-shield"></i> Detection Engineering</h2>
+    <p class="g-desc">7-tab analytics page integrating TIDE detection rules, Elasticsearch alerts, and OpenCTI threat intelligence.</p>
+
+    <div class="g-tabs-mockup">
+        <div class="g-tab-mock active">Posture</div>
+        <div class="g-tab-mock">Kill Chains</div>
+        <div class="g-tab-mock">Rules</div>
+        <div class="g-tab-mock">Execution</div>
+        <div class="g-tab-mock">Actor Readiness</div>
+        <div class="g-tab-mock">Kill Chain</div>
+        <div class="g-tab-mock">Gaps</div>
+    </div>
+
+    <div class="g-grid-2">
+        <div class="g-feature-card">
+            <h4 style="color:var(--primary)">Posture</h4>
+            <p>Rule totals, severity breakdown, quality distribution, MITRE coverage (142/159 techniques)</p>
+        </div>
+        <div class="g-feature-card">
+            <h4 style="color:var(--sev-high)">Actor Readiness</h4>
+            <p>Per-actor TTP coverage with country flags, readiness gauges, system-specific breakdowns, PDF reports</p>
+        </div>
+        <div class="g-feature-card">
+            <h4 style="color:var(--mitre-covered)">Kill Chains</h4>
+            <p>Playbook kill chain visualizations (Insider Threat, Ransomware) with per-step coverage state</p>
+        </div>
+        <div class="g-feature-card">
+            <h4 style="color:var(--sev-medium)">Gaps</h4>
+            <p>Blind spots by tactic, unmapped rules, quick wins — disabled critical/high rules to enable</p>
+        </div>
+    </div>
+
+    <div class="g-tip-box">
+        <strong>MITRE Navigator Export:</strong> Download a Navigator layer JSON at <code>/api/mitre-navigator/layer</code> — open it in the standard MITRE ATT&CK Navigator tool for visual coverage analysis.
+    </div>
+
+    <h3>Rule Tuning</h3>
+    <p>The <strong>Rule Tuning</strong> page (<code>/rule-tuning</code>) cross-references TIDE rules with case closure outcomes to identify:</p>
+    <div class="g-grid-3">
+        <div class="g-mini-card" style="border-left:3px solid var(--sev-critical)"><strong>FP-Heavy Rules</strong><br><span class="g-muted">Rules closed as false positive > 60% of the time</span></div>
+        <div class="g-mini-card" style="border-left:3px solid var(--mitre-covered)"><strong>High-Value Rules</strong><br><span class="g-muted">Rules consistently producing true positives</span></div>
+        <div class="g-mini-card" style="border-left:3px solid var(--sev-low)"><strong>Silent Rules</strong><br><span class="g-muted">Enabled in TIDE but never firing — misconfigured?</span></div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DFIR -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-forensics" data-roles="all dfir lead">
+    <h2 class="g-section-title"><i class="icon-microscope"></i> Digital Forensics (DFIR)</h2>
+    <p class="g-desc">Full forensic investigation workflow: cases, evidence chain of custody, timeline analysis, playbook-driven sections, IOC extraction, and PCAP analysis.</p>
+
+    <div class="g-features">
+        <div class="g-feature"><i class="icon-shield-check" style="color:var(--mitre-covered)"></i><div><strong>Chain of Custody</strong><br>Every evidence item logged with collection metadata and custody transfers.</div></div>
+        <div class="g-feature"><i class="icon-clock" style="color:var(--primary)"></i><div><strong>Timeline Builder</strong><br>Reconstruct events chronologically across evidence sources.</div></div>
+        <div class="g-feature"><i class="icon-file-search" style="color:var(--neon-purple)"></i><div><strong>PCAP Analyzer</strong><br>Upload packet captures for automated protocol analysis (12 heuristic detectors).</div></div>
+        <div class="g-feature"><i class="icon-scan" style="color:var(--neon-orange)"></i><div><strong>IOC Extraction</strong><br>Auto-extract IPs, domains, hashes from investigation notes.</div></div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ANALYTICS -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-analytics" data-roles="all senior lead engineer">
+    <h2 class="g-section-title"><i class="icon-bar-chart-2"></i> Analytics & Reporting</h2>
+
+    <div class="g-grid-2">
+        <div class="g-feature-card">
+            <h4><i class="icon-activity" style="color:var(--primary)"></i> Analytics Engine</h4>
+            <p>6 automated analytics jobs: entity risk scoring, repeat offenders, rule noise, observable velocity, case metrics, stale investigations.</p>
+            <p class="g-muted">Navigate to <code>/analytics</code></p>
+        </div>
+        <div class="g-feature-card">
+            <h4><i class="icon-users" style="color:var(--neon-green)"></i> Analyst Efficiency</h4>
+            <p>Per-analyst MTTR, FP rates, cases per shift, hourly activity timeline. Find your most efficient analysts.</p>
+            <p class="g-muted">Navigate to <code>/analyst-efficiency</code></p>
+        </div>
+        <div class="g-feature-card">
+            <h4><i class="icon-heart-pulse" style="color:var(--sev-critical)"></i> SOC Health Scorecard</h4>
+            <p>Living maturity assessment: detection coverage, operational efficiency, team readiness, knowledge, integrations. Graded A-F.</p>
+            <p class="g-muted">Navigate to <code>/soc-health</code></p>
+        </div>
+        <div class="g-feature-card">
+            <h4><i class="icon-file-text" style="color:var(--sev-medium)"></i> Executive Report</h4>
+            <p>Auto-generated weekly/monthly summary: cases, MTTR trends, notable incidents, team metrics. PDF or HTML.</p>
+            <p class="g-muted">Navigate to <code>/executive-report</code></p>
+        </div>
+        <div class="g-feature-card">
+            <h4><i class="icon-clipboard-list" style="color:var(--neon-orange)"></i> Shift Handover</h4>
+            <p>End-of-shift summary: what was triaged, open cases, active kill chains, pending items for the incoming shift.</p>
+            <p class="g-muted">Navigate to <code>/shift-handover</code></p>
+        </div>
+        <div class="g-feature-card">
+            <h4><i class="icon-git-commit" style="color:var(--neon-purple)"></i> Entity Timeline</h4>
+            <p>Search any host/IP/user and see a unified timeline across all data sources: cases, triage, observables, enrichments, audit log.</p>
+            <p class="g-muted">Navigate to <code>/entity-timeline</code></p>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TOOLS -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-tools" data-roles="all analyst senior">
+    <h2 class="g-section-title"><i class="icon-wrench"></i> Tools & Utilities</h2>
+
+    <div class="g-grid-3">
+        <div class="g-mini-card"><strong>SOC Tools</strong><br><span class="g-muted">CyberChef-style utilities: base64, URL decode, hash lookup, defang, etc.</span></div>
+        <div class="g-mini-card"><strong>Discover</strong><br><span class="g-muted">Raw Elasticsearch query builder. Write ECS queries against alert indices.</span></div>
+        <div class="g-mini-card"><strong>AI Chat</strong><br><span class="g-muted">Ollama-powered analysis. Ask questions, generate docs, get triage suggestions.</span></div>
+        <div class="g-mini-card"><strong>Notes</strong><br><span class="g-muted">Personal analyst notepad. Organize in folders, auto-save, pinnable.</span></div>
+        <div class="g-mini-card"><strong>Knowledge Base</strong><br><span class="g-muted">590+ articles across SOC, blue team, forensics, and security fundamentals.</span></div>
+        <div class="g-mini-card"><strong>Social Hub</strong><br><span class="g-muted">Team announcements, good work recognition, certifications, emoji reactions.</span></div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ADMIN -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-admin" data-roles="all engineer lead">
+    <h2 class="g-section-title"><i class="icon-settings"></i> Admin & Settings</h2>
+
+    <div class="g-features">
+        <div class="g-feature"><i class="icon-users" style="color:var(--primary)"></i><div><strong>User Management</strong><br>Create/edit users, assign multiple roles, manage focus mode. (<code>/users</code>)</div></div>
+        <div class="g-feature"><i class="icon-plug" style="color:var(--neon-green)"></i><div><strong>Integrations</strong><br>Configure Elasticsearch, OpenCTI, TIDE, Kibana, GitLab, Ollama connections. (<code>/integrations</code>)</div></div>
+        <div class="g-feature"><i class="icon-shield" style="color:var(--sev-critical)"></i><div><strong>Security</strong><br>Active sessions, attack detection, security event timeline. (<code>/security</code>)</div></div>
+        <div class="g-feature"><i class="icon-file-text" style="color:var(--sev-medium)"></i><div><strong>Audit Logs</strong><br>Full action history per user. Every triage, case change, and login. (<code>/audit-logs</code>)</div></div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- KEY WORKFLOWS -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-workflows" data-roles="all analyst senior lead">
+    <h2 class="g-section-title"><i class="icon-git-branch"></i> Key Workflows</h2>
+
+    <h3>Workflow 1: Triage an Alert</h3>
+    <div class="g-workflow">
+        <div class="g-wf-step"><div class="g-wf-num">1</div><div class="g-wf-content"><strong>Go to Alerts</strong><br>Open <code>/alerts</code>, filter by Open status and severity</div></div>
+        <div class="g-wf-arrow">&darr;</div>
+        <div class="g-wf-step"><div class="g-wf-num">2</div><div class="g-wf-content"><strong>Review Alert</strong><br>Click to expand. Check MITRE mapping, host, user, raw data</div></div>
+        <div class="g-wf-arrow">&darr;</div>
+        <div class="g-wf-step"><div class="g-wf-num">3</div><div class="g-wf-content"><strong>Check Triage Suggestion</strong><br>ION shows historical closure data for this rule. 80% FP? Probably FP.</div></div>
+        <div class="g-wf-arrow">&darr;</div>
+        <div class="g-wf-step"><div class="g-wf-num">4</div><div class="g-wf-content"><strong>Acknowledge</strong><br>Click "Acknowledge" to claim. Add notes about your findings.</div></div>
+        <div class="g-wf-arrow">&darr;</div>
+        <div class="g-wf-step choice"><div class="g-wf-num" style="background:var(--sev-medium)">?</div><div class="g-wf-content"><strong>Decision Point</strong><br><em>True Positive?</em> &rarr; Create Case &rarr; Investigate<br><em>False Positive?</em> &rarr; Close as FP &rarr; Note why</div></div>
+    </div>
+
+    <h3>Workflow 2: Investigate a Case</h3>
+    <div class="g-workflow">
+        <div class="g-wf-step"><div class="g-wf-num">1</div><div class="g-wf-content"><strong>Open Case</strong><br>Go to <code>/cases</code>, select your assigned case</div></div>
+        <div class="g-wf-arrow">&darr;</div>
+        <div class="g-wf-step"><div class="g-wf-num">2</div><div class="g-wf-content"><strong>Check Entity Timeline</strong><br>Go to <code>/entity-timeline</code>, search the affected host. See all related events across data sources.</div></div>
+        <div class="g-wf-arrow">&darr;</div>
+        <div class="g-wf-step"><div class="g-wf-num">3</div><div class="g-wf-content"><strong>Check Similar Cases</strong><br>ION shows past cases with matching patterns. How were they resolved? What was the MTTR?</div></div>
+        <div class="g-wf-arrow">&darr;</div>
+        <div class="g-wf-step"><div class="g-wf-num">4</div><div class="g-wf-content"><strong>Run Playbook</strong><br>Attach a playbook and work through steps. Extract IOCs. Enrich observables.</div></div>
+        <div class="g-wf-arrow">&darr;</div>
+        <div class="g-wf-step"><div class="g-wf-num">5</div><div class="g-wf-content"><strong>Close Case</strong><br>Document findings, select closure reason, close. MTTR is automatically tracked.</div></div>
+    </div>
+
+    <h3>Workflow 3: Shift Handover</h3>
+    <div class="g-workflow" style="flex-direction:row;flex-wrap:wrap">
+        <div class="g-wf-step" style="flex:1;min-width:200px"><div class="g-wf-num">1</div><div class="g-wf-content"><strong>Generate Report</strong><br>Go to <code>/shift-handover</code>. Select 8h window. Click Generate.</div></div>
+        <div class="g-wf-step" style="flex:1;min-width:200px"><div class="g-wf-num">2</div><div class="g-wf-content"><strong>Review Highlights</strong><br>Check the highlights banner for critical items the incoming shift needs.</div></div>
+        <div class="g-wf-step" style="flex:1;min-width:200px"><div class="g-wf-num">3</div><div class="g-wf-content"><strong>Print or Share</strong><br>Click Print for a clean printable version. Walk the incoming shift through it.</div></div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- QUICK REFERENCE -->
+<!-- ============================================================ -->
+<section class="g-section" id="section-shortcuts" data-roles="all analyst senior lead engineer dfir">
+    <h2 class="g-section-title"><i class="icon-zap"></i> Quick Reference Cards</h2>
+
+    <div class="g-grid-2">
+        <div class="g-ref-card">
+            <h4>Alert Statuses</h4>
+            <div class="g-ref-row"><span class="sev-badge sev-critical">OPEN</span> Not yet reviewed</div>
+            <div class="g-ref-row"><span class="sev-badge sev-medium">ACKNOWLEDGED</span> Claimed by an analyst</div>
+            <div class="g-ref-row"><span class="sev-badge sev-low">CLOSED</span> Resolved with a reason</div>
+        </div>
+        <div class="g-ref-card">
+            <h4>Severity Levels</h4>
+            <div class="g-ref-row"><span class="sev-badge sev-critical">CRITICAL</span> Immediate action required</div>
+            <div class="g-ref-row"><span class="sev-badge sev-high">HIGH</span> Investigate within 1 hour</div>
+            <div class="g-ref-row"><span class="sev-badge sev-medium">MEDIUM</span> Investigate within 4 hours</div>
+            <div class="g-ref-row"><span class="sev-badge sev-low">LOW</span> Investigate within 24 hours</div>
+        </div>
+        <div class="g-ref-card">
+            <h4>Key API Endpoints</h4>
+            <div class="g-ref-row"><code>/api/triage-suggestions?rule_name=X</code> Triage hint</div>
+            <div class="g-ref-row"><code>/api/case-similarity/{id}</code> Similar cases</div>
+            <div class="g-ref-row"><code>/api/attack-stories?hours=24</code> Attack stories</div>
+            <div class="g-ref-row"><code>/api/entity-timeline/search?q=X</code> Entity search</div>
+            <div class="g-ref-row"><code>/api/mitre-navigator/layer</code> Navigator export</div>
+            <div class="g-ref-row"><code>/api/executive-report/pdf</code> Executive PDF</div>
+        </div>
+        <div class="g-ref-card">
+            <h4>RBAC Roles</h4>
+            <div class="g-ref-row"><strong>Analyst (L1)</strong> — Alert triage, cases, observables, playbooks</div>
+            <div class="g-ref-row"><strong>Senior Analyst (L2)</strong> — L1 + escalated cases, observable trends</div>
+            <div class="g-ref-row"><strong>Principal Analyst (L3)</strong> — L2 + SLA compliance, mentoring</div>
+            <div class="g-ref-row"><strong>Forensic</strong> — Forensic investigations, evidence, chain of custody</div>
+            <div class="g-ref-row"><strong>Lead</strong> — All analyst + forensic + team management</div>
+            <div class="g-ref-row"><strong>Engineering</strong> — Integrations, system config, detection eng</div>
+            <div class="g-ref-row"><strong>Admin</strong> — Full access + user management</div>
+        </div>
+    </div>
+</section>
+
+</div><!-- end g-content -->
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Guide Layout ─────────────────────────────────── */
+.g-role-bar{display:flex;gap:6px;align-items:center;margin-bottom:16px;flex-wrap:wrap;padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.g-role-label{font-size:.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;margin-right:8px}
+.g-role-btn{padding:6px 14px;border:1px solid var(--border);border-radius:20px;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:.78rem;font-weight:600;transition:all .15s}
+.g-role-btn:hover{border-color:var(--primary);color:var(--text-primary)}
+.g-role-btn.active{background:var(--primary-dim);border-color:var(--primary);color:var(--primary)}
+
+.g-quicknav{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:20px;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius)}
+.g-quicknav a{padding:4px 10px;border-radius:4px;font-size:.72rem;font-weight:600;color:var(--text-secondary);text-decoration:none;transition:all .15s}
+.g-quicknav a:hover{background:var(--primary-dim);color:var(--primary)}
+
+.g-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;margin-bottom:20px}
+.g-section-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.g-section-title i{color:var(--primary)}
+.g-desc{font-size:.88rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6}
+.g-intro{font-size:.9rem;color:var(--text-secondary);line-height:1.7;margin-bottom:20px}
+.g-intro strong{color:var(--primary)}
+.g-muted{font-size:.78rem;color:var(--text-muted)}
+
+/* Cards */
+.g-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.g-card{background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.g-card h3{font-size:.9rem;margin:8px 0 6px;color:var(--text-primary)}
+.g-card p{font-size:.82rem;color:var(--text-secondary);line-height:1.5}
+.g-card-icon{font-size:1.4rem}
+.g-tip{font-size:.72rem;color:var(--sev-medium);margin-top:8px;padding:6px 8px;background:var(--sev-medium-bg);border-radius:var(--radius);border-left:2px solid var(--sev-medium)}
+
+/* Visual mockups */
+.g-mockup{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin:16px 0}
+.g-mockup-title{padding:8px 14px;background:var(--bg-card);font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.g-mockup-body{background:var(--bg-primary);padding:0}
+.g-mockup-callouts{padding:10px 14px;background:var(--bg-secondary);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+.g-callout{font-size:.78rem;color:var(--text-secondary);display:flex;align-items:center;gap:8px}
+.g-callout-num{width:20px;height:20px;border-radius:50%;background:var(--primary);color:var(--bg-deep);font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* Mock UI elements */
+.g-mock-stats{display:flex;gap:8px;padding:12px;flex-wrap:wrap}
+.g-mock-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;text-align:center;flex:1;min-width:100px}
+.g-mock-val{font-size:1.2rem;font-weight:700;font-family:'JetBrains Mono',monospace;display:block}
+.g-mock-label{font-size:.62rem;color:var(--text-muted);text-transform:uppercase}
+.g-mock-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 12px}
+.g-mock-panel{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:10px}
+.g-mock-panel-title{font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px}
+.g-mock-rows{display:flex;flex-direction:column;gap:4px}
+.g-mock-row{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--text-primary);padding:4px 0;border-bottom:1px solid rgba(99,110,123,.1)}
+.g-mock-sev{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.g-mock-sev.crit{background:var(--sev-critical)}.g-mock-sev.high{background:var(--sev-high)}.g-mock-sev.med{background:var(--sev-medium)}
+.g-mock-time{margin-left:auto;font-size:.68rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+.g-mock-badge{margin-left:auto;font-size:.62rem;font-weight:700;text-transform:uppercase}
+.g-mock-toolbar{display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap}
+.g-mock-input{flex:1;padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);font-size:.78rem;color:var(--text-muted);min-width:150px}
+.g-mock-select{padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);font-size:.78rem;color:var(--text-muted)}
+.g-mock-btn-primary{padding:6px 14px;background:var(--primary);color:var(--bg-deep);border-radius:var(--radius);font-size:.78rem;font-weight:700}
+.g-mock-table{padding:0}
+.g-mock-thead{display:flex;padding:8px 12px;font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border)}
+.g-mock-trow{display:flex;align-items:center;padding:8px 12px;font-size:.82rem;border-bottom:1px solid rgba(99,110,123,.1)}
+.g-mock-trow:hover{background:rgba(0,212,255,.03)}
+.g-mock-mini-stat{background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-size:.82rem}
+
+/* Kill chain nodes */
+.g-kc-node{padding:4px 10px;border-radius:4px;font-size:.68rem;font-weight:700;text-transform:uppercase;white-space:nowrap}
+.g-kc-node.active{background:var(--sev-critical-dim);color:var(--sev-critical);border:1px solid var(--sev-critical)}
+.g-kc-node.inactive{background:var(--bg-primary);color:var(--text-muted);border:1px dashed var(--border)}
+.g-kc-arrow{padding:0 4px;color:var(--text-muted);font-size:.8rem}
+
+/* Features grid */
+.g-features{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:16px 0}
+.g-feature{display:flex;gap:12px;padding:12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius)}
+.g-feature i{font-size:1.2rem;flex-shrink:0;margin-top:2px}
+.g-feature div{font-size:.82rem;color:var(--text-secondary);line-height:1.5}
+.g-feature strong{color:var(--text-primary)}
+
+.g-grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:12px 0}
+.g-grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:12px 0}
+.g-feature-card{background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.g-feature-card h4{font-size:.88rem;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.g-feature-card p{font-size:.82rem;color:var(--text-secondary);line-height:1.5;margin-top:4px}
+.g-mini-card{background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-size:.82rem;color:var(--text-primary)}
+
+/* Steps */
+.g-steps{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.g-step{display:flex;gap:12px;align-items:flex-start;padding:10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius)}
+.g-step-num{width:28px;height:28px;border-radius:50%;background:var(--primary);color:var(--bg-deep);font-size:.8rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.g-step div{font-size:.85rem;color:var(--text-secondary);line-height:1.5}
+.g-step strong{color:var(--text-primary)}
+
+/* Tip box */
+.g-tip-box{padding:12px 16px;background:var(--primary-dim);border:1px solid var(--primary);border-radius:var(--radius);font-size:.85rem;color:var(--text-primary);margin:12px 0;border-left:3px solid var(--primary)}
+.g-tip-box strong{color:var(--primary)}
+.g-tip-box code{background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px;font-size:.78rem}
+
+/* Tabs mockup */
+.g-tabs-mockup{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.g-tab-mock{padding:8px 16px;font-size:.78rem;font-weight:600;color:var(--text-secondary);border-bottom:2px solid transparent}
+.g-tab-mock.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+/* Workflow */
+.g-workflow{display:flex;flex-direction:column;gap:0;margin:12px 0}
+.g-wf-step{display:flex;gap:12px;align-items:flex-start;padding:12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius)}
+.g-wf-step.choice{border-color:var(--sev-medium);border-style:dashed}
+.g-wf-num{width:28px;height:28px;border-radius:50%;background:var(--primary);color:var(--bg-deep);font-size:.8rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.g-wf-content{font-size:.85rem;color:var(--text-secondary);line-height:1.5}
+.g-wf-content strong{color:var(--text-primary)}
+.g-wf-content em{color:var(--sev-medium)}
+.g-wf-arrow{text-align:center;color:var(--text-muted);font-size:1rem;padding:2px 0 2px 13px}
+
+/* Reference cards */
+.g-ref-card{background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px}
+.g-ref-card h4{font-size:.88rem;color:var(--primary);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.g-ref-row{font-size:.82rem;color:var(--text-secondary);padding:4px 0;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(99,110,123,.08)}
+.g-ref-row code{background:var(--bg-secondary);padding:2px 6px;border-radius:3px;font-size:.72rem;color:var(--primary)}
+.g-ref-row strong{color:var(--text-primary)}
+
+/* Role notes */
+.g-role-note{padding:10px 14px;border-radius:var(--radius);font-size:.82rem;margin:8px 0;display:none}
+.g-role-note.lead{background:var(--sev-high-bg);border-left:3px solid var(--sev-high);color:var(--sev-high)}
+.g-role-note.engineer{background:var(--sev-info-bg);border-left:3px solid var(--sev-info);color:var(--sev-info)}
+
+/* Role filtering */
+.g-section[data-hidden="true"]{display:none}
+
+/* Print styles */
+@media print{
+    .navbar,.g-role-bar,.g-quicknav,.header-actions,.chat-widget,.chat-toggle{display:none!important}
+    body{background:#fff!important;color:#333!important}
+    .g-section{break-inside:avoid;border-color:#ddd;background:#fff}
+    .g-mockup-body{background:#f8f9fa}
+    .g-section-title{color:#000}
+    .g-section-title i{color:#0969da}
+}
+
+@media(max-width:768px){
+    .g-mock-grid{grid-template-columns:1fr}
+    .g-grid-2,.g-grid-3{grid-template-columns:1fr}
+    .g-kc-node{font-size:.6rem;padding:3px 6px}
+}
+</style>
+<script>
+let currentRole = 'all';
+
+function gSetRole(role) {
+    currentRole = role;
+    document.querySelectorAll('.g-role-btn').forEach(b => b.classList.toggle('active', b.dataset.role === role));
+
+    // Show/hide sections based on role
+    document.querySelectorAll('.g-section').forEach(s => {
+        const roles = (s.dataset.roles || 'all').split(' ');
+        s.dataset.hidden = (role !== 'all' && !roles.includes(role) && !roles.includes('all')) ? 'true' : 'false';
+    });
+
+    // Show/hide role-specific notes
+    document.querySelectorAll('.g-role-note').forEach(n => {
+        n.style.display = (role === 'all' || n.classList.contains(role)) ? 'block' : 'none';
+    });
+}
+
+// Smooth scroll for quicknav
+document.querySelectorAll('.g-quicknav a').forEach(a => {
+    a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+});
+</script>
+{% endblock %}
