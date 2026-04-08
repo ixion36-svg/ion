@@ -4186,6 +4186,8 @@ async def update_case(
                 )
             except Exception as _ne:
                 logger.debug("Failed to create reassign notification: %s", _ne)
+        # Commit the assignment immediately so it persists even if Kibana sync fails
+        session.commit()
     _synced_alert_ids = []
     _mapped_triage = None
     if data.status is not None:

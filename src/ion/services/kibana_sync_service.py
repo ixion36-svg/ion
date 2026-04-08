@@ -437,6 +437,22 @@ class KibanaSyncService:
                         if first_alert.title:
                             standardized_title = first_alert.title
 
+                    # Resolve Kibana assignee to ION user
+                    assigned_to_id = None
+                    kibana_assignees = kibana_case.get("assignees") or []
+                    if kibana_assignees:
+                        # Kibana assignees are [{uid: "elastic-uid-string"}]
+                        for assignee_entry in kibana_assignees:
+                            assignee_uid = assignee_entry.get("uid")
+                            if assignee_uid:
+                                # Find ION user by elastic_uid
+                                matched_user = session.query(User).filter_by(elastic_uid=assignee_uid).first()
+                                if matched_user:
+                                    assigned_to_id = matched_user.id
+                                    break
+                                # Fallback: try matching by username/elastic_username
+                                # (elastic_uid might not be cached yet)
+
                     # Create ION case with standardized title and description
                     case_number = f"CASE-{next_num:04d}"
                     new_case = AlertCase(
@@ -446,6 +462,7 @@ class KibanaSyncService:
                         status=status,
                         severity=severity,
                         created_by_id=admin_user.id,
+                        assigned_to_id=assigned_to_id,
                         kibana_case_id=kibana_id,
                         kibana_case_version=kibana_case.get("version"),
                         source_alert_ids=source_alert_ids if source_alert_ids else None,
