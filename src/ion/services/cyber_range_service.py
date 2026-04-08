@@ -36,6 +36,16 @@ RANGE_SCENARIOS = {
                 "da_johnson": {"role": "IT Admin (Domain Admin)", "host": "SRV-JUMP01", "dept": "IT"},
             },
             "c2_server": "185.220.101.34 (Attacker C2)",
+            "hosts": [
+                {"ip": "10.20.1.10", "hostname": "SRV-DC01", "os": "Windows Server 2022", "role": "Domain Controller", "state": "online", "subnet": "servers"},
+                {"ip": "10.20.1.11", "hostname": "SRV-DC02", "os": "Windows Server 2022", "role": "Domain Controller", "state": "online", "subnet": "servers"},
+                {"ip": "10.20.1.20", "hostname": "SRV-FILE01", "os": "Windows Server 2022", "role": "File Server", "state": "online", "subnet": "servers"},
+                {"ip": "10.20.1.30", "hostname": "SRV-MAIL01", "os": "Windows Server 2022", "role": "Mail Server", "state": "online", "subnet": "servers"},
+                {"ip": "10.20.3.88", "hostname": "SRV-JUMP01", "os": "Windows Server 2022", "role": "Jump Server", "state": "online", "subnet": "servers"},
+                {"ip": "10.20.5.103", "hostname": "WS-DEV03", "os": "Windows 11 Pro", "role": "Workstation", "state": "online", "subnet": "workstations"},
+                {"ip": "10.20.6.10", "hostname": "WS-FIN01", "os": "Windows 11 Pro", "role": "Workstation", "state": "online", "subnet": "workstations"},
+                {"ip": "10.20.7.55", "hostname": "WS-MKTG07", "os": "Windows 11 Pro", "role": "Workstation", "state": "online", "subnet": "workstations"},
+            ],
         },
         "stages": [
             {
@@ -73,6 +83,7 @@ RANGE_SCENARIOS = {
                             {"title": "Outbound Connection to Known Tor Exit Node", "severity": "high", "rule": "C2 - Connection to Threat Intel IP", "mitre": "T1071.001", "host": "WS-DEV03"},
                         ],
                         "mitre": ["T1566.001", "T1059.001", "T1071.001"],
+                        "host_updates": [{"hostname": "WS-DEV03", "state": "beacon", "beacon_user": "t.nguyen", "beacon_pid": "powershell.exe (4872)"}],
                         "user_view": {
                             "desktop_user": "t.nguyen",
                             "host": "WS-DEV03",
@@ -118,6 +129,7 @@ RANGE_SCENARIOS = {
                             {"title": "Suspicious LDAP Enumeration from Workstation", "severity": "medium", "rule": "Discovery - Bulk LDAP Queries", "mitre": "T1087.002", "host": "WS-DEV03"},
                         ],
                         "mitre": ["T1087.002", "T1069.002", "T1018"],
+                        "host_updates": [{"hostname": "SRV-DC01", "state": "scanned"}, {"hostname": "SRV-DC02", "state": "scanned"}],
                         "user_view": {
                             "desktop_user": "t.nguyen",
                             "host": "WS-DEV03",
@@ -156,6 +168,7 @@ RANGE_SCENARIOS = {
                             {"title": "RC4 Encryption Requested (Downgrade Attack)", "severity": "medium", "rule": "Credential Access - Kerberos RC4 Downgrade", "mitre": "T1558.003", "host": "SRV-DC01"},
                         ],
                         "mitre": ["T1558.003"],
+                        "host_updates": [],
                         "user_view": {
                             "desktop_user": "t.nguyen",
                             "host": "WS-DEV03",
@@ -198,6 +211,7 @@ RANGE_SCENARIOS = {
                             {"title": "Service Account Interactive Logon (Unusual)", "severity": "medium", "rule": "Lateral Movement - Service Account Logon", "mitre": "T1078.002", "host": "SRV-FILE01"},
                         ],
                         "mitre": ["T1569.002", "T1021.002", "T1078.002"],
+                        "host_updates": [{"hostname": "SRV-FILE01", "state": "beacon", "beacon_user": "svc_backup", "beacon_pid": "PSEXESVC"}],
                         "user_view": {
                             "desktop_user": "Backup Service",
                             "host": "SRV-FILE01",
@@ -239,6 +253,7 @@ RANGE_SCENARIOS = {
                             {"title": "Known Attack Tool Detected: Mimikatz", "severity": "critical", "rule": "Execution - Known Attack Tool", "mitre": "T1003.001", "host": "SRV-FILE01"},
                         ],
                         "mitre": ["T1003.001"],
+                        "host_updates": [{"hostname": "SRV-FILE01", "state": "elevated", "beacon_user": "da_johnson (harvested)", "beacon_pid": "cmd.exe (2104)"}],
                         "user_view": {
                             "desktop_user": "Backup Service",
                             "host": "SRV-FILE01",
@@ -283,6 +298,7 @@ RANGE_SCENARIOS = {
                             {"title": "Replicating Directory Changes All — Suspicious Source", "severity": "critical", "rule": "Persistence - KRBTGT Extraction", "mitre": "T1003.006", "host": "SRV-DC01"},
                         ],
                         "mitre": ["T1003.006"],
+                        "host_updates": [{"hostname": "SRV-DC01", "state": "owned"}],
                         "user_view": {
                             "desktop_user": "da_johnson",
                             "host": "SRV-JUMP01",
@@ -315,6 +331,7 @@ RANGE_SCENARIOS = {
                             {"title": "Golden Ticket: TGS Without Prior Authentication", "severity": "critical", "rule": "Persistence - Golden Ticket", "mitre": "T1558.001", "host": "SRV-DC01"},
                         ],
                         "mitre": ["T1558.001"],
+                        "host_updates": [{"hostname": "SRV-DC01", "state": "owned"}, {"hostname": "SRV-DC02", "state": "owned"}],
                         "user_view": {
                             "desktop_user": "da_johnson",
                             "host": "SRV-JUMP01",
@@ -364,6 +381,7 @@ RANGE_SCENARIOS = {
                             {"title": "Data Loss Prevention: Bulk PII/Financial File Access", "severity": "critical", "rule": "Exfiltration - DLP Trigger", "mitre": "T1005", "host": "SRV-FILE01"},
                         ],
                         "mitre": ["T1039", "T1041", "T1005"],
+                        "host_updates": [{"hostname": "SRV-FILE01", "state": "owned"}],
                         "user_view": {
                             "desktop_user": "j.smith",
                             "host": "WS-FIN01",
@@ -398,6 +416,15 @@ RANGE_SCENARIOS = {
                 "a.patel": {"role": "HR Manager", "host": "WS-HR02", "dept": "Human Resources"},
             },
             "c2_server": "185.220.101.34 (Attacker VPS — Ubuntu 22.04)",
+            "hosts": [
+                {"ip": "10.20.1.10", "hostname": "SRV-DC01", "os": "Windows Server 2022", "role": "Domain Controller", "state": "online", "subnet": "servers"},
+                {"ip": "10.20.1.11", "hostname": "SRV-DC02", "os": "Windows Server 2022", "role": "Domain Controller", "state": "online", "subnet": "servers"},
+                {"ip": "10.20.1.20", "hostname": "SRV-FILE01", "os": "Windows Server 2022", "role": "File Server", "state": "online", "subnet": "servers"},
+                {"ip": "10.20.1.30", "hostname": "SRV-MAIL01", "os": "Windows Server 2022", "role": "Mail Server", "state": "online", "subnet": "servers"},
+                {"ip": "10.20.6.10", "hostname": "WS-FIN01", "os": "Windows 11 Pro", "role": "Workstation", "state": "online", "subnet": "workstations"},
+                {"ip": "10.20.6.22", "hostname": "WS-HR02", "os": "Windows 11 Pro", "role": "Workstation", "state": "online", "subnet": "workstations"},
+                {"ip": "10.20.5.103", "hostname": "WS-DEV03", "os": "Windows 11 Pro", "role": "Workstation", "state": "online", "subnet": "workstations"},
+            ],
         },
         "stages": [
             {
@@ -430,6 +457,7 @@ RANGE_SCENARIOS = {
                         "blue_logs": [],
                         "blue_alerts": [],
                         "mitre": ["T1583.004", "T1588.004"],
+                        "host_updates": [],
                         "user_view": {
                             "desktop_user": "—",
                             "host": "Attacker VPS",
@@ -461,6 +489,7 @@ RANGE_SCENARIOS = {
                         "blue_logs": [],
                         "blue_alerts": [],
                         "mitre": ["T1071.001", "T1573.002"],
+                        "host_updates": [],
                         "user_view": {
                             "desktop_user": "—",
                             "host": "Attacker VPS",
@@ -514,6 +543,7 @@ RANGE_SCENARIOS = {
                         "blue_logs": [],
                         "blue_alerts": [],
                         "mitre": ["T1587.001", "T1588.003", "T1553.002"],
+                        "host_updates": [],
                         "user_view": {
                             "desktop_user": "—",
                             "host": "Attacker VPS",
@@ -574,6 +604,7 @@ RANGE_SCENARIOS = {
                             {"title": "Outbound HTTPS to Newly Registered Domain", "severity": "medium", "rule": "C2 - New Domain Connection", "mitre": "T1071.001", "host": "WS-HR02"},
                         ],
                         "mitre": ["T1566.001", "T1047", "T1071.001"],
+                        "host_updates": [{"hostname": "WS-HR02", "state": "beacon", "beacon_user": "a.patel", "beacon_pid": "wmiprvse.exe (7204)"}],
                         "user_view": {
                             "desktop_user": "a.patel",
                             "host": "WS-HR02",
@@ -627,6 +658,7 @@ RANGE_SCENARIOS = {
                             {"title": "Unsigned DLL Dropped to ProgramData", "severity": "high", "rule": "Defense Evasion - DLL Drop", "mitre": "T1574.001", "host": "WS-HR02"},
                         ],
                         "mitre": ["T1053.005", "T1574.001", "T1113"],
+                        "host_updates": [{"hostname": "WS-HR02", "state": "elevated", "beacon_user": "a.patel", "beacon_pid": "wmiprvse.exe (7204)"}],
                         "user_view": {
                             "desktop_user": "a.patel",
                             "host": "WS-HR02",
@@ -682,6 +714,7 @@ RANGE_SCENARIOS = {
                             {"title": "Suspicious Named Pipe: msagent_72", "severity": "medium", "rule": "C2 - Known C2 Pipe Name Pattern", "mitre": "T1570", "host": "WS-FIN01"},
                         ],
                         "mitre": ["T1543.003", "T1003.002", "T1569.002", "T1570"],
+                        "host_updates": [{"hostname": "WS-HR02", "state": "elevated", "beacon_user": "SYSTEM", "beacon_pid": "svc (SYSTEM)"}, {"hostname": "WS-FIN01", "state": "beacon", "beacon_user": "svc_deploy", "beacon_pid": "SMB pipe msagent_72"}],
                         "user_view": {
                             "desktop_user": "j.smith",
                             "host": "WS-FIN01",
@@ -739,6 +772,7 @@ RANGE_SCENARIOS = {
                             {"title": "SOCKS Proxy Created by Suspicious Process", "severity": "high", "rule": "C2 - SOCKS Proxy Detection", "mitre": "T1090.001", "host": "WS-HR02"},
                         ],
                         "mitre": ["T1041", "T1570", "T1090.001", "T1005"],
+                        "host_updates": [{"hostname": "WS-FIN01", "state": "owned"}],
                         "user_view": {
                             "desktop_user": "j.smith",
                             "host": "WS-FIN01",
