@@ -37,6 +37,10 @@
         <div class="astat-value" id="astat-stale">-</div>
         <div class="astat-label">Stale Items</div>
     </div>
+    <div class="astat-card" data-tab="systems">
+        <div class="astat-value" id="astat-systems">-</div>
+        <div class="astat-label">Systems</div>
+    </div>
 </div>
 
 <!-- Tab Navigation -->
@@ -48,6 +52,7 @@
     <button class="analytics-tab" data-tab="observable_velocity" onclick="switchTab('observable_velocity')">Observables</button>
     <button class="analytics-tab" data-tab="case_metrics" onclick="switchTab('case_metrics')">Case Metrics</button>
     <button class="analytics-tab" data-tab="stale_investigations" onclick="switchTab('stale_investigations')">Stale</button>
+    <button class="analytics-tab" data-tab="systems" onclick="switchTab('systems')">Systems</button>
     <button class="analytics-tab" data-tab="config" onclick="switchTab('config')">Job Config</button>
 </div>
 
@@ -108,6 +113,42 @@
     </div>
 </div>
 
+<!-- System Analytics -->
+<div id="tab-systems" class="analytics-tab-content">
+    <div class="analytics-section">
+        <div class="section-header">
+            <h2>System Analytics</h2>
+            <span class="section-sub">Per-system alert volume + TIDE detection coverage</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;">
+            <select id="sys-time-range" onchange="loadSystemAnalyticsTab()" style="padding:0.375rem 0.75rem;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-secondary);color:var(--text-primary);font-size:0.8125rem;">
+                <option value="24">Last 24 Hours</option>
+                <option value="72">Last 3 Days</option>
+                <option value="168" selected>Last 7 Days</option>
+                <option value="720">Last 30 Days</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="loadSystemAnalyticsTab()">Refresh</button>
+            <span id="sys-summary-text" style="font-size:0.75rem;color:var(--text-muted);margin-left:auto;"></span>
+        </div>
+        <!-- System stats bar -->
+        <div id="sys-stats-bar" style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.75rem;margin-bottom:1.5rem;">
+            <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-total">-</div><div class="sys-stat-label">Total Alerts</div></div>
+            <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-systems">-</div><div class="sys-stat-label">Systems</div></div>
+            <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-mapped">-</div><div class="sys-stat-label">TIDE Mapped</div></div>
+            <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-coverage">-</div><div class="sys-stat-label">Avg Coverage</div></div>
+            <div class="sys-stat-card"><div class="sys-stat-val severity-critical" id="sys-s-critical">-</div><div class="sys-stat-label">Critical</div></div>
+        </div>
+        <!-- Timeline -->
+        <div id="sys-timeline-chart" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:1.5rem;min-height:80px;position:relative;overflow:hidden;">
+            <div class="loading-state" style="padding:1rem;">Loading...</div>
+        </div>
+        <!-- System cards grid -->
+        <div id="sys-cards-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:1.25rem;">
+            <div class="loading-state">Loading system analytics...</div>
+        </div>
+    </div>
+</div>
+
 <!-- Job Config -->
 <div id="tab-config" class="analytics-tab-content">
     <div class="analytics-section">
@@ -125,7 +166,7 @@
    ========================================================================= */
 .analytics-stats-bar {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(7, 1fr);
     gap: 1rem;
     margin-bottom: 2rem;
 }
@@ -579,7 +620,7 @@
    Responsive
    ========================================================================= */
 @media (max-width: 1100px) {
-    .analytics-stats-bar { grid-template-columns: repeat(3, 1fr); }
+    .analytics-stats-bar { grid-template-columns: repeat(4, 1fr); }
     .analytics-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
@@ -588,6 +629,212 @@
     .metrics-grid { grid-template-columns: repeat(2, 1fr); }
     .noise-bar-label { width: 150px; }
 }
+
+/* =========================================================================
+   System Analytics Tab
+   ========================================================================= */
+.sys-stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1rem 0.75rem;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    position: relative;
+    overflow: hidden;
+}
+.sys-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+}
+.sys-stat-val {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary);
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.2;
+    text-shadow: var(--glow-sm);
+}
+.sys-stat-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.25rem;
+}
+
+/* System card */
+.sys-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
+}
+.sys-card:hover {
+    border-color: var(--border-bright);
+    box-shadow: 0 2px 8px rgba(0,0,0,.15), 0 0 20px rgba(0, 212, 255, 0.08);
+    transform: translateY(-2px);
+}
+.sys-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.875rem 1.125rem;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+}
+.sys-card-header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+}
+.sys-card.mapped .sys-card-header::before {
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
+}
+.sys-card:not(.mapped) .sys-card-header::before {
+    background: linear-gradient(90deg, var(--neon-orange), var(--neon-red));
+}
+.sys-card-name {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text-bright);
+    font-family: 'JetBrains Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.sys-card-name .sys-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--bg-primary);
+    flex-shrink: 0;
+}
+.sys-card-alerts {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--primary);
+    font-family: 'JetBrains Mono', monospace;
+    text-shadow: var(--glow-sm);
+}
+.sys-card-body { padding: 0.875rem 1.125rem; }
+.sys-sev-row { display: flex; gap: 0.375rem; margin-bottom: 0.625rem; flex-wrap: wrap; }
+.sys-sev-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+}
+.sys-sev-pill.crit { background: rgba(255,69,58,0.15); color: var(--danger); border: 1px solid rgba(255,69,58,0.3); }
+.sys-sev-pill.high { background: rgba(255,149,0,0.15); color: var(--neon-orange); border: 1px solid rgba(255,149,0,0.3); }
+.sys-sev-pill.med { background: rgba(255,214,10,0.15); color: var(--warning); border: 1px solid rgba(255,214,10,0.3); }
+.sys-sev-pill.low { background: rgba(48,209,88,0.15); color: var(--success); border: 1px solid rgba(48,209,88,0.3); }
+.sys-sparkline { margin: 0.375rem 0; height: 36px; }
+.sys-sparkline svg { width: 100%; height: 36px; display: block; }
+.sys-meta {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.375rem;
+}
+.sys-meta span { display: flex; align-items: center; gap: 0.2rem; }
+.sys-rules-section {
+    margin-top: 0.625rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.625rem;
+}
+.sys-rules-title {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+}
+.sys-rule-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.2rem 0;
+    font-size: 0.7rem;
+}
+.sys-rule-name {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 260px;
+}
+.sys-rule-count {
+    color: var(--primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 0.65rem;
+}
+
+/* TIDE coverage overlay on system card */
+.sys-tide-bar {
+    margin-top: 0.625rem;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--border);
+}
+.sys-tide-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.7rem;
+    margin-bottom: 0.375rem;
+}
+.sys-tide-label .tide-label-left { color: var(--text-muted); font-weight: 500; }
+.sys-tide-label .tide-label-right { font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.sys-tide-progress {
+    height: 6px;
+    background: var(--bg-elevated);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.375rem;
+}
+.sys-tide-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}
+.sys-tide-stats {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+.sys-tide-stats span { display: flex; align-items: center; gap: 0.2rem; }
+
+/* Unmapped badge */
+.sys-unmapped-badge {
+    margin-top: 0.5rem;
+    padding: 0.375rem 0.625rem;
+    background: rgba(255,149,0,0.08);
+    border: 1px solid rgba(255,149,0,0.2);
+    border-radius: var(--radius);
+    font-size: 0.7rem;
+    color: var(--neon-orange);
+    text-align: center;
+}
+.sys-unmapped-badge a { color: var(--primary); text-decoration: none; }
+.sys-unmapped-badge a:hover { text-decoration: underline; }
 </style>
 <script>
 let dashboardData = null;
@@ -1077,5 +1324,269 @@ function showToast(msg, isError) {
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
 }
+
+// =========================================================================
+// System Analytics Tab
+// =========================================================================
+let sysOverviewData = null;
+let sysTabLoaded = false;
+
+async function loadSystemAnalyticsTab() {
+    const hours = document.getElementById('sys-time-range').value;
+    const grid = document.getElementById('sys-cards-grid');
+    grid.innerHTML = '<div class="loading-state">Loading system analytics...</div>';
+
+    try {
+        const resp = await fetch(`/api/analytics/system-overview?hours=${hours}`, { credentials: 'include' });
+        if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || resp.statusText);
+        sysOverviewData = await resp.json();
+        sysTabLoaded = true;
+        renderSystemAnalytics(sysOverviewData);
+        setText('astat-systems', sysOverviewData.total_systems || 0);
+    } catch (e) {
+        console.error('System analytics error:', e);
+        grid.innerHTML = `<div class="empty-state">${esc(e.message || 'Failed to load')}</div>`;
+    }
+}
+
+function renderSystemAnalytics(data) {
+    // Stats bar
+    const sev = data.total_severity || {};
+    setText('sys-s-total', (data.total_alerts || 0).toLocaleString());
+    setText('sys-s-systems', data.total_systems || 0);
+    setText('sys-s-mapped', data.mapped_systems || 0);
+    const covEl = document.getElementById('sys-s-coverage');
+    if (covEl) {
+        covEl.textContent = (data.avg_tide_coverage || 0) + '%';
+        covEl.style.color = data.avg_tide_coverage >= 70 ? 'var(--neon-green)' : data.avg_tide_coverage >= 40 ? 'var(--neon-yellow)' : 'var(--neon-red)';
+    }
+    setText('sys-s-critical', (sev.critical || 0).toLocaleString());
+
+    // Summary text
+    const sumEl = document.getElementById('sys-summary-text');
+    if (sumEl) {
+        const unmapped = (data.total_systems || 0) - (data.mapped_systems || 0);
+        sumEl.textContent = `${data.total_systems} systems, ${data.mapped_systems} TIDE-mapped${unmapped ? ', ' + unmapped + ' unmapped' : ''}`;
+    }
+
+    // Timeline
+    renderSysTimeline(data.total_timeline || [], data.interval);
+
+    // System cards
+    renderSysCards(data.systems || []);
+}
+
+function renderSysTimeline(timeline, interval) {
+    const container = document.getElementById('sys-timeline-chart');
+    if (!timeline.length) {
+        container.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:0.8125rem;padding:1rem;">No timeline data</div>';
+        return;
+    }
+    const W = container.clientWidth - 40 || 800;
+    const H = 70;
+    const maxVal = Math.max(...timeline.map(t => t.count), 1);
+    const points = timeline.map((t, i) => ({
+        x: 20 + (i / Math.max(timeline.length - 1, 1)) * (W - 40),
+        y: H - 10 - ((t.count / maxVal) * (H - 25)),
+        count: t.count
+    }));
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const areaPath = linePath + ` L${points[points.length-1].x.toFixed(1)},${H-10} L${points[0].x.toFixed(1)},${H-10} Z`;
+
+    container.innerHTML = `<div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:0.25rem;">Alert volume (interval: ${interval || 'auto'})</div>
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:55px;">
+            <defs><linearGradient id="sys-tl-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.4"/>
+                <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
+            </linearGradient></defs>
+            <path d="${areaPath}" fill="url(#sys-tl-grad)" opacity="0.3"/>
+            <path d="${linePath}" fill="none" stroke="var(--neon-cyan)" stroke-width="2" filter="drop-shadow(0 0 4px rgba(0,212,255,0.5))"/>
+            <text x="2" y="18" fill="var(--text-muted)" font-size="9" font-family="JetBrains Mono">${maxVal}</text>
+            <text x="2" y="${H-10}" fill="var(--text-muted)" font-size="9" font-family="JetBrains Mono">0</text>
+        </svg>`;
+}
+
+function renderSysCards(systems) {
+    const grid = document.getElementById('sys-cards-grid');
+    if (!systems.length) {
+        grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">No systems found. Configure Elasticsearch and CyAB data source namespaces to see system analytics.</div>';
+        return;
+    }
+    grid.innerHTML = systems.map(sys => buildSysCard(sys)).join('');
+}
+
+function buildSysCard(sys) {
+    const sev = sys.severity || {};
+    const ns = sys.system || 'unknown';
+    const isMapped = sys.mapped;
+    const icon = getSysIcon(ns);
+    const iconColor = getSysColor(ns);
+
+    // Severity pills
+    let sevHtml = '';
+    if (sev.critical) sevHtml += `<span class="sys-sev-pill crit">C ${sev.critical}</span>`;
+    if (sev.high) sevHtml += `<span class="sys-sev-pill high">H ${sev.high}</span>`;
+    if (sev.medium) sevHtml += `<span class="sys-sev-pill med">M ${sev.medium}</span>`;
+    if (sev.low) sevHtml += `<span class="sys-sev-pill low">L ${sev.low}</span>`;
+    if (!sevHtml && sys.alert_count > 0) sevHtml = '<span class="sys-sev-pill" style="color:var(--text-muted);">No severity data</span>';
+    if (!sevHtml && sys.alert_count === 0) sevHtml = '<span style="font-size:0.7rem;color:var(--text-muted);">No alerts in time range</span>';
+
+    // Mini sparkline
+    const sparkHtml = buildSysSparkline(sys.timeline || [], iconColor);
+
+    // Top rules (max 4)
+    const rules = (sys.top_rules || []).slice(0, 4);
+    let rulesHtml = '';
+    if (rules.length) {
+        rulesHtml = `<div class="sys-rules-section">
+            <div class="sys-rules-title">Top Rules</div>
+            ${rules.map(r => `<div class="sys-rule-row">
+                <span class="sys-rule-name" title="${esc(r.rule)}">${esc(r.rule)}</span>
+                <span class="sys-rule-count">${r.count}</span>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    // TIDE coverage overlay (if mapped)
+    let tideHtml = '';
+    if (isMapped && sys.tide) {
+        const t = sys.tide;
+        const covPct = t.coverage_pct || 0;
+        const covColor = covPct >= 70 ? 'var(--neon-green)' : covPct >= 40 ? 'var(--neon-yellow)' : 'var(--neon-red)';
+        tideHtml = `<div class="sys-tide-bar">
+            <div class="sys-tide-label">
+                <span class="tide-label-left">TIDE: ${esc(t.name || '')}</span>
+                <span class="tide-label-right" style="color:${covColor}">${covPct}%</span>
+            </div>
+            <div class="sys-tide-progress">
+                <div class="sys-tide-progress-fill" style="width:${covPct}%;background:${covColor};"></div>
+            </div>
+            <div class="sys-tide-stats">
+                <span>${t.applied_rules}/${t.total_rules} rules</span>
+                <span>${t.enabled_rules} enabled</span>
+                ${t.disabled_rules ? `<span style="color:var(--neon-orange);">${t.disabled_rules} disabled</span>` : ''}
+                ${t.severity_breakdown?.critical ? `<span style="color:var(--danger);">${t.severity_breakdown.critical} crit</span>` : ''}
+                ${t.severity_breakdown?.high ? `<span style="color:var(--neon-orange);">${t.severity_breakdown.high} high</span>` : ''}
+            </div>
+        </div>`;
+    } else if (isMapped && sys.cyab && !sys.tide) {
+        tideHtml = `<div class="sys-tide-bar">
+            <div style="font-size:0.7rem;color:var(--text-muted);">CyAB mapped (${esc(sys.cyab.cyab_source_name || '')}), no TIDE system linked</div>
+        </div>`;
+    }
+
+    // CyAB info line
+    let cyabHtml = '';
+    if (isMapped && sys.cyab) {
+        const c = sys.cyab;
+        const readColor = (c.readiness_score || 0) >= 70 ? 'var(--neon-green)' : (c.readiness_score || 0) >= 40 ? 'var(--neon-yellow)' : 'var(--neon-red)';
+        cyabHtml = `<div class="sys-meta" style="margin-top:0.25rem;">
+            <span title="CyAB System">${esc(c.cyab_system_name || c.cyab_source_name || '')}</span>
+            <span title="Readiness" style="color:${readColor};">${c.readiness_score || 0}% ready</span>
+            <span title="Use Case Status">${esc(c.use_case_status || 'Not reviewed')}</span>
+        </div>`;
+    }
+
+    // Unmapped badge
+    let unmappedHtml = '';
+    if (!isMapped) {
+        unmappedHtml = `<div class="sys-unmapped-badge">Not mapped to CyAB — <a href="/cyab">configure in CyAB</a></div>`;
+    }
+
+    return `<div class="sys-card ${isMapped ? 'mapped' : ''}">
+        <div class="sys-card-header">
+            <div class="sys-card-name">
+                <span class="sys-icon" style="background:${iconColor};">${icon}</span>
+                ${esc(ns)}
+            </div>
+            <div class="sys-card-alerts">${(sys.alert_count || 0).toLocaleString()}</div>
+        </div>
+        <div class="sys-card-body">
+            <div class="sys-sev-row">${sevHtml}</div>
+            <div class="sys-sparkline">${sparkHtml}</div>
+            <div class="sys-meta">
+                <span title="Unique hosts">&#x1F4BB; ${sys.unique_hosts || 0} hosts</span>
+                <span title="Unique users">&#x1F464; ${sys.unique_users || 0} users</span>
+                <span title="Alert status">${formatSysStatus(sys.status)}</span>
+            </div>
+            ${cyabHtml}
+            ${tideHtml}
+            ${rulesHtml}
+            ${unmappedHtml}
+        </div>
+    </div>`;
+}
+
+function buildSysSparkline(timeline, color) {
+    if (!timeline.length) return '';
+    const W = 360, H = 36;
+    const maxVal = Math.max(...timeline.map(t => t.count), 1);
+    const points = timeline.map((t, i) => ({
+        x: (i / Math.max(timeline.length - 1, 1)) * W,
+        y: H - 4 - ((t.count / maxVal) * (H - 8))
+    }));
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const areaPath = linePath + ` L${W},${H-4} L0,${H-4} Z`;
+    const gId = 'sys-sg-' + color.replace(/[^a-zA-Z0-9]/g, '');
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <defs><linearGradient id="${gId}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        </linearGradient></defs>
+        <path d="${areaPath}" fill="url(#${gId})" opacity="0.5"/>
+        <path d="${linePath}" fill="none" stroke="${color}" stroke-width="1.5" filter="drop-shadow(0 0 2px ${color})"/>
+    </svg>`;
+}
+
+function formatSysStatus(status) {
+    if (!status || !Object.keys(status).length) return '-';
+    const parts = [];
+    if (status.open) parts.push(`${status.open} open`);
+    if (status.acknowledged) parts.push(`${status.acknowledged} ack`);
+    if (status.closed) parts.push(`${status.closed} closed`);
+    return parts.join(', ') || '-';
+}
+
+function getSysIcon(name) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('windows') || n === 'default') return 'W';
+    if (n.includes('linux')) return 'L';
+    if (n.includes('network') || n.includes('firewall') || n.includes('fw')) return 'N';
+    if (n.includes('cloud') || n.includes('aws') || n.includes('azure') || n.includes('gcp')) return 'C';
+    if (n.includes('endpoint') || n.includes('edr')) return 'E';
+    if (n.includes('mail') || n.includes('email') || n.includes('exchange')) return 'M';
+    if (n.includes('dns')) return 'D';
+    if (n.includes('web') || n.includes('http') || n.includes('proxy')) return 'P';
+    if (n.includes('auth') || n.includes('identity') || n.includes('ad')) return 'A';
+    if (n.includes('db') || n.includes('sql') || n.includes('database')) return 'B';
+    return name ? name.charAt(0).toUpperCase() : '?';
+}
+
+function getSysColor(name) {
+    const n = (name || '').toLowerCase();
+    if (n.includes('windows') || n === 'default') return '#00a4ef';
+    if (n.includes('linux')) return '#fcc624';
+    if (n.includes('network') || n.includes('firewall')) return '#00d4ff';
+    if (n.includes('cloud') || n.includes('aws')) return '#ff9900';
+    if (n.includes('azure')) return '#0078d4';
+    if (n.includes('gcp')) return '#4285f4';
+    if (n.includes('endpoint') || n.includes('edr')) return '#9b59b6';
+    if (n.includes('mail') || n.includes('email')) return '#e74c3c';
+    if (n.includes('dns')) return '#2ecc71';
+    if (n.includes('web') || n.includes('proxy')) return '#f39c12';
+    if (n.includes('auth') || n.includes('identity')) return '#e91e63';
+    let hash = 0;
+    for (let i = 0; i < n.length; i++) hash = n.charCodeAt(i) + ((hash << 5) - hash);
+    return `hsl(${Math.abs(hash % 360)}, 70%, 55%)`;
+}
+
+// Lazy-load systems tab when first opened
+const origSwitchTab = switchTab;
+switchTab = function(tab) {
+    origSwitchTab(tab);
+    if (tab === 'systems' && !sysTabLoaded) {
+        loadSystemAnalyticsTab();
+    }
+};
 </script>
 {% endblock %}

@@ -90,52 +90,113 @@
     </button>
 </div>
 <div class="analytics-dashboard" id="analytics-dashboard" style="display:none;">
-    <div class="analytics-row">
-        <div class="analytics-card mitre-heatmap-card">
-            <h4>MITRE ATT&CK Technique Heatmap</h4>
+    <!-- Key Metrics Strip -->
+    <div class="ad-metrics-strip">
+        <div class="ad-metric" id="ad-metric-mttr">
+            <div class="ad-metric-val">-</div>
+            <div class="ad-metric-label">MTTR</div>
+        </div>
+        <div class="ad-metric" id="ad-metric-velocity">
+            <div class="ad-metric-val">-</div>
+            <div class="ad-metric-label">Alerts/hr</div>
+        </div>
+        <div class="ad-metric" id="ad-metric-unassigned">
+            <div class="ad-metric-val">-</div>
+            <div class="ad-metric-label">Unassigned Crit/High</div>
+        </div>
+        <div class="ad-metric" id="ad-metric-caserate">
+            <div class="ad-metric-val">-</div>
+            <div class="ad-metric-label">Case Conversion</div>
+        </div>
+        <div class="ad-metric" id="ad-metric-fprate">
+            <div class="ad-metric-val">-</div>
+            <div class="ad-metric-label">FP Rate</div>
+        </div>
+        <div class="ad-metric" id="ad-metric-closure">
+            <div class="ad-metric-val">-</div>
+            <div class="ad-metric-label">Closure Rate</div>
+        </div>
+    </div>
+
+    <!-- Tab navigation -->
+    <div class="ad-tabs">
+        <button class="ad-tab active" data-ad-tab="overview" onclick="switchAdTab('overview')">Overview</button>
+        <button class="ad-tab" data-ad-tab="mitre" onclick="switchAdTab('mitre')">MITRE ATT&CK</button>
+        <button class="ad-tab" data-ad-tab="geo" onclick="switchAdTab('geo')">Threat Map</button>
+        <button class="ad-tab" data-ad-tab="systems" onclick="switchAdTab('systems')">Systems</button>
+    </div>
+
+    <!-- Tab: Overview -->
+    <div class="ad-panel active" id="ad-panel-overview">
+        <div class="ad-overview-grid">
+            <div class="ad-card ad-card-trend">
+                <div class="ad-card-header"><span class="ad-card-icon">&#9650;</span> Alert Trend</div>
+                <div id="chart-trend" class="chart-container"></div>
+            </div>
+            <div class="ad-card">
+                <div class="ad-card-header"><span class="ad-card-icon" style="color:var(--danger);">&#9679;</span> Severity</div>
+                <div id="chart-severity" class="chart-container chart-container-sm"></div>
+            </div>
+            <div class="ad-card">
+                <div class="ad-card-header"><span class="ad-card-icon" style="color:var(--primary);">&#9679;</span> Triage Status</div>
+                <div id="chart-triage-status" class="chart-container chart-container-sm"></div>
+            </div>
+        </div>
+        <div class="ad-overview-bottom">
+            <div class="ad-card">
+                <div class="ad-card-header"><span class="ad-card-icon">&#127760;</span> Top Source Countries</div>
+                <div id="chart-top-countries" class="chart-container"></div>
+            </div>
+            <div class="ad-card">
+                <div class="ad-card-header"><span class="ad-card-icon">&#128421;</span> Top Hosts</div>
+                <div id="chart-top-hosts" class="chart-container"></div>
+            </div>
+            <div class="ad-card">
+                <div class="ad-card-header"><span class="ad-card-icon">&#128220;</span> Top Rules</div>
+                <div id="chart-top-rules" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: MITRE ATT&CK -->
+    <div class="ad-panel" id="ad-panel-mitre">
+        <div class="ad-card mitre-heatmap-card" style="grid-column:1/-1;">
+            <div class="ad-card-header"><span class="ad-card-icon" style="color:#f44336;">&#9862;</span> MITRE ATT&CK Technique Heatmap</div>
+            <div class="ad-card-hint">Click a technique to filter alerts</div>
+            <div id="mitre-heatmap-legend" class="mitre-heatmap-legend" style="display:none;"></div>
             <div id="chart-mitre-heatmap" class="mitre-heatmap"></div>
         </div>
     </div>
-    <div class="analytics-row-globe">
-        <div class="analytics-card globe-card">
-            <h4>Attack Origin Map</h4>
+
+    <!-- Tab: Threat Map -->
+    <div class="ad-panel" id="ad-panel-geo">
+        <div class="ad-card" style="grid-column:1/-1;">
+            <div class="ad-card-header"><span class="ad-card-icon">&#127760;</span> Attack Origin Map</div>
             <div class="globe-container">
                 <img id="globe-map-img" src="/static/img/earth_night.jpg" alt="" draggable="false">
                 <canvas id="globe-canvas"></canvas>
                 <div class="globe-tooltip" id="globe-tooltip" style="display:none;"></div>
             </div>
         </div>
-        <div class="analytics-card metrics-card">
-            <h4>Key Metrics</h4>
-            <div class="key-metrics-grid" id="key-metrics-grid"></div>
-        </div>
     </div>
-    <div class="analytics-row">
-        <div class="analytics-card">
-            <h4>Alert Trend</h4>
-            <div id="chart-trend" class="chart-container"></div>
+
+    <!-- Tab: Systems (TIDE + ES) -->
+    <div class="ad-panel" id="ad-panel-systems">
+        <div class="ad-sys-header">
+            <div class="ad-sys-stats" id="ad-sys-stats">
+                <div class="ad-sys-stat"><span class="ad-sys-stat-val" id="ad-sys-total">-</span><span class="ad-sys-stat-lbl">Alerts</span></div>
+                <div class="ad-sys-stat"><span class="ad-sys-stat-val" id="ad-sys-count">-</span><span class="ad-sys-stat-lbl">Systems</span></div>
+                <div class="ad-sys-stat"><span class="ad-sys-stat-val" id="ad-sys-mapped">-</span><span class="ad-sys-stat-lbl">TIDE Mapped</span></div>
+                <div class="ad-sys-stat"><span class="ad-sys-stat-val" id="ad-sys-coverage">-</span><span class="ad-sys-stat-lbl">Avg Coverage</span></div>
+            </div>
+            <select class="ad-sys-range" id="ad-sys-range" onchange="loadAdSystems()">
+                <option value="24">24 hours</option>
+                <option value="168" selected>7 days</option>
+                <option value="720">30 days</option>
+            </select>
         </div>
-        <div class="analytics-card">
-            <h4>Severity Breakdown</h4>
-            <div id="chart-severity" class="chart-container chart-container-sm"></div>
-        </div>
-        <div class="analytics-card">
-            <h4>Triage Status</h4>
-            <div id="chart-triage-status" class="chart-container chart-container-sm"></div>
-        </div>
-    </div>
-    <div class="analytics-row-even">
-        <div class="analytics-card">
-            <h4>Top Source Countries</h4>
-            <div id="chart-top-countries" class="chart-container"></div>
-        </div>
-        <div class="analytics-card">
-            <h4>Top Hosts</h4>
-            <div id="chart-top-hosts" class="chart-container"></div>
-        </div>
-        <div class="analytics-card">
-            <h4>Top Rules</h4>
-            <div id="chart-top-rules" class="chart-container"></div>
+        <div id="ad-sys-grid" class="ad-sys-grid">
+            <div class="ad-sys-loading">Loading system analytics...</div>
         </div>
     </div>
 </div>
@@ -901,7 +962,9 @@
 .threat-stat-value { font-size: 1.5rem; font-weight: bold; }
 .threat-stat-label { font-size: 0.875rem; opacity: 0.8; }
 
-/* Analytics Dashboard */
+/* ================================================================
+   Analytics Dashboard — Reworked
+   ================================================================ */
 .analytics-toggle {
     margin-bottom: 0.75rem;
 }
@@ -913,29 +976,124 @@
 }
 .analytics-dashboard {
     margin-bottom: 1.25rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
 }
-.analytics-row {
+
+/* --- Key Metrics Strip --- */
+.ad-metrics-strip {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
-    gap: 1rem;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.75rem;
     margin-bottom: 1rem;
 }
-.analytics-card {
+.ad-metric {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+.ad-metric::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--primary);
+    opacity: 0.5;
+}
+.ad-metric-val {
+    font-size: 1.375rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    line-height: 1.2;
+    color: var(--text-primary);
+}
+.ad-metric-val.metric-warn { color: var(--warning); }
+.ad-metric-val.metric-danger { color: var(--danger); }
+.ad-metric-val.metric-good { color: var(--success); }
+.ad-metric-val.metric-info { color: var(--info); }
+.ad-metric-label {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+/* --- Tab Navigation --- */
+.ad-tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+}
+.ad-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.625rem 1.125rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    letter-spacing: 0.3px;
+}
+.ad-tab:hover { color: var(--text-primary); }
+.ad-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+/* --- Tab Panels --- */
+.ad-panel { display: none; }
+.ad-panel.active { display: block; }
+
+/* --- Cards --- */
+.ad-card {
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 1rem 1.25rem;
 }
-.analytics-card h4 {
+.ad-card-header {
     font-size: 0.75rem;
     text-transform: uppercase;
     color: var(--text-muted);
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 0.625rem 0;
     letter-spacing: 0.5px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
-.analytics-card-wide {
-    grid-column: span 1;
+.ad-card-icon { font-size: 0.875rem; }
+.ad-card-hint {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    opacity: 0.7;
+    margin: -0.375rem 0 0.5rem 0;
 }
+
+/* Overview grid */
+.ad-overview-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+.ad-overview-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+}
+
+/* Chart containers */
 .chart-container {
     min-height: 200px;
     position: relative;
@@ -943,9 +1101,7 @@
 .chart-container-sm {
     min-height: 200px;
 }
-.chart-container-geo {
-    min-height: 240px;
-}
+
 /* SVG chart styles */
 .chart-bar { transition: opacity 0.15s; cursor: default; }
 .chart-bar:hover { opacity: 0.8; }
@@ -953,25 +1109,14 @@
 .chart-value { font-size: 10px; fill: var(--text-muted); }
 .chart-axis { stroke: var(--border); stroke-width: 1; }
 .chart-grid { stroke: var(--border); stroke-width: 0.5; opacity: 0.3; }
+
 /* Donut chart */
 .donut-segment { transition: opacity 0.15s; cursor: default; }
 .donut-segment:hover { opacity: 0.8; }
 .donut-legend { font-size: 11px; fill: currentColor; }
 .donut-legend-value { font-size: 11px; fill: var(--text-muted); }
-/* Globe & new analytics rows */
-.analytics-row-globe {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-.analytics-row-even {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-.globe-card { padding: 1rem 1rem 0.5rem 1rem; }
+
+/* Globe */
 .globe-container {
     position: relative;
     border-radius: var(--radius);
@@ -988,10 +1133,8 @@
 }
 #globe-canvas {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     cursor: crosshair;
 }
 .globe-tooltip {
@@ -1008,44 +1151,193 @@
     z-index: 10;
     box-shadow: 0 2px 12px rgba(0,0,0,0.5);
 }
-.key-metrics-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-    height: 100%;
+
+/* Horizontal bar chart */
+.hbar-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem; }
+.hbar-label { font-size: 0.75rem; width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+.hbar-track { flex: 1; height: 18px; background: rgba(128,128,128,0.08); border-radius: 4px; overflow: hidden; }
+.hbar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.hbar-count { font-size: 0.75rem; color: var(--text-muted); width: 36px; text-align: right; flex-shrink: 0; font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+
+/* --- Systems Tab --- */
+.ad-sys-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
 }
-.key-metric-tile {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0.75rem 1rem;
+.ad-sys-stats {
+    display: flex;
+    gap: 1.25rem;
+}
+.ad-sys-stat {
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    align-items: center;
 }
-.key-metric-value {
-    font-size: 1.5rem;
+.ad-sys-stat-val {
+    font-size: 1.25rem;
     font-weight: 700;
-    line-height: 1.2;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    color: var(--text-primary);
 }
-.key-metric-label {
+.ad-sys-stat-lbl {
     font-size: 0.6875rem;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
     color: var(--text-muted);
-    margin-top: 0.25rem;
 }
-.metric-warn { color: var(--warning); }
-.metric-danger { color: var(--danger); }
-.metric-good { color: var(--success); }
-.metric-info { color: var(--info); }
-.metrics-card { padding: 1rem 1.25rem; }
-/* Horizontal bar chart */
-.hbar-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; }
-.hbar-label { font-size: 0.75rem; width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
-.hbar-track { flex: 1; height: 16px; background: rgba(128,128,128,0.1); border-radius: 3px; overflow: hidden; }
-.hbar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
-.hbar-count { font-size: 0.75rem; color: var(--text-muted); width: 32px; text-align: right; flex-shrink: 0; }
+.ad-sys-range {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    padding: 0.375rem 0.75rem;
+}
+
+.ad-sys-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 1rem;
+}
+
+.ad-sys-loading {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+.ad-sys-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ad-sys-card:hover {
+    border-color: rgba(99,110,123,0.6);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+}
+.ad-sys-card-hdr {
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+.ad-sys-card-hdr::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+}
+.ad-sys-card.mapped .ad-sys-card-hdr::before {
+    background: linear-gradient(90deg, var(--success), rgba(76,175,80,0.2));
+}
+.ad-sys-card:not(.mapped) .ad-sys-card-hdr::before {
+    background: linear-gradient(90deg, var(--warning), rgba(255,152,0,0.2));
+}
+.ad-sys-card-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.ad-sys-card-name .ns-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    background: var(--bg-tertiary);
+    color: var(--primary);
+    flex-shrink: 0;
+}
+.ad-sys-card-alerts {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-weight: 700;
+    font-size: 1rem;
+}
+.ad-sys-card-body {
+    padding: 0.75rem 1rem;
+}
+.ad-sys-sev-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.625rem;
+    flex-wrap: wrap;
+}
+.ad-sys-sev-pill {
+    font-size: 0.6875rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 99px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+.ad-sys-sev-pill.crit { background: rgba(244,67,54,0.15); color: #f44336; }
+.ad-sys-sev-pill.high { background: rgba(255,152,0,0.15); color: #ff9800; }
+.ad-sys-sev-pill.med  { background: rgba(255,193,7,0.15); color: #ffc107; }
+.ad-sys-sev-pill.low  { background: rgba(76,175,80,0.15); color: #4caf50; }
+
+.ad-sys-tide {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(99,110,123,0.2);
+}
+.ad-sys-tide-label {
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    margin-bottom: 0.375rem;
+    display: flex;
+    justify-content: space-between;
+}
+.ad-sys-tide-bar-track {
+    height: 6px;
+    background: rgba(128,128,128,0.15);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.ad-sys-tide-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s;
+}
+.ad-sys-tide-stats {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.375rem;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+}
+.ad-sys-tide-stats span { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+
+.ad-sys-unmapped {
+    margin-top: 0.5rem;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    opacity: 0.8;
+    padding: 0.375rem 0.5rem;
+    background: rgba(255,152,0,0.06);
+    border-radius: var(--radius);
+    border: 1px dashed rgba(255,152,0,0.2);
+}
+
+.ad-sys-sparkline {
+    margin-bottom: 0.5rem;
+}
+
+@media (max-width: 900px) {
+    .ad-metrics-strip { grid-template-columns: repeat(3, 1fr); }
+    .ad-overview-grid { grid-template-columns: 1fr; }
+    .ad-overview-bottom { grid-template-columns: 1fr; }
+    .ad-sys-grid { grid-template-columns: 1fr; }
+}
 
 /* Active Filter Banner */
 .active-filter-banner {
@@ -1857,6 +2149,60 @@ kbd {
 .mitre-heatmap-cell.heat-3 { background: rgba(255, 87, 34, 0.45); color: #ff5722; }
 .mitre-heatmap-cell.heat-4 { background: rgba(244, 67, 54, 0.55); color: var(--danger); }
 .mitre-heatmap-cell.heat-5 { background: rgba(211, 47, 47, 0.7); color: #fff; }
+
+/* TIDE coverage overlay states */
+.mitre-heatmap-cell.tide-covered {
+    background: rgba(0, 200, 83, 0.12);
+    color: var(--success);
+    border: 1px solid rgba(0, 200, 83, 0.25);
+}
+.mitre-heatmap-cell.tide-covered .tech-count {
+    font-size: 0.5625rem;
+    opacity: 0.7;
+}
+.mitre-heatmap-cell.tide-blind {
+    background: rgba(244, 67, 54, 0.06);
+    color: rgba(244, 67, 54, 0.6);
+    border: 1px dashed rgba(244, 67, 54, 0.3);
+}
+.mitre-heatmap-cell.tide-blind .tech-count {
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+/* Legend bar for MITRE heatmap */
+.mitre-heatmap-legend {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 0.5rem 0;
+    margin-bottom: 0.5rem;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+}
+.mitre-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.mitre-legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.mitre-tide-summary {
+    display: flex;
+    gap: 1.25rem;
+    margin-left: auto;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+}
+.mitre-tide-summary strong {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    color: var(--text-primary);
+}
 
 .mitre-badges-row {
     display: flex;
@@ -6474,6 +6820,11 @@ function renderThreatBanner() {
 // =========================================================================
 // Analytics Dashboard
 // =========================================================================
+let _adSystemsLoaded = false;
+let _adActiveTab = 'overview';
+let _tideMitreCoverage = null;
+let _tideMitreFetched = false;
+
 function toggleAnalytics() {
     const dash = document.getElementById('analytics-dashboard');
     const icon = document.getElementById('analytics-toggle-icon');
@@ -6490,16 +6841,165 @@ function toggleAnalytics() {
 
 function renderAnalytics() {
     if (document.getElementById('analytics-dashboard').style.display === 'none') return;
-    renderMitreHeatmap();
-    startMap();
-    initMapInteraction();
-    renderKeyMetrics();
+    renderAdKeyMetrics();
     renderTrendChart();
     renderSeverityDonut();
     renderTriageStatusDonut();
     renderTopCountries();
     renderHBarChart('chart-top-hosts', allAlerts, 'host', '#4fc3f7');
     renderHBarChart('chart-top-rules', allAlerts, 'rule_name', '#ba68c8');
+    // Lazy-load active tab content
+    if (_adActiveTab === 'mitre') { loadTideMitreCoverage(); renderMitreHeatmap(); }
+    if (_adActiveTab === 'geo') { startMap(); initMapInteraction(); }
+    if (_adActiveTab === 'systems' && !_adSystemsLoaded) loadAdSystems();
+}
+
+function switchAdTab(tabName) {
+    // Stop map animation if leaving geo tab
+    if (_adActiveTab === 'geo' && tabName !== 'geo') stopMap();
+    _adActiveTab = tabName;
+    // Toggle tab buttons
+    document.querySelectorAll('.ad-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-ad-tab') === tabName);
+    });
+    // Toggle panels
+    document.querySelectorAll('.ad-panel').forEach(p => {
+        p.classList.toggle('active', p.id === `ad-panel-${tabName}`);
+    });
+    // Lazy render content
+    if (tabName === 'mitre') { loadTideMitreCoverage(); renderMitreHeatmap(); }
+    if (tabName === 'geo') { startMap(); initMapInteraction(); }
+    if (tabName === 'systems' && !_adSystemsLoaded) loadAdSystems();
+}
+
+async function loadTideMitreCoverage() {
+    if (_tideMitreFetched) return;
+    _tideMitreFetched = true;
+    try {
+        const resp = await fetch('/api/cyab/tide/mitre-coverage');
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (data.enabled) {
+            _tideMitreCoverage = data;
+        }
+    } catch (e) {
+        console.warn('TIDE MITRE coverage unavailable:', e.message);
+    }
+    // Re-render heatmap now that TIDE data is available
+    if (_adActiveTab === 'mitre') renderMitreHeatmap();
+}
+
+async function loadAdSystems() {
+    const grid = document.getElementById('ad-sys-grid');
+    const hours = document.getElementById('ad-sys-range').value;
+    grid.innerHTML = '<div class="ad-sys-loading">Loading system analytics...</div>';
+    _adSystemsLoaded = false;
+    try {
+        const resp = await fetch(`/api/analytics/system-overview?hours=${hours}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        renderAdSystems(data);
+        _adSystemsLoaded = true;
+    } catch (e) {
+        grid.innerHTML = `<div class="ad-sys-loading" style="color:var(--danger);">Failed to load: ${escapeHtml(e.message)}</div>`;
+    }
+}
+
+function renderAdSystems(data) {
+    // Stats
+    document.getElementById('ad-sys-total').textContent = (data.total_alerts || 0).toLocaleString();
+    document.getElementById('ad-sys-count').textContent = data.total_systems || 0;
+    document.getElementById('ad-sys-mapped').textContent = data.mapped_systems || 0;
+    document.getElementById('ad-sys-coverage').textContent = (data.avg_tide_coverage || 0) + '%';
+
+    const grid = document.getElementById('ad-sys-grid');
+    const systems = data.systems || [];
+    if (systems.length === 0) {
+        grid.innerHTML = '<div class="ad-sys-loading">No systems found. Connect Elasticsearch to see system data.</div>';
+        return;
+    }
+
+    // Sort: mapped first, then by alert_count desc
+    systems.sort((a, b) => {
+        if (a.mapped !== b.mapped) return a.mapped ? -1 : 1;
+        return (b.alert_count || 0) - (a.alert_count || 0);
+    });
+
+    grid.innerHTML = systems.map(sys => buildAdSysCard(sys)).join('');
+}
+
+function buildAdSysCard(sys) {
+    const ns = sys.system || 'unknown';
+    const initials = ns.slice(0, 2).toUpperCase();
+    const isMapped = sys.mapped;
+    const sev = sys.severity || {};
+    const alerts = sys.alert_count || 0;
+
+    // Severity pills
+    let sevHtml = '';
+    if (sev.critical) sevHtml += `<span class="ad-sys-sev-pill crit">${sev.critical} crit</span>`;
+    if (sev.high) sevHtml += `<span class="ad-sys-sev-pill high">${sev.high} high</span>`;
+    if (sev.medium) sevHtml += `<span class="ad-sys-sev-pill med">${sev.medium} med</span>`;
+    if (sev.low) sevHtml += `<span class="ad-sys-sev-pill low">${sev.low} low</span>`;
+    if (!sevHtml) sevHtml = '<span style="font-size:0.75rem;color:var(--text-muted);">No alerts</span>';
+
+    // Sparkline
+    let sparkHtml = '';
+    const tl = sys.timeline || [];
+    if (tl.length > 1) {
+        const maxTl = Math.max(1, ...tl.map(t => t.count || 0));
+        const w = 320, h = 32;
+        const step = w / (tl.length - 1);
+        let pts = tl.map((t, i) => `${(i * step).toFixed(1)},${(h - (t.count || 0) / maxTl * (h - 4) - 2).toFixed(1)}`).join(' ');
+        sparkHtml = `<div class="ad-sys-sparkline"><svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+            <polyline points="${pts}" fill="none" stroke="var(--primary)" stroke-width="1.5" opacity="0.6"/>
+        </svg></div>`;
+    }
+
+    // TIDE section
+    let tideHtml = '';
+    if (isMapped && sys.tide) {
+        const t = sys.tide;
+        const pct = t.coverage_pct || 0;
+        const barColor = pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--danger)';
+        tideHtml = `<div class="ad-sys-tide">
+            <div class="ad-sys-tide-label">
+                <span>TIDE Detection Coverage</span>
+                <span style="font-family:monospace;font-weight:600;color:${barColor};">${pct}%</span>
+            </div>
+            <div class="ad-sys-tide-bar-track"><div class="ad-sys-tide-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
+            <div class="ad-sys-tide-stats">
+                <span>${t.applied_rules || 0}/${t.total_rules || 0} rules</span>
+                <span>${t.enabled_rules || 0} enabled</span>
+                <span>${t.disabled_rules || 0} disabled</span>
+            </div>
+        </div>`;
+    } else if (isMapped && !sys.tide) {
+        tideHtml = `<div class="ad-sys-tide">
+            <div class="ad-sys-tide-label"><span>TIDE Detection Coverage</span><span style="color:var(--text-muted);">Not linked</span></div>
+        </div>`;
+    }
+
+    // Unmapped badge
+    let unmappedHtml = '';
+    if (!isMapped) {
+        unmappedHtml = `<div class="ad-sys-unmapped">Not mapped to CyAB &mdash; <a href="/cyab" style="color:var(--primary);">configure</a></div>`;
+    }
+
+    return `<div class="ad-sys-card ${isMapped ? 'mapped' : ''}">
+        <div class="ad-sys-card-hdr">
+            <div class="ad-sys-card-name"><span class="ns-icon">${escapeHtml(initials)}</span> ${escapeHtml(ns)}</div>
+            <div class="ad-sys-card-alerts">${alerts.toLocaleString()}</div>
+        </div>
+        <div class="ad-sys-card-body">
+            ${sparkHtml}
+            <div class="ad-sys-sev-row">${sevHtml}</div>
+            ${tideHtml}
+            ${unmappedHtml}
+        </div>
+    </div>`;
 }
 
 // --- MITRE ATT&CK Heatmap ---
@@ -6507,11 +7007,13 @@ function renderMitreHeatmap() {
     const container = document.getElementById('chart-mitre-heatmap');
     if (!container) return;
 
-    // Aggregate technique counts from alerts
+    const tideTechs = (_tideMitreCoverage && _tideMitreCoverage.techniques) ? _tideMitreCoverage.techniques : null;
+
+    // Aggregate technique counts from alerts (roll up sub-techniques to parent)
     const techCounts = {};
     allAlerts.forEach(a => {
         if (a.mitre_technique_id) {
-            const id = a.mitre_technique_id;
+            const id = a.mitre_technique_id.split('.')[0];  // parent technique
             if (!techCounts[id]) {
                 techCounts[id] = {
                     id: id,
@@ -6524,45 +7026,117 @@ function renderMitreHeatmap() {
         }
     });
 
-    // If no MITRE data, show empty state
-    if (Object.keys(techCounts).length === 0) {
+    // If no alert data AND no TIDE data, show empty state
+    if (Object.keys(techCounts).length === 0 && !tideTechs) {
         container.innerHTML = '<div class="empty-state" style="text-align:center;padding:1rem;color:var(--text-muted);">No MITRE ATT&CK data in current alerts</div>';
+        const legendEl = document.getElementById('mitre-heatmap-legend');
+        if (legendEl) legendEl.style.display = 'none';
         return;
     }
 
-    // Build a map of tactic -> techniques with counts
+    // Tactic name mapping for TIDE data (slug → display name)
+    const tacticSlugToName = {
+        'initial-access': 'Initial Access', 'execution': 'Execution', 'persistence': 'Persistence',
+        'privilege-escalation': 'Privilege Escalation', 'defense-evasion': 'Defense Evasion',
+        'credential-access': 'Credential Access', 'discovery': 'Discovery', 'lateral-movement': 'Lateral Movement',
+        'collection': 'Collection', 'command-and-control': 'Command and Control', 'exfiltration': 'Exfiltration',
+        'impact': 'Impact', 'reconnaissance': 'Reconnaissance', 'resource-development': 'Resource Development',
+    };
+
+    // Build a map of tactic -> techniques
     const tacticData = {};
     MITRE_TACTICS.forEach(t => { tacticData[t] = []; });
 
-    // Add known techniques from our map with 0 counts initially
+    // Add known techniques from our hardcoded map
     Object.entries(MITRE_TECHNIQUE_MAP).forEach(([tactic, techniques]) => {
         techniques.forEach(tech => {
             if (!tacticData[tactic].some(t => t.id === tech.id)) {
-                tacticData[tactic].push({ id: tech.id, name: tech.name, count: 0 });
+                tacticData[tactic].push({ id: tech.id, name: tech.name, count: 0, tideRules: 0 });
             }
         });
     });
 
-    // Update counts from actual alert data
+    // Overlay TIDE techniques (adds any not in our hardcoded map)
+    if (tideTechs) {
+        Object.entries(tideTechs).forEach(([techId, info]) => {
+            const tacticName = tacticSlugToName[info.tactic] || info.tactic || 'Impact';
+            if (!tacticData[tacticName]) return;
+            const existing = tacticData[tacticName].find(t => t.id === techId);
+            if (existing) {
+                existing.tideRules = info.rule_count || 0;
+                existing.tideQuality = info.avg_quality || 0;
+                existing.tideSeverity = info.severity || {};
+                existing.tideSystems = info.systems || [];
+                existing.tideEnabled = info.enabled_rules || 0;
+                if (!existing.name && info.name) existing.name = info.name;
+            } else {
+                tacticData[tacticName].push({
+                    id: techId, name: info.name || techId, count: 0,
+                    tideRules: info.rule_count || 0, tideQuality: info.avg_quality || 0,
+                    tideSeverity: info.severity || {}, tideSystems: info.systems || [],
+                    tideEnabled: info.enabled_rules || 0,
+                });
+            }
+        });
+    }
+
+    // Overlay alert counts
     Object.values(techCounts).forEach(tech => {
         const tactic = tech.tactic || TECHNIQUE_TO_TACTIC[tech.id] || 'Impact';
         if (!tacticData[tactic]) tacticData[tactic] = [];
         const existing = tacticData[tactic].find(t => t.id === tech.id);
         if (existing) {
             existing.count = tech.count;
-            existing.name = tech.name || existing.name;
+            if (!existing.name && tech.name) existing.name = tech.name;
         } else {
-            tacticData[tactic].push({ id: tech.id, name: tech.name, count: tech.count });
+            tacticData[tactic].push({ id: tech.id, name: tech.name, count: tech.count, tideRules: 0 });
         }
     });
 
-    // Find max count for heat scaling
+    // Find max alert count for heat scaling
     const maxCount = Math.max(1, ...Object.values(techCounts).map(t => t.count));
 
-    // Render heatmap as CSS grid columns
+    // Render legend if TIDE data available
+    const legendEl = document.getElementById('mitre-heatmap-legend');
+    if (legendEl && tideTechs) {
+        const cov = _tideMitreCoverage;
+        legendEl.style.display = 'flex';
+        legendEl.innerHTML = `
+            <div class="mitre-legend-item">
+                <div class="mitre-legend-swatch" style="background:rgba(255,87,34,0.45);"></div>
+                <span>Firing</span>
+            </div>
+            <div class="mitre-legend-item">
+                <div class="mitre-legend-swatch" style="background:rgba(0,200,83,0.15);border:1px solid rgba(0,200,83,0.3);"></div>
+                <span>Covered (silent)</span>
+            </div>
+            <div class="mitre-legend-item">
+                <div class="mitre-legend-swatch" style="background:rgba(244,67,54,0.08);border:1px dashed rgba(244,67,54,0.3);"></div>
+                <span>Blind spot</span>
+            </div>
+            <div class="mitre-tide-summary">
+                <span><strong>${cov.covered_techniques}</strong>/${cov.total_techniques} covered</span>
+                <span><strong>${(cov.blind_spots || []).length}</strong> blind spots</span>
+                <span><strong>${cov.total_rules}</strong> rules</span>
+            </div>
+        `;
+    } else if (legendEl) {
+        legendEl.style.display = 'none';
+    }
+
+    // Render heatmap columns
     let html = '';
     MITRE_TACTICS.forEach(tactic => {
-        const techniques = tacticData[tactic].filter(t => t.count > 0).sort((a, b) => b.count - a.count);
+        // Sort: firing first, then covered, then blind spots
+        const techniques = tacticData[tactic]
+            .filter(t => t.count > 0 || t.tideRules > 0 || tideTechs)  // show all if TIDE loaded
+            .sort((a, b) => {
+                const stateA = a.count > 0 ? 2 : ((a.tideRules || 0) > 0 ? 1 : 0);
+                const stateB = b.count > 0 ? 2 : ((b.tideRules || 0) > 0 ? 1 : 0);
+                if (stateA !== stateB) return stateB - stateA;
+                return (b.count || 0) - (a.count || 0);
+            });
+
         const shortTactic = tactic.replace('Resource Development', 'Res.Dev')
                                    .replace('Initial Access', 'Init.Acc')
                                    .replace('Privilege Escalation', 'Priv.Esc')
@@ -6579,10 +7153,38 @@ function renderMitreHeatmap() {
             html += `<div class="mitre-heatmap-cell heat-0" style="flex:1;">-</div>`;
         } else {
             techniques.forEach(tech => {
-                const heatLevel = Math.min(5, Math.ceil((tech.count / maxCount) * 5));
-                html += `<div class="mitre-heatmap-cell heat-${heatLevel}" onclick="filterByMitreTechnique('${escapeHtml(tech.id)}')" title="${escapeHtml(tech.name)} (${tech.count} alerts)">
+                let cellClass, countDisplay, titleParts = [tech.name || tech.id];
+
+                if (tech.count > 0) {
+                    // FIRING: has alerts
+                    const heatLevel = Math.min(5, Math.ceil((tech.count / maxCount) * 5));
+                    cellClass = `heat-${heatLevel}`;
+                    countDisplay = tech.count;
+                    titleParts.push(`${tech.count} alert(s)`);
+                    if ((tech.tideRules || 0) > 0) {
+                        titleParts.push(`${tech.tideRules} detection rule(s), avg quality: ${tech.tideQuality}`);
+                        titleParts.push(`${(tech.tideSystems || []).length} system(s) covered`);
+                    }
+                } else if ((tech.tideRules || 0) > 0) {
+                    // COVERED: has TIDE rules but no current alerts
+                    cellClass = 'tide-covered';
+                    countDisplay = `${tech.tideRules}r`;
+                    titleParts.push('No active alerts');
+                    titleParts.push(`${tech.tideRules} detection rule(s), ${tech.tideEnabled || 0} enabled`);
+                    titleParts.push(`Avg quality: ${tech.tideQuality}`);
+                    const sysNames = (tech.tideSystems || []).map(s => s.name).join(', ');
+                    if (sysNames) titleParts.push(`Systems: ${sysNames}`);
+                } else {
+                    // BLIND SPOT: no TIDE rules, no alerts
+                    cellClass = 'tide-blind';
+                    countDisplay = '!';
+                    titleParts.push('BLIND SPOT: No detection rules');
+                }
+
+                const onclick = tech.count > 0 ? `onclick="filterByMitreTechnique('${escapeHtml(tech.id)}')"` : '';
+                html += `<div class="mitre-heatmap-cell ${cellClass}" ${onclick} title="${escapeHtml(titleParts.join('\n'))}">
                     <span class="tech-id">${escapeHtml(tech.id)}</span>
-                    <span class="tech-count">${tech.count}</span>
+                    <span class="tech-count">${countDisplay}</span>
                 </div>`;
             });
         }
@@ -7064,14 +7666,25 @@ function formatDuration(ms) {
 }
 
 function renderKeyMetrics() {
-    const container = document.getElementById('key-metrics-grid');
-    if (!container) return;
+    // Legacy stub — redirects to new strip
+    renderAdKeyMetrics();
+}
 
-    const now = Date.now();
+function renderAdKeyMetrics() {
     const hours = getEffectiveHours();
-    const windowMs = hours * 3600000;
 
-    // MTTR: mean time to resolve (from alert timestamp to triage resolved/closed timestamp)
+    // Helper to set metric card
+    function setMetric(id, value, cls) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const valEl = el.querySelector('.ad-metric-val');
+        if (valEl) {
+            valEl.textContent = value;
+            valEl.className = 'ad-metric-val' + (cls ? ' ' + cls : '');
+        }
+    }
+
+    // MTTR
     let resolvedTimes = [];
     allAlerts.forEach(a => {
         const triage = triageCache[a.id];
@@ -7084,12 +7697,14 @@ function renderKeyMetrics() {
     const mttr = resolvedTimes.length > 0 ? resolvedTimes.reduce((a, b) => a + b, 0) / resolvedTimes.length : -1;
     const mttrStr = mttr >= 0 ? formatDuration(mttr) : '-';
     const mttrClass = mttr < 0 ? 'metric-info' : mttr < 3600000 ? 'metric-good' : mttr < 14400000 ? 'metric-warn' : 'metric-danger';
+    setMetric('ad-metric-mttr', mttrStr, mttrClass);
 
-    // Alerts per hour
+    // Alerts/hr
     const velocity = hours > 0 ? (allAlerts.length / hours).toFixed(1) : '0';
     const velClass = parseFloat(velocity) > 20 ? 'metric-danger' : parseFloat(velocity) > 10 ? 'metric-warn' : 'metric-info';
+    setMetric('ad-metric-velocity', velocity, velClass);
 
-    // Unassigned critical/high
+    // Unassigned crit/high
     let unassignedCritHigh = 0;
     allAlerts.forEach(a => {
         if (a.severity !== 'critical' && a.severity !== 'high') return;
@@ -7099,50 +7714,26 @@ function renderKeyMetrics() {
         if (!triage?.assigned_to_id) unassignedCritHigh++;
     });
     const unassClass = unassignedCritHigh > 5 ? 'metric-danger' : unassignedCritHigh > 0 ? 'metric-warn' : 'metric-good';
+    setMetric('ad-metric-unassigned', unassignedCritHigh, unassClass);
 
-    // Case conversion rate
+    // Case conversion
     const triaged = Object.keys(triageCache).length;
     const withCase = Object.values(triageCache).filter(t => t.case_id).length;
     const caseRate = triaged > 0 ? ((withCase / triaged) * 100).toFixed(0) : '0';
-    const caseClass = 'metric-info';
+    setMetric('ad-metric-caserate', caseRate + '%', 'metric-info');
 
-    // False positive rate (cases closed as false_positive)
+    // FP rate
     const fpCount = casesData.filter(c => c.closure_reason === 'false_positive').length;
     const totalCases = casesData.length;
     const fpRate = totalCases > 0 ? ((fpCount / totalCases) * 100).toFixed(0) : '0';
     const fpClass = parseFloat(fpRate) > 50 ? 'metric-warn' : 'metric-info';
+    setMetric('ad-metric-fprate', fpRate + '%', fpClass);
 
-    // Closure rate (closed alerts out of triaged)
+    // Closure rate
     const closedCount = Object.values(triageCache).filter(t => t.status === 'closed').length;
     const closureRate = triaged > 0 ? ((closedCount / triaged) * 100).toFixed(0) : '0';
-    const escClass = parseFloat(closureRate) > 80 ? 'metric-good' : 'metric-info';
-
-    container.innerHTML = `
-        <div class="key-metric-tile">
-            <div class="key-metric-value ${mttrClass}">${mttrStr}</div>
-            <div class="key-metric-label">MTTR</div>
-        </div>
-        <div class="key-metric-tile">
-            <div class="key-metric-value ${velClass}">${velocity}</div>
-            <div class="key-metric-label">Alerts / Hour</div>
-        </div>
-        <div class="key-metric-tile">
-            <div class="key-metric-value ${unassClass}">${unassignedCritHigh}</div>
-            <div class="key-metric-label">Unassigned Crit/High</div>
-        </div>
-        <div class="key-metric-tile">
-            <div class="key-metric-value ${caseClass}">${caseRate}%</div>
-            <div class="key-metric-label">Case Conversion</div>
-        </div>
-        <div class="key-metric-tile">
-            <div class="key-metric-value ${fpClass}">${fpRate}%</div>
-            <div class="key-metric-label">False Positive Rate</div>
-        </div>
-        <div class="key-metric-tile">
-            <div class="key-metric-value ${escClass}">${closureRate}%</div>
-            <div class="key-metric-label">Closure Rate</div>
-        </div>
-    `;
+    const closureClass = parseFloat(closureRate) > 80 ? 'metric-good' : 'metric-info';
+    setMetric('ad-metric-closure', closureRate + '%', closureClass);
 }
 
 // =========================================================================

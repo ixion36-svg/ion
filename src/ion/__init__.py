@@ -1,3 +1,3 @@
 """ION - Documentation Template Management System."""
 
-__version__ = "0.9.43"
+__version__ = "0.9.44"

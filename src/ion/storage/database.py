@@ -376,6 +376,18 @@ def _run_migrations(engine: Engine) -> None:
                 if rows:
                     logger.info("Migrated %d existing CyAB systems to data sources", len(rows))
 
+    # CyAB data sources: add tide_system_id and data_namespace columns
+    if insp.has_table("cyab_data_sources"):
+        existing = {col["name"] for col in insp.get_columns("cyab_data_sources")}
+        if "tide_system_id" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE cyab_data_sources ADD COLUMN tide_system_id VARCHAR(64)"))
+                logger.info("Migrated: cyab_data_sources.tide_system_id")
+        if "data_namespace" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE cyab_data_sources ADD COLUMN data_namespace VARCHAR(128)"))
+                logger.info("Migrated: cyab_data_sources.data_namespace")
+
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
 

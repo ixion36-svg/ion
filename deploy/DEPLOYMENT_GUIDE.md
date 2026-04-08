@@ -2,489 +2,169 @@
 
 ## Air-Gapped / Secure Environment Deployment
 
-This guide covers deploying ION in environments without internet access.
-
-### Features Included in Docker Image
-
-- Full NLP processing (NLTK data pre-downloaded)
-- SOC entity detection (18 pattern types: IPs, CVEs, hashes, etc.)
-- AI-assisted alert triage (observable extraction, MITRE mapping, analysis, contextual chat)
-- Multi-alert pattern detection with auto-triggered investigation playbooks
-- Playbook execution: action recording, outcome classification, and auto-generated investigation reports
-- Spell checking with technical term awareness
-- Rewrite suggestions (professional, concise, formal, technical styles)
-- Table detection (Markdown, CSV, TSV)
-- Folder organization with auto-assignment
-- Role-based access control
-- Optional Keycloak/OIDC SSO
+This guide covers deploying ION v0.9.43 in environments with restricted or no internet access.
 
 ---
 
-## Table of Contents
+## What's in the Docker Image
 
-1. [Prerequisites](#prerequisites)
-2. [Building the Offline Package](#building-the-offline-package)
-3. [Transferring to Secure Environment](#transferring-to-secure-environment)
-4. [Deployment Options](#deployment-options)
-   - [Option A: HTTP Only (Development/Testing)](#option-a-http-only)
-   - [Option B: HTTPS with Nginx (Production)](#option-b-https-with-nginx)
-5. [Configuration](#configuration)
-6. [Post-Deployment Setup](#post-deployment-setup)
-7. [Operations](#operations)
-8. [Troubleshooting](#troubleshooting)
-9. [Security Checklist](#security-checklist)
+The `ixion36/ion` image contains:
 
----
+- ION web application (FastAPI + Jinja2)
+- PostgreSQL client libraries
+- WeasyPrint PDF generation (Pango/Cairo/GDK-Pixbuf)
+- Knowledge base (590+ articles, auto-seeded on first start)
+- Forensic playbooks (8, auto-seeded)
+- Training simulator (8 scored scenarios)
+- NLP entity detection (IPs, CVEs, hashes, MITRE IDs)
 
-## Prerequisites
-
-### Build Machine (with internet access)
-
-- Docker Engine 20.10+
-- Docker Compose v2+
-- 2GB free disk space
-- Internet access (to pull base images)
-
-### Target Machine (air-gapped)
-
-- Docker Engine 20.10+
-- Docker Compose v2+
-- 800MB free disk space (for image with NLP data)
-- 100MB+ free disk space (for data)
-- 1GB RAM recommended (for NLP processing)
+The image does **NOT** contain:
+- PostgreSQL server (separate container: `postgres:16-alpine`)
+- Elasticsearch, Kibana, OpenCTI, TIDE, Ollama (your infrastructure)
 
 ---
 
-## Building the Offline Package
+## Architecture
 
-Run these commands on a machine **with internet access**.
-
-### Windows
-
-```cmd
-cd C:\Projects\ion
-scripts\build-offline-package.bat 1.0.0
+```
+┌─────────────────────────────────────────────────────┐
+│                  Docker Compose                       │
+│  ┌──────────────┐     ┌──────────────┐               │
+│  │ ion-postgres  │◄────│     ion      │               │
+│  │ PostgreSQL 16 │     │  ION v0.9.43 │               │
+│  │  (database)   │     │  port 8000   │               │
+│  └──────────────┘     └──────┬───────┘               │
+│         ion-net network       │                       │
+└───────────────────────────────┼───────────────────────┘
+                                │
+        ┌───────────────────────┼────────────────────┐
+        │         Your Infrastructure                 │
+        │  ┌─────────┐ ┌──────┐ ┌───────┐ ┌──────┐  │
+        │  │   ES    │ │Kibana│ │OpenCTI│ │ TIDE │  │
+        │  │ 8.x    │ │ 8.x  │ │       │ │      │  │
+        │  └─────────┘ └──────┘ └───────┘ └──────┘  │
+        └────────────────────────────────────────────┘
 ```
 
-### Linux/Mac
+---
+
+## Step 1: Prepare Offline Package
+
+On a machine with internet access:
 
 ```bash
-cd /path/to/ion
-chmod +x scripts/build-offline-package.sh
-./scripts/build-offline-package.sh 1.0.0
+# Pull images
+docker pull ixion36/ion:0.9.43
+docker pull postgres:16-alpine
+
+# Save to a tar file
+docker save ixion36/ion:0.9.43 postgres:16-alpine -o ion-0.9.43-bundle.tar
+
+# Gather config files
+# You need: docker-compose.yml, .env.deploy
 ```
 
-### Output
-
-The build creates `dist/ion-offline-1.0.0/` containing:
-
-```
-ion-offline-1.0.0/
-├── ion-image-1.0.0.zip    # Docker image (~150-200MB)
-├── docker-compose.yml           # Basic deployment config
-├── deploy.sh                    # Deployment script
-└── README.txt                   # Quick reference
-```
-
-For HTTPS deployment, also copy the `deploy/` folder:
-
-```
-deploy/
-├── docker-compose.https.yml    # HTTPS deployment config
-├── nginx/
-│   └── nginx.conf              # Nginx configuration
-├── generate-certs.sh           # Certificate generation script
-└── DEPLOYMENT_GUIDE.md         # This guide
-```
+Transfer to your secure environment:
+- `ion-0.9.43-bundle.tar` (~400MB)
+- `docker-compose.yml`
+- `.env.deploy`
 
 ---
 
-## Transferring to Secure Environment
+## Step 2: Deploy
 
-1. Copy the offline package to approved transfer media (USB, DVD, etc.)
-2. Follow your organization's security procedures for media transfer
-3. Copy files to the target machine
-
-**Recommended directory structure on target:**
-
-```
-/opt/ion/
-├── ion-image-1.0.0.zip
-├── docker-compose.yml           # or docker-compose.https.yml
-├── deploy.sh
-├── nginx/
-│   └── nginx.conf
-└── ssl/
-    ├── server.crt               # Your TLS certificate
-    └── server.key               # Your TLS private key
-```
-
----
-
-## Deployment Options
-
-### Option A: HTTP Only
-
-**Use for:** Development, testing, or when TLS is handled by external load balancer.
+On the secure/air-gapped machine:
 
 ```bash
-cd /opt/ion
+# Load images
+docker load -i ion-0.9.43-bundle.tar
 
-# Load Docker image
-unzip -p ion-image-*.zip | docker load
-# Or for .tar.gz: gunzip -c ion-image-*.tar.gz | docker load
+# Configure
+cp .env.deploy .env
+# Edit .env:
+#   - Set ION_ADMIN_PASSWORD
+#   - Set Elasticsearch IP/credentials
+#   - Set TIDE IP/API key (if available)
+#   - Set OpenCTI IP/token (if available)
 
-# Deploy
-./deploy.sh
-docker-compose up -d
+# Start
+docker compose up -d
 
 # Verify
-docker-compose ps
-curl http://localhost:8000/api/stats
-```
+docker compose ps
+# Expected: ion-postgres (healthy), ion (healthy)
 
-**Access:** http://localhost:8000
+# Access at http://<server-ip>:8000
+```
 
 ---
 
-### Option B: HTTPS with Nginx
+## Step 3: First Login
 
-**Use for:** Production deployments requiring encrypted connections.
-
-#### Step 1: Prepare TLS Certificates
-
-**Option 1: Use organization-provided certificates**
-
-Place your certificates in the `ssl/` directory:
-```
-ssl/
-├── server.crt    # Certificate (PEM format)
-└── server.key    # Private key (PEM format)
-```
-
-**Option 2: Generate self-signed certificates (testing only)**
-
-```bash
-cd /opt/ion
-chmod +x generate-certs.sh
-./generate-certs.sh ion.yourdomain.com
-```
-
-#### Step 2: Load Docker Images
-
-```bash
-# Load ION image
-unzip -p ion-image-*.zip | docker load
-
-# Pull nginx image (if not included in offline package)
-# If no internet, you'll need to also export/import nginx:1.25-alpine
-docker pull nginx:1.25-alpine
-docker save nginx:1.25-alpine | gzip > nginx-image.tar.gz
-# Transfer and load on target:
-gunzip -c nginx-image.tar.gz | docker load
-```
-
-#### Step 3: Deploy with HTTPS
-
-```bash
-cd /opt/ion
-
-# Initialize database (first time only)
-./deploy.sh
-
-# Start with HTTPS
-docker-compose -f docker-compose.https.yml up -d
-
-# Verify
-docker-compose -f docker-compose.https.yml ps
-curl -k https://localhost/api/stats
-```
-
-**Access:** https://localhost (or your configured hostname)
+1. Navigate to `http://<server-ip>:8000`
+2. Login with `admin` / your `ION_ADMIN_PASSWORD`
+3. Go to Settings to verify integration connections
+4. Navigate to the ION Guide (`/guide`) for feature overview
 
 ---
 
-## Configuration
+## TLS / HTTPS Deployment
 
-### Environment Variables
+### Option A: ION native TLS
 
-Configure in `docker-compose.yml` or `docker-compose.https.yml`:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ION_HOST` | `0.0.0.0` | Bind address |
-| `ION_PORT` | `8000` | Application port |
-| `ION_COOKIE_SECURE` | `false` | Set `true` for HTTPS |
-| `ION_ADMIN_PASSWORD` | `changeme` | Initial admin password |
-| `ION_OIDC_ENABLED` | `true` | Enable Keycloak SSO |
-| `ION_OIDC_KEYCLOAK_URL` | - | Keycloak server URL |
-| `ION_OIDC_REALM` | - | Keycloak realm |
-| `ION_OIDC_CLIENT_ID` | - | OIDC client ID |
-| `ION_OIDC_CLIENT_SECRET` | - | OIDC client secret |
-| `ION_OLLAMA_ENABLED` | `true` | Enable Ollama AI integration |
-| `ION_OLLAMA_URL` | `http://ollama:11434` | Ollama service URL |
-| `ION_OLLAMA_MODEL` | `llama3.1:8b` | Default AI model |
-| `ION_GITLAB_ENABLED` | `true` | Enable GitLab integration |
-| `ION_GITLAB_URL` | - | GitLab server URL |
-| `ION_GITLAB_TOKEN` | - | GitLab Personal Access Token |
-| `ION_GITLAB_PROJECT_ID` | - | GitLab project ID or path |
-
-### Example: Production HTTPS Configuration
-
-```yaml
-environment:
-  - ION_COOKIE_SECURE=true
-  - ION_ADMIN_PASSWORD=YourSecurePassword123!
+```bash
+# In .env:
+ION_SSL_CERT=/path/to/cert.pem
+ION_SSL_KEY=/path/to/key.pem
+ION_COOKIE_SECURE=true
 ```
 
-### Example: With Keycloak SSO
+### Option B: Nginx reverse proxy (recommended)
 
-```yaml
-environment:
-  - ION_COOKIE_SECURE=true
-  - ION_OIDC_ENABLED=true
-  - ION_OIDC_KEYCLOAK_URL=https://keycloak.internal.company.com
-  - ION_OIDC_REALM=ion
-  - ION_OIDC_CLIENT_ID=ion-app
-  - ION_OIDC_CLIENT_SECRET=your-client-secret-here
+Use the example nginx configs in `deploy/nginx/`. Nginx handles TLS termination, ION runs HTTP internally.
+
+```bash
+# In .env:
+ION_COOKIE_SECURE=true
+ION_BASE_URL=https://ion.yourdomain.com
 ```
-
-### Example: With GitLab Integration
-
-```yaml
-environment:
-  - ION_COOKIE_SECURE=true
-  - ION_GITLAB_ENABLED=true
-  - ION_GITLAB_URL=https://gitlab.internal.company.com
-  - ION_GITLAB_TOKEN=glpat-xxxxxxxxxxxx
-  - ION_GITLAB_PROJECT_ID=security/documentation
-```
-
-**Note:** The GitLab token requires the `api` scope. Create a Personal Access Token in GitLab > User Settings > Access Tokens.
 
 ---
 
-## Post-Deployment Setup
-
-### 1. Change Admin Password
-
-**CRITICAL:** Change the default admin password immediately!
-
-1. Navigate to https://your-server/login
-2. Login with: `admin` / `changeme` (or your configured password)
-3. Go to Profile → Change Password
-4. Set a strong password
-
-### 2. Create Additional Users
-
-1. Login as admin
-2. Navigate to Users
-3. Create users with appropriate roles:
-   - **Analyst**: Alerts, cases, playbooks, templates, documents, AI chat
-   - **Lead**: Analyst + topology, security dashboards
-   - **Engineering**: Lead + integrations, system settings
-   - **Admin**: Full system access
-
-### 3. Set Up AI Model (If Using Ollama)
+## Updating
 
 ```bash
-# Pull the default AI model into the Ollama sidecar (first time only)
-docker exec -it ion-ollama ollama pull llama3.1:8b
+# On internet-connected machine:
+docker pull ixion36/ion:latest
+docker save ixion36/ion:latest -o ion-latest.tar
 
-# Verify AI is available
-curl http://localhost:8000/api/ai/status
-# Should return: {"available": true, "default_model": "llama3.1:8b", ...}
+# Transfer and load on air-gapped machine:
+docker load -i ion-latest.tar
+docker compose down
+docker compose up -d
 ```
 
-Once available, AI assist buttons (Analyze, Extract, Suggest, Discuss) will appear automatically in the alert investigation UI.
-
-### 4. Configure Roles (Optional)
-
-Default roles and permissions are pre-configured. Customize via the admin interface if needed.
-
----
-
-## Operations
-
-### Starting Services
-
-```bash
-# HTTP
-docker-compose up -d
-
-# HTTPS
-docker-compose -f docker-compose.https.yml up -d
-```
-
-### Stopping Services
-
-```bash
-docker-compose down
-# or
-docker-compose -f docker-compose.https.yml down
-```
-
-### Viewing Logs
-
-```bash
-# All services
-docker-compose logs -f
-
-# Specific service
-docker-compose logs -f ion
-docker-compose logs -f nginx
-```
-
-### Checking Status
-
-```bash
-docker-compose ps
-docker-compose -f docker-compose.https.yml ps
-```
-
-### Backup
-
-```bash
-# Backup data volume
-docker run --rm \
-  -v ion-data:/data \
-  -v $(pwd):/backup \
-  alpine tar czf /backup/ion-backup-$(date +%Y%m%d).tar.gz -C /data .
-
-# Backup includes:
-# - Database (ion.db)
-# - Configuration (config.json)
-```
-
-### Restore
-
-```bash
-# Stop services first
-docker-compose down
-
-# Restore data
-docker run --rm \
-  -v ion-data:/data \
-  -v $(pwd):/backup \
-  alpine sh -c "rm -rf /data/* && tar xzf /backup/ion-backup-YYYYMMDD.tar.gz -C /data"
-
-# Restart services
-docker-compose up -d
-```
-
-### Updating ION
-
-1. Build new offline package with updated version
-2. Transfer to secure environment
-3. Load new image:
-   ```bash
-   unzip -p ion-image-NEW.zip | docker load
-   ```
-4. Update image tag in docker-compose.yml if needed
-5. Restart:
-   ```bash
-   docker-compose down
-   docker-compose up -d
-   ```
+Data persists in Docker volumes. No data loss on update.
 
 ---
 
 ## Troubleshooting
 
-### Container won't start
-
-```bash
-# Check logs
-docker-compose logs ion
-
-# Common issues:
-# - Database initialization failed
-# - Permission issues on /data volume
-```
-
-### Can't connect to web interface
-
-```bash
-# Check if containers are running
-docker-compose ps
-
-# Check nginx logs (HTTPS deployment)
-docker-compose logs nginx
-
-# Test internal connectivity
-docker exec ion-app curl -s http://localhost:8000/api/stats
-```
-
-### Certificate errors (HTTPS)
-
-```bash
-# Verify certificate files exist
-ls -la ssl/
-
-# Check certificate validity
-openssl x509 -in ssl/server.crt -noout -dates
-
-# Check certificate matches key
-openssl x509 -in ssl/server.crt -noout -modulus | md5sum
-openssl rsa -in ssl/server.key -noout -modulus | md5sum
-# (Both should match)
-```
-
-### Database issues
-
-```bash
-# Check database exists
-docker exec ion-app ls -la /data/.ion/
-
-# Reset database (WARNING: deletes all data!)
-docker-compose down -v
-./deploy.sh
-docker-compose up -d
-```
-
-### Permission denied errors
-
-```bash
-# Fix volume permissions
-docker run --rm -v ion-data:/data alpine chown -R 1000:1000 /data
-```
+| Problem | Solution |
+|---------|----------|
+| "Could not translate host postgres" | Containers not on same network. Run `docker compose down && docker compose up -d` |
+| "Database not ready after 60s" | PostgreSQL not starting. Check `docker logs ion-postgres` |
+| Login redirect loop | Stale `config.json` in volume. Run `docker compose down -v && docker compose up -d` |
+| ES connection refused | Check `ION_ELASTICSEARCH_URL` in `.env` — use actual IP, not `localhost` |
+| TIDE connection failed | Check `ION_TIDE_URL` and `ION_TIDE_API_KEY`. Set `ION_TIDE_VERIFY_SSL=false` for self-signed certs |
 
 ---
 
-## Security Checklist
+## Resource Requirements
 
-Before going to production, verify:
-
-- [ ] Changed default admin password
-- [ ] Using HTTPS with valid TLS certificates
-- [ ] `ION_COOKIE_SECURE=true` is set
-- [ ] Firewall configured (only ports 80/443 open if needed)
-- [ ] Regular backups scheduled
-- [ ] Log monitoring configured
-- [ ] User accounts reviewed and appropriate roles assigned
-- [ ] Self-signed certificates replaced with CA-signed (if applicable)
-- [ ] Rate limiting configured appropriately in nginx.conf
-- [ ] Resource limits set in docker-compose.yml
-
----
-
-## Quick Reference
-
-| Task | Command |
-|------|---------|
-| Start (HTTP) | `docker-compose up -d` |
-| Start (HTTPS) | `docker-compose -f docker-compose.https.yml up -d` |
-| Stop | `docker-compose down` |
-| Logs | `docker-compose logs -f` |
-| Status | `docker-compose ps` |
-| Backup | See [Backup](#backup) section |
-| Shell access | `docker exec -it ion-app /bin/bash` |
-
----
-
-## Support
-
-For issues and questions:
-- Check the [Troubleshooting](#troubleshooting) section
-- Review container logs
-- Consult your organization's Docker/security team
+| Component | CPU | Memory | Storage |
+|-----------|-----|--------|---------|
+| ION | 0.5-2 cores | 256MB-1GB | ~500MB (image) |
+| PostgreSQL | 0.25-1 core | 128-512MB | ~100MB + data |
+| Total minimum | 1 core | 512MB | 1GB |
+| Recommended | 2+ cores | 2GB+ | 5GB+ |

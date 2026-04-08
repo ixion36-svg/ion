@@ -192,3 +192,146 @@ async def get_analytics_dashboard(
             summary["observable_velocity"] = r.get("velocity_7d", 0)
 
     return {"jobs": dashboard, "summary": summary}
+
+
+@router.get("/system-overview")
+async def get_system_overview(
+    hours: int = 168,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Combined system analytics: ES alert data + CyAB namespace mappings + TIDE coverage.
+
+    Returns per-namespace alert stats enriched with TIDE detection coverage
+    for systems that have CyAB data source mappings.
+    """
+    from ion.core.config import get_elasticsearch_config
+    from ion.services.elasticsearch_service import ElasticsearchService
+    from ion.models.cyab import CyabDataSource, CyabSystem
+    from ion.services.tide_service import get_tide_service
+
+    # 1. Load ES system analytics
+    es_data = {"systems": [], "total": 0, "total_severity": {}, "total_timeline": []}
+    config = get_elasticsearch_config()
+    if config.get("url"):
+        try:
+            es = ElasticsearchService()
+            if es.is_configured:
+                es_data = await es.get_system_analytics(hours=hours)
+        except Exception as e:
+            es_data["error"] = str(e)
+
+    # 2. Load CyAB namespace mappings
+    sources = session.query(CyabDataSource).filter(
+        CyabDataSource.data_namespace.isnot(None),
+        CyabDataSource.data_namespace != "",
+    ).all()
+
+    # Build namespace → CyAB info mapping
+    ns_map = {}
+    system_ids = set()
+    for ds in sources:
+        system_ids.add(ds.system_id)
+        ns_map[ds.data_namespace] = {
+            "cyab_source_id": ds.id,
+            "cyab_source_name": ds.name,
+            "cyab_system_id": ds.system_id,
+            "tide_system_id": ds.tide_system_id,
+            "readiness_score": ds.readiness_score,
+            "field_mapping_score": ds.field_mapping_score,
+            "use_case_status": ds.use_case_status,
+        }
+
+    # Load CyAB system names
+    if system_ids:
+        cyab_systems = session.query(CyabSystem).filter(
+            CyabSystem.id.in_(system_ids)
+        ).all()
+        cyab_name_map = {s.id: s.name for s in cyab_systems}
+        for info in ns_map.values():
+            info["cyab_system_name"] = cyab_name_map.get(info["cyab_system_id"], "")
+
+    # 3. Get TIDE system details for mapped systems (sequential to avoid DuckDB issues)
+    tide_svc = get_tide_service()
+    tide_details = {}
+    if tide_svc.enabled:
+        tide_ids = set()
+        for info in ns_map.values():
+            if info.get("tide_system_id"):
+                tide_ids.add(info["tide_system_id"])
+        for tid in tide_ids:
+            detail = tide_svc.get_system_detail(tid)
+            if detail:
+                detections = detail.get("detections") or []
+                total_rules = detail.get("total_rules") or 0
+                enabled_rules = sum(1 for d in detections if d.get("enabled"))
+                sev_counts = {}
+                for d in detections:
+                    s = (d.get("severity") or "low").lower()
+                    sev_counts[s] = sev_counts.get(s, 0) + 1
+                tide_details[tid] = {
+                    "name": detail.get("name"),
+                    "applied_rules": len(detections),
+                    "total_rules": total_rules,
+                    "coverage_pct": round(len(detections) / total_rules * 100) if total_rules else 0,
+                    "enabled_rules": enabled_rules,
+                    "disabled_rules": len(detections) - enabled_rules,
+                    "severity_breakdown": sev_counts,
+                }
+
+    # 4. Enrich ES systems with CyAB + TIDE data
+    enriched = []
+    mapped_count = 0
+    total_coverage = 0
+    for sys in es_data.get("systems", []):
+        ns = sys.get("system", "")
+        entry = dict(sys)  # copy ES data
+        entry["mapped"] = ns in ns_map
+        if ns in ns_map:
+            mapped_count += 1
+            mapping = ns_map[ns]
+            entry["cyab"] = mapping
+            tid = mapping.get("tide_system_id")
+            if tid and tid in tide_details:
+                entry["tide"] = tide_details[tid]
+                total_coverage += tide_details[tid]["coverage_pct"]
+        enriched.append(entry)
+
+    # Add any mapped namespaces that aren't in ES results (no alerts, but still tracked)
+    es_namespaces = {s.get("system") for s in es_data.get("systems", [])}
+    for ns, mapping in ns_map.items():
+        if ns not in es_namespaces:
+            entry = {
+                "system": ns,
+                "alert_count": 0,
+                "severity": {},
+                "status": {},
+                "top_rules": [],
+                "timeline": [],
+                "datasets": [],
+                "unique_hosts": 0,
+                "unique_users": 0,
+                "mapped": True,
+                "cyab": mapping,
+            }
+            tid = mapping.get("tide_system_id")
+            if tid and tid in tide_details:
+                entry["tide"] = tide_details[tid]
+                total_coverage += tide_details[tid]["coverage_pct"]
+            mapped_count += 1
+            enriched.append(entry)
+
+    avg_coverage = round(total_coverage / mapped_count) if mapped_count else 0
+
+    return {
+        "systems": enriched,
+        "total_alerts": es_data.get("total", 0),
+        "total_severity": es_data.get("total_severity", {}),
+        "total_timeline": es_data.get("total_timeline", []),
+        "total_systems": len(enriched),
+        "mapped_systems": mapped_count,
+        "avg_tide_coverage": avg_coverage,
+        "hours": hours,
+        "interval": es_data.get("interval", "1h"),
+        "error": es_data.get("error"),
+    }

@@ -52,7 +52,7 @@ services:
   # =============================================================================
   ion:
     # build: .  # Uncomment to build from source instead of pulling
-    image: ixion36/ion:${ION_VERSION:-0.9.43}
+    image: ixion36/ion:${ION_VERSION:-0.9.44}
     container_name: ion
     restart: unless-stopped
 
@@ -175,7 +175,7 @@ services:
   # Shares ion-data volume for .seeded marker persistence.
   # Skips automatically on subsequent starts.
   seeder:
-    image: ixion36/ion:${ION_VERSION:-0.9.43}
+    image: ixion36/ion:${ION_VERSION:-0.9.44}
     container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]
     volumes:

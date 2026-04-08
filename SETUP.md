@@ -1,275 +1,192 @@
-# ION Setup Instructions
+# ION Setup Guide
 
-## Quick Start
+## Prerequisites
 
-### Docker Deployment (Recommended)
+- Docker Engine 20.10+ and Docker Compose v2
+- 4GB RAM minimum (8GB recommended)
+- Ports: 8000 (ION), 5432 (PostgreSQL internal)
+
+External services (deployed separately):
+- Elasticsearch 8.x with alert data
+- Kibana 8.x (optional, for case sync)
+- OpenCTI (optional, for threat intelligence)
+- TIDE (optional, for detection engineering)
+- Ollama (optional, for AI features)
+
+---
+
+## Quick Start (Docker Compose)
 
 ```bash
-# Clone repository
-git clone https://github.com/ion36-svg/ion.git
+# 1. Clone
+git clone https://github.com/ixion36-svg/ion.git
 cd ion
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your Elasticsearch/OpenCTI URLs
+# 2. Configure environment
+cp .env.deploy .env
+# Edit .env — replace all REPLACE_WITH_ placeholders with your actual IPs/credentials
 
-# Build and start
-docker build -t ion:latest .
-docker-compose up -d
+# 3. Start (pulls pre-built image + PostgreSQL)
+docker compose up -d
 
-# Pull the default AI model (first time)
-docker exec -it ion-ollama ollama pull llama3.1:8b
+# 4. Verify
+docker compose ps
+# Should show: ion (healthy), ion-postgres (healthy)
 
-# Access at http://localhost:8000
+# 5. Access
+# http://localhost:8000
+# Login: admin / <your ION_ADMIN_PASSWORD>
 ```
 
-### Local Development
+---
+
+## Environment Configuration
+
+Copy `.env.deploy` to `.env` and configure these sections:
+
+### Required
 
 ```bash
-# Install dependencies
-pip install -e ".[dev]"
-
-# Initialize database
-python -m ion.cli.main init
-
-# Upgrade database schema
-python -m ion.cli.main upgrade
-
-# Seed default users
-python -m ion.cli.main seed-users --admin-password YourPassword123
-
-# Start web server
-python -m ion.cli.main web
+ION_ADMIN_PASSWORD=your-secure-password    # Admin login password
 ```
 
-Access at: http://localhost:8000
+### Database (auto-configured)
 
----
-
-## Architecture
-
-ION integrates with your existing infrastructure:
-
-| Component | Included in Docker Image | Notes |
-|-----------|-------------------------|-------|
-| ION Web App | Yes | Core application |
-| Ollama | Yes | Local AI/LLM service |
-| Elasticsearch | **No** | Connect to existing cluster |
-| Kibana | **No** | Connect for case sync |
-| OpenCTI | **No** | Connect for threat intel |
-| GitLab | **No** | Connect for issue tracking |
-
----
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ION_COOKIE_SECURE` | `false` | Set `true` for HTTPS |
-| `ION_DEBUG_MODE` | `false` | Enable API docs (disable in prod) |
-| `ION_ADMIN_PASSWORD` | `changeme` | Initial admin password |
-| `ION_ELASTICSEARCH_ENABLED` | `true` | Enable ES integration |
-| `ION_ELASTICSEARCH_URL` | - | Elasticsearch URL |
-| `ION_ELASTICSEARCH_API_KEY` | - | ES API key |
-| `ION_OPENCTI_ENABLED` | `true` | Enable OpenCTI |
-| `ION_OPENCTI_URL` | - | OpenCTI URL |
-| `ION_OPENCTI_TOKEN` | - | OpenCTI API token |
-| `ION_OLLAMA_ENABLED` | `true` | Enable AI features |
-| `ION_OLLAMA_URL` | `http://ollama:11434` | Ollama service URL |
-| `ION_OLLAMA_MODEL` | `llama3.1:8b` | Default AI model |
-| `ION_KIBANA_CASES_ENABLED` | `true` | Enable Kibana sync |
-| `ION_KIBANA_URL` | - | Kibana URL |
-| `ION_OIDC_ENABLED` | `true` | Enable Keycloak SSO |
-| `ION_ACCOUNT_LOCKOUT_ENABLED` | `false` | Lock accounts after failed logins |
-
-### Config File
-
-Located at `.ion/config.json` (or `/data/.ion/config.json` in Docker):
-
-```json
-{
-  "db_path": ".ion/ion.db",
-  "default_format": "markdown",
-  "cookie_secure": true,
-  "debug_mode": false,
-  "elasticsearch_enabled": true,
-  "elasticsearch_url": "https://your-es:9200",
-  "opencti_enabled": true,
-  "opencti_url": "https://your-opencti:8080"
-}
+```bash
+# Default — uses the PostgreSQL container from docker-compose
+# Only change if using an external PostgreSQL server
+ION_DATABASE_URL=postgresql://ion:ion2025@postgres:5432/ion
 ```
-
----
-
-## Integration Setup
 
 ### Elasticsearch
 
-1. Enable in `.env`:
-   ```bash
-   ION_ELASTICSEARCH_ENABLED=true
-   ION_ELASTICSEARCH_URL=https://your-es:9200
-   ION_ELASTICSEARCH_API_KEY=your-api-key
-   ```
-
-2. Test connection in ION: Settings → Integrations → Test
-
-3. Configure alert index pattern (default: `.alerts-*,.watcher-history-*,alerts-*`)
-
-### OpenCTI
-
-1. Get API token from OpenCTI: Settings → API Access
-
-2. Enable in `.env`:
-   ```bash
-   ION_OPENCTI_ENABLED=true
-   ION_OPENCTI_URL=https://your-opencti:8080
-   ION_OPENCTI_TOKEN=your-uuid-token
-   ```
-
-3. Test connection in ION: Settings → Integrations → Test
-
-### Kibana Cases
-
-1. Enable in `.env`:
-   ```bash
-   ION_KIBANA_CASES_ENABLED=true
-   ION_KIBANA_URL=https://your-kibana:5601
-   ION_KIBANA_USERNAME=elastic
-   ION_KIBANA_PASSWORD=your-password
-   ```
-
-2. Cases created in ION will sync bidirectionally with Kibana
-
----
-
-## Auto-Seeded Playbooks
-
-On first startup, ION automatically seeds **6 default pattern-based investigation playbooks** for multi-alert attack detection:
-
-- Ransomware Response (priority 99, auto-execute)
-- Active Intrusion Response (priority 95, auto-execute)
-- Data Exfiltration Response (priority 92, auto-execute)
-- Forensics Investigation (priority 90, recommend only)
-- Lateral Movement Containment (priority 85, auto-execute)
-- Compromised Account Investigation (priority 80, recommend only)
-
-These playbooks are created idempotently (safe to restart). They contain realistic SOC investigation steps and are triggered automatically when multi-alert patterns are detected on the same host or user. See the [README](README.md#multi-alert-pattern-detection) for details.
-
----
-
-## Default Login
-
-- **Username:** `admin`
-- **Password:** `changeme` (or value of `ION_ADMIN_PASSWORD`)
-
-**Important:** Change the admin password after first login!
-
----
-
-## Default Roles
-
-ION uses a 4-tier role hierarchy. All page routes are enforced server-side (unauthenticated requests redirect to `/login`, insufficient permissions return 403).
-
-| Role | Permissions |
-|------|-------------|
-| **Analyst** | Alerts, cases, observables, playbooks, training, templates, documents, AI chat, notes |
-| **Lead** | Analyst + topology, security dashboards |
-| **Engineering** | Lead + integrations, system settings |
-| **Admin** | Full access — user management, audit logs, all resources |
-
----
-
-## Security Features
-
-- **Server-side route enforcement**: All page routes require authentication; permission checks enforced via FastAPI dependencies
-- Session-based authentication with secure cookies
-- Session rotation on login (invalidates previous sessions)
-- OIDC/Keycloak SSO support
-- Role-based access control (RBAC) with 4-tier hierarchy
-- **Global rate limiting** (120 req/min default, stricter on admin DB ops and AI chat)
-- **Account lockout** (opt-in, disabled by default — 5 failed attempts → 15-min lock)
-- **XSS sanitization**: DOMPurify on all Markdown rendering
-- **Hardened CSP**: object-src, base-uri, form-action directives
-- Security headers (HSTS, X-Frame-Options, Permissions-Policy)
-- Timing-attack resistant login
-- Sandboxed Jinja2 template rendering (SSTI protection)
-- SSRF protection on integration endpoints
-- CSRF protection for OIDC flows
-- Attack detection with automatic IP blocking
-- Audit logging
-
----
-
-## Backup & Restore
-
-### Docker
-
-**Backup:**
 ```bash
-docker run --rm -v ion-data:/data -v $(pwd):/backup \
-  alpine tar czf /backup/ion-backup.tar.gz -C /data .
+ION_ELASTICSEARCH_ENABLED=true
+ION_ELASTICSEARCH_URL=http://YOUR_ES_IP:9200
+ION_ELASTICSEARCH_USERNAME=elastic
+ION_ELASTICSEARCH_PASSWORD=your-es-password
 ```
 
-**Restore:**
-```bash
-docker-compose down
-docker run --rm -v ion-data:/data -v $(pwd):/backup \
-  alpine sh -c "rm -rf /data/* && tar xzf /backup/ion-backup.tar.gz -C /data"
-docker-compose up -d
-```
-
-### Local
+### TIDE Detection Engineering
 
 ```bash
-cp -r .ion .ion-backup-$(date +%Y%m%d)
+ION_TIDE_ENABLED=true
+ION_TIDE_URL=https://YOUR_TIDE_IP
+ION_TIDE_API_KEY=your-tide-api-key
+ION_TIDE_VERIFY_SSL=false              # Set true if TIDE has valid TLS cert
 ```
+
+### OpenCTI Threat Intelligence
+
+```bash
+ION_OPENCTI_ENABLED=true
+ION_OPENCTI_URL=http://YOUR_OPENCTI_IP:8080
+ION_OPENCTI_TOKEN=your-opencti-token
+```
+
+### Ollama AI (Optional)
+
+```bash
+ION_OLLAMA_ENABLED=true
+ION_OLLAMA_URL=http://YOUR_OLLAMA_IP:11434  # NOT 127.0.0.1 (that means the container itself)
+ION_OLLAMA_MODEL=llama3.2:latest
+```
+
+### TLS / Internal Certificates
+
+```bash
+# Trust your internal CA for self-signed certs on ES, OpenCTI, etc.
+ION_CA_BUNDLE=/etc/ipa/ca.crt
+
+# Serve ION itself over HTTPS
+ION_SSL_CERT=/path/to/cert.pem
+ION_SSL_KEY=/path/to/key.pem
+```
+
+---
+
+## Air-Gapped / Siloed Deployment
+
+For environments without internet access:
+
+```bash
+# On a machine WITH internet:
+docker pull ixion36/ion:latest
+docker pull postgres:16-alpine
+docker save ixion36/ion:latest postgres:16-alpine -o ion-bundle.tar
+
+# Transfer ion-bundle.tar + docker-compose.yml + .env.deploy to the air-gapped machine
+
+# On the air-gapped machine:
+docker load -i ion-bundle.tar
+cp .env.deploy .env
+# Edit .env with your internal IPs
+docker compose up -d
+```
+
+---
+
+## Fresh Database / Reset
+
+To wipe the database and start fresh:
+
+```bash
+# Option 1: One-shot via environment variable
+# Add to .env:
+ION_FRESH_DB=true
+# Restart — wipes once, then skips on subsequent restarts
+docker compose down && docker compose up -d
+
+# Option 2: Full volume wipe
+docker compose down -v    # Removes all data volumes
+docker compose up -d      # Fresh PostgreSQL + ION
+```
+
+---
+
+## Networking Notes
+
+| Hostname | What it means | Where it works |
+|----------|---------------|----------------|
+| `postgres` | Docker Compose service name | Inside compose network only |
+| `127.0.0.1` | The container itself | NOT your host machine |
+| `host.docker.internal` | Your host machine | Docker Desktop only (Windows/Mac) |
+| Actual IP (e.g. `10.0.1.50`) | The real server | Works everywhere |
+
+**For siloed Linux servers**: Always use actual IPs, not `host.docker.internal` or `localhost`.
 
 ---
 
 ## Troubleshooting
 
-### Container won't start
+### "Could not translate host postgres"
+The ION container can't reach PostgreSQL. Check:
+- `docker compose ps` — is `ion-postgres` running and healthy?
+- Both containers must be on the same Docker network
+- Run: `docker exec ion ping postgres` to test DNS resolution
 
-```bash
-docker-compose logs ion
-```
+### "Database not ready after 60s"
+PostgreSQL hasn't started yet. Check:
+- `docker logs ion-postgres` for errors
+- Ensure the postgres volume isn't corrupted: `docker compose down -v && docker compose up -d`
 
-### Can't connect to Elasticsearch
-
-1. Check URL is accessible from ION container
-2. Verify API key or credentials
-3. Check SSL certificate (set `verify_ssl: false` for self-signed)
-
-### AI features not working
-
-1. Check Ollama is running: `docker-compose logs ollama`
-2. Verify model is pulled: `docker exec ion-ollama ollama list`
-3. Pull model: `docker exec ion-ollama ollama pull llama3.1:8b`
-
-### API docs not accessible
-
-API documentation is disabled by default in production. To enable:
-```bash
-ION_DEBUG_MODE=true
-```
-Then restart the container.
+### Login redirects to change-password
+The admin password matches a weak default. Set `ION_ADMIN_PASSWORD` to a custom value in `.env` and restart.
 
 ---
 
-## CLI Commands
+## Local Development (Without Docker)
 
 ```bash
-# Database
-python -m ion.cli.main init              # Initialize database
-python -m ion.cli.main upgrade           # Upgrade schema
-python -m ion.cli.main seed-users        # Create default users
+pip install -e .
 
-# Server
-python -m ion.cli.main web               # Start web server
-python -m ion.cli.main web --port 8080   # Custom port
+# Set environment variables (or use start_ion.ps1 on Windows)
+export ION_ADMIN_PASSWORD=admin2025
+export ION_ELASTICSEARCH_URL=http://127.0.0.1:9200
+export ION_ELASTICSEARCH_USERNAME=elastic
+export ION_ELASTICSEARCH_PASSWORD=your-password
+
+# Start (uses SQLite by default for local dev)
+ion-web
+# Access at http://localhost:8000
 ```
-
-For more details, see [README.md](README.md).

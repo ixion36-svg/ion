@@ -1,7 +1,7 @@
 # SOC Documentation Templates & Framework Alignment
 
-> **Version:** 0.6.0
-> **Date:** 2026-02-11
+> **Version:** 0.9.43
+> **Date:** 2026-04-07
 > **Module:** `ion.services.soc_template_service`
 
 ---

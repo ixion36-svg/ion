@@ -463,8 +463,140 @@
             <section id="use-cases" class="cyab-section">
                 <h2 class="cyab-heading"><span class="cyab-hnum">6</span>Use Case Coverage Status</h2>
                 <div class="cyab-callout" style="margin-bottom:1rem;">
-                    <p>Use cases are defined and tracked in <strong>TIDE</strong>. This section records the review status against this data source.</p>
+                    <p>Use cases are defined and tracked in <strong>TIDE</strong>. Select a system below to review detection rule coverage for this data source.</p>
                 </div>
+
+                <!-- TIDE System Selector -->
+                <div class="form-group" style="margin-bottom:1rem;">
+                    <label>TIDE System</label>
+                    <div style="display:flex;gap:0.5rem;align-items:center;">
+                        <select id="tide-system-select" style="font-size:0.9rem;flex:1;" onchange="onTideSystemSelected(this.value)">
+                            <option value="">— Select TIDE System —</option>
+                        </select>
+                        <button type="button" class="btn btn-secondary" style="padding:0.35rem 0.75rem;font-size:0.75rem;white-space:nowrap;" onclick="loadTideSystems()" title="Refresh systems from TIDE">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                        </button>
+                    </div>
+                    <div id="tide-status-msg" style="font-size:0.7rem;color:var(--text-muted);margin-top:0.25rem;"></div>
+                </div>
+
+                <!-- ES Alert Namespace Mapping -->
+                <div class="form-group" style="margin-bottom:1rem;">
+                    <label>Alert Namespace <span style="font-weight:400;color:var(--text-muted);font-size:0.7rem;">(data_stream.namespace)</span></label>
+                    <div style="display:flex;gap:0.5rem;align-items:center;">
+                        <input type="text" id="ds-namespace" list="namespace-suggestions" placeholder="e.g. endpoint, windows, network" style="font-size:0.9rem;flex:1;">
+                        <button type="button" class="btn btn-secondary" style="padding:0.35rem 0.75rem;font-size:0.75rem;white-space:nowrap;" onclick="loadAlertMapping()" title="Load alert mapping for this namespace">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;"><path d="M21 12a9 9 0 11-6.22-8.56"/><line x1="12" y1="2" x2="12" y2="12"/><line x1="12" y1="12" x2="20" y2="12"/></svg>
+                            Map
+                        </button>
+                    </div>
+                    <datalist id="namespace-suggestions"></datalist>
+                    <div id="namespace-hint" style="font-size:0.7rem;color:var(--text-muted);margin-top:0.25rem;">Matches alerts where data_stream.namespace = this value (e.g. logs-*-<strong>endpoint</strong>)</div>
+                </div>
+
+                <!-- Alert Mapping Panel (shown when namespace mapped + TIDE system selected) -->
+                <div id="alert-mapping-panel" style="display:none;margin-bottom:1rem;">
+                    <!-- Alert stats cards -->
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1rem;">
+                        <div class="cyab-metric-card" style="padding:0.75rem;">
+                            <span class="cyab-metric-val" id="alert-stat-total" style="font-size:1.1rem;color:var(--primary);">0</span>
+                            <span class="cyab-metric-name" style="font-size:0.6rem;">Total Alerts</span>
+                        </div>
+                        <div class="cyab-metric-card" style="padding:0.75rem;">
+                            <span class="cyab-metric-val" id="alert-stat-firing" style="font-size:1.1rem;color:var(--success);">0</span>
+                            <span class="cyab-metric-name" style="font-size:0.6rem;">Rules Firing</span>
+                        </div>
+                        <div class="cyab-metric-card" style="padding:0.75rem;">
+                            <span class="cyab-metric-val" id="alert-stat-silent" style="font-size:1.1rem;color:var(--neon-orange);">0</span>
+                            <span class="cyab-metric-name" style="font-size:0.6rem;">Rules Silent</span>
+                        </div>
+                        <div class="cyab-metric-card" style="padding:0.75rem;">
+                            <span class="cyab-metric-val" id="alert-stat-unmatched" style="font-size:1.1rem;color:var(--text-muted);">0</span>
+                            <span class="cyab-metric-name" style="font-size:0.6rem;">Unmatched Alerts</span>
+                        </div>
+                    </div>
+
+                    <!-- Alert severity breakdown -->
+                    <div id="alert-severity-bar" style="margin-bottom:0.75rem;"></div>
+
+                    <!-- Alert timeline sparkline -->
+                    <div id="alert-timeline-chart" style="height:60px;margin-bottom:1rem;border:1px solid var(--border);border-radius:var(--radius-lg);padding:0.5rem;background:var(--bg-secondary);"></div>
+
+                    <!-- Firing Rules table -->
+                    <div style="margin-bottom:1rem;">
+                        <label style="margin:0;font-weight:600;font-size:0.85rem;display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+                            <span style="color:var(--success);">Firing Rules</span>
+                            <span id="alert-firing-badge" class="cyab-badge" style="background:rgba(34,197,94,0.15);color:var(--success);font-size:0.65rem;">0</span>
+                            <span style="font-weight:400;color:var(--text-muted);font-size:0.7rem;margin-left:auto;">TIDE rules generating alerts in ES</span>
+                        </label>
+                        <div id="alert-firing-table" class="tide-rules-wrap" style="max-height:250px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-lg);"></div>
+                    </div>
+
+                    <!-- Silent Rules table -->
+                    <div style="margin-bottom:1rem;">
+                        <label style="margin:0;font-weight:600;font-size:0.85rem;display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+                            <span style="color:var(--neon-orange);">Silent Rules</span>
+                            <span id="alert-silent-badge" class="cyab-badge" style="background:rgba(255,165,0,0.15);color:var(--neon-orange);font-size:0.65rem;">0</span>
+                            <span style="font-weight:400;color:var(--text-muted);font-size:0.7rem;margin-left:auto;">TIDE rules with no matching alerts</span>
+                        </label>
+                        <div id="alert-silent-table" class="tide-rules-wrap" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-lg);"></div>
+                    </div>
+
+                    <!-- Unmatched Alerts table -->
+                    <div id="alert-unmatched-section" style="display:none;margin-bottom:1rem;">
+                        <label style="margin:0;font-weight:600;font-size:0.85rem;display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+                            <span style="color:var(--text-muted);">Unmatched Alert Rules</span>
+                            <span id="alert-unmatched-badge" class="cyab-badge" style="background:rgba(148,163,184,0.15);color:var(--text-muted);font-size:0.65rem;">0</span>
+                            <span style="font-weight:400;color:var(--text-muted);font-size:0.7rem;margin-left:auto;">ES alerts not matching any TIDE rule</span>
+                        </label>
+                        <div id="alert-unmatched-table" class="tide-rules-wrap" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-lg);"></div>
+                    </div>
+                </div>
+
+                <!-- TIDE Coverage Summary (shown when system selected) -->
+                <div id="tide-coverage-panel" style="display:none;">
+                    <div class="tide-coverage-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1rem;">
+                        <div class="cyab-metric-card" style="padding:0.75rem;">
+                            <span class="cyab-metric-val" id="tide-stat-applied" style="font-size:1.1rem;">0</span>
+                            <span class="cyab-metric-name" style="font-size:0.6rem;">Applied Rules</span>
+                        </div>
+                        <div class="cyab-metric-card" style="padding:0.75rem;">
+                            <span class="cyab-metric-val" id="tide-stat-total" style="font-size:1.1rem;">0</span>
+                            <span class="cyab-metric-name" style="font-size:0.6rem;">Total Rules</span>
+                        </div>
+                        <div class="cyab-metric-card" style="padding:0.75rem;">
+                            <span class="cyab-metric-val" id="tide-stat-coverage" style="font-size:1.1rem;">0%</span>
+                            <span class="cyab-metric-name" style="font-size:0.6rem;">Coverage</span>
+                        </div>
+                        <div class="cyab-metric-card" style="padding:0.75rem;">
+                            <span class="cyab-metric-val" id="tide-stat-quality" style="font-size:1.1rem;">—</span>
+                            <span class="cyab-metric-name" style="font-size:0.6rem;">Avg Quality</span>
+                        </div>
+                    </div>
+
+                    <!-- Severity breakdown bar -->
+                    <div id="tide-severity-bar" style="margin-bottom:1rem;"></div>
+
+                    <!-- MITRE Coverage Summary -->
+                    <div id="tide-mitre-panel" style="display:none;margin-bottom:1rem;">
+                        <label style="font-weight:600;font-size:0.85rem;display:block;margin-bottom:0.5rem;">MITRE ATT&CK Coverage by Tactic</label>
+                        <div id="tide-mitre-grid" class="tide-mitre-grid"></div>
+                    </div>
+
+                    <!-- Detection rules table -->
+                    <div style="margin-bottom:1rem;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                            <label style="margin:0;font-weight:600;font-size:0.85rem;">Applied Detection Rules</label>
+                            <input type="text" id="tide-rule-search" placeholder="Filter rules..." oninput="filterTideRules()" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.3rem 0.6rem;font-size:0.75rem;color:var(--text-primary);width:180px;">
+                        </div>
+                        <div id="tide-rules-table" class="tide-rules-wrap" style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-lg);"></div>
+                        <div id="tide-no-rules" style="display:none;text-align:center;padding:1.5rem;color:var(--text-muted);font-size:0.8rem;">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin-bottom:0.5rem;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <p style="margin:0;">No detection rules applied to this system.<br><span style="font-size:0.7rem;">Add rules in TIDE to improve coverage.</span></p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-row">
                     <div class="form-group"><label>TIDE Review Status</label>
                         <select id="uc-status" style="font-size:0.9rem;">
@@ -732,6 +864,39 @@
 .cyab-blindspots{margin-top:1rem;padding:0.75rem 1rem;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.12);border-radius:var(--radius)}
 .cyab-blindspots-list{display:flex;flex-wrap:wrap;gap:0.4rem}
 .cyab-blindspot-tag{font-size:0.65rem;padding:0.2rem 0.5rem;border-radius:var(--radius);background:rgba(239,68,68,0.12);color:var(--danger);font-weight:600;border:1px solid rgba(239,68,68,0.2)}
+/* TIDE Rules */
+.tide-rules-wrap{background:var(--bg-secondary)}
+.tide-rule-header{display:grid;grid-template-columns:1fr 5rem 4rem 5rem 8rem;gap:0.5rem;padding:0.5rem 0.75rem;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);border-bottom:2px solid var(--border);position:sticky;top:0;background:var(--bg-secondary);z-index:1}
+.tide-rule-row{display:grid;grid-template-columns:1fr 5rem 4rem 5rem 8rem;gap:0.5rem;padding:0.5rem 0.75rem;font-size:0.8rem;border-bottom:1px solid var(--border);color:var(--text-primary);transition:background .1s}
+.tide-rule-row:hover{background:var(--primary-dim)}
+.tide-sev{font-size:0.6rem;font-weight:700;padding:0.1rem 0.45rem;border-radius:9999px;text-transform:uppercase;display:inline-block}
+.tide-sev-critical{background:rgba(239,68,68,0.15);color:var(--danger)}
+.tide-sev-high{background:rgba(249,115,22,0.15);color:var(--neon-orange)}
+.tide-sev-medium{background:rgba(251,191,36,0.15);color:var(--neon-yellow)}
+.tide-sev-low{background:rgba(16,185,129,0.15);color:var(--success)}
+.tide-sev-info{background:rgba(59,130,246,0.15);color:var(--primary)}
+.tide-mitre-tag{font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:var(--radius);background:rgba(139,92,246,0.12);color:#a78bfa;margin:0.1rem;display:inline-block;white-space:nowrap}
+.tide-quality-bar{width:40px;height:5px;background:var(--bg-deep);border-radius:var(--radius);overflow:hidden;display:inline-block;vertical-align:middle;margin-right:0.3rem}
+.tide-quality-fill{height:100%;border-radius:var(--radius)}
+.tide-severity-summary{display:flex;height:8px;border-radius:var(--radius);overflow:hidden;background:var(--bg-deep)}
+.tide-severity-summary span{height:100%;transition:width .3s}
+.tide-severity-legend{display:flex;gap:0.75rem;margin-top:0.35rem;font-size:0.65rem;color:var(--text-muted)}
+.tide-severity-legend span{display:flex;align-items:center;gap:0.3rem}
+.tide-severity-legend .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+/* TIDE MITRE Grid */
+.tide-mitre-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem}
+.tide-mitre-tactic{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem;position:relative;overflow:hidden}
+.tide-mitre-tactic::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.tide-mitre-tactic.covered-full::before{background:var(--success)}
+.tide-mitre-tactic.covered-partial::before{background:var(--neon-yellow)}
+.tide-mitre-tactic.covered-none::before{background:var(--danger)}
+.tide-mitre-tactic-name{font-size:0.65rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.25rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tide-mitre-tactic-stats{display:flex;align-items:center;gap:0.4rem}
+.tide-mitre-tactic-pct{font-size:0.9rem;font-weight:800}
+.tide-mitre-tactic-count{font-size:0.6rem;color:var(--text-muted)}
+.tide-mitre-bar{flex:1;height:4px;background:var(--bg-deep);border-radius:var(--radius);overflow:hidden}
+.tide-mitre-bar-fill{height:100%;border-radius:var(--radius);transition:width .3s}
+@media(max-width:768px){.tide-mitre-grid{grid-template-columns:repeat(2,1fr)}}
 /* Sign-off */
 .cyab-sign-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
 .cyab-sign-box{padding:1.25rem}
@@ -1032,6 +1197,10 @@ function resetDataSourceForm() {
     document.getElementById('uc-review-date').value = '';
     document.getElementById('uc-gaps').value = '';
     document.getElementById('uc-remediation').value = '';
+    document.getElementById('tide-system-select').value = '';
+    document.getElementById('tide-coverage-panel').style.display = 'none';
+    document.getElementById('ds-namespace').value = '';
+    document.getElementById('alert-mapping-panel').style.display = 'none';
 }
 
 function populateForm(sys) {
@@ -1075,6 +1244,17 @@ function populateDataSourceForm(ds) {
     document.getElementById('uc-review-date').value = ds.use_case_review_date || '';
     document.getElementById('uc-gaps').value = ds.use_case_gaps || '';
     document.getElementById('uc-remediation').value = ds.use_case_remediation || '';
+    // TIDE system selection
+    var tideSel = document.getElementById('tide-system-select');
+    tideSel.value = ds.tide_system_id || '';
+    onTideSystemSelected(tideSel.value);
+    // Namespace mapping
+    document.getElementById('ds-namespace').value = ds.data_namespace || '';
+    if (ds.data_namespace && ds.tide_system_id) {
+        loadAlertMapping();
+    } else {
+        document.getElementById('alert-mapping-panel').style.display = 'none';
+    }
     updateScore();
 }
 
@@ -1152,6 +1332,8 @@ function gatherDataSourceData() {
         use_case_review_date: document.getElementById('uc-review-date').value || null,
         use_case_gaps: document.getElementById('uc-gaps').value,
         use_case_remediation: document.getElementById('uc-remediation').value,
+        tide_system_id: document.getElementById('tide-system-select').value || null,
+        data_namespace: document.getElementById('ds-namespace').value || null,
     };
 }
 
@@ -1648,12 +1830,539 @@ async function saveAsDocument() {
     } catch (e) { showToast(e.message || 'Failed', 'error'); }
 }
 
+// ======================== TIDE INTEGRATION ========================
+var tideSystemsCache = [];
+var tideSelectedDetail = null;
+
+async function loadTideSystems() {
+    var msg = document.getElementById('tide-status-msg');
+    var sel = document.getElementById('tide-system-select');
+    msg.textContent = 'Connecting to TIDE...';
+    msg.style.color = 'var(--text-muted)';
+    try {
+        var status = await api.get('/api/cyab/tide/status');
+        if (!status.ok) {
+            msg.textContent = 'TIDE unavailable: ' + (status.error || 'not configured');
+            msg.style.color = 'var(--danger)';
+            return;
+        }
+        var systems = await api.get('/api/cyab/tide/systems');
+        tideSystemsCache = systems || [];
+        // Preserve current selection
+        var prev = sel.value;
+        sel.innerHTML = '<option value="">— Select TIDE System —</option>';
+        tideSystemsCache.forEach(function(s) {
+            var opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s.name + (s.classification ? ' (' + s.classification + ')' : '');
+            sel.appendChild(opt);
+        });
+        if (prev) sel.value = prev;
+        msg.textContent = tideSystemsCache.length + ' systems loaded from TIDE (' + status.rule_count + ' total rules)';
+        msg.style.color = 'var(--success)';
+    } catch (e) {
+        console.error('TIDE load error:', e);
+        msg.textContent = 'Failed to connect to TIDE';
+        msg.style.color = 'var(--danger)';
+    }
+}
+
+async function onTideSystemSelected(systemId) {
+    var panel = document.getElementById('tide-coverage-panel');
+    if (!systemId) {
+        panel.style.display = 'none';
+        tideSelectedDetail = null;
+        return;
+    }
+    try {
+        // Sequential requests — TIDE's DuckDB can't handle concurrent queries
+        var detail = await api.get('/api/cyab/tide/systems/' + systemId);
+        var mitre = await api.get('/api/cyab/tide/systems/' + systemId + '/mitre');
+        tideSelectedDetail = detail;
+        tideSelectedDetail._mitre = mitre;
+        renderTideCoverage(detail);
+        autoPopulateGaps(detail, mitre);
+        panel.style.display = '';
+    } catch (e) {
+        console.error('TIDE system detail error:', e);
+        showToast('Failed to load TIDE system detail', 'error');
+    }
+}
+
+function autoPopulateGaps(detail, mitre) {
+    var detections = detail.detections || [];
+    var totalRules = detail.total_rules || 0;
+    var applied = detections.length;
+    var coverage = totalRules > 0 ? Math.round(applied / totalRules * 100) : 0;
+    var coveredTechniques = new Set(mitre.covered || []);
+    var allTechniques = mitre.techniques || [];
+    var totalTech = mitre.total_techniques || allTechniques.length;
+
+    // Auto-set review status based on coverage
+    var ucStatus = document.getElementById('uc-status');
+    if (applied === 0) {
+        ucStatus.value = 'Not Yet Reviewed';
+    } else if (coverage >= 70 && coveredTechniques.size >= totalTech * 0.7) {
+        ucStatus.value = 'Reviewed \u2014 Fully Covered';
+    } else {
+        ucStatus.value = 'Reviewed \u2014 Known Gaps';
+    }
+    // Set review date to today
+    document.getElementById('uc-review-date').value = new Date().toISOString().split('T')[0];
+
+    // Build gaps analysis
+    var gapsText = '';
+    var systemName = detail.name || 'Unknown System';
+
+    // 1. Overall coverage gap
+    gapsText += 'TIDE Coverage Analysis: ' + systemName + '\n';
+    gapsText += 'Rules applied: ' + applied + ' / ' + totalRules + ' (' + coverage + '% coverage)\n';
+    gapsText += 'MITRE techniques covered: ' + coveredTechniques.size + ' / ' + totalTech + '\n\n';
+
+    // 2. Missing MITRE techniques grouped by tactic
+    if (allTechniques.length > 0) {
+        var missingByTactic = {};
+        allTechniques.forEach(function(t) {
+            if (!coveredTechniques.has(t.technique_id)) {
+                var tactic = t.tactic || 'Unknown';
+                if (!missingByTactic[tactic]) missingByTactic[tactic] = [];
+                missingByTactic[tactic].push(t.technique_id + ' ' + (t.name || ''));
+            }
+        });
+
+        var tacticOrder = ['initial-access', 'execution', 'persistence', 'privilege-escalation',
+            'defense-evasion', 'credential-access', 'discovery', 'lateral-movement',
+            'collection', 'command-and-control', 'exfiltration', 'impact'];
+
+        var sortedTactics = Object.keys(missingByTactic).sort(function(a, b) {
+            var ia = tacticOrder.indexOf(a), ib = tacticOrder.indexOf(b);
+            if (ia === -1) ia = 999;
+            if (ib === -1) ib = 999;
+            return ia - ib;
+        });
+
+        if (sortedTactics.length > 0) {
+            gapsText += 'Uncovered MITRE ATT&CK Techniques by Tactic:\n';
+            sortedTactics.forEach(function(tactic) {
+                var items = missingByTactic[tactic];
+                var tacticLabel = tactic.replace(/-/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); });
+                gapsText += '\n[' + tacticLabel + '] (' + items.length + ' uncovered)\n';
+                // Show up to 5 per tactic to keep it readable
+                items.slice(0, 5).forEach(function(item) {
+                    gapsText += '  - ' + item + '\n';
+                });
+                if (items.length > 5) {
+                    gapsText += '  ... and ' + (items.length - 5) + ' more\n';
+                }
+            });
+        }
+    }
+
+    // 3. Severity gaps — check if any high/critical areas are uncovered
+    var sevCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+    detections.forEach(function(d) {
+        var s = (d.severity || 'low').toLowerCase();
+        if (s in sevCounts) sevCounts[s]++;
+    });
+    if (sevCounts.critical === 0 && sevCounts.high < 5) {
+        gapsText += '\nSeverity Gap: Only ' + sevCounts.high + ' high-severity and ' + sevCounts.critical + ' critical rules applied.\n';
+        gapsText += 'Recommend reviewing TIDE for additional high/critical detection rules.\n';
+    }
+
+    // 4. Disabled rules warning
+    var disabledRules = detections.filter(function(d) { return !d.enabled; });
+    if (disabledRules.length > 0) {
+        gapsText += '\nDisabled Rules (' + disabledRules.length + '):\n';
+        disabledRules.slice(0, 5).forEach(function(d) {
+            gapsText += '  - ' + (d.name || d.rule_id) + ' (severity: ' + d.severity + ')\n';
+        });
+        if (disabledRules.length > 5) {
+            gapsText += '  ... and ' + (disabledRules.length - 5) + ' more disabled\n';
+        }
+    }
+
+    // Only auto-populate if gaps field is empty or was previously auto-populated
+    var gapsEl = document.getElementById('uc-gaps');
+    if (!gapsEl.value || gapsEl.value.startsWith('TIDE Coverage Analysis:')) {
+        gapsEl.value = gapsText.trim();
+    }
+
+    // Auto-populate remediation suggestions if empty
+    var remEl = document.getElementById('uc-remediation');
+    if (!remEl.value || remEl.value.startsWith('Auto-generated')) {
+        var remText = 'Auto-generated from TIDE analysis:\n';
+        if (applied === 0) {
+            remText += '- No detection rules applied. Review TIDE system configuration and apply relevant rules.\n';
+            remText += '- Schedule initial TIDE review with Detection Engineering team.\n';
+        } else {
+            if (coverage < 5) {
+                remText += '- Coverage critically low (' + coverage + '%). Prioritise applying rules for high-impact tactics.\n';
+            }
+            if (sevCounts.critical === 0) {
+                remText += '- No critical-severity rules applied. Review TIDE for critical detections applicable to this system.\n';
+            }
+            if (disabledRules.length > 0) {
+                remText += '- ' + disabledRules.length + ' rules are disabled. Investigate and enable where applicable.\n';
+            }
+            var totalMissing = totalTech - coveredTechniques.size;
+            if (totalMissing > 0) {
+                remText += '- ' + totalMissing + ' MITRE techniques uncovered. Review with Detection Engineering in next sprint.\n';
+            }
+        }
+        remEl.value = remText.trim();
+    }
+
+    // Trigger metrics recalc
+    updateDetailMetrics();
+}
+
+function renderTideCoverage(detail) {
+    var detections = detail.detections || [];
+    var totalRules = detail.total_rules || 0;
+    var applied = detections.length;
+    var coverage = totalRules > 0 ? Math.round(applied / totalRules * 100) : 0;
+    var avgQuality = 0;
+    if (applied > 0) {
+        var sum = 0;
+        detections.forEach(function(d) { sum += (d.quality_score || 0); });
+        avgQuality = Math.round(sum / applied);
+    }
+
+    // Stats
+    document.getElementById('tide-stat-applied').textContent = applied;
+    document.getElementById('tide-stat-total').textContent = totalRules;
+    var covEl = document.getElementById('tide-stat-coverage');
+    covEl.textContent = coverage + '%';
+    covEl.style.color = coverage >= 70 ? 'var(--success)' : coverage >= 40 ? 'var(--neon-yellow)' : 'var(--danger)';
+    document.getElementById('tide-stat-quality').textContent = applied > 0 ? avgQuality + '%' : '—';
+
+    // Severity breakdown
+    var sevCounts = { critical: 0, high: 0, medium: 0, low: 0, informational: 0 };
+    detections.forEach(function(d) {
+        var sev = (d.severity || 'low').toLowerCase();
+        if (sev in sevCounts) sevCounts[sev]++;
+        else sevCounts.low++;
+    });
+    var barHtml = '';
+    if (applied > 0) {
+        barHtml += '<div class="tide-severity-summary">';
+        var colors = { critical: 'var(--danger)', high: 'var(--neon-orange)', medium: 'var(--neon-yellow)', low: 'var(--success)', informational: 'var(--primary)' };
+        ['critical','high','medium','low','informational'].forEach(function(sev) {
+            if (sevCounts[sev] > 0) {
+                var w = (sevCounts[sev] / applied * 100).toFixed(1);
+                barHtml += '<span style="width:' + w + '%;background:' + colors[sev] + '" title="' + sev + ': ' + sevCounts[sev] + '"></span>';
+            }
+        });
+        barHtml += '</div><div class="tide-severity-legend">';
+        ['critical','high','medium','low','informational'].forEach(function(sev) {
+            if (sevCounts[sev] > 0) {
+                barHtml += '<span><span class="dot" style="background:' + colors[sev] + '"></span>' + sev.charAt(0).toUpperCase() + sev.slice(1) + ': ' + sevCounts[sev] + '</span>';
+            }
+        });
+        barHtml += '</div>';
+    }
+    document.getElementById('tide-severity-bar').innerHTML = barHtml;
+
+    // MITRE tactic grid
+    renderMitreTacticGrid(detail);
+
+    // Rules table
+    renderTideRulesTable(detections);
+}
+
+function renderMitreTacticGrid(detail) {
+    var mitre = detail._mitre;
+    var panel = document.getElementById('tide-mitre-panel');
+    var grid = document.getElementById('tide-mitre-grid');
+    if (!mitre || !mitre.techniques || mitre.techniques.length === 0) {
+        panel.style.display = 'none';
+        return;
+    }
+    panel.style.display = '';
+    var covered = new Set(mitre.covered || []);
+    // Group techniques by tactic
+    var byTactic = {};
+    mitre.techniques.forEach(function(t) {
+        var tactic = t.tactic || 'unknown';
+        if (!byTactic[tactic]) byTactic[tactic] = { total: 0, covered: 0 };
+        byTactic[tactic].total++;
+        if (covered.has(t.technique_id)) byTactic[tactic].covered++;
+    });
+    var tacticOrder = ['initial-access', 'execution', 'persistence', 'privilege-escalation',
+        'defense-evasion', 'credential-access', 'discovery', 'lateral-movement',
+        'collection', 'command-and-control', 'exfiltration', 'impact'];
+    var sortedTactics = Object.keys(byTactic).sort(function(a, b) {
+        var ia = tacticOrder.indexOf(a), ib = tacticOrder.indexOf(b);
+        if (ia === -1) ia = 999;
+        if (ib === -1) ib = 999;
+        return ia - ib;
+    });
+    grid.innerHTML = sortedTactics.map(function(tactic) {
+        var info = byTactic[tactic];
+        var pct = info.total > 0 ? Math.round(info.covered / info.total * 100) : 0;
+        var cls = pct >= 70 ? 'covered-full' : pct > 0 ? 'covered-partial' : 'covered-none';
+        var color = pct >= 70 ? 'var(--success)' : pct > 0 ? 'var(--neon-yellow)' : 'var(--danger)';
+        var label = tactic.replace(/-/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); });
+        return '<div class="tide-mitre-tactic ' + cls + '">' +
+            '<div class="tide-mitre-tactic-name" title="' + label + '">' + label + '</div>' +
+            '<div class="tide-mitre-tactic-stats">' +
+                '<span class="tide-mitre-tactic-pct" style="color:' + color + '">' + pct + '%</span>' +
+                '<div class="tide-mitre-bar"><div class="tide-mitre-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
+                '<span class="tide-mitre-tactic-count">' + info.covered + '/' + info.total + '</span>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+}
+
+function renderTideRulesTable(detections) {
+    var container = document.getElementById('tide-rules-table');
+    var noRules = document.getElementById('tide-no-rules');
+    if (!detections || detections.length === 0) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+        noRules.style.display = '';
+        return;
+    }
+    container.style.display = '';
+    noRules.style.display = 'none';
+    var html = '<div class="tide-rule-header"><span>Rule Name</span><span>Severity</span><span>Enabled</span><span>Quality</span><span>MITRE IDs</span></div>';
+    detections.forEach(function(d) {
+        var sev = (d.severity || 'low').toLowerCase();
+        var sevClass = 'tide-sev-' + (sev === 'informational' ? 'info' : sev);
+        var qScore = d.quality_score || 0;
+        var qColor = qScore >= 70 ? 'var(--success)' : qScore >= 40 ? 'var(--neon-yellow)' : 'var(--danger)';
+        var mitreIds = d.mitre_ids || [];
+        if (typeof mitreIds === 'string') {
+            try { mitreIds = JSON.parse(mitreIds); } catch(e) { mitreIds = mitreIds.split(','); }
+        }
+        var mitreTags = mitreIds.map(function(m) { return '<span class="tide-mitre-tag">' + escapeHtml(String(m).trim()) + '</span>'; }).join('');
+        html += '<div class="tide-rule-row" data-name="' + escapeHtml(d.name || '').toLowerCase() + '" data-mitre="' + escapeHtml(mitreIds.join(' ')).toLowerCase() + '">' +
+            '<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(d.name || '') + '">' + escapeHtml(d.name || d.rule_id || '') + '</span>' +
+            '<span><span class="tide-sev ' + sevClass + '">' + sev + '</span></span>' +
+            '<span>' + (d.enabled ? '<span style="color:var(--success);">Yes</span>' : '<span style="color:var(--danger);">No</span>') + '</span>' +
+            '<span><span class="tide-quality-bar"><span class="tide-quality-fill" style="width:' + qScore + '%;background:' + qColor + '"></span></span>' + qScore + '%</span>' +
+            '<span style="line-height:1.6;">' + (mitreTags || '<span style="color:var(--text-muted);font-size:0.7rem;">—</span>') + '</span>' +
+            '</div>';
+    });
+    container.innerHTML = html;
+}
+
+function filterTideRules() {
+    var q = (document.getElementById('tide-rule-search').value || '').toLowerCase();
+    document.querySelectorAll('#tide-rules-table .tide-rule-row').forEach(function(row) {
+        var name = row.getAttribute('data-name') || '';
+        var mitre = row.getAttribute('data-mitre') || '';
+        row.style.display = (!q || name.includes(q) || mitre.includes(q)) ? '' : 'none';
+    });
+}
+
+// ======================== ALERT MAPPING ========================
+var namespaceSuggestionsLoaded = false;
+
+async function loadNamespaceSuggestions() {
+    if (namespaceSuggestionsLoaded) return;
+    try {
+        var ns = await api.get('/api/cyab/namespaces');
+        var dl = document.getElementById('namespace-suggestions');
+        dl.innerHTML = '';
+        (ns || []).forEach(function(n) {
+            var opt = document.createElement('option');
+            opt.value = n.namespace;
+            opt.label = n.namespace + ' (' + n.count + ' alerts)';
+            dl.appendChild(opt);
+        });
+        namespaceSuggestionsLoaded = true;
+    } catch (e) { console.error('Namespace suggestions error:', e); }
+}
+
+async function loadAlertMapping() {
+    var tideId = document.getElementById('tide-system-select').value;
+    var namespace = document.getElementById('ds-namespace').value.trim();
+    var panel = document.getElementById('alert-mapping-panel');
+
+    if (!tideId || !namespace) {
+        panel.style.display = 'none';
+        if (!tideId) showToast('Select a TIDE system first', 'warning');
+        else if (!namespace) showToast('Enter a namespace to map alerts', 'warning');
+        return;
+    }
+
+    panel.style.display = '';
+    document.getElementById('alert-stat-total').textContent = '...';
+    document.getElementById('alert-stat-firing').textContent = '...';
+    document.getElementById('alert-stat-silent').textContent = '...';
+    document.getElementById('alert-stat-unmatched').textContent = '...';
+
+    try {
+        var data = await api.get('/api/cyab/tide/systems/' + tideId + '/alerts?namespace=' + encodeURIComponent(namespace) + '&hours=168');
+        if (data.error && !data.total_alerts) {
+            showToast(data.error, 'warning');
+        }
+        renderAlertMapping(data);
+    } catch (e) {
+        console.error('Alert mapping error:', e);
+        showToast('Failed to load alert mapping', 'error');
+        panel.style.display = 'none';
+    }
+}
+
+function renderAlertMapping(data) {
+    // Stats
+    document.getElementById('alert-stat-total').textContent = (data.total_alerts || 0).toLocaleString();
+    document.getElementById('alert-stat-firing').textContent = data.firing_count || 0;
+    document.getElementById('alert-stat-silent').textContent = data.silent_count || 0;
+    document.getElementById('alert-stat-unmatched').textContent = data.unmatched_count || 0;
+    document.getElementById('alert-firing-badge').textContent = data.firing_count || 0;
+    document.getElementById('alert-silent-badge').textContent = data.silent_count || 0;
+    document.getElementById('alert-unmatched-badge').textContent = data.unmatched_count || 0;
+
+    // Severity bar
+    var stats = data.alert_stats || {};
+    var sevMap = stats.severity || {};
+    var sevTotal = Object.values(sevMap).reduce(function(a, b) { return a + b; }, 0);
+    var sevBar = document.getElementById('alert-severity-bar');
+    if (sevTotal > 0) {
+        var colors = { critical: 'var(--danger)', high: 'var(--neon-orange)', medium: 'var(--neon-yellow)', low: 'var(--success)', unknown: 'var(--text-muted)' };
+        var barHtml = '<div class="tide-severity-summary">';
+        ['critical','high','medium','low'].forEach(function(s) {
+            var cnt = sevMap[s] || 0;
+            if (cnt > 0) {
+                var w = (cnt / sevTotal * 100).toFixed(1);
+                barHtml += '<span style="width:' + w + '%;background:' + (colors[s] || 'var(--text-muted)') + '" title="' + s + ': ' + cnt + '"></span>';
+            }
+        });
+        barHtml += '</div><div class="tide-severity-legend">';
+        ['critical','high','medium','low'].forEach(function(s) {
+            var cnt = sevMap[s] || 0;
+            if (cnt > 0) {
+                barHtml += '<span><span class="dot" style="background:' + (colors[s] || 'var(--text-muted)') + '"></span>' + s.charAt(0).toUpperCase() + s.slice(1) + ': ' + cnt + '</span>';
+            }
+        });
+        barHtml += '</div>';
+        sevBar.innerHTML = barHtml;
+    } else {
+        sevBar.innerHTML = '<div style="font-size:0.75rem;color:var(--text-muted);text-align:center;padding:0.25rem;">No alerts in this namespace (last 7 days)</div>';
+    }
+
+    // Timeline sparkline
+    var timeline = (stats.timeline || []);
+    var chartEl = document.getElementById('alert-timeline-chart');
+    if (timeline.length > 1) {
+        var maxCount = Math.max.apply(null, timeline.map(function(t) { return t.count; }));
+        if (maxCount === 0) maxCount = 1;
+        var w = 100, h = 50;
+        var step = w / (timeline.length - 1);
+        var points = timeline.map(function(t, i) {
+            var x = i * step;
+            var y = h - (t.count / maxCount) * h;
+            return x.toFixed(1) + ',' + y.toFixed(1);
+        });
+        var polyline = points.join(' ');
+        var areaPoints = '0,' + h + ' ' + polyline + ' ' + ((timeline.length - 1) * step).toFixed(1) + ',' + h;
+        chartEl.innerHTML = '<div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:0.25rem;">Alert volume (7d)</div>' +
+            '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" style="width:100%;height:40px;">' +
+            '<polygon points="' + areaPoints + '" fill="rgba(59,130,246,0.1)" />' +
+            '<polyline points="' + polyline + '" fill="none" stroke="var(--primary)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>' +
+            '</svg>';
+    } else {
+        chartEl.innerHTML = '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center;padding:1rem;">No timeline data</div>';
+    }
+
+    // Firing rules table
+    var firingTable = document.getElementById('alert-firing-table');
+    var firing = data.firing_rules || [];
+    if (firing.length > 0) {
+        var html = '<div class="tide-rule-header" style="grid-template-columns:2fr 0.6fr 0.8fr 0.8fr 1fr;"><span>Rule Name</span><span>Alerts</span><span>Severity</span><span>Status</span><span>Latest</span></div>';
+        firing.forEach(function(r) {
+            var topSev = Object.keys(r.severity || {}).sort(function(a, b) {
+                var ord = { critical: 0, high: 1, medium: 2, low: 3 };
+                return (ord[a] || 5) - (ord[b] || 5);
+            })[0] || 'low';
+            var sevClass = 'tide-sev-' + (topSev === 'informational' ? 'info' : topSev);
+            var openCount = (r.status || {}).open || 0;
+            var ackCount = (r.status || {}).acknowledged || 0;
+            var closedCount = (r.status || {}).closed || 0;
+            var statusHtml = '';
+            if (openCount > 0) statusHtml += '<span style="color:var(--danger);font-size:0.7rem;">' + openCount + ' open</span> ';
+            if (ackCount > 0) statusHtml += '<span style="color:var(--neon-yellow);font-size:0.7rem;">' + ackCount + ' ack</span> ';
+            if (closedCount > 0) statusHtml += '<span style="color:var(--success);font-size:0.7rem;">' + closedCount + ' closed</span>';
+            var latest = r.latest_alert ? new Date(r.latest_alert).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+            html += '<div class="tide-rule-row" style="grid-template-columns:2fr 0.6fr 0.8fr 0.8fr 1fr;">' +
+                '<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(r.rule_name) + '">' + escapeHtml(r.rule_name) + '</span>' +
+                '<span style="font-weight:700;color:var(--primary);">' + r.alert_count + '</span>' +
+                '<span><span class="tide-sev ' + sevClass + '">' + topSev + '</span></span>' +
+                '<span>' + statusHtml + '</span>' +
+                '<span style="font-size:0.7rem;color:var(--text-muted);">' + latest + '</span>' +
+                '</div>';
+        });
+        firingTable.innerHTML = html;
+    } else {
+        firingTable.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--text-muted);font-size:0.8rem;">No TIDE rules are generating alerts in this namespace</div>';
+    }
+
+    // Silent rules table
+    var silentTable = document.getElementById('alert-silent-table');
+    var silent = data.silent_rules || [];
+    if (silent.length > 0) {
+        var html2 = '<div class="tide-rule-header" style="grid-template-columns:2fr 0.8fr 0.6fr 1fr;"><span>Rule Name</span><span>Severity</span><span>Enabled</span><span>MITRE</span></div>';
+        silent.forEach(function(r) {
+            var sev = (r.severity || 'low').toLowerCase();
+            var sevClass = 'tide-sev-' + (sev === 'informational' ? 'info' : sev);
+            var mitreIds = r.mitre_ids || [];
+            if (typeof mitreIds === 'string') {
+                try { mitreIds = JSON.parse(mitreIds); } catch(e) { mitreIds = mitreIds.split(','); }
+            }
+            var mitreTags = mitreIds.slice(0, 3).map(function(m) { return '<span class="tide-mitre-tag">' + escapeHtml(String(m).trim()) + '</span>'; }).join('');
+            if (mitreIds.length > 3) mitreTags += '<span style="color:var(--text-muted);font-size:0.6rem;">+' + (mitreIds.length - 3) + '</span>';
+            html2 += '<div class="tide-rule-row" style="grid-template-columns:2fr 0.8fr 0.6fr 1fr;">' +
+                '<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(r.name || '') + '">' + escapeHtml(r.name || r.rule_id || '') + '</span>' +
+                '<span><span class="tide-sev ' + sevClass + '">' + sev + '</span></span>' +
+                '<span>' + (r.enabled ? '<span style="color:var(--success);">Yes</span>' : '<span style="color:var(--danger);">No</span>') + '</span>' +
+                '<span style="line-height:1.6;">' + (mitreTags || '<span style="color:var(--text-muted);">—</span>') + '</span>' +
+                '</div>';
+        });
+        silentTable.innerHTML = html2;
+    } else {
+        silentTable.innerHTML = '<div style="text-align:center;padding:1rem;color:var(--success);font-size:0.8rem;">All TIDE rules are generating alerts!</div>';
+    }
+
+    // Unmatched alerts table
+    var unmatchedSection = document.getElementById('alert-unmatched-section');
+    var unmatchedTable = document.getElementById('alert-unmatched-table');
+    var unmatched = data.unmatched_alerts || [];
+    if (unmatched.length > 0) {
+        unmatchedSection.style.display = '';
+        var html3 = '<div class="tide-rule-header" style="grid-template-columns:2fr 0.6fr 0.8fr 1fr;"><span>Alert Rule</span><span>Alerts</span><span>Severity</span><span>MITRE</span></div>';
+        unmatched.forEach(function(r) {
+            var topSev = Object.keys(r.severity || {}).sort(function(a, b) {
+                var ord = { critical: 0, high: 1, medium: 2, low: 3 };
+                return (ord[a] || 5) - (ord[b] || 5);
+            })[0] || 'low';
+            var sevClass = 'tide-sev-' + (topSev === 'informational' ? 'info' : topSev);
+            var mitreTags = (r.mitre_ids || []).slice(0, 3).map(function(m) { return '<span class="tide-mitre-tag">' + escapeHtml(String(m).trim()) + '</span>'; }).join('');
+            html3 += '<div class="tide-rule-row" style="grid-template-columns:2fr 0.6fr 0.8fr 1fr;">' +
+                '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(r.rule_name) + '">' + escapeHtml(r.rule_name) + '</span>' +
+                '<span style="font-weight:700;">' + r.alert_count + '</span>' +
+                '<span><span class="tide-sev ' + sevClass + '">' + topSev + '</span></span>' +
+                '<span style="line-height:1.6;">' + (mitreTags || '<span style="color:var(--text-muted);">—</span>') + '</span>' +
+                '</div>';
+        });
+        unmatchedTable.innerHTML = html3;
+    } else {
+        unmatchedSection.style.display = 'none';
+    }
+}
+
 // ======================== INIT ========================
 document.addEventListener('DOMContentLoaded', function() {
     var today = new Date().toISOString().split('T')[0];
     document.querySelectorAll('input[type="date"]').forEach(function(d) { if (!d.value) d.value = today; });
     // Render icon picker with default
     renderIconPicker('monitor');
+    // Load TIDE systems and namespace suggestions (non-blocking)
+    loadTideSystems();
+    loadNamespaceSuggestions();
+    document.getElementById('ds-namespace').addEventListener('focus', loadNamespaceSuggestions);
     // Check URL hash for direct system link
     var hash = window.location.hash.replace('#', '');
     if (hash && !isNaN(hash)) {

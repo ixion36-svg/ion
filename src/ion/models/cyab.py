@@ -155,6 +155,12 @@ class CyabDataSource(Base):
     use_case_gaps: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     use_case_remediation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # TIDE system link (stores TIDE system ID for use case coverage tracking)
+    tide_system_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+    # ES alert mapping (data_stream.namespace value for this system)
+    data_namespace: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), nullable=False
     )

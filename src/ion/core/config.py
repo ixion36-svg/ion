@@ -101,10 +101,10 @@ class Config:
     abuseipdb_enabled: bool = False
     abuseipdb_api_key: str = ""  # AbuseIPDB API key
 
-    # TIDE integration
+    # TIDE (Threat Informed Detection Engineering) integration
     tide_enabled: bool = False
     tide_url: str = ""  # e.g., https://tide.example.com
-    tide_api_key: str = ""  # X-TIDE-API-KEY header value
+    tide_api_key: str = ""  # X-TIDE-API-KEY for external query API
     tide_verify_ssl: bool = True
 
     @classmethod
@@ -325,7 +325,11 @@ def get_config() -> Config:
         if config_path.exists():
             _config = Config.from_file(config_path)
         else:
-            _config = Config()
+            # Use data_dir for db_path when set (Docker), otherwise CWD
+            if data_dir:
+                _config = Config(db_path=Path(data_dir) / ".ion" / "ion.db")
+            else:
+                _config = Config()
 
         # Override with environment variables
         if os.environ.get("ION_BASE_URL"):
