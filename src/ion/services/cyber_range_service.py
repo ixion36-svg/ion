@@ -73,6 +73,17 @@ RANGE_SCENARIOS = {
                             {"title": "Outbound Connection to Known Tor Exit Node", "severity": "high", "rule": "C2 - Connection to Threat Intel IP", "mitre": "T1071.001", "host": "WS-DEV03"},
                         ],
                         "mitre": ["T1566.001", "T1059.001", "T1071.001"],
+                        "user_view": {
+                            "desktop_user": "t.nguyen",
+                            "host": "WS-DEV03",
+                            "events": [
+                                {"type": "notification", "app": "Outlook", "icon": "mail", "title": "New Email", "detail": "From: Sarah Chen (LinkedIn Recruiter)\nSubject: Exciting Sr. Developer Opportunity — Salary Review Attached"},
+                                {"type": "app_open", "app": "Microsoft Excel", "icon": "file-spreadsheet", "title": "Q1_Salary_Review.xlsm", "detail": "SECURITY WARNING: Macros have been disabled.\n[Enable Content]"},
+                                {"type": "dialog", "app": "Microsoft Excel", "icon": "alert-triangle", "title": "Microsoft Excel Security Notice", "detail": "Macros have been disabled. Click 'Enable Content' to view the full document.\n\nUser clicked: Enable Content"},
+                                {"type": "brief_flash", "app": "PowerShell", "icon": "terminal", "title": "", "detail": "A black command window briefly appeared and disappeared (< 1 second)"},
+                                {"type": "normal", "app": "Microsoft Excel", "icon": "file-spreadsheet", "title": "Q1_Salary_Review.xlsm", "detail": "The spreadsheet appears to load normally. Contains a fake salary comparison table. User continues working — unaware that a beacon is now active."},
+                            ],
+                        },
                     },
                 ],
             },
@@ -107,6 +118,13 @@ RANGE_SCENARIOS = {
                             {"title": "Suspicious LDAP Enumeration from Workstation", "severity": "medium", "rule": "Discovery - Bulk LDAP Queries", "mitre": "T1087.002", "host": "WS-DEV03"},
                         ],
                         "mitre": ["T1087.002", "T1069.002", "T1018"],
+                        "user_view": {
+                            "desktop_user": "t.nguyen",
+                            "host": "WS-DEV03",
+                            "events": [
+                                {"type": "normal", "app": "Desktop", "icon": "monitor", "title": "Normal Operation", "detail": "User t.nguyen is working in VS Code editing Python files. Nothing visible on screen — all enumeration happens silently in the background via the beacon process."},
+                            ],
+                        },
                     },
                     {
                         "cmd": "execute-assembly Rubeus.exe kerberoast /outfile:hashes.txt",
@@ -138,6 +156,13 @@ RANGE_SCENARIOS = {
                             {"title": "RC4 Encryption Requested (Downgrade Attack)", "severity": "medium", "rule": "Credential Access - Kerberos RC4 Downgrade", "mitre": "T1558.003", "host": "SRV-DC01"},
                         ],
                         "mitre": ["T1558.003"],
+                        "user_view": {
+                            "desktop_user": "t.nguyen",
+                            "host": "WS-DEV03",
+                            "events": [
+                                {"type": "normal", "app": "Desktop", "icon": "monitor", "title": "Normal Operation", "detail": "User still working normally. Rubeus runs entirely in memory via the beacon — no files written to disk, no visible windows. The 23 Kerberos ticket requests happen at the protocol level, invisible to the user."},
+                            ],
+                        },
                     },
                 ],
             },
@@ -173,6 +198,14 @@ RANGE_SCENARIOS = {
                             {"title": "Service Account Interactive Logon (Unusual)", "severity": "medium", "rule": "Lateral Movement - Service Account Logon", "mitre": "T1078.002", "host": "SRV-FILE01"},
                         ],
                         "mitre": ["T1569.002", "T1021.002", "T1078.002"],
+                        "user_view": {
+                            "desktop_user": "Backup Service",
+                            "host": "SRV-FILE01",
+                            "events": [
+                                {"type": "notification", "app": "Windows Services", "icon": "settings", "title": "New Service Installed", "detail": "Service 'PSEXESVC' was installed and started.\n(Normally invisible — only appears in Event Viewer)"},
+                                {"type": "normal", "app": "Server Desktop", "icon": "server", "title": "No Interactive User", "detail": "SRV-FILE01 is a file server with no interactive desktop sessions. The PsExec service installation and command execution happen entirely in the background. No user would see anything."},
+                            ],
+                        },
                     },
                     {
                         "cmd": "mimikatz sekurlsa::logonpasswords",
@@ -206,6 +239,14 @@ RANGE_SCENARIOS = {
                             {"title": "Known Attack Tool Detected: Mimikatz", "severity": "critical", "rule": "Execution - Known Attack Tool", "mitre": "T1003.001", "host": "SRV-FILE01"},
                         ],
                         "mitre": ["T1003.001"],
+                        "user_view": {
+                            "desktop_user": "Backup Service",
+                            "host": "SRV-FILE01",
+                            "events": [
+                                {"type": "normal", "app": "Server Desktop", "icon": "server", "title": "No Visible Activity", "detail": "Mimikatz runs in memory via the PsExec session. It reads LSASS process memory to extract cached credentials. There are no visible windows, no prompts, no CPU spike noticeable by any logged-in admin."},
+                                {"type": "info", "app": "Key Insight", "icon": "info", "title": "Why This Is Dangerous", "detail": "da_johnson (Domain Admin) previously RDP'd into this server for maintenance. Their credentials are still cached in LSASS memory — even though they logged off hours ago. This is why admin credential hygiene and tiered access (PAW) matter."},
+                            ],
+                        },
                     },
                 ],
             },
@@ -242,6 +283,14 @@ RANGE_SCENARIOS = {
                             {"title": "Replicating Directory Changes All — Suspicious Source", "severity": "critical", "rule": "Persistence - KRBTGT Extraction", "mitre": "T1003.006", "host": "SRV-DC01"},
                         ],
                         "mitre": ["T1003.006"],
+                        "user_view": {
+                            "desktop_user": "da_johnson",
+                            "host": "SRV-JUMP01",
+                            "events": [
+                                {"type": "normal", "app": "Server Desktop", "icon": "server", "title": "No Visible Activity", "detail": "DCSync uses the standard Active Directory replication protocol. From the network's perspective, it looks like normal DC-to-DC replication traffic. No visible windows or prompts on any machine."},
+                                {"type": "info", "app": "Key Insight", "icon": "info", "title": "The Silent Domain Theft", "detail": "The attacker just downloaded EVERY password hash in Active Directory — all 847 user accounts, all service accounts, the KRBTGT key. This all happened via a single network request that looks like normal AD replication. No alarms on any desktop."},
+                            ],
+                        },
                     },
                     {
                         "cmd": "golden_ticket /domain:guardedglass.local /sid:S-1-5-21-... /krbtgt:e4f7c5b3a29187d6c0e4f7c5b3a29187 /user:Administrator /ptt",
@@ -266,6 +315,14 @@ RANGE_SCENARIOS = {
                             {"title": "Golden Ticket: TGS Without Prior Authentication", "severity": "critical", "rule": "Persistence - Golden Ticket", "mitre": "T1558.001", "host": "SRV-DC01"},
                         ],
                         "mitre": ["T1558.001"],
+                        "user_view": {
+                            "desktop_user": "da_johnson",
+                            "host": "SRV-JUMP01",
+                            "events": [
+                                {"type": "normal", "app": "Server Desktop", "icon": "server", "title": "Completely Invisible", "detail": "A Golden Ticket is forged entirely in the attacker's memory. No files, no network traffic to create it. Once injected, the attacker appears to be a legitimate Domain Admin to every system in the network."},
+                                {"type": "warning", "app": "Key Insight", "icon": "alert-triangle", "title": "Persistence Achieved", "detail": "The attacker now has a ticket valid for 10 YEARS. Even if da_johnson's password is reset, the Golden Ticket still works. Only resetting the KRBTGT password TWICE will invalidate it. Most organizations never do this."},
+                            ],
+                        },
                     },
                 ],
             },
@@ -307,6 +364,15 @@ RANGE_SCENARIOS = {
                             {"title": "Data Loss Prevention: Bulk PII/Financial File Access", "severity": "critical", "rule": "Exfiltration - DLP Trigger", "mitre": "T1005", "host": "SRV-FILE01"},
                         ],
                         "mitre": ["T1039", "T1041", "T1005"],
+                        "user_view": {
+                            "desktop_user": "j.smith",
+                            "host": "WS-FIN01",
+                            "events": [
+                                {"type": "normal", "app": "Desktop", "icon": "monitor", "title": "Finance Team Unaware", "detail": "j.smith in Finance is working normally at WS-FIN01. They have no idea that the Finance$ share on SRV-FILE01 is being accessed remotely. The files are being read and exfiltrated — not modified or deleted — so no file-in-use warnings appear."},
+                                {"type": "notification", "app": "Windows Explorer", "icon": "folder", "title": "No File Locks Visible", "detail": "The attacker is using Administrator credentials to read files via SMB. From j.smith's perspective, the shared drive works normally. Opened files show no conflicts."},
+                                {"type": "warning", "app": "Key Insight", "icon": "alert-triangle", "title": "The Invisible Theft", "detail": "8.1MB of confidential financial data — quarterly results, M&A drafts, employee salary database — just left the network via the attacker's encrypted C2 channel. No pop-ups, no warnings, no download dialogs. The DLP system caught it, but would anyone be watching in real-time?"},
+                            ],
+                        },
                     },
                 ],
             },

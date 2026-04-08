@@ -101,6 +101,42 @@
 .cr-kc-node.active{background:var(--sev-high-dim);color:var(--sev-high);animation:cr-pulse 1.5s infinite}
 .cr-kc-node.pending{background:rgba(99,110,123,.15);color:var(--text-muted)}
 .cr-kc-arrow{color:var(--text-muted);font-size:.7rem;padding:0 3px}
+
+/* View mode toggle */
+.cr-view-toggle{display:flex;gap:0;padding:0;background:rgba(0,0,0,.3);border-bottom:1px solid rgba(99,110,123,.2)}
+.cr-view-btn{flex:1;padding:6px;text-align:center;font-size:.68rem;font-weight:700;text-transform:uppercase;cursor:pointer;border:none;background:transparent;transition:all .15s}
+.cr-view-btn.blue-mode{color:#58a6ff}.cr-view-btn.user-mode{color:#a855f7}
+.cr-view-btn.active.blue-mode{background:rgba(88,166,255,.1);border-bottom:2px solid #58a6ff}
+.cr-view-btn.active.user-mode{background:rgba(168,85,247,.1);border-bottom:2px solid #a855f7}
+.cr-view-btn:hover{background:rgba(255,255,255,.03)}
+
+/* User perspective panel */
+.cr-user{padding:12px;overflow-y:auto;flex:1;min-height:0}
+.cr-desktop{background:#0c1526;border:1px solid #1e3a5f;border-radius:8px;overflow:hidden}
+.cr-desktop-titlebar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:#162744;font-size:.72rem;color:#8b949e}
+.cr-desktop-titlebar .cr-dt-user{color:#a855f7;font-weight:700;margin-left:auto}
+.cr-desktop-body{padding:10px;min-height:120px}
+
+.cr-user-event{padding:10px 12px;margin-bottom:8px;border-radius:6px;font-size:.82rem;border-left:3px solid var(--border);background:var(--bg-secondary);transition:all .3s}
+.cr-user-event.notification{border-left-color:#58a6ff;background:rgba(88,166,255,.06)}
+.cr-user-event.app_open{border-left-color:#a855f7;background:rgba(168,85,247,.06)}
+.cr-user-event.dialog{border-left-color:#d29922;background:rgba(210,153,34,.06)}
+.cr-user-event.brief_flash{border-left-color:#f85149;background:rgba(248,81,73,.06)}
+.cr-user-event.normal{border-left-color:#3fb950;background:rgba(63,185,80,.06)}
+.cr-user-event.info{border-left-color:#bc8cff;background:rgba(188,140,255,.06)}
+.cr-user-event.warning{border-left-color:#f0883e;background:rgba(240,136,62,.06)}
+
+.cr-ue-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.cr-ue-app{font-weight:700;color:var(--text-primary);font-size:.82rem}
+.cr-ue-type{font-size:.62rem;font-weight:700;text-transform:uppercase;padding:2px 6px;border-radius:3px;background:rgba(0,0,0,.3);color:var(--text-muted)}
+.cr-ue-title{font-weight:600;color:var(--text-primary);font-size:.82rem;margin-bottom:2px}
+.cr-ue-detail{font-size:.78rem;color:var(--text-secondary);line-height:1.6;white-space:pre-wrap}
+
+/* Windows taskbar mockup */
+.cr-taskbar{display:flex;align-items:center;gap:4px;padding:4px 8px;background:#1a1a2e;border-top:1px solid #2a2a4a;font-size:.65rem;color:#8b949e}
+.cr-taskbar-item{padding:3px 8px;background:rgba(255,255,255,.05);border-radius:3px;display:flex;align-items:center;gap:4px}
+.cr-taskbar-item.active{background:rgba(88,166,255,.15);border-bottom:2px solid #58a6ff}
+.cr-taskbar-time{margin-left:auto;font-family:monospace}
 </style>
 <script>
 const API = '/api/cyber-range';
@@ -111,6 +147,8 @@ let scenario = null;
 let currentStage = 0;
 let currentCmd = 0;
 let blueLogs = [];
+let rightView = 'blue'; // 'blue' or 'user'
+let userEvents = [];
 let blueAlerts = [];
 let blueTab = 'logs';
 
@@ -151,6 +189,7 @@ async function crStart(id) {
         scenario = await r.json();
         currentStage = 0; currentCmd = 0;
         blueLogs = []; blueAlerts = []; blueTab = 'logs';
+        rightView = 'blue'; userEvents = [];
         $('cr-back-btn').style.display = '';
         renderRange();
     } catch(e) {
@@ -226,10 +265,16 @@ function renderRange() {
     }
     html += '</div>';
 
-    // === BLUE TEAM ===
+    // === RIGHT PANEL (Blue Team / User Perspective) ===
     html += '<div class="cr-blue">';
-    html += '<div class="cr-blue-header"><i class="icon-shield"></i> BLUE TEAM — SOC View</div>';
 
+    // View mode toggle
+    html += '<div class="cr-view-toggle">';
+    html += `<div class="cr-view-btn blue-mode ${rightView==='blue'?'active':''}" onclick="crSetView('blue')"><i class="icon-shield"></i> Blue Team (SOC)</div>`;
+    html += `<div class="cr-view-btn user-mode ${rightView==='user'?'active':''}" onclick="crSetView('user')"><i class="icon-monitor"></i> User Desktop</div>`;
+    html += '</div>';
+
+    if (rightView === 'blue') {
     // Tabs
     html += '<div class="cr-blue-tabs">';
     html += `<div class="cr-blue-tab ${blueTab==='logs'?'active':''}" onclick="crBlueTab('logs')">Logs (${blueLogs.length})</div>`;
@@ -280,7 +325,47 @@ function renderRange() {
     }
     html += '</div>';
 
-    html += '</div>'; // end blue
+    } else {
+    // === USER PERSPECTIVE ===
+    html += '<div class="cr-user" id="cr-feed">';
+    if (!userEvents.length) {
+        html += '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:.85rem"><i class="icon-monitor" style="font-size:2rem;margin-bottom:8px;display:block;color:#a855f7"></i>Execute red team commands to see what the victim user experiences on their desktop.</div>';
+    } else {
+        // Show latest user context as a desktop mockup
+        const latest = userEvents[userEvents.length - 1];
+        html += '<div class="cr-desktop">';
+        html += `<div class="cr-desktop-titlebar"><i class="icon-monitor"></i> ${esc(latest.host)} <span class="cr-dt-user">${esc(latest.desktop_user)}</span></div>`;
+        html += '<div class="cr-desktop-body">';
+
+        for (const ue of userEvents) {
+            for (const ev of ue.events) {
+                html += `<div class="cr-user-event ${ev.type}">
+                    <div class="cr-ue-header">
+                        <i class="icon-${ev.icon}"></i>
+                        <span class="cr-ue-app">${esc(ev.app)}</span>
+                        <span class="cr-ue-type">${esc(ev.type.replace('_',' '))}</span>
+                    </div>
+                    ${ev.title ? `<div class="cr-ue-title">${esc(ev.title)}</div>` : ''}
+                    <div class="cr-ue-detail">${esc(ev.detail)}</div>
+                </div>`;
+            }
+        }
+
+        html += '</div>';
+        // Taskbar
+        html += '<div class="cr-taskbar">';
+        html += `<span class="cr-taskbar-item active"><i class="icon-monitor"></i> Desktop</span>`;
+        const apps = new Set();
+        for (const ue of userEvents) for (const ev of ue.events) if (ev.app !== 'Desktop' && ev.app !== 'Key Insight') apps.add(ev.app);
+        for (const app of apps) html += `<span class="cr-taskbar-item">${esc(app)}</span>`;
+        html += `<span class="cr-taskbar-time">${new Date().toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span>`;
+        html += '</div>';
+        html += '</div>';
+    }
+    html += '</div>';
+    } // end rightView toggle
+
+    html += '</div>'; // end blue/right panel
     html += '</div>'; // end range
     $('cr-content').innerHTML = html;
 
@@ -334,6 +419,9 @@ function crExecute() {
             blank.className = 'cr-term-line';
             term.appendChild(blank);
             term.scrollTop = term.scrollHeight;
+
+            // Collect user perspective data
+            if (cmd.user_view) userEvents.push(cmd.user_view);
 
             // Now roll in blue team data with slight delays
             rollBlueLogs(cmd.blue_logs, 0, () => {
@@ -410,6 +498,11 @@ function rollBlueAlerts(alerts, idx, done) {
 
 function crBlueTab(tab) {
     blueTab = tab;
+    renderRange();
+}
+
+function crSetView(view) {
+    rightView = view;
     renderRange();
 }
 
