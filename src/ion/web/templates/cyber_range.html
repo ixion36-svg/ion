@@ -28,8 +28,9 @@
 .cr-sc-badge{padding:3px 8px;border-radius:4px;font-weight:700;text-transform:uppercase;font-size:.68rem}
 
 /* Main range layout — split pane */
-.cr-range{display:grid;grid-template-columns:1fr 1fr;gap:0;height:calc(100vh - 160px);min-height:500px;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
-@media(max-width:1000px){.cr-range{grid-template-columns:1fr;height:auto}}
+.cr-range{display:grid;grid-template-columns:1fr 1fr;gap:0;height:calc(100vh - 140px);min-height:600px;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+@media(max-width:1000px){.cr-range{grid-template-columns:1fr;height:auto;min-height:0}}
+.cr-red,.cr-blue{min-height:0}
 
 /* Red team panel */
 .cr-red{background:#1a0a0a;display:flex;flex-direction:column}
@@ -37,7 +38,7 @@
 .cr-red-header i{color:#f85149}
 
 /* Terminal */
-.cr-terminal{flex:1;overflow-y:auto;padding:12px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:.78rem;line-height:1.6}
+.cr-terminal{flex:1;overflow-y:auto;min-height:0;padding:12px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:.78rem;line-height:1.6}
 .cr-term-line{color:#c9d1d9;white-space:pre-wrap;word-break:break-all}
 .cr-term-line.info{color:#f85149}
 .cr-term-line.success{color:#3fb950}
@@ -290,23 +291,121 @@ function renderRange() {
     if (feed) feed.scrollTop = feed.scrollHeight;
 }
 
+let isExecuting = false;
+
 function crExecute() {
+    if (isExecuting) return;
     const stage = scenario.stages[currentStage];
     const cmd = stage.commands[currentCmd];
     if (!cmd) return;
 
-    // Add blue team data with typing delay effect
-    for (const l of cmd.blue_logs) blueLogs.push(l);
-    for (const a of cmd.blue_alerts) blueAlerts.push(a);
+    isExecuting = true;
+    const btn = document.getElementById('cr-exec-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'RUNNING...'; }
 
-    // Advance command
-    currentCmd++;
-    if (currentCmd >= stage.commands.length) {
-        currentStage++;
-        currentCmd = 0;
+    const term = document.getElementById('cr-term');
+
+    // Type the command first
+    const cmdLine = document.createElement('div');
+    cmdLine.className = 'cr-term-line cmd';
+    cmdLine.innerHTML = `<span class="cr-term-prompt">C2&gt; </span>${esc(cmd.cmd)}`;
+    term.appendChild(cmdLine);
+    term.scrollTop = term.scrollHeight;
+
+    // Roll out red team output line by line
+    let lineIdx = 0;
+    const outputLines = cmd.red_output;
+
+    function typeLine() {
+        if (lineIdx < outputLines.length) {
+            const line = outputLines[lineIdx];
+            const el = document.createElement('div');
+            el.className = 'cr-term-line' + (line.startsWith('[+]') ? ' success' : line.startsWith('[*]') ? ' highlight' : '');
+            el.textContent = line;
+            term.appendChild(el);
+            term.scrollTop = term.scrollHeight;
+            lineIdx++;
+            // Vary delay: faster for blank lines, slower for important ones
+            const delay = line === '' ? 30 : line.startsWith('[+]') ? 120 : 60;
+            setTimeout(typeLine, delay);
+        } else {
+            // Output done — add blank line
+            const blank = document.createElement('div');
+            blank.className = 'cr-term-line';
+            term.appendChild(blank);
+            term.scrollTop = term.scrollHeight;
+
+            // Now roll in blue team data with slight delays
+            rollBlueLogs(cmd.blue_logs, 0, () => {
+                rollBlueAlerts(cmd.blue_alerts, 0, () => {
+                    // Advance to next command
+                    currentCmd++;
+                    if (currentCmd >= stage.commands.length) {
+                        currentStage++;
+                        currentCmd = 0;
+                    }
+                    isExecuting = false;
+                    // Re-render to update UI state (command bar, progress, tabs)
+                    renderRange();
+                });
+            });
+        }
     }
 
-    renderRange();
+    // Start typing after a brief "executing" pause
+    setTimeout(typeLine, 300);
+}
+
+function rollBlueLogs(logs, idx, done) {
+    if (idx >= logs.length) { done(); return; }
+    blueLogs.push(logs[idx]);
+    // Update log count in tab if visible
+    const feed = document.getElementById('cr-feed');
+    if (blueTab === 'logs' && feed) {
+        const el = document.createElement('div');
+        el.className = 'cr-log';
+        const l = logs[idx];
+        el.innerHTML = `<span class="cr-log-time">${esc(l.time)}</span><span class="cr-log-source">${esc(l.source)}</span><span class="cr-log-level ${l.level}">${esc(l.level)}</span><span class="cr-log-msg">${esc(l.msg)}</span>`;
+        el.style.opacity = '0'; el.style.transform = 'translateY(8px)';
+        feed.appendChild(el);
+        requestAnimationFrame(() => {
+            el.style.transition = 'all .2s ease';
+            el.style.opacity = '1'; el.style.transform = 'translateY(0)';
+        });
+        feed.scrollTop = feed.scrollHeight;
+    }
+    // Update tab badge
+    const logTab = document.querySelector('.cr-blue-tab:first-child');
+    if (logTab) logTab.textContent = `Logs (${blueLogs.length})`;
+
+    setTimeout(() => rollBlueLogs(logs, idx + 1, done), 150);
+}
+
+function rollBlueAlerts(alerts, idx, done) {
+    if (idx >= alerts.length) { done(); return; }
+    blueAlerts.push(alerts[idx]);
+    // Update alert count in tab
+    const alertTab = document.querySelector('.cr-blue-tab:nth-child(2)');
+    if (alertTab) alertTab.textContent = `Alerts (${blueAlerts.length})`;
+
+    if (blueTab === 'alerts') {
+        const feed = document.getElementById('cr-feed');
+        if (feed) {
+            const a = alerts[idx];
+            const el = document.createElement('div');
+            el.className = `cr-alert ${a.severity}`;
+            el.innerHTML = `<div class="cr-alert-title"><span class="sev-badge sev-${a.severity}">${esc(a.severity)}</span> ${esc(a.title)}</div><div class="cr-alert-meta"><span>Rule: ${esc(a.rule)}</span><span>Host: ${esc(a.host)}</span><span class="cr-alert-mitre">${esc(a.mitre)}</span></div>`;
+            el.style.opacity = '0'; el.style.transform = 'translateX(20px)';
+            feed.appendChild(el);
+            requestAnimationFrame(() => {
+                el.style.transition = 'all .3s ease';
+                el.style.opacity = '1'; el.style.transform = 'translateX(0)';
+            });
+            feed.scrollTop = feed.scrollHeight;
+        }
+    }
+
+    setTimeout(() => rollBlueAlerts(alerts, idx + 1, done), 250);
 }
 
 function crBlueTab(tab) {
