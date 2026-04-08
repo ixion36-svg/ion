@@ -38,12 +38,12 @@
 .cr-red-header i{color:#f85149}
 
 /* Terminal */
-.cr-terminal{flex:1;overflow-y:auto;min-height:0;padding:12px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:.78rem;line-height:1.6}
-.cr-term-line{color:#c9d1d9;white-space:pre-wrap;word-break:break-all}
+.cr-terminal{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;padding:12px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:.75rem;line-height:1.5;max-width:100%}
+.cr-term-line{color:#c9d1d9;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;max-width:100%}
 .cr-term-line.info{color:#f85149}
 .cr-term-line.success{color:#3fb950}
 .cr-term-line.highlight{color:#f0883e}
-.cr-term-line.cmd{color:#58a6ff;font-weight:700}
+.cr-term-line.cmd{color:#58a6ff;font-weight:700;word-break:break-word}
 .cr-term-line.system{color:#8b949e;font-style:italic}
 .cr-term-prompt{color:#f85149}
 
@@ -53,7 +53,7 @@
 .cr-cmd-btn{padding:6px 16px;background:rgba(248,81,73,.15);border:1px solid #f85149;border-radius:4px;color:#f85149;cursor:pointer;font-size:.78rem;font-weight:700;font-family:monospace;transition:all .15s;white-space:nowrap}
 .cr-cmd-btn:hover{background:rgba(248,81,73,.3)}
 .cr-cmd-btn:disabled{opacity:.4;cursor:default}
-.cr-cmd-desc{flex:1;font-size:.72rem;color:#8b949e;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cr-cmd-desc{flex:1;font-size:.7rem;color:#8b949e;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 
 /* Blue team panel */
 .cr-blue{background:#0a0e1a;display:flex;flex-direction:column}
