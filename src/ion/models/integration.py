@@ -33,6 +33,7 @@ class IntegrationType(str, Enum):
     ELASTICSEARCH = "elasticsearch"
     DFIR_IRIS = "dfir_iris"
     KIBANA_CASES = "kibana_cases"
+    TIDE = "tide"
     SLACK = "slack"      # Future
     JIRA = "jira"        # Future
     CUSTOM = "custom"

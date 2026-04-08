@@ -761,7 +761,6 @@ async def get_database_stats(current_user: User = Depends(require_admin)):
 
 
 @router.post("/database/backup")
-@limiter.limit("5/minute")
 async def create_database_backup(request: Request, current_user: User = Depends(require_admin)):
     """Create a backup of the database."""
     import shutil
@@ -859,7 +858,6 @@ async def delete_database_backup(
 
 
 @router.post("/database/restore/{filename}")
-@limiter.limit("3/minute")
 async def restore_database_backup(
     request: Request,
     filename: str,
@@ -903,7 +901,6 @@ async def restore_database_backup(
 
 
 @router.post("/database/cleanup")
-@limiter.limit("3/minute")
 async def cleanup_old_data(
     request: Request,
     days_to_keep: int = 30,

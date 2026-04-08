@@ -130,7 +130,6 @@ def list_policies(
     "/escalate",
     dependencies=[Depends(require_permission("alert:read"))],
 )
-@limiter.limit("10/minute")
 def escalate(
     request: Request,
     body: EscalateRequest,

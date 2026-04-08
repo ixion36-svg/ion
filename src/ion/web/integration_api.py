@@ -368,7 +368,6 @@ async def delete_webhook(
 
 
 @router.post("/webhooks/{webhook_id}/regenerate-token")
-@limiter.limit("3/minute")
 async def regenerate_webhook_token(
     request: Request,
     webhook_id: int,

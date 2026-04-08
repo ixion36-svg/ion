@@ -240,7 +240,6 @@ async def get_system_prompts(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/chat", response_model=ChatResponse)
-@limiter.limit("30/minute")
 async def chat(
     request: Request,
     payload: ChatRequest,
@@ -283,7 +282,6 @@ async def chat(
 
 
 @router.post("/chat/stream")
-@limiter.limit("30/minute")
 async def chat_stream(
     request: Request,
     payload: ChatRequest,
@@ -685,7 +683,6 @@ STYLE_INSTRUCTIONS = {
 
 
 @router.post("/document/generate")
-@limiter.limit("10/minute")
 async def generate_document(
     request: Request,
     payload: DocumentGenerateRequest,
@@ -745,7 +742,6 @@ class DocumentSaveRequest(BaseModel):
 
 
 @router.post("/document/save")
-@limiter.limit("30/minute")
 async def save_generated_document(
     request: Request,
     payload: DocumentSaveRequest,

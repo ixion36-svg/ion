@@ -192,6 +192,7 @@
 .topo-node[data-service="kibana"] .topo-node-icon.healthy { background: rgba(0,191,179,.15); color: #00bfb3; }
 .topo-node[data-service="gitlab"] .topo-node-icon.healthy { background: rgba(252,109,38,.15); color: #fc6d26; }
 .topo-node[data-service="opencti"] .topo-node-icon.healthy { background: rgba(0,27,218,.15); color: #6366f1; }
+.topo-node[data-service="tide"] .topo-node-icon.healthy { background: rgba(16,185,129,.15); color: #10b981; }
 .topo-node[data-service="ollama"] .topo-node-icon.healthy { background: rgba(168,85,247,.15); color: #a855f7; }
 .topo-node[data-service="dfir_iris"] .topo-node-icon.healthy { background: rgba(59,130,246,.15); color: #3b82f6; }
 
@@ -260,6 +261,7 @@
 .topo-detail-card[data-service="kibana"] .topo-detail-icon.healthy { background: rgba(0,191,179,.12); color: #00bfb3; }
 .topo-detail-card[data-service="gitlab"] .topo-detail-icon.healthy { background: rgba(252,109,38,.12); color: #fc6d26; }
 .topo-detail-card[data-service="opencti"] .topo-detail-icon.healthy { background: rgba(0,27,218,.12); color: #6366f1; }
+.topo-detail-card[data-service="tide"] .topo-detail-icon.healthy { background: rgba(16,185,129,.12); color: #10b981; }
 .topo-detail-card[data-service="ollama"] .topo-detail-icon.healthy { background: rgba(168,85,247,.12); color: #a855f7; }
 .topo-detail-card[data-service="dfir_iris"] .topo-detail-icon.healthy { background: rgba(59,130,246,.12); color: #3b82f6; }
 
@@ -742,6 +744,11 @@ const SERVICES = [
         id: 'opencti', name: 'OpenCTI', port: 8080, protocol: 'HTTP',
         icon: 'icon-shield', testUrl: '/api/opencti/test', configUrl: '/api/opencti/config',
         description: 'Threat intelligence platform',
+    },
+    {
+        id: 'tide', name: 'TIDE', port: 443, protocol: 'HTTPS',
+        icon: 'icon-shield-check', testUrl: '/api/integrations/healthcheck', configUrl: '/api/integrations/status',
+        description: 'Threat Informed Detection Engineering',
     },
     {
         id: 'ollama', name: 'Ollama', port: 11434, protocol: 'HTTP',

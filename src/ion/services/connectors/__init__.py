@@ -18,6 +18,7 @@ from ion.services.connectors.gitlab_connector import GitLabConnector
 from ion.services.connectors.opencti_connector import OpenCTIConnector
 from ion.services.connectors.elasticsearch_connector import ElasticsearchConnector
 from ion.services.connectors.kibana_cases_connector import KibanaCasesConnector
+from ion.services.connectors.tide_connector import TIDEConnector
 
 
 def register_default_connectors() -> None:
@@ -27,6 +28,7 @@ def register_default_connectors() -> None:
     registry.register_class("opencti", OpenCTIConnector)
     registry.register_class("elasticsearch", ElasticsearchConnector)
     registry.register_class("kibana_cases", KibanaCasesConnector)
+    registry.register_class("tide", TIDEConnector)
 
 
 # Auto-register connectors on import

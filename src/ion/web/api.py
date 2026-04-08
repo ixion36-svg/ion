@@ -225,7 +225,6 @@ def get_services(session: Session = Depends(get_db_session)) -> Services:
 # =============================================================================
 
 @router.post("/auth/login")
-@limiter.limit("5/minute")  # Rate limit: 5 login attempts per minute per IP
 async def login(
     request: Request,
     login_request: LoginRequest,
@@ -558,7 +557,6 @@ async def bulk_resolve_elastic_uids(
 
 
 @router.post("/auth/change-password")
-@limiter.limit("5/minute")  # Rate limit password change attempts
 async def change_password(
     password_request: ChangePasswordRequest,
     request: Request,
@@ -635,7 +633,6 @@ async def get_oidc_public_config(request: Request, response: Response):
 
 
 @router.get("/auth/oidc/callback")
-@limiter.limit("10/minute")  # Rate limit OIDC callbacks
 async def oidc_callback(
     request: Request,
     response: Response,
@@ -1066,7 +1063,6 @@ async def update_user_roles(
 
 
 @router.post("/users/{user_id}/reset-password", dependencies=[Depends(require_permission("user:update"))])
-@limiter.limit("10/minute")  # Rate limit password resets
 async def reset_user_password(
     user_id: int,
     password_reset: PasswordReset,
