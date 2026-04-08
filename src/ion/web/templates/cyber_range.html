@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block title %}Cyber Range - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-crosshair"></i> Cyber Range</h1>
+    <div class="header-actions" id="cr-header-actions">
+        <button class="btn btn-secondary" onclick="crBack()" id="cr-back-btn" style="display:none"><i class="icon-arrow-left"></i> Scenarios</button>
+    </div>
+</div>
+<div id="cr-content"><div class="cr-loading"><span class="cr-spinner"></span> Loading scenarios...</div></div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.cr-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.cr-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:cr-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes cr-spin{to{transform:rotate(360deg)}}
+
+/* Scenario cards */
+.cr-scenarios{display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:16px}
+.cr-sc-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;cursor:pointer;transition:all .2s;border-top:3px solid var(--sev-critical)}
+.cr-sc-card:hover{border-color:var(--sev-critical);transform:translateY(-2px)}
+.cr-sc-title{font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:6px}
+.cr-sc-desc{font-size:.82rem;color:var(--text-secondary);line-height:1.5;margin-bottom:12px}
+.cr-sc-meta{display:flex;gap:8px;font-size:.72rem;color:var(--text-muted)}
+.cr-sc-badge{padding:3px 8px;border-radius:4px;font-weight:700;text-transform:uppercase;font-size:.68rem}
+
+/* Main range layout — split pane */
+.cr-range{display:grid;grid-template-columns:1fr 1fr;gap:0;height:calc(100vh - 160px);min-height:500px;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+@media(max-width:1000px){.cr-range{grid-template-columns:1fr;height:auto}}
+
+/* Red team panel */
+.cr-red{background:#1a0a0a;display:flex;flex-direction:column}
+.cr-red-header{padding:8px 14px;background:#2d0f0f;border-bottom:1px solid #4a1a1a;display:flex;align-items:center;gap:8px;font-size:.78rem;font-weight:700;color:#f85149}
+.cr-red-header i{color:#f85149}
+
+/* Terminal */
+.cr-terminal{flex:1;overflow-y:auto;padding:12px;font-family:'JetBrains Mono','Fira Code',monospace;font-size:.78rem;line-height:1.6}
+.cr-term-line{color:#c9d1d9;white-space:pre-wrap;word-break:break-all}
+.cr-term-line.info{color:#f85149}
+.cr-term-line.success{color:#3fb950}
+.cr-term-line.highlight{color:#f0883e}
+.cr-term-line.cmd{color:#58a6ff;font-weight:700}
+.cr-term-line.system{color:#8b949e;font-style:italic}
+.cr-term-prompt{color:#f85149}
+
+/* Command input */
+.cr-cmd-bar{display:flex;align-items:center;padding:8px 12px;background:#2d0f0f;border-top:1px solid #4a1a1a;gap:8px}
+.cr-cmd-prompt{color:#f85149;font-family:monospace;font-weight:700;font-size:.82rem;white-space:nowrap}
+.cr-cmd-btn{padding:6px 16px;background:rgba(248,81,73,.15);border:1px solid #f85149;border-radius:4px;color:#f85149;cursor:pointer;font-size:.78rem;font-weight:700;font-family:monospace;transition:all .15s;white-space:nowrap}
+.cr-cmd-btn:hover{background:rgba(248,81,73,.3)}
+.cr-cmd-btn:disabled{opacity:.4;cursor:default}
+.cr-cmd-desc{flex:1;font-size:.72rem;color:#8b949e;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Blue team panel */
+.cr-blue{background:#0a0e1a;display:flex;flex-direction:column}
+.cr-blue-header{padding:8px 14px;background:#0f1a2d;border-bottom:1px solid #1a2d4a;display:flex;align-items:center;gap:8px;font-size:.78rem;font-weight:700;color:#58a6ff}
+.cr-blue-tabs{display:flex;gap:0;padding:0 8px;background:#0f1a2d;border-bottom:1px solid #1a2d4a}
+.cr-blue-tab{padding:6px 14px;font-size:.72rem;font-weight:600;color:#8b949e;cursor:pointer;border-bottom:2px solid transparent}
+.cr-blue-tab:hover{color:#c9d1d9}
+.cr-blue-tab.active{color:#58a6ff;border-bottom-color:#58a6ff}
+
+/* Log feed */
+.cr-feed{flex:1;overflow-y:auto;padding:8px}
+.cr-log{padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:.72rem;border-bottom:1px solid rgba(99,110,123,.1);display:flex;gap:8px;align-items:flex-start}
+.cr-log-time{color:#8b949e;min-width:55px;flex-shrink:0}
+.cr-log-source{color:#58a6ff;min-width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis}
+.cr-log-level{min-width:35px;flex-shrink:0;font-weight:700;font-size:.65rem;text-transform:uppercase}
+.cr-log-level.INFO{color:#8b949e}.cr-log-level.WARN{color:#d29922}.cr-log-level.CRIT{color:#f85149}
+.cr-log-msg{color:#c9d1d9;flex:1;word-break:break-word}
+
+/* Alert feed */
+.cr-alert{padding:8px 10px;margin:4px 8px;background:rgba(248,81,73,.06);border:1px solid rgba(248,81,73,.2);border-radius:var(--radius);font-size:.78rem}
+.cr-alert.critical{border-color:var(--sev-critical);background:var(--sev-critical-bg)}
+.cr-alert.high{border-color:var(--sev-high);background:var(--sev-high-bg)}
+.cr-alert.medium{border-color:var(--sev-medium);background:var(--sev-medium-bg)}
+.cr-alert-title{font-weight:700;color:var(--text-primary);margin-bottom:2px}
+.cr-alert-meta{font-size:.68rem;color:var(--text-muted);display:flex;gap:8px;flex-wrap:wrap}
+.cr-alert-mitre{display:inline-block;padding:1px 5px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:3px;font-family:monospace;font-size:.65rem;color:var(--primary)}
+
+/* Stage progress */
+.cr-stage-bar{display:flex;gap:0;padding:4px 8px;background:rgba(0,0,0,.3)}
+.cr-stage-pip{flex:1;height:4px;border-radius:2px;background:rgba(99,110,123,.3);margin:0 2px}
+.cr-stage-pip.done{background:var(--sev-critical)}
+.cr-stage-pip.active{background:var(--sev-high);animation:cr-pulse 1.5s infinite}
+@keyframes cr-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* Environment panel */
+.cr-env{padding:10px;background:rgba(0,0,0,.2);font-family:monospace;font-size:.72rem;color:#8b949e;max-height:200px;overflow-y:auto;border-bottom:1px solid rgba(99,110,123,.2)}
+.cr-env-title{font-weight:700;color:var(--text-primary);margin-bottom:4px;font-size:.75rem}
+.cr-env-row{padding:1px 0}
+.cr-env-key{color:#58a6ff}.cr-env-val{color:#c9d1d9}
+
+/* Kill chain progress */
+.cr-kc{display:flex;gap:0;align-items:center;padding:6px 10px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(99,110,123,.2);overflow-x:auto}
+.cr-kc-node{padding:3px 8px;border-radius:3px;font-size:.62rem;font-weight:700;text-transform:uppercase;white-space:nowrap}
+.cr-kc-node.done{background:var(--sev-critical-dim);color:var(--sev-critical)}
+.cr-kc-node.active{background:var(--sev-high-dim);color:var(--sev-high);animation:cr-pulse 1.5s infinite}
+.cr-kc-node.pending{background:rgba(99,110,123,.15);color:var(--text-muted)}
+.cr-kc-arrow{color:var(--text-muted);font-size:.7rem;padding:0 3px}
+</style>
+<script>
+const API = '/api/cyber-range';
+function $(id){return document.getElementById(id)}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+let scenario = null;
+let currentStage = 0;
+let currentCmd = 0;
+let blueLogs = [];
+let blueAlerts = [];
+let blueTab = 'logs';
+
+async function crInit() {
+    try {
+        const r = await fetch(API+'/scenarios');
+        const d = await r.json();
+        renderScenarioList(d.scenarios);
+    } catch(e) {
+        $('cr-content').innerHTML = '<div class="cr-loading" style="color:var(--sev-critical)">Failed to load</div>';
+    }
+}
+
+function renderScenarioList(scenarios) {
+    let html = '<div style="margin-bottom:16px"><p style="color:var(--text-secondary);font-size:.9rem">Interactive red team vs blue team training. Execute attack commands and see what the SOC sees in real-time.</p></div>';
+    html += '<div class="cr-scenarios">';
+    for (const s of scenarios) {
+        html += `<div class="cr-sc-card" onclick="crStart('${s.id}')">
+            <div class="cr-sc-title">${esc(s.title)}</div>
+            <div class="cr-sc-desc">${esc(s.description)}</div>
+            <div class="cr-sc-meta">
+                <span class="cr-sc-badge sev-badge sev-critical">${esc(s.difficulty)}</span>
+                <span>${s.estimated_minutes} min</span>
+                <span>${s.stage_count} stages</span>
+                <span>${s.total_commands} commands</span>
+            </div>
+        </div>`;
+    }
+    html += '</div>';
+    $('cr-content').innerHTML = html;
+    $('cr-back-btn').style.display = 'none';
+}
+
+async function crStart(id) {
+    $('cr-content').innerHTML = '<div class="cr-loading"><span class="cr-spinner"></span> Loading range...</div>';
+    try {
+        const r = await fetch(API+'/scenarios/'+id);
+        scenario = await r.json();
+        currentStage = 0; currentCmd = 0;
+        blueLogs = []; blueAlerts = []; blueTab = 'logs';
+        $('cr-back-btn').style.display = '';
+        renderRange();
+    } catch(e) {
+        $('cr-content').innerHTML = '<div class="cr-loading" style="color:var(--sev-critical)">Failed</div>';
+    }
+}
+
+function crBack() { scenario = null; crInit(); }
+
+function renderRange() {
+    const s = scenario;
+    const stage = s.stages[currentStage];
+    const cmd = stage ? stage.commands[currentCmd] : null;
+
+    let html = '<div class="cr-range">';
+
+    // === RED TEAM ===
+    html += '<div class="cr-red">';
+    html += '<div class="cr-red-header"><i class="icon-crosshair"></i> RED TEAM — Attacker Console</div>';
+
+    // Kill chain progress
+    html += '<div class="cr-kc">';
+    for (let i = 0; i < s.stages.length; i++) {
+        if (i > 0) html += '<span class="cr-kc-arrow">&rarr;</span>';
+        const cls = i < currentStage ? 'done' : i === currentStage ? 'active' : 'pending';
+        html += `<span class="cr-kc-node ${cls}">${esc(s.stages[i].tactic)}</span>`;
+    }
+    html += '</div>';
+
+    // Stage progress pips
+    html += '<div class="cr-stage-bar">';
+    for (let i = 0; i < s.stages.length; i++) {
+        const cls = i < currentStage ? 'done' : i === currentStage ? 'active' : '';
+        html += `<div class="cr-stage-pip ${cls}"></div>`;
+    }
+    html += '</div>';
+
+    // Terminal output
+    html += '<div class="cr-terminal" id="cr-term">';
+    html += '<div class="cr-term-line system">═══════════════════════════════════════════════════</div>';
+    html += `<div class="cr-term-line system">  ${esc(s.title)}</div>`;
+    html += `<div class="cr-term-line system">  Target: ${esc(s.environment.domain)} (${esc(s.environment.target_network)})</div>`;
+    html += `<div class="cr-term-line system">  C2: ${esc(s.environment.c2_server)}</div>`;
+    html += '<div class="cr-term-line system">═══════════════════════════════════════════════════</div>';
+    html += '<div class="cr-term-line"></div>';
+
+    // Replay executed commands
+    for (let si = 0; si <= currentStage && si < s.stages.length; si++) {
+        const st = s.stages[si];
+        html += `<div class="cr-term-line system">[Stage ${si+1}: ${esc(st.name)}]</div>`;
+        const maxCmd = si < currentStage ? st.commands.length : currentCmd;
+        for (let ci = 0; ci < maxCmd; ci++) {
+            const c = st.commands[ci];
+            html += `<div class="cr-term-line cmd"><span class="cr-term-prompt">C2&gt; </span>${esc(c.cmd)}</div>`;
+            for (const line of c.red_output) {
+                const cls = line.startsWith('[+]') ? 'success' : line.startsWith('[*]') ? 'highlight' : '';
+                html += `<div class="cr-term-line ${cls}">${esc(line)}</div>`;
+            }
+            html += '<div class="cr-term-line"></div>';
+        }
+    }
+    html += '</div>';
+
+    // Command bar
+    if (stage && cmd) {
+        html += `<div class="cr-cmd-bar">
+            <span class="cr-cmd-prompt">C2&gt;</span>
+            <span class="cr-cmd-desc" title="${esc(cmd.description)}">${esc(cmd.cmd)}</span>
+            <button class="cr-cmd-btn" onclick="crExecute()" id="cr-exec-btn">EXECUTE</button>
+        </div>`;
+    } else {
+        html += '<div class="cr-cmd-bar"><span class="cr-cmd-prompt">C2&gt;</span><span class="cr-cmd-desc" style="color:var(--mitre-covered)">Mission complete.</span></div>';
+    }
+    html += '</div>';
+
+    // === BLUE TEAM ===
+    html += '<div class="cr-blue">';
+    html += '<div class="cr-blue-header"><i class="icon-shield"></i> BLUE TEAM — SOC View</div>';
+
+    // Tabs
+    html += '<div class="cr-blue-tabs">';
+    html += `<div class="cr-blue-tab ${blueTab==='logs'?'active':''}" onclick="crBlueTab('logs')">Logs (${blueLogs.length})</div>`;
+    html += `<div class="cr-blue-tab ${blueTab==='alerts'?'active':''}" onclick="crBlueTab('alerts')">Alerts (${blueAlerts.length})</div>`;
+    html += `<div class="cr-blue-tab ${blueTab==='env'?'active':''}" onclick="crBlueTab('env')">Environment</div>`;
+    html += '</div>';
+
+    // Feed
+    html += '<div class="cr-feed" id="cr-feed">';
+    if (blueTab === 'logs') {
+        if (!blueLogs.length) html += '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:.82rem">No logs yet. Execute red team commands to generate blue team data.</div>';
+        for (const l of blueLogs) {
+            html += `<div class="cr-log">
+                <span class="cr-log-time">${esc(l.time)}</span>
+                <span class="cr-log-source">${esc(l.source)}</span>
+                <span class="cr-log-level ${l.level}">${esc(l.level)}</span>
+                <span class="cr-log-msg">${esc(l.msg)}</span>
+            </div>`;
+        }
+    } else if (blueTab === 'alerts') {
+        if (!blueAlerts.length) html += '<div style="text-align:center;padding:40px;color:var(--text-muted);font-size:.82rem">No alerts yet. Alerts will fire as the attacker progresses.</div>';
+        for (const a of blueAlerts) {
+            html += `<div class="cr-alert ${a.severity}">
+                <div class="cr-alert-title"><span class="sev-badge sev-${a.severity}">${esc(a.severity)}</span> ${esc(a.title)}</div>
+                <div class="cr-alert-meta">
+                    <span>Rule: ${esc(a.rule)}</span>
+                    <span>Host: ${esc(a.host)}</span>
+                    <span class="cr-alert-mitre">${esc(a.mitre)}</span>
+                </div>
+            </div>`;
+        }
+    } else if (blueTab === 'env') {
+        const env = s.environment;
+        html += '<div class="cr-env">';
+        html += '<div class="cr-env-title">Target Environment</div>';
+        html += `<div class="cr-env-row"><span class="cr-env-key">Domain:</span> <span class="cr-env-val">${esc(env.domain)}</span></div>`;
+        html += `<div class="cr-env-row"><span class="cr-env-key">Network:</span> <span class="cr-env-val">${esc(env.target_network)}</span></div>`;
+        html += `<div class="cr-env-row"><span class="cr-env-key">DC:</span> <span class="cr-env-val">${esc(env.dc)}</span></div>`;
+        html += `<div class="cr-env-row"><span class="cr-env-key">File Server:</span> <span class="cr-env-val">${esc(env.file_server)}</span></div>`;
+        html += `<div class="cr-env-row"><span class="cr-env-key">Mail Server:</span> <span class="cr-env-val">${esc(env.mail_server)}</span></div>`;
+        html += '<div class="cr-env-title" style="margin-top:8px">Workstations</div>';
+        for (const ws of env.workstations) html += `<div class="cr-env-row"><span class="cr-env-val">${esc(ws)}</span></div>`;
+        html += '<div class="cr-env-title" style="margin-top:8px">Users</div>';
+        for (const [user, info] of Object.entries(env.users)) {
+            html += `<div class="cr-env-row"><span class="cr-env-key">${esc(user)}</span> — ${esc(info.role)} (${esc(info.dept)}, ${esc(info.host)})</div>`;
+        }
+        html += '</div>';
+    }
+    html += '</div>';
+
+    html += '</div>'; // end blue
+    html += '</div>'; // end range
+    $('cr-content').innerHTML = html;
+
+    // Auto-scroll terminal
+    const term = document.getElementById('cr-term');
+    if (term) term.scrollTop = term.scrollHeight;
+    const feed = document.getElementById('cr-feed');
+    if (feed) feed.scrollTop = feed.scrollHeight;
+}
+
+function crExecute() {
+    const stage = scenario.stages[currentStage];
+    const cmd = stage.commands[currentCmd];
+    if (!cmd) return;
+
+    // Add blue team data with typing delay effect
+    for (const l of cmd.blue_logs) blueLogs.push(l);
+    for (const a of cmd.blue_alerts) blueAlerts.push(a);
+
+    // Advance command
+    currentCmd++;
+    if (currentCmd >= stage.commands.length) {
+        currentStage++;
+        currentCmd = 0;
+    }
+
+    renderRange();
+}
+
+function crBlueTab(tab) {
+    blueTab = tab;
+    renderRange();
+}
+
+document.addEventListener('DOMContentLoaded', crInit);
+</script>
+{% endblock %}

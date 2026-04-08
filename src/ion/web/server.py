@@ -59,6 +59,7 @@ from ion.web.threat_hunt_api import router as threat_hunt_router
 from ion.web.dashboard_layout_api import router as dashboard_layout_router
 from ion.web.report_scheduler_api import router as report_scheduler_router
 from ion.web.playbook_action_api import router as playbook_action_router
+from ion.web.cyber_range_api import router as cyber_range_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -234,6 +235,7 @@ app.include_router(threat_hunt_router, prefix="/api")
 app.include_router(dashboard_layout_router, prefix="/api")
 app.include_router(report_scheduler_router, prefix="/api")
 app.include_router(playbook_action_router, prefix="/api")
+app.include_router(cyber_range_router, prefix="/api")
 
 
 def _validate_startup_config():
@@ -752,6 +754,12 @@ async def guide_page(request: Request, user: User = Depends(require_page_auth)):
 async def guide_sim_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the interactive training simulator."""
     return templates.TemplateResponse(request=request, name="guide_sim.html")
+
+
+@app.get("/guide/range", response_class=HTMLResponse)
+async def cyber_range_page(request: Request, user: User = Depends(require_page_auth)):
+    """Render the Cyber Range training page."""
+    return templates.TemplateResponse(request=request, name="cyber_range.html")
 
 
 @app.get("/attack-stories", response_class=HTMLResponse)
