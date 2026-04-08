@@ -1,6 +1,7 @@
 """TIDE integration service — queries TIDE's external SQL API for detection data."""
 
 import logging
+import os
 import time
 from typing import Any, Optional
 
@@ -21,6 +22,7 @@ class TideService:
         self.api_key = cfg.get("api_key") or ""
         self.enabled = cfg.get("enabled", False) and bool(self.url) and bool(self.api_key)
         self.verify = get_ssl_verify() if cfg.get("verify_ssl", True) else False
+        self.space = cfg.get("space") or os.environ.get("ION_TIDE_SPACE", "default")
 
     def _query(self, sql: str, retries: int = 2) -> Optional[dict]:
         if not self.enabled:
@@ -77,7 +79,7 @@ class TideService:
             SELECT dr.rule_id, dr.name, dr.severity, dr.enabled, dr.quality_score,
                    dr.mitre_ids, dr.space
             FROM applied_detections ad
-            JOIN detection_rules dr ON dr.rule_id = ad.detection_id AND dr.space = 'default'
+            JOIN detection_rules dr ON dr.rule_id = ad.detection_id AND dr.space = '{self.space}'
             WHERE ad.system_id = '{system_id}'
             ORDER BY dr.severity DESC, dr.name
         """)
@@ -85,7 +87,7 @@ class TideService:
 
         # Get total rules count for coverage calculation
         total_result = self._query(
-            "SELECT count(DISTINCT rule_id) as total FROM detection_rules WHERE space = 'default'"
+            f"SELECT count(DISTINCT rule_id) as total FROM detection_rules WHERE space = '{self.space}'"
         )
         system["total_rules"] = total_result["rows"][0]["total"] if total_result and total_result["rows"] else 0
 
@@ -111,7 +113,7 @@ class TideService:
         covered = self._query(f"""
             SELECT DISTINCT t.technique_id
             FROM applied_detections ad
-            JOIN detection_rules dr ON dr.rule_id = ad.detection_id AND dr.space = 'default',
+            JOIN detection_rules dr ON dr.rule_id = ad.detection_id AND dr.space = '{self.space}',
             LATERAL unnest(dr.mitre_ids) AS t(technique_id)
             WHERE ad.system_id = '{system_id}'
         """)
@@ -155,7 +157,7 @@ class TideService:
                 count(DISTINCT dr.rule_id) FILTER (WHERE dr.severity = 'low') as low_rules,
                 count(DISTINCT dr.rule_id) FILTER (WHERE dr.enabled = 1) as enabled_rules
             FROM detection_rules dr, LATERAL unnest(dr.mitre_ids) AS t(technique_id)
-            WHERE dr.space = 'default'
+            WHERE dr.space = '{self.space}'
               AND dr.mitre_ids IS NOT NULL
             GROUP BY t.technique_id
         """)
@@ -193,7 +195,7 @@ class TideService:
                 s.name as system_name,
                 s.id as system_id
             FROM applied_detections ad
-            JOIN detection_rules dr ON dr.rule_id = ad.detection_id AND dr.space = 'default'
+            JOIN detection_rules dr ON dr.rule_id = ad.detection_id AND dr.space = '{self.space}'
             JOIN systems s ON s.id = ad.system_id,
             LATERAL unnest(dr.mitre_ids) AS t(technique_id)
             WHERE dr.mitre_ids IS NOT NULL
@@ -234,7 +236,7 @@ class TideService:
 
         # Total rules
         total_result = self._query(
-            "SELECT count(DISTINCT rule_id) as total FROM detection_rules WHERE space = 'default'"
+            f"SELECT count(DISTINCT rule_id) as total FROM detection_rules WHERE space = '{self.space}'"
         )
         total_rules = total_result["rows"][0]["total"] if total_result and total_result["rows"] else 0
 
@@ -261,7 +263,7 @@ class TideService:
                 count(DISTINCT rule_id) as total_rules,
                 count(DISTINCT rule_id) FILTER (WHERE enabled = 1) as enabled_rules,
                 count(DISTINCT rule_id) FILTER (WHERE enabled = 0) as disabled_rules
-            FROM detection_rules WHERE space = 'default'
+            FROM detection_rules WHERE space = '{self.space}'
         """)
         if not totals or not totals["rows"]:
             return None
@@ -273,7 +275,7 @@ class TideService:
                    count(DISTINCT rule_id) as count,
                    count(DISTINCT rule_id) FILTER (WHERE enabled = 1) as enabled,
                    count(DISTINCT rule_id) FILTER (WHERE enabled = 0) as disabled
-            FROM detection_rules WHERE space = 'default'
+            FROM detection_rules WHERE space = '{self.space}'
             GROUP BY severity ORDER BY severity
         """)
         severity = {}
@@ -293,7 +295,7 @@ class TideService:
                 round(avg(quality_score), 1) as avg_quality,
                 min(quality_score) as min_quality,
                 max(quality_score) as max_quality
-            FROM detection_rules WHERE space = 'default'
+            FROM detection_rules WHERE space = '{self.space}'
         """)
         quality = {}
         if qual and qual["rows"]:
@@ -303,7 +305,7 @@ class TideService:
         unmapped = self._query("""
             SELECT count(DISTINCT rule_id) as count
             FROM detection_rules
-            WHERE space = 'default' AND (mitre_ids IS NULL OR len(mitre_ids) = 0)
+            WHERE space = '{self.space}' AND (mitre_ids IS NULL OR len(mitre_ids) = 0)
         """)
         unmapped_count = unmapped["rows"][0]["count"] if unmapped and unmapped["rows"] else 0
 
@@ -311,7 +313,7 @@ class TideService:
         coverage = self._query("""
             SELECT count(DISTINCT t.technique_id) as covered
             FROM detection_rules dr, LATERAL unnest(dr.mitre_ids) AS t(technique_id)
-            WHERE dr.space = 'default' AND dr.mitre_ids IS NOT NULL
+            WHERE dr.space = '{self.space}' AND dr.mitre_ids IS NOT NULL
         """)
         covered_count = coverage["rows"][0]["covered"] if coverage and coverage["rows"] else 0
 
@@ -341,7 +343,7 @@ class TideService:
         result = self._query("""
             SELECT DISTINCT rule_id, name, severity, quality_score, mitre_ids
             FROM detection_rules
-            WHERE space = 'default' AND enabled = 0
+            WHERE space = '{self.space}' AND enabled = 0
               AND severity IN ('critical', 'high')
             ORDER BY
                 CASE severity WHEN 'critical' THEN 0 ELSE 1 END,
@@ -391,7 +393,7 @@ class TideService:
                            count(DISTINCT dr.rule_id) as rule_count,
                            count(DISTINCT dr.rule_id) FILTER (WHERE dr.enabled = 1) as enabled_rules
                     FROM detection_rules dr, LATERAL unnest(dr.mitre_ids) AS t(technique_id)
-                    WHERE dr.space = 'default' AND t.technique_id IN ({tid_list})
+                    WHERE dr.space = '{self.space}' AND t.technique_id IN ({tid_list})
                     GROUP BY t.technique_id
                 """)
                 cov_map = {}
@@ -415,7 +417,7 @@ class TideService:
         if not self.enabled:
             return {"rows": [], "total": 0}
 
-        conditions = ["space = 'default'"]
+        conditions = [f"space = '{self.space}'"]
         if search:
             safe = search.replace("'", "''")
             conditions.append(
@@ -459,7 +461,7 @@ class TideService:
         covered = self._query("""
             SELECT DISTINCT t.technique_id
             FROM detection_rules dr, LATERAL unnest(dr.mitre_ids) AS t(technique_id)
-            WHERE dr.space = 'default' AND dr.mitre_ids IS NOT NULL
+            WHERE dr.space = '{self.space}' AND dr.mitre_ids IS NOT NULL
         """)
         covered_set = set()
         if covered:
@@ -480,7 +482,7 @@ class TideService:
         unmapped = self._query("""
             SELECT DISTINCT rule_id, name, severity, enabled, quality_score
             FROM detection_rules
-            WHERE space = 'default' AND (mitre_ids IS NULL OR len(mitre_ids) = 0)
+            WHERE space = '{self.space}' AND (mitre_ids IS NULL OR len(mitre_ids) = 0)
             ORDER BY severity, name
             LIMIT 100
         """)
@@ -490,7 +492,7 @@ class TideService:
         quick = self._query("""
             SELECT DISTINCT rule_id, name, severity, quality_score, mitre_ids
             FROM detection_rules
-            WHERE space = 'default' AND enabled = 0
+            WHERE space = '{self.space}' AND enabled = 0
               AND quality_score >= 20 AND severity IN ('critical', 'high')
             ORDER BY quality_score DESC, severity
             LIMIT 20
@@ -519,7 +521,7 @@ class TideService:
     def test_connection(self) -> dict:
         if not self.enabled:
             return {"ok": False, "error": "TIDE integration not configured"}
-        result = self._query("SELECT count(*) as rule_count FROM detection_rules WHERE space = 'default'")
+        result = self._query(f"SELECT count(*) as rule_count FROM detection_rules WHERE space = '{self.space}'")
         if result and result["rows"]:
             return {"ok": True, "rule_count": result["rows"][0]["rule_count"]}
         return {"ok": False, "error": "Failed to query TIDE"}

@@ -106,6 +106,7 @@ class Config:
     tide_url: str = ""  # e.g., https://tide.example.com
     tide_api_key: str = ""  # X-TIDE-API-KEY for external query API
     tide_verify_ssl: bool = True
+    tide_space: str = "default"  # Kibana space where TIDE rules live (e.g., default, production)
 
     @classmethod
     def from_file(cls, path: Path) -> "Config":
@@ -199,6 +200,7 @@ class Config:
             tide_url=data.get("tide_url", ""),
             tide_api_key=data.get("tide_api_key", ""),
             tide_verify_ssl=data.get("tide_verify_ssl", True),
+            tide_space=data.get("tide_space", "default"),
         )
 
     def to_file(self, path: Path) -> None:
@@ -285,6 +287,7 @@ class Config:
                     "tide_url": self.tide_url,
                     "tide_api_key": self.tide_api_key,
                     "tide_verify_ssl": self.tide_verify_ssl,
+                    "tide_space": self.tide_space,
                 },
                 f,
                 indent=2,
@@ -462,6 +465,8 @@ def get_config() -> Config:
             _config.tide_api_key = os.environ.get("ION_TIDE_API_KEY", "")
         if os.environ.get("ION_TIDE_VERIFY_SSL"):
             _config.tide_verify_ssl = _get_env_bool("ION_TIDE_VERIFY_SSL", True)
+        if os.environ.get("ION_TIDE_SPACE"):
+            _config.tide_space = os.environ.get("ION_TIDE_SPACE", "default")
 
     return _config
 
@@ -606,4 +611,5 @@ def get_tide_config() -> dict:
         "url": config.tide_url,
         "api_key": config.tide_api_key,
         "verify_ssl": config.tide_verify_ssl,
+        "space": config.tide_space,
     }
