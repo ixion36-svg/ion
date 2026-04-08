@@ -1,0 +1,238 @@
+# =============================================================================
+# ION Cyber Range — Hands-on Training Lab
+# =============================================================================
+# Spins up vulnerable targets, attack tools, and a browser-based terminal
+# alongside the main ION stack. Alerts flow into Elasticsearch → ION.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.range.yml up -d
+#
+# Access:
+#   Kali Terminal:  http://localhost:7681  (browser-based shell with attack tools)
+#   Guacamole:      http://localhost:8090  (browser-based RDP/SSH to targets)
+#   DVWA:           http://localhost:8081  (vulnerable web app)
+#   Juice Shop:     http://localhost:3000  (OWASP vulnerable app)
+#   WebGoat:        http://localhost:8082  (Java vulnerable app)
+#   Vulnerable SSH: localhost:2222         (weak creds: root/toor, user/password123)
+#   Vulnerable SMB: localhost:4455         (open share with sensitive files)
+#   ION (alerts):   http://localhost:8000  (see range alerts in ION)
+# =============================================================================
+
+services:
+
+  # ===========================================================================
+  # ATTACK TOOLS — Kali-like container with browser terminal
+  # ===========================================================================
+  kali:
+    image: kalilinux/kali-rolling
+    container_name: ion-range-kali
+    hostname: kali
+    command: >
+      bash -c "
+        apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends
+        nmap nikto sqlmap hydra gobuster john hashcat curl wget netcat-openbsd
+        python3 python3-pip smbclient enum4linux crackmapexec
+        && pip3 install impacket ttyd --break-system-packages
+        && echo 'ION Cyber Range - Kali Attack Terminal' > /etc/motd
+        && echo '---------------------------------------' >> /etc/motd
+        && echo 'Targets:' >> /etc/motd
+        && echo '  dvwa       (10.30.0.10) - Vulnerable web app' >> /etc/motd
+        && echo '  juiceshop  (10.30.0.11) - OWASP Juice Shop' >> /etc/motd
+        && echo '  webgoat    (10.30.0.12) - WebGoat' >> /etc/motd
+        && echo '  vuln-ssh   (10.30.0.20) - Weak SSH (root:toor)' >> /etc/motd
+        && echo '  vuln-smb   (10.30.0.21) - Open SMB share' >> /etc/motd
+        && echo '  vuln-ftp   (10.30.0.22) - Anonymous FTP' >> /etc/motd
+        && echo '' >> /etc/motd
+        && echo 'Tools: nmap, nikto, sqlmap, hydra, gobuster, john, hashcat,' >> /etc/motd
+        && echo '       crackmapexec, impacket, smbclient, enum4linux' >> /etc/motd
+        && echo '' >> /etc/motd
+        && ttyd -p 7681 -W bash
+      "
+    ports:
+      - "7681:7681"
+    networks:
+      range-net:
+        ipv4_address: 10.30.0.2
+      ion-net:
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+  # ===========================================================================
+  # VULNERABLE WEB APPLICATIONS
+  # ===========================================================================
+
+  # DVWA — Damn Vulnerable Web Application
+  dvwa:
+    image: vulnerables/web-dvwa
+    container_name: ion-range-dvwa
+    hostname: dvwa
+    ports:
+      - "8081:80"
+    networks:
+      range-net:
+        ipv4_address: 10.30.0.10
+    environment:
+      - MYSQL_ROOT_PASSWORD=dvwa
+    restart: unless-stopped
+
+  # OWASP Juice Shop
+  juiceshop:
+    image: bkimminich/juice-shop
+    container_name: ion-range-juiceshop
+    hostname: juiceshop
+    ports:
+      - "3000:3000"
+    networks:
+      range-net:
+        ipv4_address: 10.30.0.11
+    restart: unless-stopped
+
+  # WebGoat — OWASP Java vulnerable app
+  webgoat:
+    image: webgoat/webgoat
+    container_name: ion-range-webgoat
+    hostname: webgoat
+    ports:
+      - "8082:8080"
+    networks:
+      range-net:
+        ipv4_address: 10.30.0.12
+    environment:
+      - WEBGOAT_PORT=8080
+    restart: unless-stopped
+
+  # ===========================================================================
+  # VULNERABLE SERVICES (network targets for scanning/exploitation)
+  # ===========================================================================
+
+  # Vulnerable SSH — weak credentials
+  vuln-ssh:
+    image: rastasheep/ubuntu-sshd
+    container_name: ion-range-ssh
+    hostname: vuln-ssh
+    ports:
+      - "2222:22"
+    networks:
+      range-net:
+        ipv4_address: 10.30.0.20
+    restart: unless-stopped
+
+  # Vulnerable SMB — Samba with open share
+  vuln-smb:
+    image: dperson/samba
+    container_name: ion-range-smb
+    hostname: vuln-smb
+    ports:
+      - "4455:445"
+    networks:
+      range-net:
+        ipv4_address: 10.30.0.21
+    command: >
+      -u "admin;password123"
+      -u "guest;guest"
+      -s "confidential;/share;yes;no;yes;guest;admin;admin"
+      -s "public;/public;yes;no;no;guest"
+    volumes:
+      - range-smb-data:/share
+      - range-smb-public:/public
+    restart: unless-stopped
+
+  # Vulnerable FTP — anonymous access
+  vuln-ftp:
+    image: stilliard/pure-ftpd
+    container_name: ion-range-ftp
+    hostname: vuln-ftp
+    ports:
+      - "2121:21"
+      - "30000-30009:30000-30009"
+    networks:
+      range-net:
+        ipv4_address: 10.30.0.22
+    environment:
+      FTP_USER_NAME: admin
+      FTP_USER_PASS: admin123
+      FTP_USER_HOME: /home/ftpusers/admin
+      PUBLICHOST: localhost
+    restart: unless-stopped
+
+  # ===========================================================================
+  # LOG COLLECTION — Filebeat ships range logs to Elasticsearch
+  # ===========================================================================
+  range-filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: ion-range-filebeat
+    hostname: range-filebeat
+    user: root
+    networks:
+      range-net:
+        ipv4_address: 10.30.0.50
+      ion-net:
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - range-filebeat-data:/usr/share/filebeat/data
+    command: >
+      filebeat -e
+      -E output.elasticsearch.hosts=["${ION_ELASTICSEARCH_URL:-http://host.docker.internal:9200}"]
+      -E output.elasticsearch.username="${ION_ELASTICSEARCH_USERNAME:-elastic}"
+      -E output.elasticsearch.password="${ION_ELASTICSEARCH_PASSWORD:-changeme}"
+      -E output.elasticsearch.ssl.verification_mode=none
+      -E filebeat.autodiscover.providers.0.type=docker
+      -E filebeat.autodiscover.providers.0.hints.enabled=true
+      -E processors.0.add_fields.target="range"
+      -E processors.0.add_fields.fields.environment="cyber_range"
+      -E processors.0.add_fields.fields.source="ion_range"
+    restart: unless-stopped
+    depends_on:
+      - dvwa
+      - vuln-ssh
+
+  # ===========================================================================
+  # SEED — Populate SMB share with fake sensitive files
+  # ===========================================================================
+  range-seed:
+    image: alpine
+    container_name: ion-range-seed
+    volumes:
+      - range-smb-data:/share
+      - range-smb-public:/public
+    command: >
+      sh -c "
+        mkdir -p /share/Finance /share/HR /share/IT /public/docs
+        && echo 'CONFIDENTIAL - Q1 2026 Revenue Report' > /share/Finance/Q1-Revenue.txt
+        && echo 'Employee SSN: 123-45-6789' > /share/HR/employee-data.csv
+        && echo 'sa_password=Summer2024!' > /share/IT/database-credentials.txt
+        && echo 'admin:5f4dcc3b5aa765d61d8327deb882cf99' > /share/IT/password-hashes.txt
+        && echo 'Welcome to Guarded Glass file server' > /public/docs/welcome.txt
+        && echo 'Network diagram: 10.30.0.0/24' > /public/docs/network-info.txt
+        && echo 'Seed complete'
+      "
+    networks:
+      range-net:
+        ipv4_address: 10.30.0.99
+    restart: "no"
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  range-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.30.0.0/24
+  ion-net:
+    external: true
+    name: ixion_ion-net
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  range-smb-data:
+  range-smb-public:
+  range-filebeat-data:
