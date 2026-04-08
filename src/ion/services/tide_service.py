@@ -352,7 +352,14 @@ class TideService:
         return result["rows"] if result else []
 
     def get_playbooks_with_kill_chains(self) -> list[dict]:
-        """Return playbooks with their steps and linked MITRE techniques."""
+        """Return playbooks (baselines) with steps, techniques, detections, and system coverage.
+
+        Uses the full TIDE baseline model:
+        - playbooks → playbook_steps (with tactic)
+        - step_techniques (many techniques per step)
+        - step_detections (many detection rules per step)
+        - system_baselines (which systems have this baseline applied)
+        """
         if not self.enabled:
             return []
         pb = self._query("SELECT id, name, description FROM playbooks ORDER BY name")
@@ -361,6 +368,7 @@ class TideService:
         playbooks = pb["rows"]
 
         for p in playbooks:
+            # Get steps
             steps = self._query(f"""
                 SELECT id as step_id, step_number, title, description,
                        technique_id, required_rule, tactic
@@ -372,18 +380,43 @@ class TideService:
             all_tids = set()
             if steps:
                 for r in steps["rows"]:
+                    step_id = r["step_id"]
+
+                    # Get multi-techniques from step_techniques junction table
+                    st = self._query(f"SELECT technique_id FROM step_techniques WHERE step_id = '{step_id}'")
+                    techniques = [row["technique_id"] for row in (st["rows"] if st else [])]
+                    # Fallback to legacy single technique_id if junction table empty
+                    if not techniques and r.get("technique_id"):
+                        techniques = [r["technique_id"]]
+
+                    # Get multi-detections from step_detections junction table
+                    sd = self._query(f"SELECT rule_ref, note, source FROM step_detections WHERE step_id = '{step_id}'")
+                    detections = [{"rule_ref": row["rule_ref"], "note": row.get("note", ""), "source": row.get("source", "")} for row in (sd["rows"] if sd else [])]
+                    # Fallback to legacy single required_rule
+                    if not detections and r.get("required_rule"):
+                        detections = [{"rule_ref": r["required_rule"], "note": "", "source": "legacy"}]
+
                     step_list.append({
-                        "step_id": r["step_id"],
+                        "step_id": step_id,
                         "order": r["step_number"],
                         "name": r["title"],
                         "description": r["description"],
-                        "techniques": [r["technique_id"]] if r.get("technique_id") else [],
-                        "required_rule": r.get("required_rule"),
+                        "techniques": techniques,
+                        "detections": detections,
                         "tactic": r.get("tactic"),
                     })
-                    if r.get("technique_id"):
-                        all_tids.add(r["technique_id"])
+                    all_tids.update(techniques)
             p["steps"] = step_list
+
+            # Get systems that have this baseline applied
+            sys_result = self._query(f"""
+                SELECT sb.system_id, s.name as system_name
+                FROM system_baselines sb
+                JOIN systems s ON s.id = sb.system_id
+                WHERE sb.playbook_id = '{p["id"]}'
+                ORDER BY s.name
+            """)
+            p["applied_systems"] = sys_result["rows"] if sys_result else []
 
             # For each technique in steps, get rule coverage
             if all_tids:
