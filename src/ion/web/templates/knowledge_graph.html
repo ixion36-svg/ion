@@ -50,6 +50,16 @@
 .kg-detail .kg-detail-link{display:inline-block;margin-top:8px;color:var(--primary);font-size:.78rem;text-decoration:none}
 .kg-detail .kg-detail-link:hover{text-decoration:underline}
 .kg-detail.empty{display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-style:italic;font-size:.82rem}
+
+@media (max-width: 768px) {
+    .kg-seed-input { width: 100%; max-width: 280px; }
+    .kg-canvas { height: 460px; }
+    .kg-meta { font-size: .7rem; gap: 10px; }
+    .kg-legend { margin-left: 0; width: 100%; }
+}
+@media (max-width: 480px) {
+    .kg-canvas { height: 380px; }
+}
 </style>
 <script src="/static/js/vis-network.min.js"></script>
 <script>

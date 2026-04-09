@@ -91,6 +91,7 @@
 .can-stat-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
 
 .can-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:16px;overflow:hidden}
+.can-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .can-section-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
 .can-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
 
@@ -136,6 +137,21 @@ table.can-table{width:100%;border-collapse:collapse}
 .can-field.can-checkbox label{display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-primary);font-size:.85rem}
 .can-help{color:var(--text-secondary);font-size:.7rem;margin-top:2px}
 .can-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+
+@media (max-width: 768px) {
+    .can-summary { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .can-row { grid-template-columns: 1fr; }
+    .can-table th, .can-table td { padding: 8px 10px; font-size: .78rem; }
+    .can-table th { font-size: .65rem; white-space: nowrap; }
+    .can-value { max-width: 160px; font-size: .7rem; }
+    .can-actions { flex-wrap: wrap; }
+    .can-modal { max-height: 95vh; }
+}
+@media (max-width: 480px) {
+    .can-summary { gap: 8px; }
+    .can-stat-val { font-size: 1.2rem; }
+    .can-table th, .can-table td { font-size: .72rem; padding: 6px 8px; }
+}
 </style>
 <script>
 const CAN_API = '/api/canaries';
@@ -191,7 +207,7 @@ function canRender(canaries, stats, hits) {
         html += `<div class="can-section"><div class="can-section-head">
             <div class="can-section-title">Planted Canaries (${canaries.length})</div>
         </div>
-        <table class="can-table"><thead><tr>
+        <div class="can-table-wrap"><table class="can-table"><thead><tr>
             <th>Name</th><th>Type</th><th>Value</th><th>Location</th><th>Status</th><th>Hits</th><th>Last Hit</th><th></th>
         </tr></thead><tbody>`;
         for (const ca of canaries) {
@@ -210,7 +226,7 @@ function canRender(canaries, stats, hits) {
                 </div></td>
             </tr>`;
         }
-        html += '</tbody></table></div>';
+        html += '</tbody></table></div></div>';
     }
 
     if (hits.length) {

@@ -74,6 +74,19 @@
 
 .pir-empty-create{padding:60px 24px;text-align:center;color:var(--text-secondary)}
 .pir-empty-create input{background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:7px 12px;border-radius:var(--radius);font:inherit;font-size:.85rem;margin-right:8px;width:160px}
+
+@media (max-width: 768px) {
+    .pir-metrics { grid-template-columns: repeat(2, 1fr); }
+    .pir-action { grid-template-columns: 1fr; gap: 6px; }
+    .pir-add-action { grid-template-columns: 1fr; }
+    .pir-detail { padding: 14px 16px; }
+    .pir-row-buttons { flex-wrap: wrap; }
+}
+@media (max-width: 480px) {
+    .pir-metrics { gap: 6px; }
+    .pir-metric { padding: 6px 8px; }
+    .pir-metric-val { font-size: 1rem; }
+}
 </style>
 <script>
 const PIR_API = '/api/pirs';

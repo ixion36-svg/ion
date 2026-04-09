@@ -70,6 +70,18 @@
 .brf-sev-pill.high{background:rgba(240,136,62,.18);color:var(--sev-high,#f0883e);border-color:rgba(240,136,62,.4)}
 .brf-sev-pill.medium{background:rgba(210,153,34,.18);color:var(--sev-medium,#d29922);border-color:rgba(210,153,34,.4)}
 .brf-sev-pill.low{background:rgba(99,110,123,.18);color:var(--text-secondary);border-color:var(--border)}
+
+@media (max-width: 768px) {
+    .brf-headlines { grid-template-columns: repeat(2, 1fr); }
+    .brf-grid { grid-template-columns: 1fr; }
+    .brf-narrative { padding: 14px 16px; }
+    .brf-narrative-body { font-size: .85rem; }
+    .brf-window select { font-size: .75rem; padding: 6px 8px; }
+}
+@media (max-width: 480px) {
+    .brf-stat-val { font-size: 1.3rem; }
+    .brf-headlines { gap: 8px; }
+}
 </style>
 <script>
 const BRF_API = '/api/briefing';
