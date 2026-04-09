@@ -59,13 +59,10 @@
             </li>
 
             <!-- Engineering dropdown — detection, reporting, infrastructure -->
-            <li class="nav-dropdown{% if '/detection-engineering' in request.url.path or '/d3fend' in request.url.path or '/emulation' in request.url.path or '/vulnerabilities' in request.url.path or '/log-sources' in request.url.path or '/rule-tuning' in request.url.path or '/soc-health' in request.url.path or '/executive-report' in request.url.path or '/service-accounts' in request.url.path or '/cyab' in request.url.path or '/data-flow' in request.url.path or '/engineering-analytics' in request.url.path or '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
+            <li class="nav-dropdown{% if '/detection-engineering' in request.url.path or '/log-sources' in request.url.path or '/rule-tuning' in request.url.path or '/soc-health' in request.url.path or '/executive-report' in request.url.path or '/service-accounts' in request.url.path or '/cyab' in request.url.path or '/data-flow' in request.url.path or '/engineering-analytics' in request.url.path or '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
                 <a href="/detection-engineering" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Engineering <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
                     <li><a href="/detection-engineering" class="{% if '/detection-engineering' in request.url.path %}active{% endif %}">Detection Engineering</a></li>
-                    <li><a href="/d3fend" class="{% if '/d3fend' in request.url.path %}active{% endif %}">D3FEND Coverage</a></li>
-                    <li><a href="/emulation" class="{% if '/emulation' in request.url.path %}active{% endif %}">Adversary Emulation</a></li>
-                    <li><a href="/vulnerabilities" class="{% if '/vulnerabilities' in request.url.path %}active{% endif %}">Vulnerabilities</a></li>
                     <li><a href="/log-sources" class="{% if '/log-sources' in request.url.path %}active{% endif %}">Log Source Health</a></li>
                     <li><a href="/rule-tuning" class="{% if '/rule-tuning' in request.url.path %}active{% endif %}">Rule Tuning</a></li>
                     <li><a href="/soc-health" class="{% if '/soc-health' in request.url.path %}active{% endif %}">SOC Health</a></li>

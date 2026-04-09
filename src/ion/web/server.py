@@ -731,12 +731,6 @@ async def detection_engineering_page(request: Request, user: User = Depends(requ
     return templates.TemplateResponse(request=request, name="detection_engineering.html")
 
 
-@app.get("/d3fend", response_class=HTMLResponse)
-async def d3fend_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the MITRE D3FEND defensive coverage page."""
-    return templates.TemplateResponse(request=request, name="d3fend.html")
-
-
 @app.get("/canaries", response_class=HTMLResponse)
 async def canaries_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the Canary / Deception Tracker page."""
@@ -767,16 +761,6 @@ async def pir_page(request: Request, user: User = Depends(require_page_permissio
     return templates.TemplateResponse(request=request, name="pir.html")
 
 
-@app.get("/emulation", response_class=HTMLResponse)
-async def emulation_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Adversary Emulation Plans page."""
-    return templates.TemplateResponse(request=request, name="emulation.html")
-
-
-@app.get("/vulnerabilities", response_class=HTMLResponse)
-async def vulnerabilities_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Vulnerability ↔ Detection Coverage page."""
-    return templates.TemplateResponse(request=request, name="vulnerabilities.html")
 
 
 @app.get("/shift-handover", response_class=HTMLResponse)

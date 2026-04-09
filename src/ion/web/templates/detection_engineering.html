@@ -22,6 +22,9 @@
     <button class="de-tab" data-tab="readiness" onclick="deSwitch('readiness')">Actor Readiness</button>
     <button class="de-tab" data-tab="progression" onclick="deSwitch('progression')">Kill Chain</button>
     <button class="de-tab" data-tab="gaps" onclick="deSwitch('gaps')">Gaps</button>
+    <button class="de-tab" data-tab="d3fend" onclick="deSwitch('d3fend')">D3FEND</button>
+    <button class="de-tab" data-tab="emulation" onclick="deSwitch('emulation')">Emulation</button>
+    <button class="de-tab" data-tab="vulns" onclick="deSwitch('vulns')">Vulnerabilities</button>
 </div>
 
 <!-- Tab panels -->
@@ -32,6 +35,9 @@
 <div class="de-panel" id="de-panel-readiness"></div>
 <div class="de-panel" id="de-panel-progression"></div>
 <div class="de-panel" id="de-panel-gaps"></div>
+<div class="de-panel" id="de-panel-d3fend"></div>
+<div class="de-panel" id="de-panel-emulation"></div>
+<div class="de-panel" id="de-panel-vulns"></div>
 {% endblock %}
 
 {% block scripts %}
@@ -256,7 +262,10 @@ let _killChainsData = null;
 let _gapsData = null;
 let _rulesPage = {search:'', severity:'', enabled:'', offset:0, limit:50, total:0, rows:[]};
 let _execHours = 168;
-let _loaded = {posture:false, killchains:false, rules:false, execution:false, readiness:false, progression:false, gaps:false};
+let _loaded = {posture:false, killchains:false, rules:false, execution:false, readiness:false, progression:false, gaps:false, d3fend:false, emulation:false, vulns:false};
+let _vulnsCache = null;
+let _d3fendCache = null;
+let _emCache = null;
 
 /* ── Helpers ──────────────────────────────────── */
 async function apiFetch(path) {
@@ -278,8 +287,9 @@ window.deSwitch = function(tab) {
 };
 
 window.deRefresh = function() {
-    _loaded = {posture:false, killchains:false, rules:false, execution:false, readiness:false, progression:false, gaps:false};
+    _loaded = {posture:false, killchains:false, rules:false, execution:false, readiness:false, progression:false, gaps:false, d3fend:false, emulation:false, vulns:false};
     _postureData = null; _killChainsData = null; _gapsData = null;
+    _d3fendCache = null; _emCache = null; _vulnsCache = null;
     loadTab(_activeTab);
 };
 
@@ -291,6 +301,9 @@ function loadTab(tab) {
         case 'killchains': loadKillChains(); break;
         case 'rules': loadRules(); break;
         case 'execution': loadExecution(); break;
+        case 'd3fend': loadD3fend(); break;
+        case 'emulation': loadEmulation(); break;
+        case 'vulns': loadVulns(); break;
         case 'readiness': loadReadiness(); break;
         case 'progression': loadProgression(); break;
         case 'gaps': loadGaps(); break;
@@ -1234,6 +1247,299 @@ function renderGaps(d) {
 
     $('de-panel-gaps').innerHTML = html;
 }
+
+/* ────────────────────────────────────────────────────────────────────── */
+/*  D3FEND defensive coverage                                              */
+/* ────────────────────────────────────────────────────────────────────── */
+async function loadD3fend() {
+    const panel = $('de-panel-d3fend');
+    try {
+        if (!_d3fendCache) {
+            const r = await fetch('/api/d3fend/coverage', {credentials:'include'});
+            if (!r.ok) throw new Error('D3FEND fetch failed');
+            _d3fendCache = await r.json();
+        }
+        const d = _d3fendCache;
+        const s = d.summary || {};
+        let html = `<div class="de-stats">
+            <div class="de-stat green"><div class="de-stat-label">Defensive Coverage</div><div class="de-stat-val">${s.overall_pct||0}%</div></div>
+            <div class="de-stat green"><div class="de-stat-label">Fully Covered</div><div class="de-stat-val">${s.fully_covered||0}</div></div>
+            <div class="de-stat warn"><div class="de-stat-label">Partial</div><div class="de-stat-val">${s.partial||0}</div></div>
+            <div class="de-stat crit"><div class="de-stat-label">Blind</div><div class="de-stat-val">${s.blind||0}</div></div>
+            <div class="de-stat"><div class="de-stat-label">D3FEND Techniques</div><div class="de-stat-val">${s.total_techniques||0}</div></div>
+        </div>`;
+
+        if (!s.tide_enabled) {
+            html += '<div class="de-section" style="border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.06)"><div style="font-size:.78rem;color:var(--text-secondary)"><strong>TIDE not connected.</strong> All D3FEND techniques shown as blind. Configure TIDE in <a href="/settings#tide" style="color:var(--neon-cyan)">Settings</a> to compute live coverage.</div></div>';
+        }
+
+        // Group techniques by tactic
+        const byTac = {};
+        for (const t of d.techniques || []) {
+            (byTac[t.tactic] = byTac[t.tactic] || []).push(t);
+        }
+        html += '<div class="de-section"><div class="de-section-title">D3FEND Tactics</div>';
+        for (const tac of d.tactics || []) {
+            const techs = byTac[tac.id] || [];
+            const pct = tac.coverage_pct || 0;
+            const barColor = pct >= 80 ? 'var(--mitre-covered,#3fb950)' : pct >= 50 ? 'var(--quality-good,#58a6ff)' : pct >= 25 ? 'var(--sev-medium,#d29922)' : 'var(--sev-critical,#f85149)';
+            html += `<div style="margin-bottom:14px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <div style="font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:.5px;font-size:.78rem">${esc(tac.name)}</div>
+                    <div style="font-size:.7rem;color:var(--text-secondary)">${tac.covered_count||0}/${tac.technique_count||0} &middot; ${pct}%</div>
+                </div>
+                <div style="height:4px;background:rgba(99,110,123,.2);border-radius:2px;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${pct}%;background:${barColor}"></div></div>
+                <div style="display:flex;flex-wrap:wrap;gap:5px">`;
+            for (const t of techs) {
+                const cls = t.state === 'full' ? 'green' : t.state === 'partial' ? 'warn' : 'crit';
+                const color = t.state === 'full' ? 'var(--mitre-covered,#3fb950)' : t.state === 'partial' ? 'var(--sev-medium,#d29922)' : 'var(--sev-critical,#f85149)';
+                html += `<span title="${esc(t.description)} — ${t.covered_attacks||0}/${t.total_attacks||0} ATT&CK techniques covered" style="display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border:1px solid ${color};border-radius:4px;font-size:.7rem;color:${color}"><span class="mono">${esc(t.id)}</span> ${esc(t.name)} <span style="opacity:.7">${t.coverage_pct||0}%</span></span>`;
+            }
+            html += '</div></div>';
+        }
+        html += '</div>';
+        panel.innerHTML = html;
+    } catch (e) {
+        panel.innerHTML = `<div class="de-section" style="color:var(--sev-critical)">Error: ${esc(e.message)}</div>`;
+    }
+}
+
+/* ────────────────────────────────────────────────────────────────────── */
+/*  Adversary emulation plans                                              */
+/* ────────────────────────────────────────────────────────────────────── */
+async function loadEmulation() {
+    const panel = $('de-panel-emulation');
+    try {
+        const r = await fetch('/api/emulation/plans', {credentials:'include'});
+        if (!r.ok) throw new Error('Emulation fetch failed');
+        _emCache = (await r.json()).plans || [];
+
+        const totalPlans = _emCache.length;
+        const running = _emCache.filter(p => p.status === 'running').length;
+        const completed = _emCache.filter(p => p.status === 'completed').length;
+        const avgCov = totalPlans
+            ? Math.round(_emCache.reduce((a, p) => a + (p.coverage_pct || 0), 0) / totalPlans)
+            : 0;
+
+        let html = `<div class="de-stats">
+            <div class="de-stat"><div class="de-stat-label">Plans</div><div class="de-stat-val">${totalPlans}</div></div>
+            <div class="de-stat warn"><div class="de-stat-label">Running</div><div class="de-stat-val">${running}</div></div>
+            <div class="de-stat green"><div class="de-stat-label">Completed</div><div class="de-stat-val">${completed}</div></div>
+            <div class="de-stat"><div class="de-stat-label">Avg Coverage</div><div class="de-stat-val">${avgCov}%</div></div>
+        </div>`;
+
+        html += `<div class="de-section"><div class="de-section-title">
+            Adversary Emulation Plans
+            <button class="btn btn-primary btn-sm" onclick="emCreatePrompt()" style="margin-left:auto;padding:4px 12px;font-size:.75rem">+ New Plan</button>
+        </div>`;
+
+        if (!totalPlans) {
+            html += '<div style="text-align:center;padding:30px;color:var(--text-secondary);font-style:italic">No plans yet. Create a per-actor purple-team plan, add TTP steps, mark them executed, then click Verify to check Elasticsearch for matching detections.</div>';
+        } else {
+            html += '<table class="de-table"><thead><tr><th>Name</th><th>Actor</th><th>Status</th><th>Steps</th><th>Coverage</th><th>Updated</th><th></th></tr></thead><tbody>';
+            for (const p of _emCache) {
+                const color = (p.coverage_pct||0) >= 80 ? 'var(--mitre-covered,#3fb950)' : (p.coverage_pct||0) >= 50 ? 'var(--sev-medium,#d29922)' : 'var(--sev-critical,#f85149)';
+                html += `<tr style="cursor:pointer" onclick="emOpenPlan(${p.id})">
+                    <td><strong>${esc(p.name)}</strong></td>
+                    <td>${esc(p.actor_name||'-')}</td>
+                    <td>${esc(p.status)}</td>
+                    <td>${p.passed_count||0}/${p.step_count||0}</td>
+                    <td><span style="font-family:'JetBrains Mono',monospace;color:${color};font-weight:700">${p.coverage_pct||0}%</span></td>
+                    <td>${p.updated_at ? new Date(p.updated_at).toLocaleDateString() : '-'}</td>
+                    <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();emDeletePlan(${p.id})" style="padding:2px 8px;font-size:.7rem">Delete</button></td>
+                </tr>`;
+            }
+            html += '</tbody></table>';
+        }
+        html += '</div><div id="de-emulation-detail"></div>';
+        panel.innerHTML = html;
+    } catch (e) {
+        panel.innerHTML = `<div class="de-section" style="color:var(--sev-critical)">Error: ${esc(e.message)}</div>`;
+    }
+}
+
+window.emCreatePrompt = async function() {
+    const name = prompt('Plan name:');
+    if (!name) return;
+    const actor = prompt('Threat actor (optional):') || null;
+    const r = await fetch('/api/emulation/plans', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
+        body: JSON.stringify({name, actor_name: actor}),
+    });
+    if (r.ok) { _loaded.emulation = false; loadTab('emulation'); }
+};
+
+window.emDeletePlan = async function(id) {
+    if (!confirm('Delete this plan and all its steps?')) return;
+    await fetch(`/api/emulation/plans/${id}`, {method: 'DELETE', credentials: 'include'});
+    _loaded.emulation = false; loadTab('emulation');
+};
+
+window.emOpenPlan = async function(id) {
+    const r = await fetch(`/api/emulation/plans/${id}`, {credentials: 'include'});
+    if (!r.ok) return;
+    const p = await r.json();
+    const det = $('de-emulation-detail');
+    let html = `<div class="de-section"><div class="de-section-title">${esc(p.name)} (${esc(p.actor_name||'-')})</div>`;
+    if (p.description) html += `<div style="color:var(--text-secondary);font-size:.82rem;margin-bottom:10px">${esc(p.description)}</div>`;
+    html += `<div class="de-stats" style="margin-bottom:14px">
+        <div class="de-stat"><div class="de-stat-label">Coverage</div><div class="de-stat-val">${p.coverage_pct||0}%</div></div>
+        <div class="de-stat green"><div class="de-stat-label">Passed</div><div class="de-stat-val">${p.passed_count||0}</div></div>
+        <div class="de-stat crit"><div class="de-stat-label">Failed</div><div class="de-stat-val">${p.failed_count||0}</div></div>
+        <div class="de-stat warn"><div class="de-stat-label">Partial</div><div class="de-stat-val">${p.partial_count||0}</div></div>
+        <div class="de-stat"><div class="de-stat-label">Total</div><div class="de-stat-val">${p.step_count||0}</div></div>
+    </div>`;
+
+    for (const s of p.steps || []) {
+        const color = s.result === 'passed' ? 'var(--mitre-covered,#3fb950)' : s.result === 'failed' ? 'var(--sev-critical,#f85149)' : s.result === 'partial' ? 'var(--sev-medium,#d29922)' : 'var(--text-secondary)';
+        const tids = (s.mitre_techniques||[]).map(t => `<span class="mono" style="background:rgba(0,212,255,.06);border:1px solid var(--border);padding:1px 6px;border-radius:3px;font-size:.7rem">${esc(t)}</span>`).join(' ');
+        html += `<div style="background:var(--bg-tertiary);border:1px solid var(--border);border-left:3px solid ${color};border-radius:6px;padding:10px 14px;margin-bottom:6px">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+                <div><strong>${(s.order_index||0)+1}. ${esc(s.title)}</strong></div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span class="mono" style="font-size:.7rem;color:${color}">${esc(s.result)}</span>
+                    ${s.matched_alert_count != null ? `<span style="font-size:.7rem;color:var(--text-secondary)">${s.matched_alert_count} alerts</span>` : ''}
+                </div>
+            </div>
+            ${tids ? `<div style="margin-top:5px">${tids}</div>` : ''}
+            <div style="margin-top:6px;display:flex;gap:5px">
+                <button class="btn btn-secondary btn-sm" onclick="emExecuteStep(${s.id})" style="padding:3px 9px;font-size:.7rem">Mark Executed</button>
+                <button class="btn btn-secondary btn-sm" onclick="emVerifyStep(${s.id})" style="padding:3px 9px;font-size:.7rem">Verify in ES</button>
+                <button class="btn btn-secondary btn-sm" onclick="emDeleteStep(${s.id})" style="padding:3px 9px;font-size:.7rem">Delete</button>
+            </div>
+        </div>`;
+    }
+
+    html += `<div style="background:var(--bg-tertiary);border:1px dashed var(--border);border-radius:6px;padding:10px 14px;margin-top:10px">
+        <input id="em-newstep-title" placeholder="Step title" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:4px;font-size:.78rem;margin-bottom:6px">
+        <input id="em-newstep-tids" placeholder="Techniques: T1003, T1059.001" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:4px;font-size:.78rem;margin-bottom:6px">
+        <button class="btn btn-primary btn-sm" onclick="emAddStep(${p.id})" style="padding:5px 14px;font-size:.78rem">+ Add Step</button>
+    </div></div>`;
+    det.innerHTML = html;
+};
+
+window.emAddStep = async function(planId) {
+    const title = $('em-newstep-title').value.trim();
+    if (!title) return;
+    const tids = ($('em-newstep-tids').value || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    await fetch(`/api/emulation/plans/${planId}/steps`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
+        body: JSON.stringify({title, mitre_techniques: tids}),
+    });
+    emOpenPlan(planId);
+};
+
+window.emExecuteStep = async function(id) {
+    await fetch(`/api/emulation/steps/${id}/execute`, {method: 'POST', credentials: 'include'});
+    const planId = _emCurrentPlan; if (planId) emOpenPlan(planId);
+};
+
+window.emVerifyStep = async function(id) {
+    const r = await fetch(`/api/emulation/steps/${id}/verify?lookback_hours=4`, {method: 'POST', credentials: 'include'});
+    const j = await r.json();
+    if (j.error) alert('Verify warning: ' + j.error);
+    const planId = _emCurrentPlan; if (planId) emOpenPlan(planId);
+};
+
+window.emDeleteStep = async function(id) {
+    if (!confirm('Delete step?')) return;
+    await fetch(`/api/emulation/steps/${id}`, {method: 'DELETE', credentials: 'include'});
+    const planId = _emCurrentPlan; if (planId) emOpenPlan(planId);
+};
+
+let _emCurrentPlan = null;
+const _origEmOpenPlan = window.emOpenPlan;
+window.emOpenPlan = async function(id) {
+    _emCurrentPlan = id;
+    return _origEmOpenPlan(id);
+};
+
+/* ────────────────────────────────────────────────────────────────────── */
+/*  Vulnerability ↔ detection coverage                                     */
+/* ────────────────────────────────────────────────────────────────────── */
+async function loadVulns() {
+    const panel = $('de-panel-vulns');
+    try {
+        const r = await fetch('/api/vulnerabilities/coverage', {credentials:'include'});
+        if (!r.ok) throw new Error('Vulns fetch failed');
+        _vulnsCache = await r.json();
+        const s = _vulnsCache.summary || {};
+
+        let html = `<div class="de-stats">
+            <div class="de-stat"><div class="de-stat-label">Tracked</div><div class="de-stat-val">${s.total||0}</div></div>
+            <div class="de-stat green"><div class="de-stat-label">Detectable</div><div class="de-stat-val">${s.covered||0}</div></div>
+            <div class="de-stat warn"><div class="de-stat-label">Partial</div><div class="de-stat-val">${s.partial||0}</div></div>
+            <div class="de-stat crit"><div class="de-stat-label">Blind</div><div class="de-stat-val">${s.blind||0}</div></div>
+        </div>`;
+
+        if (!s.tide_enabled) {
+            html += '<div class="de-section" style="border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.06)"><div style="font-size:.78rem;color:var(--text-secondary)"><strong>TIDE not connected.</strong> All verdicts shown as unknown. Configure TIDE in <a href="/settings#tide" style="color:var(--neon-cyan)">Settings</a> for live coverage.</div></div>';
+        }
+
+        html += `<div class="de-section"><div class="de-section-title">
+            Vulnerabilities
+            <button class="btn btn-primary btn-sm" onclick="vlnCreatePrompt()" style="margin-left:auto;padding:4px 12px;font-size:.75rem">+ New CVE</button>
+        </div>`;
+
+        const items = _vulnsCache.vulnerabilities || [];
+        if (!items.length) {
+            html += '<div style="text-align:center;padding:30px;color:var(--text-secondary);font-style:italic">Add CVEs and tag them with the ATT&CK techniques attackers would use to exploit them. ION will tell you whether your TIDE rules can detect exploitation.</div>';
+        } else {
+            html += '<table class="de-table"><thead><tr><th>CVE / Title</th><th>Severity</th><th>CVSS</th><th>Status</th><th>Techniques</th><th>Detection</th><th></th></tr></thead><tbody>';
+            for (const v of items) {
+                const cov = v.coverage || {};
+                const verdict = cov.verdict || 'unknown';
+                const verdictColor = verdict === 'covered' ? 'var(--mitre-covered,#3fb950)' : verdict === 'partial' ? 'var(--sev-medium,#d29922)' : verdict === 'blind' ? 'var(--sev-critical,#f85149)' : 'var(--text-secondary)';
+                const tids = (cov.by_tid||[]).map(t => `<span class="mono" style="font-size:.66rem;background:rgba(0,212,255,.06);border:1px solid ${t.covered ? 'var(--mitre-covered,#3fb950)' : 'var(--border)'};color:${t.covered ? 'var(--mitre-covered,#3fb950)' : 'var(--text-secondary)'};padding:1px 5px;border-radius:3px">${esc(t.tid)}</span>`).join(' ');
+                html += `<tr>
+                    <td>${v.cve_id ? `<div class="mono" style="color:var(--neon-cyan,#00d4ff);font-size:.78rem">${esc(v.cve_id)}</div>` : ''}<div>${esc(v.title)}</div></td>
+                    <td><span class="de-sev ${esc(v.severity)}">${esc(v.severity)}</span></td>
+                    <td>${v.cvss_score ?? '-'}</td>
+                    <td>${esc(v.status)}</td>
+                    <td>${tids || '<span style="color:var(--text-secondary);font-size:.7rem">none</span>'}</td>
+                    <td><div style="color:${verdictColor};font-weight:700;text-transform:uppercase;font-size:.7rem;letter-spacing:.5px">${esc(verdict)}</div><div style="font-size:.66rem;color:var(--text-secondary)">${cov.total > 0 ? `${cov.covered}/${cov.total} TTPs &middot; ${cov.rules} rules` : 'no TTPs set'}</div></td>
+                    <td><button class="btn btn-secondary btn-sm" onclick="vlnDelete(${v.id})" style="padding:2px 8px;font-size:.7rem">Delete</button></td>
+                </tr>`;
+            }
+            html += '</tbody></table>';
+        }
+        html += '</div>';
+        panel.innerHTML = html;
+    } catch (e) {
+        panel.innerHTML = `<div class="de-section" style="color:var(--sev-critical)">Error: ${esc(e.message)}</div>`;
+    }
+}
+
+window.vlnCreatePrompt = async function() {
+    const title = prompt('Vulnerability title:');
+    if (!title) return;
+    const cve = prompt('CVE ID (optional, e.g. CVE-2025-12345):') || null;
+    const sev = prompt('Severity (critical / high / medium / low / info):', 'medium') || 'medium';
+    const tids = prompt('ATT&CK techniques used to exploit (comma-separated, e.g. T1190, T1059):') || '';
+    const body = {
+        title,
+        cve_id: cve,
+        severity: sev,
+        mitre_techniques: tids.split(',').map(s => s.trim().toUpperCase()).filter(Boolean),
+    };
+    const r = await fetch('/api/vulnerabilities', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    if (r.ok) { _loaded.vulns = false; loadTab('vulns'); }
+};
+
+window.vlnDelete = async function(id) {
+    if (!confirm('Delete this vulnerability?')) return;
+    await fetch(`/api/vulnerabilities/${id}`, {method: 'DELETE', credentials: 'include'});
+    _loaded.vulns = false; loadTab('vulns');
+};
 
 /* ── Init ─────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => loadTab('posture'));
