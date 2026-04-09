@@ -43,6 +43,10 @@ from ion.web.triage_suggestion_api import router as triage_suggestion_router
 from ion.web.mitre_navigator_api import router as mitre_navigator_router
 from ion.web.playbook_analytics_api import router as playbook_analytics_router
 from ion.web.alert_pattern_api import router as alert_pattern_router
+from ion.web.d3fend_api import router as d3fend_router
+from ion.web.canary_api import router as canary_router
+from ion.web.log_source_api import router as log_source_router
+from ion.web.briefing_api import router as briefing_router
 from ion.web.executive_report_api import router as executive_report_router
 from ion.web.ioc_staleness_api import router as ioc_staleness_router
 from ion.web.training_sim_api import router as training_sim_router
@@ -219,6 +223,10 @@ app.include_router(triage_suggestion_router, prefix="/api")
 app.include_router(mitre_navigator_router, prefix="/api")
 app.include_router(playbook_analytics_router, prefix="/api")
 app.include_router(alert_pattern_router, prefix="/api")
+app.include_router(d3fend_router, prefix="/api")
+app.include_router(canary_router, prefix="/api")
+app.include_router(log_source_router, prefix="/api")
+app.include_router(briefing_router, prefix="/api")
 app.include_router(executive_report_router, prefix="/api")
 app.include_router(ioc_staleness_router, prefix="/api")
 app.include_router(training_sim_router, prefix="/api")
@@ -713,6 +721,30 @@ async def engineering_analytics_page(request: Request, user: User = Depends(requ
 async def detection_engineering_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the Detection Engineering page (TIDE-powered)."""
     return templates.TemplateResponse(request=request, name="detection_engineering.html")
+
+
+@app.get("/d3fend", response_class=HTMLResponse)
+async def d3fend_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the MITRE D3FEND defensive coverage page."""
+    return templates.TemplateResponse(request=request, name="d3fend.html")
+
+
+@app.get("/canaries", response_class=HTMLResponse)
+async def canaries_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Canary / Deception Tracker page."""
+    return templates.TemplateResponse(request=request, name="canaries.html")
+
+
+@app.get("/log-sources", response_class=HTMLResponse)
+async def log_sources_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Log Source Health Monitor page."""
+    return templates.TemplateResponse(request=request, name="log_sources.html")
+
+
+@app.get("/briefing", response_class=HTMLResponse)
+async def briefing_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Morning Threat Briefing page."""
+    return templates.TemplateResponse(request=request, name="briefing.html")
 
 
 @app.get("/shift-handover", response_class=HTMLResponse)

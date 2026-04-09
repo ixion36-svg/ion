@@ -24,10 +24,11 @@
             <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>
 
             <!-- Investigate dropdown — core investigation workflow -->
-            <li class="nav-dropdown{% if '/alerts' in request.url.path or '/cases' in request.url.path or '/observables' in request.url.path or '/threat-intel' in request.url.path or '/analyst' in request.url.path or '/chat' in request.url.path or '/discover' in request.url.path or '/entity-timeline' in request.url.path or '/attack-stories' in request.url.path or '/tools' in request.url.path or '/threat-hunting' in request.url.path %} has-active{% endif %}">
+            <li class="nav-dropdown{% if '/alerts' in request.url.path or '/cases' in request.url.path or '/observables' in request.url.path or '/threat-intel' in request.url.path or '/analyst' in request.url.path or '/chat' in request.url.path or '/discover' in request.url.path or '/entity-timeline' in request.url.path or '/attack-stories' in request.url.path or '/tools' in request.url.path or '/threat-hunting' in request.url.path or '/canaries' in request.url.path or '/briefing' in request.url.path %} has-active{% endif %}">
                 <a href="/analyst" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Investigate <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
                     <li><a href="/analyst" class="{% if '/analyst' in request.url.path or '/tools' in request.url.path %}active{% endif %}">SOC Dashboard</a></li>
+                    <li><a href="/briefing" class="{% if '/briefing' in request.url.path %}active{% endif %}">Morning Briefing</a></li>
                     <li><a href="/alerts" class="{% if '/alerts' in request.url.path and '/audit' not in request.url.path %}active{% endif %}">Alerts</a></li>
                     <li><a href="/cases" class="{% if '/cases' in request.url.path %}active{% endif %}">Cases</a></li>
                     <li><a href="/observables" class="{% if '/observables' in request.url.path %}active{% endif %}">Observables</a></li>
@@ -37,6 +38,7 @@
                     <li><a href="/discover" class="{% if '/discover' in request.url.path %}active{% endif %}">Discover</a></li>
                     <li><a href="/chat" class="{% if '/chat' in request.url.path %}active{% endif %}">AI Chat</a></li>
                     <li><a href="/threat-hunting" class="{% if '/threat-hunting' in request.url.path %}active{% endif %}">Threat Hunting</a></li>
+                    <li><a href="/canaries" class="{% if '/canaries' in request.url.path %}active{% endif %}">Canaries</a></li>
                 </ul>
             </li>
 
@@ -55,10 +57,12 @@
             </li>
 
             <!-- Engineering dropdown — detection, reporting, infrastructure -->
-            <li class="nav-dropdown{% if '/detection-engineering' in request.url.path or '/rule-tuning' in request.url.path or '/soc-health' in request.url.path or '/executive-report' in request.url.path or '/service-accounts' in request.url.path or '/cyab' in request.url.path or '/data-flow' in request.url.path or '/engineering-analytics' in request.url.path or '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
+            <li class="nav-dropdown{% if '/detection-engineering' in request.url.path or '/d3fend' in request.url.path or '/log-sources' in request.url.path or '/rule-tuning' in request.url.path or '/soc-health' in request.url.path or '/executive-report' in request.url.path or '/service-accounts' in request.url.path or '/cyab' in request.url.path or '/data-flow' in request.url.path or '/engineering-analytics' in request.url.path or '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
                 <a href="/detection-engineering" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Engineering <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
                     <li><a href="/detection-engineering" class="{% if '/detection-engineering' in request.url.path %}active{% endif %}">Detection Engineering</a></li>
+                    <li><a href="/d3fend" class="{% if '/d3fend' in request.url.path %}active{% endif %}">D3FEND Coverage</a></li>
+                    <li><a href="/log-sources" class="{% if '/log-sources' in request.url.path %}active{% endif %}">Log Source Health</a></li>
                     <li><a href="/rule-tuning" class="{% if '/rule-tuning' in request.url.path %}active{% endif %}">Rule Tuning</a></li>
                     <li><a href="/soc-health" class="{% if '/soc-health' in request.url.path %}active{% endif %}">SOC Health</a></li>
                     <li><a href="/executive-report" class="{% if '/executive-report' in request.url.path %}active{% endif %}">Executive Report</a></li>

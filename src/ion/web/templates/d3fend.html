@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}D3FEND Coverage - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-shield"></i> MITRE D3FEND Coverage</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="d3fLoad()">Refresh</button>
+    </div>
+</div>
+
+<div id="d3f-content"><div class="d3f-loading"><span class="d3f-spinner"></span> Computing defensive coverage...</div></div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.d3f-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.d3f-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:d3f-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes d3f-spin{to{transform:rotate(360deg)}}
+
+.d3f-intro{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 18px;margin-bottom:16px;color:var(--text-secondary);font-size:.85rem;line-height:1.55}
+.d3f-intro strong{color:var(--text-primary)}
+.d3f-intro a{color:var(--primary);text-decoration:none}
+
+/* Summary band */
+.d3f-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.d3f-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;text-align:center}
+.d3f-stat-val{font-size:1.6rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--primary)}
+.d3f-stat-val.full{color:var(--mitre-covered,#3fb950)}
+.d3f-stat-val.partial{color:var(--sev-medium,#d29922)}
+.d3f-stat-val.blind{color:var(--sev-critical,#f85149)}
+.d3f-stat-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+
+/* Tactic columns */
+.d3f-matrix{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:24px}
+.d3f-tactic{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column}
+.d3f-tactic-head{padding:12px 14px;border-bottom:1px solid var(--border)}
+.d3f-tactic-name{font-size:.95rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:.5px}
+.d3f-tactic-meta{font-size:.7rem;color:var(--text-secondary);margin-top:2px}
+.d3f-tactic-bar{height:4px;background:rgba(99,110,123,.2);border-radius:2px;overflow:hidden;margin-top:8px}
+.d3f-tactic-bar-fill{height:100%;border-radius:2px;transition:width .5s}
+.d3f-tactic-techs{padding:8px;display:flex;flex-direction:column;gap:6px;flex:1}
+.d3f-tech{background:var(--bg-tertiary);border:1px solid var(--border);border-left-width:3px;border-radius:var(--radius);padding:8px 10px;cursor:pointer;transition:transform .15s,border-color .15s}
+.d3f-tech:hover{transform:translateX(2px);border-color:var(--primary)}
+.d3f-tech.full{border-left-color:var(--mitre-covered,#3fb950)}
+.d3f-tech.partial{border-left-color:var(--sev-medium,#d29922)}
+.d3f-tech.blind{border-left-color:var(--sev-critical,#f85149)}
+.d3f-tech-id{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.d3f-tech-name{font-size:.82rem;color:var(--text-primary);font-weight:600;margin-top:2px;line-height:1.25}
+.d3f-tech-meta{font-size:.66rem;color:var(--text-secondary);margin-top:4px;display:flex;justify-content:space-between;gap:8px}
+.d3f-tech-pct{font-family:'JetBrains Mono',monospace;font-weight:700}
+.d3f-tech-pct.full{color:var(--mitre-covered,#3fb950)}
+.d3f-tech-pct.partial{color:var(--sev-medium,#d29922)}
+.d3f-tech-pct.blind{color:var(--sev-critical,#f85149)}
+
+/* Modal */
+.d3f-modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:none;z-index:1000;align-items:center;justify-content:center;padding:24px}
+.d3f-modal-bg.show{display:flex}
+.d3f-modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);max-width:680px;width:100%;max-height:80vh;overflow:auto;padding:0}
+.d3f-modal-head{padding:18px 22px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-secondary);display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.d3f-modal-id{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--text-secondary);text-transform:uppercase}
+.d3f-modal-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-top:2px}
+.d3f-modal-close{background:none;border:none;color:var(--text-secondary);font-size:1.3rem;cursor:pointer;padding:0;line-height:1}
+.d3f-modal-body{padding:18px 22px}
+.d3f-modal-desc{color:var(--text-secondary);font-size:.85rem;line-height:1.55;margin-bottom:14px}
+.d3f-modal-section{font-size:.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:8px}
+.d3f-counters{display:flex;flex-wrap:wrap;gap:6px}
+.d3f-counter{padding:5px 10px;border-radius:var(--radius);font-family:'JetBrains Mono',monospace;font-size:.72rem;border:1px solid var(--border);background:var(--bg-tertiary)}
+.d3f-counter.covered{border-color:var(--mitre-covered,#3fb950);color:var(--mitre-covered,#3fb950)}
+.d3f-counter.uncovered{border-color:var(--sev-critical,#f85149);color:var(--sev-critical,#f85149);opacity:.85}
+.d3f-counter-rules{font-size:.62rem;opacity:.75;margin-left:4px}
+</style>
+<script>
+const D3F_API = '/api/d3fend/coverage';
+function d3fEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+let d3fData = null;
+
+async function d3fLoad() {
+    const c = document.getElementById('d3f-content');
+    c.innerHTML = '<div class="d3f-loading"><span class="d3f-spinner"></span> Computing defensive coverage...</div>';
+    try {
+        const r = await fetch(D3F_API);
+        if (!r.ok) throw new Error('Failed to fetch coverage');
+        d3fData = await r.json();
+        if (d3fData.error) {
+            c.innerHTML = `<div class="d3f-loading" style="color:var(--sev-critical,#f85149)">Error: ${d3fEsc(d3fData.error)}</div>`;
+            return;
+        }
+        d3fRender(d3fData);
+    } catch (e) {
+        c.innerHTML = `<div class="d3f-loading" style="color:var(--sev-critical,#f85149)">${d3fEsc(e.message)}</div>`;
+    }
+}
+
+function d3fStateClass(state) {
+    return state === 'full' ? 'full' : state === 'partial' ? 'partial' : 'blind';
+}
+
+function d3fRender(d) {
+    const s = d.summary || {};
+    const tideNote = s.tide_enabled
+        ? '<strong>TIDE connected.</strong> Coverage below reflects ATT&CK techniques covered by enabled TIDE rules.'
+        : '<strong>TIDE not configured.</strong> Configure TIDE in <a href="/settings#tide">Settings</a> to compute live coverage. All techniques shown as blind.';
+
+    let html = `<div class="d3f-intro">
+        <strong>MITRE D3FEND</strong> is the defensive counterpart to ATT&CK. Each defensive technique below maps to one
+        or more ATT&CK techniques it counters. Coverage is computed by checking whether ION's TIDE rule catalog includes
+        any enabled rule tagged with each ATT&CK technique. ${tideNote}
+    </div>`;
+
+    // Summary
+    html += `<div class="d3f-summary">
+        <div class="d3f-stat"><div class="d3f-stat-val">${s.overall_pct||0}%</div><div class="d3f-stat-label">Defensive Coverage</div></div>
+        <div class="d3f-stat"><div class="d3f-stat-val full">${s.fully_covered||0}</div><div class="d3f-stat-label">Fully Covered</div></div>
+        <div class="d3f-stat"><div class="d3f-stat-val partial">${s.partial||0}</div><div class="d3f-stat-label">Partial</div></div>
+        <div class="d3f-stat"><div class="d3f-stat-val blind">${s.blind||0}</div><div class="d3f-stat-label">Blind</div></div>
+        <div class="d3f-stat"><div class="d3f-stat-val">${s.total_techniques||0}</div><div class="d3f-stat-label">D3FEND Techniques</div></div>
+    </div>`;
+
+    // Matrix by tactic
+    const techsByTactic = {};
+    for (const t of d.techniques || []) {
+        (techsByTactic[t.tactic] = techsByTactic[t.tactic] || []).push(t);
+    }
+    html += '<div class="d3f-matrix">';
+    for (const tactic of d.tactics || []) {
+        const techs = techsByTactic[tactic.id] || [];
+        const pct = tactic.coverage_pct || 0;
+        const barColor = pct >= 80 ? 'var(--mitre-covered,#3fb950)'
+                       : pct >= 50 ? 'var(--quality-good,#58a6ff)'
+                       : pct >= 25 ? 'var(--sev-medium,#d29922)'
+                       : 'var(--sev-critical,#f85149)';
+        html += `<div class="d3f-tactic">
+            <div class="d3f-tactic-head" title="${d3fEsc(tactic.desc||'')}">
+                <div class="d3f-tactic-name">${d3fEsc(tactic.name)}</div>
+                <div class="d3f-tactic-meta">${tactic.covered_count||0} / ${tactic.technique_count||0} techniques covered &middot; ${pct}%</div>
+                <div class="d3f-tactic-bar"><div class="d3f-tactic-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
+            </div>
+            <div class="d3f-tactic-techs">`;
+        for (const t of techs) {
+            const cls = d3fStateClass(t.state);
+            html += `<div class="d3f-tech ${cls}" onclick="d3fOpen('${d3fEsc(t.id)}')" title="${d3fEsc(t.description)}">
+                <div class="d3f-tech-id">${d3fEsc(t.id)}</div>
+                <div class="d3f-tech-name">${d3fEsc(t.name)}</div>
+                <div class="d3f-tech-meta">
+                    <span>${t.covered_attacks||0}/${t.total_attacks||0} ATT&CK</span>
+                    <span class="d3f-tech-pct ${cls}">${t.coverage_pct||0}%</span>
+                </div>
+            </div>`;
+        }
+        html += '</div></div>';
+    }
+    html += '</div>';
+
+    html += `<div class="d3f-modal-bg" id="d3f-modal-bg" onclick="if(event.target===this)d3fClose()">
+        <div class="d3f-modal" id="d3f-modal-content"></div>
+    </div>`;
+
+    document.getElementById('d3f-content').innerHTML = html;
+}
+
+function d3fOpen(techId) {
+    if (!d3fData) return;
+    const tech = (d3fData.techniques || []).find(t => t.id === techId);
+    if (!tech) return;
+    const tactic = (d3fData.tactics || []).find(t => t.id === tech.tactic);
+    const tacticName = tactic ? tactic.name : tech.tactic;
+    let counters = '';
+    for (const c of tech.counters || []) {
+        const cls = c.covered ? 'covered' : 'uncovered';
+        const rules = c.rule_count > 0 ? `<span class="d3f-counter-rules">${c.rule_count} rule${c.rule_count===1?'':'s'}</span>` : '';
+        counters += `<span class="d3f-counter ${cls}">${d3fEsc(c.attack_id)}${rules}</span>`;
+    }
+    if (!counters) counters = '<span style="color:var(--text-secondary);font-size:.85rem">No ATT&CK mappings recorded for this technique.</span>';
+
+    document.getElementById('d3f-modal-content').innerHTML = `
+        <div class="d3f-modal-head">
+            <div>
+                <div class="d3f-modal-id">${d3fEsc(tech.id)} &middot; ${d3fEsc(tacticName)}</div>
+                <div class="d3f-modal-title">${d3fEsc(tech.name)}</div>
+            </div>
+            <button class="d3f-modal-close" onclick="d3fClose()" aria-label="Close">&times;</button>
+        </div>
+        <div class="d3f-modal-body">
+            <div class="d3f-modal-desc">${d3fEsc(tech.description)}</div>
+            <div class="d3f-modal-section">Counters ATT&CK Techniques (${tech.covered_attacks||0}/${tech.total_attacks||0} covered)</div>
+            <div class="d3f-counters">${counters}</div>
+        </div>`;
+    document.getElementById('d3f-modal-bg').classList.add('show');
+}
+
+function d3fClose() {
+    const m = document.getElementById('d3f-modal-bg');
+    if (m) m.classList.remove('show');
+}
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') d3fClose(); });
+document.addEventListener('DOMContentLoaded', d3fLoad);
+</script>
+{% endblock %}

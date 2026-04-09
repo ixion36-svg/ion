@@ -109,6 +109,8 @@ from ion.models.analytics import (
     AnalyticsSnapshot,
 )
 from ion.models.cyab import CyabSystem, CyabDataSource, CyabSnapshot
+from ion.models.canary import Canary, CanaryHit, CanaryType, CanaryStatus
+from ion.models.log_source import LogSource, LogSourceCategory
 from ion.models.threat_intel import ThreatIntelWatch
 from ion.models.forensics import (
     ForensicCase,
@@ -257,6 +259,14 @@ __all__ = [
     "CyabSystem",
     "CyabDataSource",
     "CyabSnapshot",
+    # Canary / deception
+    "Canary",
+    "CanaryHit",
+    "CanaryType",
+    "CanaryStatus",
+    # Log source health
+    "LogSource",
+    "LogSourceCategory",
     # Threat Intel watch model
     "ThreatIntelWatch",
     # Notification model

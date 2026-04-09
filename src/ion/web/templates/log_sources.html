@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}Log Source Health - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-activity"></i> Log Source Health Monitor</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="lsRefresh()">Run Health Check</button>
+        <button class="btn btn-primary" onclick="lsOpenForm()">+ New Source</button>
+    </div>
+</div>
+
+<div id="ls-content"><div class="ls-loading"><span class="ls-spinner"></span> Loading...</div></div>
+
+<div class="ls-modal-bg" id="ls-modal-bg">
+    <div class="ls-modal">
+        <div class="ls-modal-head">
+            <div class="ls-modal-title" id="ls-modal-title">New Log Source</div>
+            <button class="ls-modal-close" onclick="lsCloseForm()" aria-label="Close">&times;</button>
+        </div>
+        <form class="ls-modal-body" id="ls-form" onsubmit="return lsSubmit(event)">
+            <input type="hidden" id="ls-id" value="">
+
+            <div class="ls-row">
+                <div class="ls-field">
+                    <label>Name *</label>
+                    <input id="ls-name" type="text" required maxlength="200" placeholder="Sysmon (Windows endpoints)">
+                </div>
+                <div class="ls-field">
+                    <label>Category *</label>
+                    <select id="ls-category" required></select>
+                </div>
+            </div>
+
+            <div class="ls-row">
+                <div class="ls-field">
+                    <label>Match field *</label>
+                    <input id="ls-match-field" type="text" required placeholder="event.module">
+                </div>
+                <div class="ls-field">
+                    <label>Match value *</label>
+                    <input id="ls-match-value" type="text" required placeholder="sysmon">
+                </div>
+            </div>
+
+            <div class="ls-row">
+                <div class="ls-field">
+                    <label>Index pattern</label>
+                    <input id="ls-index" type="text" placeholder="logs-*-* (optional)">
+                </div>
+                <div class="ls-field">
+                    <label>Expected interval (minutes) *</label>
+                    <input id="ls-interval" type="number" required min="1" max="10080" value="30">
+                </div>
+            </div>
+
+            <div class="ls-row">
+                <div class="ls-field">
+                    <label>Criticality</label>
+                    <select id="ls-crit"></select>
+                </div>
+                <div class="ls-field">
+                    <label>Owner</label>
+                    <input id="ls-owner" type="text" placeholder="Platform team">
+                </div>
+            </div>
+
+            <div class="ls-field">
+                <label>Description</label>
+                <textarea id="ls-desc" rows="3"></textarea>
+            </div>
+
+            <div class="ls-form-actions">
+                <button type="button" class="btn btn-secondary" onclick="lsCloseForm()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.ls-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.ls-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:ls-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes ls-spin{to{transform:rotate(360deg)}}
+.ls-empty{text-align:center;padding:60px 24px;color:var(--text-secondary)}
+.ls-empty h3{color:var(--text-primary);margin-bottom:8px}
+.ls-empty button{margin-top:14px}
+
+.ls-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px}
+.ls-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;text-align:center}
+.ls-stat-val{font-size:1.6rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--primary)}
+.ls-stat-val.good{color:var(--mitre-covered,#3fb950)}
+.ls-stat-val.warn{color:var(--sev-medium,#d29922)}
+.ls-stat-val.crit{color:var(--sev-critical,#f85149)}
+.ls-stat-val.muted{color:var(--text-secondary)}
+.ls-stat-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+
+.ls-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+.ls-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;border-left:4px solid var(--border);position:relative}
+.ls-card.healthy{border-left-color:var(--mitre-covered,#3fb950)}
+.ls-card.stale{border-left-color:var(--sev-medium,#d29922)}
+.ls-card.silent{border-left-color:var(--sev-critical,#f85149)}
+.ls-card.never{border-left-color:var(--text-secondary)}
+.ls-card.error{border-left-color:var(--sev-high,#f0883e)}
+.ls-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
+.ls-card-name{font-size:.95rem;font-weight:700;color:var(--text-primary);line-height:1.2}
+.ls-card-cat{font-size:.66rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+.ls-card-status{font-size:.66rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:3px 9px;border-radius:99px;flex-shrink:0}
+.ls-card-status.healthy{background:rgba(63,185,80,.15);color:var(--mitre-covered,#3fb950)}
+.ls-card-status.stale{background:rgba(210,153,34,.15);color:var(--sev-medium,#d29922)}
+.ls-card-status.silent{background:rgba(248,81,73,.18);color:var(--sev-critical,#f85149)}
+.ls-card-status.never{background:rgba(99,110,123,.18);color:var(--text-secondary)}
+.ls-card-status.error{background:rgba(240,136,62,.18);color:var(--sev-high,#f0883e)}
+.ls-card-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-top:8px;font-size:.72rem;color:var(--text-secondary)}
+.ls-card-meta strong{color:var(--text-primary);font-family:'JetBrains Mono',monospace}
+.ls-card-actions{margin-top:10px;display:flex;gap:6px;justify-content:flex-end}
+.ls-iconbtn{background:none;border:1px solid var(--border);color:var(--text-secondary);padding:3px 9px;border-radius:var(--radius);cursor:pointer;font-size:.7rem;font-weight:600}
+.ls-iconbtn:hover{border-color:var(--primary);color:var(--primary)}
+.ls-iconbtn.danger:hover{border-color:var(--sev-critical,#f85149);color:var(--sev-critical,#f85149)}
+
+/* Modal */
+.ls-modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:none;z-index:1000;align-items:center;justify-content:center;padding:24px}
+.ls-modal-bg.show{display:flex}
+.ls-modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);max-width:640px;width:100%;max-height:90vh;overflow:auto}
+.ls-modal-head{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg-secondary)}
+.ls-modal-title{font-size:1.05rem;font-weight:700;color:var(--text-primary)}
+.ls-modal-close{background:none;border:none;color:var(--text-secondary);font-size:1.4rem;cursor:pointer;padding:0;line-height:1}
+.ls-modal-body{padding:20px 22px}
+.ls-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.ls-field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.ls-field label{font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.ls-field input,.ls-field select,.ls-field textarea{background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:8px 10px;border-radius:var(--radius);font:inherit;font-size:.85rem}
+.ls-field input:focus,.ls-field select:focus,.ls-field textarea:focus{outline:none;border-color:var(--primary)}
+.ls-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.ls-banner{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px 14px;margin-bottom:14px;font-size:.78rem;color:var(--text-secondary)}
+.ls-banner.warn{border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.1)}
+</style>
+<script>
+const LS_API = '/api/log-sources';
+let lsCache = [];
+let lsCats = [];
+
+function lsEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function lsFmtTime(iso){if(!iso)return'never';try{const d=new Date(iso);const diff=(Date.now()-d.getTime())/1000;if(diff<60)return Math.round(diff)+'s ago';if(diff<3600)return Math.round(diff/60)+'m ago';if(diff<86400)return Math.round(diff/3600)+'h ago';return Math.round(diff/86400)+'d ago';}catch(e){return iso}}
+
+async function lsBootstrap() {
+    try {
+        const cats = await fetch(LS_API + '/categories').then(r => r.json());
+        lsCats = cats.categories || [];
+    } catch (e) {}
+    await lsLoad();
+}
+
+async function lsLoad() {
+    const c = document.getElementById('ls-content');
+    c.innerHTML = '<div class="ls-loading"><span class="ls-spinner"></span> Loading sources...</div>';
+    try {
+        const list = await fetch(LS_API).then(r => r.json());
+        lsCache = list.sources || [];
+        if (lsCache.length === 0) {
+            c.innerHTML = `<div class="ls-empty">
+                <h3>No log sources yet</h3>
+                <p>Define the ingestion sources you expect ION to see, and we'll continuously check whether they're alive in Elasticsearch.</p>
+                <button class="btn btn-secondary" onclick="lsSeedDefaults()">Seed 8 Common Sources</button>
+                <button class="btn btn-primary" onclick="lsOpenForm()" style="margin-left:8px">+ Add Manually</button>
+            </div>`;
+            return;
+        }
+        await lsRefresh();
+    } catch (e) {
+        c.innerHTML = `<div class="ls-loading" style="color:var(--sev-critical,#f85149)">${lsEsc(e.message || 'Failed to load')}</div>`;
+    }
+}
+
+async function lsRefresh() {
+    const c = document.getElementById('ls-content');
+    c.innerHTML = '<div class="ls-loading"><span class="ls-spinner"></span> Querying Elasticsearch for each source...</div>';
+    try {
+        const r = await fetch(LS_API + '/health').then(r => r.json());
+        lsRender(r);
+    } catch (e) {
+        c.innerHTML = `<div class="ls-loading" style="color:var(--sev-critical,#f85149)">${lsEsc(e.message)}</div>`;
+    }
+}
+
+async function lsSeedDefaults() {
+    const r = await fetch(LS_API + '/seed-defaults', { method: 'POST' });
+    const j = await r.json();
+    if (j.added) lsLoad();
+}
+
+function lsRender(data) {
+    const sources = data.sources || [];
+    const summary = data.summary || {};
+    const c = document.getElementById('ls-content');
+
+    let banner = '';
+    if (data.es_configured === false) {
+        banner = '<div class="ls-banner warn"><strong>Elasticsearch not configured.</strong> Health column shows the last cached check (if any). Configure ES in <a href="/settings#elasticsearch" style="color:inherit;text-decoration:underline">Settings</a> for live data.</div>';
+    }
+
+    let html = banner + `<div class="ls-summary">
+        <div class="ls-stat"><div class="ls-stat-val">${summary.healthy_pct||0}%</div><div class="ls-stat-label">Healthy %</div></div>
+        <div class="ls-stat"><div class="ls-stat-val good">${summary.healthy_count||0}</div><div class="ls-stat-label">Healthy</div></div>
+        <div class="ls-stat"><div class="ls-stat-val warn">${summary.stale_count||0}</div><div class="ls-stat-label">Stale</div></div>
+        <div class="ls-stat"><div class="ls-stat-val crit">${summary.silent_count||0}</div><div class="ls-stat-label">Silent</div></div>
+        <div class="ls-stat"><div class="ls-stat-val muted">${summary.never_count||0}</div><div class="ls-stat-label">Never Seen</div></div>
+        <div class="ls-stat"><div class="ls-stat-val muted">${summary.error_count||0}</div><div class="ls-stat-label">Errors</div></div>
+    </div>`;
+
+    // Sort: silent + never first, then stale, then healthy
+    const order = { silent: 0, never: 1, stale: 2, error: 3, healthy: 4 };
+    sources.sort((a, b) => (order[a.status] ?? 5) - (order[b.status] ?? 5));
+
+    html += '<div class="ls-grid">';
+    for (const s of sources) {
+        const status = s.status || 'never';
+        html += `<div class="ls-card ${lsEsc(status)}">
+            <div class="ls-card-head">
+                <div>
+                    <div class="ls-card-name">${lsEsc(s.name)}</div>
+                    <div class="ls-card-cat">${lsEsc(s.category)} &middot; ${lsEsc(s.criticality)}</div>
+                </div>
+                <span class="ls-card-status ${lsEsc(status)}">${lsEsc(status)}</span>
+            </div>
+            <div class="ls-card-meta">
+                <div>Last event: <strong>${lsEsc(lsFmtTime(s.last_event_at))}</strong></div>
+                <div>Window: <strong>${s.expected_interval_minutes||0}m</strong></div>
+                <div>Events 24h: <strong>${s.event_count_24h ?? '-'}</strong></div>
+                <div>Owner: <strong>${lsEsc(s.owner || '-')}</strong></div>
+            </div>
+            <div class="ls-card-actions">
+                <button class="ls-iconbtn" onclick="lsEdit(${s.id})">Edit</button>
+                <button class="ls-iconbtn danger" onclick="lsDelete(${s.id})">Delete</button>
+            </div>
+        </div>`;
+    }
+    html += '</div>';
+
+    c.innerHTML = html;
+}
+
+function lsOpenForm(source) {
+    const m = document.getElementById('ls-modal-bg');
+    document.getElementById('ls-modal-title').textContent = source ? 'Edit Log Source' : 'New Log Source';
+    const cat = document.getElementById('ls-category');
+    cat.innerHTML = '';
+    for (const c of lsCats) {
+        const o = document.createElement('option');
+        o.value = c.id; o.textContent = c.label;
+        cat.appendChild(o);
+    }
+    const crit = document.getElementById('ls-crit');
+    crit.innerHTML = '';
+    for (const c of ['critical', 'high', 'medium', 'low']) {
+        const o = document.createElement('option');
+        o.value = c; o.textContent = c.charAt(0).toUpperCase() + c.slice(1);
+        crit.appendChild(o);
+    }
+    document.getElementById('ls-id').value = source ? source.id : '';
+    document.getElementById('ls-name').value = source ? source.name : '';
+    document.getElementById('ls-category').value = source ? source.category : (lsCats[0] && lsCats[0].id) || 'endpoint';
+    const q = (source && source.query) || {};
+    document.getElementById('ls-match-field').value = q.match_field || '';
+    document.getElementById('ls-match-value').value = q.match_value || '';
+    document.getElementById('ls-index').value = source ? (source.index_pattern || '') : '';
+    document.getElementById('ls-interval').value = source ? source.expected_interval_minutes : 30;
+    document.getElementById('ls-crit').value = source ? source.criticality : 'medium';
+    document.getElementById('ls-owner').value = source ? (source.owner || '') : '';
+    document.getElementById('ls-desc').value = source ? (source.description || '') : '';
+    m.classList.add('show');
+}
+
+function lsCloseForm() {
+    document.getElementById('ls-modal-bg').classList.remove('show');
+}
+
+async function lsEdit(id) {
+    const r = await fetch(LS_API + '/' + id);
+    if (r.ok) lsOpenForm(await r.json());
+}
+
+async function lsDelete(id) {
+    if (!confirm('Delete this log source?')) return;
+    const r = await fetch(LS_API + '/' + id, { method: 'DELETE' });
+    if (r.ok) lsLoad();
+}
+
+async function lsSubmit(ev) {
+    ev.preventDefault();
+    const id = document.getElementById('ls-id').value;
+    const body = {
+        name: document.getElementById('ls-name').value.trim(),
+        category: document.getElementById('ls-category').value,
+        query: {
+            match_field: document.getElementById('ls-match-field').value.trim(),
+            match_value: document.getElementById('ls-match-value').value.trim(),
+        },
+        index_pattern: document.getElementById('ls-index').value.trim() || null,
+        expected_interval_minutes: parseInt(document.getElementById('ls-interval').value, 10) || 30,
+        criticality: document.getElementById('ls-crit').value,
+        owner: document.getElementById('ls-owner').value.trim() || null,
+        description: document.getElementById('ls-desc').value.trim() || null,
+    };
+    const url = id ? (LS_API + '/' + id) : LS_API;
+    const method = id ? 'PATCH' : 'POST';
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (r.ok) {
+        lsCloseForm();
+        lsLoad();
+    } else {
+        const j = await r.json().catch(() => ({}));
+        alert('Save failed: ' + (j.detail || 'unknown'));
+    }
+    return false;
+}
+
+document.addEventListener('DOMContentLoaded', lsBootstrap);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') lsCloseForm(); });
+</script>
+{% endblock %}

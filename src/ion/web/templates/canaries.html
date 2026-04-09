@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}Canaries - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-feather"></i> Canary / Deception Tracker</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="canScan()">Scan Recent Alerts</button>
+        <button class="btn btn-primary" onclick="canOpenForm()">+ New Canary</button>
+    </div>
+</div>
+
+<div id="can-content">
+    <div class="can-loading"><span class="can-spinner"></span> Loading canaries...</div>
+</div>
+
+<!-- New / edit modal -->
+<div class="can-modal-bg" id="can-modal-bg">
+    <div class="can-modal">
+        <div class="can-modal-head">
+            <div class="can-modal-title" id="can-modal-title">New Canary</div>
+            <button class="can-modal-close" onclick="canCloseForm()" aria-label="Close">&times;</button>
+        </div>
+        <form class="can-modal-body" id="can-form" onsubmit="return canSubmit(event)">
+            <input type="hidden" id="can-id" value="">
+
+            <div class="can-row">
+                <div class="can-field">
+                    <label>Name *</label>
+                    <input id="can-name" type="text" required maxlength="200" placeholder="HR salary spreadsheet decoy">
+                </div>
+                <div class="can-field">
+                    <label>Type *</label>
+                    <select id="can-type" required></select>
+                </div>
+            </div>
+
+            <div class="can-field">
+                <label>Canary value *</label>
+                <input id="can-value" type="text" required maxlength="500" placeholder='e.g. C:\HR\Salaries_2026.xlsx, svc_backup_old, 198.51.100.42'>
+                <small class="can-help">The exact string ION will look for in alert messages, hostnames, file paths, etc.</small>
+            </div>
+
+            <div class="can-row">
+                <div class="can-field">
+                    <label>Location</label>
+                    <input id="can-location" type="text" maxlength="255" placeholder="DC01 file share">
+                </div>
+                <div class="can-field">
+                    <label>Tags (comma-separated)</label>
+                    <input id="can-tags" type="text" placeholder="hr, finance, q1-2026">
+                </div>
+            </div>
+
+            <div class="can-field">
+                <label>Description</label>
+                <textarea id="can-desc" rows="3" placeholder="Where it lives, why it's there, who created it..."></textarea>
+            </div>
+
+            <div class="can-field can-checkbox">
+                <label>
+                    <input type="checkbox" id="can-hi" checked>
+                    High-confidence breach alert when fired
+                </label>
+            </div>
+
+            <div class="can-form-actions">
+                <button type="button" class="btn btn-secondary" onclick="canCloseForm()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Canary</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.can-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.can-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:can-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes can-spin{to{transform:rotate(360deg)}}
+.can-empty{text-align:center;padding:60px 24px;color:var(--text-secondary)}
+.can-empty h3{color:var(--text-primary);margin-bottom:8px}
+
+.can-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px}
+.can-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;text-align:center}
+.can-stat-val{font-size:1.6rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--primary)}
+.can-stat-val.warn{color:var(--sev-medium,#d29922)}
+.can-stat-val.crit{color:var(--sev-critical,#f85149)}
+.can-stat-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+
+.can-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:16px;overflow:hidden}
+.can-section-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.can-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+
+table.can-table{width:100%;border-collapse:collapse}
+.can-table th{text-align:left;padding:10px 14px;font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;background:var(--bg-tertiary);border-bottom:1px solid var(--border)}
+.can-table td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:.85rem;color:var(--text-primary);vertical-align:middle}
+.can-table tr:last-child td{border-bottom:none}
+.can-table tr.fired td{background:rgba(248,81,73,.06)}
+.can-table tr.fired td:first-child{box-shadow:inset 3px 0 0 var(--sev-critical,#f85149)}
+
+.can-pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.66rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary)}
+.can-pill.active{background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.4);color:var(--mitre-covered,#3fb950)}
+.can-pill.inactive{opacity:.6}
+.can-pill.burned{background:rgba(248,81,73,.15);border-color:rgba(248,81,73,.4);color:var(--sev-critical,#f85149)}
+.can-pill.retired{opacity:.5}
+.can-value{font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--text-secondary);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle}
+.can-actions{display:flex;gap:6px;justify-content:flex-end}
+.can-iconbtn{background:none;border:1px solid var(--border);color:var(--text-secondary);padding:4px 10px;border-radius:var(--radius);cursor:pointer;font-size:.72rem;font-weight:600}
+.can-iconbtn:hover{border-color:var(--primary);color:var(--primary)}
+.can-iconbtn.danger:hover{border-color:var(--sev-critical,#f85149);color:var(--sev-critical,#f85149)}
+
+/* Hits feed */
+.can-hit{padding:10px 16px;border-bottom:1px solid var(--border);font-size:.82rem}
+.can-hit:last-child{border-bottom:none}
+.can-hit-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.can-hit-canary{font-weight:700;color:var(--text-primary)}
+.can-hit-time{font-size:.7rem;color:var(--text-secondary);font-family:'JetBrains Mono',monospace}
+.can-hit-snippet{color:var(--text-secondary);margin-top:4px;font-family:'JetBrains Mono',monospace;font-size:.72rem;background:var(--bg-tertiary);padding:6px 10px;border-radius:var(--radius);max-height:80px;overflow:auto}
+
+/* Modal */
+.can-modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:none;z-index:1000;align-items:center;justify-content:center;padding:24px}
+.can-modal-bg.show{display:flex}
+.can-modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);max-width:640px;width:100%;max-height:90vh;overflow:auto}
+.can-modal-head{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg-secondary)}
+.can-modal-title{font-size:1.05rem;font-weight:700;color:var(--text-primary)}
+.can-modal-close{background:none;border:none;color:var(--text-secondary);font-size:1.4rem;cursor:pointer;padding:0;line-height:1}
+.can-modal-body{padding:20px 22px}
+.can-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.can-field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.can-field label{font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.can-field input,.can-field select,.can-field textarea{background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:8px 10px;border-radius:var(--radius);font:inherit;font-size:.85rem}
+.can-field input:focus,.can-field select:focus,.can-field textarea:focus{outline:none;border-color:var(--primary)}
+.can-field.can-checkbox label{display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-weight:500;color:var(--text-primary);font-size:.85rem}
+.can-help{color:var(--text-secondary);font-size:.7rem;margin-top:2px}
+.can-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+</style>
+<script>
+const CAN_API = '/api/canaries';
+let canCache = [];
+let canTypes = [];
+let canStatuses = [];
+
+function canEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function canFmtTime(iso){if(!iso)return'-';try{return new Date(iso).toLocaleString()}catch(e){return iso}}
+
+async function canBootstrap() {
+    try {
+        const types = await fetch(CAN_API + '/types').then(r => r.json());
+        canTypes = types.types || [];
+        canStatuses = types.statuses || [];
+    } catch (e) {}
+    await canRefresh();
+}
+
+async function canRefresh() {
+    const c = document.getElementById('can-content');
+    c.innerHTML = '<div class="can-loading"><span class="can-spinner"></span> Loading canaries...</div>';
+    try {
+        const [list, statsRes, hits] = await Promise.all([
+            fetch(CAN_API).then(r => r.json()),
+            fetch(CAN_API + '/stats').then(r => r.json()),
+            fetch(CAN_API + '/hits?limit=20').then(r => r.json()),
+        ]);
+        canCache = list.canaries || [];
+        canRender(canCache, statsRes, hits.hits || []);
+    } catch (e) {
+        c.innerHTML = `<div class="can-loading" style="color:var(--sev-critical,#f85149)">${canEsc(e.message || 'Failed to load')}</div>`;
+    }
+}
+
+function canRender(canaries, stats, hits) {
+    const c = document.getElementById('can-content');
+    let html = `<div class="can-summary">
+        <div class="can-stat"><div class="can-stat-val">${stats.total||0}</div><div class="can-stat-label">Total</div></div>
+        <div class="can-stat"><div class="can-stat-val">${stats.active||0}</div><div class="can-stat-label">Active</div></div>
+        <div class="can-stat"><div class="can-stat-val warn">${stats.fired||0}</div><div class="can-stat-label">Fired</div></div>
+        <div class="can-stat"><div class="can-stat-val crit">${stats.burned||0}</div><div class="can-stat-label">Burned</div></div>
+        <div class="can-stat"><div class="can-stat-val crit">${stats.hits_24h||0}</div><div class="can-stat-label">Hits (24h)</div></div>
+    </div>`;
+
+    if (!canaries.length) {
+        html += `<div class="can-section"><div class="can-empty">
+            <h3>No canaries planted yet</h3>
+            <p>Plant a decoy file, account, host, or token. ION will scan recent alerts for any mention and raise a high-confidence breach alert when one fires.</p>
+            <button class="btn btn-primary" onclick="canOpenForm()" style="margin-top:16px">+ Create First Canary</button>
+        </div></div>`;
+    } else {
+        html += `<div class="can-section"><div class="can-section-head">
+            <div class="can-section-title">Planted Canaries (${canaries.length})</div>
+        </div>
+        <table class="can-table"><thead><tr>
+            <th>Name</th><th>Type</th><th>Value</th><th>Location</th><th>Status</th><th>Hits</th><th>Last Hit</th><th></th>
+        </tr></thead><tbody>`;
+        for (const ca of canaries) {
+            const fired = (ca.hit_count || 0) > 0;
+            html += `<tr class="${fired ? 'fired' : ''}">
+                <td><strong>${canEsc(ca.name)}</strong></td>
+                <td>${canEsc((ca.canary_type || '').replace(/_/g, ' '))}</td>
+                <td><code class="can-value" title="${canEsc(ca.value)}">${canEsc(ca.value)}</code></td>
+                <td>${canEsc(ca.location || '-')}</td>
+                <td><span class="can-pill ${canEsc(ca.status)}">${canEsc(ca.status)}</span></td>
+                <td>${ca.hit_count || 0}</td>
+                <td>${canFmtTime(ca.last_hit_at)}</td>
+                <td><div class="can-actions">
+                    <button class="can-iconbtn" onclick="canEdit(${ca.id})">Edit</button>
+                    <button class="can-iconbtn danger" onclick="canDelete(${ca.id})">Delete</button>
+                </div></td>
+            </tr>`;
+        }
+        html += '</tbody></table></div>';
+    }
+
+    if (hits.length) {
+        html += `<div class="can-section"><div class="can-section-head">
+            <div class="can-section-title">Recent Hits (${hits.length})</div>
+        </div>`;
+        const byId = {};
+        for (const ca of canaries) byId[ca.id] = ca.name;
+        for (const h of hits) {
+            html += `<div class="can-hit">
+                <div class="can-hit-head">
+                    <span class="can-hit-canary">${canEsc(byId[h.canary_id] || ('Canary #' + h.canary_id))}</span>
+                    <span class="can-hit-time">${canFmtTime(h.detected_at)}</span>
+                </div>
+                ${h.snippet ? `<div class="can-hit-snippet">${canEsc(h.snippet)}</div>` : ''}
+            </div>`;
+        }
+        html += '</div>';
+    }
+
+    c.innerHTML = html;
+}
+
+function canOpenForm(canary) {
+    const m = document.getElementById('can-modal-bg');
+    document.getElementById('can-modal-title').textContent = canary ? 'Edit Canary' : 'New Canary';
+    const sel = document.getElementById('can-type');
+    sel.innerHTML = '';
+    for (const t of canTypes) {
+        const o = document.createElement('option');
+        o.value = t.id; o.textContent = t.label;
+        sel.appendChild(o);
+    }
+    document.getElementById('can-id').value = canary ? canary.id : '';
+    document.getElementById('can-name').value = canary ? canary.name : '';
+    document.getElementById('can-type').value = canary ? canary.canary_type : (canTypes[0] && canTypes[0].id) || 'file';
+    document.getElementById('can-value').value = canary ? canary.value : '';
+    document.getElementById('can-location').value = canary ? (canary.location || '') : '';
+    document.getElementById('can-tags').value = canary ? (canary.tags || []).join(', ') : '';
+    document.getElementById('can-desc').value = canary ? (canary.description || '') : '';
+    document.getElementById('can-hi').checked = canary ? !!canary.high_confidence : true;
+    m.classList.add('show');
+}
+
+function canCloseForm() {
+    document.getElementById('can-modal-bg').classList.remove('show');
+}
+
+function canEdit(id) {
+    const c = canCache.find(x => x.id === id);
+    if (c) canOpenForm(c);
+}
+
+async function canDelete(id) {
+    if (!confirm('Delete this canary? Hit history will be removed too.')) return;
+    const r = await fetch(CAN_API + '/' + id, { method: 'DELETE' });
+    if (r.ok) canRefresh();
+    else alert('Delete failed');
+}
+
+async function canSubmit(ev) {
+    ev.preventDefault();
+    const id = document.getElementById('can-id').value;
+    const tagsRaw = document.getElementById('can-tags').value;
+    const body = {
+        name: document.getElementById('can-name').value.trim(),
+        canary_type: document.getElementById('can-type').value,
+        value: document.getElementById('can-value').value.trim(),
+        description: document.getElementById('can-desc').value.trim() || null,
+        location: document.getElementById('can-location').value.trim() || null,
+        tags: tagsRaw ? tagsRaw.split(',').map(s => s.trim()).filter(Boolean) : [],
+        high_confidence: document.getElementById('can-hi').checked,
+    };
+    const url = id ? (CAN_API + '/' + id) : CAN_API;
+    const method = id ? 'PATCH' : 'POST';
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (r.ok) {
+        canCloseForm();
+        canRefresh();
+    } else {
+        const j = await r.json().catch(() => ({}));
+        alert('Save failed: ' + (j.detail || 'unknown error'));
+    }
+    return false;
+}
+
+async function canScan() {
+    const btn = event.currentTarget;
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Scanning...';
+    try {
+        const r = await fetch(CAN_API + '/scan?hours=24', { method: 'POST' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || 'Scan failed');
+        const msg = j.error
+            ? 'Scan completed with warnings: ' + j.error
+            : `Scanned ${j.scanned} alerts, ${j.matched} matched, ${j.new_hits} new hits.`;
+        alert(msg);
+        canRefresh();
+    } catch (e) {
+        alert('Scan failed: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = orig;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', canBootstrap);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') canCloseForm(); });
+</script>
+{% endblock %}

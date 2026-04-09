@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Morning Briefing - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-sunrise"></i> Morning Threat Briefing</h1>
+    <div class="header-actions">
+        <label class="brf-window">
+            Window:
+            <select id="brf-hours" onchange="brfLoad()">
+                <option value="6">6 hours</option>
+                <option value="12" selected>12 hours (overnight)</option>
+                <option value="24">24 hours</option>
+                <option value="72">3 days</option>
+                <option value="168">7 days</option>
+            </select>
+        </label>
+        <button class="btn btn-secondary" onclick="brfLoad()">Refresh</button>
+        <button class="btn btn-primary" onclick="brfLoad(true)">Generate AI Summary</button>
+    </div>
+</div>
+
+<div id="brf-content"><div class="brf-loading"><span class="brf-spinner"></span> Composing briefing...</div></div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.brf-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.brf-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:brf-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes brf-spin{to{transform:rotate(360deg)}}
+.brf-window{display:inline-flex;align-items:center;gap:8px;color:var(--text-secondary);font-size:.78rem}
+.brf-window select{background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:var(--radius);font:inherit;font-size:.82rem}
+
+.brf-meta{font-size:.78rem;color:var(--text-secondary);margin-bottom:14px}
+
+/* Headlines */
+.brf-headlines{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px}
+.brf-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;text-align:center;position:relative;overflow:hidden}
+.brf-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary);opacity:.4}
+.brf-stat-val{font-size:1.7rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--primary)}
+.brf-stat-val.warn{color:var(--sev-medium,#d29922)}
+.brf-stat-val.crit{color:var(--sev-critical,#f85149)}
+.brf-stat-val.muted{color:var(--text-secondary)}
+.brf-stat-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+
+/* AI narrative */
+.brf-narrative{background:linear-gradient(135deg, rgba(88,166,255,.06), rgba(88,166,255,.02));border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:var(--radius-lg);padding:18px 22px;margin-bottom:18px}
+.brf-narrative-label{font-size:.7rem;color:var(--primary);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:8px}
+.brf-narrative-body{font-size:.92rem;color:var(--text-primary);line-height:1.6;white-space:pre-wrap}
+.brf-narrative.empty .brf-narrative-body{color:var(--text-secondary);font-style:italic}
+
+/* Section grid */
+.brf-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+@media (max-width: 900px){.brf-grid{grid-template-columns:1fr}}
+.brf-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px}
+.brf-card-title{font-size:.78rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.brf-card-title .brf-pill{background:var(--bg-tertiary);border:1px solid var(--border);padding:2px 8px;border-radius:99px;font-size:.62rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.brf-card-title .brf-pill.live{color:var(--mitre-covered,#3fb950);border-color:rgba(63,185,80,.4)}
+.brf-card-title .brf-pill.off{color:var(--sev-critical,#f85149);border-color:rgba(248,81,73,.4)}
+
+.brf-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.brf-list li{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg-tertiary);border-radius:var(--radius);font-size:.82rem;color:var(--text-primary)}
+.brf-list li strong{font-family:'JetBrains Mono',monospace;color:var(--primary);font-size:.85rem}
+.brf-empty{font-size:.78rem;color:var(--text-secondary);text-align:center;padding:14px;font-style:italic}
+
+.brf-sev{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.brf-sev-pill{padding:4px 10px;border-radius:99px;font-size:.7rem;font-weight:700;background:var(--bg-tertiary);border:1px solid var(--border)}
+.brf-sev-pill.critical{background:rgba(248,81,73,.18);color:var(--sev-critical,#f85149);border-color:rgba(248,81,73,.4)}
+.brf-sev-pill.high{background:rgba(240,136,62,.18);color:var(--sev-high,#f0883e);border-color:rgba(240,136,62,.4)}
+.brf-sev-pill.medium{background:rgba(210,153,34,.18);color:var(--sev-medium,#d29922);border-color:rgba(210,153,34,.4)}
+.brf-sev-pill.low{background:rgba(99,110,123,.18);color:var(--text-secondary);border-color:var(--border)}
+</style>
+<script>
+const BRF_API = '/api/briefing';
+function brfEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function brfFmt(iso){if(!iso)return'-';try{return new Date(iso).toLocaleString()}catch(e){return iso}}
+
+async function brfLoad(withAI) {
+    const c = document.getElementById('brf-content');
+    const hours = document.getElementById('brf-hours').value;
+    c.innerHTML = `<div class="brf-loading"><span class="brf-spinner"></span> ${withAI ? 'Generating AI summary...' : 'Composing briefing...'}</div>`;
+    try {
+        const r = await fetch(`${BRF_API}?hours=${hours}${withAI ? '&ai=true' : ''}`);
+        if (!r.ok) throw new Error('Briefing request failed');
+        brfRender(await r.json());
+    } catch (e) {
+        c.innerHTML = `<div class="brf-loading" style="color:var(--sev-critical,#f85149)">${brfEsc(e.message)}</div>`;
+    }
+}
+
+function brfRender(b) {
+    const h = b.headlines || {};
+    const es = b.es || {};
+    const cases = b.cases || {};
+    const octi = b.opencti || {};
+    const tide = b.tide || {};
+    const sources = b.sources_reached || [];
+
+    let html = `<div class="brf-meta">Generated ${brfFmt(b.generated_at)} &middot; Window: last ${b.window_hours||0}h &middot; Sources reached: ${sources.length ? sources.join(', ') : '<em>none</em>'}</div>`;
+
+    // AI narrative (or hint)
+    if (b.narrative) {
+        html += `<div class="brf-narrative">
+            <div class="brf-narrative-label">AI Briefing</div>
+            <div class="brf-narrative-body">${brfEsc(b.narrative)}</div>
+        </div>`;
+    }
+
+    // Headlines
+    html += `<div class="brf-headlines">
+        <div class="brf-stat"><div class="brf-stat-val">${h.alerts_total||0}</div><div class="brf-stat-label">Alerts</div></div>
+        <div class="brf-stat"><div class="brf-stat-val">${h.cases_opened||0}</div><div class="brf-stat-label">Cases Opened</div></div>
+        <div class="brf-stat"><div class="brf-stat-val">${h.cases_closed||0}</div><div class="brf-stat-label">Cases Closed</div></div>
+        <div class="brf-stat"><div class="brf-stat-val warn">${h.open_backlog||0}</div><div class="brf-stat-label">Open Backlog</div></div>
+        <div class="brf-stat"><div class="brf-stat-val muted">${h.actors_tracked||0}</div><div class="brf-stat-label">Actors Tracked</div></div>
+        <div class="brf-stat"><div class="brf-stat-val muted">${h.tide_rules_enabled||'-'}</div><div class="brf-stat-label">TIDE Rules Live</div></div>
+    </div>`;
+
+    html += '<div class="brf-grid">';
+
+    // Alerts card
+    html += `<div class="brf-card">
+        <div class="brf-card-title">Alert Activity <span class="brf-pill ${es.enabled ? 'live' : 'off'}">${es.enabled ? 'live' : 'es offline'}</span></div>`;
+    if (es.by_severity && Object.keys(es.by_severity).length) {
+        html += '<div class="brf-sev">';
+        for (const [sev, cnt] of Object.entries(es.by_severity)) {
+            html += `<span class="brf-sev-pill ${brfEsc(sev)}">${brfEsc(sev)}: ${cnt}</span>`;
+        }
+        html += '</div>';
+    }
+    if (es.top_rules && es.top_rules.length) {
+        html += '<ul class="brf-list">';
+        for (const r of es.top_rules.slice(0, 6)) {
+            const name = (r && r.name) || (typeof r === 'string' ? r : JSON.stringify(r));
+            const count = (r && r.count) || (r && r.doc_count) || '';
+            html += `<li><span>${brfEsc(name)}</span>${count !== '' ? `<strong>${brfEsc(count)}</strong>` : ''}</li>`;
+        }
+        html += '</ul>';
+    } else {
+        html += `<div class="brf-empty">No firing rules in window.</div>`;
+    }
+    html += '</div>';
+
+    // Cases card
+    html += `<div class="brf-card">
+        <div class="brf-card-title">Case Activity</div>`;
+    if ((cases.notable || []).length) {
+        html += '<ul class="brf-list">';
+        for (const c of cases.notable) {
+            html += `<li><span>${brfEsc(c.case_number || '')} &middot; ${brfEsc(c.title || '')}</span><strong>${brfEsc(c.severity || '-')}</strong></li>`;
+        }
+        html += '</ul>';
+    } else {
+        html += '<div class="brf-empty">No notable cases in window.</div>';
+    }
+    html += '</div>';
+
+    // OpenCTI card
+    html += `<div class="brf-card">
+        <div class="brf-card-title">Threat Actors <span class="brf-pill ${octi.enabled ? 'live' : 'off'}">${octi.enabled ? 'live' : 'opencti offline'}</span></div>`;
+    if ((octi.actors || []).length) {
+        html += '<ul class="brf-list">';
+        for (const a of octi.actors) {
+            html += `<li><span>${brfEsc(a.name || '-')}${a.aliases && a.aliases.length ? ' <em style="color:var(--text-secondary);font-size:.7rem">(' + a.aliases.map(brfEsc).join(', ') + ')</em>' : ''}</span></li>`;
+        }
+        html += '</ul>';
+    } else {
+        html += '<div class="brf-empty">No actor data available.</div>';
+    }
+    html += '</div>';
+
+    // TIDE card
+    html += `<div class="brf-card">
+        <div class="brf-card-title">Detection Posture <span class="brf-pill ${tide.enabled ? 'live' : 'off'}">${tide.enabled ? 'live' : 'tide offline'}</span></div>`;
+    if (tide.enabled) {
+        html += `<ul class="brf-list">
+            <li><span>Total rules</span><strong>${tide.total_rules ?? '-'}</strong></li>
+            <li><span>Enabled</span><strong>${tide.enabled_rules ?? '-'}</strong></li>
+            <li><span>MITRE techniques covered</span><strong>${tide.mitre_techniques_covered ?? '-'}</strong></li>
+            <li><span>Avg quality score</span><strong>${tide.quality_avg ?? '-'}</strong></li>
+        </ul>`;
+    } else {
+        html += '<div class="brf-empty">TIDE not configured. Add it in <a href="/settings#tide" style="color:var(--primary)">Settings</a>.</div>';
+    }
+    html += '</div>';
+
+    html += '</div>'; // /grid
+
+    if (!b.narrative) {
+        html += `<div class="brf-narrative empty">
+            <div class="brf-narrative-label">AI Briefing</div>
+            <div class="brf-narrative-body">Click "Generate AI Summary" above to have Ollama write an executive narrative from this snapshot.</div>
+        </div>`;
+    }
+
+    document.getElementById('brf-content').innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', () => brfLoad(false));
+</script>
+{% endblock %}
