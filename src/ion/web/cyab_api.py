@@ -684,6 +684,23 @@ def tide_system_mitre(system_id: str):
     return svc.get_mitre_coverage(system_id)
 
 
+@router.get("/tide/systems/{system_id}/use-cases", dependencies=[Depends(require_permission("alert:read"))])
+def tide_system_use_cases(system_id: str):
+    """Per-use-case (TIDE playbook) detection coverage scoped to one system.
+
+    For each TIDE playbook, walks each step's MITRE techniques and checks
+    whether any rule applied to THIS system covers them. Used by the CyAB
+    review document and the inline coverage panel.
+    """
+    svc = get_tide_service()
+    if not svc.enabled:
+        raise HTTPException(status_code=503, detail="TIDE not configured")
+    result = svc.get_system_use_case_coverage(system_id)
+    if result is None:
+        raise HTTPException(status_code=502, detail="Failed to query TIDE")
+    return result
+
+
 @router.get("/tide/rules", dependencies=[Depends(require_permission("alert:read"))])
 def tide_rules(search: str = "", limit: int = 50):
     """Search TIDE detection rules."""

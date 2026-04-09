@@ -1801,6 +1801,35 @@ async function saveAsDocument() {
     var md = '# ' + (ref || 'CyAB') + ' \u2014 CyAB Ingestion SLA\n\n';
     md += '| Field | Value |\n|-------|-------|\n';
     md += '| **System** | ' + d.name + ' |\n| **Reference** | ' + (ref || '') + ' |\n| **Version** | ' + d.version + ' |\n| **Status** | ' + d.status + ' |\n| **Department** | ' + d.department + ' |\n| **SOC Lead** | ' + (d.soc_lead || '') + ' |\n| **Dept Lead** | ' + (d.department_lead || '') + ' |\n\n';
+
+    // If a TIDE system is currently selected, snapshot use-case coverage
+    // and include it as a dedicated section. This is the main thing that
+    // makes a CyAB review meaningful — "do we detect what we said we'd detect?"
+    if (tideSelectedDetail && tideSelectedDetail._useCases && tideSelectedDetail._useCases.use_cases) {
+        var ucData = tideSelectedDetail._useCases;
+        var ucSum = ucData.summary || {};
+        md += '## Use Case Detection Coverage (TIDE)\n\n';
+        md += '_Per-use-case detection coverage scoped to this system\u2019s applied TIDE rules._\n\n';
+        md += '| Metric | Value |\n|---|---|\n';
+        md += '| **Overall Score** | ' + (ucSum.overall_score || 0) + '% |\n';
+        md += '| **Use Cases Tracked** | ' + (ucSum.use_case_count || 0) + ' |\n';
+        md += '| **Fully Covered** | ' + (ucSum.fully_covered || 0) + ' |\n';
+        md += '| **Partial** | ' + (ucSum.partial || 0) + ' |\n';
+        md += '| **Blind** | ' + (ucSum.blind || 0) + ' |\n';
+        md += '| **Steps Covered** | ' + (ucSum.covered_steps || 0) + ' / ' + (ucSum.total_steps || 0) + ' |\n\n';
+
+        md += '| Use Case | Score | State | Steps Covered | Blind / Partial Steps |\n|---|---|---|---|---|\n';
+        ucData.use_cases.forEach(function(uc) {
+            var blindList = (uc.steps || [])
+                .filter(function(st) { return st.state === 'blind' || st.state === 'partial'; })
+                .map(function(st) { return st.order + '. ' + st.name + ' (' + st.state + ')'; })
+                .join('<br>') || '\u2014';
+            md += '| ' + uc.name + ' | ' + uc.score + '% | ' + uc.state + ' | '
+                + uc.covered_steps + ' / ' + uc.step_count + ' | ' + blindList + ' |\n';
+        });
+        md += '\n';
+    }
+
     // Include each data source
     currentDataSources.forEach(function(ds) {
         md += '## Data Source: ' + ds.name + '\n\n| Param | Value |\n|---|---|\n';
@@ -1878,10 +1907,19 @@ async function onTideSystemSelected(systemId) {
         // Sequential requests — TIDE's DuckDB can't handle concurrent queries
         var detail = await api.get('/api/cyab/tide/systems/' + systemId);
         var mitre = await api.get('/api/cyab/tide/systems/' + systemId + '/mitre');
+        // Per-use-case coverage scoped to this system. Failure here is
+        // non-fatal — fall back to the MITRE-only view.
+        var useCases = null;
+        try {
+            useCases = await api.get('/api/cyab/tide/systems/' + systemId + '/use-cases');
+        } catch (uce) {
+            console.warn('Use case coverage failed (will skip):', uce);
+        }
         tideSelectedDetail = detail;
         tideSelectedDetail._mitre = mitre;
+        tideSelectedDetail._useCases = useCases;
         renderTideCoverage(detail);
-        autoPopulateGaps(detail, mitre);
+        autoPopulateGaps(detail, mitre, useCases);
         panel.style.display = '';
     } catch (e) {
         console.error('TIDE system detail error:', e);
@@ -1889,7 +1927,7 @@ async function onTideSystemSelected(systemId) {
     }
 }
 
-function autoPopulateGaps(detail, mitre) {
+function autoPopulateGaps(detail, mitre, useCases) {
     var detections = detail.detections || [];
     var totalRules = detail.total_rules || 0;
     var applied = detections.length;
@@ -1898,10 +1936,19 @@ function autoPopulateGaps(detail, mitre) {
     var allTechniques = mitre.techniques || [];
     var totalTech = mitre.total_techniques || allTechniques.length;
 
-    // Auto-set review status based on coverage
+    // Auto-set review status based on coverage. Use-case coverage takes
+    // precedence when available because it's the more meaningful metric for
+    // CyAB reviews — "do we detect the things we said we'd detect?"
     var ucStatus = document.getElementById('uc-status');
+    var ucSummary = (useCases && useCases.summary) || null;
     if (applied === 0) {
         ucStatus.value = 'Not Yet Reviewed';
+    } else if (ucSummary && ucSummary.use_case_count > 0) {
+        if (ucSummary.overall_score >= 80 && ucSummary.blind === 0) {
+            ucStatus.value = 'Reviewed \u2014 Fully Covered';
+        } else {
+            ucStatus.value = 'Reviewed \u2014 Known Gaps';
+        }
     } else if (coverage >= 70 && coveredTechniques.size >= totalTech * 0.7) {
         ucStatus.value = 'Reviewed \u2014 Fully Covered';
     } else {
@@ -1917,7 +1964,35 @@ function autoPopulateGaps(detail, mitre) {
     // 1. Overall coverage gap
     gapsText += 'TIDE Coverage Analysis: ' + systemName + '\n';
     gapsText += 'Rules applied: ' + applied + ' / ' + totalRules + ' (' + coverage + '% coverage)\n';
-    gapsText += 'MITRE techniques covered: ' + coveredTechniques.size + ' / ' + totalTech + '\n\n';
+    gapsText += 'MITRE techniques covered: ' + coveredTechniques.size + ' / ' + totalTech + '\n';
+    if (ucSummary) {
+        gapsText += 'Use-case coverage: ' + ucSummary.overall_score + '% '
+                  + '(' + ucSummary.fully_covered + ' fully covered, '
+                  + ucSummary.partial + ' partial, '
+                  + ucSummary.blind + ' blind of ' + ucSummary.use_case_count + ')\n';
+    }
+    gapsText += '\n';
+
+    // 1b. Per-use-case breakdown — most actionable for the CyAB review
+    if (useCases && useCases.use_cases && useCases.use_cases.length > 0) {
+        gapsText += 'Use Case Coverage:\n';
+        useCases.use_cases.forEach(function(uc) {
+            var stateLabel = uc.state.toUpperCase();
+            gapsText += '\n[' + stateLabel + '] ' + uc.name + ' \u2014 ' + uc.score + '% '
+                      + '(' + uc.covered_steps + ' covered / ' + uc.partial_steps + ' partial / '
+                      + uc.blind_steps + ' blind of ' + uc.step_count + ' steps)\n';
+            // List blind/partial steps so analysts can act on them
+            (uc.steps || []).forEach(function(step) {
+                if (step.state === 'blind' || step.state === 'partial') {
+                    var techList = (step.gap_techniques || []).join(', ');
+                    gapsText += '  - Step ' + step.order + ' (' + step.state + '): ' + step.name;
+                    if (techList) gapsText += ' [' + techList + ']';
+                    gapsText += '\n';
+                }
+            });
+        });
+        gapsText += '\n';
+    }
 
     // 2. Missing MITRE techniques grouped by tactic
     if (allTechniques.length > 0) {

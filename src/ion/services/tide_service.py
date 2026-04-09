@@ -624,6 +624,150 @@ class TideService:
             "systems_coverage": systems_coverage,
         }
 
+    def get_system_use_case_coverage(self, system_id: str) -> Optional[dict]:
+        """Compute per-use-case detection coverage scoped to a single CyAB/TIDE system.
+
+        For each TIDE playbook (use case), walks each step's MITRE techniques
+        and asks: of the rules currently *applied to this system* via
+        applied_detections, do any cover the technique? Returns a list of
+        use cases with per-step coverage state and an overall % per use case.
+
+        This is the per-system equivalent of get_playbooks_with_kill_chains
+        (which is global / not scoped to one system).
+        """
+        if not self.enabled or not system_id:
+            return None
+
+        safe_id = system_id.replace("'", "''")
+
+        # 1. Pull this system's applied rules and the MITRE techniques they
+        #    cover. One round-trip via LATERAL unnest.
+        applied = self._query(f"""
+            SELECT DISTINCT t.technique_id
+            FROM applied_detections ad
+            JOIN detection_rules dr
+              ON dr.rule_id = ad.detection_id AND dr.space = '{self.space}'
+            JOIN systems s ON s.id = ad.system_id,
+                 LATERAL unnest(dr.mitre_ids) AS t(technique_id)
+            WHERE ad.system_id = '{safe_id}'
+              AND dr.mitre_ids IS NOT NULL
+        """)
+        if applied is None:
+            return None
+
+        # Build a set of covered technique IDs and a set of "parent" IDs so a
+        # use case step listing T1003 is covered by an applied rule tagged
+        # with T1003.001 (and vice-versa).
+        covered_set: set[str] = set()
+        for row in (applied.get("rows") or []):
+            tid = (row.get("technique_id") or "").strip()
+            if not tid:
+                continue
+            covered_set.add(tid)
+            if "." in tid:
+                covered_set.add(tid.split(".", 1)[0])
+
+        def _is_covered(tid: str) -> bool:
+            if not tid:
+                return False
+            tid = tid.strip()
+            if tid in covered_set:
+                return True
+            # Sub-technique on the use case side, parent in the system's coverage
+            if "." in tid and tid.split(".", 1)[0] in covered_set:
+                return True
+            # Parent on the use case side, any sub on the system's coverage
+            prefix = tid + "."
+            return any(c.startswith(prefix) for c in covered_set)
+
+        # 2. Pull the playbooks (use cases) and walk steps + step_techniques.
+        playbooks = self.get_playbooks_with_kill_chains() or []
+
+        out_use_cases: list[dict] = []
+        overall_total_steps = 0
+        overall_covered_steps = 0
+        overall_partial_steps = 0
+
+        for pb in playbooks:
+            steps = pb.get("steps") or []
+            uc_total = len(steps)
+            uc_covered = 0
+            uc_partial = 0
+            uc_steps_out: list[dict] = []
+            for s in steps:
+                techs = s.get("techniques") or []
+                if not techs:
+                    state = "unknown"
+                else:
+                    cov = sum(1 for t in techs if _is_covered(t))
+                    if cov == 0:
+                        state = "blind"
+                    elif cov == len(techs):
+                        state = "covered"
+                    else:
+                        state = "partial"
+                uc_steps_out.append({
+                    "order": s.get("order"),
+                    "name": s.get("name"),
+                    "tactic": s.get("tactic"),
+                    "techniques": techs,
+                    "state": state,
+                    "covered_techniques": [t for t in techs if _is_covered(t)],
+                    "gap_techniques": [t for t in techs if not _is_covered(t)],
+                })
+                if state == "covered":
+                    uc_covered += 1
+                elif state == "partial":
+                    uc_partial += 1
+            overall_total_steps += uc_total
+            overall_covered_steps += uc_covered
+            overall_partial_steps += uc_partial
+
+            # Step-weighted score: covered = 1, partial = 0.5, blind/unknown = 0
+            uc_score = (
+                round(((uc_covered + uc_partial * 0.5) / uc_total) * 100)
+                if uc_total else 0
+            )
+            if uc_score >= 80:
+                uc_state = "covered"
+            elif uc_score >= 30:
+                uc_state = "partial"
+            else:
+                uc_state = "blind"
+
+            out_use_cases.append({
+                "id": pb.get("id"),
+                "name": pb.get("name"),
+                "description": pb.get("description"),
+                "step_count": uc_total,
+                "covered_steps": uc_covered,
+                "partial_steps": uc_partial,
+                "blind_steps": uc_total - uc_covered - uc_partial,
+                "score": uc_score,
+                "state": uc_state,
+                "steps": uc_steps_out,
+            })
+
+        overall_score = (
+            round(((overall_covered_steps + overall_partial_steps * 0.5) / overall_total_steps) * 100)
+            if overall_total_steps else 0
+        )
+
+        return {
+            "system_id": system_id,
+            "use_cases": out_use_cases,
+            "summary": {
+                "use_case_count": len(out_use_cases),
+                "fully_covered": sum(1 for uc in out_use_cases if uc["state"] == "covered"),
+                "partial": sum(1 for uc in out_use_cases if uc["state"] == "partial"),
+                "blind": sum(1 for uc in out_use_cases if uc["state"] == "blind"),
+                "total_steps": overall_total_steps,
+                "covered_steps": overall_covered_steps,
+                "partial_steps": overall_partial_steps,
+                "overall_score": overall_score,
+            },
+        }
+
     def test_connection(self) -> dict:
         if not self.enabled:
             return {"ok": False, "error": "TIDE integration not configured"}
