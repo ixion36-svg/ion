@@ -909,9 +909,23 @@ def tide_de_disabled_critical():
     return svc.get_disabled_critical_high()
 
 
+@router.get("/tide/de/use-cases", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_use_cases():
+    """TIDE playbooks (use cases) with steps + per-technique detection coverage.
+
+    A "use case" in CyAB / TIDE terminology is a baseline playbook describing
+    a tactical sequence of TTPs we want to detect (e.g. "Insider Threat: Data
+    Exfiltration"). The endpoint returns each use case with its ordered steps,
+    each step's MITRE techniques, and how many TIDE rules cover them.
+    """
+    svc = get_tide_service()
+    return svc.get_playbooks_with_kill_chains()
+
+
+# Deprecated alias — kept for backwards compatibility with older clients.
 @router.get("/tide/de/kill-chains", dependencies=[Depends(require_permission("alert:read"))])
-def tide_de_kill_chains():
-    """Playbooks with kill chain steps and technique coverage."""
+def tide_de_kill_chains_alias():
+    """Deprecated: use /tide/de/use-cases. Same response shape."""
     svc = get_tide_service()
     return svc.get_playbooks_with_kill_chains()
 

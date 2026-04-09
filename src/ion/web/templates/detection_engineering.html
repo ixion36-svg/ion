@@ -16,7 +16,7 @@
 <!-- Tabs -->
 <div class="de-tabs" id="de-tabs">
     <button class="de-tab active" data-tab="posture" onclick="deSwitch('posture')">Posture</button>
-    <button class="de-tab" data-tab="killchains" onclick="deSwitch('killchains')">Kill Chains</button>
+    <button class="de-tab" data-tab="killchains" onclick="deSwitch('killchains')">Use Cases</button>
     <button class="de-tab" data-tab="rules" onclick="deSwitch('rules')">Rules</button>
     <button class="de-tab" data-tab="execution" onclick="deSwitch('execution')">Execution</button>
     <button class="de-tab" data-tab="readiness" onclick="deSwitch('readiness')">Actor Readiness</button>
@@ -441,10 +441,10 @@ function renderQualityBar(q, total) {
     return bar;
 }
 
-/* ── Kill Chains tab ──────────────────────────── */
+/* ── Use Cases tab (TIDE baselines / playbooks) ─── */
 async function loadKillChains() {
     try {
-        const data = await apiFetch('/tide/de/kill-chains');
+        const data = await apiFetch('/tide/de/use-cases');
         _killChainsData = data;
         renderKillChains(data);
         _loaded.killchains = true;
@@ -455,7 +455,7 @@ async function loadKillChains() {
 
 function renderKillChains(playbooks) {
     if (!playbooks.length) {
-        $('de-panel-killchains').innerHTML='<div class="de-empty">No playbooks found in TIDE</div>';
+        $('de-panel-killchains').innerHTML='<div class="de-empty">No use cases found in TIDE</div>';
         return;
     }
     let html = '';
