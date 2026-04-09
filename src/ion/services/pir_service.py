@@ -73,6 +73,7 @@ def update_pir(session: Session, pir_id: int, **fields) -> Optional[PostIncident
     allowed = {
         "status", "summary", "timeline", "what_worked", "what_didnt",
         "root_cause", "detection_gaps", "response_gaps", "metrics",
+        "linked_controls",
     }
     for k, v in fields.items():
         if k in allowed:

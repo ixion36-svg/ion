@@ -755,6 +755,12 @@ async def knowledge_graph_page(request: Request, user: User = Depends(require_pa
     return templates.TemplateResponse(request=request, name="knowledge_graph.html")
 
 
+@app.get("/compliance", response_class=HTMLResponse)
+async def compliance_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the multi-framework Compliance Posture page."""
+    return templates.TemplateResponse(request=request, name="compliance.html")
+
+
 @app.get("/pir", response_class=HTMLResponse)
 async def pir_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the Post-Incident Review page."""

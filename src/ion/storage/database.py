@@ -388,6 +388,37 @@ def _run_migrations(engine: Engine) -> None:
                 conn.execute(text("ALTER TABLE cyab_data_sources ADD COLUMN data_namespace VARCHAR(128)"))
                 logger.info("Migrated: cyab_data_sources.data_namespace")
 
+    # Quarterly review fields on service_accounts (PCI 7.2.4 / ISO A.5.16)
+    if insp.has_table("service_accounts"):
+        existing = {col["name"] for col in insp.get_columns("service_accounts")}
+        sa_cols = {
+            "last_reviewed_at": dt_type,
+            "last_reviewed_by_id": "INTEGER",
+            "review_cadence_days": "INTEGER",
+            "review_notes": "TEXT",
+        }
+        with engine.begin() as conn:
+            for col_name, col_type in sa_cols.items():
+                if col_name not in existing:
+                    conn.execute(
+                        text(f"ALTER TABLE service_accounts ADD COLUMN {col_name} {col_type}")
+                    )
+                    logger.info("Migrated: service_accounts.%s", col_name)
+            # Backfill default cadence so existing rows aren't NULL
+            conn.execute(
+                text("UPDATE service_accounts SET review_cadence_days = 90 WHERE review_cadence_days IS NULL")
+            )
+
+    # PIR linked_controls (multi-framework compliance evidence)
+    if insp.has_table("post_incident_reviews"):
+        existing = {col["name"] for col in insp.get_columns("post_incident_reviews")}
+        if "linked_controls" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE post_incident_reviews ADD COLUMN linked_controls JSON")
+                )
+                logger.info("Migrated: post_incident_reviews.linked_controls")
+
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
 

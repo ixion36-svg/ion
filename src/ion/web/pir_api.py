@@ -31,6 +31,8 @@ class PIRUpdate(BaseModel):
     detection_gaps: Optional[str] = None
     response_gaps: Optional[str] = None
     metrics: Optional[dict] = None
+    # List of {framework_id, control_id} dicts
+    linked_controls: Optional[list[dict]] = None
 
 
 class ActionCreate(BaseModel):

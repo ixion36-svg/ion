@@ -93,10 +93,16 @@ class ServiceAccount(Base, TimestampMixin):
     permissions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON: key permissions/group memberships
     spn: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # Service Principal Names
     risk_level: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")  # critical, high, medium, low
-    review_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    review_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)  # legacy: manual next-review override
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Quarterly review workflow (PCI 7.2.4, ISO A.5.16, NIST 800-53 AC-2(j))
+    last_reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_reviewed_by_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    review_cadence_days: Mapped[int] = mapped_column(Integer, nullable=False, default=90)
+    review_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     owner = relationship("User", foreign_keys=[owner_id])
+    last_reviewed_by = relationship("User", foreign_keys=[last_reviewed_by_id])
 
 
 class UserBookmark(Base, TimestampMixin):

@@ -930,6 +930,125 @@ def tide_de_kill_chains_alias():
     return svc.get_playbooks_with_kill_chains()
 
 
+@router.get("/tide/de/navigator-layer", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_navigator_layer():
+    """Export the live TIDE coverage as a MITRE ATT&CK Navigator layer file.
+
+    Returns a downloadable JSON layer compatible with
+    https://mitre-attack.github.io/attack-navigator/. Each technique is
+    annotated with the number of enabled / total TIDE rules and a heat-map
+    colour. Auditors and red teams can drop the file straight into Navigator.
+    """
+    from fastapi.responses import Response
+    import json
+    from datetime import datetime
+
+    svc = get_tide_service()
+    if not svc.enabled:
+        raise HTTPException(status_code=503, detail="TIDE not configured")
+
+    coverage = svc.get_global_mitre_coverage()
+    if not coverage:
+        raise HTTPException(status_code=502, detail="TIDE returned no coverage data")
+
+    techniques_data = coverage.get("techniques", {}) or {}
+
+    # Score: 0 (blind) → 4 (excellent). Used as Navigator's `score`.
+    def _score(rule_count: int, enabled: int) -> int:
+        if enabled <= 0:
+            return 0
+        if rule_count >= 5 and enabled >= 3:
+            return 4
+        if rule_count >= 3 and enabled >= 2:
+            return 3
+        if enabled >= 1:
+            return 2
+        return 1
+
+    nav_techniques = []
+    for tid, info in techniques_data.items():
+        if not isinstance(info, dict):
+            continue
+        rule_count = int(info.get("rule_count") or 0)
+        enabled_rules = int(info.get("enabled_rules") or 0)
+        sev = info.get("severity") or {}
+        comment_parts = [
+            f"{enabled_rules}/{rule_count} enabled rules",
+        ]
+        if sev:
+            sev_summary = ", ".join(
+                f"{k}:{v}" for k, v in sev.items() if v
+            )
+            if sev_summary:
+                comment_parts.append(sev_summary)
+        systems = info.get("systems") or []
+        if systems:
+            comment_parts.append(
+                f"systems: {', '.join(s.get('name', '') for s in systems[:3])}"
+                + (" ..." if len(systems) > 3 else "")
+            )
+        nav_techniques.append({
+            "techniqueID": tid,
+            "score": _score(rule_count, enabled_rules),
+            "comment": " · ".join(comment_parts),
+            "enabled": True,
+            "metadata": [
+                {"name": "rule_count", "value": str(rule_count)},
+                {"name": "enabled_rules", "value": str(enabled_rules)},
+                {"name": "avg_quality", "value": str(info.get("avg_quality") or "")},
+            ],
+        })
+
+    layer = {
+        "name": f"ION TIDE Coverage ({svc.space})",
+        "versions": {
+            "attack": "14",
+            "navigator": "5.0.0",
+            "layer": "4.5",
+        },
+        "domain": "enterprise-attack",
+        "description": (
+            f"Live coverage from ION at {datetime.utcnow().isoformat()}Z. "
+            f"{len(nav_techniques)} techniques mapped from TIDE space '{svc.space}'."
+        ),
+        "filters": {
+            "platforms": [
+                "Windows", "Linux", "macOS", "Network", "PRE", "Containers",
+                "Office 365", "SaaS", "Google Workspace", "IaaS", "Azure AD",
+            ],
+        },
+        "sorting": 0,
+        "layout": {"layout": "side", "showName": True, "showID": False},
+        "hideDisabled": False,
+        "techniques": nav_techniques,
+        "gradient": {
+            "colors": ["#ff6666", "#ffe766", "#8ec843"],
+            "minValue": 0,
+            "maxValue": 4,
+        },
+        "legendItems": [
+            {"label": "Blind", "color": "#ff6666"},
+            {"label": "Partial", "color": "#ffe766"},
+            {"label": "Covered", "color": "#8ec843"},
+        ],
+        "metadata": [
+            {"name": "Source", "value": "ION Detection Engineering"},
+            {"name": "Space", "value": svc.space},
+        ],
+    }
+
+    body = json.dumps(layer, indent=2)
+    filename = f"ion-tide-coverage-{svc.space}-{datetime.utcnow().strftime('%Y%m%d')}.json"
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.get("/tide/de/rules", dependencies=[Depends(require_permission("alert:read"))])
 def tide_de_rules(search: str = "", severity: str = "", enabled: str = "",
                   offset: int = 0, limit: int = 50):

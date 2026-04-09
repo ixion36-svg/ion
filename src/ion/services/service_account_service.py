@@ -24,6 +24,23 @@ def _parse_json(raw: Optional[str]) -> list | dict | None:
 
 
 def _account_to_dict(acct: ServiceAccount) -> dict:
+    cadence = acct.review_cadence_days or 90
+    next_due = None
+    overdue = False
+    days_until_due = None
+    if acct.last_reviewed_at:
+        next_due_dt = acct.last_reviewed_at + timedelta(days=cadence)
+        next_due = next_due_dt.date().isoformat()
+        days_until_due = (next_due_dt.date() - datetime.utcnow().date()).days
+        overdue = days_until_due < 0
+    elif acct.review_date:
+        next_due = acct.review_date.isoformat()
+        days_until_due = (acct.review_date - datetime.utcnow().date()).days
+        overdue = days_until_due < 0
+    else:
+        # Never reviewed and no manual override → treat as overdue immediately
+        overdue = True
+
     return {
         "id": acct.id,
         "account_name": acct.account_name,
@@ -45,9 +62,56 @@ def _account_to_dict(acct: ServiceAccount) -> dict:
         "risk_level": acct.risk_level,
         "review_date": acct.review_date.isoformat() if acct.review_date else None,
         "notes": acct.notes,
+        # Quarterly review workflow
+        "last_reviewed_at": acct.last_reviewed_at.isoformat() if acct.last_reviewed_at else None,
+        "last_reviewed_by_id": acct.last_reviewed_by_id,
+        "last_reviewed_by_username": acct.last_reviewed_by.username if acct.last_reviewed_by else None,
+        "review_cadence_days": cadence,
+        "review_notes": acct.review_notes,
+        "next_review_due": next_due,
+        "days_until_due": days_until_due,
+        "review_overdue": overdue,
         "created_at": acct.created_at.isoformat() if acct.created_at else None,
         "updated_at": acct.updated_at.isoformat() if acct.updated_at else None,
     }
+
+
+def mark_reviewed(
+    session: Session,
+    account_id: int,
+    reviewer_id: int,
+    notes: Optional[str] = None,
+    cadence_days: Optional[int] = None,
+) -> dict:
+    """Record that a service account has just been reviewed."""
+    acct = session.get(ServiceAccount, account_id)
+    if not acct:
+        return {}
+    acct.last_reviewed_at = datetime.utcnow()
+    acct.last_reviewed_by_id = reviewer_id
+    if notes is not None:
+        acct.review_notes = notes
+    if cadence_days and cadence_days > 0:
+        acct.review_cadence_days = cadence_days
+    session.flush()
+    session.refresh(acct)
+    return _account_to_dict(acct)
+
+
+def get_overdue_reviews(session: Session) -> list[dict]:
+    """All active accounts whose review is overdue."""
+    accounts = session.execute(
+        select(ServiceAccount).where(
+            ServiceAccount.status.in_(["active", "pending_review"])
+        )
+    ).scalars().all()
+    out = []
+    for a in accounts:
+        d = _account_to_dict(a)
+        if d.get("review_overdue"):
+            out.append(d)
+    out.sort(key=lambda x: x.get("days_until_due") if x.get("days_until_due") is not None else -999999)
+    return out
 
 
 def get_service_accounts(

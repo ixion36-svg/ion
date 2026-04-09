@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
-from ion.auth.dependencies import require_permission
+from ion.auth.dependencies import require_permission, get_current_user
+from ion.models.user import User
 from ion.web.api import get_db_session
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,11 @@ class ServiceAccountCreate(BaseModel):
     permissions: Optional[list] = None
     spn: Optional[str] = None
     notes: Optional[str] = None
+
+
+class MarkReviewedRequest(BaseModel):
+    notes: Optional[str] = None
+    cadence_days: Optional[int] = None
 
 
 @router.get("", dependencies=[Depends(require_permission("alert:read"))])
@@ -72,3 +78,28 @@ def create_account(data: ServiceAccountCreate, session: Session = Depends(get_db
         permissions=json.dumps(data.permissions) if data.permissions else None,
         spn=data.spn, notes=data.notes,
     )
+
+
+@router.get("/reviews/overdue", dependencies=[Depends(require_permission("alert:read"))])
+def list_overdue_reviews(session: Session = Depends(get_db_session)):
+    """All active service accounts whose review is overdue (PCI 7.2.4 / ISO A.5.16)."""
+    from ion.services.service_account_service import get_overdue_reviews
+    return {"accounts": get_overdue_reviews(session)}
+
+
+@router.post("/{account_id}/mark-reviewed", dependencies=[Depends(require_permission("system:settings"))])
+def mark_account_reviewed(
+    account_id: int,
+    data: MarkReviewedRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Record that a service account has just been reviewed by the current user."""
+    from ion.services.service_account_service import mark_reviewed
+    result = mark_reviewed(
+        session, account_id, current_user.id,
+        notes=data.notes, cadence_days=data.cadence_days,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return result

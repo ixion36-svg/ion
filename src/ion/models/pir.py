@@ -76,6 +76,8 @@ class PostIncidentReview(Base, TimestampMixin):
     detection_gaps: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     response_gaps: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     metrics: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Compliance evidence — list of {framework_id, control_id} this incident touched
+    linked_controls: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
 
     # AI-suggested improvements (stored separately so the analyst can edit
     # the human fields without losing the suggestion).
@@ -114,6 +116,7 @@ class PostIncidentReview(Base, TimestampMixin):
             "detection_gaps": self.detection_gaps,
             "response_gaps": self.response_gaps,
             "metrics": self.metrics,
+            "linked_controls": self.linked_controls or [],
             "ai_suggestions": self.ai_suggestions,
             "ai_generated_at": self.ai_generated_at.isoformat() if self.ai_generated_at else None,
             "created_by_id": self.created_by_id,
