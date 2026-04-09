@@ -47,6 +47,10 @@ from ion.web.d3fend_api import router as d3fend_router
 from ion.web.canary_api import router as canary_router
 from ion.web.log_source_api import router as log_source_router
 from ion.web.briefing_api import router as briefing_router
+from ion.web.knowledge_graph_api import router as knowledge_graph_router
+from ion.web.pir_api import router as pir_router
+from ion.web.emulation_api import router as emulation_router
+from ion.web.vulnerability_api import router as vulnerability_router
 from ion.web.executive_report_api import router as executive_report_router
 from ion.web.ioc_staleness_api import router as ioc_staleness_router
 from ion.web.training_sim_api import router as training_sim_router
@@ -227,6 +231,10 @@ app.include_router(d3fend_router, prefix="/api")
 app.include_router(canary_router, prefix="/api")
 app.include_router(log_source_router, prefix="/api")
 app.include_router(briefing_router, prefix="/api")
+app.include_router(knowledge_graph_router, prefix="/api")
+app.include_router(pir_router, prefix="/api")
+app.include_router(emulation_router, prefix="/api")
+app.include_router(vulnerability_router, prefix="/api")
 app.include_router(executive_report_router, prefix="/api")
 app.include_router(ioc_staleness_router, prefix="/api")
 app.include_router(training_sim_router, prefix="/api")
@@ -745,6 +753,30 @@ async def log_sources_page(request: Request, user: User = Depends(require_page_p
 async def briefing_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the Morning Threat Briefing page."""
     return templates.TemplateResponse(request=request, name="briefing.html")
+
+
+@app.get("/knowledge-graph", response_class=HTMLResponse)
+async def knowledge_graph_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Knowledge Graph page."""
+    return templates.TemplateResponse(request=request, name="knowledge_graph.html")
+
+
+@app.get("/pir", response_class=HTMLResponse)
+async def pir_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Post-Incident Review page."""
+    return templates.TemplateResponse(request=request, name="pir.html")
+
+
+@app.get("/emulation", response_class=HTMLResponse)
+async def emulation_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Adversary Emulation Plans page."""
+    return templates.TemplateResponse(request=request, name="emulation.html")
+
+
+@app.get("/vulnerabilities", response_class=HTMLResponse)
+async def vulnerabilities_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Vulnerability ↔ Detection Coverage page."""
+    return templates.TemplateResponse(request=request, name="vulnerabilities.html")
 
 
 @app.get("/shift-handover", response_class=HTMLResponse)

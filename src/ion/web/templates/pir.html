@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block title %}Post-Incident Reviews - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-clipboard-check"></i> Post-Incident Reviews</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="pirShowBacklog()">Action Backlog</button>
+        <button class="btn btn-primary" onclick="pirRefresh()">Refresh</button>
+    </div>
+</div>
+
+<div class="pir-layout">
+    <aside class="pir-list" id="pir-list">
+        <div class="pir-loading"><span class="pir-spinner"></span> Loading...</div>
+    </aside>
+    <main class="pir-detail" id="pir-detail">
+        <div class="pir-empty">Select a PIR on the left to view or edit it.</div>
+    </main>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.pir-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.pir-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:pir-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes pir-spin{to{transform:rotate(360deg)}}
+.pir-empty{text-align:center;padding:60px 24px;color:var(--text-secondary);font-style:italic}
+
+.pir-layout{display:grid;grid-template-columns:300px 1fr;gap:14px;height:calc(100vh - 180px);min-height:500px}
+@media (max-width: 900px){.pir-layout{grid-template-columns:1fr;height:auto}}
+.pir-list{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:8px;overflow-y:auto}
+.pir-detail{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 22px;overflow-y:auto}
+
+.pir-card{padding:10px 12px;border-radius:var(--radius);margin-bottom:6px;cursor:pointer;border:1px solid transparent;background:var(--bg-tertiary)}
+.pir-card:hover{border-color:var(--border)}
+.pir-card.active{border-color:var(--primary);background:rgba(88,166,255,.08)}
+.pir-card-title{font-size:.85rem;font-weight:700;color:var(--text-primary);margin-bottom:3px;line-height:1.25}
+.pir-card-meta{font-size:.7rem;color:var(--text-secondary);display:flex;justify-content:space-between;gap:8px}
+.pir-card-status{font-size:.62rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:2px 6px;border-radius:99px}
+.pir-card-status.draft{background:rgba(99,110,123,.18);color:var(--text-secondary)}
+.pir-card-status.review{background:rgba(210,153,34,.18);color:var(--sev-medium,#d29922)}
+.pir-card-status.approved{background:rgba(63,185,80,.18);color:var(--mitre-covered,#3fb950)}
+
+.pir-detail h2{font-size:1.05rem;color:var(--text-primary);margin:0 0 4px 0}
+.pir-detail-sub{font-size:.78rem;color:var(--text-secondary);margin-bottom:14px}
+
+.pir-section{margin-bottom:16px}
+.pir-section-label{font-size:.7rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center}
+.pir-section textarea{width:100%;min-height:90px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:8px 10px;border-radius:var(--radius);font:inherit;font-size:.85rem;resize:vertical}
+.pir-section textarea:focus{outline:none;border-color:var(--primary)}
+
+.pir-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:14px}
+.pir-metric{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;text-align:center}
+.pir-metric-val{font-size:1.1rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--primary)}
+.pir-metric-label{font-size:.62rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+.pir-actions-list{margin-top:6px;display:flex;flex-direction:column;gap:6px}
+.pir-action{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;padding:8px 12px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);font-size:.82rem}
+.pir-action-title{color:var(--text-primary);font-weight:600}
+.pir-action-meta{font-size:.66rem;color:var(--text-secondary)}
+.pir-action select{background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:3px 6px;border-radius:var(--radius);font-size:.7rem}
+.pir-action button{background:none;border:1px solid var(--border);color:var(--text-secondary);padding:3px 8px;border-radius:var(--radius);cursor:pointer;font-size:.7rem}
+.pir-action button:hover{color:var(--sev-critical,#f85149);border-color:var(--sev-critical,#f85149)}
+
+.pir-add-action{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;margin-top:8px}
+.pir-add-action input,.pir-add-action select{background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:var(--radius);font:inherit;font-size:.78rem}
+
+.pir-suggest-box{background:linear-gradient(135deg, rgba(188,140,255,.06), rgba(188,140,255,.02));border:1px solid var(--border);border-left:3px solid #bc8cff;padding:12px 16px;border-radius:var(--radius);font-size:.84rem;color:var(--text-primary);white-space:pre-wrap;line-height:1.5;margin-top:8px}
+
+.pir-row-buttons{display:flex;gap:8px;margin-top:10px}
+
+.pir-empty-create{padding:60px 24px;text-align:center;color:var(--text-secondary)}
+.pir-empty-create input{background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:7px 12px;border-radius:var(--radius);font:inherit;font-size:.85rem;margin-right:8px;width:160px}
+</style>
+<script>
+const PIR_API = '/api/pirs';
+let pirCache = [];
+let currentPir = null;
+
+function pirEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+
+async function pirRefresh() {
+    const list = document.getElementById('pir-list');
+    list.innerHTML = '<div class="pir-loading"><span class="pir-spinner"></span> Loading...</div>';
+    try {
+        const r = await fetch(PIR_API);
+        const j = await r.json();
+        pirCache = j.pirs || [];
+        pirRenderList();
+    } catch (e) {
+        list.innerHTML = `<div class="pir-loading" style="color:var(--sev-critical,#f85149)">${pirEsc(e.message)}</div>`;
+    }
+}
+
+function pirRenderList() {
+    const list = document.getElementById('pir-list');
+    if (!pirCache.length) {
+        list.innerHTML = `<div class="pir-empty-create">
+            <p>No PIRs yet. Create one for a closed case:</p>
+            <input id="pir-new-case" type="number" placeholder="Case ID" min="1">
+            <button class="btn btn-primary" onclick="pirCreateFromInput()">Create</button>
+        </div>`;
+        return;
+    }
+    let html = `<div style="padding:8px 6px;font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:700">${pirCache.length} PIRs</div>`;
+    for (const p of pirCache) {
+        const active = currentPir && currentPir.id === p.id ? 'active' : '';
+        html += `<div class="pir-card ${active}" onclick="pirSelect(${p.id})">
+            <div class="pir-card-title">PIR #${p.id} &middot; Case ${p.case_id}</div>
+            <div class="pir-card-meta">
+                <span>${pirEsc(p.created_by_username || '-')}</span>
+                <span class="pir-card-status ${pirEsc(p.status)}">${pirEsc(p.status)}</span>
+            </div>
+        </div>`;
+    }
+    html += `<div style="padding:10px 6px;border-top:1px solid var(--border);margin-top:10px">
+        <p style="font-size:.7rem;color:var(--text-secondary);margin-bottom:6px">Create new PIR for case:</p>
+        <input id="pir-new-case" type="number" placeholder="Case ID" min="1" style="width:80px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:5px 8px;border-radius:var(--radius);font-size:.78rem">
+        <button class="btn btn-secondary btn-sm" onclick="pirCreateFromInput()" style="padding:4px 10px;font-size:.78rem">+ Create</button>
+    </div>`;
+    list.innerHTML = html;
+}
+
+async function pirCreateFromInput() {
+    const id = document.getElementById('pir-new-case').value;
+    if (!id) return;
+    const r = await fetch(PIR_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ case_id: parseInt(id, 10) }) });
+    if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        alert('Create failed: ' + (j.detail || 'unknown'));
+        return;
+    }
+    const created = await r.json();
+    await pirRefresh();
+    pirSelect(created.id);
+}
+
+async function pirSelect(id) {
+    const r = await fetch(`${PIR_API}/${id}`);
+    if (!r.ok) return;
+    currentPir = await r.json();
+    pirRenderDetail();
+    pirRenderList();
+}
+
+function pirRenderDetail() {
+    const det = document.getElementById('pir-detail');
+    if (!currentPir) {
+        det.innerHTML = '<div class="pir-empty">Select a PIR on the left to view or edit it.</div>';
+        return;
+    }
+    const p = currentPir;
+    const m = p.metrics || {};
+    let html = `<h2>PIR #${p.id}: Case ${pirEsc(m.case_number || p.case_id)}</h2>
+    <div class="pir-detail-sub">
+        Status: <strong>${pirEsc(p.status)}</strong> &middot;
+        Created by ${pirEsc(p.created_by_username || '-')} &middot;
+        Updated ${pirEsc(p.updated_at || '-')}
+    </div>
+
+    <div class="pir-metrics">
+        <div class="pir-metric"><div class="pir-metric-val">${pirEsc(m.severity || '-')}</div><div class="pir-metric-label">Severity</div></div>
+        <div class="pir-metric"><div class="pir-metric-val">${pirEsc(m.mttr_hours ?? '-')}</div><div class="pir-metric-label">MTTR (hrs)</div></div>
+        <div class="pir-metric"><div class="pir-metric-val">${m.affected_hosts ?? 0}</div><div class="pir-metric-label">Hosts</div></div>
+        <div class="pir-metric"><div class="pir-metric-val">${m.affected_users ?? 0}</div><div class="pir-metric-label">Users</div></div>
+        <div class="pir-metric"><div class="pir-metric-val">${m.observable_count ?? 0}</div><div class="pir-metric-label">Observables</div></div>
+        <div class="pir-metric"><div class="pir-metric-val">${pirEsc(m.closure_reason || '-')}</div><div class="pir-metric-label">Closure</div></div>
+    </div>`;
+
+    const sections = [
+        ['summary', 'Summary'],
+        ['timeline', 'Timeline'],
+        ['root_cause', 'Root cause'],
+        ['what_worked', 'What worked'],
+        ['what_didnt', "What didn't"],
+        ['detection_gaps', 'Detection gaps'],
+        ['response_gaps', 'Response gaps'],
+    ];
+    for (const [key, label] of sections) {
+        html += `<div class="pir-section">
+            <div class="pir-section-label">${label}</div>
+            <textarea id="pir-${key}" data-field="${key}">${pirEsc(p[key] || '')}</textarea>
+        </div>`;
+    }
+
+    html += `<div class="pir-section">
+        <div class="pir-section-label">
+            AI Improvement Suggestions
+            <button class="btn btn-secondary btn-sm" onclick="pirSuggest()" style="padding:3px 10px;font-size:.7rem">Generate / Refresh</button>
+        </div>
+        <div id="pir-suggest-box" class="pir-suggest-box">${pirEsc(p.ai_suggestions || '(no suggestions yet — click Generate)')}</div>
+    </div>`;
+
+    html += `<div class="pir-section">
+        <div class="pir-section-label">Action Items (${(p.actions || []).length})</div>
+        <div class="pir-actions-list" id="pir-actions">${pirRenderActions(p.actions || [])}</div>
+        <div class="pir-add-action">
+            <input id="pir-act-title" type="text" placeholder="New action title">
+            <select id="pir-act-cat">
+                <option value="">Category...</option>
+                <option value="detection">Detection</option>
+                <option value="response">Response</option>
+                <option value="training">Training</option>
+                <option value="tooling">Tooling</option>
+                <option value="process">Process</option>
+            </select>
+            <select id="pir-act-pri">
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="low">Low</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="pirAddAction()" style="padding:6px 14px;font-size:.78rem">+ Add</button>
+        </div>
+    </div>`;
+
+    html += `<div class="pir-row-buttons">
+        <button class="btn btn-primary" onclick="pirSave()">Save Changes</button>
+        <select id="pir-status-select">
+            <option value="draft">Draft</option>
+            <option value="review">In Review</option>
+            <option value="approved">Approved</option>
+        </select>
+        <button class="btn btn-secondary" onclick="pirSetStatus()">Update Status</button>
+    </div>`;
+
+    det.innerHTML = html;
+    document.getElementById('pir-status-select').value = p.status || 'draft';
+}
+
+function pirRenderActions(actions) {
+    if (!actions.length) return '<div style="color:var(--text-secondary);font-style:italic;font-size:.78rem;padding:6px">No action items yet.</div>';
+    let html = '';
+    for (const a of actions) {
+        html += `<div class="pir-action">
+            <div>
+                <div class="pir-action-title">${pirEsc(a.title)}</div>
+                <div class="pir-action-meta">${pirEsc(a.category || '-')} &middot; ${pirEsc(a.priority)} &middot; due ${pirEsc(a.due_date || 'unset')} &middot; owner ${pirEsc(a.owner_username || '-')}</div>
+            </div>
+            <select onchange="pirActionStatus(${a.id}, this.value)">
+                <option value="open" ${a.status === 'open' ? 'selected' : ''}>Open</option>
+                <option value="in_progress" ${a.status === 'in_progress' ? 'selected' : ''}>In progress</option>
+                <option value="blocked" ${a.status === 'blocked' ? 'selected' : ''}>Blocked</option>
+                <option value="done" ${a.status === 'done' ? 'selected' : ''}>Done</option>
+                <option value="dropped" ${a.status === 'dropped' ? 'selected' : ''}>Dropped</option>
+            </select>
+            <button onclick="pirDeleteAction(${a.id})" title="Delete">&times;</button>
+        </div>`;
+    }
+    return html;
+}
+
+async function pirSave() {
+    if (!currentPir) return;
+    const fields = {};
+    document.querySelectorAll('#pir-detail textarea[data-field]').forEach(t => {
+        fields[t.dataset.field] = t.value;
+    });
+    const r = await fetch(`${PIR_API}/${currentPir.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) });
+    if (r.ok) {
+        currentPir = await r.json();
+        pirRenderList();
+    }
+}
+
+async function pirSetStatus() {
+    if (!currentPir) return;
+    const status = document.getElementById('pir-status-select').value;
+    const r = await fetch(`${PIR_API}/${currentPir.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+    if (r.ok) {
+        currentPir = await r.json();
+        pirRenderDetail();
+        pirRenderList();
+    }
+}
+
+async function pirSuggest() {
+    if (!currentPir) return;
+    const box = document.getElementById('pir-suggest-box');
+    box.textContent = 'Generating...';
+    const r = await fetch(`${PIR_API}/${currentPir.id}/suggest`, { method: 'POST' });
+    const j = await r.json();
+    box.textContent = j.suggestions || j.reason || '(no suggestions)';
+    if (j.suggestions) {
+        currentPir.ai_suggestions = j.suggestions;
+    }
+}
+
+async function pirAddAction() {
+    if (!currentPir) return;
+    const title = document.getElementById('pir-act-title').value.trim();
+    if (!title) return;
+    const body = {
+        title,
+        category: document.getElementById('pir-act-cat').value || null,
+        priority: document.getElementById('pir-act-pri').value || 'medium',
+    };
+    const r = await fetch(`${PIR_API}/${currentPir.id}/actions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (r.ok) {
+        await pirSelect(currentPir.id);
+    }
+}
+
+async function pirActionStatus(id, status) {
+    await fetch(`${PIR_API}/actions/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+    if (currentPir) await pirSelect(currentPir.id);
+}
+
+async function pirDeleteAction(id) {
+    if (!confirm('Delete this action item?')) return;
+    await fetch(`${PIR_API}/actions/${id}`, { method: 'DELETE' });
+    if (currentPir) await pirSelect(currentPir.id);
+}
+
+async function pirShowBacklog() {
+    const r = await fetch(`${PIR_API}/backlog`);
+    const j = await r.json();
+    const det = document.getElementById('pir-detail');
+    let html = `<h2>Open Action Backlog</h2>
+        <div class="pir-detail-sub">${(j.actions || []).length} open improvements across all PIRs.</div>
+        <div class="pir-actions-list">${pirRenderActions(j.actions || [])}</div>`;
+    det.innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', pirRefresh);
+</script>
+{% endblock %}
