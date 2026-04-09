@@ -1,5 +1,6 @@
 """TIDE integration service — queries TIDE's external SQL API for detection data."""
 
+import asyncio
 import logging
 import os
 import threading
@@ -26,6 +27,20 @@ _MAX_CACHE_ENTRIES = 256
 
 # Statuses we consider transient and retry with backoff.
 _RETRY_STATUSES = {429, 500, 502, 503, 504}
+
+
+# ION-side throttle. TIDE's DuckDB serializes writes and is slow under
+# contention; if we let every parallel caller hit it at once, the upstream
+# proxy starts returning 504 and our worker pool gets stuck waiting. The
+# semaphore enforces a max concurrent in-flight TIDE query count per process.
+# Acquired non-blockingly inside _query — if we can't get a slot, we treat it
+# as an immediate transient failure (cached negative + breaker tick) so the
+# caller returns fast instead of pinning a worker thread.
+_TIDE_MAX_CONCURRENT = int(os.environ.get("ION_TIDE_MAX_CONCURRENT", "3"))
+_TIDE_SEMAPHORE = threading.BoundedSemaphore(_TIDE_MAX_CONCURRENT)
+# Hard upper bound on how long _query is allowed to hold a worker thread,
+# regardless of httpx timeout / retries / waits. Used as a sanity check.
+_TIDE_TOTAL_BUDGET_S = float(os.environ.get("ION_TIDE_TOTAL_BUDGET_S", "20"))
 
 
 def _cache_get(sql: str) -> tuple[bool, Optional[dict]]:
@@ -61,7 +76,16 @@ class TideService:
         self.verify = get_ssl_verify() if cfg.get("verify_ssl", True) else False
         self.space = cfg.get("space") or os.environ.get("ION_TIDE_SPACE", "default")
 
-    def _query(self, sql: str, retries: int = 2) -> Optional[dict]:
+    async def query_async(self, sql: str, retries: int = 1) -> Optional[dict]:
+        """Async wrapper around _query that doesn't block the event loop.
+
+        Use this from any async FastAPI handler. Internally it just defers
+        the sync httpx call to a thread pool worker, but it ensures the
+        single-threaded asyncio event loop is never stalled by a slow TIDE.
+        """
+        return await asyncio.to_thread(self._query, sql, retries)
+
+    def _query(self, sql: str, retries: int = 1) -> Optional[dict]:
         if not self.enabled:
             return None
 
@@ -72,66 +96,92 @@ class TideService:
 
         # 2. Circuit breaker — if TIDE is down, fail fast and serve None.
         if not tide_breaker.can_execute():
-            logger.warning("TIDE circuit breaker OPEN — skipping query")
+            logger.debug("TIDE circuit breaker OPEN — skipping query")
             return None
 
-        last_status: Optional[int] = None
-        for attempt in range(retries + 1):
-            try:
-                resp = httpx.post(
-                    f"{self.url}/api/external/query",
-                    json={"sql": sql},
-                    headers={"X-TIDE-API-KEY": self.api_key, "Content-Type": "application/json"},
-                    verify=self.verify,
-                    # Lower per-request timeout: 15s connect/read instead of
-                    # 30s. Multiplied by 3 retries that's still <50s worst-case
-                    # rather than 90s, so the worker pool can recover.
-                    timeout=httpx.Timeout(15.0, connect=5.0),
-                )
-                last_status = resp.status_code
+        # 3. Concurrency throttle. If too many TIDE queries are already in
+        #    flight from this process, fail fast (cached negative) instead
+        #    of pinning a worker thread. This is the difference between
+        #    "the page shows partial data" and "the whole app falls over".
+        if not _TIDE_SEMAPHORE.acquire(blocking=False):
+            logger.info("TIDE concurrency limit reached — shedding query")
+            _cache_put(sql, None)
+            return None
+
+        start_t = time.time()
+        try:
+            for attempt in range(retries + 1):
+                # Hard total-budget guard — bail before another network call
+                # if we've already burned the per-query budget on backoff.
+                if time.time() - start_t > _TIDE_TOTAL_BUDGET_S:
+                    logger.warning("TIDE total budget exceeded, giving up")
+                    tide_breaker.record_failure()
+                    _cache_put(sql, None)
+                    return None
+
+                try:
+                    resp = httpx.post(
+                        f"{self.url}/api/external/query",
+                        json={"sql": sql},
+                        headers={
+                            "X-TIDE-API-KEY": self.api_key,
+                            "Content-Type": "application/json",
+                        },
+                        verify=self.verify,
+                        # Tight per-request timeout: 8s read, 3s connect.
+                        # 1 retry max → worst-case ~16s + backoff, fits inside
+                        # the 20s _TIDE_TOTAL_BUDGET_S above.
+                        timeout=httpx.Timeout(8.0, connect=3.0),
+                    )
+                except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError) as e:
+                    if attempt < retries:
+                        backoff = 0.5 * (2 ** attempt)
+                        logger.info(
+                            "TIDE %s, retrying in %.1fs (%d/%d)",
+                            type(e).__name__, backoff, attempt + 1, retries,
+                        )
+                        time.sleep(backoff)
+                        continue
+                    logger.warning("TIDE connection error after %d retries: %s", retries, type(e).__name__)
+                    tide_breaker.record_failure()
+                    _cache_put(sql, None)
+                    return None
+                except Exception as e:
+                    logger.error("TIDE unexpected error: %s", type(e).__name__)
+                    tide_breaker.record_failure()
+                    _cache_put(sql, None)
+                    return None
+
                 if resp.status_code == 200:
                     tide_breaker.record_success()
-                    data = resp.json()
+                    try:
+                        data = resp.json()
+                    except Exception:
+                        tide_breaker.record_failure()
+                        _cache_put(sql, None)
+                        return None
                     _cache_put(sql, data)
                     return data
 
-                # Retry on transient 5xx (DuckDB concurrency, upstream proxies)
+                # Transient 5xx — retry once with short backoff
                 if resp.status_code in _RETRY_STATUSES and attempt < retries:
-                    backoff = 0.5 * (2 ** attempt)  # 0.5s, 1s
+                    backoff = 0.5 * (2 ** attempt)
                     logger.info(
-                        "TIDE %d, retrying in %.1fs (%d/%d)...",
+                        "TIDE %d, retrying in %.1fs (%d/%d)",
                         resp.status_code, backoff, attempt + 1, retries,
                     )
                     time.sleep(backoff)
                     continue
 
-                # Hard fail (4xx or out of retries on 5xx).
-                logger.warning("TIDE query failed: %s %s", resp.status_code, resp.text[:200])
+                # Hard fail — 4xx or out of retries on 5xx.
+                logger.warning("TIDE query failed: %s", resp.status_code)
                 tide_breaker.record_failure()
-                # Cache the negative result briefly so duplicate concurrent
-                # callers don't all retry independently.
                 _cache_put(sql, None)
                 return None
 
-            except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError) as e:
-                if attempt < retries:
-                    backoff = 0.5 * (2 ** attempt)
-                    logger.info(
-                        "TIDE connection error (%s), retrying in %.1fs (%d/%d)",
-                        type(e).__name__, backoff, attempt + 1, retries,
-                    )
-                    time.sleep(backoff)
-                    continue
-                logger.error("TIDE connection error after %d retries: %s", retries, type(e).__name__)
-                tide_breaker.record_failure()
-                _cache_put(sql, None)
-                return None
-            except Exception as e:
-                logger.error("TIDE unexpected error: %s", type(e).__name__)
-                tide_breaker.record_failure()
-                _cache_put(sql, None)
-                return None
-        return None
+            return None
+        finally:
+            _TIDE_SEMAPHORE.release()
 
     def get_systems(self) -> list[dict[str, Any]]:
         result = self._query(

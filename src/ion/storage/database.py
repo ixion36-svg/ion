@@ -59,11 +59,17 @@ def get_engine(db_path: Optional[Path] = None) -> Engine:
             _engine = create_engine(
                 database_url,
                 echo=False,
-                pool_size=20,
-                max_overflow=30,
-                pool_timeout=30,
+                # Steady-state pool of 25 connections + 50 burst overflow.
+                # The pool_timeout is intentionally short (5s) so a request
+                # that can't get a connection fails *fast* with a clear error
+                # instead of stalling the worker for 30s. With the new TIDE
+                # budget cap (20s) and concurrency throttle (3 concurrent),
+                # the typical request should never wait this long anyway.
+                pool_size=25,
+                max_overflow=50,
+                pool_timeout=5,
                 pool_pre_ping=True,
-                pool_recycle=1800,
+                pool_recycle=900,
             )
         else:
             # SQLite (default)
