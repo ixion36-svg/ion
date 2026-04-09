@@ -14,6 +14,7 @@ from ion.auth.dependencies import get_db_session, get_current_user, require_perm
 from ion.models.user import User
 from ion.models.observable import Observable, ObservableType, ThreatLevel
 from ion.services.observable_service import ObservableService
+from ion.core.safe_errors import safe_error
 
 router = APIRouter(tags=["observables"])
 
@@ -886,7 +887,7 @@ async def add_to_watchlist(
             "observable": _observable_to_response(obs),
         }
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=safe_error(e))
 
 
 @router.delete("/observables/watchlist/{observable_id}")
@@ -905,7 +906,7 @@ async def remove_from_watchlist(
             "observable": _observable_to_response(obs),
         }
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=safe_error(e))
 
 
 @router.post("/observables/watchlist/alerts/{alert_id}/read")
@@ -921,7 +922,7 @@ async def mark_watchlist_alert_read(
         session.commit()
         return {"success": True, "alert_id": alert.id}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=safe_error(e))
 
 
 # =============================================================================
@@ -991,7 +992,7 @@ async def enable_auto_enrich(
         session.commit()
         return {"success": True, "auto_enrich": obs.auto_enrich}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=safe_error(e))
 
 
 @router.post("/observables/{observable_id}/auto-enrich/disable")
@@ -1007,4 +1008,4 @@ async def disable_auto_enrich(
         session.commit()
         return {"success": True, "auto_enrich": obs.auto_enrich}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=safe_error(e))

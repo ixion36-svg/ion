@@ -11,6 +11,7 @@ from ion.models.user import User
 from ion.auth.dependencies import get_current_user, require_permission
 from ion.services.analytics_engine import get_analytics_engine
 from ion.web.api import get_db_session
+from ion.core.safe_errors import safe_error
 
 from datetime import datetime, timedelta
 
@@ -85,7 +86,8 @@ async def run_analytics_job(
     engine = get_analytics_engine()
     result = engine.run_job_now(session, job_type)
     if "error" in result:
-        raise HTTPException(status_code=404, detail=result["error"])
+        # Generic message — full detail is logged inside the engine
+        raise HTTPException(status_code=404, detail="Analytics job failed")
     return {"job_type": job_type, "result": result, "message": "Job completed"}
 
 
@@ -219,7 +221,7 @@ async def get_system_overview(
             if es.is_configured:
                 es_data = await es.get_system_analytics(hours=hours)
         except Exception as e:
-            es_data["error"] = str(e)
+            es_data["error"] = safe_error(e, "analytics_es")
 
     # 2. Load CyAB namespace mappings
     sources = session.query(CyabDataSource).filter(

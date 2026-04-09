@@ -8,9 +8,20 @@ from sqlalchemy.orm import Session
 from ion.auth.dependencies import require_permission, get_current_user
 from ion.models.user import User
 from ion.web.api import get_db_session
+from ion.core.safe_errors import safe_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/playbook-actions", tags=["playbook-actions"])
+
+
+def _sanitize_action_result(result):
+    """Drop any embedded raw exception text from a service result before returning."""
+    if not isinstance(result, dict):
+        return {"result": "ok"}
+    safe = {k: v for k, v in result.items() if k != "error"}
+    if result.get("error"):
+        safe["has_error"] = True
+    return safe
 
 
 class ActionRequest(BaseModel):
@@ -37,7 +48,7 @@ def approve(log_id: int, current_user: User = Depends(get_current_user), session
     result = approve_action(session, log_id, current_user.id)
     if not result:
         raise HTTPException(status_code=404, detail="Action log not found")
-    return result
+    return _sanitize_action_result(result)
 
 
 @router.post("/log/{log_id}/reject", dependencies=[Depends(require_permission("alert:triage"))])
@@ -46,7 +57,7 @@ def reject(log_id: int, current_user: User = Depends(get_current_user), session:
     result = reject_action(session, log_id, current_user.id)
     if not result:
         raise HTTPException(status_code=404, detail="Action log not found")
-    return result
+    return _sanitize_action_result(result)
 
 
 @router.post("/log/{log_id}/execute", dependencies=[Depends(require_permission("system:settings"))])
@@ -55,7 +66,7 @@ def execute(log_id: int, session: Session = Depends(get_db_session)):
     result = execute_action(session, log_id)
     if not result:
         raise HTTPException(status_code=404, detail="Action log not found")
-    return result
+    return _sanitize_action_result(result)
 
 
 @router.get("/log", dependencies=[Depends(require_permission("alert:read"))])

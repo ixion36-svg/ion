@@ -252,7 +252,8 @@ def _validate_startup_config():
     # Admin password
     admin_pw = os.environ.get("ION_ADMIN_PASSWORD", "changeme")
     if admin_pw in ("changeme", "password", "admin"):
-        warnings.append(f"ION_ADMIN_PASSWORD is set to a weak default ('{admin_pw}') — change it for production")
+        # Do not echo the actual password value into logs
+        warnings.append("ION_ADMIN_PASSWORD is set to a weak default — change it for production")
 
     # Elasticsearch
     if os.environ.get("ION_ELASTICSEARCH_ENABLED", "").lower() == "true":

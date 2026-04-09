@@ -528,7 +528,8 @@ function downloadOutput() {
 function convertTimestamp(source) {
     let date;
     try {
-        const val = document.getElementById('ts-' + source.replace('-', '-')).value.trim();
+        // (Previously had a no-op `source.replace('-', '-')` — leftover typo.)
+        const val = document.getElementById('ts-' + source).value.trim();
         if (!val) return;
 
         switch(source) {
@@ -677,15 +678,29 @@ function testRegex() {
         if (matches.length > 0) {
             html += '<table class="data-table"><tr><th>#</th><th>Match</th><th>Index</th><th>Groups</th></tr>';
             matches.slice(0, 100).forEach((m, i) => {
-                const groups = m.slice(1).map((g, gi) => `$${gi+1}: ${g || '(empty)'}`).join(', ');
+                // Escape each capture group value before joining into HTML.
+                const groups = m.slice(1).map((g, gi) => `$${gi+1}: ${escapeHtml(g || '(empty)')}`).join(', ');
                 html += `<tr><td>${i+1}</td><td><code>${escapeHtml(m[0])}</code></td><td>${m.index}</td><td>${groups || '-'}</td></tr>`;
             });
             html += '</table>';
             if (matches.length > 100) html += '<p class="muted">Showing first 100 matches...</p>';
         }
 
-        // Highlighted text
-        const highlighted = test.replace(regex, '<mark>$&</mark>');
+        // Highlighted text — escape each segment of the user input separately,
+        // then wrap matched ranges in <mark>. Never let raw user text reach innerHTML.
+        const parts = [];
+        let lastIndex = 0;
+        // Use a fresh regex with the global flag so we can iterate all matches.
+        const highlightRegex = new RegExp(pattern, flags.includes('g') ? flags : flags + 'g');
+        let mh;
+        while ((mh = highlightRegex.exec(test)) !== null) {
+            parts.push(escapeHtml(test.slice(lastIndex, mh.index)));
+            parts.push('<mark>' + escapeHtml(mh[0]) + '</mark>');
+            lastIndex = mh.index + mh[0].length;
+            if (mh[0].length === 0) highlightRegex.lastIndex++;  // avoid zero-width loop
+        }
+        parts.push(escapeHtml(test.slice(lastIndex)));
+        const highlighted = parts.join('');
         html += `<h4 style="margin-top:1rem;">Highlighted</h4><pre class="code-block">${highlighted}</pre>`;
 
         document.getElementById('regex-results').innerHTML = html;
@@ -1015,11 +1030,16 @@ function exportLookupResults() {
 }
 
 // ==================== UTILITIES ====================
+// Pure string-based HTML escape — never touches the DOM, so its output is not
+// considered tainted by static analysis (avoids js/xss-through-dom false positives).
 function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    if (text == null) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 </script>
 {% endblock %}

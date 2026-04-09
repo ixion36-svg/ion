@@ -70,15 +70,15 @@ td{{padding:8px;border-bottom:1px solid #21262d}}
 th{{color:#57606a;border-color:#d0d7de}}td{{border-color:#d0d7de}}.footer{{color:#57606a}}}}
 </style></head><body>
 <h1>ION Executive Report</h1>
-<div class="meta">Period: {_fmt(d['period_start'])} — {_fmt(d['period_end'])} ({d['period_days']} days) | Generated: {_fmt(d['generated_at'])}</div>
+<div class="meta">Period: {_esc(_fmt(d['period_start']))} — {_esc(_fmt(d['period_end']))} ({_esc(d['period_days'])} days) | Generated: {_esc(_fmt(d['generated_at']))}</div>
 
 <h2>Case Metrics</h2>
 <div class="stats">
-<div class="stat"><div class="stat-val">{c['opened']}</div><div class="stat-label">Cases Opened</div></div>
-<div class="stat"><div class="stat-val green">{c['closed']}</div><div class="stat-label">Cases Closed</div></div>
-<div class="stat"><div class="stat-val{' crit' if c['fp_rate'] and c['fp_rate'] > 50 else ''}">{c['fp_rate'] or 0}%</div><div class="stat-label">FP Rate</div></div>
-<div class="stat"><div class="stat-val">{c['avg_mttr'] or '-'}</div><div class="stat-label">Avg MTTR (hrs)</div></div>
-<div class="stat"><div class="stat-val{' warn' if c['open_backlog'] > 20 else ''}">{c['open_backlog']}</div><div class="stat-label">Open Backlog</div></div>
+<div class="stat"><div class="stat-val">{_esc(c['opened'])}</div><div class="stat-label">Cases Opened</div></div>
+<div class="stat"><div class="stat-val green">{_esc(c['closed'])}</div><div class="stat-label">Cases Closed</div></div>
+<div class="stat"><div class="stat-val{' crit' if c['fp_rate'] and c['fp_rate'] > 50 else ''}">{_esc(c['fp_rate'] or 0)}%</div><div class="stat-label">FP Rate</div></div>
+<div class="stat"><div class="stat-val">{_esc(c['avg_mttr'] or '-')}</div><div class="stat-label">Avg MTTR (hrs)</div></div>
+<div class="stat"><div class="stat-val{' warn' if c['open_backlog'] > 20 else ''}">{_esc(c['open_backlog'])}</div><div class="stat-label">Open Backlog</div></div>
 </div>
 """
 
@@ -88,7 +88,7 @@ th{{color:#57606a;border-color:#d0d7de}}td{{border-color:#d0d7de}}.footer{{color
         total = sum(c["closure_reasons"].values())
         for reason, count in sorted(c["closure_reasons"].items(), key=lambda x: -x[1]):
             pct = round(count / total * 100) if total else 0
-            html += f"<tr><td>{reason.replace('_', ' ').title()}</td><td>{count}</td><td>{pct}%</td></tr>"
+            html += f"<tr><td>{_esc(reason.replace('_', ' ').title())}</td><td>{_esc(count)}</td><td>{_esc(pct)}%</td></tr>"
         html += "</table>"
 
     # Severity breakdown
@@ -97,21 +97,21 @@ th{{color:#57606a;border-color:#d0d7de}}td{{border-color:#d0d7de}}.footer{{color
         for sev in ["critical", "high", "medium", "low"]:
             cnt = c["by_severity"].get(sev, 0)
             if cnt:
-                html += f'<tr><td class="sev-{sev}">{sev.title()}</td><td>{cnt}</td></tr>'
+                html += f'<tr><td class="sev-{_esc(sev)}">{_esc(sev.title())}</td><td>{_esc(cnt)}</td></tr>'
         html += "</table>"
 
     # Alert metrics
     html += f"""<h2>Alert Metrics</h2>
 <div class="stats">
-<div class="stat"><div class="stat-val">{a['total_triaged']}</div><div class="stat-label">Alerts Triaged</div></div>
-<div class="stat"><div class="stat-val">{a['analysts_active']}</div><div class="stat-label">Analysts Active</div></div>
+<div class="stat"><div class="stat-val">{_esc(a['total_triaged'])}</div><div class="stat-label">Alerts Triaged</div></div>
+<div class="stat"><div class="stat-val">{_esc(a['analysts_active'])}</div><div class="stat-label">Analysts Active</div></div>
 </div>"""
 
     # Team
     if t["analysts"]:
         html += "<h2>Team Performance</h2><table><tr><th>Analyst</th><th>Cases Closed</th><th>Actions</th></tr>"
         for analyst in t["analysts"][:10]:
-            html += f"<tr><td>{_esc(analyst['username'])}</td><td>{analyst['cases_closed']}</td><td>{analyst['total_actions']}</td></tr>"
+            html += f"<tr><td>{_esc(analyst['username'])}</td><td>{_esc(analyst['cases_closed'])}</td><td>{_esc(analyst['total_actions'])}</td></tr>"
         html += "</table>"
 
     # Notable incidents
@@ -119,7 +119,7 @@ th{{color:#57606a;border-color:#d0d7de}}td{{border-color:#d0d7de}}.footer{{color
     if incidents:
         html += "<h2>Notable Incidents</h2><table><tr><th>Case</th><th>Title</th><th>Severity</th><th>Status</th></tr>"
         for inc in incidents[:10]:
-            html += f'<tr><td>{_esc(inc["case_number"])}</td><td>{_esc(inc["title"])}</td><td class="sev-{inc["severity"]}">{inc["severity"]}</td><td>{inc["status"]}</td></tr>'
+            html += f'<tr><td>{_esc(inc["case_number"])}</td><td>{_esc(inc["title"])}</td><td class="sev-{_esc(inc["severity"])}">{_esc(inc["severity"])}</td><td>{_esc(inc["status"])}</td></tr>'
         html += "</table>"
 
     # Trends
@@ -127,7 +127,7 @@ th{{color:#57606a;border-color:#d0d7de}}td{{border-color:#d0d7de}}.footer{{color
     if trends.get("daily"):
         html += "<h2>Daily Activity Trend</h2><table><tr><th>Date</th><th>Opened</th><th>Closed</th></tr>"
         for day in trends["daily"]:
-            html += f"<tr><td>{day['date']}</td><td>{day['opened']}</td><td>{day['closed']}</td></tr>"
+            html += f"<tr><td>{_esc(day['date'])}</td><td>{_esc(day['opened'])}</td><td>{_esc(day['closed'])}</td></tr>"
         html += "</table>"
 
     html += '<div class="footer">Generated by ION — Intelligent Operating Network</div></body></html>'
@@ -289,5 +289,19 @@ def _fmt(iso: str) -> str:
         return str(iso)
 
 
-def _esc(s: str) -> str:
-    return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+def _esc(s) -> str:
+    """HTML-escape a value for safe interpolation into report HTML.
+
+    Accepts any type, coerces to string. Escapes the five XML/HTML special
+    characters so the output is safe in element bodies AND attribute values.
+    """
+    if s is None:
+        return ""
+    return (
+        str(s)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#39;")
+    )

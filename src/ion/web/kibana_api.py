@@ -81,11 +81,13 @@ async def get_kibana_status(
         }
 
     result = service.test_connection()
+    connected = result.get("success", False)
     return {
-        "connected": result.get("success", False),
+        "connected": connected,
         "version": result.get("version"),
         "status": result.get("status"),
-        "error": result.get("error"),
+        # Don't echo the raw service-side error message — return a generic flag.
+        "error": None if connected else "Connection test failed",
     }
 
 
@@ -126,7 +128,8 @@ async def list_kibana_cases(
             "per_page": per_page,
         }
     if "error" in result and result.get("error"):
-        raise HTTPException(status_code=502, detail=result["error"])
+        # Don't echo the raw service error message (may contain stack frames).
+        raise HTTPException(status_code=502, detail="Failed to fetch cases from Kibana")
 
     # Transform to consistent format
     cases = []
@@ -233,12 +236,17 @@ async def import_kibana_cases(
 
     result = await sync_service.import_cases_from_kibana(session)
 
+    # Don't echo raw service error strings (which may contain stack frames /
+    # paths) back to the API client. Convert to a sanitized count + flag.
+    raw_errors = result.get("errors") or []
+    error_count = len(raw_errors) if isinstance(raw_errors, list) else 0
+    has_top_level_error = bool(result.get("error"))
     return {
         "message": "Import completed",
         "imported": result.get("imported", 0),
         "skipped": result.get("skipped", 0),
-        "errors": result.get("errors"),
-        "error": result.get("error"),
+        "error_count": error_count,
+        "has_error": has_top_level_error,
     }
 
 

@@ -660,9 +660,14 @@ function renderMessages(messages) {
             } else {
                 emojiDisplay = emoji;
             }
+            // Escape backslash before single-quote so trailing-backslash inputs
+            // can't break out of the inline JS string literal in the onclick.
+            const emojiJsLiteral = emoji
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'");
             return `<span class="reaction-badge ${data.hasOwn ? 'own' : ''}"
-                  onclick="toggleReaction(${msg.id}, '${emoji.replace(/'/g, "\\'")}')"
-                  title="${data.users.join(', ')}">
+                  onclick="toggleReaction(${msg.id}, '${emojiJsLiteral}')"
+                  title="${escapeHtml(data.users.join(', '))}">
                 <span class="emoji">${emojiDisplay}</span>
                 <span class="count">${data.count}</span>
             </span>`;

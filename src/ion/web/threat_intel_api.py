@@ -13,6 +13,7 @@ from ion.models.user import User
 from ion.services.opencti_service import get_opencti_service, OpenCTIError
 from ion.services.threat_intel_service import ThreatIntelService
 from ion.services.country_mapper import get_country_code, get_country_name, country_code_to_flag
+from ion.core.safe_errors import safe_error
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +99,7 @@ async def search_actors(
         result = await service.search_threat_actors(search=search, first=first, after=after)
         return result
     except OpenCTIError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=safe_error(e, "threat_intel"))
 
 
 @router.get("/actors/{entity_id}")
@@ -117,7 +118,7 @@ async def get_actor_detail(
             raise HTTPException(status_code=404, detail=result["error"])
         return result
     except OpenCTIError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=safe_error(e, "threat_intel"))
 
 
 @router.get("/campaigns")
@@ -135,7 +136,7 @@ async def search_campaigns(
         result = await service.search_campaigns(search=search, first=first, after=after)
         return result
     except OpenCTIError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=safe_error(e, "threat_intel"))
 
 
 @router.get("/campaigns/{entity_id}")
@@ -153,7 +154,7 @@ async def get_campaign_detail(
             raise HTTPException(status_code=404, detail=result["error"])
         return result
     except OpenCTIError as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=safe_error(e, "threat_intel"))
 
 
 # ---- Watch Management ----

@@ -27,6 +27,7 @@ from ion.services.connectors import get_connector_registry, ConnectorStatus
 from ion.services.webhook_service import get_webhook_service
 from ion.web.api import limiter
 from ion.services.integration_log_service import get_integration_log_service
+from ion.core.safe_errors import safe_error
 
 router = APIRouter(tags=["integrations"])
 
@@ -446,7 +447,9 @@ async def receive_webhook(
             status_code = 404
         elif result.get("status") == "invalid_signature":
             status_code = 401
-        raise HTTPException(status_code=status_code, detail=result.get("error"))
+        # Generic message — webhook errors can include upstream service text;
+        # full detail is logged by the webhook service for operators.
+        raise HTTPException(status_code=status_code, detail="Webhook processing failed")
 
     return {"success": True, "message": "Webhook processed"}
 
@@ -647,7 +650,7 @@ async def get_server_metrics(
             },
         }
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": safe_error(e, "integration_test")}
 
 
 @router.get("/metrics/server-logs")
@@ -783,7 +786,7 @@ async def get_server_log_metrics(
         }
 
     except Exception as e:
-        return {"configured": True, "error": str(e)}
+        return {"configured": True, "error": safe_error(e, "integration_status")}
 
 
 @router.get("/metrics/data-flows")

@@ -50,7 +50,14 @@ def run_now(report_id: int, session: Session = Depends(get_db_session)):
     result = run_report_now(session, report_id)
     if not result:
         raise HTTPException(status_code=404, detail="Report not found")
-    return result
+    # Strip any embedded raw exception text from the service result before
+    # returning it (avoid leaking stack frames in HTTP responses).
+    if isinstance(result, dict):
+        safe = {k: v for k, v in result.items() if k != "error"}
+        if result.get("error"):
+            safe["has_error"] = True
+        return safe
+    return {"result": "ok"}
 
 
 @router.delete("/{report_id}", dependencies=[Depends(require_permission("system:settings"))])

@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, Depends, Query
 from ion.auth.dependencies import require_permission
 from ion.services.elasticsearch_service import ElasticsearchService
+from ion.core.safe_errors import safe_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/attack-stories", tags=["attack-stories"])
@@ -24,5 +25,4 @@ async def get_attack_stories(
         alert_dicts = [a.to_dict() for a in alerts]
         return build_attack_stories(alert_dicts, min_alerts=min_alerts, time_window_hours=hours)
     except Exception as e:
-        logger.error("Attack stories failed: %s", e)
-        return {"enabled": False, "error": str(e)}
+        return {"enabled": False, "error": safe_error(e, "attack_stories")}

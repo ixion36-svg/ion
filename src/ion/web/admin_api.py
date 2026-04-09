@@ -15,6 +15,7 @@ from ion.auth.dependencies import require_admin, require_permission, get_current
 from ion.models.user import User
 from ion.core.config import get_config, set_config, Config
 from ion.core.url_validator import validate_integration_url
+from ion.core.safe_errors import safe_error
 
 router = APIRouter()
 
@@ -95,6 +96,15 @@ class DFIRIrisSettingsUpdate(BaseModel):
     dfir_iris_api_key: Optional[str] = None  # Only update if provided and not masked
     dfir_iris_verify_ssl: Optional[bool] = None
     dfir_iris_default_customer: Optional[int] = None
+
+
+class TideSettingsUpdate(BaseModel):
+    """TIDE (Threat Informed Detection Engineering) integration settings."""
+    tide_enabled: Optional[bool] = None
+    tide_url: Optional[str] = None
+    tide_api_key: Optional[str] = None  # Only update if provided and not masked
+    tide_verify_ssl: Optional[bool] = None
+    tide_space: Optional[str] = None
 
 
 # =============================================================================
@@ -201,6 +211,14 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
             "dfir_iris_api_key_set": bool(config.dfir_iris_api_key),
             "dfir_iris_verify_ssl": config.dfir_iris_verify_ssl,
             "dfir_iris_default_customer": config.dfir_iris_default_customer,
+        },
+        "tide": {
+            "tide_enabled": config.tide_enabled,
+            "tide_url": config.tide_url,
+            "tide_api_key": mask_secret(config.tide_api_key),
+            "tide_api_key_set": bool(config.tide_api_key),
+            "tide_verify_ssl": config.tide_verify_ssl,
+            "tide_space": config.tide_space,
         },
         "config_path": str(get_config_path()),
     }
@@ -449,6 +467,39 @@ async def update_dfir_iris_settings(
     return {"status": "updated", "section": "dfir_iris"}
 
 
+@router.put("/config/tide")
+async def update_tide_settings(
+    settings: TideSettingsUpdate,
+    current_user: User = Depends(require_permission("system:settings")),
+):
+    """Update TIDE integration settings."""
+    config = get_config()
+
+    if settings.tide_enabled is not None:
+        config.tide_enabled = settings.tide_enabled
+
+    if settings.tide_url is not None:
+        config.tide_url = settings.tide_url.rstrip("/")
+
+    if settings.tide_api_key is not None and not settings.tide_api_key.startswith("*"):
+        config.tide_api_key = settings.tide_api_key
+
+    if settings.tide_verify_ssl is not None:
+        config.tide_verify_ssl = settings.tide_verify_ssl
+
+    if settings.tide_space is not None:
+        config.tide_space = settings.tide_space or "default"
+
+    config.to_file(get_config_path())
+    reload_config()
+
+    # Drop cached TideService singleton so the next call picks up new config
+    from ion.services.tide_service import reset_tide_service
+    reset_tide_service()
+
+    return {"status": "updated", "section": "tide"}
+
+
 @router.post("/config/test/{integration}")
 async def test_integration_connection(
     integration: str,
@@ -464,7 +515,7 @@ async def test_integration_connection(
             result = service.test_connection()
             return {"success": True, "details": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
 
     elif integration == "opencti":
         from ion.services.opencti_service import get_opencti_service
@@ -475,7 +526,7 @@ async def test_integration_connection(
             result = service.test_connection()
             return {"success": True, "details": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
 
     elif integration == "elasticsearch":
         from ion.services.elasticsearch_service import ElasticsearchService
@@ -486,7 +537,7 @@ async def test_integration_connection(
             result = await service.test_connection()
             return {"success": result.get("connected", False), "details": result, "error": result.get("error")}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
 
     elif integration == "kibana":
         from ion.services.kibana_cases_service import get_kibana_cases_service
@@ -497,7 +548,7 @@ async def test_integration_connection(
             result = service.test_connection()
             return {"success": result.get("success", False), "details": result, "error": result.get("error")}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
 
     elif integration == "dfir_iris":
         config = get_config()
@@ -518,7 +569,22 @@ async def test_integration_connection(
                 data = response.json()
                 return {"success": True, "details": data}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
+
+    elif integration == "tide":
+        from ion.services.tide_service import get_tide_service, reset_tide_service
+        # Drop any cached singleton so we test against the latest config values
+        reset_tide_service()
+        service = get_tide_service()
+        if not service.enabled:
+            return {"success": False, "error": "TIDE is not enabled or URL/API key missing"}
+        try:
+            result = service.test_connection()
+            if result.get("ok"):
+                return {"success": True, "details": result}
+            return {"success": False, "error": result.get("error", "TIDE query failed")}
+        except Exception as e:
+            return {"success": False, "error": safe_error(e)}
 
     else:
         raise HTTPException(400, f"Unknown integration: {integration}")
@@ -660,7 +726,7 @@ async def get_active_sessions(current_user: User = Depends(require_admin)):
                     "roles": [role.name for role in user.roles] if user.roles else [],
                 })
     except Exception as e:
-        return {"error": str(e), "sessions": []}
+        return {"error": safe_error(e), "sessions": []}
 
     return {"sessions": sessions, "total": len(sessions)}
 
@@ -708,7 +774,7 @@ async def revoke_user_session(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"Failed to revoke session: {str(e)}")
+        raise HTTPException(500, f"Failed to revoke session: {safe_error(e, 'revoke_session')}")
 
 
 # =============================================================================
@@ -755,7 +821,7 @@ async def get_database_stats(current_user: User = Depends(require_admin)):
         stats["total_rows"] = sum(t["row_count"] for t in stats["tables"])
 
     except Exception as e:
-        stats["error"] = str(e)
+        stats["error"] = safe_error(e, "backup_stats")
 
     return stats
 
@@ -805,7 +871,7 @@ async def create_database_backup(request: Request, current_user: User = Depends(
             "timestamp": timestamp,
         }
     except Exception as e:
-        raise HTTPException(500, f"Backup failed: {str(e)}")
+        raise HTTPException(500, f"Backup failed: {safe_error(e, 'backup')}")
 
 
 @router.get("/database/backups")
@@ -854,7 +920,7 @@ async def delete_database_backup(
         backup_path.unlink()
         return {"status": "deleted", "filename": filename}
     except Exception as e:
-        raise HTTPException(500, f"Failed to delete backup: {str(e)}")
+        raise HTTPException(500, f"Failed to delete backup: {safe_error(e, 'delete_backup')}")
 
 
 @router.post("/database/restore/{filename}")
@@ -897,7 +963,7 @@ async def restore_database_backup(
             "message": "Database restored successfully. Please restart the server for changes to take effect.",
         }
     except Exception as e:
-        raise HTTPException(500, f"Restore failed: {str(e)}")
+        raise HTTPException(500, f"Restore failed: {safe_error(e, 'restore')}")
 
 
 @router.post("/database/cleanup")
@@ -986,7 +1052,7 @@ async def cleanup_old_data(
             "cutoff_date": cutoff_date.isoformat(),
         }
     except Exception as e:
-        raise HTTPException(500, f"Cleanup failed: {str(e)}")
+        raise HTTPException(500, f"Cleanup failed: {safe_error(e, 'cleanup')}")
 
 
 # =============================================================================
@@ -1165,6 +1231,19 @@ async def get_wizard_integrations(current_user: User = Depends(require_permissio
                 "default_customer": {"type": "number", "label": "Default Customer ID", "default": 1, "min": 1},
             },
         },
+        "tide": {
+            "name": "TIDE",
+            "description": "Threat Informed Detection Engineering — DuckDB rule catalog",
+            "enabled": config.tide_enabled,
+            "configured": bool(config.tide_url) and bool(config.tide_api_key),
+            "url": config.tide_url,
+            "fields": {
+                "url": {"type": "url", "label": "TIDE URL", "placeholder": "https://tide.example.com", "required": True},
+                "api_key": {"type": "password", "label": "API Key", "placeholder": "X-TIDE-API-KEY value", "required": True},
+                "space": {"type": "text", "label": "Space", "placeholder": "default", "default": "default"},
+                "verify_ssl": {"type": "checkbox", "label": "Verify SSL Certificate", "default": True},
+            },
+        },
     }
 
     return {"integrations": integrations}
@@ -1221,11 +1300,11 @@ async def test_wizard_integration(
                     }
                 }
         except httpx.ConnectError as e:
-            return {"success": False, "error": f"Connection failed: {str(e)}"}
+            return {"success": False, "error": f"Connection failed: {safe_error(e)}"}
         except httpx.HTTPStatusError as e:
             return {"success": False, "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}"}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
 
     elif integration == "kibana":
         try:
@@ -1264,11 +1343,11 @@ async def test_wizard_integration(
                     }
                 }
         except httpx.ConnectError as e:
-            return {"success": False, "error": f"Connection failed: {str(e)}"}
+            return {"success": False, "error": f"Connection failed: {safe_error(e)}"}
         except httpx.HTTPStatusError as e:
             return {"success": False, "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}"}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
 
     elif integration == "gitlab":
         try:
@@ -1311,7 +1390,7 @@ async def test_wizard_integration(
                     }
                 }
         except httpx.ConnectError as e:
-            return {"success": False, "error": f"Connection failed: {str(e)}"}
+            return {"success": False, "error": f"Connection failed: {safe_error(e)}"}
         except httpx.HTTPStatusError as e:
             error_msg = f"HTTP {e.response.status_code}"
             if e.response.status_code == 401:
@@ -1320,7 +1399,7 @@ async def test_wizard_integration(
                 error_msg = "Project not found - check project ID"
             return {"success": False, "error": error_msg}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
 
     elif integration == "opencti":
         try:
@@ -1360,11 +1439,11 @@ async def test_wizard_integration(
                     "details": {"version": version}
                 }
         except httpx.ConnectError as e:
-            return {"success": False, "error": f"Connection failed: {str(e)}"}
+            return {"success": False, "error": f"Connection failed: {safe_error(e)}"}
         except httpx.HTTPStatusError as e:
             return {"success": False, "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}"}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
 
     elif integration == "ollama":
         try:
@@ -1394,7 +1473,7 @@ async def test_wizard_integration(
         except httpx.ConnectError as e:
             return {"success": False, "error": f"Connection failed: Is Ollama running at {url}?"}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
 
     elif integration == "virustotal":
         try:
@@ -1414,13 +1493,13 @@ async def test_wizard_integration(
                 response.raise_for_status()
                 return {"success": True, "details": {"status": "API key validated"}}
         except httpx.ConnectError as e:
-            return {"success": False, "error": f"Connection failed: {str(e)}"}
+            return {"success": False, "error": f"Connection failed: {safe_error(e)}"}
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 401:
                 return {"success": False, "error": "Invalid API key"}
             return {"success": False, "error": f"HTTP {e.response.status_code}"}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
 
     elif integration == "abuseipdb":
         try:
@@ -1445,13 +1524,13 @@ async def test_wizard_integration(
                 response.raise_for_status()
                 return {"success": True, "details": {"status": "API key validated"}}
         except httpx.ConnectError as e:
-            return {"success": False, "error": f"Connection failed: {str(e)}"}
+            return {"success": False, "error": f"Connection failed: {safe_error(e)}"}
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 401 or e.response.status_code == 403:
                 return {"success": False, "error": "Invalid API key"}
             return {"success": False, "error": f"HTTP {e.response.status_code}"}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
 
     elif integration == "dfir_iris":
         try:
@@ -1490,11 +1569,11 @@ async def test_wizard_integration(
                     }
                 }
         except httpx.ConnectError as e:
-            return {"success": False, "error": f"Connection failed: {str(e)}"}
+            return {"success": False, "error": f"Connection failed: {safe_error(e)}"}
         except httpx.HTTPStatusError as e:
             return {"success": False, "error": f"HTTP {e.response.status_code}: {e.response.text[:200]}"}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e)}
 
     else:
         raise HTTPException(400, f"Unknown integration: {integration}")
@@ -1555,12 +1634,12 @@ Please analyze this error and provide a diagnosis."""
     except OllamaError as e:
         return {
             "available": False,
-            "message": f"AI diagnosis failed: {str(e)}",
+            "message": f"AI diagnosis failed: {safe_error(e, 'ai_diagnosis')}",
         }
     except Exception as e:
         return {
             "available": False,
-            "message": f"Unexpected error: {str(e)}",
+            "message": f"Unexpected error: {safe_error(e, 'admin_api')}",
         }
 
 
@@ -1873,7 +1952,7 @@ async def save_all_wizard_integrations(
                 errors.append({"integration": integration_name, "error": "Unknown integration"})
 
         except Exception as e:
-            errors.append({"integration": integration_name, "error": str(e)})
+            errors.append({"integration": integration_name, "error": safe_error(e)})
 
     # Save all changes
     config.to_file(get_config_path())
@@ -1932,7 +2011,7 @@ async def get_ollama_models(current_user: User = Depends(require_permission("int
     except httpx.ConnectError:
         return {"available": False, "models": [], "error": "Cannot connect to Ollama"}
     except Exception as e:
-        return {"available": False, "models": [], "error": str(e)}
+        return {"available": False, "models": [], "error": safe_error(e)}
 
 
 # =============================================================================

@@ -23,6 +23,7 @@
         <a href="#opencti" class="settings-nav-item" data-section="opencti">OpenCTI</a>
         <a href="#kibana" class="settings-nav-item" data-section="kibana">Kibana Cases</a>
         <a href="#dfir_iris" class="settings-nav-item" data-section="dfir_iris">DFIR-IRIS</a>
+        <a href="#tide" class="settings-nav-item" data-section="tide">TIDE</a>
         <a href="#oidc" class="settings-nav-item" data-section="oidc">OIDC / Keycloak</a>
         <a href="#sessions" class="settings-nav-item" data-section="sessions">Active Sessions</a>
         <a href="#database" class="settings-nav-item" data-section="database">Database</a>
@@ -386,6 +387,52 @@
 
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="testConnection('dfir_iris')">Test Connection</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- TIDE Settings -->
+        <section id="tide" class="settings-section">
+            <h2>TIDE Integration</h2>
+            <p class="section-description">Configure TIDE (Threat Informed Detection Engineering) for the detection rule catalog, kill chains, and gap analysis.</p>
+
+            <form id="tide-form" onsubmit="saveSettings(event, 'tide')">
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="tide_enabled" name="tide_enabled">
+                        Enable TIDE Integration
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="tide_url">TIDE URL</label>
+                    <input type="url" id="tide_url" name="tide_url" placeholder="https://tide.example.com">
+                    <span class="form-help">Base URL of your TIDE instance (no trailing slash)</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="tide_api_key">API Key</label>
+                    <input type="password" id="tide_api_key" name="tide_api_key" placeholder="Leave blank to keep current">
+                    <span class="form-help" id="tide_api_key_status">X-TIDE-API-KEY value used for the external query API</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="tide_space">Space</label>
+                    <input type="text" id="tide_space" name="tide_space" placeholder="default">
+                    <span class="form-help">Kibana space the TIDE rules belong to (e.g. <code>default</code> or <code>production</code>)</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="tide_verify_ssl" name="tide_verify_ssl" checked>
+                        Verify SSL Certificate
+                    </label>
+                    <span class="form-help">Disable for self-signed certificates</span>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="testConnection('tide')">Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
             </form>
@@ -1900,6 +1947,15 @@ function populateForms(config) {
     document.getElementById('dfir_iris_verify_ssl').checked = config.dfir_iris.dfir_iris_verify_ssl !== false;
     updateSecretStatus('dfir_iris_api_key', config.dfir_iris.dfir_iris_api_key_set);
 
+    // TIDE
+    if (config.tide) {
+        document.getElementById('tide_enabled').checked = config.tide.tide_enabled;
+        document.getElementById('tide_url').value = config.tide.tide_url || '';
+        document.getElementById('tide_space').value = config.tide.tide_space || 'default';
+        document.getElementById('tide_verify_ssl').checked = config.tide.tide_verify_ssl !== false;
+        updateSecretStatus('tide_api_key', config.tide.tide_api_key_set);
+    }
+
     // OIDC
     document.getElementById('base_url').value = config.oidc.base_url || '';
     document.getElementById('oidc_enabled').checked = config.oidc.oidc_enabled;
@@ -1985,6 +2041,14 @@ async function saveSettings(event, section) {
         }
         data.dfir_iris_default_customer = parseInt(form.dfir_iris_default_customer.value) || 1;
         data.dfir_iris_verify_ssl = form.dfir_iris_verify_ssl.checked;
+    } else if (section === 'tide') {
+        data.tide_enabled = form.tide_enabled.checked;
+        data.tide_url = form.tide_url.value;
+        if (form.tide_api_key.value) {
+            data.tide_api_key = form.tide_api_key.value;
+        }
+        data.tide_space = form.tide_space.value || 'default';
+        data.tide_verify_ssl = form.tide_verify_ssl.checked;
     } else if (section === 'oidc') {
         data.base_url = form.base_url.value;
         data.oidc_enabled = form.oidc_enabled.checked;

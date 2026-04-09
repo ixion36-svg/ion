@@ -998,10 +998,19 @@ function exportEvents() {
 }
 
 async function downloadExport() {
-    const hours = document.getElementById('export-hours').value;
-    const format = document.getElementById('export-format').value;
+    // Strict whitelists — values come from <select> elements but we still
+    // validate before putting them into a URL to prevent any injected text
+    // from reaching the browser via window.location.href.
+    const ALLOWED_HOURS = new Set(['1', '6', '24', '72', '168', '720']);
+    const ALLOWED_FORMATS = new Set(['json', 'csv', 'ndjson']);
 
-    window.location.href = `/api/security/export/download?hours=${hours}&format=${format}`;
+    const hoursRaw = document.getElementById('export-hours').value;
+    const formatRaw = document.getElementById('export-format').value;
+    const hours = ALLOWED_HOURS.has(hoursRaw) ? hoursRaw : '24';
+    const format = ALLOWED_FORMATS.has(formatRaw) ? formatRaw : 'json';
+
+    const params = new URLSearchParams({ hours, format });
+    window.location.href = '/api/security/export/download?' + params.toString();
     closeModal('export-modal');
 }
 

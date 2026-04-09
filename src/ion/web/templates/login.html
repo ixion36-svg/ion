@@ -254,11 +254,13 @@
                     } else {
                         // Redirect to dashboard or previous page
                         const urlParams = new URLSearchParams(window.location.search);
-                        let redirect = urlParams.get('redirect') || '/';
-                        // Prevent open redirect — only allow relative paths
-                        if (!redirect.startsWith('/') || redirect.startsWith('//') || redirect.includes('://')) {
-                            redirect = '/';
-                        }
+                        const requested = urlParams.get('redirect') || '/';
+                        // Strict allowlist: must be a single-leading-slash relative path with
+                        // only safe URL characters. Blocks protocol-relative ("//evil.com"),
+                        // absolute ("https://..."), backslash-tricks ("/\\evil.com"), and
+                        // javascript: URIs that could otherwise execute as XSS via location.href.
+                        const SAFE_RELATIVE = /^\/(?!\/)[A-Za-z0-9_\-./?#=&%~+]*$/;
+                        const redirect = SAFE_RELATIVE.test(requested) ? requested : '/';
                         window.location.href = redirect;
                     }
                 } else {

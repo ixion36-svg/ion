@@ -26,6 +26,7 @@ from ion.auth.dependencies import get_current_user
 from ion.models.user import User
 from ion.models.ai_preferences import AIResponseFeedback
 from ion.storage.database import get_session
+from ion.core.safe_errors import safe_error
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +155,7 @@ async def ai_diagnostic(current_user: User = Depends(get_current_user)):
         service = get_ollama_service()
         checks["ollama_init"] = {"ok": True, "url": service.base_url, "model": service.default_model}
     except Exception as e:
-        checks["ollama_init"] = {"ok": False, "error": str(e)}
+        checks["ollama_init"] = {"ok": False, "error": safe_error(e)}
         return {"checks": checks}
 
     # 2. Ollama connectivity
@@ -162,7 +163,7 @@ async def ai_diagnostic(current_user: User = Depends(get_current_user)):
         available = await service.is_available()
         checks["ollama_available"] = {"ok": available}
     except Exception as e:
-        checks["ollama_available"] = {"ok": False, "error": str(e)}
+        checks["ollama_available"] = {"ok": False, "error": safe_error(e)}
 
     # 3. Database / AI preferences
     try:
@@ -176,7 +177,7 @@ async def ai_diagnostic(current_user: User = Depends(get_current_user)):
                 "rag_playbooks": prefs.rag_playbooks,
             }
     except Exception as e:
-        checks["db_preferences"] = {"ok": False, "error": str(e)}
+        checks["db_preferences"] = {"ok": False, "error": safe_error(e)}
 
     # 4. Quick Ollama chat test (non-streaming, tiny prompt)
     try:
@@ -190,7 +191,7 @@ async def ai_diagnostic(current_user: User = Depends(get_current_user)):
             )
             checks["ollama_chat"] = {"ok": True, "model": result.get("model")}
     except Exception as e:
-        checks["ollama_chat"] = {"ok": False, "error": str(e)}
+        checks["ollama_chat"] = {"ok": False, "error": safe_error(e)}
 
     all_ok = all(c.get("ok", False) for c in checks.values())
     return {"status": "ok" if all_ok else "error", "checks": checks}
@@ -223,7 +224,7 @@ async def list_models(current_user: User = Depends(get_current_user)):
             "recommended": RECOMMENDED_MODELS,
         }
     except OllamaError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=safe_error(e))
 
 
 @router.get("/prompts")
@@ -275,7 +276,7 @@ async def chat(
             tokens=result.get("eval_count"),
         )
     except OllamaError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=safe_error(e))
     except Exception as e:
         logger.error("AI chat error: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"AI chat error: {e}")
@@ -449,7 +450,7 @@ async def chat_stream(
             yield "data: [DONE]\n\n"
         except Exception as e:
             logger.error("AI chat stream error: %s", e, exc_info=True)
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'error': safe_error(e)})}\n\n"
 
     return StreamingResponse(
         generate(),
@@ -480,7 +481,7 @@ async def pull_model(
                 yield f"data: {json.dumps(progress)}\n\n"
             yield "data: [DONE]\n\n"
         except OllamaError as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'error': safe_error(e)})}\n\n"
 
     return StreamingResponse(
         generate(),
@@ -527,7 +528,7 @@ Alert Data:
             "model": result["model"],
         }
     except OllamaError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=safe_error(e))
 
 
 @router.post("/triage/suggest")
@@ -576,7 +577,7 @@ Extract real observables from the alert data. Map to real MITRE ATT&CK technique
             "model": result["model"],
         }
     except OllamaError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=safe_error(e))
 
 
 @router.post("/case/generate")
@@ -617,7 +618,7 @@ EVIDENCE: A narrative summary of the evidence collected, including observables, 
             "model": result["model"],
         }
     except OllamaError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=safe_error(e))
 
 
 @router.post("/generate/query")
@@ -652,7 +653,7 @@ Request: {description}"""
             "model": result["model"],
         }
     except OllamaError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        raise HTTPException(status_code=503, detail=safe_error(e))
 
 
 # =============================================================================
@@ -726,7 +727,7 @@ async def generate_document(
             yield "data: [DONE]\n\n"
         except Exception as e:
             logger.error("Document generation error: %s", e, exc_info=True)
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'error': safe_error(e)})}\n\n"
 
     return StreamingResponse(
         generate(),
@@ -942,7 +943,7 @@ async def chat_with_history(
                 yield f"data: {json.dumps({'session_id': session.id})}\n\n"
                 yield "data: [DONE]\n\n"
             except OllamaError as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                yield f"data: {json.dumps({'error': safe_error(e)})}\n\n"
 
         return StreamingResponse(
             generate(),
@@ -968,7 +969,7 @@ async def chat_with_history(
                 "model": result["model"],
             }
         except OllamaError as e:
-            raise HTTPException(status_code=503, detail=str(e))
+            raise HTTPException(status_code=503, detail=safe_error(e))
 
 
 @router.get("/history/stats")

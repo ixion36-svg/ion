@@ -15,6 +15,7 @@ from ion.models.user import User, Role, user_roles
 from ion.web.api import get_db_session
 from ion.web.notification_api import create_notification
 from ion.services.tide_service import get_tide_service, reset_tide_service
+from ion.core.safe_errors import safe_error
 
 router = APIRouter()
 
@@ -787,7 +788,7 @@ async def tide_system_alerts(system_id: str, namespace: str = "", hours: int = 1
         result = await es._request("POST", f"/{encoded}/_search", json=query)
     except Exception as e:
         return {
-            "error": f"ES query failed: {e}",
+            "error": f"ES query failed: {safe_error(e, 'cyab_es_query')}",
             "tide_rules": len(tide_rules_map),
             "firing_rules": [],
             "silent_rules": list(tide_rules_map.values()),
@@ -964,7 +965,7 @@ async def tide_de_system_readiness(req: ReadinessReportRequest, session: Session
     try:
         actor = await opencti.get_entity_detail(req.actor_id, req.actor_type)
     except Exception as e:
-        return {"enabled": True, "error": f"OpenCTI failed: {e}"}
+        return {"enabled": True, "error": f"OpenCTI failed: {safe_error(e, 'cyab_opencti')}"}
     if not actor:
         raise HTTPException(status_code=404, detail="Threat actor not found")
 
@@ -1088,7 +1089,7 @@ async def tide_de_system_readiness(req: ReadinessReportRequest, session: Session
                 )
                 ai_recommendations = await ollama.generate(rec_prompt, temperature=0.4)
         except Exception as e:
-            ai_summary = f"AI generation failed: {e}"
+            ai_summary = f"AI generation failed: {safe_error(e, 'cyab_ai_summary')}"
 
     return {
         "enabled": True,
@@ -1125,24 +1126,31 @@ async def tide_de_readiness_pdf(req: ReadinessReportRequest, session: Session = 
     actor = data["actor"]
     system = data.get("system")
     matrix = data["coverage_matrix"]
-    h = html_mod.escape
+    # Wrap html.escape so it accepts ints/None and always returns a string,
+    # making it impossible for raw values from `req`/OpenCTI/TIDE to land in
+    # the HTML output without being escaped first.
+    def h(v) -> str:
+        return html_mod.escape("" if v is None else str(v), quote=True)
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     sys_name = system["name"] if system else "All Systems (Global)"
 
-    # Build HTML body
+    # Coerce numeric width through int() so it can never be poisoned upstream.
+    readiness_width = max(0, min(100, int(data.get('readiness_pct') or 0)))
+
+    # Build HTML body — every interpolated value goes through h()
     body = f"""
     <h2>Executive Summary</h2>
     <p>{h(data.get('ai_summary') or 'AI summary not available.')}</p>
 
     <div class="readiness-gauge">
-        <h3>Overall Readiness: {data['readiness_pct']}%</h3>
+        <h3>Overall Readiness: {h(data['readiness_pct'])}%</h3>
         <div class="gauge-bar">
-            <div class="gauge-fill" style="width:{data['readiness_pct']}%"></div>
+            <div class="gauge-fill" style="width:{readiness_width}%"></div>
         </div>
         <table class="pdf-meta">
-            <tr><td>Covered Techniques</td><td>{data['covered_count']} of {data['total_ttps']}</td></tr>
-            <tr><td>Detection Gaps</td><td>{data['gap_count']}</td></tr>
+            <tr><td>Covered Techniques</td><td>{h(data['covered_count'])} of {h(data['total_ttps'])}</td></tr>
+            <tr><td>Detection Gaps</td><td>{h(data['gap_count'])}</td></tr>
         </table>
     </div>
 
@@ -1150,7 +1158,7 @@ async def tide_de_readiness_pdf(req: ReadinessReportRequest, session: Session = 
     <table class="pdf-meta">
         <tr><td>Name</td><td><strong>{h(actor['name'])}</strong></td></tr>
         <tr><td>Aliases</td><td>{h(', '.join(actor.get('aliases', [])[:8]) or 'None known')}</td></tr>
-        <tr><td>Known TTPs</td><td>{data['total_ttps']}</td></tr>
+        <tr><td>Known TTPs</td><td>{h(data['total_ttps'])}</td></tr>
     </table>
     {f'<p>{h(actor.get("description", ""))}</p>' if actor.get('description') else ''}
 
@@ -1162,8 +1170,8 @@ async def tide_de_readiness_pdf(req: ReadinessReportRequest, session: Session = 
         body += f"""
         <tr><td>Department</td><td>{h(system.get('department', '-'))}</td></tr>
         <tr><td>Status</td><td>{h(system.get('status', '-'))}</td></tr>
-        <tr><td>Data Sources</td><td>{system.get('data_source_count', 0)}</td></tr>
-        <tr><td>Readiness Score</td><td>{system.get('readiness_score', 0)}%</td></tr>
+        <tr><td>Data Sources</td><td>{h(system.get('data_source_count', 0))}</td></tr>
+        <tr><td>Readiness Score</td><td>{h(system.get('readiness_score', 0))}%</td></tr>
         """
     body += "</table>"
 
@@ -1191,8 +1199,8 @@ async def tide_de_readiness_pdf(req: ReadinessReportRequest, session: Session = 
             <td><code>{h(entry['mitre_id'])}</code></td>
             <td>{h(entry['name'])}</td>
             <td style="color:{status_color};font-weight:bold">{status_text}</td>
-            <td style="text-align:center">{entry['rule_count']}</td>
-            <td style="text-align:center">{entry['enabled_rules']}</td>
+            <td style="text-align:center">{h(entry['rule_count'])}</td>
+            <td style="text-align:center">{h(entry['enabled_rules'])}</td>
         </tr>
         """
     body += "</tbody></table>"
@@ -1262,16 +1270,33 @@ async def tide_de_readiness_pdf(req: ReadinessReportRequest, session: Session = 
     # Try PDF first, fall back to HTML
     try:
         from weasyprint import HTML as WpHTML
+        import re as _re
         pdf_bytes = WpHTML(string=full_html).write_pdf()
-        filename = f"readiness_{actor['name'].replace(' ', '_')}_{now_str[:10]}.pdf"
+        # Strict ASCII slug for the filename so an attacker-controlled actor
+        # name can't inject CRLF / quotes into the Content-Disposition header.
+        slug = _re.sub(r"[^A-Za-z0-9._-]+", "_", actor.get("name") or "report").strip("_")[:60] or "report"
+        filename = f"readiness_{slug}_{now_str[:10]}.pdf"
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Content-Type-Options": "nosniff",
+            },
         )
     except (ImportError, OSError):
-        # WeasyPrint not available — return printable HTML
-        return Response(content=full_html, media_type="text/html")
+        # WeasyPrint not available — return printable HTML with a strict CSP
+        # so that even if a sanitization regression slipped through, the
+        # browser will refuse to execute inline scripts in the report body.
+        return Response(
+            content=full_html,
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:",
+                "X-Content-Type-Options": "nosniff",
+                "X-Frame-Options": "DENY",
+            },
+        )
 
 
 @router.get("/tide/de/actor-readiness", dependencies=[Depends(require_permission("alert:read"))])
@@ -1301,7 +1326,7 @@ async def tide_de_actor_readiness(search: str = "", first: int = 15):
     try:
         actors_result = await opencti.search_threat_actors(search=search, first=min(first, 30))
     except Exception as e:
-        return {"enabled": True, "error": f"OpenCTI query failed: {e}", "actors": []}
+        return {"enabled": True, "error": f"OpenCTI query failed: {safe_error(e, 'cyab_actors')}", "actors": []}
 
     actors = actors_result.get("actors", [])
 
@@ -1455,7 +1480,7 @@ async def tide_de_kill_chain_alerts(hours: int = 24):
         encoded = pattern.replace(",", "%2C")
         result = await es._request("POST", f"/{encoded}/_search", json=query)
     except Exception as e:
-        return {"enabled": True, "error": f"ES query failed: {e}", "progressions": []}
+        return {"enabled": True, "error": f"ES query failed: {safe_error(e, 'cyab_progressions')}", "progressions": []}
 
     aggs = result.get("aggregations", {})
     host_buckets = aggs.get("by_host", {}).get("buckets", [])
@@ -1644,7 +1669,7 @@ async def tide_de_execution(hours: int = 168):
         encoded = pattern.replace(",", "%2C")
         result = await es._request("POST", f"/{encoded}/_search", json=query)
     except Exception as e:
-        return {"enabled": True, "error": f"ES query failed: {e}", "rules": [], "summary": {}}
+        return {"enabled": True, "error": f"ES query failed: {safe_error(e, 'cyab_rules')}", "rules": [], "summary": {}}
 
     total_alerts = result.get("hits", {}).get("total", {})
     if isinstance(total_alerts, dict):

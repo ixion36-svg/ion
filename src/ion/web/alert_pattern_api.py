@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, Depends, Query
 from ion.auth.dependencies import require_permission
 from ion.services.elasticsearch_service import ElasticsearchService
+from ion.core.safe_errors import safe_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/alert-patterns", tags=["alert-patterns"])
@@ -24,5 +25,4 @@ async def get_alert_patterns(
         alert_dicts = [a.to_dict() for a in alerts]
         return detect_alert_patterns(alert_dicts, min_occurrences=min_occurrences)
     except Exception as e:
-        logger.error("Alert patterns failed: %s", e)
-        return {"enabled": False, "error": str(e)}
+        return {"enabled": False, "error": safe_error(e, "alert_patterns")}

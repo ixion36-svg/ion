@@ -21,6 +21,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from ion.core.config import get_config, get_oidc_config, get_gitlab_config, get_dfir_iris_config, get_ssl_verify
+from ion.core.safe_errors import safe_error
 from ion.services.dfir_iris_service import get_dfir_iris_service
 from ion.services.case_description import build_case_description
 from ion.services.kibana_sync_helpers import (
@@ -651,10 +652,14 @@ async def oidc_callback(
 
     Validates the state parameter to prevent CSRF attacks.
     """
-    # Helper to create safe redirect with URL-encoded error
+    # Helper to create safe redirect with URL-encoded error.
+    # The path is hard-coded to /login; only the error message is data-driven
+    # and is URL-encoded with `safe=''` so EVERY character (including /, ?, #)
+    # is percent-encoded. This makes the redirect provably target /login.
     def error_redirect(msg: str) -> RedirectResponse:
+        encoded = url_quote(str(msg or "Login failed"), safe="")
         resp = RedirectResponse(
-            url=f"/login?error={url_quote(msg)}",
+            url="/login?error=" + encoded,
             status_code=302,
         )
         # Clear the state cookie
@@ -820,14 +825,15 @@ async def oidc_callback(
 
     except OIDCValidationError as e:
         logger.warning(f"OIDC token validation failed: {e}")
-        return error_redirect(f"Token validation failed: {e}")
+        return error_redirect("Token validation failed")
     except httpx.HTTPError as e:
         logger.error(f"OIDC token exchange HTTP error: {e}", exc_info=True)
         return error_redirect("Authentication service unavailable")
     except ValueError as e:
-        # User creation failed (auto-create disabled)
+        # User creation failed (auto-create disabled). Log the full message
+        # server-side, but show a generic reason to the user.
         logger.warning(f"OIDC user sync failed: {e}")
-        return error_redirect(str(e))
+        return error_redirect("Account provisioning failed")
     except Exception as e:
         logger.error(f"Unexpected OIDC callback error: {e}", exc_info=True)
         return error_redirect("Authentication failed")
@@ -1212,7 +1218,7 @@ async def create_collection(
         services.session.commit()
         return {"id": c.id, "name": c.name, "parent_id": c.parent_id, "message": "Folder created successfully"}
     except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=safe_error(e))
 
 
 @router.get("/collections/{collection_id}", dependencies=[Depends(require_permission("template:read"))])
@@ -1278,7 +1284,7 @@ async def update_collection(
     except CollectionNotFoundError:
         raise HTTPException(status_code=404, detail="Collection not found")
     except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=safe_error(e))
 
 
 @router.delete("/collections/{collection_id}", dependencies=[Depends(require_permission("template:delete"))])
@@ -1417,7 +1423,7 @@ async def create_template(template: TemplateCreate, services: Services = Depends
         services.session.commit()
         return {"id": t.id, "name": t.name, "message": "Template created successfully"}
     except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=safe_error(e))
 
 
 @router.get("/templates/section-types", dependencies=[Depends(require_permission("template:read"))])
@@ -1488,7 +1494,7 @@ async def update_template(template_id: int, template: TemplateUpdate, services: 
     except TemplateNotFoundError:
         raise HTTPException(status_code=404, detail="Template not found")
     except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=safe_error(e))
 
 
 @router.delete("/templates/{template_id}", dependencies=[Depends(require_permission("template:delete"))])
@@ -1566,7 +1572,7 @@ async def get_version(template_id: int, version_number: int, services: Services 
             "created_at": v.created_at.isoformat() if v.created_at else None,
         }
     except VersionNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=safe_error(e))
 
 
 @router.post("/templates/{template_id}/checkpoint", dependencies=[Depends(require_permission("template:update"))])
@@ -1583,7 +1589,7 @@ async def create_checkpoint(template_id: int, checkpoint: CheckpointCreate, serv
     except TemplateNotFoundError:
         raise HTTPException(status_code=404, detail="Template not found")
     except ValidationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=safe_error(e))
 
 
 @router.get("/templates/{template_id}/diff/{from_version}/{to_version}", dependencies=[Depends(require_permission("template:read"))])
@@ -1593,7 +1599,7 @@ async def diff_versions(template_id: int, from_version: int, to_version: int, se
         diff = services.version.diff_versions(template_id, from_version, to_version)
         return {"diff": diff}
     except (TemplateNotFoundError, VersionNotFoundError) as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=safe_error(e))
 
 
 @router.post("/templates/{template_id}/rollback/{to_version}", dependencies=[Depends(require_permission("template:update"))])
@@ -1604,7 +1610,7 @@ async def rollback_version(template_id: int, to_version: int, message: Optional[
         services.session.commit()
         return {"current_version": t.current_version, "message": "Rollback successful"}
     except (TemplateNotFoundError, VersionNotFoundError) as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=safe_error(e))
 
 
 # Render endpoints
@@ -1617,7 +1623,7 @@ async def preview_template(template_id: int, render_request: RenderRequest, serv
     except TemplateNotFoundError:
         raise HTTPException(status_code=404, detail="Template not found")
     except RenderError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=safe_error(e))
 
 
 @router.post("/templates/{template_id}/render", dependencies=[Depends(require_permission("document:create"))])
@@ -1648,7 +1654,7 @@ async def render_template(
     except TemplateNotFoundError:
         raise HTTPException(status_code=404, detail="Template not found")
     except RenderError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=safe_error(e))
 
 
 @router.post("/templates/{template_id}/render-pdf", dependencies=[Depends(require_permission("template:read"))])
@@ -1663,7 +1669,7 @@ async def render_template_pdf(
     except TemplateNotFoundError:
         raise HTTPException(status_code=404, detail="Template not found")
     except RenderError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=safe_error(e))
 
     template = services.template.get_template(template_id)
     fmt = render_request.output_format or (template.format if template else "markdown")
@@ -1762,7 +1768,7 @@ async def batch_render_template(
     except TemplateNotFoundError:
         raise HTTPException(status_code=404, detail="Template not found")
     except RenderError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=safe_error(e))
 
 
 @router.get("/templates/{template_id}/variables", dependencies=[Depends(require_permission("template:read"))])
@@ -2182,7 +2188,7 @@ async def revert_document_to_version(
             "message": f"Document reverted to version {version_number}, now at version {updated.current_version}",
         }
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=safe_error(e))
 
 
 # Health check endpoint (no auth required)
@@ -2256,7 +2262,7 @@ async def get_dashboard(
                     data["open_issues"] = [i.to_dict() for i in issues]
                     data["total_open"] = len(issues)
             except Exception as e:
-                data["error"] = str(e)
+                data["error"] = safe_error(e)
         return data
 
     async def fetch_elasticsearch_data():
@@ -2287,7 +2293,7 @@ async def get_dashboard(
                     else:
                         data["error"] = connection.get("error", "Connection failed")
             except Exception as e:
-                data["error"] = str(e)
+                data["error"] = safe_error(e)
         return data
 
     # Run both with 8 second timeouts so dashboard loads quickly
@@ -2997,7 +3003,7 @@ async def list_gitlab_issues(
         )
         return {"issues": [issue.to_dict() for issue in issues]}
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3013,7 +3019,7 @@ async def get_gitlab_issue(
         issue = await service.get_issue(issue_iid)
         return issue.to_dict()
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3046,7 +3052,7 @@ async def create_gitlab_issue(
         )
         return issue.to_dict()
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3072,7 +3078,7 @@ async def update_gitlab_issue(
         )
         return issue.to_dict()
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3088,7 +3094,7 @@ async def close_gitlab_issue(
         issue = await service.close_issue(issue_iid)
         return issue.to_dict()
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3104,7 +3110,7 @@ async def reopen_gitlab_issue(
         issue = await service.reopen_issue(issue_iid)
         return issue.to_dict()
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3120,7 +3126,7 @@ async def delete_gitlab_issue(
         await service.delete_issue(issue_iid)
         return {"success": True, "message": f"Issue #{issue_iid} deleted"}
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3142,7 +3148,7 @@ async def list_gitlab_issue_comments(
         )
         return {"comments": [comment.to_dict() for comment in comments]}
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3172,7 +3178,7 @@ async def add_gitlab_issue_comment(
         )
         return comment.to_dict()
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3187,7 +3193,7 @@ async def list_gitlab_labels(
         labels = await service.list_labels()
         return {"labels": labels}
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3207,7 +3213,7 @@ async def create_gitlab_label(
         )
         return label
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3223,7 +3229,7 @@ async def list_gitlab_milestones(
         milestones = await service.list_milestones(state=state)
         return {"milestones": milestones}
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3238,7 +3244,7 @@ async def list_gitlab_members(
         members = await service.list_members()
         return {"members": members}
     except GitLabError as e:
-        raise HTTPException(status_code=e.status_code or 500, detail=str(e))
+        raise HTTPException(status_code=e.status_code or 500, detail=safe_error(e))
     finally:
         await service.close()
 
@@ -3368,7 +3374,7 @@ async def get_es_alerts(
             "enabled": True,
             "configured": True,
             "connection_error": True,
-            "message": str(e),
+            "message": safe_error(e),
         }
 
 
@@ -3431,7 +3437,7 @@ async def get_mitre_stats(
             "total_alerts_with_mitre": 0,
             "time_range_hours": hours,
             "connection_error": True,
-            "message": str(e),
+            "message": safe_error(e),
         }
 
 
@@ -4526,22 +4532,28 @@ async def escalate_case_to_dfir_iris(
     except HTTPException:
         raise
     except httpx.HTTPStatusError as e:
-        # Surface the clearer auth-failure messages from the service
-        msg = str(e)
-        if "authentication failed" in msg.lower() or "login page" in msg.lower():
-            detail = msg
+        # Log the full error server-side; surface only a generic auth/API
+        # failure message and the upstream HTTP status to the client.
+        logger.warning("DFIR-IRIS escalation HTTP error: %s", e)
+        try:
+            status = e.response.status_code
+        except Exception:
+            status = "?"
+        if status in (401, 403):
+            detail = f"DFIR-IRIS authentication failed (HTTP {status})"
         else:
-            detail = f"DFIR-IRIS API error: HTTP {e.response.status_code} - {e.response.text[:200]}"
+            detail = f"DFIR-IRIS API error (HTTP {status})"
         raise HTTPException(status_code=502, detail=detail)
     except httpx.ConnectError as e:
+        logger.warning("DFIR-IRIS connection error: %s", e)
         raise HTTPException(
             status_code=502,
-            detail=f"Cannot connect to DFIR-IRIS: {e}",
+            detail="Cannot connect to DFIR-IRIS",
         )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Escalation failed: {str(e)}",
+            detail=f"Escalation failed: {safe_error(e, 'dfir_iris_escalation')}",
         )
 
 
@@ -5450,7 +5462,7 @@ async def get_es_related_alerts(
             },
         }
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error(e))
 
 
 @router.get("/elasticsearch/alerts/stats")
@@ -5475,7 +5487,7 @@ async def get_es_alert_stats(
             **stats,
         }
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error(e))
 
 
 # ============================================================================
@@ -5530,7 +5542,7 @@ async def discover_search(
     try:
         _validate_index_pattern(request.index_pattern)
     except ValueError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=403, detail=safe_error(e))
 
     config = get_elasticsearch_config()
     if not config.get("enabled"):
@@ -5559,7 +5571,7 @@ async def discover_search(
         return result
 
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error(e))
 
 
 @router.post("/elasticsearch/discover/histogram")
@@ -5571,7 +5583,7 @@ async def discover_histogram(
     try:
         _validate_index_pattern(request.index_pattern)
     except ValueError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=403, detail=safe_error(e))
 
     config = get_elasticsearch_config()
     if not config.get("enabled"):
@@ -5597,7 +5609,7 @@ async def discover_histogram(
         return result
 
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error(e))
 
 
 # ============================================================================
@@ -5640,7 +5652,7 @@ async def list_indices(
         return result
 
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error(e))
 
 
 @router.get("/elasticsearch/indices/{index_pattern}/mappings")
@@ -5669,7 +5681,7 @@ async def get_index_mappings(
         return result
 
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error(e))
 
 
 class FieldStatsRequest(BaseModel):
@@ -5715,7 +5727,7 @@ async def get_field_stats(
         return result
 
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error(e))
 
 
 # ============================================================================
@@ -5777,7 +5789,7 @@ async def ioc_hunt(
         return result
 
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error(e))
 
 
 @router.post("/elasticsearch/ioc-hunt/bulk")
@@ -5812,7 +5824,7 @@ async def ioc_hunt_bulk(
         return result
 
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error(e))
 
 
 # ============================================================================
@@ -6824,9 +6836,15 @@ async def upload_meme(
         raise HTTPException(400, "Empty file")
 
     safe_filename = f"{name}{ext}"
-    meme_dir = Path(__file__).parent / "static" / "memes"
+    meme_dir = (Path(__file__).parent / "static" / "memes").resolve()
     meme_dir.mkdir(parents=True, exist_ok=True)
-    (meme_dir / safe_filename).write_bytes(content)
+    # Defence-in-depth: even though `name` is constrained by regex and `ext` by an
+    # allowlist, resolve the final path and confirm it stays inside `meme_dir`
+    # before writing. Blocks any future regression that loosens the validators.
+    target_path = (meme_dir / safe_filename).resolve()
+    if not target_path.is_relative_to(meme_dir) or target_path.parent != meme_dir:
+        raise HTTPException(400, "Invalid filename")
+    target_path.write_bytes(content)
 
     meme = ChatMeme(name=name, filename=safe_filename, uploaded_by_id=current_user.id)
     session.add(meme)
@@ -7915,7 +7933,7 @@ async def get_host_patterns(
     try:
         alerts = await service.get_alerts(hours=hours, limit=500)
     except ElasticsearchError as e:
-        return {"patterns": [], "total": 0, "error": str(e)}
+        return {"patterns": [], "total": 0, "error": safe_error(e)}
 
     if not alerts:
         return {"patterns": [], "total": 0}
@@ -8141,4 +8159,4 @@ async def test_iris_connection(
                 return {"connected": True, "status": "ok", "version": "unknown"}
             return {"connected": False, "error": result.get("error", "Connection failed")}
     except Exception as e:
-        return {"connected": False, "error": str(e)}
+        return {"connected": False, "error": safe_error(e)}

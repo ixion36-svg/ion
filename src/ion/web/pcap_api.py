@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
 from ion.models.user import User
+from ion.core.safe_errors import safe_error
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +44,10 @@ async def analyze_pcap(
         from ion.services.pcap_service import parse_pcap, _is_private
         result = parse_pcap(content, filename)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        # Validation errors carry user-meaningful messages — return a class label.
+        raise HTTPException(400, f"Invalid PCAP: {safe_error(e, 'pcap_parse')}")
     except Exception as e:
-        raise HTTPException(500, f"Analysis failed: {e}")
+        raise HTTPException(500, f"Analysis failed: {safe_error(e, 'pcap_parse')}")
 
     response = result.to_dict()
 
@@ -55,8 +57,7 @@ async def analyze_pcap(
         if enrichments:
             response["threat_intel"] = enrichments
     except Exception as e:
-        logger.warning("PCAP observable enrichment failed: %s", e)
-        response["threat_intel"] = {"error": str(e), "observables": []}
+        response["threat_intel"] = {"error": safe_error(e, "pcap_enrich"), "observables": []}
 
     return response
 

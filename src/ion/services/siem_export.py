@@ -321,6 +321,9 @@ class SIEMExporter:
 
             elif protocol == "tls":
                 context = ssl.create_default_context()
+                # Force TLS 1.2+ — by default create_default_context still permits
+                # TLSv1 and TLSv1.1 on some platforms, which are deprecated.
+                context.minimum_version = ssl.TLSVersion.TLSv1_2
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 secure_sock = context.wrap_socket(sock, server_hostname=host)
                 secure_sock.connect((host, port))

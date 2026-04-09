@@ -14,6 +14,7 @@ from ion.auth.dependencies import get_current_user
 from ion.core.config import get_elasticsearch_config
 from ion.services.elasticsearch_service import ElasticsearchService, ElasticsearchError
 from ion.web.api import get_db_session
+from ion.core.safe_errors import safe_error
 
 router = APIRouter(tags=["engineering-analytics"])
 
@@ -53,10 +54,10 @@ async def get_system_analytics(
             index_pattern=index_pattern,
         )
         if result.get("error"):
-            raise HTTPException(status_code=500, detail=result["error"])
+            raise HTTPException(status_code=500, detail="Elasticsearch query failed")
         return result
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error(e, "engineering_analytics"))
 
 
 @router.get("/indices")
@@ -83,11 +84,11 @@ async def get_index_breakdown(
             index_pattern=pattern,
         )
         if result.get("error"):
-            raise HTTPException(status_code=500, detail=result["error"])
+            raise HTTPException(status_code=500, detail="Elasticsearch query failed")
         return {
             "indices": result.get("indices", []),
             "total": result.get("total", 0),
             "hours": hours,
         }
     except ElasticsearchError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=safe_error(e, "engineering_analytics"))

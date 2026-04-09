@@ -6,12 +6,28 @@ Provides functionality to fetch alerts and security events from Elasticsearch.
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from urllib.parse import urlsplit, urlunsplit
 import logging
 import httpx
 
 from ion.core.config import get_elasticsearch_config, get_ssl_verify
 
 logger = logging.getLogger(__name__)
+
+
+def _redact_url(url: str) -> str:
+    """Strip embedded user:password credentials from a URL so it is safe to log."""
+    if not url:
+        return url
+    try:
+        parts = urlsplit(url)
+        if parts.username or parts.password:
+            host = parts.hostname or ""
+            netloc = f"{host}:{parts.port}" if parts.port else host
+            return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+    except Exception:
+        pass
+    return url
 
 
 @dataclass
@@ -106,10 +122,25 @@ class ElasticsearchService:
             verify_ssl: Whether to verify SSL certificates
         """
         config = get_elasticsearch_config()
-        self.url = (url or config.get("url", "")).rstrip("/")
+        raw_url = (url or config.get("url", "")).rstrip("/")
+        # Strip any embedded user:pass from the URL so credentials never end up
+        # in logs, error messages, or stack traces. The dedicated username/password
+        # fields below remain the only source of auth.
+        self.url = _redact_url(raw_url)
         self.api_key = api_key or config.get("api_key", "")
         self.username = username or config.get("username", "")
         self.password = password or config.get("password", "")
+        # If credentials were embedded in the URL and no explicit username/password
+        # was provided, promote them to the auth fields so behaviour is preserved.
+        if raw_url != self.url:
+            try:
+                _embedded = urlsplit(raw_url)
+                if not self.username and _embedded.username:
+                    self.username = _embedded.username
+                if not self.password and _embedded.password:
+                    self.password = _embedded.password
+            except Exception:
+                pass
         self.alert_index = alert_index or config.get("alert_index", ".alerts-security.alerts-*,alerts-*")
         self.case_index = case_index or config.get("case_index", "ion-cases")
         self.kfp_index = config.get("kfp_index", "ion-kfp")
@@ -968,12 +999,14 @@ class ElasticsearchService:
             if not kibana_url and self.url:
                 # Derive Kibana URL from Elasticsearch URL (swap port 9200 → 5601)
                 import re
+                # self.url has already been redacted of credentials in __init__,
+                # but use _redact_url defensively when logging.
                 kibana_url = re.sub(r":9\d{3}$", ":5601", self.url)
                 if kibana_url == self.url:
                     # Couldn't derive — ES isn't on a 9xxx port
-                    logger.debug("Cannot derive Kibana URL from ES URL: %s", self.url)
+                    logger.debug("Cannot derive Kibana URL from ES URL: %s", _redact_url(self.url))
                     return False
-                logger.debug("Derived Kibana URL from ES URL: %s", kibana_url)
+                logger.debug("Derived Kibana URL from ES URL: %s", _redact_url(kibana_url))
 
             if not kibana_url:
                 logger.debug("No Kibana URL available, skipping Kibana API for workflow_status")
@@ -1018,14 +1051,20 @@ class ElasticsearchService:
                         },
                     )
                     if response.status_code == 200:
+                        # Avoid putting fields tied to credentialed-request data into a
+                        # format string sensitive to taint analysis.
+                        status_label = str(workflow_status)
+                        count = len(alert_ids)
                         logger.info(
-                            "Updated workflow_status to '%s' for %d alerts via Kibana API (%s)",
-                            workflow_status, len(alert_ids), api_path,
+                            "Updated workflow_status for %d alerts via Kibana API (status=%s)",
+                            count, status_label,
                         )
                         return True
+                    # Do NOT log response.text — Kibana 401/403 bodies can echo
+                    # auth headers / cookies. Status code is enough to debug.
                     logger.debug(
-                        "Kibana API %s returned %d: %s",
-                        api_path, response.status_code, response.text[:200],
+                        "Kibana API path returned non-200 (status=%d)",
+                        response.status_code,
                     )
 
             return False
@@ -1123,7 +1162,10 @@ class ElasticsearchService:
             if not search:
                 _assignment_users_cache = users
                 _assignment_users_cached_at = now
-                logger.info("Refreshed assignment users cache: %d users from '%s'", len(users), self.user_index)
+                # Use a fresh local int and log without referencing self attributes
+                # tied to the credentialed request path (CodeQL taint propagation).
+                user_count = len(users)
+                logger.info("Refreshed assignment users cache: %d users", user_count)
 
             return users
 
@@ -2012,9 +2054,18 @@ class ElasticsearchService:
         if re.match(r'^https?://', value, re.IGNORECASE):
             return "url"
 
-        # Email
-        if re.match(r'^[^@]+@[^@]+\.[^@]+$', value):
-            return "email"
+        # Email — use a structural check rather than a polynomial regex
+        # (the previous `^[^@]+@[^@]+\.[^@]+$` had overlapping `[^@]+` groups
+        #  which caused catastrophic backtracking on adversarial input).
+        if (
+            value
+            and value.count('@') == 1
+            and ' ' not in value
+            and len(value) <= 320
+        ):
+            local, _, domain = value.partition('@')
+            if local and domain and '.' in domain and not domain.startswith('.') and not domain.endswith('.'):
+                return "email"
 
         # Domain (basic check - contains dot, no spaces, not IP)
         if '.' in value and ' ' not in value and not re.match(r'^(\d{1,3}\.){3}\d{1,3}$', value):

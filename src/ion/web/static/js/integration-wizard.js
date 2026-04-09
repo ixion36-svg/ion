@@ -605,12 +605,18 @@ function renderTestStep(integrationName) {
             </div>
         `;
     } else {
+        // Escape the error for both HTML and the inline JS string literal:
+        // backslash MUST be escaped first, otherwise the subsequent single-quote
+        // escapes can be neutralised by an attacker-controlled trailing backslash.
+        const errorJsLiteral = escapeHtml(testResult.error)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'");
         statusHtml = `
             <div class="test-status error">
                 <div class="test-icon">&#10007;</div>
                 <h4>Connection Failed</h4>
                 <p class="error-message">${escapeHtml(testResult.error)}</p>
-                <button class="btn btn-secondary" onclick="requestAIDiagnosis('${integrationName}', '${escapeHtml(testResult.error).replace(/'/g, "\\'")}')">
+                <button class="btn btn-secondary" onclick="requestAIDiagnosis('${integrationName}', '${errorJsLiteral}')">
                     Get AI Diagnosis
                 </button>
             </div>
