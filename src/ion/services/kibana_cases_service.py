@@ -204,55 +204,170 @@ class KibanaCasesService:
     ) -> Optional[Dict[str, Any]]:
         """Update an existing case.
 
+        Handles two recurring failure modes:
+
+        1. **Version conflict** (HTTP 500 with `version_conflict_engine_exception`,
+           or HTTP 409). The Kibana cases API uses optimistic concurrency: every
+           case carries a `version` field, and the PATCH must include the
+           current version. If anyone else (the Kibana UI, another ION user,
+           an alert closure) updates the case between us reading it and us
+           writing, the version is stale and the PATCH fails. Recovery: re-read
+           the case to get the latest version + current field values, then
+           retry once.
+
+        2. **No-op update** (HTTP 406 with "all update fields are identical to
+           current version"). Kibana refuses PATCH requests where every field
+           in the payload already matches the current state. Recovery: before
+           sending, compare the desired payload to the current case and drop
+           any field that's already at the target value. If everything matches,
+           skip the network call entirely and return the current case as-is.
+
         Args:
             case_id: Case ID to update
-            version: Current case version (required for optimistic concurrency)
-            title: New title
-            description: New description
-            status: New status (open, in-progress, closed)
-            severity: New severity
-            tags: New tags list
-            assignees: New assignees list
+            version: Current case version (used as a starting hint; we re-fetch
+                     to make sure we have the freshest value)
+            title / description / status / severity / tags / assignees: only
+                pass values you actually want to change; ``None`` means "leave
+                this field alone".
         """
         if not self.enabled:
             return None
 
-        try:
-            payload = {
-                "cases": [
-                    {
-                        "id": case_id,
-                        "version": version,
-                    }
-                ]
-            }
+        # Build the dict of fields the caller actually wants to change.
+        desired: Dict[str, Any] = {}
+        if title is not None:
+            desired["title"] = title
+        if description is not None:
+            desired["description"] = description
+        if status is not None:
+            desired["status"] = status
+        if severity is not None:
+            desired["severity"] = severity
+        if tags is not None:
+            desired["tags"] = tags
+        if assignees is not None:
+            desired["assignees"] = assignees
 
-            case_update = payload["cases"][0]
-            if title is not None:
-                case_update["title"] = title
-            if description is not None:
-                case_update["description"] = description
-            if status is not None:
-                case_update["status"] = status
-            if severity is not None:
-                case_update["severity"] = severity
-            if tags is not None:
-                case_update["tags"] = tags
-            if assignees is not None:
-                case_update["assignees"] = assignees
+        if not desired:
+            # Nothing to do. Return the current case so callers can keep their
+            # version pointer accurate.
+            current = self.get_case(case_id)
+            return current
 
-            path = self._get_api_path("/api/cases")
-            response = self.client.patch(path, json=payload)
+        # Two attempts: first uses the version the caller passed in (cheap),
+        # second re-fetches after a conflict (correct).
+        for attempt in (0, 1):
+            try:
+                # On retry, always start from a fresh fetch.
+                if attempt == 1 or not version:
+                    current = self.get_case(case_id)
+                    if not current:
+                        logger.warning("update_case: case %s not found in Kibana", case_id)
+                        return None
+                    version = current.get("version")
+                else:
+                    current = None  # we'll fetch lazily if we need to filter
 
-            if response.status_code == 200:
-                cases = response.json()
-                return cases[0] if cases else None
-            else:
-                logger.error(f"Failed to update case: {response.status_code} - {response.text}")
+                # Filter out fields that are already at the target value to
+                # avoid the 406 "all update fields are identical" error.
+                if current is None:
+                    current = self.get_case(case_id)
+                    if not current:
+                        return None
+
+                changed = self._filter_unchanged_fields(desired, current)
+                if not changed:
+                    logger.debug("update_case: no field changes for %s, skipping PATCH", case_id)
+                    return current
+
+                payload = {
+                    "cases": [
+                        {
+                            "id": case_id,
+                            "version": version,
+                            **changed,
+                        }
+                    ]
+                }
+                path = self._get_api_path("/api/cases")
+                response = self.client.patch(path, json=payload)
+
+                if response.status_code == 200:
+                    cases = response.json()
+                    return cases[0] if cases else current
+
+                body_text = (response.text or "")[:500]
+                lower_body = body_text.lower()
+
+                # Detect version conflict — Kibana surfaces ES's
+                # version_conflict_engine_exception either as a 500 with that
+                # phrase in the body, or sometimes as a plain 409.
+                is_version_conflict = (
+                    response.status_code == 409
+                    or "version_conflict" in lower_body
+                    or "version conflict" in lower_body
+                )
+                # Detect "no-op already-applied" — Kibana returns 406 with
+                # "all update fields are identical to current version".
+                is_no_op = (
+                    response.status_code == 406
+                    or "identical to current version" in lower_body
+                )
+
+                if is_no_op:
+                    logger.info(
+                        "update_case: Kibana reports case %s already at target state",
+                        case_id,
+                    )
+                    return current
+
+                if is_version_conflict and attempt == 0:
+                    logger.info(
+                        "update_case: version conflict on %s, re-fetching and retrying",
+                        case_id,
+                    )
+                    version = None  # force re-fetch on next loop
+                    continue
+
+                logger.warning(
+                    "update_case failed for %s: HTTP %s — %s",
+                    case_id, response.status_code, body_text,
+                )
                 return None
-        except Exception as e:
-            logger.error(f"Error updating Kibana case: {e}")
-            return None
+
+            except Exception as e:
+                logger.warning("update_case error for %s: %s", case_id, type(e).__name__)
+                return None
+
+        # Out of retries
+        return None
+
+    @staticmethod
+    def _filter_unchanged_fields(desired: Dict[str, Any], current: Dict[str, Any]) -> Dict[str, Any]:
+        """Drop any desired field whose value already matches the current case.
+
+        Returns the subset of ``desired`` that actually represents a change.
+        Used to avoid Kibana's 406 "all update fields are identical" error
+        and to send the smallest possible patch.
+        """
+        out: Dict[str, Any] = {}
+        for k, v in desired.items():
+            cur = current.get(k)
+            if k == "assignees":
+                # Compare as sorted UID lists so reordering is not treated as a change.
+                cur_uids = sorted(((a or {}).get("uid") or "") for a in (cur or []))
+                new_uids = sorted(((a or {}).get("uid") or "") for a in (v or []))
+                if cur_uids != new_uids:
+                    out[k] = v
+            elif k == "tags":
+                cur_tags = sorted(cur or [])
+                new_tags = sorted(v or [])
+                if cur_tags != new_tags:
+                    out[k] = v
+            else:
+                if cur != v:
+                    out[k] = v
+        return out
 
     def add_comment(
         self,
