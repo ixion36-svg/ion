@@ -2,6 +2,7 @@
 
 import logging
 import os
+import threading
 import time
 from typing import Any, Optional
 
@@ -11,6 +12,42 @@ from ion.core.config import get_tide_config, get_ssl_verify
 from ion.core.circuit_breaker import tide_breaker
 
 logger = logging.getLogger(__name__)
+
+
+# Per-process micro-cache for identical SQL within a short window. Detection
+# Engineering pages fan out 6+ parallel queries on load; without this, every
+# concurrent fetch hits TIDE independently and a slow DuckDB amplifies into a
+# storm of 504s.
+_QUERY_CACHE: dict[str, tuple[float, Optional[dict]]] = {}
+_CACHE_TTL_SECONDS = 8.0
+_CACHE_LOCK = threading.Lock()
+_MAX_CACHE_ENTRIES = 256
+
+
+# Statuses we consider transient and retry with backoff.
+_RETRY_STATUSES = {429, 500, 502, 503, 504}
+
+
+def _cache_get(sql: str) -> tuple[bool, Optional[dict]]:
+    """Return (hit, value) — hit=True means we returned a cached entry."""
+    with _CACHE_LOCK:
+        entry = _QUERY_CACHE.get(sql)
+        if not entry:
+            return False, None
+        ts, val = entry
+        if time.time() - ts > _CACHE_TTL_SECONDS:
+            _QUERY_CACHE.pop(sql, None)
+            return False, None
+        return True, val
+
+
+def _cache_put(sql: str, value: Optional[dict]) -> None:
+    with _CACHE_LOCK:
+        if len(_QUERY_CACHE) >= _MAX_CACHE_ENTRIES:
+            # Drop the oldest entry to bound memory
+            oldest_key = min(_QUERY_CACHE, key=lambda k: _QUERY_CACHE[k][0])
+            _QUERY_CACHE.pop(oldest_key, None)
+        _QUERY_CACHE[sql] = (time.time(), value)
 
 
 class TideService:
@@ -27,9 +64,18 @@ class TideService:
     def _query(self, sql: str, retries: int = 2) -> Optional[dict]:
         if not self.enabled:
             return None
+
+        # 1. Cache hit short-circuits everything (including 504 storms).
+        hit, cached = _cache_get(sql)
+        if hit:
+            return cached
+
+        # 2. Circuit breaker — if TIDE is down, fail fast and serve None.
         if not tide_breaker.can_execute():
             logger.warning("TIDE circuit breaker OPEN — skipping query")
             return None
+
+        last_status: Optional[int] = None
         for attempt in range(retries + 1):
             try:
                 resp = httpx.post(
@@ -37,26 +83,53 @@ class TideService:
                     json={"sql": sql},
                     headers={"X-TIDE-API-KEY": self.api_key, "Content-Type": "application/json"},
                     verify=self.verify,
-                    timeout=30.0,
+                    # Lower per-request timeout: 15s connect/read instead of
+                    # 30s. Multiplied by 3 retries that's still <50s worst-case
+                    # rather than 90s, so the worker pool can recover.
+                    timeout=httpx.Timeout(15.0, connect=5.0),
                 )
+                last_status = resp.status_code
                 if resp.status_code == 200:
                     tide_breaker.record_success()
-                    return resp.json()
-                # Retry on 500 (DuckDB concurrency issue)
-                if resp.status_code == 500 and attempt < retries:
-                    logger.info("TIDE 500, retrying (%d/%d)...", attempt + 1, retries)
-                    time.sleep(0.5 * (attempt + 1))
+                    data = resp.json()
+                    _cache_put(sql, data)
+                    return data
+
+                # Retry on transient 5xx (DuckDB concurrency, upstream proxies)
+                if resp.status_code in _RETRY_STATUSES and attempt < retries:
+                    backoff = 0.5 * (2 ** attempt)  # 0.5s, 1s
+                    logger.info(
+                        "TIDE %d, retrying in %.1fs (%d/%d)...",
+                        resp.status_code, backoff, attempt + 1, retries,
+                    )
+                    time.sleep(backoff)
                     continue
-                logger.warning("TIDE query failed: %s %s", resp.status_code, resp.text[:300])
+
+                # Hard fail (4xx or out of retries on 5xx).
+                logger.warning("TIDE query failed: %s %s", resp.status_code, resp.text[:200])
                 tide_breaker.record_failure()
+                # Cache the negative result briefly so duplicate concurrent
+                # callers don't all retry independently.
+                _cache_put(sql, None)
+                return None
+
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError) as e:
+                if attempt < retries:
+                    backoff = 0.5 * (2 ** attempt)
+                    logger.info(
+                        "TIDE connection error (%s), retrying in %.1fs (%d/%d)",
+                        type(e).__name__, backoff, attempt + 1, retries,
+                    )
+                    time.sleep(backoff)
+                    continue
+                logger.error("TIDE connection error after %d retries: %s", retries, type(e).__name__)
+                tide_breaker.record_failure()
+                _cache_put(sql, None)
                 return None
             except Exception as e:
-                if attempt < retries:
-                    logger.info("TIDE connection error, retrying (%d/%d): %s", attempt + 1, retries, e)
-                    time.sleep(0.5 * (attempt + 1))
-                    continue
-                logger.error("TIDE connection error: %s", e)
+                logger.error("TIDE unexpected error: %s", type(e).__name__)
                 tide_breaker.record_failure()
+                _cache_put(sql, None)
                 return None
         return None
 
@@ -146,7 +219,7 @@ class TideService:
         tech_catalog = {t["technique_id"]: t for t in techniques}
 
         # 2. Per-technique rule stats (LATERAL unnest for DuckDB compatibility)
-        stats = self._query("""
+        stats = self._query(f"""
             SELECT
                 t.technique_id,
                 count(DISTINCT dr.rule_id) as rule_count,
@@ -189,7 +262,7 @@ class TideService:
                 del s["_quality_n"]
 
         # 3. Per-technique system coverage (LATERAL unnest for DuckDB)
-        sys_cov = self._query("""
+        sys_cov = self._query(f"""
             SELECT
                 t.technique_id,
                 s.name as system_name,
@@ -258,7 +331,7 @@ class TideService:
             return None
 
         # Total rules + enabled/disabled
-        totals = self._query("""
+        totals = self._query(f"""
             SELECT
                 count(DISTINCT rule_id) as total_rules,
                 count(DISTINCT rule_id) FILTER (WHERE enabled = 1) as enabled_rules,
@@ -270,7 +343,7 @@ class TideService:
         t = totals["rows"][0]
 
         # By severity
-        sev = self._query("""
+        sev = self._query(f"""
             SELECT severity,
                    count(DISTINCT rule_id) as count,
                    count(DISTINCT rule_id) FILTER (WHERE enabled = 1) as enabled,
@@ -286,7 +359,7 @@ class TideService:
                 }
 
         # Quality distribution (TIDE scores typically 7-39 range)
-        qual = self._query("""
+        qual = self._query(f"""
             SELECT
                 count(DISTINCT rule_id) FILTER (WHERE quality_score >= 30) as excellent,
                 count(DISTINCT rule_id) FILTER (WHERE quality_score >= 20 AND quality_score < 30) as good,
@@ -302,7 +375,7 @@ class TideService:
             quality = qual["rows"][0]
 
         # Unmapped rules (no MITRE IDs)
-        unmapped = self._query("""
+        unmapped = self._query(f"""
             SELECT count(DISTINCT rule_id) as count
             FROM detection_rules
             WHERE space = '{self.space}' AND (mitre_ids IS NULL OR len(mitre_ids) = 0)
@@ -310,7 +383,7 @@ class TideService:
         unmapped_count = unmapped["rows"][0]["count"] if unmapped and unmapped["rows"] else 0
 
         # MITRE coverage
-        coverage = self._query("""
+        coverage = self._query(f"""
             SELECT count(DISTINCT t.technique_id) as covered
             FROM detection_rules dr, LATERAL unnest(dr.mitre_ids) AS t(technique_id)
             WHERE dr.space = '{self.space}' AND dr.mitre_ids IS NOT NULL
@@ -340,7 +413,7 @@ class TideService:
         """Return disabled rules with critical or high severity — quick wins to enable."""
         if not self.enabled:
             return []
-        result = self._query("""
+        result = self._query(f"""
             SELECT DISTINCT rule_id, name, severity, quality_score, mitre_ids
             FROM detection_rules
             WHERE space = '{self.space}' AND enabled = 0
@@ -491,7 +564,7 @@ class TideService:
         techniques = all_tech["rows"]
 
         # Covered techniques
-        covered = self._query("""
+        covered = self._query(f"""
             SELECT DISTINCT t.technique_id
             FROM detection_rules dr, LATERAL unnest(dr.mitre_ids) AS t(technique_id)
             WHERE dr.space = '{self.space}' AND dr.mitre_ids IS NOT NULL
@@ -512,7 +585,7 @@ class TideService:
                 by_tactic[tac].append({"id": tid, "name": t["name"]})
 
         # Unmapped rules (rules with no MITRE mapping)
-        unmapped = self._query("""
+        unmapped = self._query(f"""
             SELECT DISTINCT rule_id, name, severity, enabled, quality_score
             FROM detection_rules
             WHERE space = '{self.space}' AND (mitre_ids IS NULL OR len(mitre_ids) = 0)
@@ -522,7 +595,7 @@ class TideService:
         unmapped_rules = unmapped["rows"] if unmapped else []
 
         # Quick wins: disabled higher-quality rules (quality >= 20, severity critical/high)
-        quick = self._query("""
+        quick = self._query(f"""
             SELECT DISTINCT rule_id, name, severity, quality_score, mitre_ids
             FROM detection_rules
             WHERE space = '{self.space}' AND enabled = 0
@@ -573,3 +646,6 @@ def get_tide_service() -> TideService:
 def reset_tide_service():
     global _tide_service
     _tide_service = None
+    # Drop the per-process query cache too — config may have changed.
+    with _CACHE_LOCK:
+        _QUERY_CACHE.clear()
