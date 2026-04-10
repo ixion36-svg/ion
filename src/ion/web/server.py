@@ -663,8 +663,8 @@ async def analyst_page(request: Request, user: User = Depends(require_page_permi
 
 
 @app.get("/integrations", response_class=HTMLResponse)
-async def integrations_page(request: Request, user: User = Depends(require_page_permission("integration:read"))):
-    """Render the integrations management page."""
+async def integrations_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the integrations management page (read-only for analysts, full access for engineers)."""
     return templates.TemplateResponse(request=request, name="integrations.html")
 
 

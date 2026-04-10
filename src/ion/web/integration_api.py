@@ -14,9 +14,19 @@ from ion.auth.dependencies import get_db_session, require_admin, get_current_use
 from ion.models.user import User
 
 
-def require_integration_access(user: User = Depends(require_permission("integration:read"))) -> User:
-    """Require user to have integration:read permission."""
-    return user
+def require_integration_access(user: User = Depends(get_current_user)) -> User:
+    """Allow access if user has integration:read OR alert:read.
+
+    SOC leads and analysts need to see ES cluster health + integration logs
+    on the integrations page even if they don't have the engineering-tier
+    integration:manage permission. alert:read is a reasonable minimum —
+    if you can see alerts, you can see the infrastructure that feeds them.
+    """
+    if user is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if user.has_permission("integration:read") or user.has_permission("alert:read"):
+        return user
+    raise HTTPException(status_code=403, detail="Integration or alert read access required")
 from ion.models.integration import (
     IntegrationType,
     IntegrationStatus,
@@ -521,17 +531,23 @@ async def get_integration_logs(
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid log level: {level}")
 
-    logs = log_service.get_logs(
-        integration_type=integration_type_enum,
-        level=level_enum,
-        action=action,
-        hours=hours,
-        limit=limit,
-        offset=offset,
-        session=session,
-    )
-
-    return [IntegrationLogResponse(**log.to_dict()) for log in logs]
+    try:
+        logs = log_service.get_logs(
+            integration_type=integration_type_enum,
+            level=level_enum,
+            action=action,
+            hours=hours,
+            limit=limit,
+            offset=offset,
+            session=session,
+        )
+        return [IntegrationLogResponse(**log.to_dict()) for log in logs]
+    except Exception as e:
+        # Return an empty list with a 200 instead of 500 — the frontend
+        # treats non-200 as "failed to load" and shows no fallback.
+        import logging
+        logging.getLogger(__name__).warning("Integration logs query failed: %s", type(e).__name__)
+        return []
 
 
 @router.get("/logs/stats")
@@ -592,10 +608,23 @@ async def get_elasticsearch_metrics(
             "error": "Elasticsearch is not configured",
         }
 
-    # Gather all metrics in parallel
-    cluster_health = await es_service.get_cluster_health()
-    index_stats = await es_service.get_index_stats()
-    ingest_stats = await es_service.get_ingest_stats()
+    # Gather metrics — each call has its own try/except so a single
+    # failure doesn't take down the whole response.
+    cluster_health = {}
+    index_stats = {}
+    ingest_stats = {}
+    try:
+        cluster_health = await es_service.get_cluster_health()
+    except Exception as e:
+        cluster_health = {"error": safe_error(e, "es_cluster_health")}
+    try:
+        index_stats = await es_service.get_index_stats()
+    except Exception as e:
+        index_stats = {"error": safe_error(e, "es_index_stats")}
+    try:
+        ingest_stats = await es_service.get_ingest_stats()
+    except Exception as e:
+        ingest_stats = {"error": safe_error(e, "es_ingest_stats")}
 
     return {
         "configured": True,
