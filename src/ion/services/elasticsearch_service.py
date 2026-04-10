@@ -2292,6 +2292,20 @@ class ElasticsearchService:
         # Total timeline
         total_timeline = [{"timestamp": tb["key_as_string"], "count": tb["doc_count"]} for tb in aggs.get("total_over_time", {}).get("buckets", [])]
 
+        # If we only got one namespace (or "default"), also try to discover
+        # systems from the log index names (logs-*-systemname pattern).
+        # This covers setups where alerts all land in the default namespace
+        # but the original data streams use per-system naming.
+        if len(systems) <= 1:
+            try:
+                log_systems = await self._discover_systems_from_logs(hours, interval)
+                if log_systems:
+                    # Merge: log systems take priority if they have more entries
+                    if len(log_systems) > len(systems):
+                        systems = log_systems
+            except Exception:
+                pass  # Non-fatal — stick with what we have
+
         return {
             "systems": systems,
             "indices": indices,
@@ -2302,3 +2316,88 @@ class ElasticsearchService:
             "interval": interval,
             "error": None,
         }
+
+    async def _discover_systems_from_logs(self, hours: int, interval: str) -> List[Dict]:
+        """Query logs-* directly to discover systems by data_stream.namespace.
+
+        Kibana Security alerts live in .alerts-* with namespace='default',
+        but the ORIGINAL events live in logs-*-<systemname> with per-system
+        namespaces. This method queries the log indices to find all systems.
+        """
+        query = {
+            "size": 0,
+            "query": {
+                "range": {"@timestamp": {"gte": f"now-{hours}h", "lte": "now"}}
+            },
+            "aggs": {
+                "by_namespace": {
+                    "terms": {"field": "data_stream.namespace", "size": 50},
+                    "aggs": {
+                        "by_dataset": {
+                            "terms": {"field": "data_stream.dataset", "size": 20}
+                        },
+                        "over_time": {
+                            "date_histogram": {
+                                "field": "@timestamp",
+                                "fixed_interval": interval,
+                                "min_doc_count": 0,
+                                "extended_bounds": {
+                                    "min": f"now-{hours}h",
+                                    "max": "now"
+                                }
+                            }
+                        },
+                        "unique_hosts": {
+                            "cardinality": {"field": "host.name"}
+                        },
+                        "unique_users": {
+                            "cardinality": {"field": "user.name"}
+                        },
+                        "by_event_category": {
+                            "terms": {"field": "event.category", "size": 10}
+                        },
+                    }
+                }
+            }
+        }
+
+        try:
+            result = await self._request(
+                "POST",
+                "/logs-*/_search",
+                json=query,
+            )
+        except ElasticsearchError:
+            return []
+
+        systems = []
+        for b in result.get("aggregations", {}).get("by_namespace", {}).get("buckets", []):
+            namespace = b["key"]
+            datasets = [
+                {"dataset": db["key"], "count": db["doc_count"]}
+                for db in b.get("by_dataset", {}).get("buckets", [])
+            ]
+            timeline = [
+                {"timestamp": tb["key_as_string"], "count": tb["doc_count"]}
+                for tb in b.get("over_time", {}).get("buckets", [])
+            ]
+            categories = [
+                {"category": cb["key"], "count": cb["doc_count"]}
+                for cb in b.get("by_event_category", {}).get("buckets", [])
+            ]
+            systems.append({
+                "system": namespace,
+                "event_count": b["doc_count"],
+                "alert_count": 0,  # Will be filled by cross-ref later
+                "severity": {},
+                "status": {},
+                "top_rules": [],
+                "timeline": timeline,
+                "datasets": datasets,
+                "categories": categories,
+                "unique_hosts": b.get("unique_hosts", {}).get("value", 0),
+                "unique_users": b.get("unique_users", {}).get("value", 0),
+                "source": "logs",
+            })
+        systems.sort(key=lambda s: s["event_count"], reverse=True)
+        return systems

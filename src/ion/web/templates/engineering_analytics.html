@@ -469,6 +469,7 @@ let systemData = null;
 async function loadSystemAnalytics() {
     const hours = document.getElementById('time-range').value;
     try {
+        // Try alert-based systems first
         const resp = await fetch(`/api/engineering/analytics/systems?hours=${hours}`, {
             credentials: 'include'
         });
@@ -481,6 +482,53 @@ async function loadSystemAnalytics() {
             throw new Error(err.detail || resp.statusText);
         }
         systemData = await resp.json();
+
+        // If alerts only show 0-1 systems, also fetch from log indices
+        // (logs-*-systemname) to discover all systems shipping data.
+        if ((systemData.systems || []).length <= 1) {
+            try {
+                const logResp = await fetch(`/api/engineering/analytics/log-systems?hours=${hours}`, {
+                    credentials: 'include'
+                });
+                if (logResp.ok) {
+                    const logData = await logResp.json();
+                    const logSystems = logData.systems || [];
+                    if (logSystems.length > (systemData.systems || []).length) {
+                        // Merge: keep alert data for matching systems, add log-only systems
+                        const alertMap = {};
+                        for (const s of (systemData.systems || [])) {
+                            alertMap[s.system.toLowerCase()] = s;
+                        }
+                        const merged = [];
+                        for (const ls of logSystems) {
+                            const key = ls.system.toLowerCase();
+                            if (alertMap[key]) {
+                                // Merge log metadata into alert system
+                                const s = alertMap[key];
+                                s.event_count = ls.event_count;
+                                s.datasets = ls.datasets || s.datasets;
+                                s.categories = ls.categories;
+                                s.source = 'alerts+logs';
+                                merged.push(s);
+                                delete alertMap[key];
+                            } else {
+                                ls.source = 'logs';
+                                merged.push(ls);
+                            }
+                        }
+                        // Add any alert-only systems not in logs
+                        for (const s of Object.values(alertMap)) {
+                            s.source = 'alerts';
+                            merged.push(s);
+                        }
+                        systemData.systems = merged;
+                    }
+                }
+            } catch (logErr) {
+                console.warn('Log-systems discovery failed (non-fatal):', logErr);
+            }
+        }
+
         renderDashboard(systemData);
     } catch (e) {
         console.error('Failed to load system analytics:', e);
@@ -639,15 +687,15 @@ function renderSystemCard(sys) {
                 <span class="system-icon" style="background:${iconColor};">${icon}</span>
                 ${escapeHtml(sys.system)}
             </div>
-            <div class="system-alert-count">${sys.alert_count.toLocaleString()}</div>
+            <div class="system-alert-count">${(sys.alert_count || 0).toLocaleString()}<div style="font-size:.55rem;color:var(--text-muted);font-weight:400;text-transform:uppercase;letter-spacing:.5px">${sys.alert_count ? 'alerts' : sys.event_count ? (sys.event_count || 0).toLocaleString() + ' events' : 'no data'}</div></div>
         </div>
         <div class="system-card-body">
             <div class="severity-row">${sevHtml}</div>
             <div class="system-sparkline">${sparkHtml}</div>
             <div class="system-meta">
-                <span title="Unique hosts">&#x1F4BB; ${sys.unique_hosts} hosts</span>
-                <span title="Unique users">&#x1F464; ${sys.unique_users} users</span>
-                <span title="Status">&#x25CF; ${formatStatus(sys.status)}</span>
+                <span title="Unique hosts">&#x1F4BB; ${sys.unique_hosts || 0} hosts</span>
+                <span title="Unique users">&#x1F464; ${sys.unique_users || 0} users</span>
+                <span title="Data source">${sys.source === 'logs' ? '&#x1F4E6; logs only' : sys.source === 'alerts+logs' ? '&#x2705; alerts+logs' : '&#x25CF; ' + formatStatus(sys.status)}</span>
             </div>
             ${dsHtml}
             ${rulesHtml}

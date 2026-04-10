@@ -92,3 +92,26 @@ async def get_index_breakdown(
         }
     except ElasticsearchError as e:
         raise HTTPException(status_code=500, detail=safe_error(e, "engineering_analytics"))
+
+
+@router.get("/log-systems")
+async def get_log_systems(
+    hours: int = 24,
+    current_user: User = Depends(get_current_user),
+):
+    """Discover systems from log indices (logs-*) by data_stream.namespace.
+
+    Unlike /systems which aggregates from .alerts-*, this endpoint queries
+    the actual log data streams (logs-*-systemname) to find all systems
+    that are actively shipping logs — even if they haven't generated alerts.
+    """
+    service = _get_es_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=400, detail="Elasticsearch is not configured")
+
+    try:
+        interval = "1h" if hours <= 48 else "6h" if hours <= 168 else "1d"
+        systems = await service._discover_systems_from_logs(hours, interval)
+        return {"systems": systems, "total": len(systems), "hours": hours}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=safe_error(e, "log_systems"))
