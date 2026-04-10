@@ -190,6 +190,10 @@
             <button class="pcap-tab" data-panel="tls">TLS</button>
             <button class="pcap-tab" data-panel="data">Data Transfer</button>
             <button class="pcap-tab" data-panel="isakmp" id="tab-isakmp" style="display:none">ISAKMP/IKE</button>
+            <button class="pcap-tab" data-panel="files" id="tab-files" style="display:none">Extracted Files <span id="files-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab" data-panel="ja3" id="tab-ja3" style="display:none">JA3 Fingerprints <span id="ja3-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab" data-panel="creds" id="tab-creds" style="display:none">Credentials <span id="creds-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab" data-panel="graph" id="tab-graph">Network Graph</button>
             <button class="pcap-tab" data-panel="findings">Findings <span id="findings-count-badge" class="badge" style="display:none"></span></button>
             <button class="pcap-tab" data-panel="threatintel">Threat Intel <span id="ti-count-badge" class="badge" style="display:none"></span></button>
         </div>
@@ -202,6 +206,10 @@
         <div class="pcap-panel" id="panel-tls"></div>
         <div class="pcap-panel" id="panel-data"></div>
         <div class="pcap-panel" id="panel-isakmp"></div>
+        <div class="pcap-panel" id="panel-files"></div>
+        <div class="pcap-panel" id="panel-ja3"></div>
+        <div class="pcap-panel" id="panel-creds"></div>
+        <div class="pcap-panel" id="panel-graph"></div>
         <div class="pcap-panel" id="panel-findings"></div>
         <div class="pcap-panel" id="panel-threatintel"></div>
     </div>
@@ -349,6 +357,10 @@
         renderTls(d);
         renderData(d);
         renderIsakmp(d);
+        renderExtractedFiles(d);
+        renderJA3(d);
+        renderCredentials(d);
+        renderNetworkGraph(d);
         renderFindings(d);
         renderThreatIntel(d);
     }
@@ -524,6 +536,131 @@
                 <th>Exchanges</th><th style="text-align:center">Packets</th>
                 <th style="text-align:center">Retrans</th><th style="text-align:right">Duration</th>
             </tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    // ── Extracted Files ──
+    function renderExtractedFiles(d) {
+        const files = d.extracted_files || [];
+        const tab = document.getElementById('tab-files');
+        const badge = document.getElementById('files-count-badge');
+        if (!files.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        badge.style.display = 'inline';
+        badge.textContent = files.length;
+        badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+
+        const panel = document.getElementById('panel-files');
+        panel.innerHTML = `<h3>Extracted Files (${files.length})</h3>
+        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">Files carved from reassembled TCP streams by magic byte signature.</p>
+        <table class="pcap-table"><thead><tr><th>File</th><th>Type</th><th>Size</th><th>MD5</th><th>SHA-256</th><th>Source</th><th>Destination</th></tr></thead><tbody>
+        ${files.map(f => `<tr>
+            <td><strong>${esc(f.filename)}</strong></td>
+            <td>${esc(f.mime_type)}</td>
+            <td>${fmtBytes(f.size)}</td>
+            <td><code style="font-size:.7rem;word-break:break-all">${esc(f.md5)}</code></td>
+            <td><code style="font-size:.65rem;word-break:break-all">${esc(f.sha256)}</code></td>
+            <td>${esc(f.src_ip)}</td>
+            <td>${esc(f.dst_ip)}</td>
+        </tr>`).join('')}
+        </tbody></table>`;
+    }
+
+    // ── JA3 Fingerprints ──
+    function renderJA3(d) {
+        const fps = d.ja3_fingerprints || [];
+        const tab = document.getElementById('tab-ja3');
+        const badge = document.getElementById('ja3-count-badge');
+        if (!fps.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        const badCount = fps.filter(f => f.known_malware).length;
+        badge.style.display = 'inline';
+        badge.textContent = fps.length;
+        badge.style.cssText = `display:inline;background:${badCount ? 'var(--sev-critical)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
+
+        const panel = document.getElementById('panel-ja3');
+        panel.innerHTML = `<h3>JA3 TLS Fingerprints (${fps.length})</h3>
+        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">TLS ClientHello fingerprints computed from the PCAP. Known-malware matches are highlighted.</p>
+        <table class="pcap-table"><thead><tr><th>JA3 Hash</th><th>SNI</th><th>Source</th><th>Destination</th><th>Malware Match</th></tr></thead><tbody>
+        ${fps.map(f => `<tr style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
+            <td><code style="font-size:.72rem">${esc(f.ja3_hash)}</code></td>
+            <td>${esc(f.sni || '-')}</td>
+            <td>${esc(f.src_ip)}</td>
+            <td>${esc(f.dst_ip)}:${f.dst_port}</td>
+            <td>${f.known_malware ? `<span style="color:var(--sev-critical);font-weight:700;">${esc(f.known_malware)}</span>` : '<span style="color:var(--text-secondary)">No match</span>'}</td>
+        </tr>`).join('')}
+        </tbody></table>`;
+    }
+
+    // ── Credentials ──
+    function renderCredentials(d) {
+        const creds = d.credential_captures || [];
+        const tab = document.getElementById('tab-creds');
+        const badge = document.getElementById('creds-count-badge');
+        if (!creds.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        badge.style.display = 'inline';
+        badge.textContent = creds.length;
+        badge.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+
+        const panel = document.getElementById('panel-creds');
+        panel.innerHTML = `<h3>Captured Credentials (${creds.length})</h3>
+        <p style="color:var(--sev-critical);font-size:.82rem;margin-bottom:12px;font-weight:600;">Credentials and authentication hashes found in cleartext or weak protocols.</p>
+        <table class="pcap-table"><thead><tr><th>Protocol</th><th>Username</th><th>Credential / Hash</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
+        ${creds.map(c => `<tr style="background:rgba(248,81,73,.05);">
+            <td><strong>${esc(c.protocol)}</strong></td>
+            <td><code>${esc(c.username)}</code></td>
+            <td><code style="font-size:.7rem;word-break:break-all;max-width:200px;display:inline-block;overflow:hidden;text-overflow:ellipsis">${esc(c.credential)}</code></td>
+            <td>${esc(c.src_ip)}</td>
+            <td>${esc(c.dst_ip)}</td>
+            <td style="font-size:.78rem;color:var(--text-secondary)">${esc(c.detail)}</td>
+        </tr>`).join('')}
+        </tbody></table>`;
+    }
+
+    // ── Network Graph (vis-network) ──
+    function renderNetworkGraph(d) {
+        const graph = d.network_graph || {};
+        const panel = document.getElementById('panel-graph');
+        if (!graph.nodes || !graph.nodes.length) {
+            panel.innerHTML = '<p style="color:var(--text-secondary);padding:20px;text-align:center;">No graph data available.</p>';
+            return;
+        }
+        const stats = graph.stats || {};
+        panel.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+                <h3 style="margin:0;">Network Graph</h3>
+                <div style="font-size:.75rem;color:var(--text-secondary);">
+                    ${stats.total_nodes||0} hosts &middot;
+                    ${stats.total_edges||0} connections &middot;
+                    <span style="color:var(--primary)">${stats.internal_nodes||0} internal</span> &middot;
+                    <span style="color:var(--mitre-covered,#3fb950)">${stats.external_nodes||0} external</span>
+                    ${stats.suspicious_nodes ? ` &middot; <span style="color:var(--sev-critical)">${stats.suspicious_nodes} suspicious</span>` : ''}
+                </div>
+            </div>
+            <div id="pcap-graph-canvas" style="height:500px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-lg);"></div>
+        `;
+        // Load vis-network and render
+        const script = document.createElement('script');
+        script.src = '/static/js/vis-network.min.js';
+        script.onload = function() {
+            const container = document.getElementById('pcap-graph-canvas');
+            const nodes = new vis.DataSet(graph.nodes.map(n => ({
+                ...n, font: {color: '#c9d1d9', size: 11}, borderWidth: 2
+            })));
+            const edges = new vis.DataSet(graph.edges.map((e, i) => ({
+                ...e, id: 'e'+i, smooth: {type: 'continuous'},
+                font: {color: '#8b949e', size: 9, align: 'middle'}
+            })));
+            new vis.Network(container, {nodes, edges}, {
+                physics: {
+                    forceAtlas2Based: {gravitationalConstant: -40, springLength: 80},
+                    solver: 'forceAtlas2Based',
+                    stabilization: {iterations: 150}
+                },
+                interaction: {hover: true, tooltipDelay: 100},
+            });
+        };
+        document.head.appendChild(script);
     }
 
     function renderFindings(d) {

@@ -1,7 +1,10 @@
 """PCAP file parser and network traffic analyzer."""
 
+import hashlib
 import io
 import math
+import re
+import socket
 import struct
 import collections
 from datetime import datetime, timezone
@@ -17,6 +20,51 @@ class Finding:
     severity: str  # low, medium, high, critical
     title: str
     detail: str
+
+
+@dataclass
+class ExtractedFile:
+    """A file carved from a TCP stream."""
+    filename: str
+    mime_type: str
+    size: int
+    md5: str
+    sha256: str
+    src_ip: str = ""
+    dst_ip: str = ""
+    stream_index: int = 0
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in self.__dict__.items()}
+
+
+@dataclass
+class JA3Fingerprint:
+    """A TLS ClientHello fingerprint."""
+    ja3_hash: str
+    ja3_str: str
+    src_ip: str
+    dst_ip: str
+    dst_port: int
+    sni: str = ""
+    known_malware: str = ""  # label if hash matches known bad
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in self.__dict__.items()}
+
+
+@dataclass
+class CredentialCapture:
+    """An extracted credential or auth hash from cleartext/NTLM/HTTP."""
+    protocol: str  # http_basic, http_digest, ntlm, ftp, smtp, pop3, imap
+    username: str
+    credential: str  # password or hash
+    src_ip: str = ""
+    dst_ip: str = ""
+    detail: str = ""
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in self.__dict__.items()}
 
 
 @dataclass
@@ -40,6 +88,11 @@ class PcapResult:
     isakmp_sessions: list = field(default_factory=list)
     findings: list = field(default_factory=list)
     verdict: dict = field(default_factory=dict)
+    # New — added by the enhanced analyzers
+    extracted_files: list = field(default_factory=list)
+    ja3_fingerprints: list = field(default_factory=list)
+    credential_captures: list = field(default_factory=list)
+    network_graph: dict = field(default_factory=dict)  # {nodes, edges} for vis-network
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -72,10 +125,12 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     """Parse a PCAP/PCAPNG file and return analysis results."""
     buf = io.BytesIO(file_bytes)
 
+    pcap_reader_cls = dpkt.pcap.Reader
     try:
         reader = dpkt.pcap.Reader(buf)
     except (ValueError, dpkt.UnpackError):
         buf.seek(0)
+        pcap_reader_cls = dpkt.pcapng.Reader
         try:
             reader = dpkt.pcapng.Reader(buf)
         except Exception as e:
@@ -207,16 +262,549 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     # Summarise ISAKMP sessions for the results
     result.isakmp_sessions = _summarise_isakmp(isakmp_sessions)
 
+    # ── Enhanced analyzers (file extraction, JA3, credentials, graph) ──
+    try:
+        # Re-parse for TCP stream reassembly (separate pass for safety)
+        buf.seek(0)
+        streams, tls_hellos = _reassemble_tcp_streams(buf, pcap_reader_cls)
+        result.extracted_files = [f.to_dict() for f in _extract_files_from_streams(streams)]
+        result.ja3_fingerprints = [j.to_dict() for j in _compute_ja3(tls_hellos)]
+        result.credential_captures = [c.to_dict() for c in _extract_credentials(streams)]
+    except Exception:
+        pass  # Non-fatal — core analysis above still provides value
+
+    # Build network graph from conversations
+    try:
+        result.network_graph = _build_network_graph(result)
+    except Exception:
+        result.network_graph = {"nodes": [], "edges": []}
+
     # Run heuristic analysis
     findings = _analyze(
         result, conn_times, dns_counter, src_ip_counter, dst_ip_counter,
         src_port_counter, dst_port_counter, ip_sent, ip_recv, proto_counter,
         isakmp_sessions, payload_sigs, suspicious_uas, cleartext_creds,
     )
+
+    # Add findings from enhanced analyzers
+    if result.extracted_files:
+        findings.append(Finding(
+            category="file_extraction",
+            severity="medium",
+            title=f"{len(result.extracted_files)} file(s) extracted from traffic",
+            detail=", ".join(f.get("filename", "?") for f in result.extracted_files[:5]),
+        ))
+    if any(j.get("known_malware") for j in result.ja3_fingerprints):
+        bad = [j for j in result.ja3_fingerprints if j.get("known_malware")]
+        findings.append(Finding(
+            category="tls_fingerprint",
+            severity="high",
+            title=f"{len(bad)} known-malware JA3 fingerprint(s) detected",
+            detail=", ".join(f'{j["ja3_hash"][:12]}... ({j["known_malware"]})' for j in bad[:3]),
+        ))
+    if result.credential_captures:
+        findings.append(Finding(
+            category="credential_capture",
+            severity="critical",
+            title=f"{len(result.credential_captures)} credential(s) captured from traffic",
+            detail=", ".join(f'{c.get("protocol")}:{c.get("username","")}' for c in result.credential_captures[:5]),
+        ))
+
     result.findings = [asdict(f) for f in findings]
     result.verdict = _compute_verdict(findings)
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# TCP stream reassembly (shared by file extraction + credential extraction)
+# ---------------------------------------------------------------------------
+
+def _reassemble_tcp_streams(buf: io.BytesIO, reader_cls):
+    """Two-pass: reassemble TCP streams and collect TLS ClientHello messages."""
+    streams: dict[tuple, bytearray] = {}  # (src_ip, src_port, dst_ip, dst_port) → payload
+    tls_hellos: list[dict] = []
+
+    try:
+        reader = reader_cls(buf)
+    except Exception:
+        return streams, tls_hellos
+
+    for ts, raw in reader:
+        ip = _extract_ip(raw)
+        if ip is None:
+            continue
+        if not isinstance(ip.data, dpkt.tcp.TCP):
+            continue
+        tcp = ip.data
+        if not tcp.data:
+            continue
+
+        try:
+            src_ip = socket.inet_ntoa(ip.src) if len(ip.src) == 4 else socket.inet_ntop(socket.AF_INET6, ip.src)
+            dst_ip = socket.inet_ntoa(ip.dst) if len(ip.dst) == 4 else socket.inet_ntop(socket.AF_INET6, ip.dst)
+        except Exception:
+            continue
+
+        key = (src_ip, tcp.sport, dst_ip, tcp.dport)
+        if key not in streams:
+            streams[key] = bytearray()
+        # Cap stream size at 10 MB to avoid memory issues
+        if len(streams[key]) < 10 * 1024 * 1024:
+            streams[key].extend(tcp.data)
+
+        # Detect TLS ClientHello (content type 0x16, handshake type 0x01)
+        data = bytes(tcp.data)
+        if len(data) > 5 and data[0] == 0x16 and data[5] == 0x01:
+            tls_hellos.append({
+                "src_ip": src_ip, "dst_ip": dst_ip,
+                "src_port": tcp.sport, "dst_port": tcp.dport,
+                "data": data,
+            })
+
+    return streams, tls_hellos
+
+
+# ---------------------------------------------------------------------------
+# 1. File extraction from TCP streams
+# ---------------------------------------------------------------------------
+
+# Magic bytes → (extension, MIME type)
+_FILE_SIGNATURES = [
+    (b'\x50\x4b\x03\x04', "zip", "application/zip"),
+    (b'\x50\x4b\x05\x06', "zip", "application/zip"),
+    (b'\x25\x50\x44\x46', "pdf", "application/pdf"),
+    (b'\xd0\xcf\x11\xe0', "doc", "application/msword"),
+    (b'\x50\x4b\x03\x04\x14\x00\x06\x00', "docx", "application/vnd.openxmlformats"),
+    (b'\x4d\x5a', "exe", "application/x-dosexec"),
+    (b'\x7f\x45\x4c\x46', "elf", "application/x-elf"),
+    (b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a', "png", "image/png"),
+    (b'\xff\xd8\xff', "jpg", "image/jpeg"),
+    (b'\x47\x49\x46\x38', "gif", "image/gif"),
+    (b'\x52\x61\x72\x21', "rar", "application/x-rar"),
+    (b'\x1f\x8b\x08', "gz", "application/gzip"),
+    (b'\x42\x5a\x68', "bz2", "application/x-bzip2"),
+    (b'\xca\xfe\xba\xbe', "class", "application/java"),
+    (b'\x23\x21', "script", "text/x-script"),
+]
+
+
+def _extract_files_from_streams(streams: dict) -> list[ExtractedFile]:
+    """Scan reassembled TCP streams for file signatures and carve them out."""
+    extracted: list[ExtractedFile] = []
+    seen_hashes: set[str] = set()
+
+    for (src_ip, sport, dst_ip, dport), payload in streams.items():
+        if len(payload) < 8:
+            continue
+        data = bytes(payload)
+
+        for magic, ext, mime in _FILE_SIGNATURES:
+            offset = 0
+            while True:
+                pos = data.find(magic, offset)
+                if pos == -1 or pos > len(data) - 16:
+                    break
+                # Carve: take up to 5 MB from the signature start
+                carved = data[pos:pos + 5 * 1024 * 1024]
+                if len(carved) < 32:
+                    offset = pos + 1
+                    continue
+
+                md5 = hashlib.md5(carved).hexdigest()
+                if md5 in seen_hashes:
+                    offset = pos + len(magic)
+                    continue
+                seen_hashes.add(md5)
+
+                sha256 = hashlib.sha256(carved).hexdigest()
+                extracted.append(ExtractedFile(
+                    filename=f"extracted_{len(extracted)+1}.{ext}",
+                    mime_type=mime,
+                    size=len(carved),
+                    md5=md5,
+                    sha256=sha256,
+                    src_ip=src_ip,
+                    dst_ip=dst_ip,
+                    stream_index=len(extracted),
+                ))
+                offset = pos + len(magic)
+                if len(extracted) >= 50:  # Cap
+                    break
+            if len(extracted) >= 50:
+                break
+        if len(extracted) >= 50:
+            break
+
+    return extracted
+
+
+# ---------------------------------------------------------------------------
+# 2. JA3 TLS fingerprinting
+# ---------------------------------------------------------------------------
+
+# Known malware JA3 hashes (curated subset — extend as needed)
+_KNOWN_BAD_JA3: dict[str, str] = {
+    "51c64c77e60f3980eea90869b68c58a8": "Cobalt Strike",
+    "72a589da586844d7f0818ce684948eea": "Cobalt Strike (4.x)",
+    "a0e9f5d64349fb13191bc781f81f42e1": "Cobalt Strike (HTTPS)",
+    "7dd50e112cd23734a310b90f6f44a7cd": "Metasploit Meterpreter",
+    "e7d705a3286e19ea42f587b344ee6865": "Emotet",
+    "4d7a28d6f2263ed61de88ca66eb2e89a": "TrickBot",
+    "6734f37431670b3ab4292b8f60f29984": "Dridex",
+    "3b5074b1b5d032e5620f69f9f700ff0e": "Tofsee",
+    "36f7277af969a6947a61ae0b815907a1": "IcedID",
+    "19e29534fd49dd27d09234e639c4057e": "QakBot",
+    "c12f54a3f91dc7bafd92b15ef9a5b6b9": "AsyncRAT",
+    "e35df3e00ca4ef31d42b34bebaa2f86e": "SocGholish",
+}
+
+
+def _compute_ja3(tls_hellos: list[dict]) -> list[JA3Fingerprint]:
+    """Compute JA3 fingerprints from collected TLS ClientHello messages."""
+    fingerprints: list[JA3Fingerprint] = []
+    seen: set[str] = set()
+
+    for hello in tls_hellos:
+        data = hello["data"]
+        try:
+            ja3_str, ja3_hash = _parse_client_hello_ja3(data)
+        except Exception:
+            continue
+
+        if not ja3_hash:
+            continue
+        dedup_key = f'{hello["src_ip"]}:{hello["dst_ip"]}:{ja3_hash}'
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
+
+        # Try to extract SNI
+        sni = ""
+        try:
+            sni = _extract_tls_sni(data) or ""
+        except Exception:
+            pass
+
+        fingerprints.append(JA3Fingerprint(
+            ja3_hash=ja3_hash,
+            ja3_str=ja3_str,
+            src_ip=hello["src_ip"],
+            dst_ip=hello["dst_ip"],
+            dst_port=hello["dst_port"],
+            sni=sni,
+            known_malware=_KNOWN_BAD_JA3.get(ja3_hash, ""),
+        ))
+
+    return fingerprints
+
+
+def _parse_client_hello_ja3(data: bytes) -> tuple[str, str]:
+    """Parse a TLS ClientHello and compute the JA3 fingerprint.
+
+    JA3 = md5(TLSVersion,Ciphers,Extensions,EllipticCurves,EllipticCurvePointFormats)
+    """
+    if len(data) < 44:
+        return "", ""
+
+    # TLS record: type(1) + version(2) + length(2) + handshake
+    # Handshake: type(1) + length(3) + client_version(2) + random(32) + ...
+    content_type = data[0]
+    if content_type != 0x16:  # Handshake
+        return "", ""
+
+    handshake_type = data[5]
+    if handshake_type != 0x01:  # ClientHello
+        return "", ""
+
+    # Client version at offset 9-10
+    tls_version = struct.unpack("!H", data[9:11])[0]
+
+    # Skip random (32 bytes) starting at offset 11
+    offset = 43  # 11 + 32
+
+    # Session ID
+    if offset >= len(data):
+        return "", ""
+    session_id_len = data[offset]
+    offset += 1 + session_id_len
+
+    # Cipher suites
+    if offset + 2 > len(data):
+        return "", ""
+    cipher_len = struct.unpack("!H", data[offset:offset+2])[0]
+    offset += 2
+    ciphers = []
+    for i in range(0, cipher_len, 2):
+        if offset + i + 2 > len(data):
+            break
+        c = struct.unpack("!H", data[offset+i:offset+i+2])[0]
+        # Skip GREASE values
+        if (c & 0x0f0f) == 0x0a0a:
+            continue
+        ciphers.append(str(c))
+    offset += cipher_len
+
+    # Compression methods
+    if offset >= len(data):
+        return "", ""
+    comp_len = data[offset]
+    offset += 1 + comp_len
+
+    # Extensions
+    extensions = []
+    elliptic_curves = []
+    ec_point_formats = []
+
+    if offset + 2 <= len(data):
+        ext_total_len = struct.unpack("!H", data[offset:offset+2])[0]
+        offset += 2
+        ext_end = offset + ext_total_len
+
+        while offset + 4 <= ext_end and offset + 4 <= len(data):
+            ext_type = struct.unpack("!H", data[offset:offset+2])[0]
+            ext_len = struct.unpack("!H", data[offset+2:offset+4])[0]
+            offset += 4
+
+            # Skip GREASE
+            if (ext_type & 0x0f0f) == 0x0a0a:
+                offset += ext_len
+                continue
+
+            extensions.append(str(ext_type))
+
+            ext_data = data[offset:offset+ext_len]
+
+            # Supported Groups (0x000a)
+            if ext_type == 0x000a and len(ext_data) >= 2:
+                groups_len = struct.unpack("!H", ext_data[0:2])[0]
+                for i in range(2, min(2 + groups_len, len(ext_data)), 2):
+                    if i + 2 > len(ext_data):
+                        break
+                    g = struct.unpack("!H", ext_data[i:i+2])[0]
+                    if (g & 0x0f0f) != 0x0a0a:
+                        elliptic_curves.append(str(g))
+
+            # EC Point Formats (0x000b)
+            elif ext_type == 0x000b and len(ext_data) >= 1:
+                fmt_len = ext_data[0]
+                for i in range(1, min(1 + fmt_len, len(ext_data))):
+                    ec_point_formats.append(str(ext_data[i]))
+
+            offset += ext_len
+
+    ja3_str = ",".join([
+        str(tls_version),
+        "-".join(ciphers),
+        "-".join(extensions),
+        "-".join(elliptic_curves),
+        "-".join(ec_point_formats),
+    ])
+    ja3_hash = hashlib.md5(ja3_str.encode()).hexdigest()
+
+    return ja3_str, ja3_hash
+
+
+# ---------------------------------------------------------------------------
+# 3. Credential extraction from TCP streams
+# ---------------------------------------------------------------------------
+
+def _extract_credentials(streams: dict) -> list[CredentialCapture]:
+    """Scan reassembled TCP streams for credentials and auth hashes."""
+    creds: list[CredentialCapture] = []
+    seen: set[str] = set()
+
+    for (src_ip, sport, dst_ip, dport), payload in streams.items():
+        data = bytes(payload[:50000])  # Only scan first 50KB of each stream
+        text = ""
+        try:
+            text = data.decode("utf-8", errors="ignore")
+        except Exception:
+            continue
+
+        # HTTP Basic Auth (Authorization: Basic base64)
+        for m in re.finditer(r'Authorization:\s*Basic\s+([A-Za-z0-9+/=]+)', text, re.IGNORECASE):
+            try:
+                import base64
+                decoded = base64.b64decode(m.group(1)).decode("utf-8", errors="replace")
+                if ":" in decoded:
+                    user, pwd = decoded.split(":", 1)
+                    key = f"basic:{user}:{dst_ip}"
+                    if key not in seen:
+                        seen.add(key)
+                        creds.append(CredentialCapture(
+                            protocol="http_basic", username=user, credential=pwd,
+                            src_ip=src_ip, dst_ip=dst_ip,
+                            detail=f"HTTP Basic auth to {dst_ip}:{dport}",
+                        ))
+            except Exception:
+                pass
+
+        # HTTP Digest Auth
+        for m in re.finditer(r'Authorization:\s*Digest\s+(.+?)(?:\r?\n)', text, re.IGNORECASE):
+            digest_str = m.group(1)
+            user_m = re.search(r'username="([^"]+)"', digest_str)
+            if user_m:
+                key = f"digest:{user_m.group(1)}:{dst_ip}"
+                if key not in seen:
+                    seen.add(key)
+                    creds.append(CredentialCapture(
+                        protocol="http_digest", username=user_m.group(1),
+                        credential=digest_str[:200],
+                        src_ip=src_ip, dst_ip=dst_ip,
+                        detail=f"HTTP Digest auth to {dst_ip}:{dport}",
+                    ))
+
+        # NTLM challenge/response (Type 3 message in HTTP)
+        for m in re.finditer(r'Authorization:\s*(?:NTLM|Negotiate)\s+([A-Za-z0-9+/=]+)', text, re.IGNORECASE):
+            try:
+                import base64
+                ntlm_bytes = base64.b64decode(m.group(1))
+                if len(ntlm_bytes) > 8 and ntlm_bytes[0:7] == b'NTLMSSP':
+                    msg_type = struct.unpack("<I", ntlm_bytes[8:12])[0]
+                    if msg_type == 3:  # Type 3 = authenticate
+                        key = f"ntlm:{src_ip}:{dst_ip}"
+                        if key not in seen:
+                            seen.add(key)
+                            creds.append(CredentialCapture(
+                                protocol="ntlm", username="(see hash)",
+                                credential=m.group(1)[:100] + "...",
+                                src_ip=src_ip, dst_ip=dst_ip,
+                                detail=f"NTLM Type 3 (authenticate) to {dst_ip}:{dport}",
+                            ))
+            except Exception:
+                pass
+
+        # FTP USER/PASS
+        for m in re.finditer(r'USER\s+(\S+)\r?\n.*?PASS\s+(\S+)', text, re.IGNORECASE | re.DOTALL):
+            key = f"ftp:{m.group(1)}:{dst_ip}"
+            if key not in seen:
+                seen.add(key)
+                creds.append(CredentialCapture(
+                    protocol="ftp", username=m.group(1), credential=m.group(2),
+                    src_ip=src_ip, dst_ip=dst_ip,
+                    detail=f"FTP login to {dst_ip}:{dport}",
+                ))
+
+        # SMTP AUTH PLAIN/LOGIN
+        for m in re.finditer(r'AUTH\s+(?:PLAIN|LOGIN)\s+([A-Za-z0-9+/=]+)', text, re.IGNORECASE):
+            try:
+                import base64
+                decoded = base64.b64decode(m.group(1)).decode("utf-8", errors="replace")
+                parts = decoded.split("\x00")
+                if len(parts) >= 2:
+                    user = parts[-2] or parts[0]
+                    pwd = parts[-1]
+                    key = f"smtp:{user}:{dst_ip}"
+                    if key not in seen:
+                        seen.add(key)
+                        creds.append(CredentialCapture(
+                            protocol="smtp", username=user, credential=pwd,
+                            src_ip=src_ip, dst_ip=dst_ip,
+                            detail=f"SMTP auth to {dst_ip}:{dport}",
+                        ))
+            except Exception:
+                pass
+
+        # POP3 USER/PASS
+        for m in re.finditer(r'USER\s+(\S+)\r?\n.*?PASS\s+(\S+)', text, re.IGNORECASE | re.DOTALL):
+            if dport in (110, 995):
+                key = f"pop3:{m.group(1)}:{dst_ip}"
+                if key not in seen:
+                    seen.add(key)
+                    creds.append(CredentialCapture(
+                        protocol="pop3", username=m.group(1), credential=m.group(2),
+                        src_ip=src_ip, dst_ip=dst_ip,
+                        detail=f"POP3 login to {dst_ip}:{dport}",
+                    ))
+
+        if len(creds) >= 100:
+            break
+
+    return creds
+
+
+# ---------------------------------------------------------------------------
+# 4. Network graph builder (for vis-network visualisation)
+# ---------------------------------------------------------------------------
+
+def _build_network_graph(result: PcapResult) -> dict:
+    """Build a vis-network compatible graph from the parsed PCAP conversations."""
+    nodes: dict[str, dict] = {}
+    edges: list[dict] = []
+    edge_set: set[str] = set()
+
+    conversations = result.conversations or []
+    findings_ips: set[str] = set()
+
+    # Collect IPs mentioned in findings for highlighting
+    for f in (result.findings or []):
+        detail = f.get("detail", "") if isinstance(f, dict) else (f.detail if hasattr(f, "detail") else "")
+        for part in detail.replace(",", " ").split():
+            part = part.strip("()")
+            if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', part):
+                findings_ips.add(part)
+
+    for conv in conversations:
+        src = conv.get("src", "")
+        dst = conv.get("dst", "")
+        if not src or not dst:
+            continue
+
+        # Parse "ip:port" format
+        src_ip = src.rsplit(":", 1)[0] if ":" in src else src
+        dst_ip = dst.rsplit(":", 1)[0] if ":" in dst else dst
+
+        is_private_src = _is_private(src_ip) if src_ip else False
+        is_private_dst = _is_private(dst_ip) if dst_ip else False
+
+        for ip, is_priv in [(src_ip, is_private_src), (dst_ip, is_private_dst)]:
+            if ip and ip not in nodes:
+                is_suspicious = ip in findings_ips
+                nodes[ip] = {
+                    "id": ip,
+                    "label": ip,
+                    "color": {
+                        "background": "#f85149" if is_suspicious else ("#58a6ff" if is_priv else "#3fb950"),
+                        "border": "#a40e26" if is_suspicious else ("#1f6feb" if is_priv else "#1a7f37"),
+                    },
+                    "shape": "dot",
+                    "title": f"{'SUSPICIOUS ' if is_suspicious else ''}{'Internal' if is_priv else 'External'}: {ip}",
+                    "size": 12 if is_suspicious else 8,
+                }
+
+        edge_key = f"{src_ip}-{dst_ip}"
+        if edge_key not in edge_set:
+            edge_set.add(edge_key)
+            proto = conv.get("proto", "")
+            packet_count = conv.get("packets", 0)
+            byte_count = conv.get("bytes", 0)
+            label = proto
+            if byte_count > 1024 * 1024:
+                label += f" ({byte_count // (1024*1024)}MB)"
+            elif byte_count > 1024:
+                label += f" ({byte_count // 1024}KB)"
+            edges.append({
+                "from": src_ip,
+                "to": dst_ip,
+                "label": label,
+                "title": f"{src} → {dst}: {packet_count} pkts, {byte_count} bytes",
+                "width": min(max(1, packet_count // 10), 6),
+                "color": {"color": "#484f58"},
+                "arrows": {"to": {"enabled": True, "scaleFactor": 0.5}},
+            })
+
+    return {
+        "nodes": list(nodes.values()),
+        "edges": edges,
+        "stats": {
+            "total_nodes": len(nodes),
+            "total_edges": len(edges),
+            "internal_nodes": sum(1 for n in nodes.values() if "Internal" in n.get("title", "")),
+            "external_nodes": sum(1 for n in nodes.values() if "External" in n.get("title", "")),
+            "suspicious_nodes": sum(1 for n in nodes.values() if "SUSPICIOUS" in n.get("title", "")),
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
