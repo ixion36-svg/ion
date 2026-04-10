@@ -506,7 +506,9 @@ async def create_data_source(
         use_case_review_date=_parse_date(req.use_case_review_date),
         use_case_gaps=req.use_case_gaps, use_case_remediation=req.use_case_remediation,
         tide_system_id=req.tide_system_id,
-        data_namespace=req.data_namespace,
+        # ES data_stream.namespace is always lowercase — normalise on save
+        # so CyAB-to-ES matching never fails on case mismatch.
+        data_namespace=(req.data_namespace or "").strip().lower() or None,
     )
     session.add(ds)
     session.flush()
@@ -538,6 +540,9 @@ async def update_data_source(
         raise HTTPException(status_code=404, detail="Data source not found")
 
     data = req.model_dump(exclude_none=True)
+    # Normalise namespace to lowercase (ES enforces lowercase).
+    if "data_namespace" in data and data["data_namespace"]:
+        data["data_namespace"] = data["data_namespace"].strip().lower()
     for f in ["name", "data_source_type", "icon", "sal_tier", "uptime_target",
               "max_latency", "retention", "p1_sla", "field_mapping_score",
               "mandatory_score", "readiness_score", "risk_rating", "sal_compliance",
@@ -712,6 +717,10 @@ def tide_rules(search: str = "", limit: int = 50):
 async def tide_system_alerts(system_id: str, namespace: str = "", hours: int = 168):
     """Cross-reference TIDE detection rules with ES alerts for a namespace.
 
+    Elasticsearch data_stream.namespace is always lowercase (ES enforces this).
+    CyAB data sources may store the namespace with mixed case (e.g. 'EndpointFleet').
+    We normalise to lowercase before querying so the match always works.
+
     Returns which TIDE rules are actively firing (have matching alerts),
     which are silent, and overall alert statistics.
     """
@@ -728,6 +737,10 @@ async def tide_system_alerts(system_id: str, namespace: str = "", hours: int = 1
         rule_name = (d.get("name") or "").strip()
         if rule_name:
             tide_rules_map[rule_name.lower()] = d
+
+    # Normalise to lowercase — ES data_stream.namespace is always lowercase
+    # but CyAB data sources may store mixed case (e.g. "EndpointFleet").
+    namespace = (namespace or "").strip().lower()
 
     if not namespace:
         return {
