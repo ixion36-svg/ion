@@ -764,6 +764,19 @@ async def tide_system_alerts(system_id: str, namespace: str = "", hours: int = 1
             "alert_stats": {},
         }
 
+    # Fast-fail if the ES circuit breaker is open (avoids noisy connection
+    # errors in the system logs when ES is known to be offline).
+    from ion.core.circuit_breaker import es_breaker
+    if not es_breaker.can_execute():
+        return {
+            "error": "Elasticsearch temporarily unavailable (circuit breaker open)",
+            "tide_rules": len(tide_rules_map),
+            "firing_rules": [],
+            "silent_rules": list(tide_rules_map.values()),
+            "unmatched_alerts": [],
+            "alert_stats": {},
+        }
+
     query = {
         "size": 0,
         "query": {

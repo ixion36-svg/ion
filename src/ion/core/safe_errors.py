@@ -29,8 +29,24 @@ from typing import Optional
 logger = logging.getLogger("ion.safe_errors")
 
 
+# Exception types that indicate a known-offline external service.
+# These are logged at WARNING (no stack trace) instead of ERROR (with trace)
+# because they're expected when ES / TIDE / OpenCTI / Kibana is down —
+# a full stack trace for "connection refused" is noise, not signal.
+_CONN_ERROR_TYPES = frozenset({
+    "ConnectError", "ConnectionRefusedError", "ConnectionResetError",
+    "TimeoutException", "ReadTimeout", "ConnectTimeout", "PoolTimeout",
+    "ReadError", "RemoteProtocolError", "ElasticsearchError",
+    "ConnectionError", "OSError", "BrokenPipeError",
+})
+
+
 def safe_error(exc: BaseException, context: Optional[str] = None) -> str:
     """Log the full traceback and return a sanitized error label safe for clients.
+
+    Connection-type errors (ES offline, TIDE timeout, etc.) are logged at
+    WARNING without a stack trace so the system logs don't fill up with
+    expected noise. Unexpected errors still get the full ERROR + traceback.
 
     Args:
         exc: The exception that was caught.
@@ -41,8 +57,13 @@ def safe_error(exc: BaseException, context: Optional[str] = None) -> str:
         The exception's class name. Always safe to embed in API responses.
     """
     label = type(exc).__name__
-    if context:
-        logger.exception("safe_error: %s in %s", label, context)
+    ctx = f" in {context}" if context else ""
+
+    if label in _CONN_ERROR_TYPES:
+        # Known connectivity issue — WARNING level, no stack trace.
+        logger.warning("safe_error: %s%s — %s", label, ctx, str(exc)[:120])
     else:
-        logger.exception("safe_error: %s", label)
+        # Unexpected error — full ERROR + stack trace for debugging.
+        logger.exception("safe_error: %s%s", label, ctx)
+
     return label
