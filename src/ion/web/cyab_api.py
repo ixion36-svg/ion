@@ -1989,3 +1989,157 @@ async def list_namespaces():
         return [{"namespace": b["key"], "count": b["doc_count"]} for b in buckets]
     except Exception:
         return []
+
+
+# ---------------------------------------------------------------------------
+# Data source templates, clone, and bulk apply
+# ---------------------------------------------------------------------------
+
+@router.get("/templates", dependencies=[Depends(require_permission("alert:read"))])
+def list_ds_templates():
+    """List available data source templates for quick creation."""
+    from ion.services.cyab_templates import list_templates
+    return {"templates": list_templates()}
+
+
+@router.get("/templates/{template_id}", dependencies=[Depends(require_permission("alert:read"))])
+def get_ds_template(template_id: str):
+    """Get a fully expanded template with pre-filled fields + field mapping."""
+    from ion.services.cyab_templates import get_template
+    t = get_template(template_id)
+    if not t:
+        raise HTTPException(status_code=404, detail=f"Template not found: {template_id}")
+    return t
+
+
+@router.post("/systems/{system_id}/data-sources/from-template", dependencies=[Depends(require_permission("alert:read"))])
+def create_ds_from_template(
+    system_id: int,
+    template_id: str,
+    session: Session = Depends(get_db_session),
+):
+    """Create a new data source pre-filled from a template.
+
+    The data source is created with all template fields populated. The user
+    can then edit it to customise namespace, TIDE system link, etc.
+    """
+    from ion.services.cyab_templates import get_template
+
+    sys = session.get(CyabSystem, system_id)
+    if not sys:
+        raise HTTPException(status_code=404, detail="System not found")
+
+    t = get_template(template_id)
+    if not t:
+        raise HTTPException(status_code=404, detail=f"Template not found: {template_id}")
+
+    import json as _json
+    ds = CyabDataSource(
+        system_id=system_id,
+        name=t["name"],
+        data_source_type=t["data_source_type"],
+        icon=t["icon"],
+        sal_tier=t["sal_tier"],
+        uptime_target=t["uptime_target"],
+        max_latency=t["max_latency"],
+        retention=t["retention"],
+        p1_sla=t["p1_sla"],
+        field_mapping=_json.dumps(t["field_mapping"]),
+        field_mapping_score=t["field_mapping_score"],
+        mandatory_score=t["mandatory_score"],
+        readiness_score=t["readiness_score"],
+        field_notes=t["field_notes"],
+    )
+    session.add(ds)
+    session.flush()
+    session.refresh(sys)
+    _recalc_system_aggregates(sys)
+    _create_snapshot(session, sys, notes=f"Data source from template: {t['name']}", ds_id=ds.id)
+    session.commit()
+    session.refresh(ds)
+    return _ds_to_dict(ds)
+
+
+@router.post("/data-sources/{ds_id}/clone", dependencies=[Depends(require_permission("alert:read"))])
+def clone_data_source(
+    ds_id: int,
+    session: Session = Depends(get_db_session),
+):
+    """Clone an existing data source — copies all config fields except namespace + TIDE link."""
+    original = session.get(CyabDataSource, ds_id)
+    if not original:
+        raise HTTPException(status_code=404, detail="Data source not found")
+
+    clone = CyabDataSource(
+        system_id=original.system_id,
+        name=f"{original.name} (copy)",
+        data_source_type=original.data_source_type,
+        icon=original.icon,
+        sal_tier=original.sal_tier,
+        uptime_target=original.uptime_target,
+        max_latency=original.max_latency,
+        retention=original.retention,
+        p1_sla=original.p1_sla,
+        field_mapping=original.field_mapping,
+        field_mapping_score=original.field_mapping_score,
+        mandatory_score=original.mandatory_score,
+        readiness_score=original.readiness_score,
+        field_notes=original.field_notes,
+        # Intentionally blank — user must set for their specific deployment
+        tide_system_id=None,
+        data_namespace=None,
+        use_case_status=None,
+    )
+    session.add(clone)
+    session.flush()
+    sys = session.get(CyabSystem, original.system_id)
+    if sys:
+        session.refresh(sys)
+        _recalc_system_aggregates(sys)
+        _create_snapshot(session, sys, notes=f"Cloned data source: {original.name}", ds_id=clone.id)
+    session.commit()
+    session.refresh(clone)
+    return _ds_to_dict(clone)
+
+
+class BulkApplyRequest(BaseModel):
+    ds_ids: list[int]
+    sal_tier: Optional[str] = None
+    uptime_target: Optional[str] = None
+    max_latency: Optional[str] = None
+    retention: Optional[str] = None
+    p1_sla: Optional[str] = None
+
+
+@router.post("/data-sources/bulk-apply", dependencies=[Depends(require_permission("alert:read"))])
+def bulk_apply_settings(
+    req: BulkApplyRequest,
+    session: Session = Depends(get_db_session),
+):
+    """Apply the same SAL / retention / latency settings to multiple data sources at once."""
+    if not req.ds_ids:
+        raise HTTPException(status_code=400, detail="No data source IDs provided")
+
+    fields = req.model_dump(exclude_none=True, exclude={"ds_ids"})
+    if not fields:
+        raise HTTPException(status_code=400, detail="No fields to apply")
+
+    updated = 0
+    touched_systems: set[int] = set()
+    for ds_id in req.ds_ids:
+        ds = session.get(CyabDataSource, ds_id)
+        if not ds:
+            continue
+        for k, v in fields.items():
+            setattr(ds, k, v)
+        touched_systems.add(ds.system_id)
+        updated += 1
+
+    for sid in touched_systems:
+        sys = session.get(CyabSystem, sid)
+        if sys:
+            session.refresh(sys)
+            _recalc_system_aggregates(sys)
+
+    session.commit()
+    return {"updated": updated, "fields_applied": list(fields.keys())}
