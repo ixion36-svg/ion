@@ -441,6 +441,15 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"Failed to start Analytics Engine: {e}")
 
+    # Start TIDE background sync (pulls data into PostgreSQL snapshots)
+    try:
+        from ion.services.tide_sync_service import start_background_loop as _tide_bg
+        from ion.storage.database import get_engine as _tide_eng
+        _tide_bg(_tide_eng())
+        logger.info("TIDE background sync started")
+    except Exception as e:
+        logger.warning(f"Failed to start TIDE background sync: {e}")
+
     # Check CyAB review reminders and notify leads
     try:
         from ion.web.cyab_api import check_review_reminders as _cyab_check

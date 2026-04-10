@@ -898,53 +898,73 @@ async def tide_system_alerts(system_id: str, namespace: str = "", hours: int = 1
 
 
 # ---------------------------------------------------------------------------
-# Detection Engineering endpoints (TIDE-powered)
+# Detection Engineering endpoints (TIDE-powered, snapshot-backed)
+#
+# Every DE endpoint first checks for a pre-built snapshot in PostgreSQL
+# (populated by the TIDE background sync worker). If a fresh snapshot
+# exists, the response is instant (<10 ms from Postgres). If no
+# snapshot exists (first startup, or sync disabled), it falls back to
+# a live TIDE query.
 # ---------------------------------------------------------------------------
 
+def _snapshot_or_live(session: Session, snapshot_key: str, live_fn, live_kwargs: dict = {}):
+    """Try the snapshot cache first. Fall back to a live TIDE query."""
+    from ion.services.tide_sync_service import get_snapshot
+    cached = get_snapshot(session, snapshot_key)
+    if cached is not None:
+        return cached
+    # No snapshot — fall through to live TIDE query.
+    return live_fn(**live_kwargs)
+
+
+@router.get("/tide/de/sync-status", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_sync_status(session: Session = Depends(get_db_session)):
+    """Return the health / freshness of the TIDE snapshot cache."""
+    from ion.services.tide_sync_service import get_sync_status
+    return get_sync_status(session)
+
+
+@router.post("/tide/de/sync-now", dependencies=[Depends(require_permission("integration:manage"))])
+def tide_de_sync_now(session: Session = Depends(get_db_session)):
+    """Manually trigger an immediate TIDE sync (admin/engineering only)."""
+    from ion.services.tide_sync_service import sync_all
+    return sync_all(session)
+
+
 @router.get("/tide/de/systems", dependencies=[Depends(require_permission("alert:read"))])
-def tide_de_systems():
+def tide_de_systems(session: Session = Depends(get_db_session)):
     """List all TIDE systems (for dropdown selectors)."""
-    svc = get_tide_service()
-    return svc.get_systems()
+    return _snapshot_or_live(session, "systems", get_tide_service().get_systems)
 
 
 @router.get("/tide/de/posture", dependencies=[Depends(require_permission("alert:read"))])
-def tide_de_posture():
+def tide_de_posture(session: Session = Depends(get_db_session)):
     """Detection posture overview — totals, severity, quality, coverage."""
-    svc = get_tide_service()
-    result = svc.get_posture_stats()
+    result = _snapshot_or_live(session, "posture", get_tide_service().get_posture_stats)
     if result is None:
         return {"enabled": False}
-    result["enabled"] = True
+    if isinstance(result, dict):
+        result["enabled"] = True
     return result
 
 
 @router.get("/tide/de/disabled-critical", dependencies=[Depends(require_permission("alert:read"))])
-def tide_de_disabled_critical():
+def tide_de_disabled_critical(session: Session = Depends(get_db_session)):
     """Disabled critical/high severity rules."""
-    svc = get_tide_service()
-    return svc.get_disabled_critical_high()
+    return _snapshot_or_live(session, "disabled_critical", get_tide_service().get_disabled_critical_high)
 
 
 @router.get("/tide/de/use-cases", dependencies=[Depends(require_permission("alert:read"))])
-def tide_de_use_cases():
-    """TIDE playbooks (use cases) with steps + per-technique detection coverage.
-
-    A "use case" in CyAB / TIDE terminology is a baseline playbook describing
-    a tactical sequence of TTPs we want to detect (e.g. "Insider Threat: Data
-    Exfiltration"). The endpoint returns each use case with its ordered steps,
-    each step's MITRE techniques, and how many TIDE rules cover them.
-    """
-    svc = get_tide_service()
-    return svc.get_playbooks_with_kill_chains()
+def tide_de_use_cases(session: Session = Depends(get_db_session)):
+    """TIDE playbooks (use cases) with steps + per-technique detection coverage."""
+    return _snapshot_or_live(session, "use_cases", get_tide_service().get_playbooks_with_kill_chains)
 
 
 # Deprecated alias — kept for backwards compatibility with older clients.
 @router.get("/tide/de/kill-chains", dependencies=[Depends(require_permission("alert:read"))])
-def tide_de_kill_chains_alias():
+def tide_de_kill_chains_alias(session: Session = Depends(get_db_session)):
     """Deprecated: use /tide/de/use-cases. Same response shape."""
-    svc = get_tide_service()
-    return svc.get_playbooks_with_kill_chains()
+    return _snapshot_or_live(session, "use_cases", get_tide_service().get_playbooks_with_kill_chains)
 
 
 @router.get("/tide/de/navigator-layer", dependencies=[Depends(require_permission("alert:read"))])
@@ -1078,13 +1098,13 @@ def tide_de_rules(search: str = "", severity: str = "", enabled: str = "",
 
 
 @router.get("/tide/de/gaps", dependencies=[Depends(require_permission("alert:read"))])
-def tide_de_gaps():
+def tide_de_gaps(session: Session = Depends(get_db_session)):
     """Gap analysis — blind spots by tactic, unmapped rules, quick wins."""
-    svc = get_tide_service()
-    result = svc.get_gaps_analysis()
+    result = _snapshot_or_live(session, "gaps", get_tide_service().get_gaps_analysis)
     if result is None:
         return {"enabled": False}
-    result["enabled"] = True
+    if isinstance(result, dict):
+        result["enabled"] = True
     return result
 
 

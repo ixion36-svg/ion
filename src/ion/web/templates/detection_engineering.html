@@ -6,9 +6,10 @@
 <div class="page-header">
     <h1>Detection Engineering</h1>
     <div class="header-actions">
-        <span class="de-tide-badge" id="de-tide-badge">
+        <span class="de-tide-badge" id="de-tide-badge" title="Click for sync status">
             <span class="de-tide-dot"></span> TIDE
         </span>
+        <button class="btn btn-secondary" onclick="deSyncTide()" title="Pull fresh data from TIDE now">Sync TIDE</button>
         <button class="btn btn-secondary" onclick="deRefresh()">Refresh</button>
     </div>
 </div>
@@ -1556,8 +1557,40 @@ window.vlnDelete = async function(id) {
     _loaded.vulns = false; loadTab('vulns');
 };
 
+/* ── TIDE Sync ────────────────────────────────── */
+window.deSyncTide = async function() {
+    const badge = $('de-tide-badge');
+    badge.innerHTML = '<span class="de-tide-dot"></span> Syncing...';
+    try {
+        const r = await fetch(API + '/tide/de/sync-now', {method:'POST', credentials:'include'});
+        const j = await r.json();
+        if (j.error) {
+            badge.innerHTML = `<span class="de-tide-dot"></span> TIDE (${esc(j.error)})`;
+            return;
+        }
+        badge.innerHTML = `<span class="de-tide-dot ok"></span> TIDE synced (${j.synced}/${j.total})`;
+        // Auto-refresh current tab with fresh snapshot data
+        deRefresh();
+    } catch (e) {
+        badge.innerHTML = '<span class="de-tide-dot"></span> TIDE (sync failed)';
+    }
+};
+
+// Check sync status on load to show the badge correctly
+async function deCheckSyncStatus() {
+    try {
+        const r = await fetch(API + '/tide/de/sync-status', {credentials:'include'});
+        if (!r.ok) return;
+        const j = await r.json();
+        const badge = $('de-tide-badge');
+        if (j.healthy > 0) {
+            badge.innerHTML = `<span class="de-tide-dot ok"></span> TIDE (${j.healthy}/${j.total_datasets} cached)`;
+        }
+    } catch (e) {}
+}
+
 /* ── Init ─────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => loadTab('posture'));
+document.addEventListener('DOMContentLoaded', () => { loadTab('posture'); deCheckSyncStatus(); });
 
 })();
 </script>

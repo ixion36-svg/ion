@@ -114,6 +114,7 @@ from ion.models.log_source import LogSource, LogSourceCategory
 from ion.models.pir import PostIncidentReview, PIRActionItem, PIRStatus, PIRActionStatus
 from ion.models.emulation import EmulationPlan, EmulationStep, EmulationPlanStatus, StepResult
 from ion.models.vulnerability import Vulnerability, VulnerabilityAsset, VulnSeverity, VulnStatus
+from ion.models.tide_snapshot import TideSnapshot
 from ion.models.threat_intel import ThreatIntelWatch
 from ion.models.forensics import (
     ForensicCase,
