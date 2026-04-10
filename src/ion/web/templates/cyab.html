@@ -189,12 +189,23 @@
 
                 <!-- Data Sources panel -->
                 <div style="margin-top:1.5rem;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:6px;">
                         <h3 style="font-size:0.9rem;font-weight:700;color:var(--text-bright);margin:0;">Data Sources</h3>
-                        <button class="btn btn-primary" onclick="addDataSource()" style="padding:0.3rem 0.75rem;font-size:0.75rem;" id="btn-add-ds">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                            Add Source
-                        </button>
+                        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                            <div style="position:relative;display:inline-block;" id="template-picker-wrap">
+                                <button class="btn btn-secondary" onclick="toggleTemplatePicker()" style="padding:0.3rem 0.75rem;font-size:0.75rem;" title="Create from a pre-built template">
+                                    From Template
+                                </button>
+                                <div id="template-picker" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:6px;width:320px;max-height:360px;overflow-y:auto;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.4);">
+                                    <div style="font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:4px 8px;margin-bottom:4px;">Pick a template</div>
+                                    <div id="template-list"></div>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="addDataSource()" style="padding:0.3rem 0.75rem;font-size:0.75rem;" id="btn-add-ds">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Add Blank
+                            </button>
+                        </div>
                     </div>
                     <div id="ds-list" class="cyab-ds-list"></div>
                     <p id="ds-empty" class="cyab-dash-empty" style="display:none;padding:1rem;">No data sources yet. Save the system first, then add data sources.</p>
@@ -1410,6 +1421,88 @@ var PREDEFINED_SOURCES = [
     { name: 'Container / Kubernetes', type: 'Application', icon: 'cpu' },
 ];
 
+// ======================== RELOAD DATA SOURCES ========================
+async function reloadDataSources() {
+    if (!currentSystemId) return;
+    try {
+        var result = await api.get('/api/cyab/systems/' + currentSystemId);
+        currentSystem = result;
+        currentDataSources = result.data_sources || [];
+        renderDataSources();
+    } catch (e) {
+        console.error('Failed to reload data sources:', e);
+    }
+}
+
+// ======================== TEMPLATE PICKER ========================
+var _templateCache = null;
+
+async function toggleTemplatePicker() {
+    var picker = document.getElementById('template-picker');
+    if (picker.style.display !== 'none') {
+        picker.style.display = 'none';
+        return;
+    }
+    if (!_templateCache) {
+        try {
+            var data = await api.get('/api/cyab/templates');
+            _templateCache = data.templates || [];
+        } catch (e) {
+            showToast('Failed to load templates', 'error');
+            return;
+        }
+    }
+    var list = document.getElementById('template-list');
+    list.innerHTML = _templateCache.map(function(t) {
+        var rColor = t.readiness_score >= 70 ? 'var(--success)' : t.readiness_score >= 40 ? 'var(--neon-yellow)' : 'var(--danger)';
+        return '<div style="padding:6px 8px;border-radius:var(--radius);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px;border:1px solid transparent;" ' +
+            'onmouseover="this.style.borderColor=\'var(--primary)\';this.style.background=\'var(--primary-dim)\'" ' +
+            'onmouseout="this.style.borderColor=\'transparent\';this.style.background=\'none\'" ' +
+            'onclick="createFromTemplate(\'' + t.id + '\')">' +
+            '<div><div style="font-size:.78rem;font-weight:600;color:var(--text-bright)">' + escapeHtml(t.name) + '</div>' +
+            '<div style="font-size:.65rem;color:var(--text-muted)">' + escapeHtml(t.sal_tier) + ' · ' + t.field_count + '/' + t.total_fields + ' fields</div></div>' +
+            '<div style="font-family:\'JetBrains Mono\',monospace;font-size:.78rem;font-weight:700;color:' + rColor + '">' + t.readiness_score + '%</div>' +
+            '</div>';
+    }).join('');
+    picker.style.display = 'block';
+}
+
+async function createFromTemplate(templateId) {
+    document.getElementById('template-picker').style.display = 'none';
+    if (!currentSystemId) {
+        showToast('Save the system first, then use a template', 'warning');
+        return;
+    }
+    try {
+        var result = await api.post('/api/cyab/systems/' + currentSystemId + '/data-sources/from-template?template_id=' + templateId);
+        showToast('Data source created from template: ' + (result.name || templateId), 'success');
+        await reloadDataSources();
+        activateDataSource(result.id);
+    } catch (e) {
+        showToast('Template failed: ' + (e.message || 'unknown'), 'error');
+    }
+}
+
+async function cloneDataSource(dsId) {
+    try {
+        var result = await api.post('/api/cyab/data-sources/' + dsId + '/clone');
+        showToast('Cloned: ' + (result.name || 'data source'), 'success');
+        await reloadDataSources();
+        activateDataSource(result.id);
+    } catch (e) {
+        showToast('Clone failed: ' + (e.message || 'unknown'), 'error');
+    }
+}
+
+// Close picker when clicking outside
+document.addEventListener('click', function(e) {
+    var wrap = document.getElementById('template-picker-wrap');
+    var picker = document.getElementById('template-picker');
+    if (wrap && picker && !wrap.contains(e.target)) {
+        picker.style.display = 'none';
+    }
+});
+
 async function addDataSource() {
     if (!currentSystemId) {
         var sysData = gatherSystemData();
@@ -1642,8 +1735,10 @@ function renderDataSources() {
                 '<div class="cyab-ds-meta"><span>' + (ds.sal_tier || 'SAL-2') + '</span><span>' + (ds.data_source_type || 'Unknown') + '</span></div>' +
             '</div>' +
             '<div class="cyab-ds-score"><div class="cyab-ds-score-val" style="color:' + rColor + '">' + (ds.readiness_score || 0) + '%</div><div class="cyab-ds-score-label">Ready</div></div>' +
-            '<button class="btn btn-secondary" style="padding:0.15rem 0.4rem;font-size:0.6rem;flex-shrink:0;" onclick="event.stopPropagation();deleteDataSourceById(' + ds.id + ',\'' + escapeHtml(ds.name).replace(/'/g,"\\'") + '\')">×</button>' +
-            '</div>';
+            '<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0;">' +
+            '<button class="btn btn-secondary" style="padding:0.15rem 0.4rem;font-size:0.55rem;min-width:38px;" onclick="event.stopPropagation();cloneDataSource(' + ds.id + ')" title="Clone this data source">Clone</button>' +
+            '<button class="btn btn-secondary" style="padding:0.15rem 0.4rem;font-size:0.6rem;min-width:38px;color:var(--danger);" onclick="event.stopPropagation();deleteDataSourceById(' + ds.id + ',\'' + escapeHtml(ds.name).replace(/'/g,"\\'") + '\')" title="Delete">&times;</button>' +
+            '</div></div>';
     }).join('');
 }
 
