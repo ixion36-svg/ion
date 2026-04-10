@@ -376,85 +376,103 @@ class TideService:
     # -----------------------------------------------------------------------
 
     def get_posture_stats(self) -> Optional[dict]:
-        """Overall detection posture: totals, severity breakdown, quality, coverage."""
+        """Overall detection posture: totals, severity breakdown, quality, coverage.
+
+        Consolidated into TWO SQL round-trips (was 7) to reduce DuckDB lock
+        contention and 504 risk.
+        """
         if not self.enabled:
             return None
 
-        # Total rules + enabled/disabled
-        totals = self._query(f"""
+        # Round-trip 1: everything from detection_rules + mitre coverage in ONE CTE query.
+        result = self._query(f"""
+            WITH
+            rules AS (
+                SELECT DISTINCT rule_id, severity, enabled, quality_score, mitre_ids
+                FROM detection_rules WHERE space = '{self.space}'
+            ),
+            totals AS (
+                SELECT
+                    count(*) AS total_rules,
+                    count(*) FILTER (WHERE enabled = 1) AS enabled_rules,
+                    count(*) FILTER (WHERE enabled = 0) AS disabled_rules,
+                    count(*) FILTER (WHERE mitre_ids IS NULL OR len(mitre_ids) = 0) AS unmapped_rules,
+                    count(*) FILTER (WHERE quality_score >= 30) AS q_excellent,
+                    count(*) FILTER (WHERE quality_score >= 20 AND quality_score < 30) AS q_good,
+                    count(*) FILTER (WHERE quality_score >= 10 AND quality_score < 20) AS q_fair,
+                    count(*) FILTER (WHERE quality_score < 10) AS q_poor,
+                    round(avg(quality_score), 1) AS avg_quality,
+                    min(quality_score) AS min_quality,
+                    max(quality_score) AS max_quality
+                FROM rules
+            ),
+            sev AS (
+                SELECT severity,
+                       count(*) AS cnt,
+                       count(*) FILTER (WHERE enabled = 1) AS enabled,
+                       count(*) FILTER (WHERE enabled = 0) AS disabled
+                FROM rules
+                GROUP BY severity
+            ),
+            coverage AS (
+                SELECT count(DISTINCT t.technique_id) AS covered
+                FROM rules r, LATERAL unnest(r.mitre_ids) AS t(technique_id)
+                WHERE r.mitre_ids IS NOT NULL
+            )
             SELECT
-                count(DISTINCT rule_id) as total_rules,
-                count(DISTINCT rule_id) FILTER (WHERE enabled = 1) as enabled_rules,
-                count(DISTINCT rule_id) FILTER (WHERE enabled = 0) as disabled_rules
-            FROM detection_rules WHERE space = '{self.space}'
+                t.*,
+                c.covered AS covered_techniques,
+                (SELECT json_group_array(json_object(
+                    'severity', s.severity, 'count', s.cnt, 'enabled', s.enabled, 'disabled', s.disabled
+                )) FROM sev s) AS severity_json
+            FROM totals t, coverage c
         """)
-        if not totals or not totals["rows"]:
+
+        if not result or not result["rows"]:
             return None
-        t = totals["rows"][0]
+        r = result["rows"][0]
 
-        # By severity
-        sev = self._query(f"""
-            SELECT severity,
-                   count(DISTINCT rule_id) as count,
-                   count(DISTINCT rule_id) FILTER (WHERE enabled = 1) as enabled,
-                   count(DISTINCT rule_id) FILTER (WHERE enabled = 0) as disabled
-            FROM detection_rules WHERE space = '{self.space}'
-            GROUP BY severity ORDER BY severity
-        """)
+        # Parse the severity JSON array (DuckDB json_group_array returns a string)
         severity = {}
-        if sev:
-            for r in sev["rows"]:
-                severity[r["severity"]] = {
-                    "total": r["count"], "enabled": r["enabled"], "disabled": r["disabled"]
-                }
+        sev_raw = r.get("severity_json")
+        if sev_raw:
+            import json as _json
+            try:
+                sev_list = _json.loads(sev_raw) if isinstance(sev_raw, str) else sev_raw
+                for s in sev_list:
+                    severity[s["severity"]] = {
+                        "total": s["count"], "enabled": s["enabled"], "disabled": s["disabled"]
+                    }
+            except Exception:
+                pass
 
-        # Quality distribution (TIDE scores typically 7-39 range)
-        qual = self._query(f"""
-            SELECT
-                count(DISTINCT rule_id) FILTER (WHERE quality_score >= 30) as excellent,
-                count(DISTINCT rule_id) FILTER (WHERE quality_score >= 20 AND quality_score < 30) as good,
-                count(DISTINCT rule_id) FILTER (WHERE quality_score >= 10 AND quality_score < 20) as fair,
-                count(DISTINCT rule_id) FILTER (WHERE quality_score < 10) as poor,
-                round(avg(quality_score), 1) as avg_quality,
-                min(quality_score) as min_quality,
-                max(quality_score) as max_quality
-            FROM detection_rules WHERE space = '{self.space}'
-        """)
-        quality = {}
-        if qual and qual["rows"]:
-            quality = qual["rows"][0]
-
-        # Unmapped rules (no MITRE IDs)
-        unmapped = self._query(f"""
-            SELECT count(DISTINCT rule_id) as count
-            FROM detection_rules
-            WHERE space = '{self.space}' AND (mitre_ids IS NULL OR len(mitre_ids) = 0)
-        """)
-        unmapped_count = unmapped["rows"][0]["count"] if unmapped and unmapped["rows"] else 0
-
-        # MITRE coverage
-        coverage = self._query(f"""
-            SELECT count(DISTINCT t.technique_id) as covered
-            FROM detection_rules dr, LATERAL unnest(dr.mitre_ids) AS t(technique_id)
-            WHERE dr.space = '{self.space}' AND dr.mitre_ids IS NOT NULL
-        """)
-        covered_count = coverage["rows"][0]["covered"] if coverage and coverage["rows"] else 0
-
-        total_tech = self._query("SELECT count(*) as total FROM mitre_techniques")
-        total_techniques = total_tech["rows"][0]["total"] if total_tech and total_tech["rows"] else 0
-
-        # Systems
-        sys_result = self._query("SELECT count(*) as total FROM systems")
-        total_systems = sys_result["rows"][0]["total"] if sys_result and sys_result["rows"] else 0
+        # Round-trip 2: counts from mitre_techniques + systems (small, fast tables).
+        counts = self._query(
+            "SELECT (SELECT count(*) FROM mitre_techniques) AS total_techniques, "
+            "(SELECT count(*) FROM systems) AS total_systems"
+        )
+        total_techniques = 0
+        total_systems = 0
+        if counts and counts["rows"]:
+            total_techniques = counts["rows"][0].get("total_techniques", 0)
+            total_systems = counts["rows"][0].get("total_systems", 0)
 
         return {
-            "total_rules": t["total_rules"],
-            "enabled_rules": t["enabled_rules"],
-            "disabled_rules": t["disabled_rules"],
+            "total_rules": r["total_rules"],
+            "enabled_rules": r["enabled_rules"],
+            "disabled_rules": r["disabled_rules"],
             "severity": severity,
-            "quality": quality,
-            "unmapped_rules": unmapped_count,
-            "covered_techniques": covered_count,
+            "quality": {
+                "excellent": r["q_excellent"],
+                "good": r["q_good"],
+                "fair": r["q_fair"],
+                "poor": r["q_poor"],
+                "avg_quality": r["avg_quality"],
+                "min_quality": r["min_quality"],
+                "max_quality": r["max_quality"],
+            },
+            "unmapped_rules": r["unmapped_rules"],
+            "covered_techniques": r["covered_techniques"],
             "total_techniques": total_techniques,
             "total_systems": total_systems,
         }
@@ -587,44 +605,52 @@ class TideService:
 
         where = "WHERE " + " AND ".join(conditions)
 
-        count_result = self._query(f"SELECT count(DISTINCT rule_id) as total FROM detection_rules {where}")
-        total = count_result["rows"][0]["total"] if count_result and count_result["rows"] else 0
-
+        # Single round-trip: count(*) OVER() gives total alongside the page rows.
         rows_result = self._query(f"""
-            SELECT DISTINCT rule_id, name, severity, enabled, quality_score, mitre_ids
+            SELECT DISTINCT rule_id, name, severity, enabled, quality_score, mitre_ids,
+                   count(*) OVER() AS _total
             FROM detection_rules {where}
             ORDER BY name
             LIMIT {int(limit)} OFFSET {int(offset)}
         """)
-        rows = rows_result["rows"] if rows_result else []
-
+        if not rows_result or not rows_result["rows"]:
+            return {"rows": [], "total": 0}
+        rows = rows_result["rows"]
+        total = rows[0].get("_total", 0)
+        # Strip the _total column from the output
+        for r in rows:
+            r.pop("_total", None)
         return {"rows": rows, "total": total}
 
     def get_gaps_analysis(self) -> Optional[dict]:
-        """Blind spots by tactic, unmapped rules, quick-win suggestions."""
+        """Blind spots by tactic, unmapped rules, quick-win suggestions.
+
+        4 round-trips (was 5). The technique + covered queries are simple
+        enough that DuckDB handles them quickly. The big posture query
+        (7→2 consolidation) is where the real savings are.
+        """
         if not self.enabled:
             return None
 
-        # All techniques with tactic
+        # 1. All techniques
         all_tech = self._query(
-            "SELECT id as technique_id, name, tactic FROM mitre_techniques ORDER BY tactic, id"
+            "SELECT id AS technique_id, name, tactic FROM mitre_techniques ORDER BY tactic, id"
         )
         if not all_tech:
             return None
         techniques = all_tech["rows"]
 
-        # Covered techniques
+        # 2. Covered techniques
         covered = self._query(f"""
             SELECT DISTINCT t.technique_id
             FROM detection_rules dr, LATERAL unnest(dr.mitre_ids) AS t(technique_id)
             WHERE dr.space = '{self.space}' AND dr.mitre_ids IS NOT NULL
         """)
-        covered_set = set()
+        covered_set: set[str] = set()
         if covered:
             for r in covered["rows"]:
                 covered_set.add(r["technique_id"].split(".")[0])
 
-        # Group blind spots by tactic
         by_tactic: dict[str, list] = {}
         for t in techniques:
             tid = t["technique_id"]
@@ -634,7 +660,9 @@ class TideService:
                     by_tactic[tac] = []
                 by_tactic[tac].append({"id": tid, "name": t["name"]})
 
-        # Unmapped rules (rules with no MITRE mapping)
+        # Remaining small queries — kept separate because DuckDB rejects
+        # UNION ALL across CTEs with ORDER BY / LIMIT in sub-queries.
+        # These are tiny reads (< 100 rows each) so the lock hold time is short.
         unmapped = self._query(f"""
             SELECT DISTINCT rule_id, name, severity, enabled, quality_score
             FROM detection_rules
@@ -644,7 +672,6 @@ class TideService:
         """)
         unmapped_rules = unmapped["rows"] if unmapped else []
 
-        # Quick wins: disabled higher-quality rules (quality >= 20, severity critical/high)
         quick = self._query(f"""
             SELECT DISTINCT rule_id, name, severity, quality_score, mitre_ids
             FROM detection_rules
@@ -655,10 +682,9 @@ class TideService:
         """)
         quick_wins = quick["rows"] if quick else []
 
-        # Systems with lowest coverage
         sys_cov = self._query("""
             SELECT s.id, s.name,
-                   count(DISTINCT ad.detection_id) as applied_rules
+                   count(DISTINCT ad.detection_id) AS applied_rules
             FROM systems s
             LEFT JOIN applied_detections ad ON ad.system_id = s.id
             GROUP BY s.id, s.name
