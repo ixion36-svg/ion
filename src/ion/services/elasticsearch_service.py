@@ -608,27 +608,70 @@ class ElasticsearchService:
                 first_tactic = tactic[0] if isinstance(tactic[0], dict) else {}
                 mitre_tactic_name = _first(first_tactic.get("name"))
 
-        # Fallback: dot-notation keys (Kibana Security alert format)
-        if not mitre_technique_id:
-            mitre_technique_id = _first(_f(source, "threat.technique.id"))
-        if not mitre_technique_name:
-            mitre_technique_name = _first(_f(source, "threat.technique.name"))
-        if not mitre_tactic_name:
-            mitre_tactic_name = _first(_f(source, "threat.tactic.name"))
+        # Fallback: dot-notation keys (Kibana Security alert format).
+        # Try multiple key patterns — ES 8.x/9.x use different ones.
+        for tid_key in ("threat.technique.id", "kibana.alert.rule.threat.technique.id"):
+            if not mitre_technique_id:
+                mitre_technique_id = _first(_f(source, tid_key))
+        for tname_key in ("threat.technique.name", "kibana.alert.rule.threat.technique.name"):
+            if not mitre_technique_name:
+                mitre_technique_name = _first(_f(source, tname_key))
+        for tactic_key in ("threat.tactic.name", "threat.tactic.id", "kibana.alert.rule.threat.tactic.name", "kibana.alert.rule.threat.tactic.id"):
+            if not mitre_tactic_name:
+                val = _first(_f(source, tactic_key))
+                if val:
+                    # tactic.id values look like "credential-access" — convert to display form
+                    mitre_tactic_name = val.replace("_", " ").replace("-", " ").title() if "-" in str(val) or "_" in str(val) else val
 
-        # Fallback: kibana.alert.rule.parameters.threat (Elastic Security 8.x/9.x rule config)
-        if not mitre_technique_id:
-            params_threat = _f(source, "kibana.alert.rule.parameters.threat", [])
-            if isinstance(params_threat, list) and params_threat:
-                pt = params_threat[0] if isinstance(params_threat[0], dict) else {}
+        # Fallback: kibana.alert.rule.threat (Elastic Security — some versions)
+        # and kibana.alert.rule.parameters.threat (other versions).
+        # Both store the MITRE mapping as an array of {tactic, technique} objects.
+        # Fallback: kibana.alert.rule.threat / kibana.alert.rule.parameters.threat
+        # These are arrays with one entry PER tactic the rule maps to. The
+        # technique is usually on the first entry but the tactic name may be
+        # on any entry (often the last). We scan ALL entries.
+        for threat_path in (
+            "kibana.alert.rule.threat",
+            "kibana.alert.rule.parameters.threat",
+        ):
+            if mitre_technique_id and mitre_tactic_name:
+                break
+            params_threat = _f(source, threat_path, [])
+            if not isinstance(params_threat, list) or not params_threat:
+                continue
+            for pt in params_threat:
+                if not isinstance(pt, dict):
+                    continue
+                # Extract technique from this entry
                 pt_techniques = pt.get("technique", [])
-                if isinstance(pt_techniques, list) and pt_techniques:
+                if isinstance(pt_techniques, list) and pt_techniques and not mitre_technique_id:
                     pt_tech = pt_techniques[0] if isinstance(pt_techniques[0], dict) else {}
                     mitre_technique_id = _first(pt_tech.get("id"))
                     mitre_technique_name = _first(pt_tech.get("name"))
-                pt_tactic = pt.get("tactic", {})
-                if isinstance(pt_tactic, dict) and not mitre_tactic_name:
-                    mitre_tactic_name = _first(pt_tactic.get("name"))
+                    # Check subtechniques (more specific)
+                    pt_subs = pt_tech.get("subtechnique", [])
+                    if isinstance(pt_subs, list) and pt_subs:
+                        pt_sub = pt_subs[0] if isinstance(pt_subs[0], dict) else {}
+                        if pt_sub.get("id"):
+                            mitre_technique_id = _first(pt_sub.get("id"))
+                            mitre_technique_name = _first(pt_sub.get("name")) or mitre_technique_name
+                # Extract tactic from this entry
+                if not mitre_tactic_name:
+                    pt_tactic = pt.get("tactic", {})
+                    if isinstance(pt_tactic, dict):
+                        tactic_val = (
+                            _first(pt_tactic.get("name"))
+                            or _first(pt_tactic.get("id"))
+                            or _first(pt_tactic.get("reference"))
+                        )
+                        if tactic_val:
+                            # Handle URLs: "https://attack.mitre.org/tactics/TA0006/"
+                            if "/" in str(tactic_val):
+                                tactic_val = str(tactic_val).rstrip("/").rsplit("/", 1)[-1]
+                            # Handle slug IDs: "credential-access" or "TA0006"
+                            if "-" in str(tactic_val) or "_" in str(tactic_val):
+                                tactic_val = str(tactic_val).replace("-", " ").replace("_", " ").title()
+                            mitre_tactic_name = tactic_val
 
         # Fallback: signal.rule.threat[0].technique[0] (Elastic SIEM format)
         if not mitre_technique_id:
@@ -643,6 +686,24 @@ class ElasticsearchService:
                     tactic_obj = first_threat.get("tactic", {})
                     if isinstance(tactic_obj, dict):
                         mitre_tactic_name = _first(tactic_obj.get("name"))
+
+        # Last resort: deep scan ALL keys in _source for any value matching T####
+        # This catches custom/vendor-specific fields that store MITRE technique IDs
+        # under non-standard key names.
+        if not mitre_technique_id:
+            import re as _re
+            _tid_pattern = _re.compile(r'^T\d{4}(?:\.\d{3})?$')
+            for key, val in source.items():
+                if isinstance(val, str) and _tid_pattern.match(val):
+                    mitre_technique_id = val
+                    break
+                if isinstance(val, list):
+                    for item in val:
+                        if isinstance(item, str) and _tid_pattern.match(item):
+                            mitre_technique_id = item
+                            break
+                    if mitre_technique_id:
+                        break
 
         return ElasticsearchAlert(
             id=alert_id,

@@ -3441,6 +3441,68 @@ async def get_mitre_stats(
         }
 
 
+@router.get("/elasticsearch/alerts/diagnostic")
+async def diagnostic_alert_fields(
+    limit: int = 3,
+    current_user: User = Depends(require_permission("alert:read")),
+):
+    """Diagnostic: show raw _source field structure of recent alerts.
+
+    Helps debug MITRE parsing issues by revealing exactly which keys
+    the alert documents use (nested vs dot-notation, array vs scalar, etc.).
+    """
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        return {"error": "Elasticsearch not configured"}
+
+    try:
+        result = await service._request(
+            "POST",
+            f"/{service.alert_index}/_search",
+            json={
+                "size": min(limit, 10),
+                "sort": [{"@timestamp": {"order": "desc"}}],
+                "_source": True,
+            },
+        )
+    except Exception as e:
+        return {"error": safe_error(e, "diagnostic")}
+
+    alerts = []
+    for hit in result.get("hits", {}).get("hits", []):
+        source = hit.get("_source", {})
+        # Extract all threat-related keys
+        threat_keys = {k: v for k, v in source.items() if "threat" in k.lower() or "mitre" in k.lower() or "tactic" in k.lower() or "technique" in k.lower()}
+        # Also get the nested threat object if it exists
+        threat_obj = source.get("threat")
+        # Get parsed result
+        parsed = service._parse_alert(hit["_id"], source)
+        alerts.append({
+            "id": hit["_id"],
+            "index": hit.get("_index"),
+            "rule_name": (
+                source.get("kibana.alert.rule.name")
+                or (source.get("kibana", {}) or {}).get("alert", {}).get("rule", {}).get("name")
+                or source.get("rule_name")
+                or "?"
+            ),
+            "threat_related_keys": threat_keys,
+            "nested_threat_object": threat_obj,
+            "parsed_mitre": {
+                "technique_id": parsed.mitre_technique_id if parsed else None,
+                "technique_name": parsed.mitre_technique_name if parsed else None,
+                "tactic_name": parsed.mitre_tactic_name if parsed else None,
+            },
+            "all_keys": sorted(source.keys()),
+        })
+
+    return {
+        "total_in_index": result.get("hits", {}).get("total", {}).get("value", 0),
+        "alerts_checked": len(alerts),
+        "alerts": alerts,
+    }
+
+
 # ============================================================================
 # Alert Triage, Comments & Case Management Endpoints
 # ============================================================================

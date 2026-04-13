@@ -743,10 +743,25 @@ class KibanaSyncService:
         }
 
     async def _background_sync_loop(self, interval_seconds: int = 60):
-        """Background loop to periodically sync between ION and Kibana."""
+        """Background loop to periodically sync between ION and Kibana.
+
+        Skips the full sync when Kibana is unreachable (circuit breaker open)
+        to avoid noisy error logs and wasted CPU.
+        """
         logger.info(f"Starting Kibana sync background task (interval: {interval_seconds}s)")
 
         while self._running:
+            # Skip entire sync cycle if Kibana is known to be offline.
+            if not self.kibana_service.enabled:
+                await asyncio.sleep(interval_seconds)
+                continue
+
+            from ion.core.circuit_breaker import kibana_breaker
+            if not kibana_breaker.can_execute():
+                logger.debug("Kibana sync skipped — circuit breaker open")
+                await asyncio.sleep(interval_seconds)
+                continue
+
             try:
                 engine = get_engine()
                 factory = get_session_factory(engine)
@@ -777,7 +792,7 @@ class KibanaSyncService:
                 if result.get("synced", 0) > 0:
                     logger.info(f"Kibana sync: {result['synced']} comments synced from {result['cases']} cases")
             except Exception as e:
-                logger.error(f"Error in Kibana sync loop: {e}")
+                logger.warning(f"Kibana sync error: {type(e).__name__}")
 
             await asyncio.sleep(interval_seconds)
 

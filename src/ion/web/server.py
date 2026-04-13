@@ -8,6 +8,19 @@ from ion.auth.dependencies import require_page_auth, require_page_permission
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
+
+# Use orjson for JSON serialisation if available (5-10x faster than stdlib).
+try:
+    import orjson
+
+    class ORJSONResponse(JSONResponse):
+        media_type = "application/json"
+        def render(self, content) -> bytes:
+            return orjson.dumps(content, option=orjson.OPT_NON_STR_KEYS | orjson.OPT_SERIALIZE_NUMPY)
+
+    _default_response_class = ORJSONResponse
+except ImportError:
+    _default_response_class = JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -51,6 +64,7 @@ from ion.web.knowledge_graph_api import router as knowledge_graph_router
 from ion.web.pir_api import router as pir_router
 from ion.web.emulation_api import router as emulation_router
 from ion.web.vulnerability_api import router as vulnerability_router
+from ion.web.maturity_api import router as maturity_router
 from ion.web.executive_report_api import router as executive_report_router
 from ion.web.ioc_staleness_api import router as ioc_staleness_router
 from ion.web.training_sim_api import router as training_sim_router
@@ -114,6 +128,8 @@ app = FastAPI(
     title="ION",
     description="Intelligent Operating Network - Security Operations Portal for Guarded Glass",
     version=ion.__version__,
+    # Use orjson for ~5x faster JSON serialisation on all API responses.
+    default_response_class=_default_response_class,
     # Disable API docs in production (when debug_mode is False)
     docs_url="/docs" if _debug_mode else None,
     redoc_url="/redoc" if _debug_mode else None,
@@ -174,6 +190,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
+# Add GZip compression — compresses all responses > 500 bytes.
+# Typically 60-80% smaller for HTML/JSON/CSS/JS, major bandwidth + perceived speed win.
+from starlette.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 # Add security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -190,8 +211,24 @@ app.add_middleware(RequestLoggingMiddleware)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Mount static files
-app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+# Mount static files with cache-control headers for browser caching.
+# CSS/JS/fonts don't change between deploys, so 24h cache is safe.
+# Cache is busted by the version in the URL (ion_version in templates).
+from starlette.staticfiles import StaticFiles as _StaticFiles
+from starlette.responses import Response as _StaticResponse
+
+
+class CachedStaticFiles(_StaticFiles):
+    """StaticFiles with Cache-Control headers for browser caching."""
+    async def get_response(self, path: str, scope) -> _StaticResponse:
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            # 24h cache for immutable assets (CSS, JS, fonts, images)
+            response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=3600"
+        return response
+
+
+app.mount("/static", CachedStaticFiles(directory=BASE_DIR / "static"), name="static")
 
 # Setup templates
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -235,6 +272,7 @@ app.include_router(knowledge_graph_router, prefix="/api")
 app.include_router(pir_router, prefix="/api")
 app.include_router(emulation_router, prefix="/api")
 app.include_router(vulnerability_router, prefix="/api")
+app.include_router(maturity_router, prefix="/api")
 app.include_router(executive_report_router, prefix="/api")
 app.include_router(ioc_staleness_router, prefix="/api")
 app.include_router(training_sim_router, prefix="/api")
@@ -768,6 +806,12 @@ async def knowledge_graph_page(request: Request, user: User = Depends(require_pa
 async def compliance_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the multi-framework Compliance Posture page."""
     return templates.TemplateResponse(request=request, name="compliance.html")
+
+
+@app.get("/maturity", response_class=HTMLResponse)
+async def maturity_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the SOC Maturity Assessment page."""
+    return templates.TemplateResponse(request=request, name="maturity.html")
 
 
 @app.get("/pir", response_class=HTMLResponse)

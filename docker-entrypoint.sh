@@ -178,9 +178,16 @@ session.commit()
 print('Authentication configured')
 "
 
-echo "Starting web server on ${HOST}:${PORT}..."
+# Worker count: default 1 (background tasks require single process).
+# Override with ION_WORKERS if you disable background sync externally.
+WORKERS="${ION_WORKERS:-1}"
+echo "Starting web server on ${HOST}:${PORT} (${WORKERS} worker(s))..."
 
 exec python -m uvicorn ion.web.server:app \
     --host "${HOST}" \
     --port "${PORT}" \
+    --workers "${WORKERS}" \
+    --timeout-keep-alive 30 \
+    --limit-concurrency 200 \
+    --limit-max-requests 10000 \
     "$@"

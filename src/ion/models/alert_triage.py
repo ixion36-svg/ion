@@ -58,6 +58,16 @@ class AlertCase(Base, TimestampMixin):
     """Investigation case grouping multiple alerts."""
 
     __tablename__ = "alert_cases"
+    __table_args__ = (
+        Index("ix_cases_status", "status"),
+        Index("ix_cases_created_at", "created_at"),
+        Index("ix_cases_closed_at", "closed_at"),
+        Index("ix_cases_assigned_to", "assigned_to_id"),
+        Index("ix_cases_severity", "severity"),
+        Index("ix_cases_kibana_id", "kibana_case_id"),
+        # Composite: dashboard queries filter status + sort by created_at
+        Index("ix_cases_status_created", "status", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     case_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
@@ -133,6 +143,11 @@ class AlertTriage(Base, TimestampMixin):
     __tablename__ = "alert_triage"
     __table_args__ = (
         Index("ix_alert_triage_es_alert_id", "es_alert_id"),
+        Index("ix_alert_triage_status", "status"),
+        Index("ix_alert_triage_case_id", "case_id"),
+        Index("ix_alert_triage_assigned", "assigned_to_id"),
+        # Composite: triage queue filtered by status + sorted by created_at
+        Index("ix_alert_triage_status_created", "status", "created_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

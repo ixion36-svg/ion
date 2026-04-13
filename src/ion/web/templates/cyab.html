@@ -1897,32 +1897,54 @@ async function saveAsDocument() {
     md += '| Field | Value |\n|-------|-------|\n';
     md += '| **System** | ' + d.name + ' |\n| **Reference** | ' + (ref || '') + ' |\n| **Version** | ' + d.version + ' |\n| **Status** | ' + d.status + ' |\n| **Department** | ' + d.department + ' |\n| **SOC Lead** | ' + (d.soc_lead || '') + ' |\n| **Dept Lead** | ' + (d.department_lead || '') + ' |\n\n';
 
-    // If a TIDE system is currently selected, snapshot use-case coverage
-    // and include it as a dedicated section. This is the main thing that
-    // makes a CyAB review meaningful — "do we detect what we said we'd detect?"
+    // Assurance Baselines (use cases by tactic) — the core of the CyAB review.
     if (tideSelectedDetail && tideSelectedDetail._useCases && tideSelectedDetail._useCases.use_cases) {
         var ucData = tideSelectedDetail._useCases;
         var ucSum = ucData.summary || {};
-        md += '## Use Case Detection Coverage (TIDE)\n\n';
-        md += '_Per-use-case detection coverage scoped to this system\u2019s applied TIDE rules._\n\n';
+        md += '## Assurance Baselines (Use Cases)\n\n';
+        md += '_Detection use cases from TIDE baselines applied to this system, grouped by tactic._\n\n';
+
+        // Summary table
         md += '| Metric | Value |\n|---|---|\n';
-        md += '| **Overall Score** | ' + (ucSum.overall_score || 0) + '% |\n';
-        md += '| **Use Cases Tracked** | ' + (ucSum.use_case_count || 0) + ' |\n';
+        md += '| **Overall Use Case Coverage** | ' + (ucSum.overall_score || 0) + '% |\n';
+        md += '| **Baselines Applied** | ' + (ucSum.use_case_count || 0) + ' |\n';
         md += '| **Fully Covered** | ' + (ucSum.fully_covered || 0) + ' |\n';
         md += '| **Partial** | ' + (ucSum.partial || 0) + ' |\n';
         md += '| **Blind** | ' + (ucSum.blind || 0) + ' |\n';
         md += '| **Steps Covered** | ' + (ucSum.covered_steps || 0) + ' / ' + (ucSum.total_steps || 0) + ' |\n\n';
 
-        md += '| Use Case | Score | State | Steps Covered | Blind / Partial Steps |\n|---|---|---|---|---|\n';
+        // Per-baseline breakdown by tactic
         ucData.use_cases.forEach(function(uc) {
-            var blindList = (uc.steps || [])
-                .filter(function(st) { return st.state === 'blind' || st.state === 'partial'; })
-                .map(function(st) { return st.order + '. ' + st.name + ' (' + st.state + ')'; })
-                .join('<br>') || '\u2014';
-            md += '| ' + uc.name + ' | ' + uc.score + '% | ' + uc.state + ' | '
-                + uc.covered_steps + ' / ' + uc.step_count + ' | ' + blindList + ' |\n';
+            md += '### ' + uc.name + ' (' + uc.score + '% \u2014 ' + uc.state.toUpperCase() + ')\n\n';
+            if (uc.description) md += uc.description + '\n\n';
+
+            // Group steps by tactic
+            var stepsByTactic = {};
+            (uc.steps || []).forEach(function(step) {
+                var tactic = step.tactic || 'Unknown';
+                if (!stepsByTactic[tactic]) stepsByTactic[tactic] = [];
+                stepsByTactic[tactic].push(step);
+            });
+
+            md += '| Tactic | Step | Techniques | Detection | Gaps |\n|---|---|---|---|---|\n';
+            var tacticOrder = ['Initial Access', 'Execution', 'Persistence', 'Privilege Escalation',
+                'Defense Evasion', 'Credential Access', 'Discovery', 'Lateral Movement',
+                'Collection', 'Command and Control', 'Exfiltration', 'Impact'];
+            var sortedTactics = Object.keys(stepsByTactic).sort(function(a, b) {
+                var ia = tacticOrder.indexOf(a), ib = tacticOrder.indexOf(b);
+                return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+            });
+            sortedTactics.forEach(function(tactic) {
+                stepsByTactic[tactic].forEach(function(step) {
+                    var icon = step.state === 'covered' ? '\u2705' : step.state === 'partial' ? '\u26A0\uFE0F' : '\u274C';
+                    var techs = (step.techniques || []).join(', ');
+                    var covered = (step.covered_techniques || []).join(', ') || '\u2014';
+                    var gaps = (step.gap_techniques || []).join(', ') || '\u2014';
+                    md += '| ' + tactic + ' | ' + icon + ' ' + step.name + ' | ' + techs + ' | ' + covered + ' | ' + gaps + ' |\n';
+                });
+            });
+            md += '\n';
         });
-        md += '\n';
     }
 
     // Include each data source
@@ -2052,79 +2074,100 @@ function autoPopulateGaps(detail, mitre, useCases) {
     // Set review date to today
     document.getElementById('uc-review-date').value = new Date().toISOString().split('T')[0];
 
-    // Build gaps analysis
+    // Build gaps analysis — use cases by tactic are the PRIMARY content
     var gapsText = '';
     var systemName = detail.name || 'Unknown System';
 
-    // 1. Overall coverage gap
-    gapsText += 'TIDE Coverage Analysis: ' + systemName + '\n';
-    gapsText += 'Rules applied: ' + applied + ' / ' + totalRules + ' (' + coverage + '% coverage)\n';
-    gapsText += 'MITRE techniques covered: ' + coveredTechniques.size + ' / ' + totalTech + '\n';
-    if (ucSummary) {
-        gapsText += 'Use-case coverage: ' + ucSummary.overall_score + '% '
+    // 1. Summary metrics
+    gapsText += 'Assurance Baseline Review: ' + systemName + '\n';
+    gapsText += 'Rules applied: ' + applied + ' / ' + totalRules + ' (' + coverage + '% rule coverage)\n';
+    if (ucSummary && ucSummary.use_case_count > 0) {
+        gapsText += 'Use case coverage: ' + ucSummary.overall_score + '% '
                   + '(' + ucSummary.fully_covered + ' fully covered, '
                   + ucSummary.partial + ' partial, '
-                  + ucSummary.blind + ' blind of ' + ucSummary.use_case_count + ')\n';
+                  + ucSummary.blind + ' blind of ' + ucSummary.use_case_count + ' use cases)\n';
+        gapsText += 'Steps covered: ' + ucSummary.covered_steps + ' / ' + ucSummary.total_steps + '\n';
     }
+    gapsText += 'MITRE techniques: ' + coveredTechniques.size + ' / ' + totalTech + ' covered\n';
     gapsText += '\n';
 
-    // 1b. Per-use-case breakdown — most actionable for the CyAB review
+    // 2. Use cases by tactic — the core of the CyAB review document
     if (useCases && useCases.use_cases && useCases.use_cases.length > 0) {
-        gapsText += 'Use Case Coverage:\n';
+        gapsText += '--- ASSURANCE BASELINES (Use Cases by Tactic) ---\n';
+
         useCases.use_cases.forEach(function(uc) {
             var stateLabel = uc.state.toUpperCase();
-            gapsText += '\n[' + stateLabel + '] ' + uc.name + ' \u2014 ' + uc.score + '% '
-                      + '(' + uc.covered_steps + ' covered / ' + uc.partial_steps + ' partial / '
-                      + uc.blind_steps + ' blind of ' + uc.step_count + ' steps)\n';
-            // List blind/partial steps so analysts can act on them
+            gapsText += '\n=== ' + uc.name + ' [' + stateLabel + ' ' + uc.score + '%] ===\n';
+            if (uc.description) gapsText += uc.description + '\n';
+            gapsText += 'Steps: ' + uc.covered_steps + '/' + uc.step_count + ' covered\n\n';
+
+            // Group steps by tactic
+            var stepsByTactic = {};
             (uc.steps || []).forEach(function(step) {
-                if (step.state === 'blind' || step.state === 'partial') {
-                    var techList = (step.gap_techniques || []).join(', ');
-                    gapsText += '  - Step ' + step.order + ' (' + step.state + '): ' + step.name;
-                    if (techList) gapsText += ' [' + techList + ']';
-                    gapsText += '\n';
-                }
+                var tactic = step.tactic || 'Unknown';
+                if (!stepsByTactic[tactic]) stepsByTactic[tactic] = [];
+                stepsByTactic[tactic].push(step);
+            });
+
+            var tacticOrder = ['Initial Access', 'Execution', 'Persistence', 'Privilege Escalation',
+                'Defense Evasion', 'Credential Access', 'Discovery', 'Lateral Movement',
+                'Collection', 'Command and Control', 'Exfiltration', 'Impact'];
+
+            // Sort tactics by kill chain order
+            var sortedTactics = Object.keys(stepsByTactic).sort(function(a, b) {
+                var ia = tacticOrder.indexOf(a), ib = tacticOrder.indexOf(b);
+                if (ia === -1) ia = 999;
+                if (ib === -1) ib = 999;
+                return ia - ib;
+            });
+
+            sortedTactics.forEach(function(tactic) {
+                gapsText += '  [' + tactic + ']\n';
+                stepsByTactic[tactic].forEach(function(step) {
+                    var icon = step.state === 'covered' ? '\u2705' : step.state === 'partial' ? '\u26A0' : '\u274C';
+                    var techs = (step.techniques || []).join(', ');
+                    gapsText += '    ' + icon + ' Step ' + (step.order + 1) + ': ' + step.name;
+                    if (techs) gapsText += ' [' + techs + ']';
+                    gapsText += ' \u2014 ' + step.state.toUpperCase() + '\n';
+
+                    // Show covered + gap techniques for this step
+                    if (step.covered_techniques && step.covered_techniques.length > 0) {
+                        gapsText += '      Detected: ' + step.covered_techniques.join(', ') + '\n';
+                    }
+                    if (step.gap_techniques && step.gap_techniques.length > 0) {
+                        gapsText += '      GAPS: ' + step.gap_techniques.join(', ') + '\n';
+                    }
+                });
             });
         });
+
         gapsText += '\n';
+    } else {
+        gapsText += 'No assurance baselines are applied to this system in TIDE.\n';
+        gapsText += 'Apply baselines in TIDE to define the use cases this system should detect.\n\n';
     }
 
-    // 2. Missing MITRE techniques grouped by tactic
-    if (allTechniques.length > 0) {
-        var missingByTactic = {};
-        allTechniques.forEach(function(t) {
-            if (!coveredTechniques.has(t.technique_id)) {
-                var tactic = t.tactic || 'Unknown';
-                if (!missingByTactic[tactic]) missingByTactic[tactic] = [];
-                missingByTactic[tactic].push(t.technique_id + ' ' + (t.name || ''));
-            }
-        });
+    // 3. Additional MITRE gap summary (compact — only counts, not full listing)
+    var totalMissing = totalTech - coveredTechniques.size;
+    if (totalMissing > 0) {
+        gapsText += '--- MITRE ATT&CK GAP SUMMARY ---\n';
+        gapsText += totalMissing + ' of ' + totalTech + ' techniques uncovered.\n';
 
-        var tacticOrder = ['initial-access', 'execution', 'persistence', 'privilege-escalation',
-            'defense-evasion', 'credential-access', 'discovery', 'lateral-movement',
-            'collection', 'command-and-control', 'exfiltration', 'impact'];
-
-        var sortedTactics = Object.keys(missingByTactic).sort(function(a, b) {
-            var ia = tacticOrder.indexOf(a), ib = tacticOrder.indexOf(b);
-            if (ia === -1) ia = 999;
-            if (ib === -1) ib = 999;
-            return ia - ib;
-        });
-
-        if (sortedTactics.length > 0) {
-            gapsText += 'Uncovered MITRE ATT&CK Techniques by Tactic:\n';
-            sortedTactics.forEach(function(tactic) {
-                var items = missingByTactic[tactic];
-                var tacticLabel = tactic.replace(/-/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); });
-                gapsText += '\n[' + tacticLabel + '] (' + items.length + ' uncovered)\n';
-                // Show up to 5 per tactic to keep it readable
-                items.slice(0, 5).forEach(function(item) {
-                    gapsText += '  - ' + item + '\n';
-                });
-                if (items.length > 5) {
-                    gapsText += '  ... and ' + (items.length - 5) + ' more\n';
+        // Count by tactic (compact)
+        if (allTechniques.length > 0) {
+            var missingByTactic = {};
+            allTechniques.forEach(function(t) {
+                if (!coveredTechniques.has(t.technique_id)) {
+                    var tactic = t.tactic || 'unknown';
+                    missingByTactic[tactic] = (missingByTactic[tactic] || 0) + 1;
                 }
             });
+            var tacticGaps = Object.entries(missingByTactic)
+                .sort(function(a, b) { return b[1] - a[1]; })
+                .map(function(e) {
+                    return e[0].replace(/-/g, ' ').replace(/\b\w/g, function(l) { return l.toUpperCase(); }) + ': ' + e[1];
+                });
+            gapsText += 'Gaps by tactic: ' + tacticGaps.join(', ') + '\n';
         }
     }
 

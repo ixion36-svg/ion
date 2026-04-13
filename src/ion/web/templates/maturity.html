@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}SOC Maturity Assessment - ION{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="icon-bar-chart-2"></i> SOC Maturity Assessment</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="matShowHistory()">History</button>
+        <button class="btn btn-primary" onclick="matStartNew()">New Assessment</button>
+    </div>
+</div>
+
+<div id="mat-content"><div class="mat-loading"><span class="mat-spinner"></span> Loading...</div></div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.mat-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.mat-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:mat-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes mat-spin{to{transform:rotate(360deg)}}
+
+.mat-intro{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 22px;margin-bottom:18px;color:var(--text-secondary);font-size:.85rem;line-height:1.6}
+.mat-intro strong{color:var(--text-primary)}
+
+.mat-levels{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
+.mat-level{padding:6px 14px;border-radius:var(--radius);border:1px solid var(--border);font-size:.72rem;text-align:center;flex:1;min-width:100px}
+.mat-level strong{display:block;font-size:.85rem;margin-bottom:2px}
+.mat-level.l1{border-color:var(--sev-critical);color:var(--sev-critical)}
+.mat-level.l2{border-color:var(--sev-high);color:var(--sev-high)}
+.mat-level.l3{border-color:var(--sev-medium);color:var(--sev-medium)}
+.mat-level.l4{border-color:var(--primary);color:var(--primary)}
+.mat-level.l5{border-color:var(--mitre-covered);color:var(--mitre-covered)}
+
+.mat-domain{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:14px;overflow:hidden}
+.mat-domain-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.mat-domain-head:hover{background:rgba(88,166,255,.04)}
+.mat-domain-name{font-size:.95rem;font-weight:700;color:var(--text-primary)}
+.mat-domain-desc{font-size:.72rem;color:var(--text-secondary);margin-top:2px}
+.mat-domain-score{font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:700}
+.mat-domain-body{padding:14px 18px}
+.mat-question{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px}
+.mat-q-text{font-size:.85rem;color:var(--text-primary);font-weight:600;margin-bottom:6px}
+.mat-q-guidance{font-size:.72rem;color:var(--text-secondary);margin-bottom:8px;font-style:italic}
+.mat-q-score{display:flex;gap:4px;margin-bottom:6px}
+.mat-q-score button{width:36px;height:32px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;font-weight:700;font-size:.82rem;transition:all .12s}
+.mat-q-score button:hover{border-color:var(--primary);color:var(--primary)}
+.mat-q-score button.selected{background:var(--primary);color:#fff;border-color:var(--primary)}
+.mat-q-notes{width:100%;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:var(--radius);font:inherit;font-size:.78rem;resize:vertical;min-height:30px}
+
+.mat-submit{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+
+/* Results */
+.mat-result-overall{display:flex;align-items:center;gap:24px;padding:20px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:18px}
+.mat-result-ring{width:100px;height:100px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mat-result-inner{width:65px;height:65px;border-radius:50%;background:var(--bg-secondary);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.mat-result-score{font-size:1.6rem;font-weight:700;font-family:'JetBrains Mono',monospace}
+.mat-result-label{font-size:.65rem;color:var(--text-secondary)}
+.mat-result-text h3{margin:0 0 4px 0;color:var(--text-primary);font-size:1.1rem}
+.mat-result-text p{margin:0;color:var(--text-secondary);font-size:.82rem}
+
+.mat-result-bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px}
+.mat-result-bar{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 14px}
+.mat-result-bar-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.mat-result-bar-name{font-size:.78rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:.5px}
+.mat-result-bar-score{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:1.1rem}
+.mat-bar{height:6px;background:rgba(99,110,123,.2);border-radius:3px;overflow:hidden;margin-bottom:4px}
+.mat-bar-fill{height:100%;border-radius:3px}
+.mat-result-bar-pct{font-size:.65rem;color:var(--text-secondary)}
+
+.mat-history-table{width:100%;border-collapse:collapse;margin-top:12px}
+.mat-history-table th{text-align:left;padding:8px 12px;font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;border-bottom:1px solid var(--border)}
+.mat-history-table td{padding:8px 12px;border-bottom:1px solid var(--border);font-size:.82rem;color:var(--text-primary)}
+
+@media (max-width: 768px) {
+    .mat-levels { flex-direction: column; }
+    .mat-result-overall { flex-direction: column; text-align: center; }
+    .mat-result-bars { grid-template-columns: 1fr; }
+}
+</style>
+<script>
+const MAT_API = '/api/maturity';
+let matQuestionnaire = null;
+let matResponses = {};
+
+function matEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+
+function scoreColor(s) {
+    if (s >= 5) return 'var(--mitre-covered,#3fb950)';
+    if (s >= 4) return 'var(--primary,#58a6ff)';
+    if (s >= 3) return 'var(--sev-medium,#d29922)';
+    if (s >= 2) return 'var(--sev-high,#f0883e)';
+    return 'var(--sev-critical,#f85149)';
+}
+
+async function matStartNew() {
+    const c = document.getElementById('mat-content');
+    c.innerHTML = '<div class="mat-loading"><span class="mat-spinner"></span> Loading questionnaire...</div>';
+    try {
+        const r = await fetch(MAT_API + '/questionnaire', {credentials: 'include'});
+        matQuestionnaire = await r.json();
+        matResponses = {};
+        matRenderQuestionnaire();
+    } catch (e) {
+        c.innerHTML = `<div class="mat-loading" style="color:var(--sev-critical)">${matEsc(e.message)}</div>`;
+    }
+}
+
+function matRenderQuestionnaire() {
+    const q = matQuestionnaire;
+    const c = document.getElementById('mat-content');
+    let html = `<div class="mat-intro">
+        <strong>SOC-CMM Maturity Assessment</strong> — Rate your SOC across 5 domains on a scale of 1 (Initial) to 5 (Optimising).
+        Score each question honestly based on current state, not aspirations. Results are saved for tracking progress over time.
+    </div>
+    <div class="mat-levels">
+        <div class="mat-level l1"><strong>1</strong> Initial</div>
+        <div class="mat-level l2"><strong>2</strong> Managed</div>
+        <div class="mat-level l3"><strong>3</strong> Defined</div>
+        <div class="mat-level l4"><strong>4</strong> Measured</div>
+        <div class="mat-level l5"><strong>5</strong> Optimising</div>
+    </div>`;
+
+    for (const domain of q.domains) {
+        html += `<div class="mat-domain">
+            <div class="mat-domain-head" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                <div>
+                    <div class="mat-domain-name">${matEsc(domain.name)}</div>
+                    <div class="mat-domain-desc">${matEsc(domain.description)}</div>
+                </div>
+                <div class="mat-domain-score" id="mat-domain-score-${domain.id}">-</div>
+            </div>
+            <div class="mat-domain-body">`;
+        for (const question of domain.questions) {
+            html += `<div class="mat-question">
+                <div class="mat-q-text">${matEsc(question.text)}</div>
+                <div class="mat-q-guidance">${matEsc(question.guidance)}</div>
+                <div class="mat-q-score" id="mat-q-${question.id}">
+                    ${[1,2,3,4,5].map(n => `<button onclick="matScore('${domain.id}','${question.id}',${n},this)">${n}</button>`).join('')}
+                </div>
+                <input class="mat-q-notes" placeholder="Notes (optional)" id="mat-notes-${question.id}">
+            </div>`;
+        }
+        html += `<div style="font-size:.72rem;color:var(--text-secondary);margin-top:6px">Related ION pages: ${(domain.ion_pages||[]).map(p => `<a href="${p}" style="color:var(--primary);text-decoration:none">${p}</a>`).join(', ')}</div>`;
+        html += '</div></div>';
+    }
+
+    html += `<div class="mat-submit">
+        <input id="mat-title" type="text" placeholder="Assessment title (optional)" style="flex:1;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:8px 12px;border-radius:var(--radius);font:inherit;font-size:.85rem">
+        <button class="btn btn-primary" onclick="matSubmit()">Submit Assessment</button>
+    </div>`;
+
+    c.innerHTML = html;
+}
+
+function matScore(domainId, questionId, score, btn) {
+    if (!matResponses[domainId]) matResponses[domainId] = {};
+    matResponses[domainId][questionId] = {score};
+    const container = btn.parentElement;
+    container.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+
+    // Update domain average display
+    const domain = matQuestionnaire.domains.find(d => d.id === domainId);
+    if (domain) {
+        const dResponses = matResponses[domainId] || {};
+        const scores = domain.questions.map(q => (dResponses[q.id]||{}).score || 0).filter(s => s > 0);
+        if (scores.length) {
+            const avg = Math.round(scores.reduce((a,b) => a+b, 0) / scores.length);
+            const el = document.getElementById('mat-domain-score-' + domainId);
+            if (el) { el.textContent = avg; el.style.color = scoreColor(avg); }
+        }
+    }
+}
+
+async function matSubmit() {
+    // Collect notes
+    for (const domain of matQuestionnaire.domains) {
+        for (const q of domain.questions) {
+            const notes = document.getElementById('mat-notes-' + q.id);
+            if (notes && notes.value.trim()) {
+                if (!matResponses[domain.id]) matResponses[domain.id] = {};
+                if (!matResponses[domain.id][q.id]) matResponses[domain.id][q.id] = {score: 1};
+                matResponses[domain.id][q.id].notes = notes.value.trim();
+            }
+        }
+    }
+
+    const title = document.getElementById('mat-title').value.trim() || 'SOC Maturity Assessment';
+    try {
+        const r = await fetch(MAT_API + '/assessments', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify({title, responses: matResponses}),
+        });
+        if (!r.ok) throw new Error('Submit failed');
+        const result = await r.json();
+        matRenderResult(result);
+    } catch (e) {
+        alert('Submit failed: ' + e.message);
+    }
+}
+
+function matRenderResult(a) {
+    const c = document.getElementById('mat-content');
+    const color = scoreColor(a.overall_score);
+    const pct = a.overall_score * 20;
+
+    let html = `<div class="mat-result-overall">
+        <div class="mat-result-ring" style="background:conic-gradient(${color} ${pct}%, rgba(99,110,123,.2) ${pct}%)">
+            <div class="mat-result-inner">
+                <div class="mat-result-score" style="color:${color}">${a.overall_score}</div>
+                <div class="mat-result-label">of 5</div>
+            </div>
+        </div>
+        <div class="mat-result-text">
+            <h3>${matEsc(a.overall_level)} Maturity</h3>
+            <p>${matEsc(a.title)} — ${a.created_at ? new Date(a.created_at).toLocaleDateString() : ''}</p>
+        </div>
+    </div>`;
+
+    html += '<div class="mat-result-bars">';
+    for (const [domainId, score] of Object.entries(a.scores || {})) {
+        const domain = (matQuestionnaire || {domains:[]}).domains.find(d => d.id === domainId) || {name: domainId};
+        const col = scoreColor(score.score);
+        html += `<div class="mat-result-bar">
+            <div class="mat-result-bar-head">
+                <span class="mat-result-bar-name">${matEsc(domain.name || domainId)}</span>
+                <span class="mat-result-bar-score" style="color:${col}">${score.score}/5</span>
+            </div>
+            <div class="mat-bar"><div class="mat-bar-fill" style="width:${score.pct}%;background:${col}"></div></div>
+            <div class="mat-result-bar-pct">${score.pct}%</div>
+        </div>`;
+    }
+    html += '</div>';
+
+    html += `<div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary" onclick="matShowHistory()">View History</button>
+        <button class="btn btn-primary" onclick="matStartNew()">New Assessment</button>
+    </div>`;
+
+    c.innerHTML = html;
+}
+
+async function matShowHistory() {
+    const c = document.getElementById('mat-content');
+    c.innerHTML = '<div class="mat-loading"><span class="mat-spinner"></span> Loading history...</div>';
+    try {
+        const r = await fetch(MAT_API + '/assessments', {credentials: 'include'});
+        const d = await r.json();
+        const assessments = d.assessments || [];
+
+        if (!assessments.length) {
+            c.innerHTML = `<div class="mat-intro" style="text-align:center">
+                <h3 style="color:var(--text-primary);margin-bottom:8px">No assessments yet</h3>
+                <p>Run your first SOC maturity assessment to establish a baseline.</p>
+                <button class="btn btn-primary" onclick="matStartNew()" style="margin-top:14px">Start Assessment</button>
+            </div>`;
+            return;
+        }
+
+        let html = '<div class="mat-intro"><strong>Assessment History</strong> — track your SOC maturity progression over time.</div>';
+        html += '<table class="mat-history-table"><thead><tr><th>Date</th><th>Title</th><th>Score</th><th>Level</th><th>Business</th><th>People</th><th>Process</th><th>Technology</th><th>Services</th><th></th></tr></thead><tbody>';
+        for (const a of assessments) {
+            const s = a.scores || {};
+            html += `<tr>
+                <td>${a.created_at ? new Date(a.created_at).toLocaleDateString() : '-'}</td>
+                <td>${matEsc(a.title)}</td>
+                <td><strong style="color:${scoreColor(a.overall_score)}">${a.overall_score}/5</strong></td>
+                <td>${matEsc(a.overall_level)}</td>
+                <td>${(s.business||{}).score||'-'}</td>
+                <td>${(s.people||{}).score||'-'}</td>
+                <td>${(s.process||{}).score||'-'}</td>
+                <td>${(s.technology||{}).score||'-'}</td>
+                <td>${(s.services||{}).score||'-'}</td>
+                <td><button class="btn btn-secondary btn-sm" onclick="matDelete(${a.id})" style="padding:2px 8px;font-size:.7rem">Delete</button></td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+        c.innerHTML = html;
+    } catch (e) {
+        c.innerHTML = `<div class="mat-loading" style="color:var(--sev-critical)">${matEsc(e.message)}</div>`;
+    }
+}
+
+async function matDelete(id) {
+    if (!confirm('Delete this assessment?')) return;
+    await fetch(MAT_API + '/assessments/' + id, {method: 'DELETE', credentials: 'include'});
+    matShowHistory();
+}
+
+document.addEventListener('DOMContentLoaded', matShowHistory);
+</script>
+{% endblock %}

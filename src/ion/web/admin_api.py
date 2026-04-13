@@ -10,7 +10,8 @@ import sys
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from ion.web.api import limiter
+from ion.web.api import limiter, get_db_session
+from sqlalchemy.orm import Session
 from ion.auth.dependencies import require_admin, require_permission, get_current_user
 from ion.models.user import User
 from ion.core.config import get_config, set_config, Config
@@ -2108,3 +2109,13 @@ async def get_architecture_health(
             "minutes": minutes,
         },
     }
+
+
+@router.post("/seed-maturity", dependencies=[Depends(require_admin)])
+def seed_maturity_content(session: Session = Depends(get_db_session)):
+    """Seed SOC maturity documentation — comm templates + playbooks.
+
+    Idempotent: skips items that already exist by name.
+    """
+    from ion.services.soc_maturity_seed import seed_all
+    return seed_all(session)

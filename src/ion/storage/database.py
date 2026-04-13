@@ -394,6 +394,31 @@ def _run_migrations(engine: Engine) -> None:
                 conn.execute(text("ALTER TABLE cyab_data_sources ADD COLUMN data_namespace VARCHAR(128)"))
                 logger.info("Migrated: cyab_data_sources.data_namespace")
 
+    # Performance indexes on hot tables (alert_cases, alert_triage).
+    # create_all() creates indexes for new tables but NOT for tables that
+    # already existed before the Index() was added to the model. This
+    # migration adds them idempotently via CREATE INDEX IF NOT EXISTS.
+    _perf_indexes = [
+        ("ix_cases_status", "alert_cases", "status"),
+        ("ix_cases_created_at", "alert_cases", "created_at"),
+        ("ix_cases_closed_at", "alert_cases", "closed_at"),
+        ("ix_cases_assigned_to", "alert_cases", "assigned_to_id"),
+        ("ix_cases_severity", "alert_cases", "severity"),
+        ("ix_cases_kibana_id", "alert_cases", "kibana_case_id"),
+        ("ix_cases_status_created", "alert_cases", "status, created_at"),
+        ("ix_alert_triage_status", "alert_triage", "status"),
+        ("ix_alert_triage_case_id", "alert_triage", "case_id"),
+        ("ix_alert_triage_assigned", "alert_triage", "assigned_to_id"),
+        ("ix_alert_triage_status_created", "alert_triage", "status, created_at"),
+    ]
+    with engine.begin() as conn:
+        for idx_name, table, columns in _perf_indexes:
+            if insp.has_table(table):
+                try:
+                    conn.execute(text(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} ({columns})"))
+                except Exception:
+                    pass  # Index might already exist under a different name
+
     # Quarterly review fields on service_accounts (PCI 7.2.4 / ISO A.5.16)
     if insp.has_table("service_accounts"):
         existing = {col["name"] for col in insp.get_columns("service_accounts")}

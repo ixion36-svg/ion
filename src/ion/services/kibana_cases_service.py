@@ -299,6 +299,32 @@ class KibanaCasesService:
                 body_text = (response.text or "")[:500]
                 lower_body = body_text.lower()
 
+                # Detect Platinum license gate — Kibana returns 403 with
+                # "Elastic Platinum license" when Basic license doesn't
+                # support assignees. Strip assignees and retry without them,
+                # or return current if assignees was the only change.
+                if response.status_code == 403 and "platinum" in lower_body:
+                    if "assignees" in changed:
+                        logger.warning(
+                            "update_case: Kibana case assignment requires Elastic "
+                            "Platinum license — assignment saved in ION only"
+                        )
+                        changed.pop("assignees")
+                        if not changed:
+                            # Assignees was the only change — nothing left to send
+                            return current
+                        # Retry without assignees
+                        payload["cases"][0] = {"id": case_id, "version": version, **changed}
+                        response = self.client.patch(path, json=payload)
+                        if response.status_code == 200:
+                            cases = response.json()
+                            return cases[0] if cases else current
+                        body_text = (response.text or "")[:500]
+                        lower_body = body_text.lower()
+                    else:
+                        logger.warning("update_case: Kibana returned 403 — %s", body_text[:120])
+                        return None
+
                 # Detect version conflict — Kibana surfaces ES's
                 # version_conflict_engine_exception either as a 500 with that
                 # phrase in the body, or sometimes as a plain 409.

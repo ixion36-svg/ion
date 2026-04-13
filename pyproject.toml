@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ion"
-version = "0.9.60"
+version = "0.9.62"
 description = "Intelligent Operating Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,6 +38,8 @@ dependencies = [
     "psycopg2-binary>=2.9.0",
     # PDF generation
     "weasyprint>=62.0",
+    # Fast JSON serialisation (5-10x faster than stdlib json)
+    "orjson>=3.9.0",
 ]
 
 [project.optional-dependencies]
