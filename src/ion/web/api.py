@@ -862,6 +862,10 @@ async def list_users(
             "last_login": u.last_login.isoformat() if u.last_login else None,
             "roles": [r.name for r in u.roles],
             "employment_type": getattr(u, "employment_type", None) or "cs",
+            "elastic_username": getattr(u, "elastic_username", None),
+            "elastic_uid": getattr(u, "elastic_uid", None),
+            "keycloak_sub": getattr(u, "keycloak_sub", None),
+            "gitlab_username": getattr(u, "gitlab_username", None),
             "created_at": u.created_at.isoformat() if u.created_at else None,
         }
         for u in users

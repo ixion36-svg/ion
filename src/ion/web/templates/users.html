@@ -26,13 +26,15 @@
                     <th>Email</th>
                     <th>Display Name</th>
                     <th>Roles</th>
+                    <th>Elastic UID</th>
+                    <th>Keycloak Sub</th>
                     <th>Status</th>
                     <th>Last Login</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody id="users-tbody">
-                <tr><td colspan="7" class="loading">Loading users...</td></tr>
+                <tr><td colspan="9" class="loading">Loading users...</td></tr>
             </tbody>
         </table>
     </div>
@@ -191,7 +193,7 @@ function renderRoleCheckboxes() {
 async function loadUsers() {
     const includeInactive = document.getElementById('include-inactive').checked;
     const tbody = document.getElementById('users-tbody');
-    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading users...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading users...</td></tr>';
 
     try {
         const response = await fetch(`/api/users?include_inactive=${includeInactive}`);
@@ -200,13 +202,13 @@ async function loadUsers() {
             return;
         }
         if (response.status === 403) {
-            tbody.innerHTML = '<tr><td colspan="7" class="error">Access denied. Admin privileges required.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="error">Access denied. Admin privileges required.</td></tr>';
             return;
         }
         const users = await response.json();
 
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="empty">No users found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="empty">No users found</td></tr>';
             return;
         }
 
@@ -216,6 +218,8 @@ async function loadUsers() {
                 <td>${escapeHtml(user.email)}</td>
                 <td>${escapeHtml(user.display_name || '-')}</td>
                 <td>${user.roles.map(r => `<span class="role-badge role-${r}">${r}</span>`).join(' ')}</td>
+                <td style="font-family:'JetBrains Mono',monospace;font-size:.72rem;color:${user.elastic_uid ? 'var(--primary)' : 'var(--text-muted)'};max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(user.elastic_uid || '')}">${escapeHtml(user.elastic_uid || '-')}${user.elastic_username ? '<br><span style="color:var(--text-secondary);font-size:.65rem">' + escapeHtml(user.elastic_username) + '</span>' : ''}</td>
+                <td style="font-family:'JetBrains Mono',monospace;font-size:.72rem;color:${user.keycloak_sub ? 'var(--primary)' : 'var(--text-muted)'};max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(user.keycloak_sub || '')}">${escapeHtml(user.keycloak_sub || '-')}</td>
                 <td><span class="status-badge ${user.is_active ? 'status-active' : 'status-inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
                 <td>${user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}</td>
                 <td class="actions">
@@ -226,7 +230,7 @@ async function loadUsers() {
             </tr>
         `).join('');
     } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="7" class="error">Error loading users</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="error">Error loading users</td></tr>';
     }
 }
 
