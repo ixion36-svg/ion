@@ -51,12 +51,10 @@
             </li>
 
             <!-- Operations dropdown — day-to-day SOC operations -->
-            <li class="nav-dropdown{% if '/oncall' in request.url.path or '/shift-handover' in request.url.path or '/pir' in request.url.path or '/playbooks' in request.url.path or '/forensics' in request.url.path or '/pcap' in request.url.path %} has-active{% endif %}">
-                <a href="/oncall" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Operations <span class="nav-chevron"></span></a>
+            <li class="nav-dropdown{% if '/shift-handover' in request.url.path or '/playbooks' in request.url.path or '/forensics' in request.url.path or '/pcap' in request.url.path %} has-active{% endif %}">
+                <a href="/playbooks" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Operations <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
-                    <li><a href="/oncall" class="{% if '/oncall' in request.url.path %}active{% endif %}">On-Call / Duty IM</a></li>
                     <li><a href="/shift-handover" class="{% if '/shift-handover' in request.url.path %}active{% endif %}">Shift Handover</a></li>
-                    <li><a href="/pir" class="{% if '/pir' in request.url.path %}active{% endif %}">Post-Incident Reviews</a></li>
                     <li><a href="/playbooks" class="{% if '/playbooks' in request.url.path %}active{% endif %}">Playbooks</a></li>
                     <li id="nav-forensics-link" style="display: none;"><a href="/forensics" class="{% if '/forensics' in request.url.path %}active{% endif %}">Forensics</a></li>
                     <li><a href="/pcap" class="{% if '/pcap' in request.url.path %}active{% endif %}">PCAP Analyzer</a></li>
@@ -64,14 +62,12 @@
             </li>
 
             <!-- Engineering dropdown — detection engineering + infrastructure -->
-            <li class="nav-dropdown{% if '/detection-engineering' in request.url.path or '/cyab' in request.url.path or '/log-sources' in request.url.path or '/rule-tuning' in request.url.path or '/data-flow' in request.url.path or '/engineering-analytics' in request.url.path or '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
+            <li class="nav-dropdown{% if '/detection-engineering' in request.url.path or '/cyab' in request.url.path or '/log-sources' in request.url.path or '/engineering-analytics' in request.url.path or '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
                 <a href="/detection-engineering" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Engineering <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
                     <li><a href="/detection-engineering" class="{% if '/detection-engineering' in request.url.path %}active{% endif %}">Detection Engineering</a></li>
                     <li><a href="/cyab" class="{% if '/cyab' in request.url.path %}active{% endif %}">CyAB</a></li>
                     <li><a href="/log-sources" class="{% if '/log-sources' in request.url.path %}active{% endif %}">Log Source Health</a></li>
-                    <li><a href="/rule-tuning" class="{% if '/rule-tuning' in request.url.path %}active{% endif %}">Rule Tuning</a></li>
-                    <li><a href="/data-flow" class="{% if '/data-flow' in request.url.path %}active{% endif %}">Data Flow</a></li>
                     <li><a href="/engineering-analytics" class="{% if '/engineering-analytics' in request.url.path %}active{% endif %}">System Analytics</a></li>
                     <li><a href="/gitlab" class="{% if '/gitlab' in request.url.path %}active{% endif %}">GitLab</a></li>
                     <li id="nav-topology-link" style="display: none;"><a href="/topology" class="{% if '/topology' in request.url.path %}active{% endif %}">Topology</a></li>
@@ -84,7 +80,7 @@
             </li>
 
             <!-- Reporting dropdown — metrics, compliance, governance -->
-            <li class="nav-dropdown{% if '/soc-health' in request.url.path or '/compliance' in request.url.path or '/executive-report' in request.url.path or '/analyst-efficiency' in request.url.path or '/analytics' in request.url.path or '/service-accounts' in request.url.path %} has-active{% endif %}">
+            <li class="nav-dropdown{% if '/soc-health' in request.url.path or '/compliance' in request.url.path or '/executive-report' in request.url.path or '/analyst-efficiency' in request.url.path or '/analytics' in request.url.path or '/maturity' in request.url.path %} has-active{% endif %}">
                 <a href="/soc-health" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Reporting <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
                     <li><a href="/soc-health" class="{% if '/soc-health' in request.url.path %}active{% endif %}">SOC Health</a></li>
@@ -92,7 +88,6 @@
                     <li><a href="/executive-report" class="{% if '/executive-report' in request.url.path %}active{% endif %}">Executive Report</a></li>
                     <li><a href="/analyst-efficiency" class="{% if '/analyst-efficiency' in request.url.path %}active{% endif %}">Analyst Efficiency</a></li>
                     <li><a href="/analytics" class="{% if '/analytics' in request.url.path %}active{% endif %}">Analytics Engine</a></li>
-                    <li><a href="/service-accounts" class="{% if '/service-accounts' in request.url.path %}active{% endif %}">Service Accounts</a></li>
                     <li><a href="/maturity" class="{% if '/maturity' in request.url.path %}active{% endif %}">Maturity Assessment</a></li>
                 </ul>
             </li>

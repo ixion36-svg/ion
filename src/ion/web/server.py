@@ -46,7 +46,7 @@ from ion.web.social_api import router as social_router
 from ion.web.analytics_api import router as analytics_router
 from ion.web.engineering_analytics_api import router as engineering_analytics_router
 from ion.web.shift_handover_api import router as shift_handover_router
-from ion.web.rule_tuning_api import router as rule_tuning_router
+
 from ion.web.entity_timeline_api import router as entity_timeline_router
 from ion.web.analyst_efficiency_api import router as analyst_efficiency_router
 from ion.web.soc_health_api import router as soc_health_router
@@ -61,7 +61,7 @@ from ion.web.canary_api import router as canary_router
 from ion.web.log_source_api import router as log_source_router
 from ion.web.briefing_api import router as briefing_router
 from ion.web.knowledge_graph_api import router as knowledge_graph_router
-from ion.web.pir_api import router as pir_router
+
 from ion.web.emulation_api import router as emulation_router
 from ion.web.vulnerability_api import router as vulnerability_router
 from ion.web.maturity_api import router as maturity_router
@@ -74,7 +74,7 @@ from ion.web.compliance_api import router as compliance_router
 from ion.web.comm_template_api import router as comm_template_router
 from ion.web.change_log_api import router as change_log_router
 from ion.web.saved_search_api import router as saved_search_router
-from ion.web.oncall_api import router as oncall_router
+
 from ion.web.sla_api import router as sla_router
 from ion.web.bulk_ops_api import router as bulk_ops_router
 from ion.web.threat_hunt_api import router as threat_hunt_router
@@ -254,7 +254,6 @@ app.include_router(cyab_router, prefix="/api/cyab")
 app.include_router(threat_intel_router, prefix="/api/threat-intel")
 app.include_router(threat_watch_gap_router, prefix="/api/threat-intel")
 app.include_router(shift_handover_router, prefix="/api")
-app.include_router(rule_tuning_router, prefix="/api")
 app.include_router(entity_timeline_router, prefix="/api")
 app.include_router(analyst_efficiency_router, prefix="/api")
 app.include_router(soc_health_router, prefix="/api")
@@ -269,7 +268,6 @@ app.include_router(canary_router, prefix="/api")
 app.include_router(log_source_router, prefix="/api")
 app.include_router(briefing_router, prefix="/api")
 app.include_router(knowledge_graph_router, prefix="/api")
-app.include_router(pir_router, prefix="/api")
 app.include_router(emulation_router, prefix="/api")
 app.include_router(vulnerability_router, prefix="/api")
 app.include_router(maturity_router, prefix="/api")
@@ -282,7 +280,6 @@ app.include_router(compliance_router, prefix="/api")
 app.include_router(comm_template_router, prefix="/api")
 app.include_router(change_log_router, prefix="/api")
 app.include_router(saved_search_router, prefix="/api")
-app.include_router(oncall_router, prefix="/api")
 app.include_router(sla_router, prefix="/api")
 app.include_router(bulk_ops_router, prefix="/api")
 app.include_router(threat_hunt_router, prefix="/api")
@@ -742,11 +739,6 @@ async def pcap_page(request: Request, user: User = Depends(require_page_permissi
     return templates.TemplateResponse(request=request, name="pcap.html")
 
 
-@app.get("/data-flow", response_class=HTMLResponse)
-async def data_flow_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the data flow visualization page."""
-    return templates.TemplateResponse(request=request, name="data_flow.html")
-
 
 @app.get("/forensics", response_class=HTMLResponse)
 async def forensics_page(request: Request, user: User = Depends(require_page_permission("forensic:read"))):
@@ -814,11 +806,6 @@ async def maturity_page(request: Request, user: User = Depends(require_page_perm
     return templates.TemplateResponse(request=request, name="maturity.html")
 
 
-@app.get("/pir", response_class=HTMLResponse)
-async def pir_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Post-Incident Review page."""
-    return templates.TemplateResponse(request=request, name="pir.html")
-
 
 
 
@@ -828,10 +815,6 @@ async def shift_handover_page(request: Request, user: User = Depends(require_pag
     return templates.TemplateResponse(request=request, name="shift_handover.html")
 
 
-@app.get("/rule-tuning", response_class=HTMLResponse)
-async def rule_tuning_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Rule Tuning Feedback Loop page."""
-    return templates.TemplateResponse(request=request, name="rule_tuning.html")
 
 
 @app.get("/entity-timeline", response_class=HTMLResponse)
@@ -887,11 +870,6 @@ async def threat_hunting_page(request: Request, user: User = Depends(require_pag
     """Render the Threat Hunting Workbench page."""
     return templates.TemplateResponse(request=request, name="threat_hunting.html")
 
-
-@app.get("/oncall", response_class=HTMLResponse)
-async def oncall_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the On-Call / Escalation Manager page."""
-    return templates.TemplateResponse(request=request, name="oncall.html")
 
 
 @app.get("/service-accounts", response_class=HTMLResponse)

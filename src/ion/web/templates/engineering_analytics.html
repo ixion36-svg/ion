@@ -469,66 +469,99 @@ let systemData = null;
 async function loadSystemAnalytics() {
     const hours = document.getElementById('time-range').value;
     try {
-        // Try alert-based systems first
-        const resp = await fetch(`/api/engineering/analytics/systems?hours=${hours}`, {
-            credentials: 'include'
-        });
-        if (!resp.ok) {
-            const err = await resp.json().catch(() => ({}));
-            if (resp.status === 400 && (err.detail || '').includes('not configured')) {
+        // Fetch TIDE systems, ES alert systems, and log systems in parallel
+        const [tideResp, esResp, logResp] = await Promise.allSettled([
+            fetch('/api/engineering/analytics/tide-systems', { credentials: 'include' }),
+            fetch(`/api/engineering/analytics/systems?hours=${hours}`, { credentials: 'include' }),
+            fetch(`/api/engineering/analytics/log-systems?hours=${hours}`, { credentials: 'include' }),
+        ]);
+
+        // Parse responses
+        let tideSystems = [];
+        if (tideResp.status === 'fulfilled' && tideResp.value.ok) {
+            const td = await tideResp.value.json();
+            tideSystems = td.systems || [];
+        }
+
+        let esData = { systems: [], total: 0, total_severity: {}, total_timeline: [], indices: [] };
+        if (esResp.status === 'fulfilled' && esResp.value.ok) {
+            esData = await esResp.value.json();
+        } else if (esResp.status === 'fulfilled' && esResp.value.status === 400) {
+            const err = await esResp.value.json().catch(() => ({}));
+            if ((err.detail || '').includes('not configured')) {
                 showNotConfigured();
                 return;
             }
-            throw new Error(err.detail || resp.statusText);
         }
-        systemData = await resp.json();
 
-        // If alerts only show 0-1 systems, also fetch from log indices
-        // (logs-*-systemname) to discover all systems shipping data.
-        if ((systemData.systems || []).length <= 1) {
-            try {
-                const logResp = await fetch(`/api/engineering/analytics/log-systems?hours=${hours}`, {
-                    credentials: 'include'
-                });
-                if (logResp.ok) {
-                    const logData = await logResp.json();
-                    const logSystems = logData.systems || [];
-                    if (logSystems.length > (systemData.systems || []).length) {
-                        // Merge: keep alert data for matching systems, add log-only systems
-                        const alertMap = {};
-                        for (const s of (systemData.systems || [])) {
-                            alertMap[s.system.toLowerCase()] = s;
-                        }
-                        const merged = [];
-                        for (const ls of logSystems) {
-                            const key = ls.system.toLowerCase();
-                            if (alertMap[key]) {
-                                // Merge log metadata into alert system
-                                const s = alertMap[key];
-                                s.event_count = ls.event_count;
-                                s.datasets = ls.datasets || s.datasets;
-                                s.categories = ls.categories;
-                                s.source = 'alerts+logs';
-                                merged.push(s);
-                                delete alertMap[key];
-                            } else {
-                                ls.source = 'logs';
-                                merged.push(ls);
-                            }
-                        }
-                        // Add any alert-only systems not in logs
-                        for (const s of Object.values(alertMap)) {
-                            s.source = 'alerts';
-                            merged.push(s);
-                        }
-                        systemData.systems = merged;
-                    }
-                }
-            } catch (logErr) {
-                console.warn('Log-systems discovery failed (non-fatal):', logErr);
+        let logSystems = [];
+        if (logResp.status === 'fulfilled' && logResp.value.ok) {
+            const ld = await logResp.value.json();
+            logSystems = ld.systems || [];
+        }
+
+        // Build unified system list using TIDE as the authority
+        const esByName = {};
+        for (const s of (esData.systems || [])) {
+            esByName[s.system.toLowerCase()] = s;
+        }
+        const logByName = {};
+        for (const s of logSystems) {
+            logByName[s.system.toLowerCase()] = s;
+        }
+
+        const merged = [];
+        const seen = new Set();
+
+        // Start with TIDE systems as the canonical list
+        for (const ts of tideSystems) {
+            const name = (ts.name || '').toLowerCase();
+            seen.add(name);
+            const esMatch = esByName[name];
+            const logMatch = logByName[name];
+
+            const sys = esMatch || logMatch || { system: ts.name, alert_count: 0, severity: {} };
+            sys.system = ts.name;  // Use TIDE's canonical name
+            sys.tide_id = ts.id;
+            sys.tide_classification = ts.classification;
+            sys.tide_description = ts.description;
+            sys.tide_rule_count = ts.applied_detections_count || ts.rule_count || 0;
+            if (logMatch && !esMatch) {
+                sys.event_count = logMatch.event_count;
+                sys.datasets = logMatch.datasets;
+                sys.source = 'logs';
+            } else if (logMatch && esMatch) {
+                sys.event_count = logMatch.event_count;
+                sys.source = 'alerts+logs';
+            } else if (esMatch) {
+                sys.source = 'alerts';
+            } else {
+                sys.source = 'tide-only';
+            }
+            merged.push(sys);
+        }
+
+        // Add ES/log systems not in TIDE
+        for (const s of (esData.systems || [])) {
+            if (!seen.has(s.system.toLowerCase())) {
+                seen.add(s.system.toLowerCase());
+                s.source = 'alerts';
+                merged.push(s);
+            }
+        }
+        for (const s of logSystems) {
+            if (!seen.has(s.system.toLowerCase())) {
+                seen.add(s.system.toLowerCase());
+                s.source = 'logs';
+                merged.push(s);
             }
         }
 
+        systemData = {
+            ...esData,
+            systems: merged,
+            tide_count: tideSystems.length,
+        };
         renderDashboard(systemData);
     } catch (e) {
         console.error('Failed to load system analytics:', e);
@@ -680,6 +713,26 @@ function renderSystemCard(sys) {
         ).join('')}</div>`;
     }
 
+    // TIDE enrichment
+    let tideHtml = '';
+    if (sys.tide_id) {
+        tideHtml = `<div class="system-meta" style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px;">
+            <span title="TIDE detection rules" style="color:var(--primary);">TIDE: ${sys.tide_rule_count || 0} rules</span>
+            ${sys.tide_classification ? `<span title="Classification">${escapeHtml(sys.tide_classification)}</span>` : ''}
+        </div>`;
+        if (sys.tide_description) {
+            tideHtml += `<div style="font-size:.7rem;color:var(--text-muted);margin-top:4px;line-height:1.3;">${escapeHtml(sys.tide_description).substring(0, 120)}</div>`;
+        }
+    }
+
+    // Source indicator
+    let sourceLabel = '';
+    if (sys.source === 'tide-only') sourceLabel = 'TIDE only';
+    else if (sys.source === 'logs') sourceLabel = 'logs only';
+    else if (sys.source === 'alerts+logs') sourceLabel = 'alerts+logs';
+    else if (sys.source === 'alerts') sourceLabel = 'alerts';
+    else sourceLabel = formatStatus(sys.status);
+
     return `
     <div class="system-card">
         <div class="system-card-header">
@@ -695,10 +748,11 @@ function renderSystemCard(sys) {
             <div class="system-meta">
                 <span title="Unique hosts">&#x1F4BB; ${sys.unique_hosts || 0} hosts</span>
                 <span title="Unique users">&#x1F464; ${sys.unique_users || 0} users</span>
-                <span title="Data source">${sys.source === 'logs' ? '&#x1F4E6; logs only' : sys.source === 'alerts+logs' ? '&#x2705; alerts+logs' : '&#x25CF; ' + formatStatus(sys.status)}</span>
+                <span title="Data source">${sourceLabel}</span>
             </div>
             ${dsHtml}
             ${rulesHtml}
+            ${tideHtml}
         </div>
     </div>`;
 }

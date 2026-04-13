@@ -46,7 +46,7 @@ NODE_SHAPES = {
     "actor":      "diamond",
     "technique":  "triangle",
     "host":       "square",
-    "user":       "icon",
+    "user":       "hexagon",
 }
 
 

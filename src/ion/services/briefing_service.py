@@ -199,6 +199,7 @@ async def build_briefing(session: Session, hours: int = 12, ai: bool = False) ->
 
     if ai:
         briefing["narrative"] = await _ai_narrative(briefing)
+        briefing["_ai_requested"] = True
 
     return briefing
 

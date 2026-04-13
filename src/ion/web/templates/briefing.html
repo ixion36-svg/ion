@@ -199,7 +199,12 @@ function brfRender(b) {
 
     html += '</div>'; // /grid
 
-    if (!b.narrative) {
+    if (!b.narrative && b._ai_requested) {
+        html += `<div class="brf-narrative empty">
+            <div class="brf-narrative-label">AI Briefing</div>
+            <div class="brf-narrative-body" style="color:var(--sev-medium,#d29922)">AI summary unavailable — Ollama is not configured or not reachable. Check Settings → AI to configure.</div>
+        </div>`;
+    } else if (!b.narrative) {
         html += `<div class="brf-narrative empty">
             <div class="brf-narrative-label">AI Briefing</div>
             <div class="brf-narrative-body">Click "Generate AI Summary" above to have Ollama write an executive narrative from this snapshot.</div>

@@ -1,7 +1,7 @@
 """Engineering Analytics API router for ION.
 
 Per-system alert metrics from Elasticsearch using data_stream.namespace
-and index name patterns.
+and index name patterns, enriched with TIDE system metadata.
 """
 
 from typing import Optional
@@ -13,6 +13,7 @@ from ion.models.user import User
 from ion.auth.dependencies import get_current_user
 from ion.core.config import get_elasticsearch_config
 from ion.services.elasticsearch_service import ElasticsearchService, ElasticsearchError
+from ion.services.tide_sync_service import get_snapshot
 from ion.web.api import get_db_session
 from ion.core.safe_errors import safe_error
 
@@ -92,6 +93,24 @@ async def get_index_breakdown(
         }
     except ElasticsearchError as e:
         raise HTTPException(status_code=500, detail=safe_error(e, "engineering_analytics"))
+
+
+@router.get("/tide-systems")
+async def get_tide_systems(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Return TIDE systems with detection rule counts from cached snapshot.
+
+    These are the authoritative system names from TIDE, each with
+    applied detection rule counts and classification info.
+    """
+    snap = get_snapshot(session, "systems")
+    if not snap:
+        return {"systems": [], "source": "tide", "available": False}
+
+    systems = snap if isinstance(snap, list) else snap.get("systems", [])
+    return {"systems": systems, "source": "tide", "available": True}
 
 
 @router.get("/log-systems")

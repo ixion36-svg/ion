@@ -111,7 +111,6 @@ from ion.models.analytics import (
 from ion.models.cyab import CyabSystem, CyabDataSource, CyabSnapshot
 from ion.models.canary import Canary, CanaryHit, CanaryType, CanaryStatus
 from ion.models.log_source import LogSource, LogSourceCategory
-from ion.models.pir import PostIncidentReview, PIRActionItem, PIRStatus, PIRActionStatus
 from ion.models.emulation import EmulationPlan, EmulationStep, EmulationPlanStatus, StepResult
 from ion.models.vulnerability import Vulnerability, VulnerabilityAsset, VulnSeverity, VulnStatus
 from ion.models.tide_snapshot import TideSnapshot
@@ -133,9 +132,6 @@ from ion.models.forensics import (
     ForensicTimelineEntry,
 )
 from ion.models.oncall import (
-    OnCallRoster,
-    EscalationPolicy,
-    EscalationLog,
     ServiceAccount,
     UserBookmark,
     CommTemplate,
@@ -272,11 +268,6 @@ __all__ = [
     # Log source health
     "LogSource",
     "LogSourceCategory",
-    # Post-incident review
-    "PostIncidentReview",
-    "PIRActionItem",
-    "PIRStatus",
-    "PIRActionStatus",
     # Adversary emulation
     "EmulationPlan",
     "EmulationStep",
