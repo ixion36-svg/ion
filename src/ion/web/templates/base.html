@@ -61,12 +61,13 @@
             </li>
 
             <!-- Engineering dropdown — detection engineering + infrastructure -->
-            <li class="nav-dropdown{% if '/detection-engineering' in request.url.path or '/cyab' in request.url.path or '/log-sources' in request.url.path or '/engineering-analytics' in request.url.path or '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
+            <li class="nav-dropdown{% if '/detection-engineering' in request.url.path or '/cyab' in request.url.path or '/log-sources' in request.url.path or '/data-flow' in request.url.path or '/engineering-analytics' in request.url.path or '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
                 <a href="/detection-engineering" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Engineering <span class="nav-chevron"></span></a>
                 <ul class="nav-dropdown-menu">
                     <li><a href="/detection-engineering" class="{% if '/detection-engineering' in request.url.path %}active{% endif %}">Detection Engineering</a></li>
                     <li><a href="/cyab" class="{% if '/cyab' in request.url.path %}active{% endif %}">CyAB</a></li>
                     <li><a href="/log-sources" class="{% if '/log-sources' in request.url.path %}active{% endif %}">Log Source Health</a></li>
+                    <li><a href="/data-flow" class="{% if '/data-flow' in request.url.path %}active{% endif %}">Data Flow</a></li>
                     <li><a href="/engineering-analytics" class="{% if '/engineering-analytics' in request.url.path %}active{% endif %}">System Analytics</a></li>
                     <li><a href="/gitlab" class="{% if '/gitlab' in request.url.path %}active{% endif %}">GitLab</a></li>
                     <li id="nav-topology-link" style="display: none;"><a href="/topology" class="{% if '/topology' in request.url.path %}active{% endif %}">Topology</a></li>

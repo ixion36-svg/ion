@@ -755,6 +755,17 @@ async def pcap_page(request: Request, user: User = Depends(require_page_permissi
     return templates.TemplateResponse(request=request, name="pcap.html")
 
 
+@app.get("/data-flow", response_class=HTMLResponse)
+async def data_flow_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Data Flow visualization page (legacy / modern / compare).
+
+    Recovered from v0.9.61 in v0.9.70 — the page + route + integration
+    metrics endpoint were lost when v0.9.61's working tree was never
+    committed back to git after the docker push.
+    """
+    return templates.TemplateResponse(request=request, name="data_flow.html")
+
+
 
 @app.get("/forensics", response_class=HTMLResponse)
 async def forensics_page(request: Request, user: User = Depends(require_page_permission("forensic:read"))):
