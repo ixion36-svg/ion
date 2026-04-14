@@ -161,6 +161,9 @@
                 <div class="form-row" style="margin-top:1rem;">
                     <div class="form-group" style="flex:2;"><label>System Name</label><input type="text" id="sys-name" placeholder="e.g. IT Infrastructure — Domain Controllers"></div>
                 </div>
+
+                <!-- Live ES alert rollup for this system (last 7d), populated by openSystem() -->
+                <div id="cyab-alert-rollup" class="cyab-alert-rollup" style="display:none;margin-top:1rem;"></div>
                 <div class="form-row" style="margin-top:0.75rem;">
                     <div class="form-group"><label>System Icon</label>
                         <div class="cyab-icon-picker" id="icon-picker"></div>
@@ -943,6 +946,31 @@
     .cyab-ft-header,.cyab-ft-row{grid-template-columns:2rem 1fr 4.5rem;font-size:0.75rem}
     .cyab-ft-cat,.cyab-ft-unlock{display:none}
 }
+
+/* ============================================================ */
+/* Per-system alert rollup widget                                */
+/* ============================================================ */
+.cyab-alert-rollup{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 18px}
+.cyab-rollup-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:.85rem}
+.cyab-rollup-header strong{color:var(--text-primary)}
+.cyab-rollup-link{color:var(--primary);text-decoration:none;font-size:.78rem}
+.cyab-rollup-link:hover{text-decoration:underline}
+.cyab-rollup-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.cyab-rollup-stat{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px}
+.cyab-rollup-num{font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:700;color:var(--text-primary)}
+.cyab-rollup-label{font-size:.65rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.cyab-rollup-sev-stat{justify-content:space-between}
+.cyab-rollup-sev{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:.75rem;font-weight:700;padding:2px 8px;border-radius:8px;margin:0 2px}
+.cyab-rollup-sev-critical{background:rgba(248,81,73,.15);color:var(--sev-critical)}
+.cyab-rollup-sev-high{background:rgba(240,136,62,.15);color:var(--sev-high)}
+.cyab-rollup-sev-medium{background:rgba(210,153,34,.15);color:var(--sev-medium)}
+.cyab-rollup-sev-low{background:rgba(63,185,80,.15);color:var(--mitre-covered,#3fb950)}
+.cyab-rollup-ns-row{margin-top:10px;font-size:.72rem;color:var(--text-secondary)}
+.cyab-rollup-ns{font-family:'JetBrains Mono',monospace;background:var(--bg-tertiary);padding:1px 6px;border-radius:4px;margin-right:4px}
+.cyab-rollup-loading,.cyab-rollup-empty{padding:14px;text-align:center;color:var(--text-secondary);font-size:.78rem}
+@media (max-width:768px){
+    .cyab-rollup-grid{grid-template-columns:repeat(2,1fr)}
+}
 </style>
 {% endblock %}
 
@@ -1162,9 +1190,56 @@ async function openSystem(id) {
             setDataSourceSections(false);
         }
         showDetail();
+        // Fire-and-forget: hydrate the alert rollup widget once the page is visible
+        loadAlertRollup(id);
     } catch (e) {
         console.error(e);
         showToast('Failed to load system', 'error');
+    }
+}
+
+// Fetch and render the per-system alert rollup. Hidden when no namespaces
+// are configured or when ES is unreachable.
+async function loadAlertRollup(systemId) {
+    var box = document.getElementById('cyab-alert-rollup');
+    if (!box) return;
+    box.style.display = 'block';
+    box.innerHTML = '<div class="cyab-rollup-loading">Loading alert rollup...</div>';
+    try {
+        var data = await api.get('/api/cyab/systems/' + systemId + '/alert-rollup?hours=168');
+        if (data.message) {
+            box.innerHTML = '<div class="cyab-rollup-empty">' + escapeHtml(data.message) + '</div>';
+            return;
+        }
+        var byStatus = data.by_status || {};
+        var bySev = data.by_severity || {};
+        var total = data.total || 0;
+        var open = (byStatus.open || 0);
+        var ack = (byStatus.acknowledged || 0);
+        var closed = (byStatus.closed || 0);
+        var sevHtml = ['critical','high','medium','low'].map(function(s){
+            var n = bySev[s] || 0;
+            return '<span class="cyab-rollup-sev cyab-rollup-sev-' + s + '" title="' + s + '">' + n + '</span>';
+        }).join('');
+        var nsHtml = (data.namespaces || []).map(function(n){
+            return '<code class="cyab-rollup-ns">' + escapeHtml(n) + '</code>';
+        }).join(' ');
+        box.innerHTML =
+            '<div class="cyab-rollup-header">' +
+                '<strong>Alerts (last 7d)</strong>' +
+                '<a class="cyab-rollup-link" href="/alerts" onclick="sessionStorage.setItem(\'preset_system\', \'' + escapeHtml((data.namespaces||[])[0] || '') + '\')">View in Alerts &rarr;</a>' +
+            '</div>' +
+            '<div class="cyab-rollup-grid">' +
+                '<div class="cyab-rollup-stat"><span class="cyab-rollup-num">' + total + '</span><span class="cyab-rollup-label">Total</span></div>' +
+                '<div class="cyab-rollup-stat"><span class="cyab-rollup-num">' + open + '</span><span class="cyab-rollup-label">Open</span></div>' +
+                '<div class="cyab-rollup-stat"><span class="cyab-rollup-num">' + ack + '</span><span class="cyab-rollup-label">Acknowledged</span></div>' +
+                '<div class="cyab-rollup-stat"><span class="cyab-rollup-num">' + closed + '</span><span class="cyab-rollup-label">Closed</span></div>' +
+                '<div class="cyab-rollup-stat cyab-rollup-sev-stat"><div>' + sevHtml + '</div><span class="cyab-rollup-label">Severity</span></div>' +
+            '</div>' +
+            (nsHtml ? '<div class="cyab-rollup-ns-row">Namespaces: ' + nsHtml + '</div>' : '');
+    } catch (e) {
+        console.error('rollup error', e);
+        box.innerHTML = '<div class="cyab-rollup-empty">Failed to load alert rollup</div>';
     }
 }
 

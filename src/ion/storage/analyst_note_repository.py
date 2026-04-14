@@ -2,7 +2,7 @@
 
 from typing import Optional, List
 from sqlalchemy import select, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ion.models.analyst_note import AnalystNote
 from ion.models.note_folder import NoteFolder
@@ -165,7 +165,7 @@ class AnalystNoteRepository:
         """Get a folder by ID, scoped to user."""
         stmt = (
             select(NoteFolder)
-            .options(joinedload(NoteFolder.children), joinedload(NoteFolder.notes))
+            .options(selectinload(NoteFolder.children), selectinload(NoteFolder.notes))
             .where(NoteFolder.id == folder_id, NoteFolder.user_id == user_id)
         )
         return self.session.execute(stmt).unique().scalar_one_or_none()
@@ -174,7 +174,7 @@ class AnalystNoteRepository:
         """List all folders for a user with eager-loaded children and note counts."""
         stmt = (
             select(NoteFolder)
-            .options(joinedload(NoteFolder.children), joinedload(NoteFolder.notes))
+            .options(selectinload(NoteFolder.children), selectinload(NoteFolder.notes))
             .where(NoteFolder.user_id == user_id)
             .order_by(NoteFolder.name)
         )
@@ -184,7 +184,7 @@ class AnalystNoteRepository:
         """List root-level folders (no parent) for a user."""
         stmt = (
             select(NoteFolder)
-            .options(joinedload(NoteFolder.children), joinedload(NoteFolder.notes))
+            .options(selectinload(NoteFolder.children), selectinload(NoteFolder.notes))
             .where(NoteFolder.user_id == user_id, NoteFolder.parent_id.is_(None))
             .order_by(NoteFolder.name)
         )

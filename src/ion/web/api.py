@@ -15,7 +15,7 @@ from urllib.parse import quote as url_quote
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request, Response, Cookie
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 import httpx
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -3331,7 +3331,9 @@ async def get_es_alerts(
     include_closed: bool = False,
     time_from: Optional[str] = None,
     time_to: Optional[str] = None,
+    system: Optional[str] = None,
     current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """Fetch alerts from Elasticsearch.
 
@@ -3361,10 +3363,26 @@ async def get_es_alerts(
             include_closed=include_closed,
             time_from=time_from,
             time_to=time_to,
+            system=system,
         )
+        # Bulk-resolve every alert's namespace → CyAB + TIDE identity in one
+        # cache build instead of one lookup per alert.
+        from ion.services.system_resolver_service import bulk_resolve
+        ns_map = bulk_resolve(session, (a.source_system for a in alerts))
+        out_alerts = []
+        for a in alerts:
+            d = a.to_dict()
+            res = ns_map.get(a.source_system) if a.source_system else None
+            if res:
+                d["cyab_system_id"] = res.get("cyab_system_id")
+                d["cyab_system_name"] = res.get("cyab_system_name")
+                d["cyab_data_source_name"] = res.get("cyab_data_source_name")
+                d["tide_system_id"] = res.get("tide_system_id")
+                d["tide_system_name"] = res.get("tide_system_name")
+            out_alerts.append(d)
         return {
-            "alerts": [a.to_dict() for a in alerts],
-            "total": len(alerts),
+            "alerts": out_alerts,
+            "total": len(out_alerts),
             "hours": hours,
             "enabled": True,
             "configured": True,
@@ -3380,6 +3398,21 @@ async def get_es_alerts(
             "connection_error": True,
             "message": safe_error(e),
         }
+
+
+@router.get("/elasticsearch/alerts/systems")
+async def get_alert_systems(
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Return the list of CyAB-registered systems for the alerts filter dropdown.
+
+    Each entry: {namespace, display_name, cyab_system_id, cyab_system_name,
+    tide_system_id, tide_system_name}. Driven by the in-process resolver
+    cache so this endpoint is essentially free.
+    """
+    from ion.services.system_resolver_service import list_known_systems
+    return {"systems": list_known_systems(session)}
 
 
 @router.get("/elasticsearch/alerts/mitre-stats")
@@ -3614,7 +3647,11 @@ async def list_cases(
     session: Session = Depends(get_db_session),
 ):
     """List all investigation cases."""
-    query = session.query(AlertCase)
+    query = session.query(AlertCase).options(
+        selectinload(AlertCase.created_by),
+        selectinload(AlertCase.assigned_to),
+        selectinload(AlertCase.triage_entries),
+    )
     if status:
         query = query.filter(AlertCase.status == status)
     cases = query.order_by(AlertCase.created_at.desc()).all()
@@ -5139,6 +5176,7 @@ async def get_alert_triage(
             "analyst_notes": triage.analyst_notes,
             "observables": triage.observables,
             "mitre_techniques": triage.mitre_techniques,
+            "source_system": triage.source_system,
         }
 
     return {
@@ -5164,10 +5202,25 @@ async def update_alert_triage(
 ):
     """Update triage status, assignee, priority for an alert."""
     triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
-    if not triage:
+    is_new = triage is None
+    if is_new:
         triage = AlertTriage(es_alert_id=alert_id)
         session.add(triage)
         session.flush()
+
+    # Snapshot source_system on first triage touch so we keep attribution
+    # even after ES rotates the underlying alert document. Lookup is async
+    # but only fires on first-touch — subsequent updates skip it.
+    if is_new or not triage.source_system:
+        try:
+            from ion.services.elasticsearch_service import ElasticsearchService
+            _es = ElasticsearchService()
+            if _es.is_configured:
+                _hits = await _es.get_alerts_by_ids([alert_id])
+                if _hits and _hits[0].source_system:
+                    triage.source_system = _hits[0].source_system
+        except Exception as e:
+            logger.debug(f"Failed to snapshot source_system for {alert_id}: {e}")
 
     status_changed = False
     if data.status is not None:
@@ -6064,887 +6117,6 @@ async def enrich_observable(
     result = await service.enrich_observable(request_data.type, request_data.value)
     return result
 
-
-# =============================================================================
-# Chat endpoints
-# =============================================================================
-
-from ion.models.chat import ChatRoom, ChatRoomMember, ChatMessage, MessageReaction
-from sqlalchemy import select, and_, or_, func as sqlfunc
-
-
-class ChatRoomCreate(BaseModel):
-    room_type: str  # 'direct' or 'group'
-    name: Optional[str] = None
-    case_id: Optional[int] = None
-    member_ids: List[int]
-
-
-class ChatRoomUpdate(BaseModel):
-    name: Optional[str] = None
-    add_member_ids: Optional[List[int]] = None
-    remove_member_ids: Optional[List[int]] = None
-
-
-class ChatMessageCreate(BaseModel):
-    content: str
-    mentions: Optional[List[str]] = None  # usernames
-    reply_to_id: Optional[int] = None
-
-
-class ChatMessageUpdate(BaseModel):
-    content: str
-
-
-class ChatReactionCreate(BaseModel):
-    emoji: str
-
-
-class ChatTypingUpdate(BaseModel):
-    is_typing: bool
-
-
-@router.get("/chat/rooms")
-async def list_chat_rooms(
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """List chat rooms for the current user with unread counts."""
-    # Get rooms where user is a member
-    stmt = (
-        select(ChatRoom)
-        .join(ChatRoomMember, ChatRoomMember.room_id == ChatRoom.id)
-        .where(ChatRoomMember.user_id == current_user.id)
-        .order_by(ChatRoom.updated_at.desc())
-    )
-    rooms = list(session.execute(stmt).unique().scalars().all())
-
-    result = []
-    for room in rooms:
-        # Get member info for this room
-        member_stmt = select(ChatRoomMember).where(ChatRoomMember.room_id == room.id)
-        members = list(session.execute(member_stmt).scalars().all())
-
-        # Find current user's membership
-        user_member = next((m for m in members if m.user_id == current_user.id), None)
-
-        # Calculate unread count
-        unread_count = 0
-        if user_member:
-            msg_stmt = select(sqlfunc.count(ChatMessage.id)).where(
-                ChatMessage.room_id == room.id
-            )
-            if user_member.last_read_at:
-                msg_stmt = msg_stmt.where(ChatMessage.created_at > user_member.last_read_at)
-            msg_stmt = msg_stmt.where(ChatMessage.user_id != current_user.id)
-            unread_count = session.execute(msg_stmt).scalar() or 0
-
-        # Get last message
-        last_msg_stmt = (
-            select(ChatMessage)
-            .where(ChatMessage.room_id == room.id)
-            .order_by(ChatMessage.created_at.desc())
-            .limit(1)
-        )
-        last_msg = session.execute(last_msg_stmt).scalar_one_or_none()
-
-        # Build display name
-        display_name = room.name
-        if room.room_type == 'direct' and not display_name:
-            # For DMs, show the other user's name
-            other_member = next((m for m in members if m.user_id != current_user.id), None)
-            if other_member and other_member.user:
-                display_name = other_member.user.display_name or other_member.user.username
-
-        # Get linked case info if any
-        case_number = None
-        if room.case_id:
-            from ion.models.alert_triage import AlertCase
-            case = session.execute(select(AlertCase).where(AlertCase.id == room.case_id)).scalar_one_or_none()
-            if case:
-                case_number = case.case_number
-
-        result.append({
-            "id": room.id,
-            "name": room.name,
-            "display_name": display_name,
-            "room_type": room.room_type,
-            "case_id": room.case_id,
-            "case_number": case_number,
-            "unread_count": unread_count,
-            "last_message": last_msg.content[:50] + "..." if last_msg and len(last_msg.content) > 50 else (last_msg.content if last_msg else None),
-            "last_message_at": last_msg.created_at.isoformat() if last_msg else None,
-            "member_count": len(members),
-        })
-
-    return {"rooms": result}
-
-
-@router.post("/chat/rooms")
-async def create_chat_room(
-    data: ChatRoomCreate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Create a new chat room (DM or group)."""
-    # Validate room type
-    if data.room_type not in ['direct', 'group']:
-        raise HTTPException(status_code=400, detail="Invalid room type")
-
-    # For direct messages, check if a DM already exists between these users
-    if data.room_type == 'direct':
-        if len(data.member_ids) != 1:
-            raise HTTPException(status_code=400, detail="Direct messages require exactly one other user")
-
-        other_user_id = data.member_ids[0]
-
-        # Check for existing DM
-        existing_stmt = (
-            select(ChatRoom)
-            .join(ChatRoomMember, ChatRoomMember.room_id == ChatRoom.id)
-            .where(
-                ChatRoom.room_type == 'direct',
-                ChatRoomMember.user_id.in_([current_user.id, other_user_id])
-            )
-            .group_by(ChatRoom.id)
-            .having(sqlfunc.count(ChatRoomMember.id) == 2)
-        )
-        existing = session.execute(existing_stmt).scalar_one_or_none()
-
-        if existing:
-            return {"room_id": existing.id, "message": "Existing conversation found"}
-
-    # Create the room
-    room = ChatRoom(
-        name=data.name if data.room_type == 'group' else None,
-        room_type=data.room_type,
-        case_id=data.case_id,
-        created_by_id=current_user.id,
-    )
-    session.add(room)
-    session.flush()
-
-    # Add current user as member
-    session.add(ChatRoomMember(room_id=room.id, user_id=current_user.id))
-
-    # Add other members
-    for member_id in data.member_ids:
-        if member_id != current_user.id:
-            session.add(ChatRoomMember(room_id=room.id, user_id=member_id))
-
-    session.commit()
-
-    return {"room_id": room.id, "message": "Room created"}
-
-
-@router.get("/chat/rooms/{room_id}")
-async def get_chat_room(
-    room_id: int,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Get chat room details."""
-    # Verify user is a member
-    member_stmt = select(ChatRoomMember).where(
-        ChatRoomMember.room_id == room_id,
-        ChatRoomMember.user_id == current_user.id
-    )
-    membership = session.execute(member_stmt).scalar_one_or_none()
-    if not membership:
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    room_stmt = select(ChatRoom).where(ChatRoom.id == room_id)
-    room = session.execute(room_stmt).scalar_one_or_none()
-    if not room:
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    # Get all members
-    members_stmt = (
-        select(ChatRoomMember)
-        .where(ChatRoomMember.room_id == room_id)
-    )
-    members = list(session.execute(members_stmt).scalars().all())
-
-    # Build display name
-    display_name = room.name
-    if room.room_type == 'direct' and not display_name:
-        other_member = next((m for m in members if m.user_id != current_user.id), None)
-        if other_member and other_member.user:
-            display_name = other_member.user.display_name or other_member.user.username
-
-    # Get linked case info if any
-    case_info = None
-    if room.case_id:
-        from ion.models.alert_triage import AlertCase
-        case = session.execute(select(AlertCase).where(AlertCase.id == room.case_id)).scalar_one_or_none()
-        if case:
-            case_info = {
-                "id": case.id,
-                "case_number": case.case_number,
-                "title": case.title,
-                "description": case.description,
-                "status": case.status.value if hasattr(case.status, 'value') else str(case.status),
-                "severity": case.severity,
-                "affected_hosts": case.affected_hosts or [],
-                "affected_users": case.affected_users or [],
-                "triggered_rules": case.triggered_rules or [],
-                "evidence_summary": case.evidence_summary,
-                "created_at": case.created_at.isoformat() if case.created_at else None,
-                "assigned_to": case.assigned_to.display_name or case.assigned_to.username if case.assigned_to else None,
-            }
-
-    return {
-        "id": room.id,
-        "name": room.name,
-        "display_name": display_name,
-        "room_type": room.room_type,
-        "case_id": room.case_id,
-        "case_info": case_info,
-        "created_by_id": room.created_by_id,
-        "created_at": room.created_at.isoformat(),
-        "members": [
-            {
-                "id": m.user_id,
-                "username": m.user.username,
-                "display_name": m.user.display_name,
-                "joined_at": m.joined_at.isoformat(),
-            }
-            for m in members if m.user
-        ],
-    }
-
-
-@router.put("/chat/rooms/{room_id}")
-async def update_chat_room(
-    room_id: int,
-    data: ChatRoomUpdate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Update chat room (name, members)."""
-    # Verify user is a member
-    member_stmt = select(ChatRoomMember).where(
-        ChatRoomMember.room_id == room_id,
-        ChatRoomMember.user_id == current_user.id
-    )
-    if not session.execute(member_stmt).scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    room_stmt = select(ChatRoom).where(ChatRoom.id == room_id)
-    room = session.execute(room_stmt).scalar_one_or_none()
-    if not room:
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    # Only group chats can be renamed
-    if data.name is not None and room.room_type == 'group':
-        room.name = data.name
-
-    # Add members (groups only)
-    if data.add_member_ids and room.room_type == 'group':
-        for member_id in data.add_member_ids:
-            existing = session.execute(
-                select(ChatRoomMember).where(
-                    ChatRoomMember.room_id == room_id,
-                    ChatRoomMember.user_id == member_id
-                )
-            ).scalar_one_or_none()
-            if not existing:
-                session.add(ChatRoomMember(room_id=room_id, user_id=member_id))
-
-    # Remove members (groups only, can't remove self this way)
-    if data.remove_member_ids and room.room_type == 'group':
-        for member_id in data.remove_member_ids:
-            if member_id != current_user.id:
-                member = session.execute(
-                    select(ChatRoomMember).where(
-                        ChatRoomMember.room_id == room_id,
-                        ChatRoomMember.user_id == member_id
-                    )
-                ).scalar_one_or_none()
-                if member:
-                    session.delete(member)
-
-    session.commit()
-    return {"message": "Room updated"}
-
-
-@router.delete("/chat/rooms/{room_id}")
-async def leave_chat_room(
-    room_id: int,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Leave a chat room."""
-    member_stmt = select(ChatRoomMember).where(
-        ChatRoomMember.room_id == room_id,
-        ChatRoomMember.user_id == current_user.id
-    )
-    membership = session.execute(member_stmt).scalar_one_or_none()
-    if not membership:
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    session.delete(membership)
-
-    # Check if room is now empty
-    remaining_stmt = select(sqlfunc.count(ChatRoomMember.id)).where(
-        ChatRoomMember.room_id == room_id
-    )
-    remaining = session.execute(remaining_stmt).scalar() or 0
-
-    if remaining == 0:
-        # Delete the room if no members left
-        room = session.execute(select(ChatRoom).where(ChatRoom.id == room_id)).scalar_one_or_none()
-        if room:
-            session.delete(room)
-
-    session.commit()
-    return {"message": "Left room"}
-
-
-@router.get("/chat/rooms/{room_id}/messages")
-async def get_chat_messages(
-    room_id: int,
-    since: Optional[str] = None,
-    limit: int = 50,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Get messages from a chat room, optionally since a timestamp."""
-    # Verify user is a member
-    member_stmt = select(ChatRoomMember).where(
-        ChatRoomMember.room_id == room_id,
-        ChatRoomMember.user_id == current_user.id
-    )
-    if not session.execute(member_stmt).scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    # Build query
-    stmt = (
-        select(ChatMessage)
-        .where(ChatMessage.room_id == room_id)
-        .order_by(ChatMessage.created_at.asc())
-        .limit(min(limit, 100))
-    )
-
-    if since:
-        try:
-            since_dt = datetime.fromisoformat(since.replace('Z', '+00:00'))
-            stmt = stmt.where(ChatMessage.created_at > since_dt)
-        except ValueError:
-            pass  # Invalid timestamp, ignore filter
-
-    messages = list(session.execute(stmt).scalars().all())
-
-    result = []
-    for msg in messages:
-        # Get reactions
-        reactions_stmt = select(MessageReaction).where(MessageReaction.message_id == msg.id)
-        reactions = list(session.execute(reactions_stmt).scalars().all())
-
-        # Build reply preview if this message is a reply
-        reply_preview = None
-        reply_to_id = getattr(msg, "reply_to_id", None)
-        if reply_to_id:
-            reply_msg = session.execute(
-                select(ChatMessage).where(ChatMessage.id == reply_to_id)
-            ).scalar_one_or_none()
-            if reply_msg:
-                reply_preview = {
-                    "id": reply_msg.id,
-                    "username": reply_msg.user.username if reply_msg.user else None,
-                    "display_name": reply_msg.user.display_name if reply_msg.user else None,
-                    "content": reply_msg.content[:120] + ("..." if len(reply_msg.content) > 120 else ""),
-                }
-
-        result.append({
-            "id": msg.id,
-            "user_id": msg.user_id,
-            "username": msg.user.username if msg.user else None,
-            "display_name": msg.user.display_name if msg.user else None,
-            "content": msg.content,
-            "mentions": msg.mentions,
-            "reply_to_id": reply_to_id,
-            "reply_preview": reply_preview,
-            "created_at": msg.created_at.isoformat(),
-            "edited_at": msg.edited_at.isoformat() if msg.edited_at else None,
-            "reactions": [
-                {
-                    "emoji": r.emoji,
-                    "user_id": r.user_id,
-                    "username": r.user.username if r.user else None,
-                }
-                for r in reactions
-            ],
-        })
-
-    return {"messages": result}
-
-
-@router.post("/chat/rooms/{room_id}/messages")
-async def send_chat_message(
-    room_id: int,
-    data: ChatMessageCreate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Send a message to a chat room."""
-    # Verify user is a member
-    member_stmt = select(ChatRoomMember).where(
-        ChatRoomMember.room_id == room_id,
-        ChatRoomMember.user_id == current_user.id
-    )
-    if not session.execute(member_stmt).scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    if not data.content.strip():
-        raise HTTPException(status_code=400, detail="Message cannot be empty")
-
-    # Resolve mention usernames to user IDs
-    mention_ids = None
-    if data.mentions:
-        user_repo = UserRepository(session)
-        mention_ids = []
-        for username in data.mentions:
-            user = user_repo.get_by_username(username)
-            if user:
-                mention_ids.append(user.id)
-
-    # Create message
-    message = ChatMessage(
-        room_id=room_id,
-        user_id=current_user.id,
-        content=data.content.strip(),
-        mentions=mention_ids,
-        reply_to_id=data.reply_to_id,
-    )
-    session.add(message)
-
-    # Update room's updated_at
-    room = session.execute(select(ChatRoom).where(ChatRoom.id == room_id)).scalar_one_or_none()
-    if room:
-        room.updated_at = datetime.utcnow()
-
-    # Clear typing indicator
-    member = session.execute(member_stmt).scalar_one_or_none()
-    if member:
-        member.is_typing = False
-        member.typing_updated_at = None
-
-    # Create notifications for mentions and DMs
-    try:
-        from ion.web.notification_api import create_notification
-        sender_name = current_user.display_name or current_user.username
-        snippet = data.content.strip()[:80]
-
-        # Notifications for @mentions
-        if mention_ids:
-            for uid in mention_ids:
-                if uid != current_user.id:
-                    create_notification(
-                        session, uid,
-                        source="chat_mention",
-                        title=f"{sender_name} mentioned you",
-                        body=snippet,
-                        url=f"#chat-room-{room_id}",
-                        source_id=str(room_id),
-                    )
-
-        # Notification for DM (direct messages to the other user)
-        # or group chat messages (notify all other members)
-        other_members = session.execute(
-            select(ChatRoomMember.user_id).where(
-                ChatRoomMember.room_id == room_id,
-                ChatRoomMember.user_id != current_user.id,
-            )
-        ).scalars().all()
-
-        notified_ids = set(mention_ids or [])
-        room_name = room.name or "Chat" if room else "Chat"
-
-        for uid in other_members:
-            if uid in notified_ids:
-                continue  # Already notified via @mention
-            if room and room.room_type == "direct":
-                create_notification(
-                    session, uid,
-                    source="chat_dm",
-                    title=f"DM from {sender_name}",
-                    body=snippet,
-                    url=f"#chat-room-{room_id}",
-                    source_id=str(room_id),
-                )
-            elif room and room.room_type == "group":
-                create_notification(
-                    session, uid,
-                    source="chat_group",
-                    title=f"{sender_name} in {room_name}",
-                    body=snippet,
-                    url=f"#chat-room-{room_id}",
-                    source_id=str(room_id),
-                )
-    except Exception as _notif_err:
-        logger.debug("Failed to create chat notification: %s", _notif_err)
-
-    session.commit()
-
-    return {
-        "message_id": message.id,
-        "created_at": message.created_at.isoformat(),
-    }
-
-
-@router.put("/chat/rooms/{room_id}/messages/{message_id}")
-async def edit_chat_message(
-    room_id: int,
-    message_id: int,
-    data: ChatMessageUpdate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Edit a message (only own messages)."""
-    msg_stmt = select(ChatMessage).where(
-        ChatMessage.id == message_id,
-        ChatMessage.room_id == room_id,
-        ChatMessage.user_id == current_user.id
-    )
-    message = session.execute(msg_stmt).scalar_one_or_none()
-
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    if not data.content.strip():
-        raise HTTPException(status_code=400, detail="Message cannot be empty")
-
-    message.content = data.content.strip()
-    message.edited_at = datetime.utcnow()
-
-    session.commit()
-    return {"message": "Message updated"}
-
-
-@router.delete("/chat/rooms/{room_id}/messages/{message_id}")
-async def delete_chat_message(
-    room_id: int,
-    message_id: int,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Delete a message (only own messages)."""
-    msg_stmt = select(ChatMessage).where(
-        ChatMessage.id == message_id,
-        ChatMessage.room_id == room_id,
-        ChatMessage.user_id == current_user.id
-    )
-    message = session.execute(msg_stmt).scalar_one_or_none()
-
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    session.delete(message)
-    session.commit()
-
-    return {"message": "Message deleted"}
-
-
-@router.post("/chat/messages/{message_id}/reactions")
-async def add_reaction(
-    message_id: int,
-    data: ChatReactionCreate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Add a reaction to a message."""
-    # Verify message exists and user has access
-    msg_stmt = select(ChatMessage).where(ChatMessage.id == message_id)
-    message = session.execute(msg_stmt).scalar_one_or_none()
-
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    # Verify user is a member of the room
-    member_stmt = select(ChatRoomMember).where(
-        ChatRoomMember.room_id == message.room_id,
-        ChatRoomMember.user_id == current_user.id
-    )
-    if not session.execute(member_stmt).scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Message not found")
-
-    # Check if reaction already exists
-    existing_stmt = select(MessageReaction).where(
-        MessageReaction.message_id == message_id,
-        MessageReaction.user_id == current_user.id,
-        MessageReaction.emoji == data.emoji
-    )
-    if session.execute(existing_stmt).scalar_one_or_none():
-        return {"message": "Reaction already exists"}
-
-    # Add reaction
-    reaction = MessageReaction(
-        message_id=message_id,
-        user_id=current_user.id,
-        emoji=data.emoji,
-    )
-    session.add(reaction)
-    session.commit()
-
-    return {"message": "Reaction added"}
-
-
-@router.delete("/chat/messages/{message_id}/reactions/{emoji}")
-async def remove_reaction(
-    message_id: int,
-    emoji: str,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Remove a reaction from a message."""
-    reaction_stmt = select(MessageReaction).where(
-        MessageReaction.message_id == message_id,
-        MessageReaction.user_id == current_user.id,
-        MessageReaction.emoji == emoji
-    )
-    reaction = session.execute(reaction_stmt).scalar_one_or_none()
-
-    if not reaction:
-        raise HTTPException(status_code=404, detail="Reaction not found")
-
-    session.delete(reaction)
-    session.commit()
-
-    return {"message": "Reaction removed"}
-
-
-@router.post("/chat/rooms/{room_id}/typing")
-async def update_typing_status(
-    room_id: int,
-    data: ChatTypingUpdate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Update typing status for current user in a room."""
-    member_stmt = select(ChatRoomMember).where(
-        ChatRoomMember.room_id == room_id,
-        ChatRoomMember.user_id == current_user.id
-    )
-    member = session.execute(member_stmt).scalar_one_or_none()
-
-    if not member:
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    member.is_typing = data.is_typing
-    member.typing_updated_at = datetime.utcnow() if data.is_typing else None
-
-    session.commit()
-    return {"message": "Typing status updated"}
-
-
-@router.get("/chat/rooms/{room_id}/typing")
-async def get_typing_users(
-    room_id: int,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Get users currently typing in a room."""
-    # Verify user is a member
-    member_stmt = select(ChatRoomMember).where(
-        ChatRoomMember.room_id == room_id,
-        ChatRoomMember.user_id == current_user.id
-    )
-    if not session.execute(member_stmt).scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    # Get typing users (typing within last 5 seconds)
-    cutoff = datetime.utcnow() - timedelta(seconds=5)
-    typing_stmt = (
-        select(ChatRoomMember)
-        .where(
-            ChatRoomMember.room_id == room_id,
-            ChatRoomMember.is_typing == True,
-            ChatRoomMember.typing_updated_at > cutoff
-        )
-    )
-    typing_members = list(session.execute(typing_stmt).scalars().all())
-
-    return {
-        "typing_users": [
-            {
-                "id": m.user_id,
-                "username": m.user.username if m.user else None,
-                "display_name": m.user.display_name if m.user else None,
-            }
-            for m in typing_members
-        ]
-    }
-
-
-@router.post("/chat/rooms/{room_id}/read")
-async def mark_messages_read(
-    room_id: int,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Mark all messages in a room as read."""
-    member_stmt = select(ChatRoomMember).where(
-        ChatRoomMember.room_id == room_id,
-        ChatRoomMember.user_id == current_user.id
-    )
-    member = session.execute(member_stmt).scalar_one_or_none()
-
-    if not member:
-        raise HTTPException(status_code=404, detail="Room not found")
-
-    member.last_read_at = datetime.utcnow()
-    session.commit()
-
-    return {"message": "Messages marked as read"}
-
-
-@router.get("/chat/users")
-async def search_chat_users(
-    q: str = "",
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """Search users for @mention autocomplete and new chat creation."""
-    user_repo = UserRepository(session)
-
-    if q:
-        # Search by username or display name
-        stmt = (
-            select(User)
-            .where(
-                User.is_active == True,
-                or_(
-                    User.username.ilike(f"%{q}%"),
-                    User.display_name.ilike(f"%{q}%")
-                )
-            )
-            .limit(10)
-        )
-        users = list(session.execute(stmt).scalars().all())
-    else:
-        # Return all active users (limited)
-        stmt = select(User).where(User.is_active == True).limit(20)
-        users = list(session.execute(stmt).scalars().all())
-
-    return {
-        "users": [
-            {
-                "id": u.id,
-                "username": u.username,
-                "display_name": u.display_name,
-            }
-            for u in users
-        ]
-    }
-
-
-# ============================================================================
-# Chat Memes Endpoints
-# ============================================================================
-
-from ion.models.chat import ChatMeme
-
-
-@router.get("/chat/memes")
-async def list_memes(
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
-    """List all available memes for use in chat."""
-    memes = list(session.execute(select(ChatMeme).order_by(ChatMeme.name)).scalars().all())
-    return {
-        "memes": [
-            {
-                "id": m.id,
-                "name": m.name,
-                "filename": m.filename,
-                "url": f"/static/memes/{m.filename}",
-                "uploaded_by": m.uploaded_by.username if m.uploaded_by else None,
-            }
-            for m in memes
-        ]
-    }
-
-
-@router.post("/chat/memes")
-async def upload_meme(
-    name: str = Form(...),
-    file: UploadFile = File(...),
-    current_user: User = Depends(require_permission("system:settings")),
-    session: Session = Depends(get_db_session),
-):
-    """Upload a new custom meme image (admin/engineering only)."""
-    import re
-    from pathlib import Path
-
-    # Validate name (alphanumeric + underscores, 1-64 chars)
-    if not re.match(r'^[a-z0-9_]{1,64}$', name):
-        raise HTTPException(400, "Meme name must be 1-64 lowercase alphanumeric characters or underscores")
-
-    # Check duplicate name
-    existing = session.execute(select(ChatMeme).where(ChatMeme.name == name)).scalar_one_or_none()
-    if existing:
-        raise HTTPException(409, f"Meme '{name}' already exists")
-
-    # Validate file type
-    allowed_ext = {'.png', '.gif', '.jpg', '.jpeg', '.webp'}
-    fname = file.filename or "meme.png"
-    ext = '.' + fname.rsplit('.', 1)[-1].lower() if '.' in fname else ''
-    if ext not in allowed_ext:
-        raise HTTPException(400, f"Allowed image types: {', '.join(allowed_ext)}")
-
-    # Read and save
-    content = await file.read()
-    if len(content) > 2 * 1024 * 1024:  # 2 MB limit
-        raise HTTPException(400, "Meme image must be under 2 MB")
-    if len(content) == 0:
-        raise HTTPException(400, "Empty file")
-
-    safe_filename = f"{name}{ext}"
-    meme_dir = (Path(__file__).parent / "static" / "memes").resolve()
-    meme_dir.mkdir(parents=True, exist_ok=True)
-    # Defence-in-depth: even though `name` is constrained by regex and `ext` by an
-    # allowlist, resolve the final path and confirm it stays inside `meme_dir`
-    # before writing. Blocks any future regression that loosens the validators.
-    target_path = (meme_dir / safe_filename).resolve()
-    if not target_path.is_relative_to(meme_dir) or target_path.parent != meme_dir:
-        raise HTTPException(400, "Invalid filename")
-    target_path.write_bytes(content)
-
-    meme = ChatMeme(name=name, filename=safe_filename, uploaded_by_id=current_user.id)
-    session.add(meme)
-    session.commit()
-
-    return {
-        "id": meme.id,
-        "name": meme.name,
-        "filename": meme.filename,
-        "url": f"/static/memes/{meme.filename}",
-    }
-
-
-@router.delete("/chat/memes/{meme_id}")
-async def delete_meme(
-    meme_id: int,
-    current_user: User = Depends(require_permission("system:settings")),
-    session: Session = Depends(get_db_session),
-):
-    """Delete a custom meme (admin/engineering only)."""
-    from pathlib import Path
-
-    meme = session.execute(select(ChatMeme).where(ChatMeme.id == meme_id)).scalar_one_or_none()
-    if not meme:
-        raise HTTPException(404, "Meme not found")
-
-    # Delete file
-    meme_path = Path(__file__).parent / "static" / "memes" / meme.filename
-    if meme_path.exists():
-        meme_path.unlink()
-
-    session.delete(meme)
-    session.commit()
-    return {"message": f"Meme '{meme.name}' deleted"}
 
 
 # ============================================================================

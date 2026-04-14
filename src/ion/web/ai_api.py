@@ -783,14 +783,15 @@ async def list_sessions(
         service = AIChatService(db)
         sessions = service.get_user_sessions(current_user.id, limit, offset)
         total = service.get_session_count(current_user.id)
+        metas = service.get_session_metas([s.id for s in sessions])
 
         return {
             "sessions": [
                 {
                     "id": s.id,
-                    "title": s.title or s.preview,
+                    "title": s.title or metas.get(s.id, {}).get("preview", "Empty conversation"),
                     "context_type": s.context_type.value if s.context_type else "default",
-                    "message_count": s.message_count,
+                    "message_count": metas.get(s.id, {}).get("message_count", 0),
                     "created_at": s.created_at.isoformat(),
                     "updated_at": s.updated_at.isoformat(),
                 }

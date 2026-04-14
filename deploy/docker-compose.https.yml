@@ -20,7 +20,7 @@ services:
   # Nginx Reverse Proxy
   # ===========================================================================
   nginx:
-    image: nginx:1.25-alpine
+    image: nginx:1.29-alpine
     container_name: ion-nginx
     restart: unless-stopped
 
@@ -46,8 +46,9 @@ services:
       - no-new-privileges:true
     read_only: true
     tmpfs:
-      - /var/cache/nginx
-      - /var/run
+      # 256M cap leaves room for the 200M static_cache zone declared in nginx.conf
+      - /var/cache/nginx:size=256m
+      - /var/run:size=8m
 
     # Health check
     healthcheck:
@@ -56,15 +57,17 @@ services:
       timeout: 10s
       retries: 3
 
-    # Resource limits
+    # Resource limits — sized for ION's 50-user max ceiling.
+    # nginx ~30M + static_cache 200M + ssl session cache 50M + conn state +
+    # buffers ≈ 350M. 512M leaves ~30% slack.
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 128M
+          cpus: '2'
+          memory: 512M
         reservations:
-          cpus: '0.1'
-          memory: 32M
+          cpus: '0.25'
+          memory: 64M
 
   # ===========================================================================
   # ION Application

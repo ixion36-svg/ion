@@ -11,6 +11,18 @@ services:
     container_name: ion-postgres
     restart: unless-stopped
 
+    # Slow query logging — anything > 200ms hits the log so we can find
+    # bottlenecks under real load. log_statement=none keeps the noise down
+    # (we only want SLOW queries, not every SELECT).
+    command:
+      - postgres
+      - -c
+      - log_min_duration_statement=100
+      - -c
+      - log_statement=none
+      - -c
+      - log_line_prefix=%t [%p] %u@%d
+
     environment:
       POSTGRES_DB: ion
       POSTGRES_USER: ion
@@ -52,7 +64,7 @@ services:
   # =============================================================================
   ion:
     # build: .  # Uncomment to build from source instead of pulling
-    image: ixion36/ion:${ION_VERSION:-0.9.63}
+    image: ixion36/ion:${ION_VERSION:-0.9.66}
     container_name: ion
     restart: unless-stopped
 
@@ -82,6 +94,13 @@ services:
       - ION_DATABASE_URL=postgresql://ion:${ION_DB_PASSWORD:-ion2025}@postgres:5432/ion
       # Ollama connection (when enabled via --profile ai)
       - ION_OLLAMA_URL=http://ollama:11434
+      # uvicorn workers — 4 sized for ION's 50-user max ceiling.
+      # KNOWN ISSUE: each worker re-runs the background-task starters in
+      # server.py (Kibana sync, Analytics Engine, TIDE sync, CyAB reminders).
+      # Periodic polls are idempotent (just wasted CPU); CyAB review
+      # notifications duplicate on each startup. Fix via pg advisory lock
+      # leader election in a future pass.
+      - ION_WORKERS=${ION_WORKERS:-4}
       # Optional: Trust a self-signed CA for OpenCTI, ES, Keycloak, etc.
       # - ION_CA_BUNDLE=/etc/ssl/certs/custom-ca.pem
 
@@ -168,6 +187,9 @@ services:
     #           count: 1
     #           capabilities: [gpu]
 
+    networks:
+      - ion-net
+
   # =============================================================================
   # Seeder - One-shot data population
   # =============================================================================
@@ -175,7 +197,7 @@ services:
   # Shares ion-data volume for .seeded marker persistence.
   # Skips automatically on subsequent starts.
   seeder:
-    image: ixion36/ion:${ION_VERSION:-0.9.63}
+    image: ixion36/ion:${ION_VERSION:-0.9.66}
     container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]
     volumes:

@@ -31,13 +31,6 @@ from ion.models.alert_triage import (
     AlertComment,  # Backward compatibility alias for Note
     CaseNote,  # Backward compatibility alias for Note
 )
-from ion.models.chat import (
-    ChatRoom,
-    ChatRoomMember,
-    ChatMessage,
-    MessageReaction,
-    ChatMeme,
-)
 from ion.models.integration import (
     IntegrationType,
     IntegrationStatus,
@@ -179,10 +172,6 @@ __all__ = [
     "NoteEntityType",
     "AlertComment",  # Alias for Note
     "CaseNote",  # Alias for Note
-    "ChatRoom",
-    "ChatRoomMember",
-    "ChatMessage",
-    "MessageReaction",
     # Integration models
     "IntegrationType",
     "IntegrationStatus",

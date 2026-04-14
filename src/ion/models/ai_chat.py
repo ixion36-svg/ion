@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, Index, Integer, String, Text, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 import enum
 
@@ -19,6 +19,9 @@ class AIContextType(str, enum.Enum):
 class AIChatSession(Base):
     """AI chat session/conversation."""
     __tablename__ = "ai_chat_sessions"
+    __table_args__ = (
+        Index("ix_ai_chat_sessions_user_updated", "user_id", "updated_at"),
+    )
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -32,23 +35,13 @@ class AIChatSession(Base):
     messages = relationship("AIChatMessage", back_populates="session", cascade="all, delete-orphan",
                           order_by="AIChatMessage.created_at")
 
-    @property
-    def message_count(self) -> int:
-        return len(self.messages) if self.messages else 0
-
-    @property
-    def preview(self) -> str:
-        """Get preview of conversation (first user message)."""
-        if self.messages:
-            for msg in self.messages:
-                if msg.role == "user":
-                    return msg.content[:100] + "..." if len(msg.content) > 100 else msg.content
-        return "Empty conversation"
-
 
 class AIChatMessage(Base):
     """Individual message in an AI chat session."""
     __tablename__ = "ai_chat_messages"
+    __table_args__ = (
+        Index("ix_ai_chat_messages_session_id", "session_id"),
+    )
 
     id = Column(Integer, primary_key=True)
     session_id = Column(Integer, ForeignKey("ai_chat_sessions.id", ondelete="CASCADE"), nullable=False)

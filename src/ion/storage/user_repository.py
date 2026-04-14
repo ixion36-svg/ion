@@ -2,7 +2,7 @@
 
 from typing import Optional, List
 from sqlalchemy import select, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ion.models.user import User, Role, Permission
 
@@ -39,7 +39,7 @@ class UserRepository:
         """Get a user by ID."""
         stmt = (
             select(User)
-            .options(joinedload(User.roles).joinedload(Role.permissions))
+            .options(selectinload(User.roles).selectinload(Role.permissions))
             .where(User.id == user_id)
         )
         return self.session.execute(stmt).unique().scalar_one_or_none()
@@ -48,7 +48,7 @@ class UserRepository:
         """Get a user by username."""
         stmt = (
             select(User)
-            .options(joinedload(User.roles).joinedload(Role.permissions))
+            .options(selectinload(User.roles).selectinload(Role.permissions))
             .where(User.username == username)
         )
         return self.session.execute(stmt).unique().scalar_one_or_none()
@@ -57,7 +57,7 @@ class UserRepository:
         """Get a user by email."""
         stmt = (
             select(User)
-            .options(joinedload(User.roles).joinedload(Role.permissions))
+            .options(selectinload(User.roles).selectinload(Role.permissions))
             .where(User.email == email)
         )
         return self.session.execute(stmt).unique().scalar_one_or_none()

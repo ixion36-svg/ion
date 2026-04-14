@@ -66,6 +66,45 @@ class AIChatService:
             AIChatSession.user_id == user_id
         ).order_by(desc(AIChatSession.updated_at)).offset(offset).limit(limit).all()
 
+    def get_session_metas(self, session_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+        """Bulk-fetch message count + first user-message preview for a set of sessions.
+
+        Two queries (count + preview) instead of N+1 lazy loads. Used by the
+        history list endpoint so the AIChatSession model can stay free of
+        properties that secretly trigger SQL on attribute access.
+        """
+        if not session_ids:
+            return {}
+
+        # 1. Counts per session (single GROUP BY)
+        count_rows = self.db.query(
+            AIChatMessage.session_id, func.count(AIChatMessage.id)
+        ).filter(
+            AIChatMessage.session_id.in_(session_ids)
+        ).group_by(AIChatMessage.session_id).all()
+        counts = {sid: int(n) for sid, n in count_rows}
+
+        # 2. First user message per session via DISTINCT ON (Postgres)
+        first_msgs = self.db.query(
+            AIChatMessage.session_id, AIChatMessage.content
+        ).filter(
+            AIChatMessage.session_id.in_(session_ids),
+            AIChatMessage.role == "user",
+        ).order_by(
+            AIChatMessage.session_id, AIChatMessage.created_at
+        ).distinct(AIChatMessage.session_id).all()
+        previews: Dict[int, str] = {}
+        for sid, content in first_msgs:
+            previews[sid] = (content[:100] + "...") if len(content) > 100 else content
+
+        return {
+            sid: {
+                "message_count": counts.get(sid, 0),
+                "preview": previews.get(sid, "Empty conversation"),
+            }
+            for sid in session_ids
+        }
+
     def get_session_count(self, user_id: int) -> int:
         """Get total session count for user."""
         return self.db.query(func.count(AIChatSession.id)).filter(

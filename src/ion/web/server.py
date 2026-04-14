@@ -412,22 +412,6 @@ async def startup_event():
         import logging
         logging.getLogger(__name__).warning(f"Failed to seed forensic playbooks: {e}")
 
-    # Seed built-in meme pack for team chat (20 SOC-themed memes, idempotent)
-    try:
-        from ion.services.meme_seed_service import seed_memes
-        seed_memes()
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to seed memes: {e}")
-
-    # Seed role-based group chat rooms (idempotent, reconciles memberships)
-    try:
-        from ion.services.chat_room_seed_service import seed_chat_rooms
-        seed_chat_rooms()
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to seed chat rooms: {e}")
-
     # Start Kibana bidirectional sync if enabled (via connector)
     try:
         from ion.services.connectors import get_connector_registry
@@ -497,17 +481,25 @@ async def startup_event():
             from ion.models.cyab import CyabSystem
             from datetime import date as _date, timedelta as _td
             from sqlalchemy import select as _sel
+            # Cap startup scan: ix_cyab_next_review covers the WHERE filter,
+            # but we still cap rows so a runaway dataset can't slow boot.
             due = _sess.execute(
-                _sel(CyabSystem).where(CyabSystem.next_review_date <= _date.today() + _td(days=7))
+                _sel(CyabSystem)
+                .where(CyabSystem.next_review_date <= _date.today() + _td(days=7))
+                .order_by(CyabSystem.next_review_date)
+                .limit(50)
             ).scalars().all()
             if due:
                 from ion.models.user import User as _U, Role as _R, user_roles as _ur
+                # Cap leads too — there shouldn't be more than a handful, but
+                # this stops a misconfigured role-permission grant from spamming.
                 leads = _sess.execute(
                     _sel(_U)
                     .join(_ur, _ur.c.user_id == _U.id)
                     .join(_R, _R.id == _ur.c.role_id)
                     .where(_R.name.in_(["lead", "admin", "principal_analyst"]))
                     .where(_U.is_active == True)
+                    .limit(20)
                 ).scalars().all()
                 sent = 0
                 for sys in due:

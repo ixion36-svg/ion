@@ -256,6 +256,9 @@
         <option value="closed">Closed</option>
         <option value="all">All Statuses</option>
     </select>
+    <select id="alert-system-filter" onchange="loadAlerts()" title="Filter by source system (CyAB-registered systems only)">
+        <option value="">All Systems</option>
+    </select>
     <input type="text" id="alert-search" class="search-input" placeholder="Search alerts..." oninput="debouncedSearch()">
     <button class="btn btn-secondary" onclick="clearAllFilters()">Clear</button>
     <span class="filter-separator">|</span>
@@ -380,6 +383,9 @@
                             User <span class="sort-arrow" id="sort-user"></span>
                         </th>
                         <th>Rule</th>
+                        <th class="sortable" onclick="sortBy('source_system')">
+                            System <span class="sort-arrow" id="sort-source_system"></span>
+                        </th>
                         <th>Case</th>
                         <th>Status</th>
                         <th class="sortable" onclick="sortBy('timestamp')">
@@ -389,7 +395,7 @@
                     </tr>
                 </thead>
                 <tbody id="alerts-tbody">
-                    <tr><td colspan="11" class="loading">Loading alerts...</td></tr>
+                    <tr><td colspan="12" class="loading">Loading alerts...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -2018,6 +2024,29 @@ kbd {
 /* ============================================= */
 /* MITRE ATT&CK Badges and Heatmap               */
 /* ============================================= */
+.system-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: rgba(99,110,123,0.18);
+    color: var(--text-primary);
+    border: 1px solid rgba(99,110,123,0.35);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.02em;
+    cursor: default;
+}
+.system-badge.linked {
+    background: rgba(88,166,255,0.15);
+    color: var(--primary);
+    border-color: rgba(88,166,255,0.4);
+    cursor: pointer;
+    text-decoration: none;
+}
+.system-badge.linked:hover {
+    background: rgba(88,166,255,0.25);
+}
 .mitre-badge {
     display: inline-flex;
     align-items: center;
@@ -3318,6 +3347,7 @@ function showNotification(message, type = 'info') {
 // Initialization
 // =========================================================================
 document.addEventListener('DOMContentLoaded', function() {
+    loadSystemFilterOptions();
     loadAlerts();
     loadCases();
     startAutoRefresh();
@@ -3353,7 +3383,7 @@ async function loadAlerts() {
     const timeVal = document.getElementById('alert-time-range').value;
     const statusFilter = document.getElementById('alert-status-filter').value;
     const tbody = document.getElementById('alerts-tbody');
-    tbody.innerHTML = '<tr><td colspan="11" class="loading">Loading alerts...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="loading">Loading alerts...</td></tr>';
 
     try {
         const params = new URLSearchParams({ limit: 500 });
@@ -3370,6 +3400,8 @@ async function loadAlerts() {
         if (statusFilter === 'closed' || statusFilter === 'all') {
             params.set('include_closed', 'true');
         }
+        const systemFilter = document.getElementById('alert-system-filter')?.value;
+        if (systemFilter) params.set('system', systemFilter);
         const response = await fetch(`/api/elasticsearch/alerts?${params}`);
         if (!response.ok) {
             if (response.status === 401) {
@@ -3386,7 +3418,7 @@ async function loadAlerts() {
             const friendlyMsg = data.connection_error
                 ? 'Unable to connect to Elasticsearch. Verify the service is running and the connection settings are correct.'
                 : data.message;
-            tbody.innerHTML = `<tr><td colspan="11" class="error">${friendlyMsg}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="12" class="error">${friendlyMsg}</td></tr>`;
             document.getElementById('top-hosts-list').innerHTML = '<div class="empty-state">-</div>';
             document.getElementById('top-rules-list').innerHTML = '<div class="empty-state">-</div>';
             document.getElementById('top-users-list').innerHTML = '<div class="empty-state">-</div>';
@@ -3403,7 +3435,7 @@ async function loadAlerts() {
         loadPatternDetections();
     } catch (error) {
         console.error('Error loading alerts:', error);
-        tbody.innerHTML = '<tr><td colspan="11" class="error">Error loading alerts. Check Elasticsearch connection.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="error">Error loading alerts. Check Elasticsearch connection.</td></tr>';
         document.getElementById('top-hosts-list').innerHTML = '<div class="empty-state">-</div>';
         document.getElementById('top-rules-list').innerHTML = '<div class="empty-state">-</div>';
         document.getElementById('top-users-list').innerHTML = '<div class="empty-state">-</div>';
@@ -3631,6 +3663,8 @@ function filterToAttention(severity, maxAgeHours) {
     // Clear existing filters
     document.getElementById('alert-severity-filter').value = '';
     document.getElementById('alert-status-filter').value = '';
+    const _sysFilter = document.getElementById('alert-system-filter');
+    if (_sysFilter) _sysFilter.value = '';
     document.getElementById('alert-search').value = '';
     entityFilter = null;
     document.getElementById('active-filter-banner').style.display = 'none';
@@ -3660,6 +3694,8 @@ function filterToAttention(severity, maxAgeHours) {
 function filterToAttentionUnassigned() {
     document.getElementById('alert-severity-filter').value = '';
     document.getElementById('alert-status-filter').value = '';
+    const _sysFilter = document.getElementById('alert-system-filter');
+    if (_sysFilter) _sysFilter.value = '';
     document.getElementById('alert-search').value = '';
     entityFilter = null;
     document.getElementById('active-filter-banner').style.display = 'none';
@@ -6582,6 +6618,8 @@ function clearEntityFilter() {
 function clearAllFilters() {
     document.getElementById('alert-severity-filter').value = '';
     document.getElementById('alert-status-filter').value = '';
+    const _sysFilter = document.getElementById('alert-system-filter');
+    if (_sysFilter) _sysFilter.value = '';
     document.getElementById('alert-search').value = '';
     document.getElementById('alert-time-range').value = '24';
     document.getElementById('custom-time-range').style.display = 'none';
@@ -6633,11 +6671,55 @@ function applySorting() {
 // =========================================================================
 // Rendering
 // =========================================================================
+// Render the system attribution badge for an alert. Prefers the CyAB system
+// name (linked to /cyab#id) and falls back to the raw namespace. Tooltip
+// surfaces the TIDE system name when it differs.
+// Populate the system filter dropdown from CyAB-registered systems.
+async function loadSystemFilterOptions() {
+    const sel = document.getElementById('alert-system-filter');
+    if (!sel) return;
+    try {
+        const r = await fetch('/api/elasticsearch/alerts/systems');
+        if (!r.ok) return;
+        const d = await r.json();
+        const current = sel.value;
+        sel.innerHTML = '<option value="">All Systems</option>';
+        for (const s of (d.systems || [])) {
+            const opt = document.createElement('option');
+            opt.value = s.namespace;
+            opt.textContent = s.display_name;
+            sel.appendChild(opt);
+        }
+        if (current) sel.value = current;
+    } catch (e) {
+        console.warn('Failed to load system filter:', e);
+    }
+}
+
+function renderSystemBadge(a) {
+    if (!a.source_system && !a.cyab_system_name && !a.tide_system_name) {
+        return '<span style="color:var(--text-muted);">-</span>';
+    }
+    const cyabName = a.cyab_system_name;
+    const tideName = a.tide_system_name;
+    const ns = a.source_system || '';
+    const display = cyabName || tideName || ns;
+    const tooltipParts = [];
+    if (ns) tooltipParts.push(`namespace: ${ns}`);
+    if (cyabName) tooltipParts.push(`CyAB: ${cyabName}`);
+    if (tideName && tideName !== cyabName) tooltipParts.push(`TIDE: ${tideName}`);
+    const tooltip = escapeHtml(tooltipParts.join(' • ') || display);
+    if (a.cyab_system_id) {
+        return `<a href="/cyab#${a.cyab_system_id}" class="system-badge linked" title="${tooltip}" onclick="event.stopPropagation()">${escapeHtml(display)}</a>`;
+    }
+    return `<span class="system-badge" title="${tooltip}">${escapeHtml(display)}</span>`;
+}
+
 function renderAlerts() {
     const tbody = document.getElementById('alerts-tbody');
 
     if (filteredAlerts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="empty">No alerts match the current filters</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="empty">No alerts match the current filters</td></tr>';
         return;
     }
 
@@ -6666,6 +6748,7 @@ function renderAlerts() {
             <td title="${escapeHtml(a.host || '-')}">${escapeHtml(a.host || '-')}</td>
             <td title="${escapeHtml(a.user || '-')}">${escapeHtml(a.user || '-')}</td>
             <td title="${escapeHtml(a.rule_name || '-')}">${escapeHtml(a.rule_name || '-')}</td>
+            <td>${renderSystemBadge(a)}</td>
             <td>${caseName}</td>
             <td><span class="status-badge alert-status-${triageStatus !== 'none' ? triageStatus : a.status}">${triageStatus !== 'none' ? triageStatus : a.status}</span></td>
             <td>${formatDate(a.timestamp)}</td>
@@ -7844,7 +7927,11 @@ async function showAlertDetail(alertId) {
             <div class="alert-meta-label">Rule</div>
             <div class="alert-meta-value">${escapeHtml(alert.rule_name || '-')}</div>
         </div>
-        <div class="alert-meta-item" style="grid-column: span 2;">
+        <div class="alert-meta-item">
+            <div class="alert-meta-label">System</div>
+            <div class="alert-meta-value">${renderSystemBadge(alert)}</div>
+        </div>
+        <div class="alert-meta-item">
             <div class="alert-meta-label">Timestamp</div>
             <div class="alert-meta-value">${new Date(alert.timestamp).toLocaleString()}</div>
         </div>

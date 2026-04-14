@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional, List
 from sqlalchemy import select, or_, and_, func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ion.models.playbook import (
     Playbook,
@@ -52,7 +52,7 @@ class PlaybookRepository:
             select(Playbook)
             .options(
                 joinedload(Playbook.created_by),
-                joinedload(Playbook.steps),
+                selectinload(Playbook.steps),
             )
             .where(Playbook.id == playbook_id)
         )
@@ -62,7 +62,7 @@ class PlaybookRepository:
         """Get a playbook by name."""
         stmt = (
             select(Playbook)
-            .options(joinedload(Playbook.steps))
+            .options(selectinload(Playbook.steps))
             .where(Playbook.name == name)
         )
         return self.session.execute(stmt).unique().scalar_one_or_none()
@@ -76,7 +76,7 @@ class PlaybookRepository:
         stmt = select(Playbook).options(joinedload(Playbook.created_by))
 
         if include_steps:
-            stmt = stmt.options(joinedload(Playbook.steps))
+            stmt = stmt.options(selectinload(Playbook.steps))
 
         if active_only:
             stmt = stmt.where(Playbook.is_active == True)
@@ -329,7 +329,7 @@ class PlaybookRepository:
         stmt = (
             select(PlaybookExecution)
             .options(
-                joinedload(PlaybookExecution.playbook).joinedload(Playbook.steps),
+                joinedload(PlaybookExecution.playbook).selectinload(Playbook.steps),
                 joinedload(PlaybookExecution.executed_by),
                 joinedload(PlaybookExecution.case),
             )
@@ -342,7 +342,7 @@ class PlaybookRepository:
         stmt = (
             select(PlaybookExecution)
             .options(
-                joinedload(PlaybookExecution.playbook).joinedload(Playbook.steps),
+                joinedload(PlaybookExecution.playbook).selectinload(Playbook.steps),
                 joinedload(PlaybookExecution.executed_by),
                 joinedload(PlaybookExecution.case),
             )
@@ -360,7 +360,7 @@ class PlaybookRepository:
         stmt = (
             select(PlaybookExecution)
             .options(
-                joinedload(PlaybookExecution.playbook).joinedload(Playbook.steps),
+                joinedload(PlaybookExecution.playbook).selectinload(Playbook.steps),
                 joinedload(PlaybookExecution.executed_by),
             )
             .where(
@@ -471,7 +471,7 @@ class PlaybookRepository:
         stmt = (
             select(PlaybookExecution)
             .options(
-                joinedload(PlaybookExecution.playbook).joinedload(Playbook.steps),
+                joinedload(PlaybookExecution.playbook).selectinload(Playbook.steps),
                 joinedload(PlaybookExecution.executed_by),
                 joinedload(PlaybookExecution.case),
             )
@@ -489,7 +489,7 @@ class PlaybookRepository:
         stmt = (
             select(PlaybookExecution)
             .options(
-                joinedload(PlaybookExecution.playbook).joinedload(Playbook.steps),
+                joinedload(PlaybookExecution.playbook).selectinload(Playbook.steps),
                 joinedload(PlaybookExecution.executed_by),
                 joinedload(PlaybookExecution.case),
             )

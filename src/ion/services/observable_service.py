@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
 from sqlalchemy import func, and_, or_, desc
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ion.models.observable import (
     Observable,
@@ -246,7 +246,8 @@ class ObservableService:
 
         total = q.count()
         results = (
-            q.order_by(desc(Observable.last_seen))
+            q.options(selectinload(Observable.enrichments))
+            .order_by(desc(Observable.last_seen))
             .offset(offset)
             .limit(limit)
             .all()

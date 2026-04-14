@@ -13,9 +13,10 @@ from sqlalchemy import (
     JSON,
     String,
     Text,
+    and_,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ion.models.base import Base, TimestampMixin
 
@@ -119,19 +120,20 @@ class AlertCase(Base, TimestampMixin):
         "AlertTriage", back_populates="case"
     )
 
-    @property
-    def notes(self) -> List["Note"]:
-        """Get notes for this case (compatibility property)."""
-        from sqlalchemy.orm import joinedload
-        from ion.storage.database import get_session_factory
-        session_factory = get_session_factory()
-        with session_factory() as session:
-            return session.query(Note).options(
-                joinedload(Note.user)
-            ).filter(
-                Note.entity_type == NoteEntityType.CASE,
-                Note.entity_id == str(self.id)
-            ).order_by(Note.created_at).all()
+    # Polymorphic relationship to Note via (entity_type='CASE', entity_id=str(id)).
+    # viewonly because Note.entity_id is a string and not a real FK constraint.
+    # Use selectinload(AlertCase.notes) on list endpoints to avoid N+1.
+    notes: Mapped[List["Note"]] = relationship(
+        "Note",
+        primaryjoin=lambda: and_(
+            foreign(Note.entity_id) == AlertCase.id.cast(String),
+            Note.entity_type == NoteEntityType.CASE,
+        ),
+        viewonly=True,
+        uselist=True,
+        order_by=lambda: Note.created_at,
+        lazy="select",
+    )
 
     def __repr__(self) -> str:
         return f"<AlertCase(id={self.id}, case_number='{self.case_number}')>"
@@ -148,6 +150,8 @@ class AlertTriage(Base, TimestampMixin):
         Index("ix_alert_triage_assigned", "assigned_to_id"),
         # Composite: triage queue filtered by status + sorted by created_at
         Index("ix_alert_triage_status_created", "status", "created_at"),
+        # System attribution lookup (per-system rollups, filters)
+        Index("ix_alert_triage_source_system", "source_system"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -165,6 +169,11 @@ class AlertTriage(Base, TimestampMixin):
     analyst_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     observables: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     mitre_techniques: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Snapshot of the originating system at first triage touch. Lives here
+    # (not just on the live ES doc) so attribution survives ES retention
+    # rotation. Sourced from data_stream.namespace when the triage is
+    # created/updated.
+    source_system: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
 
     # Relationships
     assigned_to: Mapped[Optional["User"]] = relationship(

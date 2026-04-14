@@ -15,6 +15,8 @@ from ion.models.user import User, Role, user_roles
 from ion.web.api import get_db_session
 from ion.web.notification_api import create_notification
 from ion.services.tide_service import get_tide_service, reset_tide_service
+from ion.services.elasticsearch_service import ElasticsearchService
+from ion.core.config import get_elasticsearch_config
 from ion.core.safe_errors import safe_error
 
 router = APIRouter()
@@ -400,6 +402,84 @@ async def get_system(system_id: int, session: Session = Depends(get_db_session))
     return _system_to_dict(sys, include_sources=True)
 
 
+@router.get("/systems/{system_id}/alert-rollup", dependencies=[Depends(require_permission("alert:read"))])
+async def get_system_alert_rollup(
+    system_id: int,
+    hours: int = 168,
+    session: Session = Depends(get_db_session),
+):
+    """Return alert counts for this CyAB system, scoped to its data sources' namespaces.
+
+    Pulls the namespaces the system owns, queries ES for matching alerts in
+    the last `hours` (default 7d), returns total + status + severity breakdowns.
+    """
+    sys = session.get(CyabSystem, system_id)
+    if not sys:
+        raise HTTPException(status_code=404, detail="CyAB system not found")
+
+    namespaces = [
+        ds.data_namespace for ds in sys.data_sources
+        if ds.data_namespace
+    ]
+    if not namespaces:
+        return {
+            "system_id": system_id,
+            "namespaces": [],
+            "total": 0,
+            "by_status": {},
+            "by_severity": {},
+            "by_namespace": {},
+            "hours": hours,
+            "message": "No data namespaces configured on this system's data sources",
+        }
+
+    config = get_elasticsearch_config()
+    if not config.get("enabled"):
+        return {
+            "system_id": system_id,
+            "namespaces": namespaces,
+            "total": 0,
+            "by_status": {},
+            "by_severity": {},
+            "by_namespace": {},
+            "hours": hours,
+            "message": "Elasticsearch integration is not enabled",
+        }
+
+    es = ElasticsearchService()
+    if not es.is_configured:
+        return {
+            "system_id": system_id,
+            "namespaces": namespaces,
+            "total": 0,
+            "by_status": {},
+            "by_severity": {},
+            "by_namespace": {},
+            "hours": hours,
+            "message": "Elasticsearch is not configured",
+        }
+
+    try:
+        rollup = await es.get_alert_rollup_for_namespaces(namespaces, hours=hours)
+    except Exception as e:
+        return {
+            "system_id": system_id,
+            "namespaces": namespaces,
+            "total": 0,
+            "by_status": {},
+            "by_severity": {},
+            "by_namespace": {},
+            "hours": hours,
+            "error": safe_error(e, "alert_rollup"),
+        }
+
+    return {
+        "system_id": system_id,
+        "namespaces": namespaces,
+        **rollup,
+    }
+
+
 @router.put("/systems/{system_id}", dependencies=[Depends(require_permission("alert:read"))])
 async def update_system(
     system_id: int, req: SystemUpdateRequest,
@@ -519,6 +599,9 @@ async def create_data_source(
     _create_snapshot(session, sys, notes=f"Data source added: {req.name}", ds_id=ds.id)
     session.commit()
     session.refresh(ds)
+    # Drop the alert→system resolver cache so the new mapping appears immediately
+    from ion.services.system_resolver_service import invalidate as _invalidate_resolver
+    _invalidate_resolver()
     return _ds_to_dict(ds)
 
 
@@ -563,6 +646,9 @@ async def update_data_source(
     _create_snapshot(session, sys, notes=f"Data source updated: {ds.name}", ds_id=ds.id)
     session.commit()
     session.refresh(ds)
+    # Drop the alert→system resolver cache (data_namespace/tide_system_id may have changed)
+    from ion.services.system_resolver_service import invalidate as _invalidate_resolver
+    _invalidate_resolver()
     return _ds_to_dict(ds)
 
 
@@ -586,6 +672,9 @@ async def delete_data_source(source_id: int, session: Session = Depends(get_db_s
     _recalc_system_aggregates(sys)
     _create_snapshot(session, sys, notes=f"Data source removed: {name}")
     session.commit()
+    # Drop the alert→system resolver cache (mapping no longer exists)
+    from ion.services.system_resolver_service import invalidate as _invalidate_resolver
+    _invalidate_resolver()
     return {"ok": True, "deleted": source_id}
 
 

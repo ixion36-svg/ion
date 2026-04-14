@@ -310,24 +310,6 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: users.keycloak_sub")
 
-    # Migration for chat_messages.reply_to_id (v0.9.16+)
-    if insp.has_table("chat_messages"):
-        existing = {col["name"] for col in insp.get_columns("chat_messages")}
-        if "reply_to_id" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE chat_messages ADD COLUMN reply_to_id INTEGER REFERENCES chat_messages(id)")
-                )
-                logger.info("Migrated: chat_messages.reply_to_id")
-
-    # Migration for chat_rooms.is_system (system-managed group rooms)
-    if insp.has_table("chat_rooms"):
-        existing = {col["name"] for col in insp.get_columns("chat_rooms")}
-        if "is_system" not in existing:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE chat_rooms ADD COLUMN is_system BOOLEAN DEFAULT FALSE NOT NULL"))
-                logger.info("Migrated: chat_rooms.is_system")
-
     # Variables: add options column
     if insp.has_table("variables"):
         existing = {col["name"] for col in insp.get_columns("variables")}
@@ -439,6 +421,57 @@ def _run_migrations(engine: Engine) -> None:
             conn.execute(
                 text("UPDATE service_accounts SET review_cadence_days = 90 WHERE review_cadence_days IS NULL")
             )
+
+    # AlertTriage source_system column + index (v0.9.66 — alert→system attribution)
+    if insp.has_table("alert_triage"):
+        existing = {col["name"] for col in insp.get_columns("alert_triage")}
+        if "source_system" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE alert_triage ADD COLUMN source_system VARCHAR(128)"
+                ))
+                logger.info("Migrated: alert_triage.source_system")
+        existing_idx = {idx["name"] for idx in insp.get_indexes("alert_triage")}
+        if "ix_alert_triage_source_system" not in existing_idx:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "CREATE INDEX ix_alert_triage_source_system "
+                    "ON alert_triage (source_system)"
+                ))
+                logger.info("Migrated: ix_alert_triage_source_system")
+
+    # AI chat messages: index session_id for count+cleanup queries (v0.9.64)
+    if insp.has_table("ai_chat_messages"):
+        existing_idx = {idx["name"] for idx in insp.get_indexes("ai_chat_messages")}
+        if "ix_ai_chat_messages_session_id" not in existing_idx:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "CREATE INDEX ix_ai_chat_messages_session_id "
+                    "ON ai_chat_messages (session_id)"
+                ))
+                logger.info("Migrated: ix_ai_chat_messages_session_id")
+
+    # AI chat sessions: composite (user_id, updated_at) for list+order (v0.9.64)
+    if insp.has_table("ai_chat_sessions"):
+        existing_idx = {idx["name"] for idx in insp.get_indexes("ai_chat_sessions")}
+        if "ix_ai_chat_sessions_user_updated" not in existing_idx:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "CREATE INDEX ix_ai_chat_sessions_user_updated "
+                    "ON ai_chat_sessions (user_id, updated_at)"
+                ))
+                logger.info("Migrated: ix_ai_chat_sessions_user_updated")
+
+    # Notifications: composite (user_id, created_at) for list+order (v0.9.64)
+    if insp.has_table("notifications"):
+        existing_idx = {idx["name"] for idx in insp.get_indexes("notifications")}
+        if "ix_notifications_user_created" not in existing_idx:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "CREATE INDEX ix_notifications_user_created "
+                    "ON notifications (user_id, created_at)"
+                ))
+                logger.info("Migrated: ix_notifications_user_created")
 
     # PIR linked_controls (multi-framework compliance evidence)
     if insp.has_table("post_incident_reviews"):

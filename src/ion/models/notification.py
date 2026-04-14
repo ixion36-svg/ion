@@ -16,6 +16,9 @@ class Notification(Base):
     __table_args__ = (
         Index("ix_notifications_user_unread", "user_id", "is_read"),
         Index("ix_notifications_created", "created_at"),
+        # Hot path: list endpoint orders by created_at DESC for a single user.
+        # Composite index lets Postgres serve list+ordering in one index scan.
+        Index("ix_notifications_user_created", "user_id", "created_at"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

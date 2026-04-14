@@ -267,6 +267,7 @@ class ElasticsearchService:
         include_closed: bool = False,
         time_from: Optional[str] = None,
         time_to: Optional[str] = None,
+        system: Optional[str] = None,
     ) -> List[ElasticsearchAlert]:
         """Fetch alerts from Elasticsearch.
 
@@ -319,6 +320,14 @@ class ElasticsearchService:
                     ],
                     "minimum_should_match": 1
                 }
+            })
+
+        if system:
+            # Filter by data_stream.namespace which is what we surface as
+            # the alert's `source_system` field. Lowercased to match the
+            # ES storage convention enforced by CyAB on save.
+            must_clauses.append({
+                "term": {"data_stream.namespace": system.strip().lower()}
             })
 
         must_not_clauses = [
@@ -2193,6 +2202,94 @@ class ElasticsearchService:
     # =========================================================================
     # Engineering System Analytics
     # =========================================================================
+
+    async def get_alert_rollup_for_namespaces(
+        self,
+        namespaces: List[str],
+        hours: int = 168,
+    ) -> Dict[str, Any]:
+        """Return alert counts for a specific list of `data_stream.namespace` values.
+
+        Used by the CyAB system detail page to show "open alerts: N (last 7d)"
+        scoped to the namespaces owned by that CyAB system. Single ES query
+        with a `terms` filter + status sub-aggregation.
+
+        Returns:
+            {
+                "total": int,
+                "by_status": {open: N, acknowledged: N, closed: N},
+                "by_severity": {critical: N, high: N, medium: N, low: N},
+                "by_namespace": {ns: count, ...},
+                "hours": int,
+            }
+        """
+        empty: Dict[str, Any] = {
+            "total": 0,
+            "by_status": {},
+            "by_severity": {},
+            "by_namespace": {},
+            "hours": hours,
+        }
+        if not self.is_configured or not namespaces:
+            return empty
+
+        # Lowercase the input — ES stores namespaces lowercase by convention
+        ns_clean = sorted({(n or "").strip().lower() for n in namespaces if n})
+        if not ns_clean:
+            return empty
+
+        query = {
+            "size": 0,
+            "query": {
+                "bool": {
+                    "must": [
+                        {"range": {"@timestamp": {"gte": f"now-{hours}h", "lte": "now"}}},
+                        {"terms": {"data_stream.namespace": ns_clean}},
+                    ],
+                    "must_not": [
+                        {"exists": {"field": "kibana.alert.building_block_type"}},
+                    ],
+                }
+            },
+            "aggs": {
+                "by_status": {
+                    "terms": {"field": "kibana.alert.workflow_status", "size": 10, "missing": "open"}
+                },
+                "by_severity": {
+                    "terms": {"field": "kibana.alert.severity", "size": 10, "missing": "unknown"}
+                },
+                "by_namespace": {
+                    "terms": {"field": "data_stream.namespace", "size": len(ns_clean)}
+                },
+            },
+        }
+
+        try:
+            result = await self._request(
+                "POST",
+                f"/{self.alert_index}/_search",
+                json=query,
+            )
+        except ElasticsearchError as e:
+            if "index_not_found" in str(e).lower() or "404" in str(e):
+                return empty
+            raise
+
+        total = result.get("hits", {}).get("total", {})
+        if isinstance(total, dict):
+            total = total.get("value", 0)
+
+        def _bucket_dict(agg):
+            return {b["key"]: b["doc_count"] for b in (agg or {}).get("buckets", [])}
+
+        aggs = result.get("aggregations", {})
+        return {
+            "total": int(total or 0),
+            "by_status": _bucket_dict(aggs.get("by_status")),
+            "by_severity": _bucket_dict(aggs.get("by_severity")),
+            "by_namespace": _bucket_dict(aggs.get("by_namespace")),
+            "hours": hours,
+        }
 
     async def get_system_analytics(
         self,
