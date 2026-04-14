@@ -10,8 +10,9 @@ PostgreSQL requires the 'postgres' extra: pip install ion[postgres]
 
 import logging
 import os
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Callable, Generator, Iterator, Optional
 from sqlalchemy import create_engine, Engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -27,10 +28,138 @@ logger = logging.getLogger(__name__)
 _engine: Optional[Engine] = None
 _session_factory: Optional[sessionmaker[Session]] = None
 
+# Module-level store of pinned advisory-lock connections. When a hook is
+# wrapped with `hold_until_close=True`, the lock-holding connection is
+# stashed here so it never goes out of scope and the lock survives for
+# the worker's lifetime — preventing other workers from re-acquiring and
+# re-running the same hook (e.g. don't start 4 TIDE background loops).
+_pinned_lock_conns: dict = {}
+
 
 def _is_postgres(engine: Engine) -> bool:
     """Check if the engine is connected to PostgreSQL."""
     return engine.dialect.name == "postgresql"
+
+
+# =========================================================================
+# Cross-worker coordination via Postgres advisory locks
+# =========================================================================
+#
+# uvicorn spawns N worker processes (ION_WORKERS) which all run the
+# FastAPI startup event independently. That means each worker tries to
+# run every seed/migration/background-task starter in parallel — leading
+# to constraint violations, wasted work, and (worst case) postgres
+# deadlocks when multiple workers race on the same rows.
+#
+# `pg_try_advisory_lock` is a session-scoped, non-blocking lock — only
+# one worker acquires it; the rest see False and skip. Locks auto-release
+# when the holding session closes (so a crashed worker doesn't strand
+# them). On non-postgres backends we yield True so single-process setups
+# (sqlite dev) still run all hooks.
+#
+# Lock IDs are unique constants centralised here so they can't collide.
+
+# Lock IDs — MUST be unique across the codebase. Use the 1000-1999 range.
+LOCK_RUN_MIGRATIONS         = 1001
+LOCK_SEED_PERMISSIONS       = 1002
+LOCK_SEED_DEFAULT_PLAYBOOKS = 1003
+LOCK_SEED_SOC_TEMPLATES     = 1004
+LOCK_SEED_KNOWLEDGE_BASE    = 1005
+LOCK_SEED_FORENSIC_PB       = 1006
+LOCK_SEED_CAPABILITY_KB     = 1007
+LOCK_SKILLS_DAILY_SNAPSHOT  = 1008
+LOCK_SEED_ANALYTICS_JOBS    = 1009
+LOCK_KIBANA_BG_SYNC         = 1010
+LOCK_TIDE_BG_SYNC           = 1011
+LOCK_CYAB_REVIEW_CHECK      = 1012
+LOCK_ANALYTICS_BG_LOOP      = 1013
+
+
+@contextmanager
+def advisory_lock(engine: Engine, lock_id: int, *, hold_until_close: bool = False) -> Iterator[bool]:
+    """Acquire a non-blocking Postgres advisory lock for cross-worker coordination.
+
+    Yields True if this caller acquired the lock and should run the work,
+    False if another worker already holds it (skip the work). On non-postgres
+    backends (e.g. SQLite) yields True so single-process setups still run
+    all hooks normally.
+
+    Two modes:
+
+    - **hold_until_close=False (default)**: the lock is released as soon as
+      the `with` block exits. Subsequent workers can re-acquire it and run
+      the same hook again. Use this for idempotent seeds — concurrent races
+      are prevented but serial re-runs are harmless because each invocation
+      checks "already seeded" and skips.
+
+    - **hold_until_close=True**: the lock-holding connection is pinned to
+      module state and never closed for the worker's lifetime. Subsequent
+      workers see the lock as held and skip permanently. Use this for
+      single-instance background loops (TIDE bg sync, Analytics loop, etc.)
+      so we don't end up with 4× duplicate background tasks. The lock
+      auto-releases on connection drop, so a worker crash hands ownership
+      to a sibling worker on the next restart cycle.
+    """
+    if not _is_postgres(engine):
+        yield True
+        return
+
+    # Already pinned by THIS worker? Treat as acquired without re-locking.
+    if lock_id in _pinned_lock_conns:
+        yield True
+        return
+
+    conn = engine.connect()
+    acquired = False
+    try:
+        result = conn.execute(text("SELECT pg_try_advisory_lock(:id)"), {"id": lock_id})
+        acquired = bool(result.scalar())
+        yield acquired
+    finally:
+        if acquired and hold_until_close:
+            # Pin the connection to module state so the lock survives the
+            # rest of the worker's lifetime. Do NOT close.
+            _pinned_lock_conns[lock_id] = conn
+            return
+        if acquired:
+            try:
+                conn.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": lock_id})
+                conn.commit()
+            except Exception:
+                pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def run_locked(
+    engine: Engine,
+    lock_id: int,
+    label: str,
+    fn: Callable[[], None],
+    *,
+    hold_until_close: bool = False,
+) -> bool:
+    """Run `fn` only if this worker acquires the advisory lock.
+
+    `hold_until_close` is passed through to advisory_lock — set True for
+    single-instance background loops, False (default) for idempotent seeds.
+
+    Returns True if the work ran, False if skipped (another worker holds
+    the lock). Logs at debug for skips, warning for exceptions inside the
+    work itself. Does NOT re-raise — startup hooks are best-effort.
+    """
+    with advisory_lock(engine, lock_id, hold_until_close=hold_until_close) as acquired:
+        if not acquired:
+            logger.debug("Skipping %s — another worker holds lock %d", label, lock_id)
+            return False
+        try:
+            fn()
+            return True
+        except Exception as e:
+            logger.warning("Failed %s (lock %d): %s", label, lock_id, e)
+            return False
 
 
 def _set_sqlite_pragmas(dbapi_conn, connection_record):

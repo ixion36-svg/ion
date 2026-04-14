@@ -353,22 +353,40 @@ def _validate_startup_config():
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database on startup."""
+    """Initialize database + run seed/background-task starters on startup.
+
+    Every hook below is wrapped in a Postgres advisory lock via run_locked()
+    so that uvicorn's N parallel worker processes don't race each other on
+    the same tables (which previously caused unique-constraint violations,
+    deadlocks, and duplicate background loops). Only one worker per restart
+    actually runs each hook; the rest skip cleanly.
+    """
     _validate_startup_config()
     config = get_config()
     if not config.db_path.exists():
         config.db_path.parent.mkdir(parents=True, exist_ok=True)
-    # Always run create_all to ensure new tables are created
+    # create_all() is concurrent-safe in postgres (CREATE TABLE IF NOT EXISTS)
+    # so we don't need to lock it; let every worker run it independently.
     init_db(config.db_path)
 
-    # Seed roles, permissions, and ensure admin user has admin role
-    try:
-        from ion.storage.database import get_engine, get_session_factory
+    from ion.storage.database import (
+        advisory_lock, run_locked, get_engine, get_session_factory,
+        LOCK_SEED_PERMISSIONS, LOCK_SEED_DEFAULT_PLAYBOOKS,
+        LOCK_SEED_SOC_TEMPLATES, LOCK_SEED_KNOWLEDGE_BASE,
+        LOCK_SEED_FORENSIC_PB, LOCK_SEED_CAPABILITY_KB,
+        LOCK_KIBANA_BG_SYNC, LOCK_SKILLS_DAILY_SNAPSHOT,
+        LOCK_SEED_ANALYTICS_JOBS, LOCK_ANALYTICS_BG_LOOP,
+        LOCK_TIDE_BG_SYNC, LOCK_CYAB_REVIEW_CHECK,
+    )
+    engine = get_engine(config.db_path)
+    factory = get_session_factory(engine)
+
+    # ---------------------------------------------------------------
+    # Seed roles, permissions, admin user
+    # ---------------------------------------------------------------
+    def _seed_auth():
         from ion.auth.service import AuthService
         import os
-
-        engine = get_engine(config.db_path)
-        factory = get_session_factory(engine)
         session = factory()
         try:
             auth_service = AuthService(session)
@@ -379,172 +397,160 @@ async def startup_event():
             session.commit()
         finally:
             session.close()
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to seed auth data: {e}")
+    run_locked(engine, LOCK_SEED_PERMISSIONS, "seed_auth", _seed_auth)
 
+    # ---------------------------------------------------------------
     # Seed default pattern-based playbooks
-    try:
+    # ---------------------------------------------------------------
+    def _seed_default_playbooks():
         from ion.services.pattern_detection_service import seed_default_playbooks
         seed_default_playbooks()
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to seed default playbooks: {e}")
+    run_locked(engine, LOCK_SEED_DEFAULT_PLAYBOOKS, "seed_default_playbooks", _seed_default_playbooks)
 
+    # ---------------------------------------------------------------
     # Seed SOC documentation templates
-    try:
+    # ---------------------------------------------------------------
+    def _seed_soc_templates():
         from ion.services.soc_template_service import seed_soc_templates
         seed_soc_templates()
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to seed SOC templates: {e}")
+    run_locked(engine, LOCK_SEED_SOC_TEMPLATES, "seed_soc_templates", _seed_soc_templates)
 
-    # Seed built-in Knowledge Base articles (392 articles, idempotent)
-    try:
+    # ---------------------------------------------------------------
+    # Seed built-in Knowledge Base articles (idempotent)
+    # ---------------------------------------------------------------
+    def _seed_kb():
         from ion.services.kb_seed_service import seed_knowledge_base
         seed_knowledge_base()
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to seed Knowledge Base: {e}")
+    run_locked(engine, LOCK_SEED_KNOWLEDGE_BASE, "seed_knowledge_base", _seed_kb)
 
-    # Seed built-in Forensic Investigation playbooks (8 playbooks, idempotent)
-    try:
+    # ---------------------------------------------------------------
+    # Seed built-in Forensic Investigation playbooks
+    # ---------------------------------------------------------------
+    def _seed_forensic():
         from ion.services.forensic_seed_service import seed_forensic_playbooks
         seed_forensic_playbooks()
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to seed forensic playbooks: {e}")
+    run_locked(engine, LOCK_SEED_FORENSIC_PB, "seed_forensic_playbooks", _seed_forensic)
 
-    # Seed KnowledgeArticle rows for every capability_key referenced by the
-    # Role Match questionnaires, so the gap-recommendations tier surfaces
-    # something instead of returning an empty list. Idempotent.
-    try:
+    # ---------------------------------------------------------------
+    # Seed KnowledgeArticle rows for Role Match capability_keys
+    # ---------------------------------------------------------------
+    def _seed_capability_articles():
         from ion.services.role_skills_service import seed_capability_articles
-        from ion.storage.database import get_engine, get_session_factory
-        _eng = get_engine(config.db_path)
-        _fac = get_session_factory(_eng)
-        _sess = _fac()
+        session = factory()
         try:
-            report = seed_capability_articles(_sess)
+            report = seed_capability_articles(session)
             if report.get("seeded"):
                 logger.info(
                     "Seeded %d Role Match capability articles (%d already present)",
                     report["seeded"], report["already_present"],
                 )
         finally:
-            _sess.close()
-    except Exception as e:
-        logger.warning(f"Failed to seed Role Match capability articles: {e}")
+            session.close()
+    run_locked(engine, LOCK_SEED_CAPABILITY_KB, "seed_capability_articles", _seed_capability_articles)
 
-    # Start Kibana bidirectional sync if enabled (via connector)
-    try:
+    # ---------------------------------------------------------------
+    # Start Kibana bidirectional sync (hold_until_close: only one worker
+    # in the lifetime of this container instance runs the loop)
+    # ---------------------------------------------------------------
+    def _start_kibana_sync():
         from ion.services.connectors import get_connector_registry
-
         registry = get_connector_registry()
         kibana = registry.get("kibana_cases")
         if kibana and kibana.is_configured:
             kibana.start_background_sync(interval_seconds=60)
-            import logging
-            logging.getLogger(__name__).info("Kibana bidirectional sync started (60s interval)")
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to start Kibana sync: {e}")
+            logger.info("Kibana bidirectional sync started (60s interval)")
+    run_locked(engine, LOCK_KIBANA_BG_SYNC, "kibana_bg_sync", _start_kibana_sync,
+               hold_until_close=True)
 
-    # Create daily skills assessment snapshot
-    try:
+    # ---------------------------------------------------------------
+    # Daily skills assessment snapshot
+    # ---------------------------------------------------------------
+    def _skills_snapshot():
         from ion.services.skills_snapshot_service import create_daily_snapshot
-        from ion.storage.database import get_engine, get_session_factory
-
-        engine = get_engine(config.db_path)
-        factory = get_session_factory(engine)
         session = factory()
         try:
             create_daily_snapshot(session)
         finally:
             session.close()
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Failed to create skills snapshot: {e}")
+    run_locked(engine, LOCK_SKILLS_DAILY_SNAPSHOT, "skills_daily_snapshot", _skills_snapshot)
 
-    # Start Analytics Engine background loop
-    try:
-        from ion.services.analytics_engine import get_analytics_engine, seed_default_jobs
-
-        engine = get_engine(config.db_path)
-        factory = get_session_factory(engine)
+    # ---------------------------------------------------------------
+    # Analytics Engine: seed default jobs + start background loop
+    # ---------------------------------------------------------------
+    def _seed_analytics_jobs():
+        from ion.services.analytics_engine import seed_default_jobs
         session = factory()
         try:
             seed_default_jobs(session)
         finally:
             session.close()
+    run_locked(engine, LOCK_SEED_ANALYTICS_JOBS, "seed_analytics_jobs", _seed_analytics_jobs)
 
+    def _start_analytics_loop():
+        from ion.services.analytics_engine import get_analytics_engine
         analytics = get_analytics_engine()
         analytics.start_background_loop()
         logger.info("Analytics Engine background loop started")
-    except Exception as e:
-        logger.warning(f"Failed to start Analytics Engine: {e}")
+    run_locked(engine, LOCK_ANALYTICS_BG_LOOP, "analytics_bg_loop", _start_analytics_loop,
+               hold_until_close=True)
 
-    # Start TIDE background sync (pulls data into PostgreSQL snapshots)
-    try:
+    # ---------------------------------------------------------------
+    # TIDE background sync (single worker — hold_until_close)
+    # ---------------------------------------------------------------
+    def _start_tide_sync():
         from ion.services.tide_sync_service import start_background_loop as _tide_bg
-        from ion.storage.database import get_engine as _tide_eng
-        _tide_bg(_tide_eng())
+        _tide_bg(engine)
         logger.info("TIDE background sync started")
-    except Exception as e:
-        logger.warning(f"Failed to start TIDE background sync: {e}")
+    run_locked(engine, LOCK_TIDE_BG_SYNC, "tide_bg_sync", _start_tide_sync,
+               hold_until_close=True)
 
-    # Check CyAB review reminders and notify leads
-    try:
-        from ion.web.cyab_api import check_review_reminders as _cyab_check
-        from ion.storage.database import get_engine as _ge, get_session_factory as _gsf
-
-        _eng = _ge(config.db_path)
-        _fac = _gsf(_eng)
-        _sess = _fac()
+    # ---------------------------------------------------------------
+    # CyAB review reminder check (one-shot per startup)
+    # ---------------------------------------------------------------
+    def _cyab_review_check():
+        session = factory()
         try:
             from ion.models.cyab import CyabSystem
             from datetime import date as _date, timedelta as _td
             from sqlalchemy import select as _sel
             # Cap startup scan: ix_cyab_next_review covers the WHERE filter,
             # but we still cap rows so a runaway dataset can't slow boot.
-            due = _sess.execute(
+            due = session.execute(
                 _sel(CyabSystem)
                 .where(CyabSystem.next_review_date <= _date.today() + _td(days=7))
                 .order_by(CyabSystem.next_review_date)
                 .limit(50)
             ).scalars().all()
-            if due:
-                from ion.models.user import User as _U, Role as _R, user_roles as _ur
-                # Cap leads too — there shouldn't be more than a handful, but
-                # this stops a misconfigured role-permission grant from spamming.
-                leads = _sess.execute(
-                    _sel(_U)
-                    .join(_ur, _ur.c.user_id == _U.id)
-                    .join(_R, _R.id == _ur.c.role_id)
-                    .where(_R.name.in_(["lead", "admin", "principal_analyst"]))
-                    .where(_U.is_active == True)
-                    .limit(20)
-                ).scalars().all()
-                sent = 0
-                for sys in due:
-                    is_overdue = sys.next_review_date < _date.today()
-                    label = "OVERDUE" if is_overdue else "Due soon"
-                    for u in leads:
-                        create_notification(
-                            session=_sess, user_id=u.id,
-                            source="cyab_review", source_id=str(sys.id),
-                            title=f"CyAB Review {label}: {sys.name}",
-                            body=f"{sys.department} — {sys.sal_tier}",
-                            url=f"/cyab#{sys.id}",
-                        )
-                        sent += 1
-                _sess.commit()
-                if sent:
-                    logger.info("CyAB review reminders: %d notifications sent for %d systems", sent, len(due))
+            if not due:
+                return
+            from ion.models.user import User as _U, Role as _R, user_roles as _ur
+            leads = session.execute(
+                _sel(_U)
+                .join(_ur, _ur.c.user_id == _U.id)
+                .join(_R, _R.id == _ur.c.role_id)
+                .where(_R.name.in_(["lead", "admin", "principal_analyst"]))
+                .where(_U.is_active == True)
+                .limit(20)
+            ).scalars().all()
+            sent = 0
+            for sys in due:
+                is_overdue = sys.next_review_date < _date.today()
+                label = "OVERDUE" if is_overdue else "Due soon"
+                for u in leads:
+                    create_notification(
+                        session=session, user_id=u.id,
+                        source="cyab_review", source_id=str(sys.id),
+                        title=f"CyAB Review {label}: {sys.name}",
+                        body=f"{sys.department} — {sys.sal_tier}",
+                        url=f"/cyab#{sys.id}",
+                    )
+                    sent += 1
+            session.commit()
+            if sent:
+                logger.info("CyAB review reminders: %d notifications sent for %d systems", sent, len(due))
         finally:
-            _sess.close()
-    except Exception as e:
-        logger.warning(f"CyAB review reminder check failed: {e}")
+            session.close()
+    run_locked(engine, LOCK_CYAB_REVIEW_CHECK, "cyab_review_check", _cyab_review_check)
 
     # Version compatibility checks for connectors that declare supported ranges
     try:
