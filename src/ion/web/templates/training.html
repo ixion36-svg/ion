@@ -2452,6 +2452,7 @@
 <div class="training-tabs" id="training-tabs">
     <button class="training-tab active" data-tab="tab-pathways" onclick="switchTab('tab-pathways')">Career Pathways</button>
     <button class="training-tab" data-tab="tab-assessment" onclick="switchTab('tab-assessment')">Skills Assessment</button>
+    <button class="training-tab" data-tab="tab-rolematch" onclick="switchTab('tab-rolematch')">Role Match</button>
     <button class="training-tab" data-tab="tab-team" id="tab-team-btn" onclick="switchTab('tab-team')" style="display:none;">Team Skills</button>
     <button class="training-tab" data-tab="tab-schedule" id="tab-schedule-btn" onclick="switchTab('tab-schedule')" style="display:none;">Team Schedule</button>
     <button class="training-tab" data-tab="tab-myplan" onclick="switchTab('tab-myplan')">My Training Plan</button>
@@ -2966,6 +2967,309 @@
         </div>
     </div>
 </div>
+
+<!-- Tab 5b: Role Match — pick a role, take an Elastic-focused questionnaire,
+     get a per-area breakdown, KB recommendations, sim suggestions, and an
+     AI tutor study plan. Backed by /api/skills/role-match/* (role_skills_api.py). -->
+<div class="tab-content" id="tab-rolematch">
+    <div class="rm-header">
+        <h2>Role Match</h2>
+        <p class="rm-sub">Pick a SOC role, answer a short Elastic-focused questionnaire, and see how your current knowledge maps to the role's expectations.</p>
+        <div class="rm-actions">
+            <button class="btn btn-secondary" onclick="rmShowHistory()">My History</button>
+            <button class="btn btn-primary" onclick="rmShowRolePicker()">Start Assessment</button>
+        </div>
+    </div>
+    <div id="rm-content"><div class="rm-loading">Loading...</div></div>
+</div>
+
+<style>
+.rm-header{margin-bottom:1rem}
+.rm-header h2{margin:0 0 .25rem 0}
+.rm-sub{color:var(--text-secondary);font-size:.85rem;margin:0 0 .75rem 0}
+.rm-actions{display:flex;gap:.5rem}
+.rm-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+
+.rm-role-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.75rem}
+.rm-role-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;cursor:pointer;transition:all .15s}
+.rm-role-card:hover{border-color:var(--primary);transform:translateY(-1px)}
+.rm-role-name{font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:.25rem}
+.rm-role-tier{display:inline-block;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(88,166,255,.15);color:var(--primary);font-family:'JetBrains Mono',monospace;margin-right:.5rem}
+.rm-role-desc{font-size:.78rem;color:var(--text-secondary);margin:.4rem 0 .6rem 0;line-height:1.4}
+.rm-role-meta{font-size:.7rem;color:var(--text-secondary)}
+
+.rm-area{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:1rem}
+.rm-area-name{font-size:.95rem;font-weight:700;margin-bottom:.5rem;color:var(--text-primary)}
+.rm-question{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;margin-bottom:.5rem}
+.rm-q-text{font-size:.85rem;color:var(--text-primary);font-weight:600;margin-bottom:.25rem}
+.rm-q-guidance{font-size:.72rem;color:var(--text-secondary);font-style:italic;margin-bottom:.5rem;line-height:1.4}
+.rm-q-rate{display:flex;gap:.25rem}
+.rm-q-rate button{width:36px;height:32px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;font-weight:700;font-size:.82rem;transition:all .12s}
+.rm-q-rate button:hover{border-color:var(--primary);color:var(--primary)}
+.rm-q-rate button.selected{background:var(--primary);color:#fff;border-color:var(--primary)}
+.rm-rating-legend{display:flex;gap:.5rem;font-size:.7rem;color:var(--text-secondary);margin-bottom:.75rem;flex-wrap:wrap}
+.rm-rating-legend span{padding:2px 6px;border-radius:4px;background:var(--bg-tertiary);border:1px solid var(--border)}
+.rm-submit{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem}
+
+.rm-result-overall{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem;display:flex;align-items:center;gap:1.5rem}
+.rm-result-ring{width:110px;height:110px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rm-result-inner{width:80px;height:80px;border-radius:50%;background:var(--bg-secondary);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.rm-result-pct{font-size:1.4rem;font-weight:700;font-family:'JetBrains Mono',monospace}
+.rm-result-label{font-size:.65rem;color:var(--text-secondary);text-transform:uppercase}
+.rm-result-text h3{margin:0 0 .25rem 0;color:var(--text-primary)}
+.rm-result-text p{margin:0;color:var(--text-secondary);font-size:.82rem}
+
+.rm-areas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin-bottom:1rem}
+.rm-area-bar{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.85rem 1rem}
+.rm-area-bar-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem}
+.rm-area-bar-name{font-size:.78rem;font-weight:700;color:var(--text-primary)}
+.rm-area-bar-pct{font-family:'JetBrains Mono',monospace;font-weight:700}
+.rm-bar{height:6px;background:rgba(99,110,123,.2);border-radius:3px;overflow:hidden}
+.rm-bar-fill{height:100%;border-radius:3px;transition:width .3s}
+
+.rm-rec-block{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;margin-bottom:1rem}
+.rm-rec-block h4{margin:0 0 .5rem 0;font-size:.9rem;color:var(--text-primary);display:flex;align-items:center;gap:.5rem}
+.rm-rec-block h4 .badge{font-family:'JetBrains Mono',monospace;font-size:.7rem;background:var(--bg-tertiary);color:var(--text-secondary);padding:1px 8px;border-radius:10px}
+.rm-rec-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.5rem}
+.rm-rec-item{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:.5rem .75rem;font-size:.78rem;color:var(--text-primary)}
+.rm-rec-item strong{display:block;margin-bottom:2px}
+.rm-rec-item .rm-rec-meta{font-size:.7rem;color:var(--text-secondary)}
+.rm-ai-summary{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius);padding:.85rem 1rem;font-size:.82rem;color:var(--text-primary);line-height:1.5;white-space:pre-wrap}
+
+.rm-history-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.rm-history-table th{text-align:left;padding:.5rem .75rem;font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;border-bottom:1px solid var(--border)}
+.rm-history-table td{padding:.5rem .75rem;border-bottom:1px solid var(--border);color:var(--text-primary)}
+.rm-history-table tr:hover{background:rgba(88,166,255,.04);cursor:pointer}
+</style>
+
+<script>
+const RM_API = '/api/skills/role-match';
+let rmDefinitions = null;
+let rmCurrentRole = null;
+let rmResponses = {};
+
+function rmEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+
+function rmPctColor(pct) {
+    if (pct >= 85) return 'var(--mitre-covered,#3fb950)';
+    if (pct >= 70) return 'var(--primary,#58a6ff)';
+    if (pct >= 55) return 'var(--sev-medium,#d29922)';
+    if (pct >= 40) return 'var(--sev-high,#f0883e)';
+    return 'var(--sev-critical,#f85149)';
+}
+
+async function rmInit() {
+    const c = document.getElementById('rm-content');
+    c.innerHTML = '<div class="rm-loading">Loading...</div>';
+    try {
+        const r = await fetch(RM_API + '/me', {credentials: 'include'});
+        const d = await r.json();
+        if (d.assessment) {
+            rmRenderResult(d.assessment);
+        } else {
+            rmShowRolePicker();
+        }
+    } catch (e) {
+        rmShowRolePicker();
+    }
+}
+
+async function rmShowRolePicker() {
+    const c = document.getElementById('rm-content');
+    c.innerHTML = '<div class="rm-loading">Loading roles...</div>';
+    try {
+        const r = await fetch(RM_API + '/definitions', {credentials: 'include'});
+        rmDefinitions = await r.json();
+        let html = '<div class="rm-role-grid">';
+        for (const role of rmDefinitions.roles) {
+            html += '<div class="rm-role-card" onclick="rmStartAssessment(\'' + rmEsc(role.id) + '\')">'
+                + '<div class="rm-role-name"><span class="rm-role-tier">' + rmEsc(role.tier) + '</span>' + rmEsc(role.name) + '</div>'
+                + '<div class="rm-role-desc">' + rmEsc(role.description) + '</div>'
+                + '<div class="rm-role-meta">' + role.area_count + ' sections · ' + role.question_count + ' questions</div>'
+                + '</div>';
+        }
+        html += '</div>';
+        c.innerHTML = html;
+    } catch (e) {
+        c.innerHTML = '<div class="rm-loading">Failed to load roles</div>';
+    }
+}
+
+function rmStartAssessment(roleId) {
+    rmCurrentRole = (rmDefinitions.roles || []).find(r => r.id === roleId);
+    if (!rmCurrentRole) return;
+    rmResponses = {};
+    rmRenderQuestionnaire();
+}
+
+function rmRenderQuestionnaire() {
+    const role = rmCurrentRole;
+    const c = document.getElementById('rm-content');
+    let html = '<div class="rm-header"><h2>' + rmEsc(role.name) + '</h2>'
+        + '<p class="rm-sub">' + rmEsc(role.description) + '</p>'
+        + '<div class="rm-rating-legend">';
+    for (const r of (rmDefinitions.rating_scale || [])) {
+        html += '<span><strong>' + r.value + '</strong> ' + rmEsc(r.label) + '</span>';
+    }
+    html += '</div></div>';
+
+    for (const area of role.areas) {
+        html += '<div class="rm-area"><div class="rm-area-name">' + rmEsc(area.name) + '</div>';
+        for (const q of area.questions) {
+            html += '<div class="rm-question">'
+                + '<div class="rm-q-text">' + rmEsc(q.text) + '</div>'
+                + '<div class="rm-q-guidance">' + rmEsc(q.guidance) + '</div>'
+                + '<div class="rm-q-rate" data-area="' + rmEsc(area.id) + '" data-q="' + rmEsc(q.id) + '">';
+            for (const v of [1,2,3,4,5]) {
+                html += '<button onclick="rmRate(\'' + rmEsc(area.id) + '\',\'' + rmEsc(q.id) + '\',' + v + ',this)">' + v + '</button>';
+            }
+            html += '</div></div>';
+        }
+        html += '</div>';
+    }
+
+    html += '<div class="rm-submit">'
+        + '<button class="btn btn-secondary" onclick="rmShowRolePicker()">Cancel</button>'
+        + '<button class="btn btn-primary" id="rm-submit-btn" onclick="rmSubmit()">Submit</button>'
+        + '</div>';
+    c.innerHTML = html;
+}
+
+function rmRate(areaId, qId, value, btn) {
+    if (!rmResponses[areaId]) rmResponses[areaId] = {};
+    rmResponses[areaId][qId] = value;
+    const container = btn.parentElement;
+    container.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+}
+
+async function rmSubmit() {
+    const btn = document.getElementById('rm-submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Scoring (AI tutor may take 30s)...';
+    try {
+        const r = await fetch(RM_API + '/submit', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify({
+                role_id: rmCurrentRole.id,
+                responses: rmResponses,
+                set_as_target: true,
+            }),
+        });
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err.detail || ('HTTP ' + r.status));
+        }
+        const result = await r.json();
+        rmRenderResult(result);
+    } catch (e) {
+        alert('Submit failed: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = 'Submit';
+    }
+}
+
+function rmRenderResult(a) {
+    const c = document.getElementById('rm-content');
+    const pct = a.overall_match_pct;
+    const color = rmPctColor(pct);
+    const scores = a.scores || {};
+    const areas = scores.areas || {};
+    const rec = a.recommendations || {};
+
+    let html = '<div class="rm-result-overall">'
+        + '<div class="rm-result-ring" style="background:conic-gradient(' + color + ' ' + pct + '%, rgba(99,110,123,.2) ' + pct + '%)">'
+        + '<div class="rm-result-inner"><div class="rm-result-pct" style="color:' + color + '">' + pct + '%</div><div class="rm-result-label">Match</div></div>'
+        + '</div>'
+        + '<div class="rm-result-text"><h3>' + rmEsc(a.overall_level) + ' — ' + rmEsc(a.role_name) + '</h3>'
+        + '<p>Taken ' + (a.taken_at ? new Date(a.taken_at).toLocaleString() : '-') + ' · saved as your target role</p></div>'
+        + '</div>';
+
+    html += '<div class="rm-areas-grid">';
+    for (const [aid, aScore] of Object.entries(areas)) {
+        const aColor = rmPctColor(aScore.pct);
+        html += '<div class="rm-area-bar"><div class="rm-area-bar-head">'
+            + '<span class="rm-area-bar-name">' + rmEsc(aScore.name || aid) + '</span>'
+            + '<span class="rm-area-bar-pct" style="color:' + aColor + '">' + aScore.pct + '%</span>'
+            + '</div><div class="rm-bar"><div class="rm-bar-fill" style="width:' + aScore.pct + '%;background:' + aColor + '"></div></div></div>';
+    }
+    html += '</div>';
+
+    if ((rec.gaps || []).length > 0) {
+        html += '<div class="rm-rec-block"><h4>Focus areas <span class="badge">' + rec.gaps.length + '</span></h4>'
+            + '<div class="rm-rec-list">';
+        for (const g of rec.gaps) {
+            html += '<div class="rm-rec-item"><strong>' + rmEsc(g.name) + '</strong><div class="rm-rec-meta">' + g.pct + '%</div></div>';
+        }
+        html += '</div></div>';
+    }
+
+    if ((rec.kb_articles || []).length > 0) {
+        html += '<div class="rm-rec-block"><h4>Knowledge base articles <span class="badge">' + rec.kb_articles.length + '</span></h4>'
+            + '<div class="rm-rec-list">';
+        for (const k of rec.kb_articles) {
+            html += '<div class="rm-rec-item"><strong>' + rmEsc(k.capability_key) + '</strong>'
+                + '<div class="rm-rec-meta">' + rmEsc(k.doc_status) + (k.has_runbooks ? ' · runbooks' : '') + (k.has_procedures ? ' · procedures' : '') + '</div>'
+                + '</div>';
+        }
+        html += '</div></div>';
+    }
+
+    if ((rec.sim_scenarios || []).length > 0) {
+        html += '<div class="rm-rec-block"><h4>Training sim scenarios <span class="badge">' + rec.sim_scenarios.length + '</span></h4>'
+            + '<div class="rm-rec-list">';
+        for (const s of rec.sim_scenarios) {
+            html += '<div class="rm-rec-item"><strong>' + rmEsc(s.name) + '</strong>'
+                + '<div class="rm-rec-meta">' + rmEsc(s.tier || '') + (s.duration_min ? ' · ' + s.duration_min + ' min' : '') + '</div>'
+                + '</div>';
+        }
+        html += '</div></div>';
+    }
+
+    if (rec.ai_summary) {
+        html += '<div class="rm-rec-block"><h4>AI tutor — your 4-week study plan</h4>'
+            + '<div class="rm-ai-summary">' + rmEsc(rec.ai_summary) + '</div></div>';
+    }
+
+    html += '<div class="rm-submit">'
+        + '<button class="btn btn-secondary" onclick="rmShowHistory()">View History</button>'
+        + '<button class="btn btn-primary" onclick="rmShowRolePicker()">New Assessment</button>'
+        + '</div>';
+    c.innerHTML = html;
+}
+
+async function rmShowHistory() {
+    const c = document.getElementById('rm-content');
+    c.innerHTML = '<div class="rm-loading">Loading history...</div>';
+    try {
+        const r = await fetch(RM_API + '/history', {credentials: 'include'});
+        const d = await r.json();
+        const list = d.assessments || [];
+        if (!list.length) {
+            c.innerHTML = '<div class="rm-loading">No assessments yet — click "Start Assessment" above.</div>';
+            return;
+        }
+        let html = '<table class="rm-history-table"><thead><tr><th>Date</th><th>Role</th><th>Match</th><th>Level</th><th></th></tr></thead><tbody>';
+        for (const a of list) {
+            const pct = a.overall_match_pct;
+            const color = rmPctColor(pct);
+            html += '<tr onclick="rmRenderResult(' + JSON.stringify(a).replace(/"/g,'&quot;') + ')">'
+                + '<td>' + (a.taken_at ? new Date(a.taken_at).toLocaleDateString() : '-') + '</td>'
+                + '<td>' + rmEsc(a.role_name) + '</td>'
+                + '<td><strong style="color:' + color + '">' + pct + '%</strong></td>'
+                + '<td>' + rmEsc(a.overall_level) + '</td>'
+                + '<td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();rmRenderResult(' + JSON.stringify(a).replace(/"/g,'&quot;') + ')">View</button></td>'
+                + '</tr>';
+        }
+        html += '</tbody></table>';
+        c.innerHTML = html;
+    } catch (e) {
+        c.innerHTML = '<div class="rm-loading">Failed to load history</div>';
+    }
+}
+</script>
 
 <!-- Tab 6: My Training Plan -->
 <div class="tab-content" id="tab-myplan">
@@ -5289,6 +5593,7 @@ function switchTab(tabId) {
     if (btn) btn.classList.add('active');
     if (tabId === 'tab-pathways') setTimeout(drawConnectors, 50);
     if (tabId === 'tab-assessment') renderAssessmentForm();
+    if (tabId === 'tab-rolematch') rmInit();
     if (tabId === 'tab-team') loadTeamData();
     if (tabId === 'tab-schedule') initSchedule();
     if (tabId === 'tab-myplan') tpInit();

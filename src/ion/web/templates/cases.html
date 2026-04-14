@@ -683,6 +683,35 @@
 .cpanel-meta-item select:focus,
 .cpanel-meta-item input:focus { outline: none; border-color: var(--accent-color); }
 
+.cpanel-kibana-assignees {
+    margin-top: 0.4rem;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+.cpanel-kibana-label { font-weight: 600; opacity: 0.85; }
+.cpanel-kibana-pill {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    background: rgba(88,166,255,0.12);
+    color: var(--primary, #58a6ff);
+    border: 1px solid rgba(88,166,255,0.25);
+}
+.cpanel-kibana-pill.mismatch {
+    background: rgba(240,136,62,0.15);
+    color: var(--sev-high, #f0883e);
+    border-color: rgba(240,136,62,0.4);
+}
+.cpanel-kibana-warn {
+    color: var(--sev-high, #f0883e);
+    font-weight: 600;
+}
+
 .cpanel-tags {
     display: flex;
     flex-wrap: wrap;
@@ -1752,13 +1781,22 @@ async function loadAllCases() {
 }
 
 async function loadUsers() {
+    // /api/users/assignable is the picker-friendly endpoint (gated by alert:read
+    // so every analyst can populate their dropdown). /api/users requires
+    // user:read which analyst roles don't have, so the dropdown was silently
+    // empty for them.
     try {
-        const resp = await fetch('/api/users');
-        if (!resp.ok) return;
+        const resp = await fetch('/api/users/assignable');
+        if (!resp.ok) {
+            console.log('assignable users endpoint returned', resp.status);
+            usersCache = [];
+            populateAssigneeDropdowns();
+            return;
+        }
         const data = await resp.json();
-        usersCache = Array.isArray(data) ? data : data.users || [];
+        usersCache = data.users || [];
     } catch (e) {
-        console.log('Could not load users');
+        console.log('Could not load assignable users', e);
         usersCache = [];
     }
     populateAssigneeDropdowns();
@@ -1768,15 +1806,25 @@ function populateAssigneeDropdowns() {
     const filterSelect = document.getElementById('filter-assignee');
     const createSelect = document.getElementById('new-case-assignee');
 
-    const options = usersCache.map(u =>
+    // Filter dropdown matches against the response field `assigned_to`
+    // (a username string returned by the case GET endpoint), so it stays
+    // username-keyed. Create/picker dropdowns are id-keyed because the
+    // POST/PATCH endpoints expect assigned_to_id: int.
+    const filterOptions = usersCache.map(u =>
         '<option value="' + esc(u.username) + '">' + esc(u.display_name || u.username) + '</option>'
+    ).join('');
+    const idOptions = usersCache.map(u =>
+        '<option value="' + u.id + '">'
+        + esc(u.display_name || u.username)
+        + (u.has_elastic_profile ? '' : ' (no Kibana profile)')
+        + '</option>'
     ).join('');
 
     if (filterSelect) {
-        filterSelect.innerHTML = '<option value="">All Assignees</option>' + options;
+        filterSelect.innerHTML = '<option value="">All Assignees</option>' + filterOptions;
     }
     if (createSelect) {
-        createSelect.innerHTML = '<option value="">Unassigned</option>' + options;
+        createSelect.innerHTML = '<option value="">Unassigned</option>' + idOptions;
     }
 }
 
@@ -2098,14 +2146,41 @@ function renderPanelContent(c) {
             '<option value="' + s + '"' + (c.severity === s ? ' selected' : '') + '>' + s + '</option>'
         ).join('')
         + '</select></div>';
+    // Assignee dropdown — value is the ION user.id (int), field name is
+    // assigned_to_id so the PATCH endpoint's CaseUpdate(assigned_to_id: int)
+    // actually receives it. The endpoint then resolves the elastic_uid and
+    // syncs to Kibana automatically (api.py:4366).
+    //
+    // c.kibana_assignees comes from the read direction: Kibana case → ES
+    // profile bulk_get → ION user reverse-lookup. We surface a warning if
+    // Kibana's current assignee differs from ION's local assignment (means
+    // someone touched the case directly in Kibana since ION last wrote).
+    const kbAssignees = c.kibana_assignees || [];
+    const kbIonIds = kbAssignees.map(a => a.ion_user_id).filter(x => x != null);
+    const mismatch = kbAssignees.length > 0
+        && (c.assigned_to_id == null || !kbIonIds.includes(c.assigned_to_id));
     html += '<div class="cpanel-meta-item"><label>Assigned To</label>'
-        + '<select onchange="panelUpdateField(' + c.id + ',\'assigned_to\',this.value)">'
-        + '<option value=""' + (!c.assigned_to ? ' selected' : '') + '>Unassigned</option>'
+        + '<select onchange="panelUpdateField(' + c.id + ',\'assigned_to_id\',this.value)">'
+        + '<option value=""' + (!c.assigned_to_id ? ' selected' : '') + '>Unassigned</option>'
         + usersCache.map(u =>
-            '<option value="' + esc(u.username) + '"' + (c.assigned_to === u.username ? ' selected' : '') + '>'
-            + esc(u.display_name || u.username) + '</option>'
+            '<option value="' + u.id + '"' + (c.assigned_to_id === u.id ? ' selected' : '') + '>'
+            + esc(u.display_name || u.username)
+            + (u.has_elastic_profile ? '' : ' (no Kibana profile)')
+            + '</option>'
         ).join('')
-        + '</select></div>';
+        + '</select>'
+        + (kbAssignees.length > 0
+            ? '<div class="cpanel-kibana-assignees" title="Live state from the linked Kibana case">'
+              + '<span class="cpanel-kibana-label">Kibana:</span> '
+              + kbAssignees.map(a => {
+                    const display = a.ion_display_name || a.ion_username || a.full_name || a.username || a.uid;
+                    return '<span class="cpanel-kibana-pill' + (mismatch ? ' mismatch' : '') + '">'
+                        + esc(display) + '</span>';
+                }).join(' ')
+              + (mismatch ? ' <span class="cpanel-kibana-warn" title="ION and Kibana disagree on the assignee">⚠ mismatch</span>' : '')
+              + '</div>'
+            : '')
+        + '</div>';
     html += '<div class="cpanel-meta-item"><label>Created</label>'
         + '<input type="text" value="' + esc(fmtDate(c.created_at)) + '" disabled></div>';
     html += '</div></div>';
@@ -2339,7 +2414,16 @@ async function panelUpdateField(caseId, field, value) {
 
     try {
         const body = {};
-        body[field] = value || null;
+        // Coerce empty string → null, and integer-typed fields to int so the
+        // PATCH endpoint's Pydantic validators accept the payload (the
+        // assigned_to_id picker in particular sends string values from
+        // <select>; PATCH expects Optional[int]).
+        let coerced = value === '' || value == null ? null : value;
+        if (field === 'assigned_to_id' && coerced != null) {
+            coerced = parseInt(coerced, 10);
+            if (Number.isNaN(coerced)) coerced = null;
+        }
+        body[field] = coerced;
 
         const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId, {
             method: 'PATCH',
@@ -2538,7 +2622,7 @@ async function submitCreateCase() {
 
     const description = document.getElementById('new-case-description').value.trim();
     const severity = document.getElementById('new-case-severity').value;
-    const assignee = document.getElementById('new-case-assignee').value;
+    const assigneeId = document.getElementById('new-case-assignee').value;
 
     try {
         const body = {
@@ -2547,7 +2631,11 @@ async function submitCreateCase() {
             alert_ids: [],
         };
         if (description) body.description = description;
-        if (assignee) body.assigned_to = assignee;
+        // CaseCreate expects assigned_to_id: int — coerce from the select string
+        if (assigneeId) {
+            const idNum = parseInt(assigneeId, 10);
+            if (!Number.isNaN(idNum)) body.assigned_to_id = idNum;
+        }
 
         const resp = await fetch('/api/elasticsearch/alerts/cases', {
             method: 'POST',

@@ -843,6 +843,32 @@ async def oidc_callback(
 # User management endpoints (admin only)
 # =============================================================================
 
+@router.get("/users/assignable", dependencies=[Depends(require_permission("alert:read"))])
+async def list_assignable_users(
+    session: Session = Depends(get_db_session),
+):
+    """Lightweight user list for assignment pickers.
+
+    Returns only the fields a picker needs: id, username, display_name, and
+    elastic_uid (so callers can show which users have a Kibana profile mapped).
+    Gated by `alert:read` so every analyst can populate their assignment
+    dropdown — `/api/users` requires `user:read` which analysts don't have.
+    """
+    user_repo = UserRepository(session)
+    users = user_repo.list_all(include_inactive=False)
+    return {
+        "users": [
+            {
+                "id": u.id,
+                "username": u.username,
+                "display_name": u.display_name or u.username,
+                "has_elastic_profile": bool(getattr(u, "elastic_uid", None)),
+            }
+            for u in users
+        ]
+    }
+
+
 @router.get("/users", dependencies=[Depends(require_permission("user:read"))])
 async def list_users(
     include_inactive: bool = False,
@@ -4198,6 +4224,73 @@ async def get_case_detail(
     # Get Kibana URL if available
     kibana_url = get_kibana_case_url(case.kibana_case_id)
 
+    # Resolve Kibana assignees (read direction): if the case is linked to a
+    # Kibana case, fetch its current assignees, resolve the opaque UIDs to
+    # user profiles via the ES native API, and map each profile back to an
+    # ION user via users.elastic_uid. The UI uses this to show whichever
+    # state Kibana actually has — useful when assignment was made externally.
+    #
+    # Self-healing: if a UID isn't cached on any ION user but the resolved
+    # ES username matches an ION user that has no elastic_uid yet, the
+    # mapping is filled in. This means the FIRST read after an external
+    # Kibana assignment is enough to bind the ION user to its Kibana profile.
+    kibana_assignees: list[dict] = []
+    if case.kibana_case_id:
+        try:
+            from ion.services.kibana_cases_service import get_kibana_cases_service
+            from ion.services.elasticsearch_service import ElasticsearchService
+            kb = get_kibana_cases_service()
+            if kb.enabled:
+                kb_case = kb.get_case(case.kibana_case_id)
+                if kb_case:
+                    raw_assignees = kb_case.get("assignees") or []
+                    uids = [a.get("uid") for a in raw_assignees if isinstance(a, dict) and a.get("uid")]
+                    if uids:
+                        es = ElasticsearchService()
+                        if es.is_configured:
+                            profile_map = await es.bulk_get_user_profiles(uids)
+                            # Reverse-lookup ION users in one query
+                            ion_users = session.query(User).filter(User.elastic_uid.in_(uids)).all()
+                            ion_by_uid = {u.elastic_uid: u for u in ion_users}
+                            self_healed = False
+                            for uid in uids:
+                                profile = profile_map.get(uid) or {}
+                                puser = profile.get("user") if isinstance(profile, dict) else None
+                                puser = puser if isinstance(puser, dict) else {}
+                                ion_user = ion_by_uid.get(uid)
+
+                                # Self-heal: bind a UID-less ION user to this profile
+                                # by exact username match.
+                                if not ion_user and puser.get("username"):
+                                    candidate = (
+                                        session.query(User)
+                                        .filter(User.username == puser["username"])
+                                        .filter((User.elastic_uid.is_(None)) | (User.elastic_uid == ""))
+                                        .first()
+                                    )
+                                    if candidate:
+                                        candidate.elastic_uid = uid
+                                        ion_user = candidate
+                                        self_healed = True
+                                        logger.info(
+                                            "Auto-cached elastic_uid for %s from Kibana case read: %s",
+                                            candidate.username, uid,
+                                        )
+
+                                kibana_assignees.append({
+                                    "uid": uid,
+                                    "username": puser.get("username"),
+                                    "full_name": puser.get("full_name"),
+                                    "email": puser.get("email"),
+                                    "ion_user_id": ion_user.id if ion_user else None,
+                                    "ion_username": ion_user.username if ion_user else None,
+                                    "ion_display_name": (ion_user.display_name or ion_user.username) if ion_user else None,
+                                })
+                            if self_healed:
+                                session.commit()
+        except Exception as e:
+            logger.debug(f"Failed to resolve Kibana assignees for case {case_id}: {e}")
+
     # Get DFIR-IRIS URL if available
     dfir_iris_url = None
     if case.dfir_iris_case_id:
@@ -4217,6 +4310,9 @@ async def get_case_detail(
         "created_by": case.created_by.username if case.created_by else None,
         "assigned_to": case.assigned_to.username if case.assigned_to else None,
         "assigned_to_id": case.assigned_to_id,
+        # Live Kibana-side assignees, resolved through ES profile API.
+        # Empty when no Kibana case is linked OR Kibana has no assignees.
+        "kibana_assignees": kibana_assignees,
         "affected_hosts": case.affected_hosts,
         "affected_users": case.affected_users,
         "triggered_rules": case.triggered_rules,
@@ -4363,30 +4459,32 @@ async def update_case(
         except Exception as e:
             logger.warning(f"Failed to sync alert workflow_status on case update: {e}")
 
-    # Resolve Kibana assignee UID if assignee changed
+    # Resolve assignee UID if assignee changed.
+    # Resolution goes via the Elasticsearch native API (POST /_security/profile/_suggest),
+    # NOT the Kibana internal route — that one is 404 outside a browser session
+    # in Kibana 8.11+. The cached `users.elastic_uid` short-circuits the lookup.
     assignee_elastic_uid = None
     if data.assigned_to_id is not None and case.kibana_case_id:
         assignee = session.query(User).filter_by(id=data.assigned_to_id).first()
         if assignee:
-            # Use cached elastic_uid, or look it up from Kibana and cache it
             if assignee.elastic_uid:
                 assignee_elastic_uid = assignee.elastic_uid
             else:
                 try:
-                    from ion.services.kibana_cases_service import get_kibana_cases_service
-                    kb_service = get_kibana_cases_service()
-                    if kb_service.enabled:
+                    from ion.services.elasticsearch_service import ElasticsearchService
+                    _es = ElasticsearchService()
+                    if _es.is_configured:
                         lookup_name = getattr(assignee, 'elastic_username', None) or assignee.username
-                        uid = kb_service.resolve_user_uid(lookup_name)
+                        uid = await _es.resolve_user_uid(lookup_name)
                         if not uid and lookup_name != assignee.username:
-                            uid = kb_service.resolve_user_uid(assignee.username)
+                            uid = await _es.resolve_user_uid(assignee.username)
                         if uid:
                             assignee_elastic_uid = uid
                             assignee.elastic_uid = uid
                             session.commit()
                             logger.info("Cached elastic_uid for user %s: %s", assignee.username, uid)
                 except Exception as e:
-                    logger.debug("Failed to resolve Kibana UID for %s: %s", assignee.username, e)
+                    logger.debug("Failed to resolve Elastic UID for %s: %s", assignee.username, e)
 
     # Sync updates to Kibana
     new_version, kibana_url = sync_case_update_to_kibana(

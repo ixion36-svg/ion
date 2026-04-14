@@ -35,6 +35,7 @@ from ion.web.observable_api import router as observable_router
 from ion.web.ai_api import router as ai_router
 from ion.web.kibana_api import router as kibana_router
 from ion.web.skills_api import router as skills_router
+from ion.web.role_skills_api import router as role_skills_router
 from ion.web.notes_api import router as notes_router
 from ion.web.pcap_api import router as pcap_router
 from ion.web.forensics_api import router as forensics_router
@@ -243,6 +244,8 @@ app.include_router(observable_router, prefix="/api")
 app.include_router(ai_router)
 app.include_router(kibana_router, prefix="/api/kibana")
 app.include_router(skills_router, prefix="/api/skills")
+# Role-match router has its own /skills/role-match prefix in the router itself
+app.include_router(role_skills_router, prefix="/api")
 app.include_router(notes_router, prefix="/api/notes")
 app.include_router(pcap_router, prefix="/api/pcap")
 app.include_router(forensics_router, prefix="/api/forensics")

@@ -87,6 +87,7 @@ from ion.models.skills import (
     KnowledgeArticle,
     TrainingPlan,
     TrainingPlanItem,
+    RoleAssessment,
 )
 from ion.models.analyst_note import AnalystNote
 from ion.models.note_folder import NoteFolder
@@ -224,6 +225,7 @@ __all__ = [
     # Training plan models
     "TrainingPlan",
     "TrainingPlanItem",
+    "RoleAssessment",
     # Analyst notepad
     "AnalystNote",
     "NoteFolder",

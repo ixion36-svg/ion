@@ -64,7 +64,7 @@ services:
   # =============================================================================
   ion:
     # build: .  # Uncomment to build from source instead of pulling
-    image: ixion36/ion:${ION_VERSION:-0.9.66}
+    image: ixion36/ion:${ION_VERSION:-0.9.68}
     container_name: ion
     restart: unless-stopped
 
@@ -101,6 +101,10 @@ services:
       # notifications duplicate on each startup. Fix via pg advisory lock
       # leader election in a future pass.
       - ION_WORKERS=${ION_WORKERS:-4}
+      # Note: ION_OLLAMA_MODEL is loaded from .env. On Docker Desktop for
+      # Windows the host VM is ~4GB and qwen2.5:3b will OOM the runner —
+      # set ION_OLLAMA_MODEL=qwen2.5:0.5b in .env for dev. Prod boxes with
+      # more RAM can use 3b/7b for higher-quality AI tutor narratives.
       # Optional: Trust a self-signed CA for OpenCTI, ES, Keycloak, etc.
       # - ION_CA_BUNDLE=/etc/ssl/certs/custom-ca.pem
 
@@ -197,7 +201,7 @@ services:
   # Shares ion-data volume for .seeded marker persistence.
   # Skips automatically on subsequent starts.
   seeder:
-    image: ixion36/ion:${ION_VERSION:-0.9.66}
+    image: ixion36/ion:${ION_VERSION:-0.9.68}
     container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]
     volumes:

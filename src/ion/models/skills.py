@@ -3,8 +3,9 @@
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, Float, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import JSON
 
 from ion.models.base import Base, TimestampMixin
 
@@ -172,3 +173,42 @@ class KnowledgeArticle(Base, TimestampMixin):
     spof_risk: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)  # single point of failure
     owner_user_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # knowledge domain owner
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class RoleAssessment(Base, TimestampMixin):
+    """A user's self-assessment for a specific career role.
+
+    The user picks a role (L1/L2/L3 SOC Analyst, SOC Engineer, Threat Hunter,
+    etc.), answers a per-role Elastic-stack-focused questionnaire, and the
+    service stores their responses + calculated per-area scores + an
+    overall match percentage. History is preserved across submissions so
+    progress over time is visible.
+    """
+
+    __tablename__ = "role_assessments"
+    __table_args__ = (
+        Index("ix_role_assessment_user_taken", "user_id", "taken_at"),
+        Index("ix_role_assessment_role", "role_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    role_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    role_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    # responses: {area_id: {question_id: rating(int 1-5)}}
+    responses: Mapped[dict] = mapped_column(JSON, nullable=False)
+    # scores:    {area_id: {avg: float, total: int, max: int, pct: int}}
+    scores: Mapped[dict] = mapped_column(JSON, nullable=False)
+    overall_match_pct: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    overall_level: Mapped[str] = mapped_column(String(40), nullable=False, default="Developing")
+    # Recommendations blob set at submit time:
+    #   {"strengths":[area_ids], "gaps":[area_ids],
+    #    "kb_articles":[{capability_key, ...}],
+    #    "sim_scenarios":[{id, name, ...}], "ai_summary": "..."}
+    recommendations: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    taken_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), nullable=False
+    )

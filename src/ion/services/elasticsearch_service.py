@@ -220,6 +220,74 @@ class ElasticsearchService:
 
         return response.json()
 
+    async def suggest_user_profiles(
+        self, name: str, size: int = 5
+    ) -> List[Dict[str, Any]]:
+        """Suggest Elasticsearch user profiles by username/email/full-name match.
+
+        Hits the ES native API `POST /_security/profile/_suggest`. This is the
+        correct endpoint for username → UID resolution; the equivalent Kibana
+        endpoint `POST /internal/security/user_profile/_suggest` is 404 in
+        Kibana 8.11+ unless invoked from a logged-in browser session.
+
+        Returns:
+            list of profile dicts shaped like
+            `{"uid": "...", "user": {"username": ..., "email": ..., ...}}`
+        """
+        if not self.is_configured:
+            return []
+        try:
+            result = await self._request(
+                "POST",
+                "/_security/profile/_suggest",
+                json={"name": name, "size": size},
+            )
+            return result.get("profiles", []) if isinstance(result, dict) else []
+        except ElasticsearchError as e:
+            logger.debug("ES profile suggest failed for %r: %s", name, e)
+            return []
+
+    async def resolve_user_uid(self, username: str) -> Optional[str]:
+        """Resolve an exact username to its Elasticsearch user profile UID.
+
+        Calls `suggest_user_profiles` and returns only an EXACT username match
+        — fuzzy hits are dropped to avoid attributing alerts to the wrong user.
+        Returns None if the username has no profile (user has never logged
+        into Kibana, or doesn't exist in ES).
+        """
+        profiles = await self.suggest_user_profiles(username, size=10)
+        for p in profiles:
+            user = p.get("user", {}) if isinstance(p, dict) else {}
+            if isinstance(user, dict) and user.get("username") == username:
+                return p.get("uid")
+        return None
+
+    async def bulk_get_user_profiles(
+        self, uids: List[str]
+    ) -> Dict[str, Dict[str, Any]]:
+        """Resolve a list of UIDs back to their user profiles in one call.
+
+        Used when reading Kibana case `assignees: [{uid: ...}]` — Kibana
+        stores assignees by opaque UID, this maps them back to usernames.
+        Returns a `{uid: profile}` map; missing UIDs are simply absent.
+        """
+        if not self.is_configured or not uids:
+            return {}
+        try:
+            result = await self._request(
+                "GET",
+                f"/_security/profile/{','.join(uids)}",
+            )
+        except ElasticsearchError as e:
+            logger.debug("ES profile bulk_get failed for %d uids: %s", len(uids), e)
+            return {}
+        out: Dict[str, Dict[str, Any]] = {}
+        for p in (result.get("profiles", []) if isinstance(result, dict) else []):
+            uid = p.get("uid") if isinstance(p, dict) else None
+            if uid:
+                out[uid] = p
+        return out
+
     async def test_connection(self) -> Dict[str, Any]:
         """Test the Elasticsearch connection."""
         if not self.is_configured:
