@@ -415,6 +415,27 @@ async def startup_event():
         import logging
         logging.getLogger(__name__).warning(f"Failed to seed forensic playbooks: {e}")
 
+    # Seed KnowledgeArticle rows for every capability_key referenced by the
+    # Role Match questionnaires, so the gap-recommendations tier surfaces
+    # something instead of returning an empty list. Idempotent.
+    try:
+        from ion.services.role_skills_service import seed_capability_articles
+        from ion.storage.database import get_engine, get_session_factory
+        _eng = get_engine(config.db_path)
+        _fac = get_session_factory(_eng)
+        _sess = _fac()
+        try:
+            report = seed_capability_articles(_sess)
+            if report.get("seeded"):
+                logger.info(
+                    "Seeded %d Role Match capability articles (%d already present)",
+                    report["seeded"], report["already_present"],
+                )
+        finally:
+            _sess.close()
+    except Exception as e:
+        logger.warning(f"Failed to seed Role Match capability articles: {e}")
+
     # Start Kibana bidirectional sync if enabled (via connector)
     try:
         from ion.services.connectors import get_connector_registry

@@ -1162,6 +1162,98 @@ def list_history_for_user(session: Session, user_id: int) -> List[Dict[str, Any]
     return [_to_dict(r) for r in rows]
 
 
+def collect_capability_keys() -> List[Dict[str, str]]:
+    """Return every unique capability_key referenced by role questionnaires.
+
+    Each entry includes the role + area context so the seeder can write a
+    useful default note when creating a KnowledgeArticle row.
+    """
+    seen: Dict[str, Dict[str, str]] = {}
+    for role in ROLE_DEFINITIONS:
+        for area in role["areas"]:
+            for q in area["questions"]:
+                ck = q.get("capability_key")
+                if ck and ck not in seen:
+                    seen[ck] = {
+                        "capability_key": ck,
+                        "role_name": role["name"],
+                        "area_name": area["name"],
+                        "first_question": q["text"],
+                    }
+    return list(seen.values())
+
+
+def seed_capability_articles(session: Session) -> Dict[str, int]:
+    """Create KnowledgeArticle rows for every capability_key the role
+    questionnaires reference, so the gap-recommendations tier of Role
+    Match has something to surface.
+
+    Idempotent and **safe under concurrent uvicorn workers** — uses
+    Postgres `INSERT ... ON CONFLICT DO NOTHING` so a race between
+    workers on the same constraint just no-ops instead of raising.
+    Returns `{seeded: N, already_present: N, total: N}` for logging.
+    """
+    keys = collect_capability_keys()
+    if not keys:
+        return {"seeded": 0, "already_present": 0, "total": 0}
+
+    # How many already exist, for the report only
+    existing_count = (
+        session.query(KnowledgeArticle.capability_key)
+        .filter(KnowledgeArticle.capability_key.in_([k["capability_key"] for k in keys]))
+        .count()
+    )
+
+    rows = [
+        {
+            "capability_key": k["capability_key"],
+            "doc_status": "undocumented",
+            "has_runbooks": False,
+            "has_procedures": False,
+            "knowledge_sharing": "siloed",
+            "spof_risk": True,
+            "owner_user_id": None,
+            "notes": (
+                f"Role Match capability — referenced by {k['role_name']} -> "
+                f"{k['area_name']}. Example question: {k['first_question'][:140]}"
+            ),
+        }
+        for k in keys
+    ]
+
+    # Postgres-only path — race-safe. SQLite fallback below.
+    try:
+        from sqlalchemy.dialects.postgresql import insert as pg_insert  # type: ignore
+        stmt = pg_insert(KnowledgeArticle).values(rows).on_conflict_do_nothing(
+            index_elements=["capability_key"]
+        )
+        result = session.execute(stmt)
+        session.commit()
+        # `rowcount` reflects rows actually inserted on Postgres.
+        seeded = result.rowcount if result.rowcount and result.rowcount > 0 else 0
+    except Exception:
+        # Fallback: per-row try/except with savepoints. Slow but portable.
+        session.rollback()
+        seeded = 0
+        for row in rows:
+            sp = session.begin_nested()
+            try:
+                session.add(KnowledgeArticle(**row))
+                session.flush()
+                sp.commit()
+                seeded += 1
+            except Exception:
+                sp.rollback()
+        if seeded:
+            session.commit()
+
+    return {
+        "seeded": seeded,
+        "already_present": existing_count,
+        "total": len(keys),
+    }
+
+
 def _to_dict(a: RoleAssessment) -> Dict[str, Any]:
     return {
         "id": a.id,
