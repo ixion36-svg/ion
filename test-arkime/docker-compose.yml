@@ -1,0 +1,37 @@
+# Dev-only mock Arkime viewer — emulates the Arkime 5.x API endpoints ION's
+# arkime_service uses. Not a real Arkime deployment; designed to exercise the
+# ION integration end-to-end without the weight of a full Arkime install.
+#
+#   cd test-arkime
+#   docker compose up -d
+#   python seed_arkime_alert.py   # needs the test-elasticsearch stack running
+#
+# Then open /alerts in ION, find the new "Suspicious outbound beaconing"
+# alert, click the cyan Arkime icon in the Actions column.
+services:
+  mock-arkime:
+    image: python:3.14-slim
+    container_name: mock-arkime
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./mock_arkime.py:/app/mock_arkime.py:ro
+    ports:
+      - "8005:8005"
+    environment:
+      - PORT=8005
+      - MOCK_ARKIME_NODE=capture01
+      - MOCK_ARKIME_COMMUNITY_ID=1:0ECALHJBcs13AkbmCmvNd9CVOkA=
+      - MOCK_ARKIME_USER=arkime
+      - MOCK_ARKIME_PASS=arkime
+      - MOCK_ARKIME_REQUIRE_AUTH=1
+    command:
+      - sh
+      - -c
+      - "pip install --quiet --no-cache-dir fastapi 'uvicorn[standard]' scapy && exec python mock_arkime.py"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
