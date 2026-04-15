@@ -284,9 +284,12 @@ async function switchFocusMode(roleName) {
 
 function toggleUserDropdown() {
     const dropdown = document.getElementById('user-dropdown');
-    if (dropdown) {
-        dropdown.classList.toggle('show');
-    }
+    if (!dropdown) return;
+    // The template sets an inline display:none so toggling a CSS class alone
+    // would be masked. Flip the style directly instead.
+    const open = dropdown.style.display !== 'block';
+    dropdown.style.display = open ? 'block' : 'none';
+    dropdown.classList.toggle('show', open);
 }
 
 // Mobile nav hamburger toggle
@@ -304,6 +307,7 @@ document.addEventListener('click', function(event) {
     const userMenu = document.getElementById('user-menu');
     const dropdown = document.getElementById('user-dropdown');
     if (userMenu && dropdown && !userMenu.contains(event.target)) {
+        dropdown.style.display = 'none';
         dropdown.classList.remove('show');
     }
     // Close mobile nav when clicking outside
