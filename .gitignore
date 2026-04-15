@@ -7,6 +7,9 @@ frontend/tailwindcss-*
 dashboard_prototype.html
 dashboard_static/
 
+# Local-only Docker Compose overrides (e.g., bigger memory for dev boxes)
+docker-compose.override.yml
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

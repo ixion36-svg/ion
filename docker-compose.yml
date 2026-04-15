@@ -50,21 +50,23 @@ services:
     security_opt:
       - no-new-privileges:true
 
+    # Sized for ~50 concurrent SOC users on the v0.9.65 load-test profile.
+    # Override per-deployment via .env: ION_DB_CPUS, ION_DB_MEMORY.
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 512M
+          cpus: '${ION_DB_CPUS:-4}'
+          memory: ${ION_DB_MEMORY:-4G}
         reservations:
-          cpus: '0.25'
-          memory: 128M
+          cpus: '0.5'
+          memory: 512M
 
   # =============================================================================
   # ION - Main Application
   # =============================================================================
   ion:
     # build: .  # Uncomment to build from source instead of pulling
-    image: ixion36/ion:${ION_VERSION:-0.9.77}
+    image: ixion36/ion:${ION_VERSION:-0.9.78}
     container_name: ion
     restart: unless-stopped
 
@@ -125,15 +127,23 @@ services:
       start_period: 15s
       retries: 5
 
-    # Resource limits (increased for NLP processing)
+    # Resource limits — sized for ~50 concurrent SOC users (v0.9.65 load-test
+    # design ceiling). 4 uvicorn workers × ~1GB steady with headroom for PCAP
+    # parsing spikes, SQLAlchemy pools, and the 3 background sync loops
+    # (TIDE / Kibana / Analytics Engine). 6 CPUs = 4 workers + 2 for background
+    # tasks running in parallel with request handling.
+    #
+    # Override per-deployment via .env: ION_CPUS, ION_MEMORY. On a 64 GB host
+    # leave these at the defaults; on a 16 GB dev box drop ION_MEMORY=2G and
+    # ION_WORKERS=2 (via docker-compose.override.yml).
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 1G
+          cpus: '${ION_CPUS:-6}'
+          memory: ${ION_MEMORY:-6G}
         reservations:
-          cpus: '0.5'
-          memory: 256M
+          cpus: '1'
+          memory: 1G
 
     # Logging — override with a Docker logging driver if desired
     # Default: json-file (docker logs). Alternatives: syslog, fluentd, gelf
@@ -201,7 +211,7 @@ services:
   # Shares ion-data volume for .seeded marker persistence.
   # Skips automatically on subsequent starts.
   seeder:
-    image: ixion36/ion:${ION_VERSION:-0.9.77}
+    image: ixion36/ion:${ION_VERSION:-0.9.78}
     container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]
     volumes:
