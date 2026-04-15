@@ -6862,6 +6862,7 @@ function renderAlerts() {
                     <button class="quick-action-btn" onclick="quickAssignToMe('${escapeHtml(a.id)}')" title="Assign to me"><i class="icon-user-check"></i></button>
                     <button class="quick-action-btn" onclick="quickStatusChange('${escapeHtml(a.id)}', 'acknowledged')" title="Acknowledge"><i class="icon-search"></i></button>
                     <button class="quick-action-btn" onclick="showCreateCaseForm('${escapeHtml(a.id)}')" title="Create case"><i class="icon-folder-plus"></i></button>
+                    ${a.network_community_id && a.arkime_node ? `<a class="quick-action-btn arkime-action-btn" href="/alerts/${encodeURIComponent(a.id)}/arkime" title="Arkime PCAP analysis" onclick="event.stopPropagation()" style="color:#6de4ff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></a>` : ''}
                 </div>
             </td>
         </tr>

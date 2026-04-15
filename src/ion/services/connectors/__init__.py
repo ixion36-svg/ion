@@ -19,6 +19,7 @@ from ion.services.connectors.opencti_connector import OpenCTIConnector
 from ion.services.connectors.elasticsearch_connector import ElasticsearchConnector
 from ion.services.connectors.kibana_cases_connector import KibanaCasesConnector
 from ion.services.connectors.tide_connector import TIDEConnector
+from ion.services.connectors.arkime_connector import ArkimeConnector
 
 
 def register_default_connectors() -> None:
@@ -29,6 +30,7 @@ def register_default_connectors() -> None:
     registry.register_class("elasticsearch", ElasticsearchConnector)
     registry.register_class("kibana_cases", KibanaCasesConnector)
     registry.register_class("tide", TIDEConnector)
+    registry.register_class("arkime", ArkimeConnector)
 
 
 # Auto-register connectors on import
@@ -49,6 +51,8 @@ __all__ = [
     "OpenCTIConnector",
     "ElasticsearchConnector",
     "KibanaCasesConnector",
+    "TIDEConnector",
+    "ArkimeConnector",
     # Registration
     "register_default_connectors",
 ]

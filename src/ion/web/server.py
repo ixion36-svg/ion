@@ -38,6 +38,7 @@ from ion.web.skills_api import router as skills_router
 from ion.web.role_skills_api import router as role_skills_router
 from ion.web.notes_api import router as notes_router
 from ion.web.pcap_api import router as pcap_router
+from ion.web.arkime_api import router as arkime_router
 from ion.web.forensics_api import router as forensics_router
 from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.threat_watch_gap_api import router as threat_watch_gap_router
@@ -248,6 +249,7 @@ app.include_router(skills_router, prefix="/api/skills")
 app.include_router(role_skills_router, prefix="/api")
 app.include_router(notes_router, prefix="/api/notes")
 app.include_router(pcap_router, prefix="/api/pcap")
+app.include_router(arkime_router)  # router already has prefix="/api"
 app.include_router(forensics_router, prefix="/api/forensics")
 app.include_router(notification_router, prefix="/api")
 app.include_router(social_router, prefix="/api/social")
@@ -687,6 +689,22 @@ async def security_dashboard_page(request: Request, user: User = Depends(require
 async def alerts_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the alerts investigation page."""
     return templates.TemplateResponse(request=request, name="alerts.html")
+
+
+@app.get("/alerts/{alert_id}/arkime", response_class=HTMLResponse)
+async def alert_arkime_page(
+    alert_id: str,
+    request: Request,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """Arkime PCAP investigation workspace — pulls the raw capture for the
+    alert, runs pcap_service analysis, enriches observables via OpenCTI, and
+    lets the analyst attach the result to a case."""
+    return templates.TemplateResponse(
+        request=request,
+        name="alert_arkime.html",
+        context={"alert_id": alert_id},
+    )
 
 
 @app.get("/cases", response_class=HTMLResponse)

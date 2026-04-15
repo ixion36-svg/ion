@@ -1,0 +1,468 @@
+{% extends "base.html" %}
+{% block title %}Arkime PCAP · ION{% endblock %}
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+  <!-- Tailwind safelist — classes built dynamically by the JS renderer -->
+  <div class="hidden
+    bg-ion-coral bg-ion-amber bg-ion-iris bg-ion-lime bg-ion-cyan
+    text-ion-coral text-ion-amber text-ion-iris text-ion-lime text-ion-cyan
+    bg-ion-coral/10 bg-ion-amber/10 bg-ion-iris/10 bg-ion-lime/10 bg-ion-cyan/10
+    border-ion-coral/20 border-ion-amber/20 border-ion-iris/20 border-ion-lime/20 border-ion-cyan/20
+  " aria-hidden="true"></div>
+
+  <!-- ── Header ── -->
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-4 h-4 text-ion-iris"><use href="#i-network"/></svg>
+        <span class="label-tiny text-ion-iris">Arkime investigation</span>
+        <span class="label-tiny text-slate-600">/</span>
+        <a href="/alerts?id={{ alert_id }}" class="label-tiny text-slate-500 hover:text-white transition">Alert {{ alert_id[:12] }}…</a>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">PCAP Analysis</h1>
+      <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Pull the raw capture from Arkime, run heuristic analysis, enrich observables via OpenCTI, and attach the result to a case.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/alerts?id={{ alert_id }}" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+        <svg class="w-3.5 h-3.5"><use href="#i-chevron-left"/></svg>
+        Back to alert
+      </a>
+    </div>
+  </section>
+
+  <!-- ── Status banner ── -->
+  <div id="arkime-status" class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5 mb-6 rise d-2">
+    <div class="flex items-center gap-3">
+      <div id="status-spinner" class="h-4 w-4 rounded-full border-2 border-ion-cyan border-t-transparent animate-spin"></div>
+      <span id="status-text" class="text-[14px] text-white">Requesting PCAP from Arkime…</span>
+    </div>
+    <div id="status-detail" class="mt-1 text-[12px] text-slate-500"></div>
+  </div>
+
+  <!-- ── Main grid ── -->
+  <div id="arkime-body" class="hidden grid grid-cols-12 gap-6 rise d-3">
+
+    <!-- ── LEFT: Analysis ── -->
+    <section class="col-span-12 lg:col-span-8 min-w-0 flex flex-col gap-6">
+
+      <!-- Arkime session card -->
+      <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <svg class="w-4 h-4 text-ion-cyan"><use href="#i-network"/></svg>
+            <span class="label-tiny text-slate-500">Arkime session</span>
+          </div>
+          <span id="session-size" class="font-mono text-[11px] text-slate-400"></span>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-3 text-[12px]">
+          <div>
+            <div class="label-tiny text-slate-500 mb-1">Node</div>
+            <div id="sess-node" class="font-mono text-slate-200">—</div>
+          </div>
+          <div>
+            <div class="label-tiny text-slate-500 mb-1">Session</div>
+            <div id="sess-id" class="font-mono text-slate-200 truncate">—</div>
+          </div>
+          <div>
+            <div class="label-tiny text-slate-500 mb-1">Src → Dst</div>
+            <div id="sess-flow" class="font-mono text-slate-200 truncate">—</div>
+          </div>
+          <div>
+            <div class="label-tiny text-slate-500 mb-1">Protocol</div>
+            <div id="sess-proto" class="font-mono text-slate-200">—</div>
+          </div>
+          <div>
+            <div class="label-tiny text-slate-500 mb-1">First packet</div>
+            <div id="sess-first" class="font-mono text-slate-200">—</div>
+          </div>
+          <div>
+            <div class="label-tiny text-slate-500 mb-1">Last packet</div>
+            <div id="sess-last" class="font-mono text-slate-200">—</div>
+          </div>
+          <div>
+            <div class="label-tiny text-slate-500 mb-1">Packets</div>
+            <div id="sess-packets" class="font-mono text-slate-200">—</div>
+          </div>
+          <div>
+            <div class="label-tiny text-slate-500 mb-1">Community ID</div>
+            <div id="sess-cid" class="font-mono text-slate-200 truncate">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verdict + stats -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+          <div class="label-tiny text-slate-500 mb-2">Verdict</div>
+          <div id="stat-verdict" class="font-sans font-semibold text-[22px] leading-none text-white">—</div>
+          <div id="stat-verdict-sub" class="mt-1 text-[11px] text-slate-500"></div>
+        </div>
+        <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+          <div class="label-tiny text-slate-500 mb-2">Findings</div>
+          <div id="stat-findings" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-coral">—</div>
+        </div>
+        <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+          <div class="label-tiny text-slate-500 mb-2">Observables</div>
+          <div id="stat-obs" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-cyan">—</div>
+        </div>
+        <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+          <div class="label-tiny text-slate-500 mb-2">OpenCTI hits</div>
+          <div id="stat-hits" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-lime">—</div>
+        </div>
+      </div>
+
+      <!-- Findings list -->
+      <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-6">
+        <div class="flex items-baseline gap-3 mb-4">
+          <svg class="w-4 h-4 text-ion-coral"><use href="#i-alert-triangle"/></svg>
+          <span class="label-tiny text-slate-500">Heuristic detection</span>
+          <h2 class="font-sans font-semibold text-[20px] tracking-tight leading-none text-white">Findings</h2>
+        </div>
+        <div id="findings-list" class="space-y-2">
+          <div class="py-6 text-center text-[12px] text-slate-600">No findings yet.</div>
+        </div>
+      </div>
+
+      <!-- Top talkers + protocols side by side -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-6">
+          <h2 class="font-sans font-semibold text-[16px] tracking-tight text-white mb-4">Top destinations</h2>
+          <div id="top-dst" class="space-y-2 text-[12px]"></div>
+        </div>
+        <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-6">
+          <h2 class="font-sans font-semibold text-[16px] tracking-tight text-white mb-4">Protocols</h2>
+          <div id="protocols" class="space-y-2 text-[12px]"></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ── RIGHT: Observables + commit panel ── -->
+    <aside class="col-span-12 lg:col-span-4 min-w-0 flex flex-col gap-6">
+
+      <!-- Observables -->
+      <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-6">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-baseline gap-3">
+            <span class="label-tiny text-slate-500">Extracted IOCs</span>
+            <h2 class="font-sans font-semibold text-[18px] tracking-tight leading-none text-white">Observables</h2>
+          </div>
+          <span id="obs-count" class="font-mono text-[11px] text-slate-500">0</span>
+        </div>
+        <div id="obs-list" class="space-y-2 max-h-[560px] overflow-y-auto">
+          <div class="py-6 text-center text-[12px] text-slate-600">Waiting for analysis…</div>
+        </div>
+      </div>
+
+      <!-- Commit panel -->
+      <div class="rounded-[14px] border border-ion-cyan/20 bg-ion-cyan/5 px-6 py-6 sticky top-20">
+        <div class="flex items-center gap-3 mb-4">
+          <svg class="w-4 h-4 text-ion-cyan"><use href="#i-file-text"/></svg>
+          <span class="label-tiny text-ion-cyan">Attach to case</span>
+        </div>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-1 p-1 rounded-lg bg-white/5 border border-white/10">
+            <button type="button" data-mode="new" class="commit-mode-btn flex-1 px-3 py-2 rounded-md label-tiny text-ink-950 bg-ion-cyan">New case</button>
+            <button type="button" data-mode="existing" class="commit-mode-btn flex-1 px-3 py-2 rounded-md label-tiny text-slate-400 hover:text-white transition">Existing</button>
+          </div>
+
+          <div id="commit-new" class="flex flex-col gap-3">
+            <div class="flex flex-col gap-1.5">
+              <label class="label-tiny text-slate-500">Case title</label>
+              <input id="case-title" type="text" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 focus:border-ion-cyan/50 transition" placeholder="Auto-generated if blank">
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="label-tiny text-slate-500">Severity</label>
+              <select id="case-severity" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white focus:border-ion-cyan/50 transition">
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium" selected>Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="commit-existing" class="hidden flex flex-col gap-1.5">
+            <label class="label-tiny text-slate-500">Case ID</label>
+            <input id="case-id-input" type="number" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 focus:border-ion-cyan/50 transition" placeholder="e.g. 2847">
+          </div>
+
+          <button id="commit-btn" type="button" class="h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg class="w-3.5 h-3.5"><use href="#i-arrow-right"/></svg>
+            Attach analysis
+          </button>
+          <div id="commit-result" class="hidden text-[12px] text-center"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ── Error panel ── -->
+  <div id="arkime-error" class="hidden rounded-[14px] border border-ion-coral/30 bg-ion-coral/5 px-6 py-5 rise d-3">
+    <div class="flex items-center gap-3 mb-2">
+      <svg class="w-4 h-4 text-ion-coral"><use href="#i-alert-triangle"/></svg>
+      <span class="label-tiny text-ion-coral">Arkime error</span>
+    </div>
+    <div id="error-message" class="text-[14px] text-white mb-2"></div>
+    <div id="error-detail" class="text-[12px] text-slate-400 font-mono"></div>
+  </div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const ALERT_ID = {{ alert_id | tojson }};
+  let previewPayload = null;
+
+  const $ = (id) => document.getElementById(id);
+  const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+
+  const SEV_MAP = {
+    critical: 'ion-coral', high: 'ion-amber', medium: 'ion-iris',
+    low: 'slate-400', info: 'ion-cyan',
+  };
+
+  function setStatus(text, detail = '', done = false) {
+    $('status-text').textContent = text;
+    $('status-detail').textContent = detail;
+    if (done) $('status-spinner').classList.add('hidden');
+  }
+
+  function showError(message, detail = '') {
+    $('arkime-status').classList.add('hidden');
+    $('arkime-body').classList.add('hidden');
+    const errEl = $('arkime-error');
+    errEl.classList.remove('hidden');
+    $('error-message').textContent = message;
+    $('error-detail').textContent = detail;
+  }
+
+  function fmt(n) {
+    if (n == null) return '—';
+    if (typeof n !== 'number') return n;
+    return n.toLocaleString();
+  }
+
+  function fmtBytes(n) {
+    if (!n) return '0 B';
+    if (n < 1024) return `${n} B`;
+    if (n < 1048576) return `${(n / 1024).toFixed(1)} KB`;
+    if (n < 1073741824) return `${(n / 1048576).toFixed(1)} MB`;
+    return `${(n / 1073741824).toFixed(2)} GB`;
+  }
+
+  function fmtTime(ms) {
+    if (!ms) return '—';
+    const d = new Date(ms);
+    return d.toISOString().replace('T', ' ').slice(0, 19);
+  }
+
+  async function loadPreview() {
+    try {
+      setStatus('Requesting PCAP from Arkime…', 'Resolving community_id → session → downloading capture');
+      const resp = await fetch(`/api/alerts/${encodeURIComponent(ALERT_ID)}/arkime/preview`, {
+        method: 'POST', credentials: 'same-origin',
+      });
+      if (!resp.ok) {
+        let detail = '';
+        try { detail = (await resp.json()).detail || ''; } catch {}
+        showError(`Preview failed (HTTP ${resp.status})`, detail);
+        return;
+      }
+      previewPayload = await resp.json();
+      render(previewPayload);
+      setStatus('Analysis complete.', '', true);
+      setTimeout(() => { $('arkime-status').classList.add('hidden'); }, 600);
+    } catch (e) {
+      showError('Network error', String(e));
+    }
+  }
+
+  function render(p) {
+    $('arkime-body').classList.remove('hidden');
+    $('arkime-body').classList.add('grid');
+
+    // Session metadata
+    const meta = p.session_metadata || {};
+    $('sess-node').textContent = p.arkime_node || '—';
+    $('sess-id').textContent = p.arkime_session_id || '—';
+    $('sess-cid').textContent = p.network_community_id || '—';
+    $('sess-first').textContent = fmtTime(meta.firstPacket);
+    $('sess-last').textContent = fmtTime(meta.lastPacket);
+    $('sess-packets').textContent = fmt(meta.packets);
+    $('sess-proto').textContent = (meta.ipProtocol || meta.protocol || []).toString() || '—';
+    const src = meta.srcIp ? `${meta.srcIp}:${meta.srcPort ?? '?'}` : '—';
+    const dst = meta.dstIp ? `${meta.dstIp}:${meta.dstPort ?? '?'}` : '—';
+    $('sess-flow').textContent = `${src} → ${dst}`;
+    $('session-size').textContent = `${fmtBytes(p.pcap_size_bytes)} · ${fmt(meta.bytes)} raw`;
+
+    // Stats
+    const analysis = p.analysis || {};
+    const verdict = analysis.verdict || {};
+    $('stat-verdict').textContent = verdict.label || 'benign';
+    $('stat-verdict-sub').textContent = verdict.score != null ? `score ${verdict.score}` : '';
+    const findings = analysis.findings || [];
+    $('stat-findings').textContent = findings.length;
+    $('stat-obs').textContent = (p.observables || []).length;
+    const hits = (p.observables || []).filter(o => o.found).length;
+    $('stat-hits').textContent = hits;
+
+    // Findings
+    const fel = $('findings-list');
+    if (findings.length === 0) {
+      fel.innerHTML = `<div class="py-6 text-center text-[12px] text-slate-600">No suspicious findings detected.</div>`;
+    } else {
+      fel.innerHTML = findings.slice(0, 25).map(f => {
+        const sev = (f.severity || 'info').toLowerCase();
+        const color = SEV_MAP[sev] || 'slate-400';
+        const title = escHtml(f.title || f.type || '(no title)');
+        const desc = escHtml(f.description || '');
+        return `
+          <div class="flex items-start gap-3 p-3 rounded-lg bg-white/3 border border-white/5">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-[0.12em] bg-${color}/10 text-${color} border border-${color}/20">${sev}</span>
+            <div class="flex-1 min-w-0">
+              <div class="text-[13px] text-white font-medium">${title}</div>
+              ${desc ? `<div class="text-[11px] text-slate-500 mt-0.5">${desc}</div>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // Top destinations
+    const topDst = analysis.top_dst_ips || [];
+    const topEl = $('top-dst');
+    if (topDst.length === 0) {
+      topEl.innerHTML = `<div class="text-slate-600">No outbound traffic recorded.</div>`;
+    } else {
+      topEl.innerHTML = topDst.slice(0, 8).map(row => {
+        const ip = (row.ip || row) + '';
+        const bytes = row.bytes ? fmtBytes(row.bytes) : '';
+        return `<div class="flex items-center justify-between gap-3 py-1">
+          <span class="font-mono text-slate-200 truncate">${escHtml(ip)}</span>
+          <span class="font-mono text-[11px] text-slate-500">${bytes}</span>
+        </div>`;
+      }).join('');
+    }
+
+    // Protocols
+    const protos = analysis.protocols || {};
+    const proEl = $('protocols');
+    const entries = Object.entries(protos).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    if (entries.length === 0) {
+      proEl.innerHTML = `<div class="text-slate-600">—</div>`;
+    } else {
+      const total = entries.reduce((s, [, n]) => s + n, 0) || 1;
+      proEl.innerHTML = entries.map(([name, n]) => {
+        const pct = Math.round((n / total) * 100);
+        return `<div class="flex flex-col gap-1">
+          <div class="flex items-center justify-between text-[11px]">
+            <span class="font-mono text-slate-200">${escHtml(name)}</span>
+            <span class="font-mono text-slate-500">${n} · ${pct}%</span>
+          </div>
+          <div class="h-1 rounded-full bg-white/5 overflow-hidden">
+            <div class="h-full rounded-full bg-ion-cyan" style="width:${pct}%"></div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // Observables
+    const obs = p.observables || [];
+    $('obs-count').textContent = obs.length;
+    const obsEl = $('obs-list');
+    if (obs.length === 0) {
+      obsEl.innerHTML = `<div class="py-6 text-center text-[12px] text-slate-600">No observables extracted.</div>`;
+    } else {
+      obsEl.innerHTML = obs.map(o => {
+        const foundBadge = o.found
+          ? `<span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-[0.12em] bg-ion-lime/10 text-ion-lime border border-ion-lime/25">OpenCTI</span>`
+          : '';
+        const labels = (o.labels || []).slice(0, 3).map(l =>
+          `<span class="inline-flex px-1.5 py-0.5 rounded text-[9px] bg-ion-iris/10 text-ion-iris border border-ion-iris/25">${escHtml(l)}</span>`
+        ).join(' ');
+        const actors = (o.threat_actors || []).slice(0, 2).map(a =>
+          `<span class="inline-flex px-1.5 py-0.5 rounded text-[9px] bg-ion-coral/10 text-ion-coral border border-ion-coral/25">${escHtml(a)}</span>`
+        ).join(' ');
+        return `<div class="p-3 rounded-lg bg-white/3 border border-white/5">
+          <div class="flex items-center justify-between gap-2 mb-1">
+            <span class="font-mono text-[11px] text-slate-500">${escHtml(o.type)}</span>
+            ${foundBadge}
+          </div>
+          <div class="font-mono text-[12px] text-white break-all">${escHtml(o.value)}</div>
+          ${(labels || actors) ? `<div class="mt-2 flex flex-wrap gap-1">${labels} ${actors}</div>` : ''}
+          <div class="mt-1 text-[10px] text-slate-600">via ${escHtml(o.source)}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // Enable commit button
+    $('commit-btn').disabled = false;
+  }
+
+  // ── Commit panel ──
+  document.querySelectorAll('.commit-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.commit-mode-btn').forEach(b => {
+        b.classList.remove('text-ink-950', 'bg-ion-cyan');
+        b.classList.add('text-slate-400', 'hover:text-white');
+      });
+      btn.classList.add('text-ink-950', 'bg-ion-cyan');
+      btn.classList.remove('text-slate-400', 'hover:text-white');
+      const mode = btn.dataset.mode;
+      $('commit-new').classList.toggle('hidden', mode !== 'new');
+      $('commit-existing').classList.toggle('hidden', mode !== 'existing');
+    });
+  });
+
+  $('commit-btn').addEventListener('click', async () => {
+    if (!previewPayload) return;
+    const btn = $('commit-btn');
+    btn.disabled = true;
+    btn.innerHTML = 'Attaching…';
+
+    const newMode = !$('commit-new').classList.contains('hidden');
+    const body = {
+      create_new_case: newMode,
+      case_id: newMode ? null : parseInt($('case-id-input').value, 10) || null,
+      case_title: newMode ? ($('case-title').value.trim() || null) : null,
+      case_severity: newMode ? $('case-severity').value : 'medium',
+      pcap_size_bytes: previewPayload.pcap_size_bytes,
+      analysis: previewPayload.analysis,
+      observables: previewPayload.observables,
+    };
+
+    try {
+      const resp = await fetch(`/api/alerts/${encodeURIComponent(ALERT_ID)}/arkime/commit`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) {
+        const detail = (await resp.json().catch(() => ({}))).detail || `HTTP ${resp.status}`;
+        throw new Error(detail);
+      }
+      const result = await resp.json();
+      const resEl = $('commit-result');
+      resEl.classList.remove('hidden');
+      resEl.innerHTML = `<div class="text-ion-lime">Attached to <a href="/cases?id=${result.case_id}" class="underline">${result.case_number}</a> — ${result.observables_created} observable(s) created.</div>`;
+      btn.innerHTML = 'Done ✓';
+      setTimeout(() => { window.location.href = `/cases?id=${result.case_id}`; }, 1500);
+    } catch (e) {
+      btn.disabled = false;
+      btn.innerHTML = '<svg class="w-3.5 h-3.5"><use href="#i-arrow-right"/></svg> Attach analysis';
+      const resEl = $('commit-result');
+      resEl.classList.remove('hidden');
+      resEl.innerHTML = `<div class="text-ion-coral">${escHtml(e.message || String(e))}</div>`;
+    }
+  });
+
+  loadPreview();
+</script>
+{% endblock %}

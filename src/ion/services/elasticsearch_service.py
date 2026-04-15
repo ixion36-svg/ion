@@ -51,6 +51,11 @@ class ElasticsearchAlert:
     mitre_tactic_name: Optional[str] = None
     geo_data: Dict[str, Any] = None
     source_system: Optional[str] = None
+    # Arkime PCAP linkage — alerts from a network pipeline carry
+    # `network.community_id` (flow hash, shared with Arkime) and `node`
+    # (Arkime capture node name).
+    network_community_id: Optional[str] = None
+    arkime_node: Optional[str] = None
 
     def __post_init__(self):
         if self.tags is None:
@@ -80,6 +85,8 @@ class ElasticsearchAlert:
             "mitre_tactic_name": self.mitre_tactic_name,
             "geo_data": self.geo_data,
             "source_system": self.source_system,
+            "network_community_id": self.network_community_id,
+            "arkime_node": self.arkime_node,
         }
 
 
@@ -600,6 +607,33 @@ class ElasticsearchService:
         if isinstance(user, dict):
             user = user.get("name")
 
+        # Arkime PCAP linkage — `network.community_id` holds the Community ID
+        # flow hash (shared between Zeek/Suricata/Arkime), and `node` carries
+        # the Arkime capture node name. Both are required to hit Arkime's
+        # `/api/session/{node}/{id}/pcap` endpoint.
+        network_community_id = (
+            _f(source, "network.community_id")
+            or _f(source, "community_id")
+            or source.get("network_community_id")
+        )
+        if isinstance(network_community_id, dict):
+            network_community_id = (
+                network_community_id.get("community_id")
+                or network_community_id.get("id")
+            )
+        arkime_node = (
+            source.get("node")
+            or _f(source, "observer.name")
+            or _f(source, "arkime.node")
+        )
+        if isinstance(arkime_node, dict):
+            arkime_node = arkime_node.get("name")
+        # Normalise to strings
+        if network_community_id is not None:
+            network_community_id = str(network_community_id)
+        if arkime_node is not None:
+            arkime_node = str(arkime_node)
+
         # Tags
         tags = source.get("tags", [])
         if isinstance(tags, str):
@@ -800,6 +834,8 @@ class ElasticsearchService:
             mitre_tactic_name=mitre_tactic_name,
             geo_data=geo_data,
             source_system=source_system,
+            network_community_id=network_community_id,
+            arkime_node=arkime_node,
         )
 
     async def get_related_alerts(
