@@ -14,7 +14,6 @@ from ion.models.threat_intel import ThreatIntelWatch
 from ion.services.tide_service import get_tide_service
 from ion.services.opencti_service import get_opencti_service
 from ion.web.api import get_db_session
-from ion.web.notification_api import create_notification
 
 logger = logging.getLogger(__name__)
 
@@ -122,42 +121,15 @@ async def check_and_notify(
     if "enabled" in result and not result["enabled"]:
         return result
 
-    notifications_created = 0
-    for r in result.get("results", []):
-        if r["gaps"] < min_gap_count:
-            continue
-
-        watcher_username = r.get("watched_by")
-        if not watcher_username:
-            continue
-
-        watcher = session.execute(
-            select(User).where(User.username == watcher_username)
-        ).scalar_one_or_none()
-        if not watcher:
-            continue
-
-        gap_ids = ", ".join(g["mitre_id"] for g in r["gap_techniques"][:5])
-        suffix = f" (+{r['gaps'] - 5} more)" if r["gaps"] > 5 else ""
-
-        create_notification(
-            session=session,
-            user_id=watcher.id,
-            source="threat_watch_gaps",
-            title=f"Detection gaps for {r['actor_name']}",
-            body=(
-                f"{r['gaps']} TTP(s) not covered by TIDE "
-                f"({r['coverage_pct']}% coverage). "
-                f"Gaps: {gap_ids}{suffix}"
-            ),
-            url=f"/threat-intel?watch_id={r['watch_id']}",
-        )
-        notifications_created += 1
-
-    session.commit()
+    # Gap counting (notifications were removed in v0.9.76 — the caller can
+    # still see which watches have gaps in the response body).
+    gaps_detected = sum(
+        1 for r in result.get("results", [])
+        if r.get("gaps", 0) >= min_gap_count
+    )
 
     for r in result.get("results", []):
         r.pop("watched_by", None)
 
-    result["notifications_created"] = notifications_created
+    result["gaps_detected"] = gaps_detected
     return result

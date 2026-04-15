@@ -91,7 +91,6 @@ from ion.models.skills import (
 )
 from ion.models.analyst_note import AnalystNote
 from ion.models.note_folder import NoteFolder
-from ion.models.notification import Notification
 from ion.models.social import (
     SocialPost,
     SocialComment,
@@ -271,8 +270,6 @@ __all__ = [
     "VulnStatus",
     # Threat Intel watch model
     "ThreatIntelWatch",
-    # Notification model
-    "Notification",
     # Social Hub models
     "SocialPost",
     "SocialComment",

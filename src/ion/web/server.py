@@ -42,7 +42,6 @@ from ion.web.arkime_api import router as arkime_router
 from ion.web.forensics_api import router as forensics_router
 from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.threat_watch_gap_api import router as threat_watch_gap_router
-from ion.web.notification_api import router as notification_router
 from ion.web.cyab_api import router as cyab_router
 from ion.web.social_api import router as social_router
 from ion.web.analytics_api import router as analytics_router
@@ -251,7 +250,6 @@ app.include_router(notes_router, prefix="/api/notes")
 app.include_router(pcap_router, prefix="/api/pcap")
 app.include_router(arkime_router)  # router already has prefix="/api"
 app.include_router(forensics_router, prefix="/api/forensics")
-app.include_router(notification_router, prefix="/api")
 app.include_router(social_router, prefix="/api/social")
 app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(engineering_analytics_router, prefix="/api/engineering/analytics")
@@ -378,7 +376,7 @@ async def startup_event():
         LOCK_SEED_FORENSIC_PB, LOCK_SEED_CAPABILITY_KB,
         LOCK_KIBANA_BG_SYNC, LOCK_SKILLS_DAILY_SNAPSHOT,
         LOCK_SEED_ANALYTICS_JOBS, LOCK_ANALYTICS_BG_LOOP,
-        LOCK_TIDE_BG_SYNC, LOCK_CYAB_REVIEW_CHECK,
+        LOCK_TIDE_BG_SYNC,
     )
     engine = get_engine(config.db_path)
     factory = get_session_factory(engine)
@@ -505,54 +503,6 @@ async def startup_event():
         logger.info("TIDE background sync started")
     run_locked(engine, LOCK_TIDE_BG_SYNC, "tide_bg_sync", _start_tide_sync,
                hold_until_close=True)
-
-    # ---------------------------------------------------------------
-    # CyAB review reminder check (one-shot per startup)
-    # ---------------------------------------------------------------
-    def _cyab_review_check():
-        session = factory()
-        try:
-            from ion.models.cyab import CyabSystem
-            from datetime import date as _date, timedelta as _td
-            from sqlalchemy import select as _sel
-            # Cap startup scan: ix_cyab_next_review covers the WHERE filter,
-            # but we still cap rows so a runaway dataset can't slow boot.
-            due = session.execute(
-                _sel(CyabSystem)
-                .where(CyabSystem.next_review_date <= _date.today() + _td(days=7))
-                .order_by(CyabSystem.next_review_date)
-                .limit(50)
-            ).scalars().all()
-            if not due:
-                return
-            from ion.models.user import User as _U, Role as _R, user_roles as _ur
-            leads = session.execute(
-                _sel(_U)
-                .join(_ur, _ur.c.user_id == _U.id)
-                .join(_R, _R.id == _ur.c.role_id)
-                .where(_R.name.in_(["lead", "admin", "principal_analyst"]))
-                .where(_U.is_active == True)
-                .limit(20)
-            ).scalars().all()
-            sent = 0
-            for sys in due:
-                is_overdue = sys.next_review_date < _date.today()
-                label = "OVERDUE" if is_overdue else "Due soon"
-                for u in leads:
-                    create_notification(
-                        session=session, user_id=u.id,
-                        source="cyab_review", source_id=str(sys.id),
-                        title=f"CyAB Review {label}: {sys.name}",
-                        body=f"{sys.department} — {sys.sal_tier}",
-                        url=f"/cyab#{sys.id}",
-                    )
-                    sent += 1
-            session.commit()
-            if sent:
-                logger.info("CyAB review reminders: %d notifications sent for %d systems", sent, len(due))
-        finally:
-            session.close()
-    run_locked(engine, LOCK_CYAB_REVIEW_CHECK, "cyab_review_check", _cyab_review_check)
 
     # Version compatibility checks for connectors that declare supported ranges
     try:

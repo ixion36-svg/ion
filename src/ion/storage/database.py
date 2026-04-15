@@ -71,7 +71,7 @@ LOCK_SKILLS_DAILY_SNAPSHOT  = 1008
 LOCK_SEED_ANALYTICS_JOBS    = 1009
 LOCK_KIBANA_BG_SYNC         = 1010
 LOCK_TIDE_BG_SYNC           = 1011
-LOCK_CYAB_REVIEW_CHECK      = 1012
+# 1012 was LOCK_CYAB_REVIEW_CHECK — removed in v0.9.76 with the notifications feature
 LOCK_ANALYTICS_BG_LOOP      = 1013
 
 
@@ -249,6 +249,12 @@ def _run_migrations(engine: Engine) -> None:
     insp = inspect(engine)
     # Use TIMESTAMP for PostgreSQL, DATETIME for SQLite
     dt_type = "TIMESTAMP" if _is_postgres(engine) else "DATETIME"
+
+    # v0.9.76: drop the notifications table — feature removed. Safe & idempotent.
+    if insp.has_table("notifications"):
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE notifications"))
+            logger.info("Migrated: dropped notifications table (v0.9.76)")
 
     # Migrations for alert_cases table
     if insp.has_table("alert_cases"):

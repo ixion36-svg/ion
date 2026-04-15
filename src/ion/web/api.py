@@ -4036,21 +4036,6 @@ async def create_case(
 
     logger.info("create_case: collected %d raw_data items for enrichment", len(raw_data_list))
 
-    # Notify assignee
-    if data.assigned_to_id and data.assigned_to_id != current_user.id:
-        try:
-            from ion.web.notification_api import create_notification
-            create_notification(
-                session, data.assigned_to_id,
-                source="case_assigned",
-                title=f"Case assigned: {case_number}",
-                body=data.title[:120],
-                url="/cases",
-                source_id=str(case_number),
-            )
-        except Exception as _ne:
-            logger.debug("Failed to create case notification: %s", _ne)
-
     session.commit()
     session.refresh(new_case)
 
@@ -4371,22 +4356,7 @@ async def update_case(
     if data.severity is not None:
         case.severity = data.severity
     if data.assigned_to_id is not None:
-        old_assignee = case.assigned_to_id
         case.assigned_to_id = data.assigned_to_id
-        # Notify new assignee
-        if data.assigned_to_id and data.assigned_to_id != current_user.id and data.assigned_to_id != old_assignee:
-            try:
-                from ion.web.notification_api import create_notification
-                create_notification(
-                    session, data.assigned_to_id,
-                    source="case_assigned",
-                    title=f"Case reassigned: {case.case_number}",
-                    body=case.title[:120] if case.title else "",
-                    url="/cases",
-                    source_id=str(case.case_number),
-                )
-            except Exception as _ne:
-                logger.debug("Failed to create reassign notification: %s", _ne)
         # Commit the assignment immediately so it persists even if Kibana sync fails
         session.commit()
     _synced_alert_ids = []

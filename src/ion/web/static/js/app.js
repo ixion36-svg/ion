@@ -299,18 +299,12 @@ function toggleNavMenu() {
     }
 }
 
-// Close dropdown, notification panel, and mobile nav when clicking outside
+// Close dropdown and mobile nav when clicking outside
 document.addEventListener('click', function(event) {
     const userMenu = document.getElementById('user-menu');
     const dropdown = document.getElementById('user-dropdown');
     if (userMenu && dropdown && !userMenu.contains(event.target)) {
         dropdown.classList.remove('show');
-    }
-    // Close notification panel when clicking outside
-    const notifBell = document.getElementById('notif-bell-btn');
-    const notifPanel = document.getElementById('notif-panel');
-    if (notifBell && notifPanel && !notifBell.contains(event.target) && !notifPanel.contains(event.target)) {
-        notifPanel.classList.remove('show');
     }
     // Close mobile nav when clicking outside
     const hamburger = document.getElementById('nav-hamburger');
@@ -331,156 +325,7 @@ async function logout() {
     window.location.href = '/login';
 }
 
-// =============================================================================
-// Notification System
-// =============================================================================
-
-let _notifPollInterval = null;
-const NOTIF_POLL_MS = 10000;
-
-function toggleNotifPanel() {
-    const panel = document.getElementById('notif-panel');
-    if (!panel) return;
-    const isOpen = panel.classList.toggle('show');
-    if (isOpen) {
-        loadNotifications();
-    }
-}
-
-async function loadNotifications() {
-    try {
-        const data = await api.get('/api/notifications?limit=30');
-        renderNotifications(data.notifications || []);
-        updateNotifBadge(data.unread_count || 0);
-    } catch (e) {
-        console.debug('Failed to load notifications:', e);
-    }
-}
-
-function renderNotifications(notifications) {
-    const list = document.getElementById('notif-list');
-    if (!list) return;
-
-    if (!notifications.length) {
-        list.innerHTML = '<div class="notif-empty">No notifications</div>';
-        return;
-    }
-
-    const sourceIcons = {
-        chat_mention: '@',
-        chat_dm: '\u2709',
-        chat_group: '\u{1F4AC}',
-        case_assigned: '\u26A0',
-        gitlab_assigned: '\u{1F4CB}',
-        system: '\u2699',
-    };
-
-    list.innerHTML = notifications.map(n => {
-        const icon = sourceIcons[n.source] || '\u{1F514}';
-        const cls = n.is_read ? '' : ' unread';
-        const time = n.created_at ? formatNotifTime(n.created_at) : '';
-        return `<div class="notif-item${cls}" data-id="${n.id}" data-url="${escapeHtml(n.url || '')}" onclick="handleNotifClick(this)">
-            <div class="notif-item-icon">${icon}</div>
-            <div class="notif-item-content">
-                <div class="notif-item-title">${escapeHtml(n.title)}</div>
-                ${n.body ? `<div class="notif-item-body">${escapeHtml(n.body)}</div>` : ''}
-                <div class="notif-item-time">${time}</div>
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function formatNotifTime(isoString) {
-    const d = new Date(isoString);
-    const now = new Date();
-    const diffMs = now - d;
-    const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return 'just now';
-    if (diffMin < 60) return diffMin + 'm ago';
-    const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return diffHr + 'h ago';
-    const diffDay = Math.floor(diffHr / 24);
-    if (diffDay < 7) return diffDay + 'd ago';
-    return d.toLocaleDateString();
-}
-
-async function handleNotifClick(el) {
-    const id = el.dataset.id;
-    const url = el.dataset.url;
-
-    // Mark read
-    try {
-        await api.post('/api/notifications/' + id + '/read');
-        el.classList.remove('unread');
-        // Decrement badge
-        const badge = document.getElementById('notif-unread-badge');
-        if (badge) {
-            const cur = parseInt(badge.textContent) || 0;
-            updateNotifBadge(Math.max(0, cur - 1));
-        }
-    } catch {}
-
-    // Navigate if URL provided
-    if (url && url !== 'null') {
-        if (url.startsWith('#chat-room-')) {
-            // Open chat to specific room
-            const roomId = url.replace('#chat-room-', '');
-            if (typeof openChatRoom === 'function') openChatRoom(parseInt(roomId));
-        } else {
-            window.location.href = url;
-        }
-    }
-}
-
-function updateNotifBadge(count) {
-    const badge = document.getElementById('notif-unread-badge');
-    const bell = document.getElementById('notif-bell-btn');
-    if (badge) {
-        if (count > 0) {
-            badge.textContent = count > 99 ? '99+' : count;
-            badge.style.display = 'flex';
-            if (bell) bell.classList.add('has-unread');
-        } else {
-            badge.style.display = 'none';
-            if (bell) bell.classList.remove('has-unread');
-        }
-    }
-}
-
-async function markAllNotificationsRead() {
-    try {
-        await api.post('/api/notifications/read-all');
-        updateNotifBadge(0);
-        // Re-render the panel
-        const list = document.getElementById('notif-list');
-        if (list) {
-            list.querySelectorAll('.notif-item.unread').forEach(el => el.classList.remove('unread'));
-        }
-    } catch {}
-}
-
-async function pollNotifications() {
-    try {
-        const data = await api.get('/api/notifications/unread-count');
-        updateNotifBadge(data.unread_count || 0);
-
-        // Show toasts for new notifications
-        if (data.toasts && data.toasts.length) {
-            data.toasts.forEach(t => {
-                showToast(t.title + (t.body ? ': ' + t.body.substring(0, 60) : ''), 'info');
-            });
-        }
-    } catch {}
-}
-
-function startNotifPolling() {
-    if (_notifPollInterval) return;
-    // Initial check
-    pollNotifications();
-    _notifPollInterval = setInterval(pollNotifications, NOTIF_POLL_MS);
-}
-
-// Initialize user menu and notifications on page load (if not on login page)
+// Initialize user menu on page load (skip on the pre-auth login page)
 document.addEventListener('DOMContentLoaded', function() {
     if (!window.location.pathname.startsWith('/login')) {
         // Render immediately from cache (no flash)
@@ -489,7 +334,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // Then refresh from server in background
         loadCurrentUser();
-        // Start notification polling
-        startNotifPolling();
     }
 });

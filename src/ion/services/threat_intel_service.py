@@ -117,8 +117,8 @@ class ThreatIntelService:
     ) -> List[WatchlistAlert]:
         """Check if enrichment result contains any watched threat actors.
 
-        Matches by opencti_id or by name/aliases. Creates WatchlistAlert and
-        Notification for each match.
+        Matches by opencti_id or by name/aliases. Creates a WatchlistAlert
+        per match and bumps the watch's `match_count` / `last_seen_at`.
 
         Returns:
             List of created WatchlistAlert records.
@@ -206,29 +206,6 @@ class ThreatIntelService:
                 # Update watch stats
                 watch.match_count = (watch.match_count or 0) + 1
                 watch.last_seen_at = datetime.utcnow()
-
-                # Create notification for the watcher
-                try:
-                    from ion.web.notification_api import create_notification
-                    from ion.models.user import User
-
-                    watcher = (
-                        self.session.query(User)
-                        .filter(User.username == watch.watched_by)
-                        .first()
-                    )
-                    if watcher:
-                        create_notification(
-                            session=self.session,
-                            user_id=watcher.id,
-                            source="threat_intel_match",
-                            source_id=str(watch.id),
-                            title=f"Threat Intel Match: {watch.name}",
-                            body=f"Observable '{observable.value}' enrichment matched watched {watch.entity_type.replace('_', ' ')} '{watch.name}'",
-                            url="/threat-intel",
-                        )
-                except Exception as e:
-                    logger.warning("Failed to create notification for watch match: %s", e)
 
         return alerts
 

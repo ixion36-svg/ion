@@ -127,25 +127,11 @@
           </nav>
         </div>
 
-        <!-- Right cluster: notif bell, notepad, user -->
+        <!-- Right cluster: notepad, user -->
         <div class="flex items-center gap-2 shrink-0">
           <button class="md:hidden h-8 w-8 grid place-items-center rounded-md hover:bg-white/5 transition" id="tw-mobile-toggle" aria-label="Menu">
             <svg class="w-4 h-4 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
-
-          <button id="notif-bell-btn" onclick="toggleNotifPanel()" class="relative h-8 w-8 grid place-items-center rounded-md hover:bg-white/5 transition" title="Notifications">
-            <i class="icon-bell text-slate-400"></i>
-            <span id="notif-unread-badge" class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-ion-coral text-ink-950 text-[9px] font-bold grid place-items-center" style="display:none;">0</span>
-          </button>
-          <div id="notif-panel" class="notif-panel absolute right-4 top-14 w-80 rounded-lg border border-white/10 bg-ink-900/95 backdrop-blur-md shadow-xl z-50" style="display:none;">
-            <div class="flex items-center justify-between px-4 py-3 border-b border-white/10">
-              <strong class="text-[13px] text-white">Notifications</strong>
-              <button class="text-[11px] text-ion-cyan hover:underline" onclick="markAllNotificationsRead()">Mark all read</button>
-            </div>
-            <div id="notif-list" class="max-h-96 overflow-y-auto">
-              <div class="p-6 text-center text-[12px] text-slate-500">No notifications</div>
-            </div>
-          </div>
 
           <button id="notepad-toggle-btn" onclick="toggleNotepad()" class="h-8 w-8 grid place-items-center rounded-md hover:bg-white/5 transition" title="Notepad (Ctrl+Shift+N)">
             <i class="icon-notebook-pen text-slate-400"></i>
@@ -356,8 +342,6 @@
     .np-clip-text{flex:1;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.75rem;color:#cbd5e1;white-space:pre-wrap;word-break:break-all;line-height:1.5}
     .np-clip-actions{display:flex;gap:4px;flex-shrink:0}
 
-    /* ── Notif panel (popover triggered from nav bell) ── */
-    .notif-panel{font-family:'Geist',ui-sans-serif,system-ui,sans-serif}
     </style>
 
     <main class="container">

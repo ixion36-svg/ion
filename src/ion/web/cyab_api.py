@@ -13,7 +13,6 @@ from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.cyab import CyabSystem, CyabDataSource, CyabSnapshot, SYSTEM_ICONS
 from ion.models.user import User, Role, user_roles
 from ion.web.api import get_db_session
-from ion.web.notification_api import create_notification
 from ion.services.tide_service import get_tide_service, reset_tide_service
 from ion.services.elasticsearch_service import ElasticsearchService
 from ion.core.config import get_elasticsearch_config
@@ -692,44 +691,6 @@ async def get_system_history(system_id: int, session: Session = Depends(get_db_s
         .order_by(CyabSnapshot.snapshot_date.desc(), CyabSnapshot.id.desc())
     ).scalars().all()
     return [_snap_to_dict(s) for s in snaps]
-
-
-# ---------------------------------------------------------------------------
-# Review reminders
-# ---------------------------------------------------------------------------
-
-@router.post("/check-reminders")
-async def check_review_reminders(session: Session = Depends(get_db_session)):
-    today = date.today()
-    due_systems = session.execute(
-        select(CyabSystem).where(CyabSystem.next_review_date <= today + timedelta(days=7))
-    ).scalars().all()
-    if not due_systems:
-        return {"notifications_sent": 0}
-
-    lead_users = session.execute(
-        select(User)
-        .join(user_roles, user_roles.c.user_id == User.id)
-        .join(Role, Role.id == user_roles.c.role_id)
-        .where(Role.name.in_(["lead", "admin", "principal_analyst"]))
-        .where(User.is_active == True)
-    ).scalars().all()
-
-    sent = 0
-    for sys in due_systems:
-        is_overdue = sys.next_review_date < today
-        label = "OVERDUE" if is_overdue else "Due soon"
-        for u in lead_users:
-            create_notification(
-                session=session, user_id=u.id, source="cyab_review",
-                source_id=str(sys.id),
-                title=f"CyAB Review {label}: {sys.name}",
-                body=f"{sys.department} — review {'was due ' + sys.next_review_date.isoformat() if is_overdue else 'due ' + sys.next_review_date.isoformat()}",
-                url=f"/cyab#{sys.id}",
-            )
-            sent += 1
-    session.commit()
-    return {"notifications_sent": sent, "systems_due": len(due_systems)}
 
 
 # ---------------------------------------------------------------------------
