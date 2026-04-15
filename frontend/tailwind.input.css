@@ -1,0 +1,169 @@
+/*
+ * ION Tailwind input — compiled to src/ion/web/static/css/tailwind.css
+ *
+ * Rebuild after editing this file OR any template that uses Tailwind classes:
+ *   ./frontend/tailwindcss.exe \
+ *     -i ./frontend/tailwind.input.css \
+ *     -o ./src/ion/web/static/css/tailwind.css \
+ *     --minify
+ *
+ * Watch mode during dev:
+ *   ./frontend/tailwindcss.exe -i … -o … --watch
+ *
+ * IMPORTANT: tailwind.css is loaded ONLY on templates that opt in
+ * (currently dashboard_v2.html). It is NOT loaded via base.html, because
+ * Tailwind v4's preflight would reset the existing style.css pages.
+ */
+
+/*
+ * Modular Tailwind v4 import.
+ *
+ * We split the import so that UTILITIES are NOT placed in a CSS layer.
+ * The legacy src/ion/web/static/css/style.css contains a `* { margin:0; padding:0 }`
+ * universal reset at the top-level (unlayered). In CSS cascade, any unlayered
+ * declaration beats any layered one regardless of specificity, so when utilities
+ * lived inside @layer utilities they were all being nuked by that reset.
+ *
+ * By importing utilities without a layer they cascade normally against the
+ * universal reset and win by specificity (.py-14 beats *).
+ */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
+
+/* Scan every template for class names so tree-shaking only keeps what's used. */
+@source "../src/ion/web/templates/**/*.html";
+
+/* ── Theme tokens (v4 @theme) ── */
+@theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-ink-950: #07080c;
+  --color-ink-900: #0a0c12;
+  --color-ink-850: #0d1017;
+  --color-ink-800: #11141c;
+  --color-ink-700: #171b24;
+  --color-ink-600: #1e232e;
+  --color-ink-500: #2a2f3a;
+  --color-ink-400: #3b414d;
+
+  --color-ion-cyan:  #6de4ff;
+  --color-ion-amber: #f8b33a;
+  --color-ion-coral: #ff6c6c;
+  --color-ion-lime:  #86f0a0;
+  --color-ion-iris:  #9a8cff;
+}
+
+/* ── Vendored variable fonts ── */
+@font-face {
+  font-family: "Geist";
+  src: url("/static/fonts/geist.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/static/fonts/jetbrains-mono.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Atmosphere — applied to any element with .ion-tw ── */
+.ion-tw {
+  font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.ion-tw-page {
+  background-color: #07080c;
+  background-image:
+    radial-gradient(ellipse 1200px 600px at 20% -10%, rgba(109, 228, 255, 0.055), transparent 60%),
+    radial-gradient(ellipse 900px 500px at 110% 10%, rgba(154, 140, 255, 0.045), transparent 60%);
+  color: #cbd5e1;
+  min-height: calc(100vh - 56px);
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+.grain::before {
+  content: "";
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.06 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: overlay;
+  opacity: 0.5;
+}
+
+/* ── Pulse dots ── */
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 108, 108, 0.45); }
+  50%      { box-shadow: 0 0 0 6px rgba(255, 108, 108, 0);   }
+}
+.pulse-red { animation: pulse-dot 1.8s ease-in-out infinite; }
+
+@keyframes pulse-dot-cyan {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(109, 228, 255, 0.35); }
+  50%      { box-shadow: 0 0 0 5px rgba(109, 228, 255, 0);   }
+}
+.pulse-cyan { animation: pulse-dot-cyan 2.4s ease-in-out infinite; }
+
+/* ── Staggered page-load reveal ── */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);  }
+}
+.rise { opacity: 0; animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
+.d-1 { animation-delay: .05s; }
+.d-2 { animation-delay: .12s; }
+.d-3 { animation-delay: .19s; }
+.d-4 { animation-delay: .26s; }
+.d-5 { animation-delay: .33s; }
+.d-6 { animation-delay: .40s; }
+.d-7 { animation-delay: .47s; }
+
+/* ── Hairline gradient border for the hero card ── */
+.hero-border { position: relative; }
+.hero-border::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: 14px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(109,228,255,.5), rgba(154,140,255,.25) 40%, rgba(255,255,255,0.04) 75%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ── Severity accent bar ── */
+.sev-bar { width: 2px; border-radius: 1px; }
+
+/* ── Row hover ── */
+.row-hover { transition: background-color .18s ease, border-color .18s ease, transform .18s ease; }
+.row-hover:hover { background-color: rgba(255,255,255,0.02); }
+
+/* ── Tiny uppercase label ── */
+.label-tiny { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; }
+
+/* ── Selection, focus, scrollbar ── */
+::selection { background: rgba(109, 228, 255, 0.25); color: #fff; }
+
+button:focus, a:focus, input:focus { outline: none; }
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  box-shadow: 0 0 0 2px #07080c, 0 0 0 3px rgba(109,228,255,0.6);
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }

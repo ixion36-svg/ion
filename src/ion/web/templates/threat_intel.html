@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}ION - Threat Intel{% endblock %}
 {% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <style>
 .ti-page { max-width: 1400px; margin: 0 auto; }
 .ti-header { margin-bottom: 24px; }
@@ -106,10 +108,14 @@
 </style>
 
 <div class="ti-page">
-    <div class="ti-header">
-        <h1>Threat Intel</h1>
-        <p>Search OpenCTI for threat actors and campaigns, manage your watchlist, and monitor enrichment matches.</p>
-    </div>
+    <section class="mb-8 rise d-1">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-4 h-4 text-ion-coral"><use href="#i-target"/></svg>
+        <span class="label-tiny text-ion-coral">OpenCTI intelligence</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Threat Intel</h1>
+      <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Search OpenCTI for threat actors and campaigns, manage your watchlist, and monitor enrichment matches.</p>
+    </section>
 
     <!-- Tabs -->
     <div class="ti-tabs" id="ti-tabs">
@@ -175,6 +181,9 @@
     </div>
 </div>
 
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

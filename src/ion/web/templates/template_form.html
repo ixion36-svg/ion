@@ -3,9 +3,11 @@
 {% block title %}{% if template_id %}Edit Template{% else %}New Template{% endif %} - ION{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>{% if template_id %}Edit Template{% else %}New Template{% endif %}</h1>
-</div>
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex items-end justify-between flex-wrap gap-6 mb-8 rise d-1">
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em] mb-6">{% if template_id %}Edit Template{% else %}New Template{% endif %}</h1>
+</section>
 
 <form id="template-form" class="form">
     <div class="form-group">
@@ -109,6 +111,9 @@
         </div>
     </div>
 </div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

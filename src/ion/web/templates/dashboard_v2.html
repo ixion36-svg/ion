@@ -1,0 +1,563 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · ION{% endblock %}
+{% block content %}
+<div class="ion-tw ion-tw-page grain text-slate-200 overflow-x-hidden">
+
+  <!-- Tailwind safelist (classes built dynamically in JS) -->
+  <div class="hidden
+    bg-ion-coral bg-ion-amber bg-ion-iris bg-ion-lime bg-ion-cyan
+    text-ion-coral text-ion-amber text-ion-iris text-ion-lime text-ion-cyan
+    bg-ion-coral/10 bg-ion-amber/10 bg-ion-iris/10 bg-ion-lime/10 bg-slate-500/10 bg-slate-400/10
+    border-ion-coral/20 border-ion-amber/20 border-ion-iris/20 border-ion-lime/20 border-slate-500/20 border-slate-400/20
+    text-slate-400 text-slate-500 bg-slate-400 bg-slate-500
+  " aria-hidden="true"></div>
+
+  <!-- Grid backdrop -->
+  <div class="fixed inset-0 bg-grid pointer-events-none opacity-40 z-0"></div>
+
+  <!-- Icon definitions for dashboard -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <defs>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+      <symbol id="i-arrow-up-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></symbol>
+      <symbol id="i-trending-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></symbol>
+      <symbol id="i-trending-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+      <symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></symbol>
+      <symbol id="i-alert-triangle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+      <symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></symbol>
+      <symbol id="i-book-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+    </defs>
+  </svg>
+
+<!-- ═══════════════════ PAGE ═══════════════════ -->
+  <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-14 md:py-20">
+
+    <!-- ── WELCOME ROW ── -->
+    <section class="flex flex-wrap items-end justify-between gap-6 md:gap-10 mb-16 md:mb-24 rise d-1">
+      <div class="flex-1">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="h-1.5 w-1.5 rounded-full bg-ion-lime pulse-cyan"></span>
+          <span class="label-tiny text-ion-cyan">ION · SOC Operations</span>
+          <span class="label-tiny text-slate-600">/</span>
+          <span class="label-tiny text-slate-500"><span id="today-label">—</span> · <span id="clock" class="font-mono">--:--:--</span> UTC</span>
+        </div>
+        <h1 class="font-sans font-semibold text-[48px] md:text-[60px] xl:text-[72px] leading-[1.02] text-white tracking-[-0.02em]">
+          <span id="greeting">Welcome</span>, <span id="welcome-name" class="text-ion-cyan">—</span>.
+        </h1>
+        <p id="welcome-message" class="mt-5 max-w-xl text-[17px] text-slate-400 leading-relaxed">
+          Loading your queue…
+        </p>
+      </div>
+
+      <!-- Focus mode switch + environment -->
+      <div class="flex flex-col items-end gap-3">
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10">
+          <span id="system-status-dot" class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
+          <span id="system-status-text" class="label-tiny text-slate-300">Checking systems…</span>
+        </div>
+        <div id="role-switcher" class="flex items-center gap-1 p-1 rounded-lg bg-white/5 border border-white/10">
+          <button class="px-3 py-1.5 rounded-md label-tiny text-ink-950 bg-ion-cyan shadow-[0_0_18px_-4px_rgba(109,228,255,0.8)]">—</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── MAIN GRID ── -->
+    <main class="grid grid-cols-12 gap-6">
+
+      <!-- ┌─── LEFT: CRITICAL FEED (HERO) ───┐ -->
+      <section class="col-span-12 lg:col-span-8 min-w-0 rise d-2">
+        <div class="hero-border rounded-[14px] bg-ink-900/60 backdrop-blur-sm">
+          <div class="px-7 py-10 lg:px-7 lg:py-14">
+            <!-- Header -->
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-8">
+              <div class="flex flex-wrap items-baseline gap-x-4 gap-y-2 min-w-0">
+                <span class="label-tiny text-ion-coral flex items-center gap-2">
+                  <span class="h-1.5 w-1.5 rounded-full bg-ion-coral pulse-red"></span>
+                  Active threats
+                </span>
+                <span id="hero-critical" class="font-sans font-semibold text-[26px] tracking-tight leading-none text-white">— critical</span>
+                <span class="text-[15px] text-slate-500">· <span id="hero-high">—</span> high</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1 p-0.5 rounded-md bg-white/5 border border-white/5">
+                  <button class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-white bg-white/10">Live</button>
+                  <button class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">1h</button>
+                  <button class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">24h</button>
+                </div>
+                <button class="h-7 px-3 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold hover:brightness-110 transition flex items-center gap-1.5">
+                  Triage queue
+                  <svg class="w-3 h-3"><use href="#i-arrow-right"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Alert rows (populated by JS from /api/dashboard) -->
+            <div id="alerts-feed" class="divide-y divide-white/5 -mx-2">
+              <div class="py-10 text-center text-[12px] text-slate-500">Loading alerts…</div>
+            </div>
+
+            <!-- Footer link -->
+            <div class="mt-5 pt-4 border-t border-white/5 flex items-center justify-between text-[12px]">
+              <span class="text-slate-500">Showing <span id="alerts-shown" class="font-mono text-white">—</span> of <span id="alerts-total-footer" class="font-mono text-white">—</span> active</span>
+              <a href="#" class="text-ion-cyan hover:underline flex items-center gap-1">
+                Open alert queue
+                <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ┌─── RIGHT: KPI STACK ───┐ -->
+      <aside class="col-span-12 lg:col-span-4 min-w-0 flex flex-col gap-5 lg:gap-6">
+
+        <!-- KPI 1 -->
+        <div class="rise d-3 rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-8 lg:px-6 lg:py-10 hover:border-white/10 transition">
+          <div class="flex items-center justify-between mb-3">
+            <span class="label-tiny text-slate-500">Open alerts · 24h</span>
+            <span id="kpi-open-alerts-delta" class="flex items-center gap-1 text-[11px] text-slate-500">
+              <svg class="w-3 h-3"><use href="#i-clock"/></svg>
+              last 24h
+            </span>
+          </div>
+          <div class="flex items-end justify-between gap-4">
+            <div id="kpi-open-alerts" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-white">—</div>
+            <svg viewBox="0 0 140 44" class="w-[140px] h-11 text-ion-cyan">
+              <defs>
+                <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="currentColor" stop-opacity="0.35"/>
+                  <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,32 L14,28 L28,30 L42,22 L56,26 L70,18 L84,20 L98,12 L112,16 L126,8 L140,14 L140,44 L0,44 Z" fill="url(#g1)"/>
+              <path d="M0,32 L14,28 L28,30 L42,22 L56,26 L70,18 L84,20 L98,12 L112,16 L126,8 L140,14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- KPI 2 -->
+        <div class="rise d-4 rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-8 lg:px-6 lg:py-10 hover:border-white/10 transition">
+          <div class="flex items-center justify-between mb-3">
+            <span class="label-tiny text-slate-500">My open cases</span>
+            <span id="kpi-cases-tag" class="flex items-center gap-1 text-[11px] text-slate-500">
+              <svg class="w-3 h-3"><use href="#i-clock"/></svg>
+              assigned to you
+            </span>
+          </div>
+          <div class="flex items-end justify-between gap-4">
+            <div id="kpi-my-cases" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-white">—</div>
+            <div id="kpi-my-cases-breakdown" class="flex flex-col items-end gap-1 pb-1 text-[10px] text-slate-500">
+              <span>loading…</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 3 -->
+        <div class="rise d-5 rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-8 lg:px-6 lg:py-10 hover:border-white/10 transition">
+          <div class="flex items-center justify-between mb-3">
+            <span class="label-tiny text-slate-500">Mean time to resolve</span>
+            <span id="kpi-mttr-tag" class="flex items-center gap-1 text-[11px] text-slate-500">
+              <svg class="w-3 h-3"><use href="#i-clock"/></svg>
+              30d rolling
+            </span>
+          </div>
+          <div class="flex items-end justify-between gap-4">
+            <div id="kpi-mttr" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-white">—</div>
+            <div class="text-right pb-2">
+              <div class="font-mono text-[10px] text-slate-500 uppercase">Target</div>
+              <div class="font-mono text-[13px] text-slate-300">4h</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI 4 -->
+        <div class="rise d-6 rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-8 lg:px-6 lg:py-10 hover:border-white/10 transition">
+          <div class="flex items-center justify-between mb-3">
+            <span class="label-tiny text-slate-500">Closure rate · 7d</span>
+            <span id="kpi-sla-tag" class="flex items-center gap-1 text-[11px] text-slate-500">
+              <svg class="w-3 h-3"><use href="#i-check-circle"/></svg>
+              team-wide
+            </span>
+          </div>
+          <div class="flex items-end justify-between gap-4 mb-3">
+            <div class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-white"><span id="kpi-sla">—</span><span class="text-ion-cyan text-[32px] font-medium">%</span></div>
+          </div>
+          <div class="h-1 w-full rounded-full bg-white/5 overflow-hidden">
+            <div id="kpi-sla-bar" class="h-full rounded-full bg-gradient-to-r from-ion-cyan to-ion-lime transition-[width] duration-700" style="width:0%"></div>
+          </div>
+        </div>
+      </aside>
+
+    </main>
+
+    <!-- ═══════════════════ SECONDARY ROW ═══════════════════ -->
+    <section class="grid grid-cols-12 gap-6 mt-10 lg:mt-14">
+
+      <!-- My open cases -->
+      <div class="col-span-12 lg:col-span-5 min-w-0 rise d-4 rounded-[16px] border border-white/5 bg-ink-900/40 px-6 py-8 lg:px-6 lg:py-10">
+        <div class="flex items-center justify-between mb-5">
+          <div class="flex items-baseline gap-3">
+            <span class="label-tiny text-slate-500">My work</span>
+            <h2 class="font-sans font-semibold text-[22px] tracking-tight leading-none text-white">Open cases</h2>
+          </div>
+          <a href="#" class="text-[12px] text-slate-400 hover:text-ion-cyan transition flex items-center gap-1">
+            View all
+            <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
+          </a>
+        </div>
+
+        <div id="cases-feed" class="space-y-3">
+          <div class="py-10 text-center text-[12px] text-slate-500">Loading cases…</div>
+        </div>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="col-span-12 lg:col-span-4 min-w-0 rise d-5 rounded-[16px] border border-white/5 bg-ink-900/40 px-6 py-8 lg:px-6 lg:py-10">
+        <div class="flex items-baseline gap-3 mb-5">
+          <span class="label-tiny text-slate-500">Go-to</span>
+          <h2 class="font-sans font-semibold text-[22px] tracking-tight leading-none text-white">Quick actions</h2>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <a href="#" class="group flex flex-col gap-2 p-4 rounded-lg border border-white/5 hover:border-ion-coral/40 hover:bg-ion-coral/5 transition">
+            <svg class="w-4 h-4 text-ion-coral"><use href="#i-alert-triangle"/></svg>
+            <div class="text-[13px] text-white font-medium">Triage alert</div>
+            <div class="text-[11px] text-slate-500">next in queue</div>
+          </a>
+          <a href="#" class="group flex flex-col gap-2 p-4 rounded-lg border border-white/5 hover:border-ion-cyan/40 hover:bg-ion-cyan/5 transition">
+            <svg class="w-4 h-4 text-ion-cyan"><use href="#i-sparkles"/></svg>
+            <div class="text-[13px] text-white font-medium">AI assist</div>
+            <div class="text-[11px] text-slate-500">llama3.2:latest</div>
+          </a>
+          <a href="#" class="group flex flex-col gap-2 p-4 rounded-lg border border-white/5 hover:border-ion-lime/40 hover:bg-ion-lime/5 transition">
+            <svg class="w-4 h-4 text-ion-lime"><use href="#i-search"/></svg>
+            <div class="text-[13px] text-white font-medium">Search IOC</div>
+            <div class="text-[11px] text-slate-500">observables DB</div>
+          </a>
+          <a href="#" class="group flex flex-col gap-2 p-4 rounded-lg border border-white/5 hover:border-ion-iris/40 hover:bg-ion-iris/5 transition">
+            <svg class="w-4 h-4 text-ion-iris"><use href="#i-book-open"/></svg>
+            <div class="text-[13px] text-white font-medium">Run playbook</div>
+            <div class="text-[11px] text-slate-500">25 available</div>
+          </a>
+        </div>
+      </div>
+
+      <!-- Shift handover -->
+      <div class="col-span-12 lg:col-span-3 min-w-0 rise d-6 rounded-[16px] border border-white/5 bg-ink-900/40 px-6 py-8 lg:px-6 lg:py-10">
+        <div class="flex items-baseline gap-3 mb-5">
+          <span class="label-tiny text-slate-500">06:00</span>
+          <h2 class="font-sans font-semibold text-[22px] tracking-tight leading-none text-white">Handover</h2>
+        </div>
+
+        <div class="space-y-4 text-[12.5px] leading-relaxed">
+          <div class="flex gap-3">
+            <div class="font-mono text-[10px] text-slate-600 pt-0.5">03:14</div>
+            <div class="text-slate-300">TIDE background sync completed — <span class="text-ion-lime">1,214 rules</span> reconciled.</div>
+          </div>
+          <div class="flex gap-3">
+            <div class="font-mono text-[10px] text-slate-600 pt-0.5">04:02</div>
+            <div class="text-slate-300">Passed <span class="text-white font-medium">3 escalations</span> to L2 — all suspected APT38 precursors.</div>
+          </div>
+          <div class="flex gap-3">
+            <div class="font-mono text-[10px] text-slate-600 pt-0.5">05:38</div>
+            <div class="text-slate-300">Closed <span class="font-mono text-slate-400">CASE-2830</span> as <span class="text-ion-cyan">benign true positive</span>.</div>
+          </div>
+          <div class="flex gap-3">
+            <div class="font-mono text-[10px] text-slate-600 pt-0.5">05:52</div>
+            <div class="text-slate-300">Kibana sync briefly stalled — resolved, see advisory lock log.</div>
+          </div>
+        </div>
+
+        <div class="mt-5 pt-4 border-t border-white/5 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="h-5 w-5 rounded-full bg-gradient-to-br from-ion-amber to-ion-coral grid place-items-center font-mono text-[9px] text-ink-950 font-bold">MK</div>
+            <span class="text-[11px] text-slate-400">Marcus · night shift</span>
+          </div>
+          <a href="#" class="text-[11px] text-ion-cyan hover:underline">Full log</a>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ═══════════════════ INTEGRATION STATUS FOOTER ═══════════════════ -->
+    <footer class="mt-10 pt-6 border-t border-white/5 rise d-7">
+      <div class="flex items-center justify-between flex-wrap gap-6">
+        <div class="flex items-center gap-8 text-[11px]">
+          <div class="flex items-center gap-2">
+            <span id="es-dot" class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
+            <span class="label-tiny text-slate-500">Elasticsearch</span>
+            <span id="es-label" class="font-mono text-slate-300">—</span>
+          </div>
+        </div>
+        <div class="text-[10px] text-slate-600 font-mono">
+          ION 0.9.71 · 4 workers · pg advisory-lock leader
+        </div>
+      </div>
+    </footer>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // ── Helpers ──────────────────────────────────────────────────
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => String(n).padStart(2, '0');
+  const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+
+  const SEV_MAP = {
+    critical: { cls: 'ion-coral', label: 'CRIT', glow: 'shadow-[0_0_12px_rgba(255,108,108,0.6)]' },
+    high:     { cls: 'ion-amber', label: 'HIGH', glow: '' },
+    medium:   { cls: 'ion-iris',  label: 'MED',  glow: '' },
+    low:      { cls: 'slate-400', label: 'LOW',  glow: '' },
+    info:     { cls: 'slate-500', label: 'INFO', glow: '' },
+  };
+
+  function relativeTime(iso) {
+    if (!iso) return '';
+    const then = new Date(iso).getTime();
+    const now = Date.now();
+    const s = Math.max(0, Math.round((now - then) / 1000));
+    if (s < 60)    return `${s}s ago`;
+    if (s < 3600)  return `${Math.round(s / 60)}m ago`;
+    if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+    return `${Math.round(s / 86400)}d ago`;
+  }
+
+  function hhmmss(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function formatHoursMTTR(h) {
+    if (h == null) return '—';
+    if (h < 1)   return `${Math.round(h * 60)}m`;
+    if (h < 24)  return `${Math.floor(h)}h ${Math.round((h % 1) * 60)}m`;
+    return `${Math.floor(h / 24)}d ${Math.round(h % 24)}h`;
+  }
+
+  // ── UTC clock ────────────────────────────────────────────────
+  const clock = $('clock');
+  function tick() {
+    const d = new Date();
+    clock.textContent = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // ── Today label ──────────────────────────────────────────────
+  (() => {
+    const d = new Date();
+    const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const MO  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    $('today-label').textContent = `${DOW[d.getDay()]}, ${MO[d.getMonth()]} ${d.getDate()}`;
+  })();
+
+  // ── Greeting by hour ─────────────────────────────────────────
+  (() => {
+    const h = new Date().getHours();
+    $('greeting').textContent = h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  })();
+
+  // ── API helper ───────────────────────────────────────────────
+  async function apiGet(path) {
+    const r = await fetch(path, { credentials: 'same-origin' });
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    return r.json();
+  }
+
+  // ── Renderers ────────────────────────────────────────────────
+  function roleLabel(r) {
+    return r ? r.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'User';
+  }
+
+  function renderAlertRow(a) {
+    const sev = SEV_MAP[a.severity] || SEV_MAP.info;
+    const tactic = a.mitre_tactic_name || a.source || 'Alert';
+    const tid = a.mitre_technique_id || '';
+    const metaBits = [];
+    if (a.host) metaBits.push(`<span class="font-mono text-ion-amber">${escHtml(a.host)}</span>`);
+    if (a.user) metaBits.push(`user <span class="font-mono text-slate-300">${escHtml(a.user)}</span>`);
+    if (a.rule_name) metaBits.push(`<span class="truncate">${escHtml(a.rule_name)}</span>`);
+    const meta = metaBits.join(' <span>·</span> ');
+    return `
+      <a href="/alerts?id=${encodeURIComponent(a.id)}" class="row-hover flex items-start gap-4 py-6 px-2">
+        <div class="sev-bar self-stretch bg-${sev.cls} ${sev.glow}"></div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="label-tiny text-${sev.cls}">${sev.label}</span>
+            <span class="text-[10px] text-slate-600">·</span>
+            <span class="label-tiny text-slate-500">${escHtml(tactic)}${tid ? ' · ' + escHtml(tid) : ''}</span>
+          </div>
+          <div class="text-[15px] text-white font-medium truncate">${escHtml(a.title || a.message || 'Untitled alert')}</div>
+          ${meta ? `<div class="mt-1 flex items-center gap-3 text-[12px] text-slate-500 min-w-0 overflow-hidden whitespace-nowrap text-ellipsis">${meta}</div>` : ''}
+        </div>
+        <div class="text-right shrink-0">
+          <div class="font-mono text-[11px] text-slate-500">${hhmmss(a.timestamp)}</div>
+          <div class="text-[11px] text-slate-600 mt-0.5">${relativeTime(a.timestamp)}</div>
+        </div>
+      </a>`;
+  }
+
+  function renderCaseRow(c) {
+    const sevKey = (c.severity || '').toLowerCase();
+    const sev = SEV_MAP[sevKey] || SEV_MAP.low;
+    const pretty = sevKey ? sevKey[0].toUpperCase() + sevKey.slice(1) : 'Low';
+    const bits = [];
+    bits.push(`Updated ${relativeTime(c.updated_at || c.created_at)}`);
+    if (c.observables_count != null) bits.push(`${c.observables_count} observables`);
+    if (c.alert_count) bits.push(`${c.alert_count} alerts`);
+    return `
+      <a href="/cases?id=${encodeURIComponent(c.id)}" class="row-hover flex items-center gap-4 p-4 -mx-4 rounded-lg">
+        <div class="font-mono text-[11px] text-slate-500 w-16 shrink-0">${escHtml(c.case_number || 'CASE-' + c.id)}</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-[14px] text-white truncate">${escHtml(c.title || 'Untitled case')}</div>
+          <div class="text-[11px] text-slate-500 mt-0.5">${bits.join(' · ')}</div>
+        </div>
+        <span class="label-tiny px-2 py-1 rounded-md bg-${sev.cls}/10 text-${sev.cls} border border-${sev.cls}/20">${pretty}</span>
+      </a>`;
+  }
+
+  // ── Main loader ──────────────────────────────────────────────
+  async function loadDashboard() {
+    // Fire in parallel; each call degrades gracefully on failure/permission
+    const [dash, metrics, casesResp] = await Promise.all([
+      apiGet('/api/dashboard').catch((e) => { console.warn('dashboard failed', e); return null; }),
+      apiGet('/api/dashboard/team-metrics').catch((e) => { console.warn('team-metrics failed', e); return null; }),
+      apiGet('/api/elasticsearch/alerts/cases?status=open').catch((e) => { console.warn('cases failed', e); return null; }),
+    ]);
+
+    // ── User / welcome ──
+    if (dash?.user) {
+      const u = dash.user;
+      const name = (u.display_name || u.username || 'there').split(' ')[0];
+      $('welcome-name').textContent = name;
+      const role = roleLabel(u.focus_role || u.roles?.[0]);
+      const switcher = $('role-switcher');
+      switcher.innerHTML = (u.roles || []).map((r, i) => {
+        const active = (u.focus_role || u.roles[0]) === r;
+        return `<button class="px-3 py-1.5 rounded-md label-tiny ${active ? 'text-ink-950 bg-ion-cyan shadow-[0_0_18px_-4px_rgba(109,228,255,0.8)]' : 'text-slate-400 hover:text-white transition'}">${escHtml(roleLabel(r))}</button>`;
+      }).join('') || `<button class="px-3 py-1.5 rounded-md label-tiny text-ink-950 bg-ion-cyan shadow-[0_0_18px_-4px_rgba(109,228,255,0.8)]">${escHtml(role)}</button>`;
+    }
+
+    // ── Elasticsearch / alerts ──
+    const es = dash?.elasticsearch;
+    if (es) {
+      const critical = es.critical_count || 0;
+      const high = es.high_count || 0;
+      const total = es.total_alerts || 0;
+
+      $('hero-critical').textContent = `${critical} critical`;
+      $('hero-high').textContent = high;
+      $('kpi-open-alerts').textContent = total;
+      $('alerts-total-footer').textContent = total;
+
+      const feed = $('alerts-feed');
+      const alerts = (es.alerts || []).slice(0, 6);
+      $('alerts-shown').textContent = alerts.length;
+
+      if (alerts.length === 0) {
+        feed.innerHTML = `<div class="py-10 text-center text-[12px] text-slate-500">No active alerts.</div>`;
+      } else {
+        feed.innerHTML = alerts.map(renderAlertRow).join('');
+      }
+
+      // Welcome message
+      const name = dash.user?.display_name?.split(' ')[0] || 'there';
+      let msg;
+      if (total === 0) {
+        msg = `Your queue is clear. No open alerts in the last 24h.`;
+      } else if (critical > 0) {
+        msg = `Your queue has <span class="text-white font-medium">${critical} critical</span> and <span class="text-white font-medium">${high} high</span> alert${high === 1 ? '' : 's'} pending triage.`;
+      } else {
+        msg = `<span class="text-white font-medium">${total}</span> open alert${total === 1 ? '' : 's'} in the last 24h — nothing critical right now.`;
+      }
+      $('welcome-message').innerHTML = msg;
+
+      // ES footer
+      if (es.connected) {
+        $('es-dot').className = 'h-1.5 w-1.5 rounded-full bg-ion-lime';
+        $('es-label').textContent = es.cluster_name || 'connected';
+      } else {
+        $('es-dot').className = 'h-1.5 w-1.5 rounded-full bg-ion-coral';
+        $('es-label').textContent = es.error || 'disconnected';
+      }
+
+      // System status pill
+      if (es.connected) {
+        $('system-status-dot').className = 'h-1.5 w-1.5 rounded-full bg-ion-lime';
+        $('system-status-text').textContent = 'All systems nominal';
+      } else {
+        $('system-status-dot').className = 'h-1.5 w-1.5 rounded-full bg-ion-amber';
+        $('system-status-text').textContent = 'Elasticsearch degraded';
+      }
+    } else {
+      $('welcome-message').textContent = 'Dashboard data unavailable.';
+    }
+
+    // ── Team metrics → MTTR + SLA proxy ──
+    if (metrics) {
+      $('kpi-mttr').textContent = formatHoursMTTR(metrics.mttr_hours);
+
+      const closureRate = metrics.closure_rate_7d;
+      if (closureRate != null) {
+        $('kpi-sla').textContent = Math.round(closureRate);
+        $('kpi-sla-bar').style.width = `${Math.min(100, Math.max(0, closureRate))}%`;
+      } else {
+        $('kpi-sla').textContent = '—';
+      }
+    }
+
+    // ── My open cases ──
+    const currentUsername = dash?.user?.username;
+    if (casesResp?.cases && currentUsername) {
+      const mine = casesResp.cases.filter((c) => c.assigned_to === currentUsername && (c.status || '').toLowerCase() !== 'closed');
+      $('kpi-my-cases').textContent = mine.length;
+
+      // Breakdown by severity
+      const breakdown = { critical: 0, high: 0, medium: 0, low: 0 };
+      for (const c of mine) {
+        const k = (c.severity || 'low').toLowerCase();
+        if (breakdown[k] != null) breakdown[k]++;
+      }
+      const breakdownEl = $('kpi-my-cases-breakdown');
+      const maxW = 32;
+      const total = Math.max(1, mine.length);
+      const rows = [
+        ['critical', 'coral', 'crit'],
+        ['high',     'amber', 'high'],
+        ['medium',   'iris',  'med'],
+      ].filter(([k]) => breakdown[k] > 0);
+      if (rows.length === 0) {
+        breakdownEl.innerHTML = `<span class="font-mono text-[10px] text-slate-600">all clear</span>`;
+      } else {
+        breakdownEl.innerHTML = rows.map(([k, color, label]) => {
+          const w = Math.max(8, Math.round((breakdown[k] / total) * maxW));
+          return `<div class="flex items-center gap-1"><span class="h-1 rounded-full bg-ion-${color}" style="width:${w}px"></span><span class="font-mono text-[10px] text-slate-400">${breakdown[k]} ${label}</span></div>`;
+        }).join('');
+      }
+
+      // Case list (top 4 by updated_at desc)
+      const feed = $('cases-feed');
+      const top = mine.slice().sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)).slice(0, 4);
+      if (top.length === 0) {
+        feed.innerHTML = `<div class="py-10 text-center text-[12px] text-slate-500">No open cases assigned to you.</div>`;
+      } else {
+        feed.innerHTML = top.map(renderCaseRow).join('');
+      }
+    } else if (casesResp === null) {
+      // No permission or fetch error — show hint
+      $('kpi-my-cases').textContent = '—';
+      $('cases-feed').innerHTML = `<div class="py-10 text-center text-[12px] text-slate-500">Cases unavailable (permission required).</div>`;
+    }
+  }
+
+  loadDashboard();
+</script>
+{% endblock %}

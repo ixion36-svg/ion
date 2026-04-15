@@ -3,6 +3,8 @@
 {% block title %}Notes - ION{% endblock %}
 
 {% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <style>
 /* ── Override container max-width for full-page layout ── */
 .container:has(.notes-page){max-width:100%;padding:0;margin:0}
@@ -215,6 +217,9 @@
 
 <!-- Move to folder dropdown (positioned by JS) -->
 <div id="fp-move-dropdown" class="move-folder-dropdown"></div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

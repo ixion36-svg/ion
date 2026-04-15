@@ -2,22 +2,24 @@
 {% block title %}CyAB — Cyber Assurance Baseline{% endblock %}
 
 {% block content %}
-
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <!-- ======================== DASHBOARD VIEW ======================== -->
 <div id="cyab-dashboard">
-    <div class="cyab-dash-header">
-        <div>
-            <h1 class="cyab-dash-title">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
-                Cyber Assurance Baseline
-            </h1>
-            <p class="cyab-dash-sub">Data source ingestion SLAs across all departments</p>
+    <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-3 mb-4">
+          <svg class="w-4 h-4 text-ion-lime"><use href="#i-shield"/></svg>
+          <span class="label-tiny text-ion-lime">Cyber Assurance Baseline</span>
         </div>
-        <button class="btn btn-primary" onclick="openNewSystem()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:4px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            New System
-        </button>
-    </div>
+        <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">CyAB</h1>
+        <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Data source ingestion SLAs across all departments.</p>
+      </div>
+      <button onclick="openNewSystem()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+        <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
+        New System
+      </button>
+    </section>
 
     <!-- Aggregate metrics -->
     <div class="cyab-dash-metrics" id="dash-metrics">
@@ -972,6 +974,9 @@
     .cyab-rollup-grid{grid-template-columns:repeat(2,1fr)}
 }
 </style>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

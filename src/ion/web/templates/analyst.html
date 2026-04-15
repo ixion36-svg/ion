@@ -3,10 +3,16 @@
 {% block title %}Analyst Workspace - ION{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Analyst Workspace</h1>
-    <p class="page-subtitle">Security Operations Center Tools & Investigation</p>
-</div>
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="mb-8 rise d-1">
+  <div class="flex items-center gap-3 mb-4">
+    <span class="h-1.5 w-1.5 rounded-full bg-ion-cyan pulse-cyan"></span>
+    <span class="label-tiny text-ion-cyan">SOC Workspace</span>
+  </div>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Analyst Workspace</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Investigation tools, knowledge base, and daily workflow.</p>
+</section>
 
 <!-- Quick Stats Bar -->
 <div class="analyst-stats-bar" id="analyst-stats">
@@ -738,6 +744,9 @@
 }
 </style>
 
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

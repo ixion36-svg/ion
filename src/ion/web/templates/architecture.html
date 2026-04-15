@@ -3,15 +3,16 @@
 {% block title %}System Architecture - ION{% endblock %}
 
 {% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 w-full py-10 md:py-12">
 <style>
 /* ═══════════════════════════════════════════════════════════════
    ION System Architecture — Workflow Orchestrator
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Break out of .container ───────────────────────────────── */
+/* ── Full-width layout (wrapper is already w-full; no break-out needed) ───── */
 .arch-page-wrap {
-    width: 100vw; position: relative; left: 50%; right: 50%;
-    margin-left: -50vw; margin-right: -50vw;
+    width: 100%;
     padding: 0 1rem;
     box-sizing: border-box;
     height: calc(100vh - 60px);
@@ -342,6 +343,9 @@
         </div>
     </div>
 </div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

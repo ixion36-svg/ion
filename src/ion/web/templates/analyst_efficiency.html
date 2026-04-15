@@ -3,9 +3,18 @@
 {% block title %}Analyst Efficiency - ION{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1><i class="icon-bar-chart-2"></i> Analyst Efficiency Dashboard</h1>
-    <div class="header-actions">
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+<div class="flex-1 min-w-0">
+  <div class="flex items-center gap-3 mb-4">
+    <svg class="w-4 h-4 text-ion-cyan"><use href="#i-users"/></svg>
+    <span class="label-tiny text-ion-cyan">Workload metrics</span>
+  </div>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Analyst Efficiency</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Per-analyst workload, closure rate and MTTR.</p>
+</div>
+<div class="flex items-center gap-2 flex-wrap">
         <select id="ae-hours" onchange="aeLoad()">
             <option value="24">Last 24h</option>
             <option value="72">Last 3 days</option>
@@ -15,9 +24,12 @@
         </select>
         <button class="btn btn-primary" onclick="aeLoad()">Refresh</button>
     </div>
-</div>
+</section>
 
 <div id="ae-content"><div class="ae-loading"><span class="ae-spinner"></span> Loading metrics...</div></div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

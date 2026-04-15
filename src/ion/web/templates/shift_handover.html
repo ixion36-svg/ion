@@ -3,9 +3,18 @@
 {% block title %}Shift Handover - ION{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1><i class="icon-clipboard-list"></i> Shift Handover Report</h1>
-    <div class="header-actions">
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+<div class="flex-1 min-w-0">
+  <div class="flex items-center gap-3 mb-4">
+    <svg class="w-4 h-4 text-ion-iris"><use href="#i-clock"/></svg>
+    <span class="label-tiny text-ion-iris">Shift change</span>
+  </div>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Shift Handover</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">End-of-shift notes and handover log.</p>
+</div>
+<div class="flex items-center gap-2 flex-wrap">
         <select id="sh-hours" class="sh-select">
             <option value="4">Last 4 hours</option>
             <option value="8" selected>Last 8 hours</option>
@@ -15,11 +24,14 @@
         <button class="btn btn-primary" onclick="shGenerate()">Generate Report</button>
         <button class="btn btn-secondary" onclick="window.print()"><i class="icon-printer"></i> Print</button>
     </div>
-</div>
+</section>
 
 <div id="sh-content">
     <div class="sh-loading" id="sh-loading"><span class="sh-spinner"></span> Generating shift report...</div>
 </div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

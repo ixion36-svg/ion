@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}ION - Data Flow Visualization{% endblock %}
 {% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <style>
 .df-page { max-width: 1400px; margin: 0 auto; }
 
@@ -141,7 +143,7 @@
             <div class="df-header-label">
                 <i class="icon-user-plus"></i> SOC Architecture Review: Privilege Escalation
             </div>
-            <h1>Group Membership Ingestion Flow</h1>
+            <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em] mb-6">Group Membership Ingestion Flow</h1>
         </div>
         <div class="df-toggle-group">
             <button class="df-toggle-btn active-legacy" id="df-btn-legacy" onclick="dfSetFlow('legacy')">Legacy</button>
@@ -608,4 +610,7 @@
     render();
 })();
 </script>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}

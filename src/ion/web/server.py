@@ -587,8 +587,20 @@ async def startup_event():
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request, user: User = Depends(require_page_auth)):
-    """Render the main dashboard."""
+    """Render the main dashboard (Tailwind refresh)."""
+    return templates.TemplateResponse(request=request, name="dashboard_v2.html")
+
+
+@app.get("/dashboard-legacy", response_class=HTMLResponse)
+async def dashboard_legacy(request: Request, user: User = Depends(require_page_auth)):
+    """Legacy role-based dashboard — kept as a rollback path during the Tailwind migration."""
     return templates.TemplateResponse(request=request, name="index.html")
+
+
+@app.get("/dashboard-v2", response_class=HTMLResponse)
+async def dashboard_v2(request: Request, user: User = Depends(require_page_auth)):
+    """Alias for /. Kept so existing bookmarks still resolve during the rollout."""
+    return templates.TemplateResponse(request=request, name="dashboard_v2.html")
 
 
 @app.get("/templates", response_class=HTMLResponse)

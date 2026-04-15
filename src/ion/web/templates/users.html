@@ -3,15 +3,27 @@
 {% block title %}User Management - ION{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>User Management</h1>
-    <button class="btn btn-primary" onclick="showCreateUserModal()">Create User</button>
-</div>
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-3 mb-4">
+      <svg class="w-4 h-4 text-ion-cyan"><use href="#i-users"/></svg>
+      <span class="label-tiny text-ion-cyan">Identity &amp; access</span>
+    </div>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Users</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">User accounts, roles and sessions.</p>
+  </div>
+  <button onclick="showCreateUserModal()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+    <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
+    New User
+  </button>
+</section>
 
 <div class="card">
     <div class="card-header">
         <h2>Users</h2>
-        <div class="header-actions">
+        <div class="flex items-center gap-2 flex-wrap">
             <label class="checkbox-label">
                 <input type="checkbox" id="include-inactive" onchange="loadUsers()">
                 Show inactive users
@@ -159,6 +171,9 @@
         </form>
     </div>
 </div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

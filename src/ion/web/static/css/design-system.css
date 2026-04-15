@@ -1,0 +1,320 @@
+/* ============================================================ *
+ * ION Design System — extracted patterns from data_flow.html    *
+ * ============================================================ *
+ *                                                              *
+ * Opt-in utility layer for the "modern look" the user picked   *
+ * as the visual reference. Every rule uses CSS variables that  *
+ * already exist in style.css — no new tokens, no new colors.   *
+ *                                                              *
+ * Loaded after style.css in base.html. Existing pages render   *
+ * unchanged unless they apply ds-* classes.                    *
+ *                                                              *
+ * Naming: every selector is `ds-*` to avoid collisions with    *
+ * the existing `df-*` (data flow) and per-page utility classes *
+ * scattered across templates.                                  *
+ * ============================================================ */
+
+/* ── Page wrapper ──────────────────────────────────────────── */
+.ds-page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px 0;
+}
+
+/* ── Page header (label + h1 + actions) ─────────────────────── */
+.ds-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+}
+.ds-page-header-left { display: flex; flex-direction: column; gap: 4px; }
+.ds-page-header-actions { display: flex; gap: 8px; align-items: center; }
+
+.ds-section-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--primary);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+.ds-section-label.muted { color: var(--text-muted); }
+.ds-section-label.success { color: var(--success); }
+.ds-section-label.danger { color: var(--danger); }
+.ds-section-label.warning { color: var(--warning); }
+
+.ds-h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    margin: 0;
+    line-height: 1.2;
+}
+
+/* ── Cards ─────────────────────────────────────────────────── */
+.ds-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.ds-card.elevated {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+.ds-card.interactive {
+    cursor: pointer;
+}
+.ds-card.interactive:hover {
+    transform: translateY(-1px);
+    border-color: rgba(0, 212, 255, 0.35);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+
+.ds-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 12px;
+}
+.ds-card-title {
+    font-size: 11px;
+    font-weight: 900;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ds-card-title i { color: var(--info); }
+
+/* ── Toggle group (segmented control) ──────────────────────── */
+.ds-toggle-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--bg-secondary);
+    padding: 4px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+}
+.ds-toggle-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-secondary);
+    transition: all .2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.ds-toggle-btn:hover:not(.active) { color: var(--text-primary); }
+.ds-toggle-btn.active {
+    background: var(--primary);
+    color: var(--bg-deep);
+    box-shadow: 0 4px 12px var(--primary-glow);
+}
+.ds-toggle-btn.active.success { background: var(--success); color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,.3); }
+.ds-toggle-btn.active.danger  { background: var(--danger);  color: #fff; box-shadow: 0 4px 12px rgba(239,68,68,.3); }
+.ds-toggle-btn.active.info    { background: var(--info);    color: #fff; box-shadow: 0 4px 12px rgba(14,165,233,.3); }
+
+/* ── Metric card (label + status + animated bar) ───────────── */
+.ds-metric { margin-bottom: 20px; }
+.ds-metric:last-child { margin-bottom: 0; }
+.ds-metric-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+.ds-metric-status { font-weight: 700; }
+.ds-metric-status.success { color: var(--success); }
+.ds-metric-status.warning { color: var(--warning); }
+.ds-metric-status.danger  { color: var(--danger); }
+.ds-metric-status.info    { color: var(--info); }
+
+.ds-bar {
+    height: 6px;
+    width: 100%;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.ds-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width .8s ease;
+    background: var(--primary);
+}
+.ds-bar-fill.success { background: var(--success); }
+.ds-bar-fill.warning { background: var(--warning); }
+.ds-bar-fill.danger  { background: var(--danger); }
+.ds-bar-fill.info    { background: var(--info); }
+
+/* ── Stat tile (big number + label) ────────────────────────── */
+.ds-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 20px 24px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    transition: transform .2s ease, border-color .2s ease;
+}
+.ds-stat:hover {
+    transform: translateY(-1px);
+    border-color: rgba(0, 212, 255, 0.25);
+}
+.ds-stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    line-height: 1;
+}
+.ds-stat-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+}
+
+/* ── Badge ─────────────────────────────────────────────────── */
+.ds-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(0, 212, 255, 0.12);
+    color: var(--primary);
+    border: 1px solid rgba(0, 212, 255, 0.25);
+}
+.ds-badge.success { background: rgba(16,185,129,.12); color: var(--success); border-color: rgba(16,185,129,.3); }
+.ds-badge.danger  { background: rgba(239,68,68,.12);  color: var(--danger);  border-color: rgba(239,68,68,.3); }
+.ds-badge.warning { background: rgba(251,191,36,.12); color: var(--warning); border-color: rgba(251,191,36,.3); }
+.ds-badge.info    { background: rgba(14,165,233,.12); color: var(--info);    border-color: rgba(14,165,233,.3); }
+.ds-badge.muted   { background: rgba(139,148,158,.12); color: var(--text-muted); border-color: rgba(139,148,158,.3); }
+
+/* ── Layout grids ──────────────────────────────────────────── */
+.ds-grid-2col       { display: grid; grid-template-columns: 1fr 1fr;  gap: 24px; }
+.ds-grid-2col-7-5   { display: grid; grid-template-columns: 7fr 5fr;  gap: 32px; }
+.ds-grid-3col       { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.ds-grid-4col       { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.ds-grid-auto       { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+
+@media (max-width: 1024px) {
+    .ds-grid-2col, .ds-grid-2col-7-5 { grid-template-columns: 1fr; }
+    .ds-grid-3col { grid-template-columns: 1fr 1fr; }
+    .ds-grid-4col { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+    .ds-grid-3col, .ds-grid-4col { grid-template-columns: 1fr; }
+    .ds-page { padding: 16px; }
+    .ds-card { padding: 20px; }
+}
+
+/* ── Sidebar (right rail metric stack) ─────────────────────── */
+.ds-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* ── Score ring ────────────────────────────────────────────── */
+.ds-ring {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform .3s ease;
+}
+.ds-ring-inner {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+}
+.ds-ring-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1;
+}
+.ds-ring-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+}
+
+/* ── Empty state ───────────────────────────────────────────── */
+.ds-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+.ds-empty i {
+    font-size: 2.5rem;
+    color: var(--text-muted);
+    opacity: 0.5;
+    margin-bottom: 12px;
+    display: block;
+}
+
+/* ── Skeleton loader ───────────────────────────────────────── */
+.ds-skeleton {
+    background: linear-gradient(
+        90deg,
+        var(--bg-secondary) 0%,
+        var(--bg-card) 50%,
+        var(--bg-secondary) 100%
+    );
+    background-size: 200% 100%;
+    animation: ds-skeleton-shimmer 1.4s ease-in-out infinite;
+    border-radius: var(--radius);
+}
+@keyframes ds-skeleton-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+.ds-skeleton.line  { height: 12px; margin-bottom: 8px; }
+.ds-skeleton.title { height: 20px; width: 40%; margin-bottom: 12px; }
+.ds-skeleton.card  { height: 120px; margin-bottom: 16px; }

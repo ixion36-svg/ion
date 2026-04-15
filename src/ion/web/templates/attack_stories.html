@@ -3,9 +3,18 @@
 {% block title %}Attack Stories - ION{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1><i class="icon-book-open"></i> Attack Stories</h1>
-    <div class="header-actions">
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+<div class="flex-1 min-w-0">
+  <div class="flex items-center gap-3 mb-4">
+    <svg class="w-4 h-4 text-ion-iris"><use href="#i-file-text"/></svg>
+    <span class="label-tiny text-ion-iris">Narrative intelligence</span>
+  </div>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Attack Stories</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Linked alerts, IOCs and playbooks reconstructed as incidents.</p>
+</div>
+<div class="flex items-center gap-2 flex-wrap">
         <select id="as-hours" onchange="asLoad()">
             <option value="4">Last 4h</option>
             <option value="12">Last 12h</option>
@@ -15,9 +24,12 @@
         </select>
         <button class="btn btn-primary" onclick="asLoad()">Refresh</button>
     </div>
-</div>
+</section>
 
 <div id="as-content"><div class="as-loading"><span class="as-spinner"></span> Correlating alerts into attack stories...</div></div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Social Hub - ION{% endblock %}
 {% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <style>
     .social-hub { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
     .social-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
@@ -142,9 +144,14 @@
 </style>
 
 <div class="social-hub">
-    <div class="social-header">
-        <h1><i class="icon-megaphone"></i> Social Hub</h1>
-    </div>
+    <section class="mb-8 rise d-1">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-4 h-4 text-ion-iris"><use href="#i-users"/></svg>
+        <span class="label-tiny text-ion-iris">Team space</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Social Hub</h1>
+      <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Announcements, shoutouts and team channels.</p>
+    </section>
 
     <!-- Compose -->
     <div class="social-compose">
@@ -459,4 +466,7 @@ async function deleteComment(postId, commentId) {
     }
 }
 </script>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}

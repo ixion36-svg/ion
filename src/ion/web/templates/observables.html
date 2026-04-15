@@ -1,56 +1,66 @@
 {% extends "base.html" %}
 
-{% block title %}Observables - ION{% endblock %}
+{% block title %}Observables · ION{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Observables</h1>
-    <div class="header-actions">
-        <button class="btn btn-secondary" onclick="loadStats()">Refresh</button>
-        <button class="btn btn-secondary" onclick="showGraphView()">Relationship Graph</button>
-        <button class="btn btn-secondary" onclick="showPatternsView()">Detect Patterns</button>
-        <button class="btn btn-secondary" onclick="showWatchlist()">Watchlist <span class="badge" id="watchlist-count" style="display:none">0</span></button>
-        <button class="btn btn-secondary" onclick="showImportModal()">Import</button>
-        <button class="btn btn-secondary" onclick="exportCSV()">Export CSV</button>
-        <button class="btn btn-primary" onclick="showMigrateModal()">Migrate Legacy</button>
-    </div>
-</div>
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 
-<!-- Watchlist Alerts Banner -->
-<div class="watchlist-banner" id="watchlist-banner" style="display:none">
-    <div class="watchlist-alert-icon">!</div>
-    <span id="watchlist-alert-text">You have unread watchlist alerts</span>
-    <button class="btn btn-sm btn-warning" onclick="showWatchlistAlerts()">View Alerts</button>
-    <button class="btn btn-sm btn-link" onclick="dismissWatchlistBanner()">Dismiss</button>
-</div>
+  <!-- Header -->
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="h-1.5 w-1.5 rounded-full bg-ion-lime pulse-cyan"></span>
+        <span class="label-tiny text-ion-lime">IOC tracking</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Observables</h1>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button onclick="loadStats()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Refresh</button>
+      <button onclick="showGraphView()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-network"/></svg>Graph</button>
+      <button onclick="showPatternsView()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>Patterns</button>
+      <button onclick="showWatchlist()" class="relative inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-eye"/></svg>Watchlist<span id="watchlist-count" class="ml-1 px-1.5 py-0.5 rounded-full bg-ion-coral/20 text-ion-coral text-[10px]" style="display:none">0</span></button>
+      <button onclick="showImportModal()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-upload"/></svg>Import</button>
+      <button onclick="exportCSV()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-download"/></svg>Export</button>
+      <button onclick="showMigrateModal()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">Migrate</button>
+    </div>
+  </section>
 
-<!-- Quick Stats -->
-<div class="stats-banner" id="stats-banner">
-    <div class="stat-card">
-        <div class="stat-value" id="stat-total">-</div>
-        <div class="stat-label">Total</div>
+  <!-- Watchlist Banner -->
+  <div id="watchlist-banner" class="mb-4 rounded-[12px] border border-ion-coral/30 bg-ion-coral/5 px-5 py-4 flex items-center gap-3" style="display:none">
+    <div class="h-7 w-7 rounded-full bg-ion-coral/20 grid place-items-center text-ion-coral font-bold">!</div>
+    <span id="watchlist-alert-text" class="flex-1 text-[13px] text-white">You have unread watchlist alerts</span>
+    <button onclick="showWatchlistAlerts()" class="h-8 px-3 rounded-md bg-ion-coral text-ink-950 text-[11px] font-semibold hover:brightness-110 transition">View</button>
+    <button onclick="dismissWatchlistBanner()" class="text-slate-400 hover:text-white transition"><svg class="w-4 h-4"><use href="#i-x"/></svg></button>
+  </div>
+
+  <!-- Stats -->
+  <div id="stats-banner" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8 rise d-2">
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+      <div class="label-tiny text-slate-500 mb-2">Total</div>
+      <div id="stat-total" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-white">–</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-value" id="stat-ips">-</div>
-        <div class="stat-label">IPs</div>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+      <div class="label-tiny text-slate-500 mb-2">IPs</div>
+      <div id="stat-ips" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-cyan">–</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-value" id="stat-domains">-</div>
-        <div class="stat-label">Domains</div>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+      <div class="label-tiny text-slate-500 mb-2">Domains</div>
+      <div id="stat-domains" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-iris">–</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-value" id="stat-enriched">-</div>
-        <div class="stat-label">Enriched</div>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+      <div class="label-tiny text-slate-500 mb-2">Enriched</div>
+      <div id="stat-enriched" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-lime">–</div>
     </div>
-    <div class="stat-card stat-card-threat">
-        <div class="stat-value" id="stat-critical">-</div>
-        <div class="stat-label">Critical/High</div>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+      <div class="label-tiny text-slate-500 mb-2">Critical / High</div>
+      <div id="stat-critical" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-coral">–</div>
     </div>
-    <div class="stat-card stat-card-watched">
-        <div class="stat-value" id="stat-watched">-</div>
-        <div class="stat-label">Watched</div>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+      <div class="label-tiny text-slate-500 mb-2">Watched</div>
+      <div id="stat-watched" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-amber">–</div>
     </div>
-</div>
+  </div>
 
 <!-- Filters -->
 <div class="observables-filters">
@@ -343,6 +353,8 @@ sha256,abc123...,c2,</pre>
         </div>
     </div>
 </div>
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

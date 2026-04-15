@@ -1,0 +1,260 @@
+{#
+  ION Tailwind component macros.
+
+  Import in a page template via:
+    {% from "_components.html" import page_shell, page_header, card, stat, badge, section_header, empty_state, loader, button, pill, sev_dot, data_row %}
+
+  All components use Tailwind utilities + the .ion-tw design language from
+  frontend/tailwind.input.css. They expect to be rendered inside a container
+  that has the `.ion-tw` class (page_shell provides it).
+
+  Conventions:
+    - Severity strings: "critical" | "high" | "medium" | "low" | "info"
+    - Colour slugs: "coral" | "amber" | "iris" | "lime" | "cyan" (maps to ion-*)
+#}
+
+{# ─────────────────────────────── SHELL ─────────────────────────────── #}
+{% macro page_shell(grain=true) %}
+  <div class="ion-tw ion-tw-page {% if grain %}grain{% endif %} text-slate-200 overflow-x-hidden">
+    <div class="fixed inset-0 bg-grid pointer-events-none opacity-40 z-0"></div>
+    <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-12 md:py-16">
+      {{ caller() }}
+    </div>
+  </div>
+{% endmacro %}
+
+{# ───────────────────── PAGE HEADER (eyebrow + title + actions) ───────────────────── #}
+{% macro page_header(eyebrow, title, subtitle=None) %}
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-10 md:mb-14 rise d-1">
+    <div class="flex-1 min-w-0">
+      {% if eyebrow %}
+      <div class="flex items-center gap-3 mb-4">
+        <span class="h-1.5 w-1.5 rounded-full bg-ion-cyan pulse-cyan"></span>
+        <span class="label-tiny text-ion-cyan">{{ eyebrow }}</span>
+      </div>
+      {% endif %}
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">{{ title|safe }}</h1>
+      {% if subtitle %}
+        <p class="mt-4 max-w-2xl text-[15px] text-slate-400 leading-relaxed">{{ subtitle|safe }}</p>
+      {% endif %}
+    </div>
+    {% if caller is defined %}
+      <div class="flex items-center gap-2 shrink-0">{{ caller() }}</div>
+    {% endif %}
+  </section>
+{% endmacro %}
+
+{# ─────────────────────────────── CARD ─────────────────────────────── #}
+{% macro card(title=None, eyebrow=None, action_url=None, action_label=None, extra_class='', id='', padding='standard') %}
+  {% set pad = {
+      'compact':  'px-5 py-6',
+      'standard': 'px-6 py-8 lg:py-10',
+      'roomy':    'px-7 py-10 lg:px-8 lg:py-12',
+  }[padding] %}
+  <div {% if id %}id="{{ id }}"{% endif %} class="rounded-[16px] border border-white/5 bg-ink-900/50 {{ pad }} hover:border-white/10 transition {{ extra_class }}">
+    {% if title or eyebrow or action_url %}
+    <div class="flex items-center justify-between mb-5">
+      <div class="flex items-baseline gap-3">
+        {% if eyebrow %}<span class="label-tiny text-slate-500">{{ eyebrow }}</span>{% endif %}
+        {% if title %}<h2 class="font-sans font-semibold text-[20px] tracking-tight leading-none text-white">{{ title }}</h2>{% endif %}
+      </div>
+      {% if action_url %}
+        <a href="{{ action_url }}" class="text-[12px] text-slate-400 hover:text-ion-cyan transition flex items-center gap-1">
+          {{ action_label or 'View' }}
+          <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
+        </a>
+      {% endif %}
+    </div>
+    {% endif %}
+    {{ caller() }}
+  </div>
+{% endmacro %}
+
+{# ─────────────────────── STAT TILE (label + big number + tag) ─────────────────────── #}
+{% macro stat(label, value, tag=None, tag_color='slate', id_value=None, id_tag=None) %}
+  {% set tag_class = {
+      'coral':  'text-ion-coral',
+      'amber':  'text-ion-amber',
+      'iris':   'text-ion-iris',
+      'lime':   'text-ion-lime',
+      'cyan':   'text-ion-cyan',
+      'slate':  'text-slate-500',
+  }[tag_color] %}
+  <div class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-7 lg:py-8 hover:border-white/10 transition">
+    <div class="flex items-center justify-between mb-3">
+      <span class="label-tiny text-slate-500">{{ label }}</span>
+      {% if tag %}
+      <span {% if id_tag %}id="{{ id_tag }}"{% endif %} class="flex items-center gap-1 text-[11px] {{ tag_class }}">{{ tag|safe }}</span>
+      {% endif %}
+    </div>
+    <div {% if id_value %}id="{{ id_value }}"{% endif %} class="font-sans font-semibold tabular-nums tracking-tight text-[40px] xl:text-[52px] leading-none text-white">{{ value }}</div>
+  </div>
+{% endmacro %}
+
+{# ───────────────────────────── BADGE / PILL ───────────────────────────── #}
+{% macro badge(label, color='cyan', size='md') %}
+  {% set colors = {
+      'coral': 'bg-ion-coral/10 text-ion-coral border-ion-coral/20',
+      'amber': 'bg-ion-amber/10 text-ion-amber border-ion-amber/20',
+      'iris':  'bg-ion-iris/10  text-ion-iris  border-ion-iris/20',
+      'lime':  'bg-ion-lime/10  text-ion-lime  border-ion-lime/20',
+      'cyan':  'bg-ion-cyan/10  text-ion-cyan  border-ion-cyan/20',
+      'slate': 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+  }[color] %}
+  {% set sz = {
+      'sm': 'px-2 py-0.5 text-[9px]',
+      'md': 'px-2.5 py-1 text-[10px]',
+      'lg': 'px-3 py-1.5 text-[11px]',
+  }[size] %}
+  <span class="inline-flex items-center gap-1 rounded-md border font-semibold uppercase tracking-[0.12em] {{ colors }} {{ sz }}">{{ label }}</span>
+{% endmacro %}
+
+{# ─────────────────────── SEVERITY DOT (small coloured indicator) ─────────────────────── #}
+{% macro sev_dot(severity) %}
+  {% set m = {
+      'critical': 'bg-ion-coral',
+      'high':     'bg-ion-amber',
+      'medium':   'bg-ion-iris',
+      'low':      'bg-slate-500',
+      'info':     'bg-ion-cyan',
+  } %}
+  <span class="h-1.5 w-1.5 rounded-full {{ m.get(severity|lower, 'bg-slate-500') }}"></span>
+{% endmacro %}
+
+{# ───────────────── SECTION HEADER (eyebrow + title on a row) ───────────────── #}
+{% macro section_header(eyebrow, title, action_url=None, action_label=None) %}
+  <div class="flex items-center justify-between mb-5">
+    <div class="flex items-baseline gap-3">
+      <span class="label-tiny text-slate-500">{{ eyebrow }}</span>
+      <h2 class="font-sans font-semibold text-[22px] tracking-tight leading-none text-white">{{ title }}</h2>
+    </div>
+    {% if action_url %}
+      <a href="{{ action_url }}" class="text-[12px] text-slate-400 hover:text-ion-cyan transition flex items-center gap-1">
+        {{ action_label or 'View all' }}
+        <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
+      </a>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{# ─────────────────────────── EMPTY STATE ─────────────────────────── #}
+{% macro empty_state(message, icon='i-search') %}
+  <div class="py-14 px-4 text-center">
+    <svg class="w-8 h-8 mx-auto mb-3 text-slate-600"><use href="#{{ icon }}"/></svg>
+    <div class="text-[13px] text-slate-500">{{ message }}</div>
+  </div>
+{% endmacro %}
+
+{# ─────────────────────────── LOADING STATE ─────────────────────────── #}
+{% macro loader(message='Loading…') %}
+  <div class="py-14 text-center text-[12px] text-slate-500">{{ message }}</div>
+{% endmacro %}
+
+{# ──────────────────────────────── BUTTON ──────────────────────────────── #}
+{% macro button(label, variant='primary', size='md', icon=None, href=None, type='button', id='', onclick='', extra_class='') %}
+  {% set variants = {
+      'primary':   'bg-ion-cyan text-ink-950 hover:brightness-110 shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]',
+      'secondary': 'bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10',
+      'danger':    'bg-ion-coral text-ink-950 hover:brightness-110',
+      'ghost':     'text-slate-400 hover:text-white hover:bg-white/5',
+  }[variant] %}
+  {% set sizes = {
+      'sm': 'h-7 px-3 text-[11px]',
+      'md': 'h-9 px-4 text-[12px]',
+      'lg': 'h-10 px-5 text-[13px]',
+  }[size] %}
+  {% set common = 'inline-flex items-center gap-2 rounded-md font-semibold transition whitespace-nowrap ' ~ variants ~ ' ' ~ sizes ~ ' ' ~ extra_class %}
+  {% if href %}
+    <a href="{{ href }}" {% if id %}id="{{ id }}"{% endif %} class="{{ common }}">
+      {% if icon %}<svg class="w-3.5 h-3.5"><use href="#{{ icon }}"/></svg>{% endif %}
+      {{ label }}
+    </a>
+  {% else %}
+    <button type="{{ type }}" {% if id %}id="{{ id }}"{% endif %} {% if onclick %}onclick="{{ onclick }}"{% endif %} class="{{ common }}">
+      {% if icon %}<svg class="w-3.5 h-3.5"><use href="#{{ icon }}"/></svg>{% endif %}
+      {{ label }}
+    </button>
+  {% endif %}
+{% endmacro %}
+
+{# ──────────────────────── PILL (toggle-group segment) ──────────────────────── #}
+{% macro pill(label, active=false, onclick='', extra_class='') %}
+  <button onclick="{{ onclick }}" class="px-3 py-1.5 rounded-md label-tiny transition {% if active %}text-ink-950 bg-ion-cyan shadow-[0_0_18px_-6px_rgba(109,228,255,0.8)]{% else %}text-slate-400 hover:text-white{% endif %} {{ extra_class }}">{{ label }}</button>
+{% endmacro %}
+
+{# ──────────────────── DATA ROW (severity-bar + body + time) ──────────────────── #}
+{% macro data_row(severity, title, meta='', time='', href='#', id='') %}
+  {% set sev_color = {
+      'critical': 'bg-ion-coral shadow-[0_0_12px_rgba(255,108,108,0.6)]',
+      'high':     'bg-ion-amber',
+      'medium':   'bg-ion-iris',
+      'low':      'bg-slate-500',
+      'info':     'bg-ion-cyan',
+  }[severity|lower] %}
+  <a href="{{ href }}" {% if id %}id="{{ id }}"{% endif %} class="row-hover flex items-start gap-4 py-5 px-2">
+    <div class="sev-bar self-stretch {{ sev_color }}"></div>
+    <div class="flex-1 min-w-0">
+      <div class="text-[14px] text-white font-medium truncate">{{ title }}</div>
+      {% if meta %}
+        <div class="mt-1 flex items-center gap-3 text-[12px] text-slate-500 min-w-0 overflow-hidden whitespace-nowrap">{{ meta|safe }}</div>
+      {% endif %}
+    </div>
+    {% if time %}
+      <div class="text-right shrink-0 text-[11px] text-slate-500 font-mono">{{ time }}</div>
+    {% endif %}
+  </a>
+{% endmacro %}
+
+{# ─────────────────────── TABLE WRAPPER (simple data table) ─────────────────────── #}
+{% macro table_wrap() %}
+  <div class="rounded-[14px] border border-white/5 bg-ink-900/40 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-[13px]">
+        {{ caller() }}
+      </table>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro th(label, align='left', extra_class='') %}
+  <th class="label-tiny text-slate-500 font-semibold text-{{ align }} px-4 py-3 border-b border-white/5 {{ extra_class }}">{{ label }}</th>
+{% endmacro %}
+
+{% macro td(content='', align='left', extra_class='') %}
+  <td class="px-4 py-3 text-{{ align }} text-slate-300 border-b border-white/5 {{ extra_class }}">{{ content|safe }}</td>
+{% endmacro %}
+
+{# ─────────────────── FORM INPUT (styled text / number / select) ─────────────────── #}
+{% macro input(name, label=None, type='text', value='', placeholder='', id='') %}
+  <div class="flex flex-col gap-1.5">
+    {% if label %}<label class="label-tiny text-slate-500" for="{{ id or name }}">{{ label }}</label>{% endif %}
+    <input
+      id="{{ id or name }}"
+      name="{{ name }}"
+      type="{{ type }}"
+      value="{{ value }}"
+      placeholder="{{ placeholder }}"
+      class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 focus:border-ion-cyan/50 focus:bg-white/8 transition">
+  </div>
+{% endmacro %}
+
+{% macro select(name, label=None, options=[], value='', id='') %}
+  <div class="flex flex-col gap-1.5">
+    {% if label %}<label class="label-tiny text-slate-500" for="{{ id or name }}">{{ label }}</label>{% endif %}
+    <select
+      id="{{ id or name }}"
+      name="{{ name }}"
+      class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white focus:border-ion-cyan/50 transition">
+      {% for opt in options %}
+        <option value="{{ opt.value }}" {% if opt.value == value %}selected{% endif %}>{{ opt.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+{% endmacro %}
+
+{# ─────────────────── GRID LAYOUT HELPERS ─────────────────── #}
+{% macro stat_grid() %}
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 lg:gap-5 mb-8">
+    {{ caller() }}
+  </div>
+{% endmacro %}

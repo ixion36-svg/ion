@@ -8,28 +8,33 @@
 
 :root,
 [data-theme="cyan"] {
-    /* Core colors - Cyber/Neon palette */
-    --bg-deep: #0a0e14;
-    --bg-primary: #0d1117;
-    --bg-secondary: #161b22;
-    --bg-tertiary: #1c2128;
-    --bg-card: #21262d;
-    --bg-elevated: #2d333b;
+    /* Tailwind refresh v0.9.72 — align tokens with the ion-* design language
+       used by dashboard_v2, base.html nav, and the compiled tailwind.css.
+       Any legacy component class that reads these vars now picks up the
+       new palette automatically. */
 
-    /* Neon accents */
-    --neon-cyan: #00d4ff;
-    --neon-blue: #0ea5e9;
-    --neon-purple: #a855f7;
+    /* Surfaces */
+    --bg-deep: #07080c;
+    --bg-primary: #0a0c12;
+    --bg-secondary: #11141c;
+    --bg-tertiary: #171b24;
+    --bg-card: #0d1017;
+    --bg-elevated: #1e232e;
+
+    /* Neon accents — softened to match ion-* palette */
+    --neon-cyan: #6de4ff;
+    --neon-blue: #60a5fa;
+    --neon-purple: #9a8cff;
     --neon-pink: #ec4899;
-    --neon-green: #10b981;
-    --neon-yellow: #fbbf24;
-    --neon-orange: #f97316;
-    --neon-red: #ef4444;
+    --neon-green: #86f0a0;
+    --neon-yellow: #f8b33a;
+    --neon-orange: #f8b33a;
+    --neon-red: #ff6c6c;
 
     /* Primary color */
     --primary: var(--neon-cyan);
-    --primary-dim: rgba(0, 212, 255, 0.15);
-    --primary-glow: rgba(0, 212, 255, 0.4);
+    --primary-dim: rgba(109, 228, 255, 0.12);
+    --primary-glow: rgba(109, 228, 255, 0.45);
 
     /* Semantic colors */
     --success: var(--neon-green);
@@ -37,25 +42,25 @@
     --danger: var(--neon-red);
     --info: var(--neon-blue);
 
-    /* Text colors */
-    --text-primary: #f0f6fc;
-    --text-secondary: #b1bac4;
-    --text-muted: #8b949e;
+    /* Text colors — slate-* family */
+    --text-primary: #cbd5e1;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
     --text-bright: #ffffff;
 
     /* Border colors */
-    --border: rgba(99, 110, 123, 0.4);
-    --border-bright: rgba(0, 212, 255, 0.3);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-bright: rgba(109, 228, 255, 0.35);
 
     /* Effects */
-    --glow-sm: 0 0 10px rgba(0, 212, 255, 0.3);
-    --glow-md: 0 0 20px rgba(0, 212, 255, 0.4);
-    --glow-lg: 0 0 30px rgba(0, 212, 255, 0.5);
-    --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.4);
+    --glow-sm: 0 0 0 1px rgba(109, 228, 255, 0.12), 0 0 16px -6px rgba(109, 228, 255, 0.6);
+    --glow-md: 0 0 0 1px rgba(109, 228, 255, 0.2), 0 0 24px -4px rgba(109, 228, 255, 0.8);
+    --glow-lg: 0 0 0 1px rgba(109, 228, 255, 0.3), 0 0 40px -4px rgba(109, 228, 255, 0.9);
+    --shadow-card: 0 16px 40px rgba(0, 0, 0, 0.5);
 
     /* Sizing */
-    --radius: 6px;
-    --radius-lg: 12px;
+    --radius: 8px;
+    --radius-lg: 14px;
 
     /* ── 5-Severity System (aligned with TIDE) ──────────── */
     /* Sev-1: Critical (Red) */
@@ -485,11 +490,15 @@ body {
     background: var(--text-muted);
 }
 
-/* Body */
+/* Body — Tailwind refresh: Geist typeface + ION cyber atmosphere */
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg-deep);
-    color: var(--text-primary);
+    font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background-color: #07080c;
+    background-image:
+        radial-gradient(ellipse 1200px 600px at 20% -10%, rgba(109, 228, 255, 0.055), transparent 60%),
+        radial-gradient(ellipse 900px 500px at 110% 10%, rgba(154, 140, 255, 0.045), transparent 60%);
+    color: #cbd5e1;
+    -webkit-font-smoothing: antialiased;
     line-height: 1.6;
     min-height: 100vh;
     display: flex;
@@ -505,12 +514,12 @@ body::before {
     width: 100%;
     height: 100%;
     background-image:
-        linear-gradient(var(--primary-dim) 1px, transparent 1px),
-        linear-gradient(90deg, var(--primary-dim) 1px, transparent 1px);
-    background-size: 50px 50px;
+        linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 56px 56px;
     pointer-events: none;
     z-index: -1;
-    opacity: 0.15;
+    opacity: 0.4;
 }
 
 /* =============================================================================
@@ -2884,3 +2893,1174 @@ select option {
 /* ── Transition helper ───────────────────────────────────────────────────── */
 .ion-fade-in { animation: ionFadeIn .3s ease; }
 @keyframes ionFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TAILWIND REFRESH — v0.9.72 Path A
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Overrides the legacy component classes (.btn, .card, .stat-card, etc.) so
+   every legacy page body automatically wears the new Tailwind design language
+   without any HTML changes.
+
+   Rules below are later in source order than the original definitions, so for
+   equal specificity they win. Where the legacy rule had a specificity advantage
+   we bump ours accordingly (`body .btn`, `.card.card`, etc.).
+
+   To revert: delete this block and the :root token rewrite above.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Page header refresh ────────────────────────────────────────────────── */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 2rem;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+.page-header h1 {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 2.25rem;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin: 0;
+}
+.page-subtitle {
+    font-size: 0.9375rem;
+    color: #94a3b8;
+    margin: 0.75rem 0 0;
+    max-width: 44rem;
+}
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 2.25rem;
+    padding: 0 1rem;
+    border-radius: 0.5rem;
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.05);
+    color: #cbd5e1;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    text-decoration: none;
+    transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #fff;
+}
+.btn-primary {
+    background: #6de4ff;
+    color: #07080c;
+    border: none;
+    box-shadow: 0 0 0 1px rgba(109, 228, 255, 0.25), 0 0 18px -6px rgba(109, 228, 255, 0.9);
+}
+.btn-primary:hover {
+    background: #8aeaff;
+    color: #07080c;
+    filter: brightness(1.05);
+    transform: none;
+    box-shadow: 0 0 0 1px rgba(109, 228, 255, 0.4), 0 0 28px -4px rgba(109, 228, 255, 1);
+}
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    color: #cbd5e1;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #fff;
+}
+.btn-success {
+    background: #86f0a0;
+    color: #07080c;
+    border: none;
+    font-weight: 600;
+}
+.btn-success:hover { filter: brightness(1.05); box-shadow: 0 0 16px -6px rgba(134, 240, 160, 0.8); }
+.btn-danger {
+    background: #ff6c6c;
+    color: #07080c;
+    border: none;
+}
+.btn-danger:hover { filter: brightness(1.05); box-shadow: 0 0 16px -6px rgba(255, 108, 108, 0.8); }
+.btn-warning {
+    background: #f8b33a;
+    color: #07080c;
+    border: none;
+    font-weight: 600;
+}
+.btn-warning:hover { filter: brightness(1.05); box-shadow: 0 0 16px -6px rgba(248, 179, 58, 0.8); }
+.btn-sm {
+    height: 1.875rem;
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+    border-radius: 0.375rem;
+}
+.btn-xs {
+    height: 1.625rem;
+    padding: 0 0.625rem;
+    font-size: 0.6875rem;
+}
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.card {
+    background: rgba(10, 12, 18, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 14px;
+    padding: 1.75rem;
+    margin-bottom: 1rem;
+    box-shadow: none;
+    transition: border-color .18s ease, background .18s ease;
+}
+.card:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+.card-header h2,
+.card-header h3,
+.card-title {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+.card-body { margin-bottom: 0; }
+.card-description { color: #94a3b8; }
+.card-footer {
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ── Stat cards ──────────────────────────────────────────────────────────── */
+.stat-card {
+    background: rgba(10, 12, 18, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1.5rem 1.5rem;
+    transition: border-color .18s ease, background .18s ease;
+    box-shadow: none;
+    position: relative;
+    overflow: hidden;
+}
+.stat-card::before { display: none; }
+.stat-card:hover {
+    border-color: rgba(255, 255, 255, 0.12);
+    transform: none;
+}
+.stat-value {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    margin-bottom: 0.375rem;
+}
+.stat-label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-top: 0.5rem;
+}
+.stat-card .stat-label { order: 2; }
+.stat-card .stat-value { order: 1; }
+
+/* ── Data tables ────────────────────────────────────────────────────────── */
+.table, .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(10, 12, 18, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 14px;
+    overflow: hidden;
+}
+.table th, .data-table th {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #64748b;
+    background: transparent;
+    padding: 0.875rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.table td, .data-table td {
+    padding: 1rem;
+    font-size: 0.8125rem;
+    color: #cbd5e1;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    font-variant-numeric: tabular-nums;
+}
+.table tr:hover td,
+.data-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+.table tbody tr:last-child td,
+.data-table tbody tr:last-child td { border-bottom: 0; }
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    line-height: 1.4;
+}
+.badge-primary {
+    background: rgba(109, 228, 255, 0.1);
+    color: #6de4ff;
+    border-color: rgba(109, 228, 255, 0.25);
+}
+.badge-info {
+    background: rgba(96, 165, 250, 0.1);
+    color: #60a5fa;
+    border-color: rgba(96, 165, 250, 0.25);
+}
+.badge-success {
+    background: rgba(134, 240, 160, 0.1);
+    color: #86f0a0;
+    border-color: rgba(134, 240, 160, 0.25);
+}
+.badge-warning {
+    background: rgba(248, 179, 58, 0.1);
+    color: #f8b33a;
+    border-color: rgba(248, 179, 58, 0.25);
+}
+.badge-danger {
+    background: rgba(255, 108, 108, 0.1);
+    color: #ff6c6c;
+    border-color: rgba(255, 108, 108, 0.25);
+}
+.tag {
+    display: inline-block;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    border-radius: 6px;
+    background: rgba(109, 228, 255, 0.1);
+    color: #6de4ff;
+    margin-right: 0.375rem;
+    border: 1px solid rgba(109, 228, 255, 0.2);
+}
+
+/* ── Forms ──────────────────────────────────────────────────────────────── */
+.form-group { margin-bottom: 1.25rem; }
+.form-group label {
+    display: block;
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+}
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="number"],
+.form-group input[type="file"],
+.form-group input[type="url"],
+.form-group input[type="date"],
+.form-group input[type="datetime-local"],
+.form-group select,
+.form-group textarea,
+.form-control {
+    width: 100%;
+    height: 2.375rem;
+    padding: 0 0.875rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    color: #fff;
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.8125rem;
+    transition: border-color .15s ease, background .15s ease;
+}
+.form-group textarea,
+textarea.form-control {
+    height: auto;
+    min-height: 5rem;
+    padding: 0.625rem 0.875rem;
+    line-height: 1.5;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus,
+.form-control:focus {
+    outline: none;
+    border-color: rgba(109, 228, 255, 0.5);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 2px rgba(109, 228, 255, 0.1);
+}
+.form-group input::placeholder,
+.form-group textarea::placeholder,
+.form-control::placeholder { color: #64748b; }
+
+/* ── Modals ─────────────────────────────────────────────────────────────── */
+.modal {
+    background: rgba(7, 8, 12, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+.modal-content {
+    background: rgba(10, 12, 18, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+.modal-header {
+    padding: 1.5rem 1.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.modal-header h2,
+.modal-header h3 {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+.modal-close {
+    color: #64748b;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.25rem;
+    transition: color .15s ease;
+}
+.modal-close:hover { color: #fff; }
+.modal-body { padding: 1.75rem; }
+.modal-footer {
+    padding: 1.25rem 1.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+/* ── Section / tabs ─────────────────────────────────────────────────────── */
+.section {
+    margin-bottom: 2rem;
+}
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+.section-header h2,
+.section-header h3 {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+.tab-nav {
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 1.75rem;
+}
+.tab-btn {
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #64748b;
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color .15s ease, border-color .15s ease;
+    margin-bottom: -1px;
+}
+.tab-btn:hover { color: #cbd5e1; }
+.tab-btn.active {
+    color: #6de4ff;
+    border-bottom-color: #6de4ff;
+}
+
+/* ── Misc utility refresh ───────────────────────────────────────────────── */
+.loading, .empty-state {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.8125rem;
+}
+.list-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.list-item {
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.5rem;
+    transition: background .15s ease;
+}
+.list-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+hr, .divider {
+    border: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    margin: 1.5rem 0;
+}
+
+/* ── Typography nudges so legacy headings use Geist ────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.01em;
+}
+
+/* ── Scrollbar refresh to match the Tailwind pages ─────────────────────── */
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.06); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* ── Selection ─────────────────────────────────────────────────────────── */
+::selection { background: rgba(109, 228, 255, 0.25); color: #fff; }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TAILWIND REFRESH — v0.9.72 Path B sweep
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Extends Path A with the remaining legacy class families that are used
+   across specific pages (analyst, tools, DE, training, users, versions, etc.).
+   All refreshed to the same Tailwind design language so no page-level HTML
+   edits are needed. */
+
+/* ── Action cards (analyst workspace, tools page) ──────────────────────── */
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+}
+.action-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1.25rem;
+    background: rgba(10, 12, 18, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    text-decoration: none;
+    color: #cbd5e1;
+    transition: border-color .18s ease, background .18s ease;
+}
+.action-card:hover {
+    border-color: rgba(109, 228, 255, 0.35);
+    background: rgba(109, 228, 255, 0.04);
+}
+.action-card-danger:hover { border-color: rgba(255, 108, 108, 0.35); background: rgba(255, 108, 108, 0.04); }
+.action-card-primary:hover { border-color: rgba(109, 228, 255, 0.35); background: rgba(109, 228, 255, 0.04); }
+.action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    color: #6de4ff;
+    font-size: 1rem;
+}
+.action-card-danger .action-icon { color: #ff6c6c; }
+.action-label {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+/* ── Metric cards (training, analytics pages) ──────────────────────────── */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+.metric-card {
+    background: rgba(10, 12, 18, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1.5rem 1.5rem;
+    transition: border-color .18s ease;
+}
+.metric-card:hover { border-color: rgba(255, 255, 255, 0.12); }
+.metric-value {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+.metric-label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+/* ── Severity badges (unified palette) ────────────────────────────────── */
+.sev-badge,
+.severity-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.25rem 0.625rem;
+    border-radius: 6px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    border: 1px solid transparent;
+    line-height: 1.4;
+}
+.sev-badge.sev-critical, .sev-critical {
+    background: rgba(255, 108, 108, 0.1);
+    color: #ff6c6c;
+    border-color: rgba(255, 108, 108, 0.25);
+}
+.sev-badge.sev-high, .sev-high {
+    background: rgba(248, 179, 58, 0.1);
+    color: #f8b33a;
+    border-color: rgba(248, 179, 58, 0.25);
+}
+.sev-badge.sev-medium, .sev-medium {
+    background: rgba(154, 140, 255, 0.1);
+    color: #9a8cff;
+    border-color: rgba(154, 140, 255, 0.25);
+}
+.sev-badge.sev-low, .sev-low {
+    background: rgba(100, 116, 139, 0.1);
+    color: #94a3b8;
+    border-color: rgba(100, 116, 139, 0.25);
+}
+.sev-badge.sev-info, .sev-info {
+    background: rgba(109, 228, 255, 0.1);
+    color: #6de4ff;
+    border-color: rgba(109, 228, 255, 0.25);
+}
+/* Severity stripes used on card edges */
+.sev-stripe-critical { border-left: 3px solid #ff6c6c; }
+.sev-stripe-high     { border-left: 3px solid #f8b33a; }
+.sev-stripe-medium   { border-left: 3px solid #9a8cff; }
+.sev-stripe-low      { border-left: 3px solid #94a3b8; }
+.sev-stripe-info     { border-left: 3px solid #6de4ff; }
+/* Severity borders */
+.sev-border-critical { border-color: rgba(255, 108, 108, 0.35); }
+.sev-border-high     { border-color: rgba(248, 179, 58, 0.35); }
+.sev-border-medium   { border-color: rgba(154, 140, 255, 0.35); }
+.sev-border-low      { border-color: rgba(100, 116, 139, 0.35); }
+.sev-border-info     { border-color: rgba(109, 228, 255, 0.35); }
+/* Severity text */
+.sev-text-critical { color: #ff6c6c; }
+.sev-text-high     { color: #f8b33a; }
+.sev-text-medium   { color: #9a8cff; }
+.sev-text-low      { color: #94a3b8; }
+.sev-text-info     { color: #6de4ff; }
+
+/* ── MITRE badges (Detection Engineering, compliance) ─────────────────── */
+.mitre-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.25rem 0.625rem;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    border: 1px solid transparent;
+}
+.mitre-covered {
+    background: rgba(134, 240, 160, 0.1);
+    color: #86f0a0;
+    border-color: rgba(134, 240, 160, 0.25);
+}
+.mitre-gap {
+    background: rgba(255, 108, 108, 0.1);
+    color: #ff6c6c;
+    border-color: rgba(255, 108, 108, 0.25);
+}
+.mitre-partial {
+    background: rgba(248, 179, 58, 0.1);
+    color: #f8b33a;
+    border-color: rgba(248, 179, 58, 0.25);
+}
+
+/* ── Quality score classes (DE rule quality) ──────────────────────────── */
+.quality-excellent {
+    background: rgba(134, 240, 160, 0.1);
+    color: #86f0a0;
+    border-color: rgba(134, 240, 160, 0.25);
+}
+.quality-good {
+    background: rgba(109, 228, 255, 0.1);
+    color: #6de4ff;
+    border-color: rgba(109, 228, 255, 0.25);
+}
+.quality-fair {
+    background: rgba(248, 179, 58, 0.1);
+    color: #f8b33a;
+    border-color: rgba(248, 179, 58, 0.25);
+}
+.quality-poor {
+    background: rgba(255, 108, 108, 0.1);
+    color: #ff6c6c;
+    border-color: rgba(255, 108, 108, 0.25);
+}
+
+/* ── Status badge (cases, alerts, system panels) ──────────────────────── */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.25rem 0.625rem;
+    border-radius: 6px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: rgba(255, 255, 255, 0.05);
+    color: #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ── Alert callouts (.alert-*) ────────────────────────────────────────── */
+.alert {
+    padding: 1rem 1.25rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(10, 12, 18, 0.5);
+    margin-bottom: 1rem;
+    color: #cbd5e1;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+.alert-success {
+    background: rgba(134, 240, 160, 0.06);
+    border-color: rgba(134, 240, 160, 0.28);
+    color: #86f0a0;
+}
+.alert-warning {
+    background: rgba(248, 179, 58, 0.06);
+    border-color: rgba(248, 179, 58, 0.28);
+    color: #f8b33a;
+}
+.alert-danger {
+    background: rgba(255, 108, 108, 0.06);
+    border-color: rgba(255, 108, 108, 0.28);
+    color: #ff6c6c;
+}
+
+/* ── Tool cards (/tools, /analyst) ─────────────────────────────────────── */
+.tool-card {
+    background: rgba(10, 12, 18, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: border-color .18s ease, background .18s ease;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+.tool-card:hover {
+    border-color: rgba(109, 228, 255, 0.35);
+    background: rgba(109, 228, 255, 0.04);
+}
+.tool-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #6de4ff;
+    font-size: 1.125rem;
+}
+.tool-icon-sm {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.875rem;
+}
+
+/* ── Tool tabs & panels (tools page, discover, etc.) ──────────────────── */
+.tools-tabs, .tool-tab-strip {
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 1.5rem;
+}
+.tool-tab, .tools-tab {
+    padding: 0.75rem 1rem;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #64748b;
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color .15s ease, border-color .15s ease;
+    margin-bottom: -1px;
+}
+.tool-tab:hover, .tools-tab:hover { color: #cbd5e1; }
+.tool-tab.active, .tools-tab.active {
+    color: #6de4ff;
+    border-bottom-color: #6de4ff;
+}
+.tools-panel {
+    background: rgba(10, 12, 18, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 14px;
+    padding: 1.75rem;
+    margin-bottom: 1.25rem;
+}
+.tools-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+}
+.tools-textarea {
+    width: 100%;
+    min-height: 10rem;
+    padding: 0.875rem 1rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    color: #fff;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    resize: vertical;
+    transition: border-color .15s ease, background .15s ease;
+}
+.tools-textarea:focus {
+    outline: none;
+    border-color: rgba(109, 228, 255, 0.5);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 2px rgba(109, 228, 255, 0.1);
+}
+
+/* ── Panel headers (generic) ───────────────────────────────────────────── */
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 1.25rem;
+}
+.panel-header h2,
+.panel-header h3 {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+
+/* ── Role cards & badges (users, profile pages) ────────────────────────── */
+.role-card {
+    background: rgba(10, 12, 18, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: border-color .18s ease;
+}
+.role-card:hover { border-color: rgba(255, 255, 255, 0.12); }
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border: 1px solid transparent;
+    line-height: 1.5;
+}
+.role-badge.role-admin      { background: rgba(154, 140, 255, 0.1); color: #9a8cff; border-color: rgba(154, 140, 255, 0.25); }
+.role-badge.role-editor     { background: rgba(109, 228, 255, 0.1); color: #6de4ff; border-color: rgba(109, 228, 255, 0.25); }
+.role-badge.role-viewer     { background: rgba(134, 240, 160, 0.1); color: #86f0a0; border-color: rgba(134, 240, 160, 0.25); }
+.role-badge.role-engineering{ background: rgba(109, 228, 255, 0.1); color: #6de4ff; border-color: rgba(109, 228, 255, 0.25); }
+.role-badge.role-analyst    { background: rgba(109, 228, 255, 0.1); color: #6de4ff; border-color: rgba(109, 228, 255, 0.25); }
+.role-badge.role-senior_analyst { background: rgba(154, 140, 255, 0.1); color: #9a8cff; border-color: rgba(154, 140, 255, 0.25); }
+.role-badge.role-principal_analyst { background: rgba(255, 108, 108, 0.1); color: #ff6c6c; border-color: rgba(255, 108, 108, 0.25); }
+.role-badge.role-lead       { background: rgba(248, 179, 58, 0.1); color: #f8b33a; border-color: rgba(248, 179, 58, 0.25); }
+.role-badge.role-forensic   { background: rgba(154, 140, 255, 0.1); color: #9a8cff; border-color: rgba(154, 140, 255, 0.25); }
+
+/* ── Version items ────────────────────────────────────────────────────── */
+.version-item {
+    background: rgba(10, 12, 18, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 0.75rem;
+    transition: border-color .18s ease;
+}
+.version-item:hover { border-color: rgba(255, 255, 255, 0.12); }
+.version-number {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #6de4ff;
+    letter-spacing: -0.01em;
+}
+
+/* ── Settings tabs (sidebar style) ────────────────────────────────────── */
+.settings-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0.75rem 0.5rem;
+}
+.settings-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: 0.5rem;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+    text-align: left;
+}
+.settings-tab:hover { background: rgba(255, 255, 255, 0.03); color: #fff; }
+.settings-tab.active {
+    background: rgba(109, 228, 255, 0.08);
+    color: #6de4ff;
+    border: 1px solid rgba(109, 228, 255, 0.2);
+}
+
+/* ── Notification panel items ────────────────────────────────────────── */
+.notif-panel {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+}
+.notif-item {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    display: flex;
+    gap: 0.625rem;
+    align-items: flex-start;
+    cursor: pointer;
+    transition: background .15s ease;
+}
+.notif-item:hover { background: rgba(255, 255, 255, 0.03); }
+.notif-item:last-child { border-bottom: 0; }
+.notif-item-icon {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #6de4ff;
+}
+.notif-item-content { flex: 1; min-width: 0; }
+.notif-item-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 0.25rem;
+}
+.notif-item-body {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    line-height: 1.4;
+}
+.notif-item-time {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.6875rem;
+    color: #64748b;
+    margin-top: 0.375rem;
+}
+.notif-empty {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    font-size: 0.8125rem;
+    color: #64748b;
+}
+.notif-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.notif-panel-header strong {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #fff;
+}
+.notif-mark-all {
+    background: transparent;
+    border: none;
+    color: #6de4ff;
+    font-size: 0.6875rem;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+/* ── Theme switcher (admin settings) ───────────────────────────────────── */
+.theme-switcher { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.theme-options { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.theme-option {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: border-color .15s ease, transform .15s ease;
+}
+.theme-option:hover { transform: scale(1.05); }
+.theme-option.active {
+    border-color: #6de4ff;
+    box-shadow: 0 0 0 2px rgba(109, 228, 255, 0.2);
+}
+
+/* ── Search input (discover, observables, alerts) ─────────────────────── */
+.search-input {
+    height: 2.375rem;
+    padding: 0 0.875rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    color: #fff;
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.8125rem;
+    transition: border-color .15s ease, background .15s ease;
+}
+.search-input:focus {
+    outline: none;
+    border-color: rgba(109, 228, 255, 0.5);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 2px rgba(109, 228, 255, 0.1);
+}
+.search-input::placeholder { color: #475569; }
+
+/* ── Filter selects ────────────────────────────────────────────────────── */
+.filter-select {
+    height: 2.375rem;
+    padding: 0 2rem 0 0.875rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    color: #cbd5e1;
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.8125rem;
+    cursor: pointer;
+}
+.filter-select:focus {
+    outline: none;
+    border-color: rgba(109, 228, 255, 0.5);
+}
+
+/* ── Code blocks (extractors, render previews) ────────────────────────── */
+.code-block, .output-box {
+    background: rgba(7, 8, 12, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.75rem;
+    color: #cbd5e1;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-x: auto;
+}
+
+/* ── Toasts ───────────────────────────────────────────────────────────── */
+.toast {
+    background: rgba(10, 12, 18, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 0.875rem 1.125rem;
+    color: #fff;
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.8125rem;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Profile grid (user profile pages) ────────────────────────────────── */
+.profile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+}
+.profile-field {
+    padding: 1rem 1.25rem;
+    background: rgba(10, 12, 18, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+}
+
+/* ── Checkbox labels ──────────────────────────────────────────────────── */
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: #94a3b8;
+    cursor: pointer;
+    user-select: none;
+}
+.checkbox-label input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: #6de4ff;
+    cursor: pointer;
+}
+
+/* ── Pagination ───────────────────────────────────────────────────────── */
+.pagination {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+    margin-top: 1rem;
+}
+.pagination button,
+.pagination a {
+    min-width: 2.25rem;
+    height: 2.25rem;
+    padding: 0 0.625rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+    text-decoration: none;
+}
+.pagination button:hover,
+.pagination a:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+.pagination .active,
+.pagination button.active {
+    background: #6de4ff;
+    color: #07080c;
+    border-color: #6de4ff;
+}
+
+/* ── Mode / toggle switches (reporting pages) ─────────────────────────── */
+.mode-switch, .mode-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.5rem;
+}
+.mode-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+.mode-btn:hover { color: #fff; }
+.mode-btn.active {
+    background: #6de4ff;
+    color: #07080c;
+}
+
+/* ── Empty states ────────────────────────────────────────────────────── */
+.empty-state {
+    padding: 3rem 1.5rem;
+    text-align: center;
+    color: #64748b;
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.8125rem;
+}
+.empty-state i {
+    font-size: 2.5rem;
+    color: #475569;
+    opacity: 0.5;
+    margin-bottom: 0.75rem;
+    display: block;
+}
+/* ══════════════ END PATH B SWEEP ══════════════ */

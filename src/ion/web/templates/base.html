@@ -7,144 +7,230 @@
     <link rel="icon" type="image/png" href="/static/img/ion-logo.png">
     <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.28">
     <link rel="stylesheet" href="/static/css/style.css?v=0.9.28">
+    <link rel="stylesheet" href="/static/css/design-system.css?v=0.9.72">
     <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.9.28">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
+    <link rel="stylesheet" href="/static/css/tailwind.css?v=0.9.72">
     <script src="/static/js/theme-init.js"></script>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="nav-brand">
-            <a href="/"><img src="/static/img/ion-logo.png" alt="ION" class="nav-logo">ION</a>
-        </div>
-        <button class="nav-hamburger" id="nav-hamburger" onclick="toggleNavMenu()" aria-label="Toggle navigation">
-            <span></span><span></span><span></span>
-        </button>
-        <ul class="nav-links" id="nav-links">
-            <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a></li>
+    <!-- ═══════════════════ TAILWIND TOP NAV ═══════════════════ -->
+    {% set p = request.url.path %}
+    <header class="ion-tw relative z-40 border-b border-white/10 bg-ink-950/80 backdrop-blur-md font-sans">
+      <div class="mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 h-14 flex items-center justify-between gap-4">
 
-            <!-- Investigate dropdown — core analyst investigation workflow -->
-            <li class="nav-dropdown{% if '/analyst' in request.url.path or '/briefing' in request.url.path or '/alerts' in request.url.path or '/cases' in request.url.path or '/observables' in request.url.path or '/entity-timeline' in request.url.path or '/discover' in request.url.path or '/chat' in request.url.path or '/tools' in request.url.path %} has-active{% endif %}">
-                <a href="/analyst" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Investigate <span class="nav-chevron"></span></a>
-                <ul class="nav-dropdown-menu">
-                    <li><a href="/analyst" class="{% if '/analyst' in request.url.path or '/tools' in request.url.path %}active{% endif %}">SOC Dashboard</a></li>
-                    <li><a href="/briefing" class="{% if '/briefing' in request.url.path %}active{% endif %}">Morning Briefing</a></li>
-                    <li><a href="/alerts" class="{% if '/alerts' in request.url.path and '/audit' not in request.url.path %}active{% endif %}">Alerts</a></li>
-                    <li><a href="/cases" class="{% if '/cases' in request.url.path %}active{% endif %}">Cases</a></li>
-                    <li><a href="/observables" class="{% if '/observables' in request.url.path %}active{% endif %}">Observables</a></li>
-                    <li><a href="/entity-timeline" class="{% if '/entity-timeline' in request.url.path %}active{% endif %}">Entity Timeline</a></li>
-                    <li><a href="/discover" class="{% if '/discover' in request.url.path %}active{% endif %}">Discover</a></li>
-                    <li><a href="/chat" class="{% if '/chat' in request.url.path %}active{% endif %}">AI Chat</a></li>
-                </ul>
-            </li>
-
-            <!-- Threat Intel dropdown — intelligence, hunting, deception -->
-            <li class="nav-dropdown{% if '/threat-intel' in request.url.path or '/attack-stories' in request.url.path or '/threat-hunting' in request.url.path or '/canaries' in request.url.path or '/knowledge-graph' in request.url.path %} has-active{% endif %}">
-                <a href="/threat-intel" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Threat Intel <span class="nav-chevron"></span></a>
-                <ul class="nav-dropdown-menu">
-                    <li><a href="/threat-intel" class="{% if '/threat-intel' in request.url.path %}active{% endif %}">Threat Intel</a></li>
-                    <li><a href="/attack-stories" class="{% if '/attack-stories' in request.url.path %}active{% endif %}">Attack Stories</a></li>
-                    <li><a href="/threat-hunting" class="{% if '/threat-hunting' in request.url.path %}active{% endif %}">Threat Hunting</a></li>
-                    <li><a href="/canaries" class="{% if '/canaries' in request.url.path %}active{% endif %}">Canaries</a></li>
-                    <li><a href="/knowledge-graph" class="{% if '/knowledge-graph' in request.url.path %}active{% endif %}">Knowledge Graph</a></li>
-                </ul>
-            </li>
-
-            <!-- Operations dropdown — day-to-day SOC operations -->
-            <li class="nav-dropdown{% if '/shift-handover' in request.url.path or '/playbooks' in request.url.path or '/forensics' in request.url.path or '/pcap' in request.url.path %} has-active{% endif %}">
-                <a href="/playbooks" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Operations <span class="nav-chevron"></span></a>
-                <ul class="nav-dropdown-menu">
-                    <li><a href="/shift-handover" class="{% if '/shift-handover' in request.url.path %}active{% endif %}">Shift Handover</a></li>
-                    <li><a href="/playbooks" class="{% if '/playbooks' in request.url.path %}active{% endif %}">Playbooks</a></li>
-                    <li id="nav-forensics-link" style="display: none;"><a href="/forensics" class="{% if '/forensics' in request.url.path %}active{% endif %}">Forensics</a></li>
-                    <li><a href="/pcap" class="{% if '/pcap' in request.url.path %}active{% endif %}">PCAP Analyzer</a></li>
-                </ul>
-            </li>
-
-            <!-- Engineering dropdown — detection engineering + infrastructure -->
-            <li class="nav-dropdown{% if '/detection-engineering' in request.url.path or '/cyab' in request.url.path or '/log-sources' in request.url.path or '/data-flow' in request.url.path or '/engineering-analytics' in request.url.path or '/gitlab' in request.url.path or '/topology' in request.url.path or '/architecture' in request.url.path or '/security' in request.url.path or '/integrations' in request.url.path or '/users' in request.url.path or '/audit-logs' in request.url.path %} has-active{% endif %}" id="nav-group-engineering">
-                <a href="/detection-engineering" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Engineering <span class="nav-chevron"></span></a>
-                <ul class="nav-dropdown-menu">
-                    <li><a href="/detection-engineering" class="{% if '/detection-engineering' in request.url.path %}active{% endif %}">Detection Engineering</a></li>
-                    <li><a href="/cyab" class="{% if '/cyab' in request.url.path %}active{% endif %}">CyAB</a></li>
-                    <li><a href="/log-sources" class="{% if '/log-sources' in request.url.path %}active{% endif %}">Log Source Health</a></li>
-                    <li><a href="/data-flow" class="{% if '/data-flow' in request.url.path %}active{% endif %}">Data Flow</a></li>
-                    <li><a href="/engineering-analytics" class="{% if '/engineering-analytics' in request.url.path %}active{% endif %}">System Analytics</a></li>
-                    <li><a href="/gitlab" class="{% if '/gitlab' in request.url.path %}active{% endif %}">GitLab</a></li>
-                    <li id="nav-topology-link" style="display: none;"><a href="/topology" class="{% if '/topology' in request.url.path %}active{% endif %}">Topology</a></li>
-                    <li id="nav-architecture-link" style="display: none;"><a href="/architecture" class="{% if '/architecture' in request.url.path %}active{% endif %}">Architecture</a></li>
-                    <li id="nav-security-link" style="display: none;"><a href="/security" class="{% if '/security' in request.url.path %}active{% endif %}">Security</a></li>
-                    <li id="nav-integrations-link" style="display: none;"><a href="/integrations" class="{% if '/integrations' in request.url.path %}active{% endif %}">Integrations</a></li>
-                    <li id="nav-admin-links" style="display: none;"><a href="/users" class="{% if '/users' in request.url.path %}active{% endif %}">Users</a></li>
-                    <li id="nav-audit-link" style="display: none;"><a href="/audit-logs" class="{% if '/audit-logs' in request.url.path %}active{% endif %}">Audit Logs</a></li>
-                </ul>
-            </li>
-
-            <!-- Reporting dropdown — metrics, compliance, governance -->
-            <li class="nav-dropdown{% if '/soc-health' in request.url.path or '/compliance' in request.url.path or '/executive-report' in request.url.path or '/analyst-efficiency' in request.url.path or '/analytics' in request.url.path or '/maturity' in request.url.path %} has-active{% endif %}">
-                <a href="/soc-health" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Reporting <span class="nav-chevron"></span></a>
-                <ul class="nav-dropdown-menu">
-                    <li><a href="/soc-health" class="{% if '/soc-health' in request.url.path %}active{% endif %}">SOC Health</a></li>
-                    <li><a href="/compliance" class="{% if '/compliance' in request.url.path %}active{% endif %}">Compliance</a></li>
-                    <li><a href="/executive-report" class="{% if '/executive-report' in request.url.path %}active{% endif %}">Executive Report</a></li>
-                    <li><a href="/analyst-efficiency" class="{% if '/analyst-efficiency' in request.url.path %}active{% endif %}">Analyst Efficiency</a></li>
-                    <li><a href="/analytics" class="{% if '/analytics' in request.url.path %}active{% endif %}">Analytics Engine</a></li>
-                    <li><a href="/maturity" class="{% if '/maturity' in request.url.path %}active{% endif %}">Maturity Assessment</a></li>
-                </ul>
-            </li>
-
-            <!-- Knowledge dropdown — learning, training, documentation -->
-            <li class="nav-dropdown{% if '/social' in request.url.path or '/training' in request.url.path or '/guide' in request.url.path or '/notes' in request.url.path or '/templates' in request.url.path or '/documents' in request.url.path %} has-active{% endif %}">
-                <a href="/social" class="nav-dropdown-toggle" onclick="toggleNavDropdown(event)">Knowledge <span class="nav-chevron"></span></a>
-                <ul class="nav-dropdown-menu">
-                    <li><a href="/social" class="{% if '/social' in request.url.path %}active{% endif %}">Social Hub</a></li>
-                    <li><a href="/guide" class="{% if '/guide' in request.url.path and '/guide/sim' not in request.url.path and '/guide/range' not in request.url.path %}active{% endif %}">ION Guide</a></li>
-                    <li><a href="/guide/sim" class="{% if '/guide/sim' in request.url.path %}active{% endif %}">Training Sim</a></li>
-                    <li><a href="/guide/range" class="{% if '/guide/range' in request.url.path %}active{% endif %}">Cyber Range</a></li>
-                    <li><a href="/training" class="{% if '/training' in request.url.path %}active{% endif %}">Skills & Training</a></li>
-                    <li><a href="/notes" class="{% if '/notes' in request.url.path %}active{% endif %}">Notes</a></li>
-                    <li><a href="/templates" class="{% if '/templates' in request.url.path %}active{% endif %}">Templates</a></li>
-                    <li><a href="/documents" class="{% if '/documents' in request.url.path %}active{% endif %}">Documents</a></li>
-                </ul>
-            </li>
-
-            <!-- Settings (standalone) -->
-            <li id="nav-settings-link" style="display: none;"><a href="/settings" class="{% if '/settings' in request.url.path %}active{% endif %}">Settings</a></li>
-        </ul>
-        <!-- Notification bell -->
-        <button class="chat-toggle-btn" id="notif-bell-btn" onclick="toggleNotifPanel()" title="Notifications">
-            <i class="icon-bell"></i>
-            <span class="chat-unread-badge" id="notif-unread-badge" style="display: none;">0</span>
-        </button>
-        <div class="notif-panel" id="notif-panel">
-            <div class="notif-panel-header">
-                <strong>Notifications</strong>
-                <button class="notif-mark-all" onclick="markAllNotificationsRead()">Mark all read</button>
+        <!-- Brand + nav -->
+        <div class="flex items-center gap-6 xl:gap-8 min-w-0">
+          <a href="/" class="flex items-center gap-2.5 shrink-0">
+            <div class="h-6 w-6 rounded-[5px] bg-gradient-to-br from-ion-cyan to-ion-iris grid place-items-center">
+              <span class="font-mono text-[11px] font-bold text-ink-950">I</span>
             </div>
-            <div class="notif-list" id="notif-list">
-                <div class="notif-empty">No notifications</div>
+            <span class="font-mono text-[13px] font-semibold tracking-tight text-white">ION</span>
+            <span class="label-tiny text-slate-500">v{{ ion_version }}</span>
+          </a>
+
+          <nav id="tw-nav" class="hidden md:flex items-center gap-0.5 text-[13px]">
+            <a href="/" class="tw-nav-link {% if p == '/' %}is-active{% endif %}">Dashboard</a>
+
+            <div class="tw-drop" data-drop>
+              <button class="tw-nav-link tw-drop-btn {% if p == '/analyst' or p == '/briefing' or p.startswith('/alerts') or p.startswith('/cases') or p.startswith('/observables') or p.startswith('/entity-timeline') or p.startswith('/discover') or p.startswith('/chat') or p.startswith('/tools') %}is-active{% endif %}">Investigate
+                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
+              </button>
+              <div class="tw-drop-menu">
+                <a href="/analyst" class="tw-drop-item {% if p == '/analyst' or p.startswith('/tools') %}is-active{% endif %}">SOC Dashboard</a>
+                <a href="/briefing" class="tw-drop-item {% if p == '/briefing' %}is-active{% endif %}">Morning Briefing</a>
+                <a href="/alerts" class="tw-drop-item {% if p.startswith('/alerts') and '/audit' not in p %}is-active{% endif %}">Alerts</a>
+                <a href="/cases" class="tw-drop-item {% if p.startswith('/cases') %}is-active{% endif %}">Cases</a>
+                <a href="/observables" class="tw-drop-item {% if p.startswith('/observables') %}is-active{% endif %}">Observables</a>
+                <a href="/entity-timeline" class="tw-drop-item {% if p.startswith('/entity-timeline') %}is-active{% endif %}">Entity Timeline</a>
+                <a href="/discover" class="tw-drop-item {% if p.startswith('/discover') %}is-active{% endif %}">Discover</a>
+                <a href="/chat" class="tw-drop-item {% if p.startswith('/chat') %}is-active{% endif %}">AI Chat</a>
+              </div>
             </div>
+
+            <div class="tw-drop" data-drop>
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/threat-intel') or p.startswith('/attack-stories') or p.startswith('/threat-hunting') or p.startswith('/canaries') or p.startswith('/knowledge-graph') %}is-active{% endif %}">Threat Intel
+                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
+              </button>
+              <div class="tw-drop-menu">
+                <a href="/threat-intel" class="tw-drop-item {% if p.startswith('/threat-intel') %}is-active{% endif %}">Threat Intel</a>
+                <a href="/attack-stories" class="tw-drop-item {% if p.startswith('/attack-stories') %}is-active{% endif %}">Attack Stories</a>
+                <a href="/threat-hunting" class="tw-drop-item {% if p.startswith('/threat-hunting') %}is-active{% endif %}">Threat Hunting</a>
+                <a href="/canaries" class="tw-drop-item {% if p.startswith('/canaries') %}is-active{% endif %}">Canaries</a>
+                <a href="/knowledge-graph" class="tw-drop-item {% if p.startswith('/knowledge-graph') %}is-active{% endif %}">Knowledge Graph</a>
+              </div>
+            </div>
+
+            <div class="tw-drop" data-drop>
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/shift-handover') or p.startswith('/playbooks') or p.startswith('/forensics') or p.startswith('/pcap') %}is-active{% endif %}">Operations
+                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
+              </button>
+              <div class="tw-drop-menu">
+                <a href="/shift-handover" class="tw-drop-item {% if p.startswith('/shift-handover') %}is-active{% endif %}">Shift Handover</a>
+                <a href="/playbooks" class="tw-drop-item {% if p.startswith('/playbooks') %}is-active{% endif %}">Playbooks</a>
+                <a href="/forensics" id="nav-forensics-link" class="tw-drop-item {% if p.startswith('/forensics') %}is-active{% endif %}" style="display:none;">Forensics</a>
+                <a href="/pcap" class="tw-drop-item {% if p.startswith('/pcap') %}is-active{% endif %}">PCAP Analyzer</a>
+              </div>
+            </div>
+
+            <div class="tw-drop" data-drop id="nav-group-engineering">
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/detection-engineering') or p.startswith('/cyab') or p.startswith('/log-sources') or p.startswith('/data-flow') or p.startswith('/engineering-analytics') or p.startswith('/gitlab') or p.startswith('/topology') or p.startswith('/architecture') or p.startswith('/security') or p.startswith('/integrations') or p.startswith('/users') or p.startswith('/audit-logs') %}is-active{% endif %}">Engineering
+                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
+              </button>
+              <div class="tw-drop-menu">
+                <a href="/detection-engineering" class="tw-drop-item {% if p.startswith('/detection-engineering') %}is-active{% endif %}">Detection Engineering</a>
+                <a href="/cyab" class="tw-drop-item {% if p.startswith('/cyab') %}is-active{% endif %}">CyAB</a>
+                <a href="/log-sources" class="tw-drop-item {% if p.startswith('/log-sources') %}is-active{% endif %}">Log Source Health</a>
+                <a href="/data-flow" class="tw-drop-item {% if p.startswith('/data-flow') %}is-active{% endif %}">Data Flow</a>
+                <a href="/engineering-analytics" class="tw-drop-item {% if p.startswith('/engineering-analytics') %}is-active{% endif %}">System Analytics</a>
+                <a href="/gitlab" class="tw-drop-item {% if p.startswith('/gitlab') %}is-active{% endif %}">GitLab</a>
+                <a href="/topology" id="nav-topology-link" class="tw-drop-item {% if p.startswith('/topology') %}is-active{% endif %}" style="display:none;">Topology</a>
+                <a href="/architecture" id="nav-architecture-link" class="tw-drop-item {% if p.startswith('/architecture') %}is-active{% endif %}" style="display:none;">Architecture</a>
+                <a href="/security" id="nav-security-link" class="tw-drop-item {% if p.startswith('/security') %}is-active{% endif %}" style="display:none;">Security</a>
+                <a href="/integrations" id="nav-integrations-link" class="tw-drop-item {% if p.startswith('/integrations') %}is-active{% endif %}" style="display:none;">Integrations</a>
+                <a href="/users" id="nav-admin-links" class="tw-drop-item {% if p.startswith('/users') %}is-active{% endif %}" style="display:none;">Users</a>
+                <a href="/audit-logs" id="nav-audit-link" class="tw-drop-item {% if p.startswith('/audit-logs') %}is-active{% endif %}" style="display:none;">Audit Logs</a>
+              </div>
+            </div>
+
+            <div class="tw-drop" data-drop>
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/soc-health') or p.startswith('/compliance') or p.startswith('/executive-report') or p.startswith('/analyst-efficiency') or p.startswith('/analytics') or p.startswith('/maturity') %}is-active{% endif %}">Reporting
+                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
+              </button>
+              <div class="tw-drop-menu">
+                <a href="/soc-health" class="tw-drop-item {% if p.startswith('/soc-health') %}is-active{% endif %}">SOC Health</a>
+                <a href="/compliance" class="tw-drop-item {% if p.startswith('/compliance') %}is-active{% endif %}">Compliance</a>
+                <a href="/executive-report" class="tw-drop-item {% if p.startswith('/executive-report') %}is-active{% endif %}">Executive Report</a>
+                <a href="/analyst-efficiency" class="tw-drop-item {% if p.startswith('/analyst-efficiency') %}is-active{% endif %}">Analyst Efficiency</a>
+                <a href="/analytics" class="tw-drop-item {% if p.startswith('/analytics') %}is-active{% endif %}">Analytics Engine</a>
+                <a href="/maturity" class="tw-drop-item {% if p.startswith('/maturity') %}is-active{% endif %}">Maturity</a>
+              </div>
+            </div>
+
+            <div class="tw-drop" data-drop>
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/social') or p.startswith('/training') or p.startswith('/guide') or p.startswith('/notes') or p.startswith('/templates') or p.startswith('/documents') %}is-active{% endif %}">Knowledge
+                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
+              </button>
+              <div class="tw-drop-menu">
+                <a href="/social" class="tw-drop-item {% if p.startswith('/social') %}is-active{% endif %}">Social Hub</a>
+                <a href="/guide" class="tw-drop-item {% if p == '/guide' or (p.startswith('/guide') and '/guide/sim' not in p and '/guide/range' not in p) %}is-active{% endif %}">ION Guide</a>
+                <a href="/guide/sim" class="tw-drop-item {% if p.startswith('/guide/sim') %}is-active{% endif %}">Training Sim</a>
+                <a href="/guide/range" class="tw-drop-item {% if p.startswith('/guide/range') %}is-active{% endif %}">Cyber Range</a>
+                <a href="/training" class="tw-drop-item {% if p.startswith('/training') %}is-active{% endif %}">Skills &amp; Training</a>
+                <a href="/notes" class="tw-drop-item {% if p.startswith('/notes') %}is-active{% endif %}">Notes</a>
+                <a href="/templates" class="tw-drop-item {% if p.startswith('/templates') %}is-active{% endif %}">Templates</a>
+                <a href="/documents" class="tw-drop-item {% if p.startswith('/documents') %}is-active{% endif %}">Documents</a>
+              </div>
+            </div>
+
+            <a href="/settings" id="nav-settings-link" class="tw-nav-link {% if p.startswith('/settings') %}is-active{% endif %}" style="display:none;">Settings</a>
+          </nav>
         </div>
-        <!-- Notepad toggle button -->
-        <button class="chat-toggle-btn" id="notepad-toggle-btn" onclick="toggleNotepad()" title="Notepad (Ctrl+Shift+N)">
-            <i class="icon-notebook-pen"></i>
-        </button>
-        <div class="user-menu" id="user-menu">
-            <button class="user-menu-btn" onclick="toggleUserDropdown()">
-                <span class="user-avatar" id="user-avatar">?</span>
-                <span class="user-name" id="user-name">Loading...</span>
-                <span class="dropdown-arrow"><i class="icon-chevron-down"></i></span>
+
+        <!-- Right cluster: notif bell, notepad, user -->
+        <div class="flex items-center gap-2 shrink-0">
+          <button class="md:hidden h-8 w-8 grid place-items-center rounded-md hover:bg-white/5 transition" id="tw-mobile-toggle" aria-label="Menu">
+            <svg class="w-4 h-4 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+
+          <button id="notif-bell-btn" onclick="toggleNotifPanel()" class="relative h-8 w-8 grid place-items-center rounded-md hover:bg-white/5 transition" title="Notifications">
+            <i class="icon-bell text-slate-400"></i>
+            <span id="notif-unread-badge" class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-ion-coral text-ink-950 text-[9px] font-bold grid place-items-center" style="display:none;">0</span>
+          </button>
+          <div id="notif-panel" class="notif-panel absolute right-4 top-14 w-80 rounded-lg border border-white/10 bg-ink-900/95 backdrop-blur-md shadow-xl z-50" style="display:none;">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-white/10">
+              <strong class="text-[13px] text-white">Notifications</strong>
+              <button class="text-[11px] text-ion-cyan hover:underline" onclick="markAllNotificationsRead()">Mark all read</button>
+            </div>
+            <div id="notif-list" class="max-h-96 overflow-y-auto">
+              <div class="p-6 text-center text-[12px] text-slate-500">No notifications</div>
+            </div>
+          </div>
+
+          <button id="notepad-toggle-btn" onclick="toggleNotepad()" class="h-8 w-8 grid place-items-center rounded-md hover:bg-white/5 transition" title="Notepad (Ctrl+Shift+N)">
+            <i class="icon-notebook-pen text-slate-400"></i>
+          </button>
+
+          <div class="h-5 w-px bg-white/10 mx-1"></div>
+
+          <div class="user-menu relative" id="user-menu">
+            <button class="flex items-center gap-2 h-8 pl-1 lg:pr-3 pr-1 rounded-md hover:bg-white/5 transition" onclick="toggleUserDropdown()">
+              <span id="user-avatar" class="h-6 w-6 rounded-full bg-gradient-to-br from-ion-iris to-ion-cyan grid place-items-center font-mono text-[11px] text-ink-950 font-bold">?</span>
+              <span id="user-name" class="hidden lg:inline text-[12px] text-slate-300">Loading…</span>
+              <svg class="hidden lg:block w-3 h-3 text-slate-500"><use href="#i-chevron-down"/></svg>
             </button>
-            <div class="user-dropdown" id="user-dropdown">
-                <div class="user-dropdown-header" id="user-dropdown-header">
-                    <!-- Populated by JS -->
-                </div>
-                <div class="user-dropdown-menu">
-                    <a href="/profile">My Profile</a>
-                    <a href="#" onclick="logout(); return false;">Sign Out</a>
-                </div>
+            <div id="user-dropdown" class="user-dropdown absolute right-0 top-10 w-60 rounded-lg border border-white/10 bg-ink-900/95 backdrop-blur-md shadow-xl z-50" style="display:none;">
+              <div id="user-dropdown-header" class="px-4 py-3 border-b border-white/10"></div>
+              <div class="py-1">
+                <a href="/profile" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">My Profile</a>
+                <a href="#" onclick="logout(); return false;" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Sign Out</a>
+              </div>
             </div>
+          </div>
         </div>
-    </nav>
+      </div>
+
+      <!-- Mobile nav panel (md-) — mirrors desktop items via JS clone — simpler: hidden for now -->
+      <div id="tw-mobile-panel" class="md:hidden hidden border-t border-white/10 bg-ink-950/95 backdrop-blur-md">
+        <div class="px-4 py-3 flex flex-col gap-1 text-[13px]">
+          <a href="/" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">Dashboard</a>
+          <a href="/alerts" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">Alerts</a>
+          <a href="/cases" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">Cases</a>
+          <a href="/detection-engineering" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">Detection</a>
+          <a href="/observables" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">Observables</a>
+          <a href="/playbooks" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">Playbooks</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Icon library — all SVG <symbol> defs shared across every page -->
+    {% include "_icons.html" %}
+
+    <style>
+    /* ── Tailwind nav: atoms that need arbitrary rules ── */
+    .tw-nav-link { display: flex; align-items: center; padding: 6px 12px; border-radius: 6px; color: rgb(148 163 184); transition: background .18s, color .18s; white-space: nowrap; }
+    .tw-nav-link:hover { color: #fff; background: rgba(255,255,255,0.05); }
+    .tw-nav-link.is-active { color: #fff; background: rgba(255,255,255,0.06); }
+    .tw-drop { position: relative; }
+    .tw-drop-btn { background: transparent; border: none; cursor: pointer; font: inherit; }
+    .tw-drop-menu {
+      display: none; position: absolute; top: calc(100% + 8px); left: 0; min-width: 220px;
+      background: rgba(10, 12, 18, 0.96); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.5); padding: 6px; z-index: 50;
+    }
+    .tw-drop.is-open > .tw-drop-menu { display: block; }
+    .tw-drop-item { display: block; padding: 8px 12px; border-radius: 6px; color: rgb(148 163 184); font-size: 13px; transition: background .18s, color .18s; }
+    .tw-drop-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
+    .tw-drop-item.is-active { color: #6de4ff; background: rgba(109, 228, 255, 0.08); }
+    /* legacy text decoration reset for header anchors */
+    .ion-tw a { text-decoration: none; }
+    </style>
+
+    <script>
+    // Self-contained dropdown toggle for the Tailwind nav.
+    (function() {
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.tw-drop-btn');
+        const drops = document.querySelectorAll('.tw-drop');
+        if (btn) {
+          const drop = btn.closest('.tw-drop');
+          const wasOpen = drop.classList.contains('is-open');
+          drops.forEach(d => d.classList.remove('is-open'));
+          if (!wasOpen) drop.classList.add('is-open');
+          e.stopPropagation();
+          return;
+        }
+        if (!e.target.closest('.tw-drop-menu')) {
+          drops.forEach(d => d.classList.remove('is-open'));
+        }
+      });
+      // Mobile panel
+      const mt = document.getElementById('tw-mobile-toggle');
+      const mp = document.getElementById('tw-mobile-panel');
+      if (mt && mp) mt.addEventListener('click', () => mp.classList.toggle('hidden'));
+    })();
+    </script>
 
     <!-- Notepad overlay -->
     <div id="notepad-overlay" class="np-overlay"></div>
@@ -194,96 +280,84 @@
         </div>
     </div>
 
-    <!-- Notepad inline styles -->
+    <!-- Notepad styles — refreshed to align with the Tailwind design language (v0.9.72 Path A) -->
     <style>
     /* ── Overlay ─────────────────────────────────── */
-    .np-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1049;opacity:0;pointer-events:none;transition:opacity .25s}
+    .np-overlay{position:fixed;inset:0;background:rgba(7,8,12,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:1049;opacity:0;pointer-events:none;transition:opacity .25s}
     .np-overlay.open{opacity:1;pointer-events:auto}
 
     /* ── Panel ───────────────────────────────────── */
-    .np-panel{position:fixed;top:0;right:0;width:420px;max-width:95vw;height:100vh;background:var(--bg-primary);border-left:1px solid var(--border-color,#30363d);z-index:1050;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease}
+    .np-panel{position:fixed;top:0;right:0;width:420px;max-width:95vw;height:100vh;background:rgba(10,12,18,.95);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-left:1px solid rgba(255,255,255,.1);z-index:1050;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s cubic-bezier(.2,.7,.2,1);font-family:'Geist',ui-sans-serif,system-ui,sans-serif;color:#cbd5e1}
     .np-panel.open{transform:translateX(0)}
 
     /* ── Tabs ────────────────────────────────────── */
-    .np-tabs{display:flex;border-bottom:1px solid var(--border-color,#30363d);flex-shrink:0}
-    .np-tab{flex:1;padding:10px;background:transparent;border:none;color:var(--text-secondary,#8b949e);cursor:pointer;font-size:.85rem;font-weight:600;transition:color .15s,border-color .15s;border-bottom:2px solid transparent}
-    .np-tab.active{color:var(--accent,#00e5ff);border-bottom-color:var(--accent,#00e5ff)}
-    .np-tab:hover{color:var(--text-primary,#f0f6fc)}
+    .np-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0}
+    .np-tab{flex:1;padding:14px 10px;background:transparent;border:none;color:#64748b;cursor:pointer;font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;transition:color .15s ease,border-color .15s ease;border-bottom:2px solid transparent;margin-bottom:-1px}
+    .np-tab.active{color:#6de4ff;border-bottom-color:#6de4ff}
+    .np-tab:hover{color:#cbd5e1}
 
     /* ── Content panels ─────────────────────────── */
     .np-content{display:none;flex:1;flex-direction:column;overflow:hidden}
     .np-content.active{display:flex}
 
     /* ── List header / search ────────────────────── */
-    .np-list-header,.np-clip-header{display:flex;gap:6px;padding:10px;flex-shrink:0}
-    .np-search{flex:1;padding:6px 10px;background:var(--bg-secondary,#161b22);border:1px solid var(--border-color,#30363d);border-radius:4px;color:var(--text-primary,#f0f6fc);font-size:.82rem}
-    .np-search::placeholder{color:var(--text-secondary,#8b949e)}
+    .np-list-header,.np-clip-header{display:flex;gap:8px;padding:14px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.05)}
+    .np-search{flex:1;height:2.125rem;padding:0 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:.5rem;color:#fff;font-family:inherit;font-size:.8125rem;transition:border-color .15s ease,background .15s ease}
+    .np-search::placeholder{color:#475569}
+    .np-search:focus{outline:none;border-color:rgba(109,228,255,.5);background:rgba(255,255,255,.06);box-shadow:0 0 0 2px rgba(109,228,255,.1)}
 
     /* ── Buttons ─────────────────────────────────── */
-    .np-btn-primary{padding:6px 12px;background:var(--accent,#00e5ff);color:#000;border:none;border-radius:4px;cursor:pointer;font-size:.82rem;font-weight:600;white-space:nowrap}
-    .np-btn-primary:hover{opacity:.85}
-    .np-btn-sm{padding:4px 8px;background:transparent;border:1px solid var(--border-color,#30363d);border-radius:4px;color:var(--text-secondary,#8b949e);cursor:pointer;font-size:.8rem}
-    .np-btn-sm:hover{color:var(--text-primary,#f0f6fc);border-color:var(--text-secondary,#8b949e)}
-    .np-btn-danger{color:var(--sev-critical)!important}
-    .np-btn-danger:hover{border-color:var(--sev-critical)!important}
-    .np-btn-xs{padding:2px 6px;background:transparent;border:1px solid var(--border-color,#30363d);border-radius:3px;color:var(--text-secondary,#8b949e);cursor:pointer;font-size:.75rem}
-    .np-btn-xs:hover{color:var(--text-primary,#f0f6fc)}
+    .np-btn-primary{display:inline-flex;align-items:center;gap:4px;height:2.125rem;padding:0 14px;background:#6de4ff;color:#07080c;border:none;border-radius:.5rem;cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:600;white-space:nowrap;transition:filter .15s ease;box-shadow:0 0 0 1px rgba(109,228,255,.25),0 0 16px -6px rgba(109,228,255,.8)}
+    .np-btn-primary:hover{filter:brightness(1.08)}
+    .np-btn-sm{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:.375rem;color:#94a3b8;cursor:pointer;font-family:inherit;font-size:.75rem;transition:background .15s ease,color .15s ease}
+    .np-btn-sm:hover{color:#fff;background:rgba(255,255,255,.08)}
+    .np-btn-danger{color:#ff6c6c!important;border-color:rgba(255,108,108,.3)!important}
+    .np-btn-danger:hover{background:rgba(255,108,108,.1)!important;border-color:rgba(255,108,108,.5)!important}
+    .np-btn-xs{display:inline-flex;align-items:center;gap:2px;padding:3px 8px;background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:.375rem;color:#94a3b8;cursor:pointer;font-family:inherit;font-size:.6875rem;transition:color .15s ease,background .15s ease}
+    .np-btn-xs:hover{color:#fff;background:rgba(255,255,255,.04)}
 
     /* ── Note list ───────────────────────────────── */
-    .np-note-list{flex:1;overflow-y:auto;padding:4px 10px}
-    .np-note-item{padding:10px;border-radius:6px;cursor:pointer;margin-bottom:4px;transition:background .15s}
-    .np-note-item:hover{background:var(--bg-secondary,#161b22)}
-    .np-note-item.active{background:var(--bg-secondary,#161b22);border-left:3px solid var(--accent,#00e5ff)}
+    .np-note-list{flex:1;overflow-y:auto;padding:8px}
+    .np-note-item{padding:12px;border-radius:.5rem;cursor:pointer;margin-bottom:2px;transition:background .15s ease;border:1px solid transparent}
+    .np-note-item:hover{background:rgba(255,255,255,.03)}
+    .np-note-item.active{background:rgba(109,228,255,.06);border-color:rgba(109,228,255,.2)}
     .np-note-item-header{display:flex;align-items:center;gap:6px}
-    .np-note-title{font-size:.85rem;font-weight:600;color:var(--text-primary,#f0f6fc);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .np-pin-icon{font-size:.7rem}
-    .np-note-time{font-size:.72rem;color:var(--text-secondary,#8b949e)}
-    .np-empty{padding:30px 10px;text-align:center;color:var(--text-secondary,#8b949e);font-size:.85rem}
+    .np-note-title{font-size:.8125rem;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .np-pin-icon{font-size:.7rem;color:#f8b33a}
+    .np-note-time{font-size:.6875rem;color:#64748b;font-family:'JetBrains Mono',ui-monospace,monospace}
+    .np-empty{padding:3rem 1rem;text-align:center;color:#64748b;font-size:.8125rem}
 
     /* ── Editor ──────────────────────────────────── */
     .np-editor{display:flex;flex-direction:column;flex:1;overflow:hidden}
-    .np-editor-toolbar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border-color,#30363d);flex-shrink:0}
-    .np-save-status{flex:1;text-align:right;font-size:.72rem;color:var(--text-secondary,#8b949e)}
-    .np-title-input{width:100%;padding:8px 10px;background:transparent;border:none;border-bottom:1px solid var(--border-color,#30363d);color:var(--text-primary,#f0f6fc);font-size:1rem;font-weight:700;flex-shrink:0}
-    .np-title-input:focus{outline:none;border-bottom-color:var(--accent,#00e5ff)}
+    .np-editor-toolbar{display:flex;align-items:center;gap:6px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.05);flex-shrink:0}
+    .np-save-status{flex:1;text-align:right;font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#64748b}
+    .np-title-input{width:100%;padding:14px;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.05);color:#fff;font-family:'Geist',ui-sans-serif,system-ui,sans-serif;font-size:1.125rem;font-weight:600;letter-spacing:-.01em;flex-shrink:0}
+    .np-title-input:focus{outline:none;border-bottom-color:rgba(109,228,255,.5)}
+    .np-title-input::placeholder{color:#475569}
 
-    /* Quill overrides for dark theme */
+    /* Quill overrides */
     .np-quill-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column}
-    .np-quill-wrap .ql-toolbar.ql-snow{border:none;border-bottom:1px solid var(--border-color,#30363d);background:var(--bg-secondary,#161b22);flex-shrink:0}
-    .np-quill-wrap .ql-container.ql-snow{border:none;flex:1;overflow-y:auto}
-    .np-quill-wrap .ql-editor{color:var(--text-primary,#f0f6fc);font-size:.85rem;line-height:1.6;min-height:100px}
-    .np-quill-wrap .ql-editor.ql-blank::before{color:var(--text-secondary,#8b949e);font-style:normal}
-    .np-quill-wrap .ql-snow .ql-stroke{stroke:var(--text-secondary,#8b949e)}
-    .np-quill-wrap .ql-snow .ql-fill{fill:var(--text-secondary,#8b949e)}
-    .np-quill-wrap .ql-snow .ql-picker-label{color:var(--text-secondary,#8b949e)}
-    .np-quill-wrap .ql-snow .ql-picker-options{background:var(--bg-primary,#0d1117);border-color:var(--border-color,#30363d)}
-    .np-quill-wrap .ql-snow .ql-picker-item{color:var(--text-primary,#f0f6fc)}
+    .np-quill-wrap .ql-toolbar.ql-snow{border:none;border-bottom:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.02);flex-shrink:0;padding:8px 14px}
+    .np-quill-wrap .ql-container.ql-snow{border:none;flex:1;overflow-y:auto;font-family:'Geist',ui-sans-serif,system-ui,sans-serif}
+    .np-quill-wrap .ql-editor{color:#cbd5e1;font-size:.875rem;line-height:1.6;min-height:120px;padding:14px}
+    .np-quill-wrap .ql-editor.ql-blank::before{color:#475569;font-style:normal}
+    .np-quill-wrap .ql-snow .ql-stroke{stroke:#64748b}
+    .np-quill-wrap .ql-snow .ql-fill{fill:#64748b}
+    .np-quill-wrap .ql-snow .ql-picker-label{color:#64748b}
+    .np-quill-wrap .ql-snow .ql-picker-options{background:rgba(10,12,18,.98);border-color:rgba(255,255,255,.1);border-radius:.5rem;box-shadow:0 16px 40px rgba(0,0,0,.5)}
+    .np-quill-wrap .ql-snow .ql-picker-item{color:#cbd5e1}
     .np-quill-wrap .ql-snow button:hover .ql-stroke,
-    .np-quill-wrap .ql-snow .ql-picker-label:hover{color:var(--accent,#00e5ff)}
-    .np-quill-wrap .ql-snow button:hover .ql-stroke{stroke:var(--accent,#00e5ff)}
+    .np-quill-wrap .ql-snow .ql-picker-label:hover{color:#6de4ff}
+    .np-quill-wrap .ql-snow button:hover .ql-stroke{stroke:#6de4ff}
 
     /* ── Clipboard ───────────────────────────────── */
-    .np-clip-list{flex:1;overflow-y:auto;padding:4px 10px}
-    .np-clip-item{display:flex;align-items:flex-start;gap:8px;padding:8px;border-radius:6px;margin-bottom:4px;background:var(--bg-secondary,#161b22)}
-    .np-clip-text{flex:1;font-size:.82rem;color:var(--text-primary,#f0f6fc);white-space:pre-wrap;word-break:break-all}
+    .np-clip-list{flex:1;overflow-y:auto;padding:8px}
+    .np-clip-item{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:.5rem;margin-bottom:4px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05)}
+    .np-clip-text{flex:1;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.75rem;color:#cbd5e1;white-space:pre-wrap;word-break:break-all;line-height:1.5}
     .np-clip-actions{display:flex;gap:4px;flex-shrink:0}
 
-    /* ── Hamburger Menu ─────────────────────────── */
-    .nav-hamburger{display:none;background:none;border:none;cursor:pointer;padding:6px;margin-left:auto;flex-shrink:0;z-index:101}
-    .nav-hamburger span{display:block;width:22px;height:2px;background:var(--text-primary,#f0f6fc);margin:5px 0;border-radius:2px;transition:all .25s ease}
-    .nav-hamburger.open span:nth-child(1){transform:rotate(45deg) translate(5px,5px)}
-    .nav-hamburger.open span:nth-child(2){opacity:0}
-    .nav-hamburger.open span:nth-child(3){transform:rotate(-45deg) translate(5px,-5px)}
-    @media (max-width: 600px){
-        .nav-hamburger{display:block}
-        .nav-links{display:none;position:absolute;top:56px;left:0;right:0;background:var(--bg-secondary,#161b22);border-bottom:1px solid var(--border,#30363d);flex-direction:column;padding:0.5rem;gap:0;z-index:99;max-height:80vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)}
-        .nav-links.mobile-open{display:flex!important}
-        .nav-links li{width:100%}
-        .nav-links a,.nav-dropdown-toggle{display:block;padding:0.6rem 1rem!important;font-size:0.85rem!important;border-radius:var(--radius)}
-        .nav-dropdown-menu{position:static;box-shadow:none;border:none;background:transparent;padding:0 0 0 1rem;min-width:0}
-        .nav-dropdown-menu a{padding:0.4rem 1rem!important;font-size:.82rem!important}
-        .nav-dropdown.open>.nav-dropdown-menu{display:block}
-    }
+    /* ── Notif panel (popover triggered from nav bell) ── */
+    .notif-panel{font-family:'Geist',ui-sans-serif,system-ui,sans-serif}
     </style>
 
     <main class="container">

@@ -3,40 +3,49 @@
 {% block title %}Forensics - ION{% endblock %}
 
 {% block content %}
-<div class="page-header" style="display:flex;justify-content:space-between;align-items:center;">
-    <div>
-        <h1>Forensic Investigations</h1>
-        <p class="subtitle" style="color:var(--text-secondary);margin:4px 0 0;">Chain of custody, evidence tracking, and investigation management</p>
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-3 mb-4">
+      <svg class="w-4 h-4 text-ion-iris"><use href="#i-file-text"/></svg>
+      <span class="label-tiny text-ion-iris">Chain of custody</span>
     </div>
-    <button class="btn btn-primary" id="btn-new-investigation" onclick="showNewCaseModal()">+ New Investigation</button>
-</div>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Forensics</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Evidence tracking and investigation management.</p>
+  </div>
+  <button id="btn-new-investigation" onclick="showNewCaseModal()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+    <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
+    New Investigation
+  </button>
+</section>
 
-<!-- Metric Tiles -->
-<div class="fr-tiles">
-    <div class="fr-tile fr-tile-blue">
-        <div class="fr-tile-value" id="stat-intake">0</div>
-        <div class="fr-tile-label">Intake</div>
-    </div>
-    <div class="fr-tile fr-tile-cyan">
-        <div class="fr-tile-value" id="stat-active">0</div>
-        <div class="fr-tile-label">Active Investigations</div>
-    </div>
-    <div class="fr-tile fr-tile-red">
-        <div class="fr-tile-value" id="stat-overdue">0</div>
-        <div class="fr-tile-label">SLA Overdue</div>
-    </div>
-    <div class="fr-tile fr-tile-green">
-        <div class="fr-tile-value" id="stat-closed">0</div>
-        <div class="fr-tile-label">Closed</div>
-    </div>
-    <div class="fr-tile fr-tile-purple">
-        <div class="fr-tile-value" id="stat-evidence">0</div>
-        <div class="fr-tile-label">Evidence Items</div>
-    </div>
-    <div class="fr-tile fr-tile-amber">
-        <div class="fr-tile-value" id="stat-locked">0</div>
-        <div class="fr-tile-label">Locked</div>
-    </div>
+<!-- Metric Tiles (JS-populated IDs preserved) -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8 rise d-2">
+  <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+    <div class="label-tiny text-slate-500 mb-2">Intake</div>
+    <div id="stat-intake" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-cyan">0</div>
+  </div>
+  <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+    <div class="label-tiny text-slate-500 mb-2">Active</div>
+    <div id="stat-active" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-cyan">0</div>
+  </div>
+  <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+    <div class="label-tiny text-slate-500 mb-2">SLA Overdue</div>
+    <div id="stat-overdue" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-coral">0</div>
+  </div>
+  <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+    <div class="label-tiny text-slate-500 mb-2">Closed</div>
+    <div id="stat-closed" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-lime">0</div>
+  </div>
+  <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+    <div class="label-tiny text-slate-500 mb-2">Evidence Items</div>
+    <div id="stat-evidence" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-iris">0</div>
+  </div>
+  <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+    <div class="label-tiny text-slate-500 mb-2">Locked</div>
+    <div id="stat-locked" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-amber">0</div>
+  </div>
 </div>
 
 <!-- Tabs -->
@@ -747,6 +756,9 @@ textarea.form-input { resize: vertical; }
     .modal-dialog { width: 95%; }
 }
 </style>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

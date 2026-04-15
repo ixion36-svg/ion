@@ -1,88 +1,101 @@
 {% extends "base.html" %}
 
-{% block title %}Alert Investigation - ION{% endblock %}
+{% block title %}Alerts · ION{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Alert Investigation</h1>
-    <div class="header-actions">
-        <label class="auto-refresh-toggle" id="auto-refresh-toggle">
-            <input type="checkbox" id="auto-refresh-cb" checked onchange="toggleAutoRefresh()">
-            <span class="auto-refresh-label">Auto-refresh</span>
-            <span class="auto-refresh-indicator" id="auto-refresh-indicator"></span>
-        </label>
-        <button class="btn btn-secondary" onclick="loadAlerts()">Refresh</button>
-        <a href="/cases" class="btn btn-primary" style="text-decoration:none">Cases</a>
-    </div>
-</div>
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-10 md:py-12">
 
-<!-- Threat Banner -->
-<div class="security-banner" id="alerts-threat-banner">
-    <div class="threat-level" id="alerts-threat-level">
-        <span class="threat-icon"><i class="icon-shield-alert"></i></span>
-        <span class="threat-text">Loading threat assessment...</span>
+  <!-- ── Header row ── -->
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="h-1.5 w-1.5 rounded-full bg-ion-coral pulse-red"></span>
+        <span class="label-tiny text-ion-coral">Active investigation</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Alerts</h1>
     </div>
-    <div class="threat-stats" id="alerts-threat-stats"></div>
-</div>
+    <div class="flex items-center gap-2">
+      <label id="auto-refresh-toggle" class="flex items-center gap-2 h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[12px] text-slate-300 cursor-pointer">
+        <input type="checkbox" id="auto-refresh-cb" checked onchange="toggleAutoRefresh()" class="accent-ion-cyan">
+        Auto-refresh
+        <span id="auto-refresh-indicator" class="h-1.5 w-1.5 rounded-full bg-ion-lime"></span>
+      </label>
+      <button onclick="loadAlerts()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+        <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>
+        Refresh
+      </button>
+      <a href="/cases" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+        Cases
+        <svg class="w-3 h-3"><use href="#i-arrow-right"/></svg>
+      </a>
+    </div>
+  </section>
 
-<!-- Attention Banner -->
-<div class="alert-attn-banner" id="alert-attn-banner" style="display:none;">
-    <span class="alert-attn-icon"><i class="icon-alert-triangle"></i></span>
-    <span class="alert-attn-label">Needs attention:</span>
-    <div class="alert-attn-chips" id="alert-attn-chips"></div>
-    <button class="alert-attn-dismiss" onclick="dismissAlertAttention()">&times;</button>
-</div>
+  <!-- ── Threat Banner (JS-populated) ── -->
+  <div id="alerts-threat-banner" class="mb-4 rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5 flex flex-wrap items-center justify-between gap-4 rise d-2">
+    <div id="alerts-threat-level" class="flex items-center gap-3">
+      <svg class="w-5 h-5 text-ion-coral"><use href="#i-shield-alert"/></svg>
+      <span class="threat-text text-[14px] text-white font-medium">Loading threat assessment…</span>
+    </div>
+    <div id="alerts-threat-stats" class="flex items-center gap-4 text-[12px] text-slate-400"></div>
+  </div>
 
-<!-- Quick Stats Bar -->
-<div class="alert-stats-bar" id="alert-stats-bar">
-    <div class="stats-group">
-        <div class="stat-item">
-            <span class="stat-value" id="stat-total">-</span>
-            <span class="stat-label">Total</span>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item clickable" onclick="quickFilterByTriage('open')">
-            <span class="stat-value stat-open" id="stat-open">-</span>
-            <span class="stat-label">Open</span>
-        </div>
-        <div class="stat-item clickable" onclick="quickFilterByTriage('acknowledged')">
-            <span class="stat-value stat-acknowledged" id="stat-acknowledged">-</span>
-            <span class="stat-label">Acknowledged</span>
-        </div>
-        <div class="stat-item clickable" onclick="quickFilterByTriage('closed')">
-            <span class="stat-value stat-closed" id="stat-closed">-</span>
-            <span class="stat-label">Closed</span>
-        </div>
+  <!-- ── Attention Banner (JS-populated) ── -->
+  <div id="alert-attn-banner" class="mb-4 rounded-[12px] border border-ion-amber/30 bg-ion-amber/5 px-5 py-3 flex items-center gap-3" style="display:none;">
+    <svg class="w-4 h-4 text-ion-amber shrink-0"><use href="#i-alert-triangle"/></svg>
+    <span class="label-tiny text-ion-amber">Needs attention:</span>
+    <div id="alert-attn-chips" class="flex items-center gap-2 flex-wrap flex-1"></div>
+    <button onclick="dismissAlertAttention()" class="text-slate-400 hover:text-white transition" aria-label="Dismiss">
+      <svg class="w-4 h-4"><use href="#i-x"/></svg>
+    </button>
+  </div>
+
+  <!-- ── Stats Bar (JS-populated; IDs preserved) ── -->
+  <div id="alert-stats-bar" class="flex flex-wrap gap-x-8 gap-y-4 px-5 py-4 rounded-[12px] border border-white/5 bg-ink-900/50 mb-6 rise d-3">
+    <div class="flex flex-col gap-1 min-w-[70px]">
+      <span class="label-tiny text-slate-500">Total</span>
+      <span id="stat-total" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-white">–</span>
     </div>
-    <div class="stats-group">
-        <div class="stat-item clickable" onclick="quickFilterBySeverity('critical')">
-            <span class="stat-value severity-critical" id="stat-critical">-</span>
-            <span class="stat-label">Critical</span>
-        </div>
-        <div class="stat-item clickable" onclick="quickFilterBySeverity('high')">
-            <span class="stat-value severity-high" id="stat-high">-</span>
-            <span class="stat-label">High</span>
-        </div>
-        <div class="stat-item clickable" onclick="quickFilterBySeverity('medium')">
-            <span class="stat-value severity-medium" id="stat-medium">-</span>
-            <span class="stat-label">Medium</span>
-        </div>
-        <div class="stat-item clickable" onclick="quickFilterBySeverity('low')">
-            <span class="stat-value severity-low" id="stat-low">-</span>
-            <span class="stat-label">Low</span>
-        </div>
+    <button onclick="quickFilterByTriage('open')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+      <span class="label-tiny text-slate-500">Open</span>
+      <span id="stat-open" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-cyan">–</span>
+    </button>
+    <button onclick="quickFilterByTriage('acknowledged')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+      <span class="label-tiny text-slate-500">Ack</span>
+      <span id="stat-acknowledged" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-iris">–</span>
+    </button>
+    <button onclick="quickFilterByTriage('closed')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+      <span class="label-tiny text-slate-500">Closed</span>
+      <span id="stat-closed" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-slate-400">–</span>
+    </button>
+    <div class="w-px bg-white/10"></div>
+    <button onclick="quickFilterBySeverity('critical')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+      <span class="label-tiny text-slate-500">Critical</span>
+      <span id="stat-critical" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-coral">–</span>
+    </button>
+    <button onclick="quickFilterBySeverity('high')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+      <span class="label-tiny text-slate-500">High</span>
+      <span id="stat-high" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-amber">–</span>
+    </button>
+    <button onclick="quickFilterBySeverity('medium')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+      <span class="label-tiny text-slate-500">Medium</span>
+      <span id="stat-medium" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-iris">–</span>
+    </button>
+    <button onclick="quickFilterBySeverity('low')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+      <span class="label-tiny text-slate-500">Low</span>
+      <span id="stat-low" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-slate-400">–</span>
+    </button>
+    <div class="w-px bg-white/10"></div>
+    <div class="flex flex-col gap-1 min-w-[70px]">
+      <span class="label-tiny text-slate-500">Cases</span>
+      <span id="stat-cases" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-white">–</span>
     </div>
-    <div class="stats-group stats-cases">
-        <div class="stat-item">
-            <span class="stat-value" id="stat-cases">-</span>
-            <span class="stat-label">Cases</span>
-        </div>
-        <div class="stat-item">
-            <span class="stat-value" id="stat-unassigned">-</span>
-            <span class="stat-label">Unassigned</span>
-        </div>
+    <div class="flex flex-col gap-1 min-w-[90px]">
+      <span class="label-tiny text-slate-500">Unassigned</span>
+      <span id="stat-unassigned" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-slate-400">–</span>
     </div>
-</div>
+  </div>
 
 <!-- Analytics Dashboard (collapsible) -->
 <div class="analytics-toggle">
@@ -470,6 +483,8 @@
         </div>
     </div>
 </div>
+</div><!-- /ion-tw inner wrapper -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}
@@ -544,40 +559,49 @@
     margin-left: auto;
 }
 
+/* Stats bar — refreshed in v0.9.72 to use the data_flow tile pattern */
 .stat-item {
-    text-align: center;
-    min-width: 50px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+    padding: 14px 22px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    min-width: 110px;
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
 }
 
 .stat-item.clickable {
     cursor: pointer;
-    padding: 0.25rem 0.5rem;
-    border-radius: var(--radius);
-    transition: background 0.15s;
 }
 
 .stat-item.clickable:hover {
-    background: var(--bg-hover);
+    transform: translateY(-1px);
+    border-color: rgba(0, 212, 255, 0.3);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
 .stat-value {
     display: block;
-    font-size: 1.25rem;
-    font-weight: 700;
-    line-height: 1.2;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.7rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text-bright);
 }
 
 .stat-label {
-    font-size: 0.7rem;
+    font-size: 0.66rem;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1.2px;
+    font-weight: 700;
 }
 
 .stat-divider {
-    width: 1px;
-    height: 30px;
-    background: var(--border);
+    display: none;  /* tiles have their own borders now, no divider needed */
 }
 
 .stat-open { color: var(--info); }
@@ -585,17 +609,19 @@
 .stat-escalated { color: var(--danger); }
 .stat-resolved { color: var(--success); }
 
-/* Bulk Actions Toolbar */
+/* Bulk Actions Toolbar — refreshed in v0.9.72 with elevated card pattern */
 .bulk-actions-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     background: var(--bg-secondary);
-    border: 1px solid var(--primary);
-    border-radius: var(--radius);
-    padding: 0.75rem 1rem;
-    margin-bottom: 1rem;
-    gap: 1rem;
+    border: 1px solid rgba(0, 212, 255, 0.4);
+    border-left: 3px solid var(--primary);
+    border-radius: var(--radius-lg);
+    padding: 16px 22px;
+    margin-bottom: 18px;
+    gap: 16px;
+    box-shadow: 0 8px 24px rgba(0, 212, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .bulk-actions-info {
@@ -646,9 +672,8 @@
     cursor: pointer;
 }
 
-.alert-row.selected {
-    background: rgba(var(--primary-rgb, 59, 130, 246), 0.1);
-}
+/* .alert-row.selected was here — replaced by the modern version next to
+   #alerts-table tr.alert-row.selected (with the inset cyan accent rail). */
 
 .alert-row:hover .checkbox-col input[type="checkbox"] {
     opacity: 1;
@@ -922,10 +947,15 @@
 
 .alerts-grid {
     display: grid;
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: minmax(0, 1fr) 300px;
     gap: 1.5rem;
     align-items: start;
 }
+/* Main column shrinks to its grid track; table inside scrolls horizontally */
+.alerts-grid > :first-child { min-width: 0; }
+.alerts-grid .card-wide { min-width: 0; max-width: 100%; }
+.alerts-grid .card-wide .card-body { overflow-x: auto; }
+.alerts-grid .data-table { min-width: 900px; } /* sane minimum so columns aren't crushed */
 
 @media (max-width: 1200px) {
     .alerts-grid {
@@ -1378,50 +1408,88 @@
 .sort-arrow.asc::after { content: '\25B2'; }
 .sort-arrow.desc::after { content: '\25BC'; }
 
-/* Alert table styling */
+/* Alert table — refreshed in v0.9.72 with smoother hover + tighter typography */
 #alerts-table {
     min-width: 700px;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .card-wide .card-body {
     overflow-x: auto;
 }
 
+#alerts-table thead th {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    font-weight: 800;
+    padding: 14px 12px;
+    border-bottom: 1px solid var(--border);
+}
+
 #alerts-table tr.alert-row {
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background .15s ease, box-shadow .15s ease;
 }
 
 #alerts-table tr.alert-row:hover {
-    background: rgba(37, 99, 235, 0.04);
+    background: rgba(0, 212, 255, 0.05);
+    box-shadow: inset 3px 0 0 var(--primary);
 }
 
-/* Severity badges (reuse from security_dashboard) */
+#alerts-table tr.alert-row.selected {
+    background: rgba(0, 212, 255, 0.08);
+    box-shadow: inset 3px 0 0 var(--primary);
+}
+
+/* Severity + status badges — refreshed in v0.9.72 with the modern pill pattern.
+   Stronger contrast, semi-transparent border outlines, tighter typography. */
 .severity-badge {
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 10px;
+    font-size: 0.66rem;
+    font-weight: 800;
     text-transform: uppercase;
+    letter-spacing: 0.6px;
+    border: 1px solid transparent;
+    line-height: 1;
 }
 
-.severity-critical { background: rgba(220, 53, 69, .12); color: var(--danger); }
-.severity-high { background: rgba(253, 126, 20, .12); color: var(--neon-orange); }
-.severity-medium { background: rgba(255, 193, 7, .12); color: var(--warning); }
-.severity-low { background: rgba(23, 162, 184, .12); color: var(--info); }
-.severity-info { background: rgba(23, 162, 184, .12); color: var(--info); }
+.severity-critical { background: var(--sev-critical-bg); color: var(--sev-critical); border-color: var(--sev-critical-dim); }
+.severity-high     { background: var(--sev-high-bg);     color: var(--sev-high);     border-color: var(--sev-high-dim); }
+.severity-medium   { background: var(--sev-medium-bg);   color: var(--sev-medium);   border-color: var(--sev-medium-dim); }
+.severity-low      { background: rgba(14, 165, 233, .12); color: var(--info);        border-color: rgba(14, 165, 233, .3); }
+.severity-info     { background: rgba(168, 85, 247, .12); color: var(--neon-purple); border-color: rgba(168, 85, 247, .3); }
 
-/* Status badges */
-.alert-status-open { background: rgba(25, 118, 210, .12); color: #1976d2; }
-.alert-status-acknowledged { background: rgba(245, 124, 0, .12); color: #f57c00; }
-.alert-status-resolved { background: rgba(97, 97, 97, .12); color: #616161; }
+/* Status badges — same pill pattern, one source of truth via .status-badge */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 10px;
+    font-size: 0.66rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    border: 1px solid transparent;
+    line-height: 1;
+}
+.alert-status-open         { background: rgba(0, 212, 255, .12);  color: var(--primary); border-color: rgba(0, 212, 255, .3); }
+.alert-status-acknowledged { background: rgba(251, 191, 36, .12); color: var(--warning); border-color: rgba(251, 191, 36, .3); }
+.alert-status-closed       { background: rgba(139, 148, 158, .12); color: var(--text-muted); border-color: rgba(139, 148, 158, .3); }
+.alert-status-resolved     { background: rgba(16, 185, 129, .12); color: var(--success); border-color: rgba(16, 185, 129, .3); }
 
-/* Side panel clickable items */
+/* Side panel — refreshed in v0.9.72 with hover-lift + count pill */
 .side-panel .list-group {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
-    max-height: 200px;
+    gap: 8px;
+    max-height: 240px;
     overflow-y: auto;
 }
 
@@ -1429,28 +1497,34 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.5rem 0.75rem;
-    background: var(--bg);
+    padding: 10px 14px;
+    background: var(--bg-tertiary);
     border: 1px solid var(--border);
-    border-radius: 4px;
-    font-size: 0.8125rem;
+    border-radius: var(--radius-lg);
+    font-size: 0.82rem;
+    color: var(--text-primary);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
     margin-bottom: 0;
 }
 
 .side-panel .list-item:hover {
-    border-color: var(--primary);
-    background: rgba(37, 99, 235, 0.04);
+    transform: translateY(-1px);
+    border-color: rgba(0, 212, 255, 0.3);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
 }
 
 .side-panel .list-item-count {
-    background: var(--primary);
-    color: white;
-    padding: 0.125rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    background: var(--primary-dim);
+    color: var(--primary);
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    border: 1px solid rgba(0, 212, 255, 0.25);
 }
 
 /* Auto-refresh toggle */
@@ -1474,84 +1548,115 @@
     background: var(--text-muted);
 }
 
-/* Modal detail styles */
+/* Modal detail — refreshed in v0.9.72 with the data_flow card pattern.
+   Wider grid gap, framed meta items, monospace values for keys, generous
+   message box, segmented-control style detail tabs. */
 .alert-meta-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-    margin-bottom: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
 }
 
 .alert-meta-item {
-    padding: 0.625rem;
-    background: var(--bg);
-    border-radius: 4px;
+    padding: 14px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    transition: border-color .15s ease, transform .15s ease;
+}
+.alert-meta-item:hover {
+    border-color: rgba(0, 212, 255, 0.25);
+    transform: translateY(-1px);
 }
 
 .alert-meta-label {
-    font-size: 0.7rem;
+    font-size: 0.62rem;
     color: var(--text-muted);
     text-transform: uppercase;
-    margin-bottom: 0.25rem;
+    letter-spacing: 1.2px;
+    font-weight: 800;
+    margin-bottom: 6px;
+    display: block;
 }
 
 .alert-meta-value {
-    font-weight: 500;
-    word-break: break-all;
-    font-size: 0.875rem;
+    font-weight: 600;
+    word-break: break-word;
+    font-size: 0.9rem;
+    color: var(--text-bright);
+    line-height: 1.4;
 }
 
 .alert-message-box {
-    background: var(--bg);
-    border-radius: var(--radius);
-    padding: 1rem;
-    margin-bottom: 1.25rem;
-    font-size: 0.875rem;
-    line-height: 1.6;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: var(--radius-lg);
+    padding: 18px 22px;
+    margin-bottom: 22px;
+    font-size: 0.88rem;
+    line-height: 1.65;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .alert-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.375rem;
-    margin-bottom: 1.25rem;
+    gap: 6px;
+    margin-bottom: 22px;
 }
 
 .alert-tag {
-    display: inline-block;
-    padding: 0.125rem 0.5rem;
-    font-size: 0.7rem;
-    border-radius: 4px;
-    background: rgba(37, 99, 235, 0.1);
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    border-radius: 10px;
+    background: rgba(0, 212, 255, 0.12);
     color: var(--primary);
+    border: 1px solid rgba(0, 212, 255, 0.3);
 }
 
-/* Detail tabs */
+/* Detail tabs — segmented-control feel, no bottom-border underline */
 .detail-tabs {
-    display: flex;
-    gap: 0.25rem;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--bg-secondary);
+    padding: 4px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
 }
 
 .detail-tab-btn {
-    padding: 0.5rem 1rem;
-    background: none;
+    padding: 8px 16px;
+    background: transparent;
     border: none;
-    border-bottom: 2px solid transparent;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    margin-bottom: -1px;
-    transition: all 0.2s;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-secondary);
+    transition: all .15s ease;
 }
 
-.detail-tab-btn:hover { color: var(--primary); }
+.detail-tab-btn:hover {
+    color: var(--text-bright);
+}
 
 .detail-tab-btn.active {
-    color: var(--primary);
-    border-bottom-color: var(--primary);
+    color: var(--bg-deep);
+    background: var(--primary);
+    box-shadow: 0 4px 12px var(--primary-glow);
 }
 
 .detail-tab-content {

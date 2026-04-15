@@ -3,13 +3,22 @@
 {% block title %}Templates - ION{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Templates</h1>
-    <div class="header-actions">
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+<div class="flex-1 min-w-0">
+  <div class="flex items-center gap-3 mb-4">
+    <svg class="w-4 h-4 text-ion-cyan"><use href="#i-file-text"/></svg>
+    <span class="label-tiny text-ion-cyan">Report templates</span>
+  </div>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Templates</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Document templates for playbooks and reports.</p>
+</div>
+<div class="flex items-center gap-2 flex-wrap">
         <button class="btn" onclick="showFoldersModal()">Manage Folders</button>
         <a href="/templates/new" class="btn btn-primary">New Template</a>
     </div>
-</div>
+</section>
 
 <div class="templates-layout">
     <!-- Folder Sidebar -->
@@ -96,6 +105,9 @@
         </div>
     </div>
 </div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

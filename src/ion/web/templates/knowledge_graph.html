@@ -3,9 +3,18 @@
 {% block title %}Knowledge Graph - ION{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1><i class="icon-share-2"></i> Knowledge Graph</h1>
-    <div class="header-actions">
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+<div class="flex-1 min-w-0">
+  <div class="flex items-center gap-3 mb-4">
+    <svg class="w-4 h-4 text-ion-iris"><use href="#i-network"/></svg>
+    <span class="label-tiny text-ion-iris">Entity graph</span>
+  </div>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Knowledge Graph</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Interactive visualisation of related observables and entities.</p>
+</div>
+<div class="flex items-center gap-2 flex-wrap">
         <input id="kg-seed" type="text" placeholder="Pivot from observable value..." class="kg-seed-input">
         <label class="kg-cb"><input type="checkbox" id="kg-closed"> Include closed cases</label>
         <select id="kg-limit" class="kg-select">
@@ -16,13 +25,16 @@
         </select>
         <button class="btn btn-secondary" onclick="kgLoad()">Refresh</button>
     </div>
-</div>
+</section>
 
 <div class="kg-meta" id="kg-meta">Loading...</div>
 <div id="kg-canvas" class="kg-canvas">
     <div class="kg-loading"><span class="kg-spinner"></span> Loading vis-network...</div>
 </div>
 <div id="kg-detail" class="kg-detail"></div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

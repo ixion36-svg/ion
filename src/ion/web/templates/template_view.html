@@ -3,13 +3,15 @@
 {% block title %}Template - ION{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex items-end justify-between flex-wrap gap-6 mb-8 rise d-1">
     <h1 id="template-name">Loading...</h1>
-    <div class="header-actions">
+    <div class="flex items-center gap-2 flex-wrap">
         <a href="/templates/{{ template_id }}/render" class="btn btn-primary">Render</a>
         <a href="/templates/{{ template_id }}/edit" class="btn">Edit</a>
     </div>
-</div>
+</section>
 
 <div class="template-details">
     <div class="meta-bar">
@@ -86,6 +88,9 @@
         </div>
     </div>
 </div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}

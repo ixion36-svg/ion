@@ -3,13 +3,15 @@
 {% block title %}Render Template - ION{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex items-end justify-between flex-wrap gap-6 mb-8 rise d-1">
     <h1>Render: <span id="template-name">Loading...</span></h1>
-    <div class="header-actions">
+    <div class="flex items-center gap-2 flex-wrap">
         <button type="button" id="settings-btn" class="btn btn-secondary" title="User Preferences">Settings</button>
         <a href="/templates/{{ template_id }}" class="btn btn-secondary">Back to Template</a>
     </div>
-</div>
+</section>
 
 <div class="render-layout">
     <div class="render-input">
@@ -124,6 +126,9 @@
 #sections-area{border-top:2px solid var(--border);padding-top:1rem;margin-top:1rem}
 .btn-sm{padding:0.25rem 0.6rem;font-size:0.75rem}
 </style>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}
