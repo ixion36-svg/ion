@@ -127,6 +127,8 @@ services:
       # Background tasks (Kibana sync, Analytics Engine, TIDE sync,
       # Network Mapper, CyAB reminders) run on ONE worker via pg
       # advisory lock leader election (v0.9.71+).
+      # Base URL for OIDC redirect URIs — must match Keycloak Valid Redirect URIs
+      - ION_BASE_URL=${ION_BASE_URL:-https://ion.guardedglass.internal}
       - ION_WORKERS=${ION_WORKERS:-4}
       # CA bundle — set ION_CA_BUNDLE in .env when using the cert mount above
       - ION_CA_BUNDLE=${ION_CA_BUNDLE:-}

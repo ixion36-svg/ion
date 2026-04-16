@@ -17,7 +17,7 @@ class Config:
     max_versions_to_keep: int = 100
 
     # Base URL for OIDC redirect URIs (e.g., https://ion.example.org)
-    base_url: str = ""
+    base_url: str = "https://ion.guardedglass.internal"
 
     # OIDC/Keycloak configuration
     oidc_enabled: bool = True
@@ -142,7 +142,7 @@ class Config:
             auto_save=data.get("auto_save", True),
             max_versions_to_keep=data.get("max_versions_to_keep", 100),
             # Base URL
-            base_url=data.get("base_url", ""),
+            base_url=data.get("base_url", "https://ion.guardedglass.internal"),
             # OIDC configuration
             oidc_enabled=data.get("oidc_enabled", True),
             oidc_keycloak_url=data.get("oidc_keycloak_url", ""),
