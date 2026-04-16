@@ -2002,6 +2002,8 @@ function renderBoard() {
         }
     });
 
+    const CLOSED_DISPLAY_LIMIT = 20;
+
     Object.keys(columns).forEach(status => {
         const container = document.getElementById('col-' + status);
         const countEl = document.getElementById('col-count-' + status);
@@ -2014,7 +2016,20 @@ function renderBoard() {
             return;
         }
 
-        container.innerHTML = cards.map(c => renderCard(c)).join('');
+        // Cap the closed column so the page doesn't grow endlessly.
+        // Open and acknowledged always show everything.
+        const visible = (status === 'closed' && cards.length > CLOSED_DISPLAY_LIMIT)
+            ? cards.slice(0, CLOSED_DISPLAY_LIMIT)
+            : cards;
+
+        let html = visible.map(c => renderCard(c)).join('');
+        if (status === 'closed' && cards.length > CLOSED_DISPLAY_LIMIT) {
+            const remaining = cards.length - CLOSED_DISPLAY_LIMIT;
+            html += '<div class="kanban-empty" style="margin-top:0.5rem">'
+                + remaining + ' more closed case' + (remaining === 1 ? '' : 's')
+                + ' — <a href="/cases?status=closed" style="color:var(--primary)">view all</a></div>';
+        }
+        container.innerHTML = html;
     });
 }
 
