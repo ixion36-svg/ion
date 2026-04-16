@@ -39,7 +39,7 @@ FROM python:3.14-slim AS runtime
 
 LABEL org.opencontainers.image.title="ION" \
       org.opencontainers.image.description="Intelligent Operating Network - Security Operations Portal" \
-      org.opencontainers.image.version="0.9.86" \
+      org.opencontainers.image.version="0.9.87" \
       org.opencontainers.image.source="https://hub.docker.com/repository/docker/ixion36/ion"
 
 # Install runtime libraries (PostgreSQL client + WeasyPrint deps + fonts)

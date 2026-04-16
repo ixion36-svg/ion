@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% block title %}Network Map · ION{% endblock %}
+{% block content %}
+<div class="ion-tw ion-tw-page grain text-slate-200 overflow-x-hidden">
+<div class="fixed inset-0 bg-grid pointer-events-none opacity-40 z-0"></div>
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10">
+
+  <!-- Header -->
+  <section class="flex flex-wrap items-end justify-between gap-4 mb-10 rise d-1">
+    <div>
+      <div class="flex items-center gap-2 mb-2">
+        <span class="h-1.5 w-1.5 rounded-full bg-ion-cyan pulse-cyan"></span>
+        <span class="label-tiny text-ion-cyan">Live CMDB</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] leading-tight text-white tracking-[-0.02em]">Network Map</h1>
+      <p class="mt-1 text-[14px] text-slate-400">Asset inventory auto-populated from Elasticsearch host data.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <button onclick="triggerSync()" class="h-8 px-4 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold hover:brightness-110 transition flex items-center gap-1.5" id="sync-btn">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+        Sync Now
+      </button>
+    </div>
+  </section>
+
+  <!-- Stats row -->
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 rise d-2">
+    <div class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4">
+      <div class="label-tiny text-slate-500 mb-1">Total Assets</div>
+      <div id="stat-total" class="font-sans font-semibold text-[28px] text-white tabular-nums">—</div>
+    </div>
+    <div class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4">
+      <div class="label-tiny text-slate-500 mb-1">Seen 24h</div>
+      <div id="stat-seen24" class="font-sans font-semibold text-[28px] text-ion-cyan tabular-nums">—</div>
+    </div>
+    <div class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4">
+      <div class="label-tiny text-slate-500 mb-1">Unique IPs</div>
+      <div id="stat-ips" class="font-sans font-semibold text-[28px] text-ion-lime tabular-nums">—</div>
+    </div>
+    <div class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4">
+      <div class="label-tiny text-slate-500 mb-1">OS Families</div>
+      <div id="stat-os-count" class="font-sans font-semibold text-[28px] text-ion-iris tabular-nums">—</div>
+    </div>
+  </section>
+
+  <!-- Filters -->
+  <section class="flex flex-wrap items-center gap-3 mb-6 rise d-3">
+    <input type="text" id="filter-search" placeholder="Search hostname or IP…"
+           class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200 placeholder:text-slate-500 w-64 focus:border-ion-cyan/50 focus:outline-none transition"
+           oninput="debounceLoad()">
+    <select id="filter-env" onchange="loadAssets()" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
+      <option value="">All Environments</option>
+      <option value="prod">Production</option>
+      <option value="staging">Staging</option>
+      <option value="dev">Development</option>
+      <option value="unknown">Unknown</option>
+    </select>
+    <select id="filter-crit" onchange="loadAssets()" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
+      <option value="">All Criticality</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+      <option value="unknown">Unknown</option>
+    </select>
+    <select id="filter-seen" onchange="loadAssets()" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
+      <option value="">All Time</option>
+      <option value="24h">Last 24h</option>
+      <option value="7d">Last 7 days</option>
+      <option value="30d">Last 30 days</option>
+    </select>
+    <button onclick="clearFilters()" class="h-9 px-3 rounded-lg border border-white/10 text-[12px] text-slate-400 hover:text-white transition">Clear</button>
+    <span id="results-count" class="text-[12px] text-slate-500 ml-auto"></span>
+  </section>
+
+  <!-- Asset table -->
+  <section class="rise d-4 rounded-xl border border-white/5 bg-ink-900/50 overflow-x-auto">
+    <table class="w-full text-[13px]">
+      <thead>
+        <tr class="border-b border-white/5 text-left">
+          <th class="px-4 py-3 label-tiny text-slate-500">Hostname</th>
+          <th class="px-4 py-3 label-tiny text-slate-500">Primary IP</th>
+          <th class="px-4 py-3 label-tiny text-slate-500">OS</th>
+          <th class="px-4 py-3 label-tiny text-slate-500">Environment</th>
+          <th class="px-4 py-3 label-tiny text-slate-500">Criticality</th>
+          <th class="px-4 py-3 label-tiny text-slate-500">Source Systems</th>
+          <th class="px-4 py-3 label-tiny text-slate-500">Last Seen</th>
+          <th class="px-4 py-3 label-tiny text-slate-500">Events</th>
+        </tr>
+      </thead>
+      <tbody id="assets-tbody">
+        <tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">Loading assets…</td></tr>
+      </tbody>
+    </table>
+    <div id="pagination" class="flex items-center justify-between px-4 py-3 border-t border-white/5 text-[12px] text-slate-500"></div>
+  </section>
+
+  <!-- Detail drawer (hidden by default) -->
+  <div id="detail-drawer" class="fixed inset-y-0 right-0 w-[480px] bg-ink-900 border-l border-white/10 shadow-2xl z-50 translate-x-full transition-transform duration-200" style="display:none;">
+    <div class="h-full overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h2 id="drawer-hostname" class="font-sans font-semibold text-[20px] text-white"></h2>
+        <button onclick="closeDrawer()" class="h-8 w-8 rounded-md hover:bg-white/5 grid place-items-center text-slate-400 hover:text-white">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div id="drawer-content"></div>
+    </div>
+  </div>
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+let currentPage = 0;
+const PAGE_SIZE = 50;
+let debounceTimer = null;
+
+function debounceLoad() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => loadAssets(), 300);
+}
+
+function clearFilters() {
+  $('filter-search').value = '';
+  $('filter-env').value = '';
+  $('filter-crit').value = '';
+  $('filter-seen').value = '';
+  currentPage = 0;
+  loadAssets();
+}
+
+function relTime(iso) {
+  if (!iso) return '—';
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.round(s/60) + 'm ago';
+  if (s < 86400) return Math.round(s/3600) + 'h ago';
+  return Math.round(s/86400) + 'd ago';
+}
+
+const CRIT_CLS = {
+  critical: 'bg-ion-coral/10 text-ion-coral border-ion-coral/20',
+  high: 'bg-ion-amber/10 text-ion-amber border-ion-amber/20',
+  medium: 'bg-ion-iris/10 text-ion-iris border-ion-iris/20',
+  low: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+  unknown: 'bg-white/5 text-slate-500 border-white/10',
+};
+const ENV_CLS = {
+  prod: 'bg-ion-coral/10 text-ion-coral border-ion-coral/20',
+  staging: 'bg-ion-amber/10 text-ion-amber border-ion-amber/20',
+  dev: 'bg-ion-lime/10 text-ion-lime border-ion-lime/20',
+  unknown: 'bg-white/5 text-slate-500 border-white/10',
+};
+
+function pill(text, cls) {
+  return `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${cls}">${esc(text)}</span>`;
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch('/api/network-map/stats', {credentials:'same-origin'});
+    if (!r.ok) return;
+    const d = await r.json();
+    $('stat-total').textContent = d.total_assets ?? '—';
+    $('stat-seen24').textContent = d.seen_24h ?? '—';
+    $('stat-ips').textContent = d.total_ips ?? '—';
+    $('stat-os-count').textContent = Object.keys(d.os_breakdown || {}).length;
+  } catch(e) { console.warn('stats failed', e); }
+}
+
+async function loadAssets() {
+  const params = new URLSearchParams();
+  const search = $('filter-search').value.trim();
+  if (search) params.set('search', search);
+  const env = $('filter-env').value;
+  if (env) params.set('environment', env);
+  const crit = $('filter-crit').value;
+  if (crit) params.set('criticality', crit);
+  const seen = $('filter-seen').value;
+  if (seen) params.set('last_seen_within', seen);
+  params.set('offset', String(currentPage * PAGE_SIZE));
+  params.set('limit', String(PAGE_SIZE));
+
+  try {
+    const r = await fetch('/api/network-map/assets?' + params, {credentials:'same-origin'});
+    if (!r.ok) { $('assets-tbody').innerHTML = '<tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">Error loading assets</td></tr>'; return; }
+    const d = await r.json();
+    renderTable(d.assets || []);
+    renderPagination(d.total, d.offset, d.limit);
+    $('results-count').textContent = d.total + ' asset' + (d.total === 1 ? '' : 's');
+  } catch(e) {
+    $('assets-tbody').innerHTML = '<tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">Failed to load</td></tr>';
+  }
+}
+
+function renderTable(assets) {
+  if (!assets.length) {
+    $('assets-tbody').innerHTML = '<tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">No assets found. Run a sync or adjust filters.</td></tr>';
+    return;
+  }
+  $('assets-tbody').innerHTML = assets.map(a => {
+    const os = [a.os_name, a.os_version].filter(Boolean).join(' ') || '—';
+    const systems = (a.source_systems || []).map(s => `<span class="inline-block px-1.5 py-0.5 rounded bg-white/5 text-[10px] text-slate-400 mr-1">${esc(s)}</span>`).join('');
+    return `<tr class="row-hover border-b border-white/[0.03] cursor-pointer" onclick="openDetail(${a.id})">
+      <td class="px-4 py-3 font-mono text-[12px] text-ion-cyan">${esc(a.display_hostname)}</td>
+      <td class="px-4 py-3 font-mono text-[12px] text-slate-300">${esc(a.primary_ip || '—')}</td>
+      <td class="px-4 py-3 text-slate-300">${esc(os)}</td>
+      <td class="px-4 py-3">${pill(a.environment || 'unknown', ENV_CLS[a.environment] || ENV_CLS.unknown)}</td>
+      <td class="px-4 py-3">${pill(a.criticality || 'unknown', CRIT_CLS[a.criticality] || CRIT_CLS.unknown)}</td>
+      <td class="px-4 py-3">${systems || '<span class="text-slate-600">—</span>'}</td>
+      <td class="px-4 py-3 text-slate-400 text-[12px]">${relTime(a.last_seen)}</td>
+      <td class="px-4 py-3 font-mono text-[12px] text-slate-400">${a.event_count?.toLocaleString() || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPagination(total, offset, limit) {
+  const pages = Math.ceil(total / limit);
+  const current = Math.floor(offset / limit);
+  if (pages <= 1) { $('pagination').innerHTML = ''; return; }
+  let html = `<span>Page ${current + 1} of ${pages}</span><div class="flex gap-1">`;
+  if (current > 0) html += `<button onclick="goPage(${current - 1})" class="px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition">Prev</button>`;
+  if (current < pages - 1) html += `<button onclick="goPage(${current + 1})" class="px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition">Next</button>`;
+  html += '</div>';
+  $('pagination').innerHTML = html;
+}
+
+function goPage(p) {
+  currentPage = p;
+  loadAssets();
+}
+
+async function openDetail(id) {
+  try {
+    const r = await fetch('/api/network-map/assets/' + id, {credentials:'same-origin'});
+    if (!r.ok) return;
+    const a = await r.json();
+    renderDrawer(a);
+  } catch(e) { console.warn('detail failed', e); }
+}
+
+function renderDrawer(a) {
+  $('drawer-hostname').textContent = a.display_hostname;
+  const os = [a.os_name, a.os_version].filter(Boolean).join(' ') || 'Unknown';
+  const ips = (a.ips || []).map(ip =>
+    `<div class="flex items-center justify-between py-1.5 border-b border-white/[0.03]">
+      <span class="font-mono text-[12px] text-slate-200">${esc(ip.ip)}</span>
+      <span class="text-[10px] text-slate-500">${relTime(ip.last_seen)} · ${ip.event_count} events</span>
+    </div>`
+  ).join('') || '<div class="text-slate-500 text-[12px]">No IPs recorded</div>';
+  const macs = (a.macs || []).map(m =>
+    `<span class="inline-block px-2 py-0.5 rounded bg-white/5 text-[11px] font-mono text-slate-400 mr-1 mb-1">${esc(m.mac)}</span>`
+  ).join('') || '<span class="text-slate-500 text-[12px]">None</span>';
+  const systems = (a.source_systems || []).map(s =>
+    `<span class="inline-block px-2 py-0.5 rounded bg-ion-cyan/10 text-[10px] text-ion-cyan mr-1 mb-1">${esc(s)}</span>`
+  ).join('') || '<span class="text-slate-500 text-[12px]">—</span>';
+
+  $('drawer-content').innerHTML = `
+    <div class="space-y-5">
+      <!-- Metadata -->
+      <div class="grid grid-cols-2 gap-3 text-[12px]">
+        <div><span class="text-slate-500">OS</span><div class="text-slate-200 mt-0.5">${esc(os)}</div></div>
+        <div><span class="text-slate-500">Architecture</span><div class="text-slate-200 mt-0.5">${esc(a.architecture || '—')}</div></div>
+        <div><span class="text-slate-500">First Seen</span><div class="text-slate-200 mt-0.5">${a.first_seen ? new Date(a.first_seen).toLocaleString() : '—'}</div></div>
+        <div><span class="text-slate-500">Last Seen</span><div class="text-slate-200 mt-0.5">${relTime(a.last_seen)}</div></div>
+        <div><span class="text-slate-500">Events</span><div class="text-slate-200 mt-0.5">${a.event_count?.toLocaleString()}</div></div>
+        <div><span class="text-slate-500">Last Index</span><div class="text-slate-200 mt-0.5 font-mono text-[11px] truncate" title="${esc(a.last_index)}">${esc(a.last_index || '—')}</div></div>
+      </div>
+
+      <!-- Source systems -->
+      <div>
+        <div class="label-tiny text-slate-500 mb-2">Source Systems</div>
+        <div>${systems}</div>
+      </div>
+
+      <!-- Editable fields -->
+      <div class="border-t border-white/5 pt-4 space-y-3">
+        <div class="label-tiny text-slate-500 mb-2">Enrichment</div>
+        <div class="flex gap-3">
+          <div class="flex-1">
+            <label class="text-[11px] text-slate-500">Environment</label>
+            <select id="edit-env" class="mt-1 w-full h-8 px-2 rounded border border-white/10 bg-ink-800 text-[12px] text-slate-200">
+              <option value="unknown" ${a.environment==='unknown'?'selected':''}>Unknown</option>
+              <option value="prod" ${a.environment==='prod'?'selected':''}>Production</option>
+              <option value="staging" ${a.environment==='staging'?'selected':''}>Staging</option>
+              <option value="dev" ${a.environment==='dev'?'selected':''}>Development</option>
+            </select>
+          </div>
+          <div class="flex-1">
+            <label class="text-[11px] text-slate-500">Criticality</label>
+            <select id="edit-crit" class="mt-1 w-full h-8 px-2 rounded border border-white/10 bg-ink-800 text-[12px] text-slate-200">
+              <option value="unknown" ${a.criticality==='unknown'?'selected':''}>Unknown</option>
+              <option value="low" ${a.criticality==='low'?'selected':''}>Low</option>
+              <option value="medium" ${a.criticality==='medium'?'selected':''}>Medium</option>
+              <option value="high" ${a.criticality==='high'?'selected':''}>High</option>
+              <option value="critical" ${a.criticality==='critical'?'selected':''}>Critical</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="text-[11px] text-slate-500">Owner</label>
+          <input type="text" id="edit-owner" value="${esc(a.owner || '')}" placeholder="Team or person"
+                 class="mt-1 w-full h-8 px-2 rounded border border-white/10 bg-ink-800 text-[12px] text-slate-200">
+        </div>
+        <div>
+          <label class="text-[11px] text-slate-500">Notes</label>
+          <textarea id="edit-notes" rows="3" placeholder="Free-text notes…"
+                    class="mt-1 w-full px-2 py-1.5 rounded border border-white/10 bg-ink-800 text-[12px] text-slate-200 resize-y">${esc(a.notes || '')}</textarea>
+        </div>
+        <button onclick="saveEnrichment(${a.id})" class="h-8 px-4 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold hover:brightness-110 transition">Save</button>
+      </div>
+
+      <!-- IP History -->
+      <div class="border-t border-white/5 pt-4">
+        <div class="label-tiny text-slate-500 mb-2">IP History (${(a.ips||[]).length})</div>
+        <div>${ips}</div>
+      </div>
+
+      <!-- MAC Addresses -->
+      <div class="border-t border-white/5 pt-4">
+        <div class="label-tiny text-slate-500 mb-2">MAC Addresses</div>
+        <div>${macs}</div>
+      </div>
+    </div>
+  `;
+
+  const drawer = $('detail-drawer');
+  drawer.style.display = '';
+  requestAnimationFrame(() => drawer.classList.remove('translate-x-full'));
+}
+
+function closeDrawer() {
+  const drawer = $('detail-drawer');
+  drawer.classList.add('translate-x-full');
+  setTimeout(() => { drawer.style.display = 'none'; }, 200);
+}
+
+async function saveEnrichment(id) {
+  const body = {
+    environment: $('edit-env').value,
+    criticality: $('edit-crit').value,
+    owner: $('edit-owner').value,
+    notes: $('edit-notes').value,
+  };
+  try {
+    const r = await fetch('/api/network-map/assets/' + id, {
+      method: 'PATCH', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (r.ok) {
+      if (typeof showToast === 'function') showToast('Asset updated', 'success');
+      loadAssets();
+      loadStats();
+    } else {
+      if (typeof showToast === 'function') showToast('Update failed', 'error');
+    }
+  } catch(e) {
+    if (typeof showToast === 'function') showToast('Update failed', 'error');
+  }
+}
+
+async function triggerSync() {
+  const btn = $('sync-btn');
+  btn.disabled = true;
+  btn.textContent = 'Syncing…';
+  try {
+    const r = await fetch('/api/network-map/sync', {method:'POST', credentials:'same-origin'});
+    const d = await r.json();
+    if (r.ok) {
+      if (typeof showToast === 'function') showToast(`Synced: ${d.hosts_processed} hosts, ${d.ips_upserted} IPs`, 'success');
+      loadStats();
+      loadAssets();
+    } else {
+      if (typeof showToast === 'function') showToast(d.detail || 'Sync failed', 'error');
+    }
+  } catch(e) {
+    if (typeof showToast === 'function') showToast('Sync failed', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg> Sync Now';
+  }
+}
+
+// Close drawer on Escape
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+// Initial load
+loadStats();
+loadAssets();
+</script>
+{% endblock %}

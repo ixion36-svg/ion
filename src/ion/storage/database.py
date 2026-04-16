@@ -73,6 +73,7 @@ LOCK_KIBANA_BG_SYNC         = 1010
 LOCK_TIDE_BG_SYNC           = 1011
 # 1012 was LOCK_CYAB_REVIEW_CHECK — removed in v0.9.76 with the notifications feature
 LOCK_ANALYTICS_BG_LOOP      = 1013
+LOCK_NETMAP_BG_SYNC         = 1014
 
 
 @contextmanager

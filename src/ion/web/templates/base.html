@@ -74,7 +74,7 @@
             </div>
 
             <div class="tw-drop" data-drop id="nav-group-engineering">
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/detection-engineering') or p.startswith('/cyab') or p.startswith('/log-sources') or p.startswith('/data-flow') or p.startswith('/engineering-analytics') or p.startswith('/gitlab') or p.startswith('/topology') or p.startswith('/architecture') or p.startswith('/security') or p.startswith('/integrations') or p.startswith('/users') or p.startswith('/audit-logs') %}is-active{% endif %}">Engineering
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/detection-engineering') or p.startswith('/cyab') or p.startswith('/log-sources') or p.startswith('/data-flow') or p.startswith('/engineering-analytics') or p.startswith('/gitlab') or p.startswith('/topology') or p.startswith('/architecture') or p.startswith('/network-map') or p.startswith('/security') or p.startswith('/integrations') or p.startswith('/users') or p.startswith('/audit-logs') %}is-active{% endif %}">Engineering
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
@@ -82,6 +82,7 @@
                 <a href="/cyab" class="tw-drop-item {% if p.startswith('/cyab') %}is-active{% endif %}">CyAB</a>
                 <a href="/log-sources" class="tw-drop-item {% if p.startswith('/log-sources') %}is-active{% endif %}">Log Source Health</a>
                 <a href="/data-flow" class="tw-drop-item {% if p.startswith('/data-flow') %}is-active{% endif %}">Data Flow</a>
+                <a href="/network-map" class="tw-drop-item {% if p.startswith('/network-map') %}is-active{% endif %}">Network Map</a>
                 <a href="/engineering-analytics" class="tw-drop-item {% if p.startswith('/engineering-analytics') %}is-active{% endif %}">System Analytics</a>
                 <a href="/gitlab" class="tw-drop-item {% if p.startswith('/gitlab') %}is-active{% endif %}">GitLab</a>
                 <a href="/topology" id="nav-topology-link" class="tw-drop-item {% if p.startswith('/topology') %}is-active{% endif %}" style="display:none;">Topology</a>

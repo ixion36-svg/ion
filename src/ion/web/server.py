@@ -71,6 +71,7 @@ from ion.web.ioc_staleness_api import router as ioc_staleness_router
 from ion.web.training_sim_api import router as training_sim_router
 from ion.web.service_account_api import router as service_account_router
 from ion.web.incident_cost_api import router as incident_cost_router
+from ion.web.network_map_api import router as network_map_router
 from ion.web.compliance_api import router as compliance_router
 from ion.web.comm_template_api import router as comm_template_router
 from ion.web.change_log_api import router as change_log_router
@@ -284,6 +285,7 @@ app.include_router(comm_template_router, prefix="/api")
 app.include_router(change_log_router, prefix="/api")
 app.include_router(saved_search_router, prefix="/api")
 app.include_router(sla_router, prefix="/api")
+app.include_router(network_map_router, prefix="/api")
 app.include_router(bulk_ops_router, prefix="/api")
 app.include_router(threat_hunt_router, prefix="/api")
 app.include_router(dashboard_layout_router, prefix="/api")
@@ -514,6 +516,17 @@ async def startup_event():
         _tide_bg(engine)
         logger.info("TIDE background sync started")
     run_locked(engine, LOCK_TIDE_BG_SYNC, "tide_bg_sync", _start_tide_sync,
+               hold_until_close=True)
+
+    # ---------------------------------------------------------------
+    # Network Mapper background sync
+    # ---------------------------------------------------------------
+    from ion.storage.database import LOCK_NETMAP_BG_SYNC
+    def _start_netmap_sync():
+        from ion.services.network_mapper_service import start_background_loop as _netmap_bg
+        _netmap_bg()
+        logger.info("Network Mapper background sync started")
+    run_locked(engine, LOCK_NETMAP_BG_SYNC, "netmap_bg_sync", _start_netmap_sync,
                hold_until_close=True)
 
     # Version compatibility checks for connectors that declare supported ranges
@@ -913,6 +926,12 @@ async def topology_page(request: Request, user: User = Depends(require_page_perm
 async def architecture_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
     """Render the system architecture flow diagram page."""
     return templates.TemplateResponse(request=request, name="architecture.html")
+
+
+@app.get("/network-map", response_class=HTMLResponse)
+async def network_map_page(request: Request, user: User = Depends(require_page_auth)):
+    """Render the Network Mapper / CMDB page."""
+    return templates.TemplateResponse(request=request, name="network_map.html")
 
 
 def main():
