@@ -96,7 +96,7 @@ class Config:
     kibana_url: str = ""  # e.g., http://localhost:5601
     kibana_username: str = ""  # Kibana username (uses ES credentials if not set)
     kibana_password: str = ""  # Kibana password
-    kibana_space_id: str = "default"  # Kibana space ID
+    kibana_space_id: str = "production"  # Kibana space ID
     kibana_case_owner: str = "securitySolution"  # Case owner app (securitySolution, observability, cases)
     kibana_verify_ssl: bool = False
 
@@ -205,7 +205,7 @@ class Config:
             kibana_url=data.get("kibana_url", ""),
             kibana_username=data.get("kibana_username", ""),
             kibana_password=data.get("kibana_password", ""),
-            kibana_space_id=data.get("kibana_space_id", "default"),
+            kibana_space_id=data.get("kibana_space_id", "production"),
             kibana_case_owner=data.get("kibana_case_owner", "securitySolution"),
             kibana_verify_ssl=data.get("kibana_verify_ssl", False),
             # DFIR-IRIS integration
@@ -493,7 +493,7 @@ def get_config() -> Config:
         if os.environ.get("ION_KIBANA_PASSWORD"):
             _config.kibana_password = os.environ.get("ION_KIBANA_PASSWORD", "")
         if os.environ.get("ION_KIBANA_SPACE_ID"):
-            _config.kibana_space_id = os.environ.get("ION_KIBANA_SPACE_ID", "default")
+            _config.kibana_space_id = os.environ.get("ION_KIBANA_SPACE_ID", "production")
         if os.environ.get("ION_KIBANA_CASE_OWNER"):
             _config.kibana_case_owner = os.environ.get("ION_KIBANA_CASE_OWNER", "securitySolution")
         if os.environ.get("ION_KIBANA_VERIFY_SSL"):
