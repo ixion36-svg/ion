@@ -400,11 +400,13 @@ class OllamaService:
         default_model: str = "llama3.1:8b",
         timeout: float = 120.0,
         verify_ssl: bool = True,
+        enabled: bool = True,
     ):
         self.base_url = base_url.rstrip("/")
         self.default_model = default_model
         self.timeout = timeout
         self.verify_ssl = verify_ssl
+        self.enabled = enabled
         self._client: Optional[httpx.AsyncClient] = None
         self._queue = get_request_queue()
 
@@ -701,6 +703,7 @@ def get_ollama_service() -> OllamaService:
             default_model=getattr(config, 'ollama_model', 'llama3.1:8b'),
             timeout=float(getattr(config, 'ollama_timeout', 120)),
             verify_ssl=getattr(config, 'ollama_verify_ssl', True),
+            enabled=getattr(config, 'ollama_enabled', True),
         )
     return _ollama_service
 
