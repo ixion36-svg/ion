@@ -11,11 +11,18 @@ services:
     container_name: ion-postgres
     restart: unless-stopped
 
-    # Slow query logging — anything > 200ms hits the log so we can find
+    # Slow query logging — anything > 100ms hits the log so we can find
     # bottlenecks under real load. log_statement=none keeps the noise down
     # (we only want SLOW queries, not every SELECT).
+    #
+    # max_connections = 320: covers the v0.9.82 ION pool ceiling
+    # (4 uvicorn workers × (25 pool + 50 overflow) = 300 peak) with a
+    # ~20-connection headroom for psql / admin / reserved_connections.
+    # Default Postgres is 100 which was the real hard-wall under load.
     command:
       - postgres
+      - -c
+      - max_connections=320
       - -c
       - log_min_duration_statement=100
       - -c
@@ -66,7 +73,7 @@ services:
   # =============================================================================
   ion:
     # build: .  # Uncomment to build from source instead of pulling
-    image: ixion36/ion:${ION_VERSION:-0.9.78}
+    image: ixion36/ion:${ION_VERSION:-0.9.86}
     container_name: ion
     restart: unless-stopped
 
@@ -211,7 +218,7 @@ services:
   # Shares ion-data volume for .seeded marker persistence.
   # Skips automatically on subsequent starts.
   seeder:
-    image: ixion36/ion:${ION_VERSION:-0.9.78}
+    image: ixion36/ion:${ION_VERSION:-0.9.86}
     container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]
     volumes:

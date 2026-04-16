@@ -6,11 +6,11 @@
     <title>{% block title %}ION{% endblock %}</title>
     <link rel="icon" type="image/png" href="/static/img/ion-logo.png">
     <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.28">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.9.28">
+    <link rel="stylesheet" href="/static/css/style.css?v=0.9.80-lightmode">
     <link rel="stylesheet" href="/static/css/design-system.css?v=0.9.72">
     <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.9.28">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
-    <link rel="stylesheet" href="/static/css/tailwind.css?v=0.9.72">
+    <link rel="stylesheet" href="/static/css/tailwind.css?v=0.9.80-lightmode">
     <script src="/static/js/theme-init.js"></script>
 </head>
 <body>
@@ -149,6 +149,11 @@
               <div id="user-dropdown-header" class="px-4 py-3 border-b border-white/10"></div>
               <div class="py-1">
                 <a href="/profile" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">My Profile</a>
+                <button type="button" onclick="toggleIonMode(); return false;"
+                        class="w-full flex items-center justify-between px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">
+                  <span>Appearance</span>
+                  <span id="ion-mode-label" class="font-mono text-[10px] uppercase tracking-wider text-slate-500">Dark</span>
+                </button>
                 <a href="#" onclick="logout(); return false;" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Sign Out</a>
               </div>
             </div>

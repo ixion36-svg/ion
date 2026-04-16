@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Generator
 from dataclasses import dataclass
 from urllib.parse import quote as url_quote
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request, Response, Cookie
+from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File, Form, Depends, Request, Response, Cookie
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
@@ -24,6 +24,7 @@ from ion.core.config import get_config, get_oidc_config, get_gitlab_config, get_
 from ion.core.safe_errors import safe_error
 from ion.services.dfir_iris_service import get_dfir_iris_service
 from ion.services.case_description import build_case_description
+from ion.services.kibana_cases_service import get_kibana_cases_service
 from ion.services.kibana_sync_helpers import (
     sync_new_case_to_kibana,
     sync_note_to_kibana,
@@ -2303,6 +2304,7 @@ async def get_dashboard(
             "total_alerts": 0,
             "critical_count": 0,
             "high_count": 0,
+            "alerts_histogram": [],
         }
         es_config = get_elasticsearch_config()
         if es_config.get("enabled") and es_config.get("url"):
@@ -2315,11 +2317,17 @@ async def get_dashboard(
                     if connection.get("connected"):
                         data["connected"] = True
                         data["cluster_name"] = connection.get("cluster_name")
-                        alerts = await es_service.get_alerts(hours=24, limit=10)
+                        # Fetch recent alerts + histogram in parallel — the
+                        # sparkline on the dashboard reads alerts_histogram.
+                        alerts, histogram = await asyncio.gather(
+                            es_service.get_alerts(hours=24, limit=10),
+                            es_service.get_alerts_histogram(hours=24, interval="1h"),
+                        )
                         data["alerts"] = [a.to_dict() for a in alerts]
                         data["total_alerts"] = len(alerts)
                         data["critical_count"] = sum(1 for a in alerts if a.severity == "critical")
                         data["high_count"] = sum(1 for a in alerts if a.severity == "high")
+                        data["alerts_histogram"] = histogram or []
                     else:
                         data["error"] = connection.get("error", "Connection failed")
             except Exception as e:
@@ -3772,6 +3780,110 @@ async def _sync_case_to_es(case, session):
         _case_es_logger.warning("Failed to sync case %s to ES: %s", getattr(case, "id", "?"), e)
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# Case-update background sync helpers (v0.9.81)
+#
+# Every helper opens its OWN DB session — request-scoped sessions are
+# closed by the time FastAPI schedules these, so they cannot borrow the
+# caller's session. Each one is a best-effort fire-and-forget: exceptions
+# are logged, never re-raised, so a dead downstream never causes the
+# user-visible PATCH to 500.
+# ──────────────────────────────────────────────────────────────────────────
+
+def _new_background_session():
+    """Open a fresh DB session bound to the app engine. Caller is responsible
+    for closing it. Used by BackgroundTasks helpers because the request-scoped
+    session from Depends(get_db_session) is already closed by the time they run.
+    """
+    from ion.storage.database import get_session_factory
+    return get_session_factory()()
+
+
+async def _background_case_sync(case_id: int) -> None:
+    """Re-index a case into Elasticsearch with its latest state."""
+    _session = _new_background_session()
+    try:
+        _case = _session.query(AlertCase).filter_by(id=case_id).first()
+        if _case is None:
+            return
+        await _sync_case_to_es(_case, _session)
+    except Exception as e:
+        logger.warning("Background case ES sync failed for %s: %s", case_id, e)
+    finally:
+        _session.close()
+
+
+async def _background_alert_workflow_sync(alert_ids: list, mapped_triage: str) -> None:
+    """Push linked alert workflow_status changes to Elasticsearch."""
+    if not alert_ids or not mapped_triage:
+        return
+    try:
+        from ion.services.elasticsearch_service import ElasticsearchService
+        es = ElasticsearchService()
+        if es.is_configured:
+            await es.update_alert_workflow_status(alert_ids, mapped_triage)
+    except Exception as e:
+        logger.warning("Background alert workflow_status sync failed: %s", e)
+
+
+async def _background_kibana_case_sync(
+    case_id: int,
+    case_number: str,
+    kibana_case_id: str,
+    fields: dict,
+    assignee_user_id: int | None,
+) -> None:
+    """Push a Kibana case update + optional assignee resolution.
+
+    Runs in FastAPI's BackgroundTasks pool so slow Kibana responses
+    (which used to trip the 30s nginx upstream timeout and surface as
+    502s) are invisible to the user. Opens its own DB session to resolve
+    the assignee UID and persist the Kibana version after a successful sync.
+    """
+    _session = _new_background_session()
+    assignee_elastic_uid = None
+    try:
+        if assignee_user_id is not None:
+            assignee = _session.query(User).filter_by(id=assignee_user_id).first()
+            if assignee:
+                if assignee.elastic_uid:
+                    assignee_elastic_uid = assignee.elastic_uid
+                else:
+                    try:
+                        from ion.services.elasticsearch_service import ElasticsearchService
+                        _es = ElasticsearchService()
+                        if _es.is_configured:
+                            lookup_name = getattr(assignee, "elastic_username", None) or assignee.username
+                            uid = await _es.resolve_user_uid(lookup_name)
+                            if not uid and lookup_name != assignee.username:
+                                uid = await _es.resolve_user_uid(assignee.username)
+                            if uid:
+                                assignee_elastic_uid = uid
+                                assignee.elastic_uid = uid
+                                _session.commit()
+                    except Exception as e:
+                        logger.debug("Background Elastic UID resolve failed: %s", e)
+
+        new_version, _ = sync_case_update_to_kibana(
+            kibana_case_id=kibana_case_id,
+            case_number=case_number,
+            title=fields.get("title"),
+            description=fields.get("description"),
+            status=fields.get("status"),
+            severity=fields.get("severity"),
+            assignee_elastic_uid=assignee_elastic_uid,
+        )
+        if new_version:
+            _case_row = _session.query(AlertCase).filter_by(id=case_id).first()
+            if _case_row is not None:
+                _case_row.kibana_case_version = new_version
+                _session.commit()
+    except Exception as e:
+        logger.warning("Background Kibana case sync failed for %s: %s", case_id, e)
+    finally:
+        _session.close()
+
+
 def _build_kfp_es_doc(kfp) -> dict:
     """Build the Elasticsearch document from a KnownFalsePositive ORM object."""
     now = datetime.now(timezone.utc).isoformat()
@@ -4219,8 +4331,24 @@ async def get_case_detail(
     # ES username matches an ION user that has no elastic_uid yet, the
     # mapping is filled in. This means the FIRST read after an external
     # Kibana assignment is enough to bind the ION user to its Kibana profile.
+    #
+    # v0.9.82 — SYNC RACE GRACE WINDOW: v0.9.81 moved the Kibana case sync
+    # off the request path into a BackgroundTask, which introduced a ~1s
+    # race where a PATCH returns success and the UI refreshes faster than
+    # Kibana has accepted the new assignee. During that window the mismatch
+    # pill ("ION and Kibana disagree") was firing as a false positive.
+    # Fix: if the case was updated within the grace window, skip the live
+    # Kibana fetch entirely — the UI falls back to ION's local state which
+    # is what the user just set. Next refresh after grace expires reads
+    # real Kibana state and mismatch detection works normally.
+    kibana_sync_pending = False
+    if case.updated_at is not None:
+        _age_s = (datetime.utcnow() - case.updated_at).total_seconds()
+        if 0 <= _age_s < 15:
+            kibana_sync_pending = True
+
     kibana_assignees: list[dict] = []
-    if case.kibana_case_id:
+    if case.kibana_case_id and not kibana_sync_pending:
         try:
             from ion.services.kibana_cases_service import get_kibana_cases_service
             from ion.services.elasticsearch_service import ElasticsearchService
@@ -4296,8 +4424,13 @@ async def get_case_detail(
         "assigned_to": case.assigned_to.username if case.assigned_to else None,
         "assigned_to_id": case.assigned_to_id,
         # Live Kibana-side assignees, resolved through ES profile API.
-        # Empty when no Kibana case is linked OR Kibana has no assignees.
+        # Empty when no Kibana case is linked OR Kibana has no assignees
+        # OR we're inside the post-write grace window (see kibana_sync_pending).
         "kibana_assignees": kibana_assignees,
+        # True if the case was written within the last 15s and the
+        # background Kibana sync may not yet have propagated. UI can use
+        # this to hint "syncing…" instead of rendering stale state.
+        "kibana_sync_pending": kibana_sync_pending,
         "affected_hosts": case.affected_hosts,
         "affected_users": case.affected_users,
         "triggered_rules": case.triggered_rules,
@@ -4341,10 +4474,23 @@ async def get_case_detail(
 async def update_case(
     case_id: int,
     data: CaseUpdate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_permission("case:update")),
     session: Session = Depends(get_db_session),
 ):
-    """Update case status, assignee, title, etc."""
+    """Update case status, assignee, title, etc.
+
+    v0.9.81: external syncs (Kibana case sync, ES case mirror, alert
+    workflow_status) moved to FastAPI BackgroundTasks so the response
+    returns as soon as the Postgres commit lands. Previously a slow Kibana
+    could block this endpoint for the full 30s nginx upstream timeout and
+    surface as a 502 to the user.
+
+    The Kibana sync is also short-circuited when none of the
+    Kibana-relevant fields (title/description/status/severity/assignee)
+    actually changed — so edits on case type, notes, etc. never touch
+    Kibana at all.
+    """
     case = session.query(AlertCase).filter_by(id=case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -4417,65 +4563,66 @@ async def update_case(
 
     session.commit()
     session.refresh(case)
-    await _sync_case_to_es(case, session)
 
-    # Sync alert workflow_status to Elasticsearch
-    if data.status is not None and _synced_alert_ids:
-        try:
-            from ion.services.elasticsearch_service import ElasticsearchService
-            es = ElasticsearchService()
-            if es.is_configured:
-                await es.update_alert_workflow_status(_synced_alert_ids, _mapped_triage)
-        except Exception as e:
-            logger.warning(f"Failed to sync alert workflow_status on case update: {e}")
-
-    # Resolve assignee UID if assignee changed.
-    # Resolution goes via the Elasticsearch native API (POST /_security/profile/_suggest),
-    # NOT the Kibana internal route — that one is 404 outside a browser session
-    # in Kibana 8.11+. The cached `users.elastic_uid` short-circuits the lookup.
-    assignee_elastic_uid = None
-    if data.assigned_to_id is not None and case.kibana_case_id:
-        assignee = session.query(User).filter_by(id=data.assigned_to_id).first()
-        if assignee:
-            if assignee.elastic_uid:
-                assignee_elastic_uid = assignee.elastic_uid
-            else:
-                try:
-                    from ion.services.elasticsearch_service import ElasticsearchService
-                    _es = ElasticsearchService()
-                    if _es.is_configured:
-                        lookup_name = getattr(assignee, 'elastic_username', None) or assignee.username
-                        uid = await _es.resolve_user_uid(lookup_name)
-                        if not uid and lookup_name != assignee.username:
-                            uid = await _es.resolve_user_uid(assignee.username)
-                        if uid:
-                            assignee_elastic_uid = uid
-                            assignee.elastic_uid = uid
-                            session.commit()
-                            logger.info("Cached elastic_uid for user %s: %s", assignee.username, uid)
-                except Exception as e:
-                    logger.debug("Failed to resolve Elastic UID for %s: %s", assignee.username, e)
-
-    # Sync updates to Kibana
-    new_version, kibana_url = sync_case_update_to_kibana(
-        kibana_case_id=case.kibana_case_id,
-        case_number=case.case_number,
-        title=data.title,
-        description=data.description,
-        status=data.status,
-        severity=data.severity,
-        assignee_elastic_uid=assignee_elastic_uid,
+    # Cache fields the background tasks will need before the session closes
+    _case_id = case.id
+    _case_number = case.case_number
+    _kibana_case_id = case.kibana_case_id
+    _kibana_touches = {
+        "title": data.title,
+        "description": data.description,
+        "status": data.status,
+        "severity": data.severity,
+    }
+    _kibana_relevant_change = (
+        data.title is not None
+        or data.description is not None
+        or data.status is not None
+        or data.severity is not None
+        or data.assigned_to_id is not None
     )
-    if new_version:
-        case.kibana_case_version = new_version
-        session.commit()
+    _assignee_changed = data.assigned_to_id is not None
+    _assignee_id = data.assigned_to_id
+    _status_changed = data.status is not None
+    _alert_ids_to_sync = list(_synced_alert_ids)
+    _mapped_triage_status = _mapped_triage
+    _dfir_iris_case_id = case.dfir_iris_case_id
 
-    # Get DFIR-IRIS URL if available
+    # Kick every external sync off the request path. The handler now
+    # returns as soon as Postgres commits — total latency ~20ms instead
+    # of 30+s when Kibana is degraded.
+    background_tasks.add_task(_background_case_sync, _case_id)
+    if _status_changed and _alert_ids_to_sync:
+        background_tasks.add_task(
+            _background_alert_workflow_sync,
+            _alert_ids_to_sync,
+            _mapped_triage_status,
+        )
+    if _kibana_case_id and _kibana_relevant_change:
+        background_tasks.add_task(
+            _background_kibana_case_sync,
+            _case_id,
+            _case_number,
+            _kibana_case_id,
+            _kibana_touches,
+            _assignee_id if _assignee_changed else None,
+        )
+
+    # Build Kibana URL locally without an external call (it's just a
+    # predictable path on the kibana host).
+    kibana_url = None
+    if _kibana_case_id:
+        try:
+            kibana_url = get_kibana_cases_service().get_case_url(_kibana_case_id)
+        except Exception:
+            kibana_url = None
+
+    # DFIR-IRIS URL — local computation only (no HTTP call).
     dfir_iris_url = None
-    if case.dfir_iris_case_id:
+    if _dfir_iris_case_id:
         try:
             iris_svc = get_dfir_iris_service()
-            dfir_iris_url = iris_svc.get_case_url(case.dfir_iris_case_id)
+            dfir_iris_url = iris_svc.get_case_url(_dfir_iris_case_id)
         except Exception:
             pass
 

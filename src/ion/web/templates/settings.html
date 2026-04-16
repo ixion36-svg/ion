@@ -433,6 +433,12 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="tide_client_id">Client ID <span class="form-help-inline">(TIDE 4.x tenant)</span></label>
+                    <input type="text" id="tide_client_id" name="tide_client_id" placeholder="Leave blank for single-tenant keys">
+                    <span class="form-help">TIDE 4.x multi-tenant deployments require the target tenant id. Leave blank if your API key has access to exactly one tenant — ION will auto-resolve it.</span>
+                </div>
+
+                <div class="form-group">
                     <label class="checkbox-label">
                         <input type="checkbox" id="tide_verify_ssl" name="tide_verify_ssl" checked>
                         Verify SSL Certificate
@@ -1964,6 +1970,7 @@ function populateForms(config) {
         document.getElementById('tide_enabled').checked = config.tide.tide_enabled;
         document.getElementById('tide_url').value = config.tide.tide_url || '';
         document.getElementById('tide_space').value = config.tide.tide_space || 'default';
+        document.getElementById('tide_client_id').value = config.tide.tide_client_id || '';
         document.getElementById('tide_verify_ssl').checked = config.tide.tide_verify_ssl !== false;
         updateSecretStatus('tide_api_key', config.tide.tide_api_key_set);
     }
@@ -2060,6 +2067,7 @@ async function saveSettings(event, section) {
             data.tide_api_key = form.tide_api_key.value;
         }
         data.tide_space = form.tide_space.value || 'default';
+        data.tide_client_id = form.tide_client_id.value.trim();
         data.tide_verify_ssl = form.tide_verify_ssl.checked;
     } else if (section === 'oidc') {
         data.base_url = form.base_url.value;

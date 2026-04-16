@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Optional, List
 from sqlalchemy import select, func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ion.models.forensics import (
     ForensicCase,
@@ -248,19 +248,22 @@ class ForensicRepository:
         return case
 
     def get_case_by_id(self, case_id: int) -> Optional[ForensicCase]:
+        # v0.9.81: selectinload for every *-to-many collection — previous
+        # chained joinedload produced a 6-dimensional cartesian
+        # (case_steps × evidence_items × custody_log × timeline_entries × …).
         stmt = (
             select(ForensicCase)
             .options(
                 joinedload(ForensicCase.lead_investigator),
-                joinedload(ForensicCase.playbook).joinedload(ForensicPlaybook.steps),
-                joinedload(ForensicCase.case_steps).joinedload(ForensicCaseStep.completed_by),
-                joinedload(ForensicCase.evidence_items).joinedload(EvidenceItem.collected_by),
-                joinedload(ForensicCase.evidence_items).joinedload(EvidenceItem.custody_log),
-                joinedload(ForensicCase.timeline_entries).joinedload(ForensicTimelineEntry.user),
+                joinedload(ForensicCase.playbook).selectinload(ForensicPlaybook.steps),
+                selectinload(ForensicCase.case_steps).joinedload(ForensicCaseStep.completed_by),
+                selectinload(ForensicCase.evidence_items).joinedload(EvidenceItem.collected_by),
+                selectinload(ForensicCase.evidence_items).selectinload(EvidenceItem.custody_log),
+                selectinload(ForensicCase.timeline_entries).joinedload(ForensicTimelineEntry.user),
             )
             .where(ForensicCase.id == case_id)
         )
-        return self.session.execute(stmt).unique().scalar_one_or_none()
+        return self.session.execute(stmt).scalar_one_or_none()
 
     def list_cases(
         self,
@@ -274,8 +277,8 @@ class ForensicRepository:
             .options(
                 joinedload(ForensicCase.lead_investigator),
                 joinedload(ForensicCase.playbook),
-                joinedload(ForensicCase.case_steps),
-                joinedload(ForensicCase.evidence_items),
+                selectinload(ForensicCase.case_steps),
+                selectinload(ForensicCase.evidence_items),
             )
         )
         if status:
@@ -287,7 +290,7 @@ class ForensicRepository:
         if lead_investigator_id:
             stmt = stmt.where(ForensicCase.lead_investigator_id == lead_investigator_id)
         stmt = stmt.order_by(ForensicCase.created_at.desc())
-        return list(self.session.execute(stmt).unique().scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def update_case(
         self,
@@ -783,24 +786,24 @@ class ForensicRepository:
             select(EvidenceItem)
             .options(
                 joinedload(EvidenceItem.collected_by),
-                joinedload(EvidenceItem.custody_log).joinedload(CustodyLogEntry.performed_by),
-                joinedload(EvidenceItem.custody_log).joinedload(CustodyLogEntry.received_by),
+                selectinload(EvidenceItem.custody_log).joinedload(CustodyLogEntry.performed_by),
+                selectinload(EvidenceItem.custody_log).joinedload(CustodyLogEntry.received_by),
             )
             .where(EvidenceItem.id == evidence_id)
         )
-        return self.session.execute(stmt).unique().scalar_one_or_none()
+        return self.session.execute(stmt).scalar_one_or_none()
 
     def list_evidence_for_case(self, case_id: int) -> List[EvidenceItem]:
         stmt = (
             select(EvidenceItem)
             .options(
                 joinedload(EvidenceItem.collected_by),
-                joinedload(EvidenceItem.custody_log),
+                selectinload(EvidenceItem.custody_log),
             )
             .where(EvidenceItem.forensic_case_id == case_id)
             .order_by(EvidenceItem.created_at)
         )
-        return list(self.session.execute(stmt).unique().scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def update_evidence(
         self,
@@ -939,11 +942,11 @@ class ForensicRepository:
             select(ForensicPlaybook)
             .options(
                 joinedload(ForensicPlaybook.created_by),
-                joinedload(ForensicPlaybook.steps),
+                selectinload(ForensicPlaybook.steps),
             )
             .where(ForensicPlaybook.id == playbook_id)
         )
-        return self.session.execute(stmt).unique().scalar_one_or_none()
+        return self.session.execute(stmt).scalar_one_or_none()
 
     def list_playbooks(
         self,
@@ -954,7 +957,7 @@ class ForensicRepository:
             select(ForensicPlaybook)
             .options(
                 joinedload(ForensicPlaybook.created_by),
-                joinedload(ForensicPlaybook.steps),
+                selectinload(ForensicPlaybook.steps),
             )
         )
         if investigation_type:
@@ -962,7 +965,7 @@ class ForensicRepository:
         if active_only:
             stmt = stmt.where(ForensicPlaybook.is_active == True)
         stmt = stmt.order_by(ForensicPlaybook.name)
-        return list(self.session.execute(stmt).unique().scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def update_playbook(
         self,

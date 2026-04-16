@@ -290,6 +290,28 @@ function toggleUserDropdown() {
     const open = dropdown.style.display !== 'block';
     dropdown.style.display = open ? 'block' : 'none';
     dropdown.classList.toggle('show', open);
+    if (open) syncIonModeLabel();
+}
+
+// Dark / Light mode toggle, wired to the nav user-dropdown button.
+// Uses the same contract as profile.html: data-mode attr + localStorage
+// so profile and nav stay in lock-step.
+function toggleIonMode() {
+    const current = document.documentElement.getAttribute('data-mode') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-mode', next);
+    try { localStorage.setItem('ion-mode', next); } catch (e) { /* private mode */ }
+    syncIonModeLabel();
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === next);
+    });
+}
+
+function syncIonModeLabel() {
+    const label = document.getElementById('ion-mode-label');
+    if (!label) return;
+    const mode = document.documentElement.getAttribute('data-mode') || 'dark';
+    label.textContent = mode === 'dark' ? 'Dark' : 'Light';
 }
 
 // Mobile nav hamburger toggle

@@ -106,6 +106,7 @@ class TideSettingsUpdate(BaseModel):
     tide_api_key: Optional[str] = None  # Only update if provided and not masked
     tide_verify_ssl: Optional[bool] = None
     tide_space: Optional[str] = None
+    tide_client_id: Optional[str] = None  # TIDE 4.x tenant id (blank = single-tenant auto)
 
 
 # =============================================================================
@@ -220,6 +221,7 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
             "tide_api_key_set": bool(config.tide_api_key),
             "tide_verify_ssl": config.tide_verify_ssl,
             "tide_space": config.tide_space,
+            "tide_client_id": config.tide_client_id,
         },
         "config_path": str(get_config_path()),
     }
@@ -490,6 +492,9 @@ async def update_tide_settings(
 
     if settings.tide_space is not None:
         config.tide_space = settings.tide_space or "default"
+
+    if settings.tide_client_id is not None:
+        config.tide_client_id = settings.tide_client_id.strip()
 
     config.to_file(get_config_path())
     reload_config()
@@ -1083,6 +1088,9 @@ class WizardIntegrationConfig(BaseModel):
     timeout: Optional[int] = None
     # DFIR-IRIS specific
     default_customer: Optional[int] = None
+    # TIDE specific
+    space: Optional[str] = None
+    client_id: Optional[str] = None
 
 
 class WizardDiagnoseRequest(BaseModel):
@@ -1242,6 +1250,7 @@ async def get_wizard_integrations(current_user: User = Depends(require_permissio
                 "url": {"type": "url", "label": "TIDE URL", "placeholder": "https://tide.example.com", "required": True},
                 "api_key": {"type": "password", "label": "API Key", "placeholder": "X-TIDE-API-KEY value", "required": True},
                 "space": {"type": "text", "label": "Space", "placeholder": "default", "default": "default"},
+                "client_id": {"type": "text", "label": "Client ID (TIDE 4.x)", "placeholder": "Leave blank for single-tenant keys"},
                 "verify_ssl": {"type": "checkbox", "label": "Verify SSL Certificate", "default": True},
             },
         },

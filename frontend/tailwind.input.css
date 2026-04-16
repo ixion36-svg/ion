@@ -34,7 +34,14 @@
 /* Scan every template for class names so tree-shaking only keeps what's used. */
 @source "../src/ion/web/templates/**/*.html";
 
-/* ── Theme tokens (v4 @theme) ── */
+/* ── Theme tokens (v4 @theme) ──
+ *
+ * Tokens point at CSS custom properties that flip under [data-mode="light"]
+ * below. Tailwind v4 compiles utilities like .bg-ink-950 to
+ *   background-color: var(--color-ink-950);
+ * so overriding those vars at a more specific selector cascades
+ * automatically — no per-utility rewrite needed.
+ */
 @theme {
   --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -53,6 +60,82 @@
   --color-ion-coral: #ff6c6c;
   --color-ion-lime:  #86f0a0;
   --color-ion-iris:  #9a8cff;
+}
+
+/* ── Shell palette (flips with [data-mode]) ──
+ *
+ * Named tokens used by .ion-tw-page / .bg-grid / ::selection / scrollbars.
+ * Template authors should prefer these over raw hex.
+ */
+:root {
+  --ion-bg:            #07080c;
+  --ion-surface:       #0d1017;
+  --ion-surface-2:     #11141c;
+  --ion-text:          #e6e9ef;
+  --ion-text-muted:    #94a3b8;
+  --ion-border:        rgba(255,255,255,0.08);
+  --ion-border-strong: rgba(255,255,255,0.12);
+  --ion-grid-line:     rgba(255,255,255,0.025);
+  --ion-row-hover:     rgba(255,255,255,0.02);
+  --ion-scroll-thumb:  rgba(255,255,255,0.06);
+  --ion-scroll-thumb-hover: rgba(255,255,255,0.12);
+  --ion-selection-bg:  rgba(109, 228, 255, 0.25);
+  --ion-focus-ring-bg: #07080c;
+  --ion-hero-edge:     linear-gradient(135deg, rgba(109,228,255,.5), rgba(154,140,255,.25) 40%, rgba(255,255,255,0.04) 75%);
+  --ion-radial-1:      radial-gradient(ellipse 1200px 600px at 20% -10%, rgba(109, 228, 255, 0.055), transparent 60%);
+  --ion-radial-2:      radial-gradient(ellipse 900px 500px at 110% 10%, rgba(154, 140, 255, 0.045), transparent 60%);
+}
+
+[data-mode="light"] {
+  /* Shell tokens */
+  --ion-bg:            #f6f7f9;
+  --ion-surface:       #ffffff;
+  --ion-surface-2:     #f1f3f6;
+  --ion-text:          #0f172a;
+  --ion-text-muted:    #475569;
+  --ion-border:        rgba(15, 23, 42, 0.12);
+  --ion-border-strong: rgba(15, 23, 42, 0.18);
+  --ion-grid-line:     rgba(15, 23, 42, 0.04);
+  --ion-row-hover:     rgba(15, 23, 42, 0.035);
+  --ion-scroll-thumb:  rgba(15, 23, 42, 0.18);
+  --ion-scroll-thumb-hover: rgba(15, 23, 42, 0.28);
+  --ion-selection-bg:  rgba(14, 165, 233, 0.22);
+  --ion-focus-ring-bg: #ffffff;
+  --ion-hero-edge:     linear-gradient(135deg, rgba(14,165,233,.5), rgba(99,102,241,.25) 40%, rgba(15,23,42,0.06) 75%);
+  --ion-radial-1:      radial-gradient(ellipse 1200px 600px at 20% -10%, rgba(14, 165, 233, 0.08), transparent 60%);
+  --ion-radial-2:      radial-gradient(ellipse 900px 500px at 110% 10%, rgba(99, 102, 241, 0.06), transparent 60%);
+
+  /* Flip Tailwind palette tokens so utility classes cascade automatically.
+     ink-NNN becomes the light surface ramp (darkest = deepest card,
+     lightest = page bg), and the slate text palette is remapped to
+     dark-on-light equivalents. white-alpha utilities are handled in the
+     override block below. */
+  --color-ink-950: #f6f7f9;
+  --color-ink-900: #ffffff;
+  --color-ink-850: #ffffff;
+  --color-ink-800: #f1f3f6;
+  --color-ink-700: #e7ebf0;
+  --color-ink-600: #dbe1e8;
+  --color-ink-500: #cbd5e1;
+  --color-ink-400: #94a3b8;
+
+  /* Text utilities used across the Tailwind shell. These invert so that
+     text-slate-300 (a mid-dark-mode body color) becomes a readable
+     mid-light-mode body color. */
+  --color-slate-50:  #0f172a;
+  --color-slate-100: #0f172a;
+  --color-slate-200: #1e293b;
+  --color-slate-300: #334155;
+  --color-slate-400: #475569;
+  --color-slate-500: #64748b;
+  --color-slate-600: #64748b;
+  --color-slate-700: #94a3b8;
+  --color-slate-800: #cbd5e1;
+  --color-slate-900: #e2e8f0;
+
+  /* white-alpha utilities (border-white/10 etc.) bake the literal
+     rgba(255,255,255,.N) at build time — there is no CSS var to flip.
+     They are patched in the attribute-selector block below. */
 }
 
 /* ── Vendored variable fonts ── */
@@ -77,18 +160,16 @@
   -webkit-font-smoothing: antialiased;
 }
 .ion-tw-page {
-  background-color: #07080c;
-  background-image:
-    radial-gradient(ellipse 1200px 600px at 20% -10%, rgba(109, 228, 255, 0.055), transparent 60%),
-    radial-gradient(ellipse 900px 500px at 110% 10%, rgba(154, 140, 255, 0.045), transparent 60%);
-  color: #cbd5e1;
+  background-color: var(--ion-bg);
+  background-image: var(--ion-radial-1), var(--ion-radial-2);
+  color: var(--ion-text);
   min-height: calc(100vh - 56px);
 }
 
 .bg-grid {
   background-image:
-    linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+    linear-gradient(to right, var(--ion-grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--ion-grid-line) 1px, transparent 1px);
   background-size: 56px 56px;
 }
 
@@ -136,7 +217,7 @@
   position: absolute; inset: 0;
   border-radius: 14px;
   padding: 1px;
-  background: linear-gradient(135deg, rgba(109,228,255,.5), rgba(154,140,255,.25) 40%, rgba(255,255,255,0.04) 75%);
+  background: var(--ion-hero-edge);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
           mask-composite: exclude;
@@ -148,22 +229,111 @@
 
 /* ── Row hover ── */
 .row-hover { transition: background-color .18s ease, border-color .18s ease, transform .18s ease; }
-.row-hover:hover { background-color: rgba(255,255,255,0.02); }
+.row-hover:hover { background-color: var(--ion-row-hover); }
 
 /* ── Tiny uppercase label ── */
 .label-tiny { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; }
 
 /* ── Selection, focus, scrollbar ── */
-::selection { background: rgba(109, 228, 255, 0.25); color: #fff; }
+::selection { background: var(--ion-selection-bg); color: var(--ion-text); }
 
 button:focus, a:focus, input:focus { outline: none; }
 button:focus-visible,
 a:focus-visible,
 input:focus-visible {
-  box-shadow: 0 0 0 2px #07080c, 0 0 0 3px rgba(109,228,255,0.6);
+  box-shadow: 0 0 0 2px var(--ion-focus-ring-bg), 0 0 0 3px rgba(109,228,255,0.6);
 }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
+::-webkit-scrollbar-thumb { background: var(--ion-scroll-thumb); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ion-scroll-thumb-hover); }
+
+/* ── Light-mode patch for utilities Tailwind bakes literally ──
+ *
+ * border-white/5, bg-white/5, text-white compile to literal white values
+ * at build time — there is no CSS variable to override, so the var flip
+ * in the [data-mode="light"] block above cannot reach them. We patch
+ * each utility explicitly here so templates keep using familiar names.
+ *
+ * Enumeration is based on a grep across templates (see commit note), so
+ * if a new variant is introduced it must be added here too.
+ */
+
+/* The page background is on <body>, hardcoded to #07080c by style.css.
+   Override it so everything outside the .ion-tw-page wrapper (e.g. the
+   area behind the translucent nav) reads as the light surface. */
+[data-mode="light"] body {
+  background-color: var(--ion-bg) !important;
+  background-image: var(--ion-radial-1), var(--ion-radial-2) !important;
+  color: var(--ion-text);
+}
+
+/* text-white is the single biggest offender — brand, active nav links,
+   all page headings. In light mode it must become near-black. */
+[data-mode="light"] .text-white {
+  color: #0f172a !important;
+}
+[data-mode="light"] .hover\:text-white:hover {
+  color: #000000 !important;
+}
+
+/* Hairline borders across the shell. All of the bleow compile to
+   rgba(255,255,255,.N) literally. */
+[data-mode="light"] .border-white\/5,
+[data-mode="light"] .border-white\/10,
+[data-mode="light"] .border-white\/20,
+[data-mode="light"] .border-white\/\[0\.06\],
+[data-mode="light"] .border-white\/\[0\.08\] {
+  border-color: var(--ion-border) !important;
+}
+[data-mode="light"] .hover\:border-white\/10:hover,
+[data-mode="light"] .hover\:border-white\/20:hover {
+  border-color: var(--ion-border-strong) !important;
+}
+
+/* Translucent white fills (card tints, hover washes, divider rails). */
+[data-mode="light"] .bg-white\/3,
+[data-mode="light"] .bg-white\/5,
+[data-mode="light"] .bg-white\/10,
+[data-mode="light"] .bg-white\/\[0\.02\],
+[data-mode="light"] .bg-white\/\[0\.03\],
+[data-mode="light"] .bg-white\/\[0\.04\],
+[data-mode="light"] .bg-white\/\[0\.06\] {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+}
+[data-mode="light"] .hover\:bg-white\/5:hover,
+[data-mode="light"] .hover\:bg-white\/10:hover,
+[data-mode="light"] .focus\:bg-white\/8:focus {
+  background-color: rgba(15, 23, 42, 0.07) !important;
+}
+
+/* bg-ink alpha variants — Tailwind compiles these as color-mix() against
+   our flipped --color-ink-* vars, so they technically "work", but a
+   50% white-on-white card is invisible. Force opaque surfaces. */
+[data-mode="light"] .bg-ink-900\/40,
+[data-mode="light"] .bg-ink-900\/50,
+[data-mode="light"] .bg-ink-900\/60 {
+  background-color: #ffffff !important;
+  border-color: var(--ion-border) !important;
+}
+[data-mode="light"] .bg-ink-900\/80,
+[data-mode="light"] .bg-ink-900\/95,
+[data-mode="light"] .bg-ink-950\/80,
+[data-mode="light"] .bg-ink-950\/95 {
+  /* Translucent floating panels (nav, user dropdown). Over a light body
+     this reads as a soft frosted sheet. */
+  background-color: rgba(255, 255, 255, 0.88) !important;
+}
+
+/* text-ink-950 is used inside accent gradients (e.g. the brand logo
+   square's "I"). In light mode the gradient is still dark, so the char
+   should stay white to maintain contrast. */
+[data-mode="light"] .text-ink-950 {
+  color: #ffffff !important;
+}
+
+/* from-ink-950 / to-ink-950 gradient stops (e.g. fade-out overlays that
+   expect the page to be dark) — flip to light equivalents. */
+[data-mode="light"] .from-ink-950 { --tw-gradient-from: #f6f7f9 !important; }
+[data-mode="light"] .to-ink-950   { --tw-gradient-to:   #f6f7f9 !important; }

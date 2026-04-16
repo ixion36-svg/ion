@@ -71,6 +71,21 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 user_agent=request.headers.get("User-Agent"),
             )
 
+            # v0.9.82 — slow-request tripwire. Any request above the soft
+            # threshold gets a warning, anything above the hard threshold
+            # gets an error (visible in alerting). Thresholds are tuned to
+            # the current perf budget; tighten once p99 drops below them.
+            if duration_ms >= 2000:
+                logger.error(
+                    f"SLOW REQUEST (>2s): {request.method} {request.url.path} "
+                    f"{response.status_code} {duration_ms}ms",
+                )
+            elif duration_ms >= 500:
+                logger.warning(
+                    f"Slow request (>500ms): {request.method} {request.url.path} "
+                    f"{response.status_code} {duration_ms}ms",
+                )
+
             # Add headers to response
             response.headers["X-Request-ID"] = request_id
             response.headers["X-Response-Time"] = f"{duration_ms}ms"

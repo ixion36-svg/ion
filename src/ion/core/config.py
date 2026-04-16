@@ -121,6 +121,7 @@ class Config:
     tide_api_key: str = ""  # X-TIDE-API-KEY for external query API
     tide_verify_ssl: bool = True
     tide_space: str = "default"  # Kibana space where TIDE rules live (e.g., default, production)
+    tide_client_id: str = ""  # TIDE 4.x tenant (client) id. Leave blank for single-tenant API keys.
 
     @classmethod
     def from_file(cls, path: Path) -> "Config":
@@ -225,6 +226,7 @@ class Config:
             tide_api_key=data.get("tide_api_key", ""),
             tide_verify_ssl=data.get("tide_verify_ssl", True),
             tide_space=data.get("tide_space", "default"),
+            tide_client_id=data.get("tide_client_id", ""),
         )
 
     def to_file(self, path: Path) -> None:
@@ -322,6 +324,7 @@ class Config:
                     "tide_api_key": self.tide_api_key,
                     "tide_verify_ssl": self.tide_verify_ssl,
                     "tide_space": self.tide_space,
+                    "tide_client_id": self.tide_client_id,
                 },
                 f,
                 indent=2,
@@ -531,6 +534,8 @@ def get_config() -> Config:
             _config.tide_verify_ssl = _get_env_bool("ION_TIDE_VERIFY_SSL", True)
         if os.environ.get("ION_TIDE_SPACE"):
             _config.tide_space = os.environ.get("ION_TIDE_SPACE", "default")
+        if os.environ.get("ION_TIDE_CLIENT_ID"):
+            _config.tide_client_id = os.environ.get("ION_TIDE_CLIENT_ID", "")
 
     return _config
 
@@ -698,4 +703,5 @@ def get_tide_config() -> dict:
         "api_key": config.tide_api_key,
         "verify_ssl": config.tide_verify_ssl,
         "space": config.tide_space,
+        "client_id": config.tide_client_id,
     }

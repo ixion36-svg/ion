@@ -81,15 +81,10 @@
                 <span class="text-[15px] text-slate-500">· <span id="hero-high">—</span> high</span>
               </div>
               <div class="flex items-center gap-2">
-                <div class="flex items-center gap-1 p-0.5 rounded-md bg-white/5 border border-white/5">
-                  <button class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-white bg-white/10">Live</button>
-                  <button class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">1h</button>
-                  <button class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">24h</button>
-                </div>
-                <button class="h-7 px-3 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold hover:brightness-110 transition flex items-center gap-1.5">
+                <a href="/alerts" class="h-7 px-3 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold hover:brightness-110 transition flex items-center gap-1.5">
                   Triage queue
                   <svg class="w-3 h-3"><use href="#i-arrow-right"/></svg>
-                </button>
+                </a>
               </div>
             </div>
 
@@ -124,15 +119,19 @@
           </div>
           <div class="flex items-end justify-between gap-4">
             <div id="kpi-open-alerts" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-white">—</div>
-            <svg viewBox="0 0 140 44" class="w-[140px] h-11 text-ion-cyan">
+            <!-- Real sparkline — driven by /api/dashboard alerts_histogram.
+                 The fill + stroke paths are injected by renderSparkline()
+                 in the script block below. While the fetch is in flight
+                 the SVG is empty so nothing fake is shown. -->
+            <svg id="kpi-open-alerts-spark" viewBox="0 0 140 44" preserveAspectRatio="none" class="w-[140px] h-11 text-ion-cyan shrink-0" aria-hidden="true">
               <defs>
                 <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
                   <stop offset="0%" stop-color="currentColor" stop-opacity="0.35"/>
                   <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
                 </linearGradient>
               </defs>
-              <path d="M0,32 L14,28 L28,30 L42,22 L56,26 L70,18 L84,20 L98,12 L112,16 L126,8 L140,14 L140,44 L0,44 Z" fill="url(#g1)"/>
-              <path d="M0,32 L14,28 L28,30 L42,22 L56,26 L70,18 L84,20 L98,12 L112,16 L126,8 L140,14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path id="kpi-open-alerts-spark-fill" fill="url(#g1)" d=""/>
+              <path id="kpi-open-alerts-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
             </svg>
           </div>
         </div>
@@ -165,10 +164,6 @@
           </div>
           <div class="flex items-end justify-between gap-4">
             <div id="kpi-mttr" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-white">—</div>
-            <div class="text-right pb-2">
-              <div class="font-mono text-[10px] text-slate-500 uppercase">Target</div>
-              <div class="font-mono text-[13px] text-slate-300">4h</div>
-            </div>
           </div>
         </div>
 
@@ -202,7 +197,7 @@
             <span class="label-tiny text-slate-500">My work</span>
             <h2 class="font-sans font-semibold text-[22px] tracking-tight leading-none text-white">Open cases</h2>
           </div>
-          <a href="#" class="text-[12px] text-slate-400 hover:text-ion-cyan transition flex items-center gap-1">
+          <a href="/cases" class="text-[12px] text-slate-400 hover:text-ion-cyan transition flex items-center gap-1">
             View all
             <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
           </a>
@@ -221,61 +216,44 @@
         </div>
 
         <div class="grid grid-cols-2 gap-2.5">
-          <a href="#" class="group flex flex-col gap-2 p-4 rounded-lg border border-white/5 hover:border-ion-coral/40 hover:bg-ion-coral/5 transition">
+          <a href="/alerts" class="group flex flex-col gap-2 p-4 rounded-lg border border-white/5 hover:border-ion-coral/40 hover:bg-ion-coral/5 transition">
             <svg class="w-4 h-4 text-ion-coral"><use href="#i-alert-triangle"/></svg>
-            <div class="text-[13px] text-white font-medium">Triage alert</div>
-            <div class="text-[11px] text-slate-500">next in queue</div>
+            <div class="text-[13px] text-white font-medium">Triage alerts</div>
           </a>
-          <a href="#" class="group flex flex-col gap-2 p-4 rounded-lg border border-white/5 hover:border-ion-cyan/40 hover:bg-ion-cyan/5 transition">
+          <a href="/chat" class="group flex flex-col gap-2 p-4 rounded-lg border border-white/5 hover:border-ion-cyan/40 hover:bg-ion-cyan/5 transition">
             <svg class="w-4 h-4 text-ion-cyan"><use href="#i-sparkles"/></svg>
             <div class="text-[13px] text-white font-medium">AI assist</div>
-            <div class="text-[11px] text-slate-500">llama3.2:latest</div>
           </a>
-          <a href="#" class="group flex flex-col gap-2 p-4 rounded-lg border border-white/5 hover:border-ion-lime/40 hover:bg-ion-lime/5 transition">
+          <a href="/observables" class="group flex flex-col gap-2 p-4 rounded-lg border border-white/5 hover:border-ion-lime/40 hover:bg-ion-lime/5 transition">
             <svg class="w-4 h-4 text-ion-lime"><use href="#i-search"/></svg>
             <div class="text-[13px] text-white font-medium">Search IOC</div>
-            <div class="text-[11px] text-slate-500">observables DB</div>
           </a>
-          <a href="#" class="group flex flex-col gap-2 p-4 rounded-lg border border-white/5 hover:border-ion-iris/40 hover:bg-ion-iris/5 transition">
+          <a href="/playbooks" class="group flex flex-col gap-2 p-4 rounded-lg border border-white/5 hover:border-ion-iris/40 hover:bg-ion-iris/5 transition">
             <svg class="w-4 h-4 text-ion-iris"><use href="#i-book-open"/></svg>
             <div class="text-[13px] text-white font-medium">Run playbook</div>
-            <div class="text-[11px] text-slate-500">25 available</div>
           </a>
         </div>
       </div>
 
-      <!-- Shift handover -->
+      <!-- Shift handover — real data from /api/shift-handover/report -->
       <div class="col-span-12 lg:col-span-3 min-w-0 rise d-6 rounded-[16px] border border-white/5 bg-ink-900/40 px-6 py-8 lg:px-6 lg:py-10">
-        <div class="flex items-baseline gap-3 mb-5">
-          <span class="label-tiny text-slate-500">06:00</span>
-          <h2 class="font-sans font-semibold text-[22px] tracking-tight leading-none text-white">Handover</h2>
+        <div class="flex items-center justify-between mb-5">
+          <div class="flex items-baseline gap-3">
+            <span id="handover-window-label" class="label-tiny text-slate-500">Last 8h</span>
+            <h2 class="font-sans font-semibold text-[22px] tracking-tight leading-none text-white">Handover</h2>
+          </div>
+          <a href="/shift-handover" class="text-[12px] text-slate-400 hover:text-ion-cyan transition flex items-center gap-1">
+            Full
+            <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
+          </a>
         </div>
 
-        <div class="space-y-4 text-[12.5px] leading-relaxed">
-          <div class="flex gap-3">
-            <div class="font-mono text-[10px] text-slate-600 pt-0.5">03:14</div>
-            <div class="text-slate-300">TIDE background sync completed — <span class="text-ion-lime">1,214 rules</span> reconciled.</div>
-          </div>
-          <div class="flex gap-3">
-            <div class="font-mono text-[10px] text-slate-600 pt-0.5">04:02</div>
-            <div class="text-slate-300">Passed <span class="text-white font-medium">3 escalations</span> to L2 — all suspected APT38 precursors.</div>
-          </div>
-          <div class="flex gap-3">
-            <div class="font-mono text-[10px] text-slate-600 pt-0.5">05:38</div>
-            <div class="text-slate-300">Closed <span class="font-mono text-slate-400">CASE-2830</span> as <span class="text-ion-cyan">benign true positive</span>.</div>
-          </div>
-          <div class="flex gap-3">
-            <div class="font-mono text-[10px] text-slate-600 pt-0.5">05:52</div>
-            <div class="text-slate-300">Kibana sync briefly stalled — resolved, see advisory lock log.</div>
-          </div>
-        </div>
+        <!-- Stat strip: opened / closed / triaged -->
+        <div id="handover-stats" class="grid grid-cols-3 gap-2 mb-5 text-center"></div>
 
-        <div class="mt-5 pt-4 border-t border-white/5 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <div class="h-5 w-5 rounded-full bg-gradient-to-br from-ion-amber to-ion-coral grid place-items-center font-mono text-[9px] text-ink-950 font-bold">MK</div>
-            <span class="text-[11px] text-slate-400">Marcus · night shift</span>
-          </div>
-          <a href="#" class="text-[11px] text-ion-cyan hover:underline">Full log</a>
+        <!-- Highlights list -->
+        <div id="handover-highlights" class="space-y-3 text-[12.5px] leading-relaxed">
+          <div class="py-6 text-center text-[12px] text-slate-500">Loading handover…</div>
         </div>
       </div>
 
@@ -292,7 +270,7 @@
           </div>
         </div>
         <div class="text-[10px] text-slate-600 font-mono">
-          ION 0.9.71 · 4 workers · pg advisory-lock leader
+          ION v{{ ion_version }}
         </div>
       </div>
     </footer>
@@ -340,6 +318,50 @@
     if (h < 1)   return `${Math.round(h * 60)}m`;
     if (h < 24)  return `${Math.floor(h)}h ${Math.round((h % 1) * 60)}m`;
     return `${Math.floor(h / 24)}d ${Math.round(h % 24)}h`;
+  }
+
+  // ── Sparkline renderer ──────────────────────────────────────
+  //
+  // Takes the histogram array from /api/dashboard (alerts_histogram) —
+  // [{ts, count}, …] oldest → newest — and computes an SVG path that
+  // fits the 140×44 viewBox. Zero-count windows still render as a flat
+  // line along the bottom so the shape doesn't collapse.
+  //
+  // If there's no data or too few points to draw a meaningful line, the
+  // sparkline is hidden entirely — no fake "sample" waveform.
+  function renderSparkline(buckets) {
+    const svg  = $('kpi-open-alerts-spark');
+    const fill = $('kpi-open-alerts-spark-fill');
+    const line = $('kpi-open-alerts-spark-line');
+    if (!svg || !fill || !line) return;
+
+    if (!Array.isArray(buckets) || buckets.length < 2) {
+      svg.style.display = 'none';
+      return;
+    }
+    svg.style.display = '';
+
+    const W = 140, H = 44, PAD = 2;
+    const n = buckets.length;
+    const max = Math.max(1, ...buckets.map(b => b.count || 0));
+    const stepX = (W - PAD * 2) / (n - 1);
+
+    // Build path points
+    const pts = buckets.map((b, i) => {
+      const x = PAD + i * stepX;
+      // Invert Y so higher counts sit near the top of the viewBox,
+      // leaving ~4px of floor so zero values don't touch the bottom edge.
+      const y = H - PAD - ((b.count || 0) / max) * (H - PAD * 2 - 4);
+      return [x, y];
+    });
+
+    const linePath = pts
+      .map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
+      .join(' ');
+    const fillPath = `${linePath} L${(W - PAD).toFixed(1)},${H} L${PAD.toFixed(1)},${H} Z`;
+
+    line.setAttribute('d', linePath);
+    fill.setAttribute('d', fillPath);
   }
 
   // ── UTC clock ────────────────────────────────────────────────
@@ -427,10 +449,11 @@
   // ── Main loader ──────────────────────────────────────────────
   async function loadDashboard() {
     // Fire in parallel; each call degrades gracefully on failure/permission
-    const [dash, metrics, casesResp] = await Promise.all([
+    const [dash, metrics, casesResp, handover] = await Promise.all([
       apiGet('/api/dashboard').catch((e) => { console.warn('dashboard failed', e); return null; }),
       apiGet('/api/dashboard/team-metrics').catch((e) => { console.warn('team-metrics failed', e); return null; }),
       apiGet('/api/elasticsearch/alerts/cases?status=open').catch((e) => { console.warn('cases failed', e); return null; }),
+      apiGet('/api/shift-handover/report?hours=8').catch((e) => { console.warn('handover failed', e); return null; }),
     ]);
 
     // ── User / welcome ──
@@ -457,6 +480,9 @@
       $('hero-high').textContent = high;
       $('kpi-open-alerts').textContent = total;
       $('alerts-total-footer').textContent = total;
+
+      // Real sparkline from the ES date_histogram
+      renderSparkline(es.alerts_histogram || []);
 
       const feed = $('alerts-feed');
       const alerts = (es.alerts || []).slice(0, 6);
@@ -555,6 +581,69 @@
       // No permission or fetch error — show hint
       $('kpi-my-cases').textContent = '—';
       $('cases-feed').innerHTML = `<div class="py-10 text-center text-[12px] text-slate-500">Cases unavailable (permission required).</div>`;
+    }
+
+    // ── Shift handover ──
+    renderHandover(handover);
+  }
+
+  function renderHandover(h) {
+    const statsEl = $('handover-stats');
+    const hlEl = $('handover-highlights');
+    if (!statsEl || !hlEl) return;
+
+    if (!h) {
+      statsEl.innerHTML = '';
+      hlEl.innerHTML = `<div class="py-6 text-center text-[12px] text-slate-500">Handover unavailable.</div>`;
+      return;
+    }
+
+    // Stat strip
+    const opened = h.cases?.opened ?? 0;
+    const closed = h.cases?.closed ?? 0;
+    const triaged = h.alerts?.total_triaged ?? 0;
+    statsEl.innerHTML = `
+      <div>
+        <div class="font-sans font-semibold tabular-nums text-[22px] leading-none text-white">${opened}</div>
+        <div class="label-tiny text-slate-500 mt-1.5">opened</div>
+      </div>
+      <div>
+        <div class="font-sans font-semibold tabular-nums text-[22px] leading-none text-ion-lime">${closed}</div>
+        <div class="label-tiny text-slate-500 mt-1.5">closed</div>
+      </div>
+      <div>
+        <div class="font-sans font-semibold tabular-nums text-[22px] leading-none text-ion-cyan">${triaged}</div>
+        <div class="label-tiny text-slate-500 mt-1.5">triaged</div>
+      </div>
+    `;
+
+    // Highlights list (real highlights from _build_highlights)
+    const highlights = h.highlights || [];
+    const LEVEL_CLS = {
+      critical: 'text-ion-coral',
+      high:     'text-ion-amber',
+      warning:  'text-ion-amber',
+      info:     'text-slate-400',
+    };
+    const LEVEL_DOT = {
+      critical: 'bg-ion-coral',
+      high:     'bg-ion-amber',
+      warning:  'bg-ion-amber',
+      info:     'bg-slate-500',
+    };
+
+    if (highlights.length === 0) {
+      hlEl.innerHTML = `<div class="py-4 text-center text-[11px] text-slate-500">No noteworthy events this shift.</div>`;
+    } else {
+      hlEl.innerHTML = highlights.slice(0, 5).map((hl) => {
+        const cls = LEVEL_CLS[hl.level] || 'text-slate-400';
+        const dot = LEVEL_DOT[hl.level] || 'bg-slate-500';
+        return `
+          <div class="flex gap-2.5 items-start">
+            <span class="h-1.5 w-1.5 rounded-full ${dot} mt-1.5 shrink-0"></span>
+            <span class="${cls}">${escHtml(hl.message)}</span>
+          </div>`;
+      }).join('');
     }
   }
 

@@ -75,6 +75,14 @@ class TideService:
         self.enabled = cfg.get("enabled", False) and bool(self.url) and bool(self.api_key)
         self.verify = get_ssl_verify() if cfg.get("verify_ssl", True) else False
         self.space = cfg.get("space") or os.environ.get("ION_TIDE_SPACE", "default")
+        # TIDE 4.x multi-tenant: optional client/tenant id. If the API key
+        # is single-tenant, this can be left blank — TIDE will infer it.
+        # If multi-tenant, the server returns HTTP 400 without it.
+        self.client_id = cfg.get("client_id") or ""
+        # Resolved-once cache for single-tenant auto-discovery. Populated the
+        # first time we hit a 400 "client_id required" or a successful
+        # discover_clients() call, so we don't re-discover on every query.
+        self._resolved_client_id: Optional[str] = None
 
     async def query_async(self, sql: str, retries: int = 1) -> Optional[dict]:
         """Async wrapper around _query that doesn't block the event loop.
@@ -119,10 +127,19 @@ class TideService:
                     _cache_put(sql, None)
                     return None
 
+                # TIDE 4.x accepts an optional client_id on the POST body.
+                # Prefer explicit config, else the auto-resolved single-tenant
+                # id, else omit entirely (TIDE 3.x ignores unknown fields and
+                # 4.x infers for single-tenant keys).
+                payload: dict[str, Any] = {"sql": sql}
+                tenant = self.client_id or self._resolved_client_id
+                if tenant:
+                    payload["client_id"] = tenant
+
                 try:
                     resp = httpx.post(
                         f"{self.url}/api/external/query",
-                        json={"sql": sql},
+                        json=payload,
                         headers={
                             "X-TIDE-API-KEY": self.api_key,
                             "Content-Type": "application/json",
@@ -173,6 +190,42 @@ class TideService:
                     time.sleep(backoff)
                     continue
 
+                # TIDE 4.x: 400 when a multi-tenant API key is missing
+                # client_id. Try to auto-resolve once via /api/external/clients
+                # and retry this same attempt if we get exactly one tenant.
+                if (
+                    resp.status_code == 400
+                    and not tenant
+                    and self._resolved_client_id is None
+                ):
+                    try:
+                        detail = (resp.json() or {}).get("detail", "")
+                    except Exception:
+                        detail = ""
+                    if "client_id" in str(detail).lower():
+                        resolved = self._discover_single_tenant()
+                        if resolved:
+                            self._resolved_client_id = resolved
+                            payload["client_id"] = resolved
+                            logger.info("TIDE auto-resolved client_id=%s", resolved[:8])
+                            # Re-issue immediately without burning a retry slot
+                            continue
+
+                # TIDE 4.x specific auth failures — log loudly and circuit-break,
+                # but don't retry (they are deterministic).
+                if resp.status_code in (401, 403, 404):
+                    try:
+                        detail = (resp.json() or {}).get("detail", "")
+                    except Exception:
+                        detail = resp.text[:200]
+                    logger.error(
+                        "TIDE %d: %s (check ION_TIDE_API_KEY / ION_TIDE_CLIENT_ID)",
+                        resp.status_code, detail,
+                    )
+                    tide_breaker.record_failure()
+                    _cache_put(sql, None)
+                    return None
+
                 # Hard fail — 4xx or out of retries on 5xx.
                 logger.warning("TIDE query failed: %s", resp.status_code)
                 tide_breaker.record_failure()
@@ -182,6 +235,46 @@ class TideService:
             return None
         finally:
             _TIDE_SEMAPHORE.release()
+
+    # -----------------------------------------------------------------------
+    # TIDE 4.x tenant discovery
+    # -----------------------------------------------------------------------
+
+    def discover_clients(self) -> list[dict[str, str]]:
+        """Return [{id, name, slug}] for tenants this API key can access.
+
+        TIDE 3.x does not expose this endpoint and will return 404 — that is
+        handled as "empty list" so callers can treat it as "nothing to show".
+        """
+        if not self.enabled:
+            return []
+        try:
+            resp = httpx.get(
+                f"{self.url}/api/external/clients",
+                headers={"X-TIDE-API-KEY": self.api_key},
+                verify=self.verify,
+                timeout=httpx.Timeout(5.0, connect=3.0),
+            )
+        except Exception as e:
+            logger.warning("TIDE discover_clients error: %s", type(e).__name__)
+            return []
+        if resp.status_code == 404:
+            # TIDE 3.x — endpoint not present
+            return []
+        if resp.status_code != 200:
+            logger.warning("TIDE discover_clients %d", resp.status_code)
+            return []
+        try:
+            return (resp.json() or {}).get("clients", []) or []
+        except Exception:
+            return []
+
+    def _discover_single_tenant(self) -> Optional[str]:
+        """If the API key has exactly one tenant, return its id; else None."""
+        clients = self.discover_clients()
+        if len(clients) == 1:
+            return clients[0].get("id")
+        return None
 
     def get_systems(self) -> list[dict[str, Any]]:
         result = self._query(

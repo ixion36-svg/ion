@@ -36,16 +36,26 @@ class SessionRepository:
         return user_session
 
     def get_by_token(self, session_token: str) -> Optional[UserSession]:
-        """Get a session by token."""
+        """Get a session by token.
+
+        v0.9.82 — matched to get_valid_session(): joinedload for the
+        *-to-one relations, selectinload for the many-to-many collections.
+        The previous chained joinedload produced the same cartesian
+        (80+ rows per admin lookup) that was fixed on the hot path in
+        v0.9.65 — this one was a landmine because logout is rare.
+        """
         stmt = (
             select(UserSession)
             .options(
-                joinedload(UserSession.user).joinedload(User.roles).joinedload(Role.permissions),
-                joinedload(UserSession.active_role).joinedload(Role.permissions),
+                joinedload(UserSession.user)
+                    .selectinload(User.roles)
+                    .selectinload(Role.permissions),
+                joinedload(UserSession.active_role)
+                    .selectinload(Role.permissions),
             )
             .where(UserSession.session_token == session_token)
         )
-        return self.session.execute(stmt).unique().scalar_one_or_none()
+        return self.session.execute(stmt).scalar_one_or_none()
 
     def get_valid_session(self, session_token: str) -> Optional[UserSession]:
         """Get a valid (non-expired) session by token.

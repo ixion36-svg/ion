@@ -2,7 +2,7 @@
 
 from typing import Optional, List
 from sqlalchemy import select, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ion.models.template import Template, Tag, Variable
 
@@ -40,19 +40,19 @@ class TemplateRepository:
         """Get a template by ID."""
         stmt = (
             select(Template)
-            .options(joinedload(Template.tags), joinedload(Template.variables))
+            .options(selectinload(Template.tags), selectinload(Template.variables))
             .where(Template.id == template_id)
         )
-        return self.session.execute(stmt).unique().scalar_one_or_none()
+        return self.session.execute(stmt).scalar_one_or_none()
 
     def get_by_name(self, name: str) -> Optional[Template]:
         """Get a template by name."""
         stmt = (
             select(Template)
-            .options(joinedload(Template.tags), joinedload(Template.variables))
+            .options(selectinload(Template.tags), selectinload(Template.variables))
             .where(Template.name == name)
         )
-        return self.session.execute(stmt).unique().scalars().first()
+        return self.session.execute(stmt).scalars().first()
 
     def list_all(
         self,
@@ -64,7 +64,7 @@ class TemplateRepository:
     ) -> List[Template]:
         """List all templates with optional filters."""
         stmt = select(Template).options(
-            joinedload(Template.tags), joinedload(Template.variables)
+            selectinload(Template.tags), selectinload(Template.variables)
         )
 
         if format:
@@ -79,14 +79,14 @@ class TemplateRepository:
             stmt = stmt.where(Template.document_type == document_type)
 
         stmt = stmt.order_by(Template.name)
-        return list(self.session.execute(stmt).unique().scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def search(self, query: str) -> List[Template]:
         """Search templates by name, description, or content."""
         pattern = f"%{query}%"
         stmt = (
             select(Template)
-            .options(joinedload(Template.tags), joinedload(Template.variables))
+            .options(selectinload(Template.tags), selectinload(Template.variables))
             .where(
                 or_(
                     Template.name.ilike(pattern),
@@ -96,7 +96,7 @@ class TemplateRepository:
             )
             .order_by(Template.name)
         )
-        return list(self.session.execute(stmt).unique().scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def update(
         self,

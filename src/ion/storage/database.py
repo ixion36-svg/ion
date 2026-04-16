@@ -199,6 +199,18 @@ def get_engine(db_path: Optional[Path] = None) -> Engine:
                 pool_timeout=5,
                 pool_pre_ping=True,
                 pool_recycle=900,
+                # v0.9.82 safety nets:
+                # - statement_timeout: Postgres server-side kill any query
+                #   that runs longer than 10s. Converts "ION frozen" into
+                #   a clean 500 with a clear error in the log.
+                # - application_name: shows up in pg_stat_activity so
+                #   "who is holding this lock" is obvious during incidents.
+                # - options is the libpq way to pass session GUCs; psycopg2
+                #   honours it at connection time.
+                connect_args={
+                    "options": "-c statement_timeout=10000 -c application_name=ion",
+                    "connect_timeout": 5,
+                },
             )
         else:
             # SQLite (default)

@@ -361,6 +361,18 @@ async def startup_event():
     deadlocks, and duplicate background loops). Only one worker per restart
     actually runs each hook; the rest skip cleanly.
     """
+    # v0.9.82 — event-loop lag tripwire. Python asyncio will auto-log a
+    # warning any time a callback (read: a sync function called from an
+    # async handler) blocks the event loop longer than this threshold.
+    # 250ms is aggressive enough to surface the real offenders without
+    # spamming the log for normal small syncs.
+    try:
+        import asyncio as _asyncio
+        _loop = _asyncio.get_event_loop()
+        _loop.slow_callback_duration = 0.25
+    except Exception:
+        pass
+
     _validate_startup_config()
     config = get_config()
     if not config.db_path.exists():

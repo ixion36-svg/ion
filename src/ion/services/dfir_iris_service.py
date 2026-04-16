@@ -89,7 +89,8 @@ class DFIRIRISService:
                 base_url=self.url,
                 headers=self._get_headers(),
                 verify=get_ssl_verify(self.config.get("verify_ssl", True)),
-                timeout=httpx.Timeout(30.0, connect=10.0),
+                # v0.9.82: 10s read, 3s connect — was 30s/10s.
+                timeout=httpx.Timeout(10.0, connect=3.0),
                 follow_redirects=False,
             )
         return self._client

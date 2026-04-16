@@ -201,7 +201,9 @@ class ElasticsearchService:
                 headers=self._get_headers(),
                 auth=self._get_auth(),
                 verify=get_ssl_verify(self.verify_ssl),
-                timeout=httpx.Timeout(30.0, connect=10.0),
+                # v0.9.82: 10s read, 3s connect. Was 30s/10s — way too long
+                # for an interactive alert-listing request on a degraded ES.
+                timeout=httpx.Timeout(10.0, connect=3.0),
             ) as client:
                 response = await client.request(method, url, **kwargs)
         except httpx.ConnectError as e:
@@ -448,6 +450,91 @@ class ElasticsearchService:
                 alerts.append(alert)
 
         return alerts
+
+    async def get_alerts_histogram(
+        self,
+        hours: int = 24,
+        interval: str = "1h",
+        include_closed: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Return a time-bucketed count of alerts for the dashboard sparkline.
+
+        Uses a date_histogram aggregation with extended_bounds so empty
+        buckets are zero-filled — the sparkline then plots a continuous
+        N-point line even on quiet windows.
+
+        Args:
+            hours: Lookback window (default 24h).
+            interval: ES fixed_interval (default "1h" → 24 points).
+            include_closed: Count closed alerts too (default False — the
+                default dashboard view shows only active work).
+
+        Returns: [{"ts": iso_string, "count": int}, ...] oldest → newest.
+        Empty list on any failure.
+        """
+        must_clauses = [
+            {"range": {"@timestamp": {"gte": f"now-{hours}h", "lte": "now"}}}
+        ]
+        must_not_clauses = [
+            {"exists": {"field": "kibana.alert.building_block_type"}}
+        ]
+        if not include_closed:
+            must_not_clauses.extend([
+                {"term": {"kibana.alert.workflow_status": "closed"}},
+                {"term": {"status": "closed"}},
+                {"term": {"status": "resolved"}},
+            ])
+
+        query = {
+            "size": 0,
+            "query": {
+                "bool": {
+                    "must": must_clauses,
+                    "must_not": must_not_clauses,
+                }
+            },
+            "aggs": {
+                "over_time": {
+                    "date_histogram": {
+                        "field": "@timestamp",
+                        "fixed_interval": interval,
+                        "min_doc_count": 0,
+                        "extended_bounds": {
+                            "min": f"now-{hours}h",
+                            "max": "now",
+                        },
+                    }
+                }
+            },
+        }
+
+        try:
+            result = await self._request(
+                "POST",
+                f"/{self.alert_index}/_search",
+                json=query,
+            )
+        except ElasticsearchError as e:
+            if "index_not_found" in str(e).lower() or "404" in str(e):
+                return []
+            logger.warning("alert histogram failed: %s", e)
+            return []
+        except Exception as e:
+            logger.warning("alert histogram unexpected: %s", e)
+            return []
+
+        buckets = (
+            result.get("aggregations", {})
+            .get("over_time", {})
+            .get("buckets", [])
+        )
+        return [
+            {
+                "ts": b.get("key_as_string") or b.get("key"),
+                "count": int(b.get("doc_count", 0)),
+            }
+            for b in buckets
+        ]
 
     async def get_alerts_by_ids(self, alert_ids: List[str]) -> List[ElasticsearchAlert]:
         """Fetch multiple alerts by their document IDs."""

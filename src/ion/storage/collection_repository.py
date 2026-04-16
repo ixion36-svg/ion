@@ -2,7 +2,7 @@
 
 from typing import Optional, List
 from sqlalchemy import select, and_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, selectinload
 
 from ion.models.template import Collection, Template
 from ion.models.document import Document
@@ -37,22 +37,22 @@ class CollectionRepository:
         stmt = (
             select(Collection)
             .options(
-                joinedload(Collection.templates),
-                joinedload(Collection.documents),
-                joinedload(Collection.children),
+                selectinload(Collection.templates),
+                selectinload(Collection.documents),
+                selectinload(Collection.children),
             )
             .where(Collection.id == collection_id)
         )
-        return self.session.execute(stmt).unique().scalar_one_or_none()
+        return self.session.execute(stmt).scalar_one_or_none()
 
     def get_by_name(self, name: str) -> Optional[Collection]:
         """Get a collection by name (first match)."""
         stmt = (
             select(Collection)
-            .options(joinedload(Collection.templates))
+            .options(selectinload(Collection.templates))
             .where(Collection.name == name)
         )
-        return self.session.execute(stmt).unique().scalars().first()
+        return self.session.execute(stmt).scalars().first()
 
     def get_by_name_and_parent(self, name: str, parent_id: int | None) -> Optional[Collection]:
         """Get a collection by name within a specific parent folder."""
@@ -73,41 +73,41 @@ class CollectionRepository:
         stmt = (
             select(Collection)
             .options(
-                joinedload(Collection.templates),
-                joinedload(Collection.documents),
-                joinedload(Collection.children),
+                selectinload(Collection.templates),
+                selectinload(Collection.documents),
+                selectinload(Collection.children),
             )
             .order_by(Collection.name)
         )
-        return list(self.session.execute(stmt).unique().scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def list_root_collections(self) -> List[Collection]:
         """List only root-level collections (no parent)."""
         stmt = (
             select(Collection)
             .options(
-                joinedload(Collection.templates),
-                joinedload(Collection.documents),
-                joinedload(Collection.children),
+                selectinload(Collection.templates),
+                selectinload(Collection.documents),
+                selectinload(Collection.children),
             )
             .where(Collection.parent_id.is_(None))
             .order_by(Collection.name)
         )
-        return list(self.session.execute(stmt).unique().scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def list_children(self, parent_id: int) -> List[Collection]:
         """List child collections of a parent."""
         stmt = (
             select(Collection)
             .options(
-                joinedload(Collection.templates),
-                joinedload(Collection.documents),
-                joinedload(Collection.children),
+                selectinload(Collection.templates),
+                selectinload(Collection.documents),
+                selectinload(Collection.children),
             )
             .where(Collection.parent_id == parent_id)
             .order_by(Collection.name)
         )
-        return list(self.session.execute(stmt).unique().scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def update(
         self,

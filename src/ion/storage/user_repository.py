@@ -64,20 +64,21 @@ class UserRepository:
 
     def list_all(self, include_inactive: bool = False) -> List[User]:
         """List all users."""
-        stmt = select(User).options(joinedload(User.roles))
+        # v0.9.82: selectinload for M2M — was joinedload, producing a users × roles cartesian.
+        stmt = select(User).options(selectinload(User.roles))
 
         if not include_inactive:
             stmt = stmt.where(User.is_active == True)
 
         stmt = stmt.order_by(User.username)
-        return list(self.session.execute(stmt).unique().scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def search(self, query: str) -> List[User]:
         """Search users by username, email, or display name."""
         pattern = f"%{query}%"
         stmt = (
             select(User)
-            .options(joinedload(User.roles))
+            .options(selectinload(User.roles))
             .where(
                 or_(
                     User.username.ilike(pattern),
@@ -87,7 +88,7 @@ class UserRepository:
             )
             .order_by(User.username)
         )
-        return list(self.session.execute(stmt).unique().scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def update(
         self,
@@ -173,30 +174,31 @@ class RoleRepository:
 
     def get_by_id(self, role_id: int) -> Optional[Role]:
         """Get a role by ID."""
+        # v0.9.82: selectinload — Role.permissions is M2M
         stmt = (
             select(Role)
-            .options(joinedload(Role.permissions))
+            .options(selectinload(Role.permissions))
             .where(Role.id == role_id)
         )
-        return self.session.execute(stmt).unique().scalar_one_or_none()
+        return self.session.execute(stmt).scalar_one_or_none()
 
     def get_by_name(self, name: str) -> Optional[Role]:
         """Get a role by name."""
         stmt = (
             select(Role)
-            .options(joinedload(Role.permissions))
+            .options(selectinload(Role.permissions))
             .where(Role.name == name)
         )
-        return self.session.execute(stmt).unique().scalar_one_or_none()
+        return self.session.execute(stmt).scalar_one_or_none()
 
     def list_all(self) -> List[Role]:
         """List all roles."""
         stmt = (
             select(Role)
-            .options(joinedload(Role.permissions))
+            .options(selectinload(Role.permissions))
             .order_by(Role.name)
         )
-        return list(self.session.execute(stmt).unique().scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def delete(self, role: Role) -> None:
         """Delete a role."""

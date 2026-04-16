@@ -3994,3 +3994,275 @@ h1, h2, h3, h4, h5, h6 {
     display: block;
 }
 /* ══════════════ END PATH B SWEEP ══════════════ */
+
+/* ════════════════════════════════════════════════════════════════════════
+ * LIGHT-MODE OVERRIDES FOR PATH B CLASSES
+ * ════════════════════════════════════════════════════════════════════════
+ *
+ * The Path B sweep above hardcodes literal dark rgba values on .card,
+ * .data-table, .stat-card, etc. — so they don't flip when data-mode
+ * switches. This block forcibly re-points the most load-bearing classes
+ * to their light-mode equivalents.
+ *
+ * Reuses the existing --bg-*, --text-*, --border variables that style.css
+ * already sets under [data-mode="light"] at line ~207 of this file, so
+ * accent colors stay in sync with the selected [data-theme].
+ * ════════════════════════════════════════════════════════════════════════ */
+
+[data-mode="light"] .card,
+[data-mode="light"] .integration-card,
+[data-mode="light"] .ion-card {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+[data-mode="light"] .card:hover,
+[data-mode="light"] .integration-card:hover {
+  border-color: rgba(100, 116, 139, 0.5) !important;
+}
+[data-mode="light"] .card-header h2,
+[data-mode="light"] .card-header h3,
+[data-mode="light"] .card-title,
+[data-mode="light"] .panel-header h2,
+[data-mode="light"] .panel-header h3 {
+  color: var(--text-bright) !important;
+}
+[data-mode="light"] .card-description {
+  color: var(--text-muted) !important;
+}
+[data-mode="light"] .card-footer {
+  border-top-color: var(--border) !important;
+}
+
+/* Stat / action / metric / tool / role cards — small tile variants */
+[data-mode="light"] .stat-card,
+[data-mode="light"] .action-card,
+[data-mode="light"] .metric-card,
+[data-mode="light"] .tool-card,
+[data-mode="light"] .role-card,
+[data-mode="light"] .ion-stat-card {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+[data-mode="light"] .stat-card:hover,
+[data-mode="light"] .action-card:hover,
+[data-mode="light"] .metric-card:hover,
+[data-mode="light"] .tool-card:hover,
+[data-mode="light"] .role-card:hover {
+  border-color: rgba(100, 116, 139, 0.5) !important;
+}
+
+/* Data tables */
+[data-mode="light"] .table,
+[data-mode="light"] .data-table {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+}
+[data-mode="light"] .table th,
+[data-mode="light"] .data-table th {
+  color: var(--text-muted) !important;
+  border-bottom-color: var(--border) !important;
+}
+[data-mode="light"] .table td,
+[data-mode="light"] .data-table td {
+  color: var(--text-primary) !important;
+  border-bottom-color: rgba(148, 163, 184, 0.2) !important;
+}
+[data-mode="light"] .table tr:hover td,
+[data-mode="light"] .data-table tr:hover td {
+  background: rgba(15, 23, 42, 0.04) !important;
+}
+
+/* Badges — keep the accent color, darken the neutral surface */
+[data-mode="light"] .badge {
+  background: rgba(15, 23, 42, 0.06) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--border) !important;
+}
+
+/* Forms */
+[data-mode="light"] .form-control,
+[data-mode="light"] .form-input,
+[data-mode="light"] .form-select,
+[data-mode="light"] .form-textarea,
+[data-mode="light"] input[type="text"],
+[data-mode="light"] input[type="email"],
+[data-mode="light"] input[type="password"],
+[data-mode="light"] input[type="number"],
+[data-mode="light"] input[type="url"],
+[data-mode="light"] input[type="search"],
+[data-mode="light"] textarea,
+[data-mode="light"] select {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+[data-mode="light"] .form-control::placeholder,
+[data-mode="light"] input::placeholder,
+[data-mode="light"] textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+[data-mode="light"] .form-label,
+[data-mode="light"] label {
+  color: var(--text-secondary) !important;
+}
+
+/* Modals */
+[data-mode="light"] .modal,
+[data-mode="light"] .modal-content,
+[data-mode="light"] .modal-body {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+[data-mode="light"] .modal-header,
+[data-mode="light"] .modal-footer {
+  border-color: var(--border) !important;
+}
+[data-mode="light"] .modal-header h2,
+[data-mode="light"] .modal-header h3,
+[data-mode="light"] .modal-title {
+  color: var(--text-bright) !important;
+}
+[data-mode="light"] .modal-overlay,
+[data-mode="light"] .modal-backdrop {
+  background: rgba(15, 23, 42, 0.4) !important;
+}
+
+/* Section tabs / nav pills */
+[data-mode="light"] .section-nav,
+[data-mode="light"] .tab-bar,
+[data-mode="light"] .nav-tabs {
+  border-bottom-color: var(--border) !important;
+}
+[data-mode="light"] .section-nav a,
+[data-mode="light"] .tab-btn,
+[data-mode="light"] .nav-tab {
+  color: var(--text-secondary) !important;
+}
+[data-mode="light"] .section-nav a:hover,
+[data-mode="light"] .tab-btn:hover,
+[data-mode="light"] .nav-tab:hover {
+  color: var(--text-primary) !important;
+}
+[data-mode="light"] .section-nav a.active,
+[data-mode="light"] .tab-btn.active,
+[data-mode="light"] .nav-tab.active {
+  color: var(--primary) !important;
+}
+
+/* Buttons — secondary/ghost variants need fresh borders on light bg */
+[data-mode="light"] .btn-secondary,
+[data-mode="light"] .btn-ghost {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+[data-mode="light"] .btn-secondary:hover,
+[data-mode="light"] .btn-ghost:hover {
+  background: var(--bg-secondary) !important;
+  border-color: rgba(100, 116, 139, 0.5) !important;
+}
+
+/* Tool tabs / panels (tools, discover, observables) */
+[data-mode="light"] .tool-tab,
+[data-mode="light"] .panel,
+[data-mode="light"] .panel-body,
+[data-mode="light"] .side-panel,
+[data-mode="light"] .sidebar-card {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+[data-mode="light"] .panel-header {
+  background: var(--bg-secondary) !important;
+  border-bottom-color: var(--border) !important;
+}
+
+/* Code blocks / output boxes — keep readable monospace on off-white */
+[data-mode="light"] .code-block,
+[data-mode="light"] .output-box,
+[data-mode="light"] .rendered-content pre,
+[data-mode="light"] pre {
+  background: #f1f5f9 !important;
+  border-color: var(--border) !important;
+  color: #0f172a !important;
+}
+[data-mode="light"] code {
+  background: rgba(15, 23, 42, 0.06) !important;
+  color: #0f172a !important;
+}
+
+/* Search input + filter selects */
+[data-mode="light"] .search-input,
+[data-mode="light"] .filter-select {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Toasts */
+[data-mode="light"] .toast {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+/* Checkbox labels, profile grid, version items, settings tabs */
+[data-mode="light"] .checkbox-label,
+[data-mode="light"] .profile-field,
+[data-mode="light"] .version-item,
+[data-mode="light"] .settings-tab {
+  color: var(--text-primary) !important;
+}
+[data-mode="light"] .profile-field label,
+[data-mode="light"] .version-item label {
+  color: var(--text-muted) !important;
+}
+[data-mode="light"] .settings-tab.active {
+  background: var(--bg-secondary) !important;
+  color: var(--primary) !important;
+}
+
+/* Pagination */
+[data-mode="light"] .pagination-btn,
+[data-mode="light"] .page-btn {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+[data-mode="light"] .pagination-btn:hover,
+[data-mode="light"] .page-btn:hover {
+  background: var(--bg-secondary) !important;
+}
+[data-mode="light"] .pagination-btn.active,
+[data-mode="light"] .page-btn.active {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+}
+
+/* Empty states */
+[data-mode="light"] .empty-state {
+  color: var(--text-muted) !important;
+}
+[data-mode="light"] .empty-state i {
+  color: var(--text-muted) !important;
+}
+
+/* Mode / toggle switches */
+[data-mode="light"] .toggle-switch,
+[data-mode="light"] .mode-switch {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border) !important;
+}
+
+/* Notepad panel (if visible during mode flip) */
+[data-mode="light"] .notepad-panel,
+[data-mode="light"] #notepad-panel {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+}

@@ -2,7 +2,7 @@
 
 from typing import Optional, List
 from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ion.models.document import Document, DocumentVersion
 from ion.models.template import Tag
@@ -57,10 +57,10 @@ class DocumentRepository:
         """Get a document by ID."""
         stmt = (
             select(Document)
-            .options(joinedload(Document.tags))
+            .options(selectinload(Document.tags))
             .where(Document.id == document_id)
         )
-        return self.session.execute(stmt).unique().scalar_one_or_none()
+        return self.session.execute(stmt).scalar_one_or_none()
 
     def get_by_name(self, name: str) -> Optional[Document]:
         """Get a document by name."""
@@ -73,10 +73,16 @@ class DocumentRepository:
         output_format: str | None = None,
         include_archived: bool = False,
     ) -> List[Document]:
-        """List all documents with optional filters."""
+        """List all documents with optional filters.
+
+        source_template is *-to-one so joinedload is cheap. tags is many-to-many
+        and must use selectinload — v0.9.65 fix: the previous joinedload on
+        tags produced a documents × templates × tags cartesian that hit 1.1s
+        in the postgres slow log.
+        """
         stmt = select(Document).options(
             joinedload(Document.source_template),
-            joinedload(Document.tags),
+            selectinload(Document.tags),
         )
 
         if not include_archived:
@@ -87,7 +93,7 @@ class DocumentRepository:
             stmt = stmt.where(Document.output_format == output_format)
 
         stmt = stmt.order_by(Document.updated_at.desc())
-        return list(self.session.execute(stmt).unique().scalars().all())
+        return list(self.session.execute(stmt).scalars().all())
 
     def update(
         self,
