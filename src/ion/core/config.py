@@ -28,7 +28,7 @@ class Config:
     oidc_auto_create_users: bool = True
     oidc_role_claim: str = "realm_access.roles"
     oidc_role_mapping: Dict[str, str] = field(default_factory=dict)
-    oidc_verify_ssl: bool = True
+    oidc_verify_ssl: bool = False
 
     # Custom CA bundle for self-signed certificates (set via ION_CA_BUNDLE env var)
     ca_bundle: str = ""  # Path to CA cert file, e.g. /etc/ssl/certs/my-ca.pem
@@ -47,14 +47,14 @@ class Config:
     gitlab_url: str = ""  # e.g., https://gitlab.example.com or http://localhost:8929
     gitlab_token: str = ""  # Personal access token with api scope
     gitlab_project_id: str = ""  # Project ID or path (e.g., "group/project" or "123")
-    gitlab_verify_ssl: bool = True
+    gitlab_verify_ssl: bool = False
     gitlab_sudo_enabled: bool = False  # Requires admin-level API token
 
     # OpenCTI integration
     opencti_enabled: bool = True
     opencti_url: str = ""  # e.g., http://localhost:8888
     opencti_token: str = ""  # API bearer token (UUID)
-    opencti_verify_ssl: bool = True
+    opencti_verify_ssl: bool = False
 
     # Arkime integration (v5.x viewer API — fetch raw PCAPs by session id)
     arkime_enabled: bool = False
@@ -68,7 +68,7 @@ class Config:
     arkime_username: str = ""  # HTTP basic auth
     arkime_password: str = ""
     arkime_api_key: str = ""  # Digest-style token
-    arkime_verify_ssl: bool = True
+    arkime_verify_ssl: bool = False
 
     # Elasticsearch integration
     elasticsearch_enabled: bool = True
@@ -78,7 +78,7 @@ class Config:
     elasticsearch_password: str = ""  # Basic auth password
     elasticsearch_alert_index: str = ".alerts-security.alerts-*,alerts-*"  # Alert index pattern
     elasticsearch_case_index: str = "ion-cases"  # Index for synced case documents
-    elasticsearch_verify_ssl: bool = True
+    elasticsearch_verify_ssl: bool = False
     # User mapping for alert assignment
     elasticsearch_user_index: str = ""  # ES index containing user profiles (e.g., ion-users)
     elasticsearch_user_field: str = ""  # Field in user index with display names (e.g., ion.user)
@@ -89,7 +89,7 @@ class Config:
     ollama_url: str = "http://localhost:11434"  # Ollama API URL
     ollama_model: str = "llama3.1:8b"  # Default model
     ollama_timeout: int = 120  # Request timeout in seconds
-    ollama_verify_ssl: bool = True
+    ollama_verify_ssl: bool = False
 
     # Kibana Cases integration
     kibana_cases_enabled: bool = True
@@ -98,13 +98,13 @@ class Config:
     kibana_password: str = ""  # Kibana password
     kibana_space_id: str = "default"  # Kibana space ID
     kibana_case_owner: str = "securitySolution"  # Case owner app (securitySolution, observability, cases)
-    kibana_verify_ssl: bool = True
+    kibana_verify_ssl: bool = False
 
     # DFIR-IRIS integration
     dfir_iris_enabled: bool = False
     dfir_iris_url: str = ""  # e.g., https://iris.example.com
     dfir_iris_api_key: str = ""  # Bearer API key from IRIS user profile
-    dfir_iris_verify_ssl: bool = True
+    dfir_iris_verify_ssl: bool = False
     dfir_iris_default_customer: int = 1  # Default customer ID in IRIS
 
     # VirusTotal integration
@@ -119,7 +119,7 @@ class Config:
     tide_enabled: bool = False
     tide_url: str = ""  # e.g., https://tide.example.com
     tide_api_key: str = ""  # X-TIDE-API-KEY for external query API
-    tide_verify_ssl: bool = True
+    tide_verify_ssl: bool = False
     tide_space: str = "default"  # Kibana space where TIDE rules live (e.g., default, production)
     tide_client_id: str = ""  # TIDE 4.x tenant (client) id. Leave blank for single-tenant API keys.
 
@@ -152,7 +152,7 @@ class Config:
             oidc_auto_create_users=data.get("oidc_auto_create_users", True),
             oidc_role_claim=data.get("oidc_role_claim", "realm_access.roles"),
             oidc_role_mapping=data.get("oidc_role_mapping", {}),
-            oidc_verify_ssl=data.get("oidc_verify_ssl", True),
+            oidc_verify_ssl=data.get("oidc_verify_ssl", False),
             # TLS
             ssl_cert=data.get("ssl_cert", ""),
             ssl_key=data.get("ssl_key", ""),
@@ -165,13 +165,13 @@ class Config:
             gitlab_url=data.get("gitlab_url", ""),
             gitlab_token=data.get("gitlab_token", ""),
             gitlab_project_id=data.get("gitlab_project_id", ""),
-            gitlab_verify_ssl=data.get("gitlab_verify_ssl", True),
+            gitlab_verify_ssl=data.get("gitlab_verify_ssl", False),
             gitlab_sudo_enabled=data.get("gitlab_sudo_enabled", False),
             # OpenCTI integration
             opencti_enabled=data.get("opencti_enabled", True),
             opencti_url=data.get("opencti_url", ""),
             opencti_token=data.get("opencti_token", ""),
-            opencti_verify_ssl=data.get("opencti_verify_ssl", True),
+            opencti_verify_ssl=data.get("opencti_verify_ssl", False),
             arkime_enabled=data.get("arkime_enabled", False),
             arkime_url=data.get("arkime_url", ""),
             arkime_keycloak_issuer=data.get("arkime_keycloak_issuer", ""),
@@ -181,7 +181,7 @@ class Config:
             arkime_username=data.get("arkime_username", ""),
             arkime_password=data.get("arkime_password", ""),
             arkime_api_key=data.get("arkime_api_key", ""),
-            arkime_verify_ssl=data.get("arkime_verify_ssl", True),
+            arkime_verify_ssl=data.get("arkime_verify_ssl", False),
             # Elasticsearch integration
             elasticsearch_enabled=data.get("elasticsearch_enabled", True),
             elasticsearch_url=data.get("elasticsearch_url", ""),
@@ -190,7 +190,7 @@ class Config:
             elasticsearch_password=data.get("elasticsearch_password", ""),
             elasticsearch_alert_index=data.get("elasticsearch_alert_index", ".alerts-security.alerts-*,alerts-*"),
             elasticsearch_case_index=data.get("elasticsearch_case_index", "ion-cases"),
-            elasticsearch_verify_ssl=data.get("elasticsearch_verify_ssl", True),
+            elasticsearch_verify_ssl=data.get("elasticsearch_verify_ssl", False),
             elasticsearch_user_index=data.get("elasticsearch_user_index", ""),
             elasticsearch_user_field=data.get("elasticsearch_user_field", ""),
             elasticsearch_assignment_field=data.get("elasticsearch_assignment_field", "kibana.alert.workflow_user"),
@@ -199,7 +199,7 @@ class Config:
             ollama_url=data.get("ollama_url", "http://localhost:11434"),
             ollama_model=data.get("ollama_model", "llama3.1:8b"),
             ollama_timeout=data.get("ollama_timeout", 120),
-            ollama_verify_ssl=data.get("ollama_verify_ssl", True),
+            ollama_verify_ssl=data.get("ollama_verify_ssl", False),
             # Kibana Cases integration
             kibana_cases_enabled=data.get("kibana_cases_enabled", True),
             kibana_url=data.get("kibana_url", ""),
@@ -207,12 +207,12 @@ class Config:
             kibana_password=data.get("kibana_password", ""),
             kibana_space_id=data.get("kibana_space_id", "default"),
             kibana_case_owner=data.get("kibana_case_owner", "securitySolution"),
-            kibana_verify_ssl=data.get("kibana_verify_ssl", True),
+            kibana_verify_ssl=data.get("kibana_verify_ssl", False),
             # DFIR-IRIS integration
             dfir_iris_enabled=data.get("dfir_iris_enabled", False),
             dfir_iris_url=data.get("dfir_iris_url", ""),
             dfir_iris_api_key=data.get("dfir_iris_api_key", ""),
-            dfir_iris_verify_ssl=data.get("dfir_iris_verify_ssl", True),
+            dfir_iris_verify_ssl=data.get("dfir_iris_verify_ssl", False),
             dfir_iris_default_customer=data.get("dfir_iris_default_customer", 1),
             # VirusTotal integration
             virustotal_enabled=data.get("virustotal_enabled", False),
@@ -224,7 +224,7 @@ class Config:
             tide_enabled=data.get("tide_enabled", False),
             tide_url=data.get("tide_url", ""),
             tide_api_key=data.get("tide_api_key", ""),
-            tide_verify_ssl=data.get("tide_verify_ssl", True),
+            tide_verify_ssl=data.get("tide_verify_ssl", False),
             tide_space=data.get("tide_space", "default"),
             tide_client_id=data.get("tide_client_id", ""),
         )
@@ -397,7 +397,7 @@ def get_config() -> Config:
         if os.environ.get("ION_OIDC_CLIENT_SECRET"):
             _config.oidc_client_secret = os.environ.get("ION_OIDC_CLIENT_SECRET", "")
         if os.environ.get("ION_OIDC_VERIFY_SSL"):
-            _config.oidc_verify_ssl = _get_env_bool("ION_OIDC_VERIFY_SSL", True)
+            _config.oidc_verify_ssl = _get_env_bool("ION_OIDC_VERIFY_SSL", False)
 
         # GitLab environment variable overrides
         if os.environ.get("ION_GITLAB_ENABLED"):
@@ -409,7 +409,7 @@ def get_config() -> Config:
         if os.environ.get("ION_GITLAB_PROJECT_ID"):
             _config.gitlab_project_id = os.environ.get("ION_GITLAB_PROJECT_ID", "")
         if os.environ.get("ION_GITLAB_VERIFY_SSL"):
-            _config.gitlab_verify_ssl = _get_env_bool("ION_GITLAB_VERIFY_SSL", True)
+            _config.gitlab_verify_ssl = _get_env_bool("ION_GITLAB_VERIFY_SSL", False)
         if os.environ.get("ION_GITLAB_SUDO"):
             _config.gitlab_sudo_enabled = _get_env_bool("ION_GITLAB_SUDO", False)
 
@@ -421,7 +421,7 @@ def get_config() -> Config:
         if os.environ.get("ION_OPENCTI_TOKEN"):
             _config.opencti_token = os.environ.get("ION_OPENCTI_TOKEN", "")
         if os.environ.get("ION_OPENCTI_VERIFY_SSL"):
-            _config.opencti_verify_ssl = _get_env_bool("ION_OPENCTI_VERIFY_SSL", True)
+            _config.opencti_verify_ssl = _get_env_bool("ION_OPENCTI_VERIFY_SSL", False)
 
         # Arkime environment variable overrides
         if os.environ.get("ION_ARKIME_ENABLED"):
@@ -451,7 +451,7 @@ def get_config() -> Config:
         if os.environ.get("ION_ARKIME_API_KEY"):
             _config.arkime_api_key = os.environ.get("ION_ARKIME_API_KEY", "")
         if os.environ.get("ION_ARKIME_VERIFY_SSL"):
-            _config.arkime_verify_ssl = _get_env_bool("ION_ARKIME_VERIFY_SSL", True)
+            _config.arkime_verify_ssl = _get_env_bool("ION_ARKIME_VERIFY_SSL", False)
 
         # Elasticsearch environment variable overrides
         if os.environ.get("ION_ELASTICSEARCH_ENABLED"):
@@ -469,7 +469,7 @@ def get_config() -> Config:
         if os.environ.get("ION_ELASTICSEARCH_CASE_INDEX"):
             _config.elasticsearch_case_index = os.environ.get("ION_ELASTICSEARCH_CASE_INDEX", "ion-cases")
         if os.environ.get("ION_ELASTICSEARCH_VERIFY_SSL"):
-            _config.elasticsearch_verify_ssl = _get_env_bool("ION_ELASTICSEARCH_VERIFY_SSL", True)
+            _config.elasticsearch_verify_ssl = _get_env_bool("ION_ELASTICSEARCH_VERIFY_SSL", False)
 
         # Ollama environment overrides
         if os.environ.get("ION_OLLAMA_ENABLED"):
@@ -481,7 +481,7 @@ def get_config() -> Config:
         if os.environ.get("ION_OLLAMA_TIMEOUT"):
             _config.ollama_timeout = int(os.environ.get("ION_OLLAMA_TIMEOUT", "120"))
         if os.environ.get("ION_OLLAMA_VERIFY_SSL"):
-            _config.ollama_verify_ssl = _get_env_bool("ION_OLLAMA_VERIFY_SSL", True)
+            _config.ollama_verify_ssl = _get_env_bool("ION_OLLAMA_VERIFY_SSL", False)
 
         # Kibana Cases environment overrides
         if os.environ.get("ION_KIBANA_CASES_ENABLED"):
@@ -497,7 +497,7 @@ def get_config() -> Config:
         if os.environ.get("ION_KIBANA_CASE_OWNER"):
             _config.kibana_case_owner = os.environ.get("ION_KIBANA_CASE_OWNER", "securitySolution")
         if os.environ.get("ION_KIBANA_VERIFY_SSL"):
-            _config.kibana_verify_ssl = _get_env_bool("ION_KIBANA_VERIFY_SSL", True)
+            _config.kibana_verify_ssl = _get_env_bool("ION_KIBANA_VERIFY_SSL", False)
 
         # DFIR-IRIS environment overrides
         if os.environ.get("ION_DFIR_IRIS_ENABLED"):
@@ -507,7 +507,7 @@ def get_config() -> Config:
         if os.environ.get("ION_DFIR_IRIS_API_KEY"):
             _config.dfir_iris_api_key = os.environ.get("ION_DFIR_IRIS_API_KEY", "")
         if os.environ.get("ION_DFIR_IRIS_VERIFY_SSL"):
-            _config.dfir_iris_verify_ssl = _get_env_bool("ION_DFIR_IRIS_VERIFY_SSL", True)
+            _config.dfir_iris_verify_ssl = _get_env_bool("ION_DFIR_IRIS_VERIFY_SSL", False)
         if os.environ.get("ION_DFIR_IRIS_DEFAULT_CUSTOMER"):
             _config.dfir_iris_default_customer = int(os.environ.get("ION_DFIR_IRIS_DEFAULT_CUSTOMER", "1"))
 
@@ -531,7 +531,7 @@ def get_config() -> Config:
         if os.environ.get("ION_TIDE_API_KEY"):
             _config.tide_api_key = os.environ.get("ION_TIDE_API_KEY", "")
         if os.environ.get("ION_TIDE_VERIFY_SSL"):
-            _config.tide_verify_ssl = _get_env_bool("ION_TIDE_VERIFY_SSL", True)
+            _config.tide_verify_ssl = _get_env_bool("ION_TIDE_VERIFY_SSL", False)
         if os.environ.get("ION_TIDE_SPACE"):
             _config.tide_space = os.environ.get("ION_TIDE_SPACE", "default")
         if os.environ.get("ION_TIDE_CLIENT_ID"):
