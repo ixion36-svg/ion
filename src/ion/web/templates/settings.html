@@ -33,6 +33,10 @@
         <a href="#kibana" class="settings-nav-item" data-section="kibana">Kibana Cases</a>
         <a href="#dfir_iris" class="settings-nav-item" data-section="dfir_iris">DFIR-IRIS</a>
         <a href="#tide" class="settings-nav-item" data-section="tide">TIDE</a>
+        <a href="#arkime" class="settings-nav-item" data-section="arkime">Arkime</a>
+        <a href="#ollama" class="settings-nav-item" data-section="ollama">Ollama AI</a>
+        <a href="#abuseipdb" class="settings-nav-item" data-section="abuseipdb">AbuseIPDB</a>
+        <a href="#virustotal" class="settings-nav-item" data-section="virustotal">VirusTotal</a>
         <a href="#oidc" class="settings-nav-item" data-section="oidc">OIDC / Keycloak</a>
         <a href="#sessions" class="settings-nav-item" data-section="sessions">Active Sessions</a>
         <a href="#database" class="settings-nav-item" data-section="database">Database</a>
@@ -452,6 +456,61 @@
                 </div>
             </form>
         </section>
+
+        <!-- Arkime Settings -->
+        <div class="settings-section" data-section="arkime" style="display:none;">
+            <h2>Arkime Integration</h2>
+            <p class="section-description">Configure Arkime for PCAP download and session search from alerts.</p>
+            <form onsubmit="saveSettings(event, 'arkime')">
+                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="arkime_enabled" name="arkime_enabled"> Enable Arkime Integration</label></div>
+                <div class="form-group"><label for="arkime_url">Arkime URL</label><input type="url" id="arkime_url" name="arkime_url" placeholder="https://viewer.guardedglass.internal"></div>
+                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="arkime_verify_ssl" name="arkime_verify_ssl"> Verify SSL Certificate</label></div>
+                <h3 style="margin-top:1rem;">Authentication (Keycloak preferred)</h3>
+                <div class="form-group"><label for="arkime_keycloak_issuer">Keycloak Issuer URL</label><input type="url" id="arkime_keycloak_issuer" name="arkime_keycloak_issuer" placeholder="https://keycloak.guardedglass.internal/realms/soc"></div>
+                <div class="form-group"><label for="arkime_keycloak_client_id">Keycloak Client ID</label><input type="text" id="arkime_keycloak_client_id" name="arkime_keycloak_client_id" placeholder="arkime"></div>
+                <div class="form-group"><label for="arkime_keycloak_client_secret">Keycloak Client Secret</label><input type="password" id="arkime_keycloak_client_secret" name="arkime_keycloak_client_secret" placeholder="Leave blank to keep current"></div>
+                <h3 style="margin-top:1rem;">Basic Auth Fallback</h3>
+                <div class="form-group"><label for="arkime_username">Username</label><input type="text" id="arkime_username" name="arkime_username" placeholder="Optional basic auth fallback"></div>
+                <div class="form-group"><label for="arkime_password">Password</label><input type="password" id="arkime_password" name="arkime_password" placeholder="Leave blank to keep current"></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+            </form>
+        </div>
+
+        <!-- Ollama AI Settings -->
+        <div class="settings-section" data-section="ollama" style="display:none;">
+            <h2>Ollama AI</h2>
+            <p class="section-description">Configure the Ollama LLM for AI chat, morning briefing narratives, and training plan generation.</p>
+            <form onsubmit="saveSettings(event, 'ollama')">
+                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ollama_enabled" name="ollama_enabled"> Enable Ollama AI</label></div>
+                <div class="form-group"><label for="ollama_url">Ollama URL</label><input type="url" id="ollama_url" name="ollama_url" placeholder="http://ollama-host:11434"></div>
+                <div class="form-group"><label for="ollama_model">Model</label><input type="text" id="ollama_model" name="ollama_model" placeholder="qwen2.5:3b"></div>
+                <div class="form-group"><label for="ollama_timeout">Timeout (seconds)</label><input type="number" id="ollama_timeout" name="ollama_timeout" min="10" max="600" placeholder="120"></div>
+                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ollama_verify_ssl" name="ollama_verify_ssl"> Verify SSL Certificate</label></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+            </form>
+        </div>
+
+        <!-- AbuseIPDB Settings -->
+        <div class="settings-section" data-section="abuseipdb" style="display:none;">
+            <h2>AbuseIPDB</h2>
+            <p class="section-description">IP address reputation lookups for observable enrichment.</p>
+            <form onsubmit="saveSettings(event, 'abuseipdb')">
+                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="abuseipdb_enabled" name="abuseipdb_enabled"> Enable AbuseIPDB</label></div>
+                <div class="form-group"><label for="abuseipdb_api_key">API Key</label><input type="password" id="abuseipdb_api_key" name="abuseipdb_api_key" placeholder="Leave blank to keep current"><span class="form-help" id="abuseipdb_api_key_status"></span></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+            </form>
+        </div>
+
+        <!-- VirusTotal Settings -->
+        <div class="settings-section" data-section="virustotal" style="display:none;">
+            <h2>VirusTotal</h2>
+            <p class="section-description">File hash and URL reputation lookups for observable enrichment.</p>
+            <form onsubmit="saveSettings(event, 'virustotal')">
+                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="virustotal_enabled" name="virustotal_enabled"> Enable VirusTotal</label></div>
+                <div class="form-group"><label for="virustotal_api_key">API Key</label><input type="password" id="virustotal_api_key" name="virustotal_api_key" placeholder="Leave blank to keep current"><span class="form-help" id="virustotal_api_key_status"></span></div>
+                <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+            </form>
+        </div>
 
         <!-- OIDC Settings -->
         <section id="oidc" class="settings-section">
@@ -1975,6 +2034,37 @@ function populateForms(config) {
         updateSecretStatus('tide_api_key', config.tide.tide_api_key_set);
     }
 
+    // Arkime
+    if (config.arkime) {
+        document.getElementById('arkime_enabled').checked = config.arkime.arkime_enabled;
+        document.getElementById('arkime_url').value = config.arkime.arkime_url || '';
+        document.getElementById('arkime_verify_ssl').checked = config.arkime.arkime_verify_ssl !== false;
+        document.getElementById('arkime_username').value = config.arkime.arkime_username || '';
+        document.getElementById('arkime_keycloak_issuer').value = config.arkime.arkime_keycloak_issuer || '';
+        document.getElementById('arkime_keycloak_client_id').value = config.arkime.arkime_keycloak_client_id || '';
+    }
+
+    // Ollama
+    if (config.ollama) {
+        document.getElementById('ollama_enabled').checked = config.ollama.ollama_enabled;
+        document.getElementById('ollama_url').value = config.ollama.ollama_url || '';
+        document.getElementById('ollama_model').value = config.ollama.ollama_model || '';
+        document.getElementById('ollama_timeout').value = config.ollama.ollama_timeout || 120;
+        document.getElementById('ollama_verify_ssl').checked = config.ollama.ollama_verify_ssl !== false;
+    }
+
+    // AbuseIPDB
+    if (config.abuseipdb) {
+        document.getElementById('abuseipdb_enabled').checked = config.abuseipdb.abuseipdb_enabled;
+        updateSecretStatus('abuseipdb_api_key', config.abuseipdb.abuseipdb_api_key_set);
+    }
+
+    // VirusTotal
+    if (config.virustotal) {
+        document.getElementById('virustotal_enabled').checked = config.virustotal.virustotal_enabled;
+        updateSecretStatus('virustotal_api_key', config.virustotal.virustotal_api_key_set);
+    }
+
     // OIDC
     document.getElementById('base_url').value = config.oidc.base_url || '';
     document.getElementById('oidc_enabled').checked = config.oidc.oidc_enabled;
@@ -2069,6 +2159,27 @@ async function saveSettings(event, section) {
         data.tide_space = form.tide_space.value || 'default';
         data.tide_client_id = form.tide_client_id.value.trim();
         data.tide_verify_ssl = form.tide_verify_ssl.checked;
+    } else if (section === 'arkime') {
+        data.arkime_enabled = form.arkime_enabled.checked;
+        data.arkime_url = form.arkime_url.value;
+        data.arkime_verify_ssl = form.arkime_verify_ssl.checked;
+        data.arkime_username = form.arkime_username.value;
+        if (form.arkime_password.value) data.arkime_password = form.arkime_password.value;
+        data.arkime_keycloak_issuer = form.arkime_keycloak_issuer.value;
+        data.arkime_keycloak_client_id = form.arkime_keycloak_client_id.value;
+        if (form.arkime_keycloak_client_secret.value) data.arkime_keycloak_client_secret = form.arkime_keycloak_client_secret.value;
+    } else if (section === 'ollama') {
+        data.ollama_enabled = form.ollama_enabled.checked;
+        data.ollama_url = form.ollama_url.value;
+        data.ollama_model = form.ollama_model.value;
+        data.ollama_timeout = parseInt(form.ollama_timeout.value) || 120;
+        data.ollama_verify_ssl = form.ollama_verify_ssl.checked;
+    } else if (section === 'abuseipdb') {
+        data.abuseipdb_enabled = form.abuseipdb_enabled.checked;
+        if (form.abuseipdb_api_key.value) data.abuseipdb_api_key = form.abuseipdb_api_key.value;
+    } else if (section === 'virustotal') {
+        data.virustotal_enabled = form.virustotal_enabled.checked;
+        if (form.virustotal_api_key.value) data.virustotal_api_key = form.virustotal_api_key.value;
     } else if (section === 'oidc') {
         data.base_url = form.base_url.value;
         data.oidc_enabled = form.oidc_enabled.checked;

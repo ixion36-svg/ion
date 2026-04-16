@@ -103,10 +103,43 @@ class TideSettingsUpdate(BaseModel):
     """TIDE (Threat Informed Detection Engineering) integration settings."""
     tide_enabled: Optional[bool] = None
     tide_url: Optional[str] = None
-    tide_api_key: Optional[str] = None  # Only update if provided and not masked
+    tide_api_key: Optional[str] = None
     tide_verify_ssl: Optional[bool] = None
     tide_space: Optional[str] = None
-    tide_client_id: Optional[str] = None  # TIDE 4.x tenant id (blank = single-tenant auto)
+    tide_client_id: Optional[str] = None
+
+
+class ArkimeSettingsUpdate(BaseModel):
+    """Arkime PCAP analysis integration settings."""
+    arkime_enabled: Optional[bool] = None
+    arkime_url: Optional[str] = None
+    arkime_verify_ssl: Optional[bool] = None
+    arkime_username: Optional[str] = None
+    arkime_password: Optional[str] = None
+    arkime_keycloak_issuer: Optional[str] = None
+    arkime_keycloak_client_id: Optional[str] = None
+    arkime_keycloak_client_secret: Optional[str] = None
+
+
+class OllamaSettingsUpdate(BaseModel):
+    """Ollama AI / LLM integration settings."""
+    ollama_enabled: Optional[bool] = None
+    ollama_url: Optional[str] = None
+    ollama_model: Optional[str] = None
+    ollama_timeout: Optional[int] = None
+    ollama_verify_ssl: Optional[bool] = None
+
+
+class AbuseIPDBSettingsUpdate(BaseModel):
+    """AbuseIPDB integration settings."""
+    abuseipdb_enabled: Optional[bool] = None
+    abuseipdb_api_key: Optional[str] = None
+
+
+class VirusTotalSettingsUpdate(BaseModel):
+    """VirusTotal integration settings."""
+    virustotal_enabled: Optional[bool] = None
+    virustotal_api_key: Optional[str] = None
 
 
 # =============================================================================
@@ -222,6 +255,33 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
             "tide_verify_ssl": config.tide_verify_ssl,
             "tide_space": config.tide_space,
             "tide_client_id": config.tide_client_id,
+        },
+        "arkime": {
+            "arkime_enabled": config.arkime_enabled,
+            "arkime_url": config.arkime_url,
+            "arkime_verify_ssl": config.arkime_verify_ssl,
+            "arkime_username": config.arkime_username,
+            "arkime_password_set": bool(config.arkime_password),
+            "arkime_keycloak_issuer": config.arkime_keycloak_issuer,
+            "arkime_keycloak_client_id": config.arkime_keycloak_client_id,
+            "arkime_keycloak_client_secret_set": bool(config.arkime_keycloak_client_secret),
+        },
+        "ollama": {
+            "ollama_enabled": config.ollama_enabled,
+            "ollama_url": config.ollama_url,
+            "ollama_model": config.ollama_model,
+            "ollama_timeout": config.ollama_timeout,
+            "ollama_verify_ssl": config.ollama_verify_ssl,
+        },
+        "abuseipdb": {
+            "abuseipdb_enabled": config.abuseipdb_enabled,
+            "abuseipdb_api_key": mask_secret(config.abuseipdb_api_key),
+            "abuseipdb_api_key_set": bool(config.abuseipdb_api_key),
+        },
+        "virustotal": {
+            "virustotal_enabled": config.virustotal_enabled,
+            "virustotal_api_key": mask_secret(config.virustotal_api_key),
+            "virustotal_api_key_set": bool(config.virustotal_api_key),
         },
         "config_path": str(get_config_path()),
     }
@@ -504,6 +564,94 @@ async def update_tide_settings(
     reset_tide_service()
 
     return {"status": "updated", "section": "tide"}
+
+
+@router.put("/config/arkime")
+async def update_arkime_settings(
+    settings: ArkimeSettingsUpdate,
+    current_user: User = Depends(require_permission("system:settings")),
+):
+    """Update Arkime PCAP analysis settings."""
+    config = get_config()
+    if settings.arkime_enabled is not None:
+        config.arkime_enabled = settings.arkime_enabled
+    if settings.arkime_url is not None:
+        config.arkime_url = settings.arkime_url.rstrip("/")
+    if settings.arkime_verify_ssl is not None:
+        config.arkime_verify_ssl = settings.arkime_verify_ssl
+    if settings.arkime_username is not None:
+        config.arkime_username = settings.arkime_username
+    if settings.arkime_password is not None and not settings.arkime_password.startswith("*"):
+        config.arkime_password = settings.arkime_password
+    if settings.arkime_keycloak_issuer is not None:
+        config.arkime_keycloak_issuer = settings.arkime_keycloak_issuer
+    if settings.arkime_keycloak_client_id is not None:
+        config.arkime_keycloak_client_id = settings.arkime_keycloak_client_id
+    if settings.arkime_keycloak_client_secret is not None and not settings.arkime_keycloak_client_secret.startswith("*"):
+        config.arkime_keycloak_client_secret = settings.arkime_keycloak_client_secret
+    config.to_file(get_config_path())
+    reload_config()
+    return {"status": "updated", "section": "arkime"}
+
+
+@router.put("/config/ollama")
+async def update_ollama_settings(
+    settings: OllamaSettingsUpdate,
+    current_user: User = Depends(require_permission("system:settings")),
+):
+    """Update Ollama AI / LLM settings."""
+    config = get_config()
+    if settings.ollama_enabled is not None:
+        config.ollama_enabled = settings.ollama_enabled
+    if settings.ollama_url is not None:
+        config.ollama_url = settings.ollama_url.rstrip("/")
+    if settings.ollama_model is not None:
+        config.ollama_model = settings.ollama_model
+    if settings.ollama_timeout is not None:
+        config.ollama_timeout = settings.ollama_timeout
+    if settings.ollama_verify_ssl is not None:
+        config.ollama_verify_ssl = settings.ollama_verify_ssl
+    config.to_file(get_config_path())
+    reload_config()
+    # Reset the cached service singleton so new config takes effect
+    from ion.services.ollama_service import reset_ollama_service
+    try:
+        reset_ollama_service()
+    except Exception:
+        pass
+    return {"status": "updated", "section": "ollama"}
+
+
+@router.put("/config/abuseipdb")
+async def update_abuseipdb_settings(
+    settings: AbuseIPDBSettingsUpdate,
+    current_user: User = Depends(require_permission("system:settings")),
+):
+    """Update AbuseIPDB settings."""
+    config = get_config()
+    if settings.abuseipdb_enabled is not None:
+        config.abuseipdb_enabled = settings.abuseipdb_enabled
+    if settings.abuseipdb_api_key is not None and not settings.abuseipdb_api_key.startswith("*"):
+        config.abuseipdb_api_key = settings.abuseipdb_api_key
+    config.to_file(get_config_path())
+    reload_config()
+    return {"status": "updated", "section": "abuseipdb"}
+
+
+@router.put("/config/virustotal")
+async def update_virustotal_settings(
+    settings: VirusTotalSettingsUpdate,
+    current_user: User = Depends(require_permission("system:settings")),
+):
+    """Update VirusTotal settings."""
+    config = get_config()
+    if settings.virustotal_enabled is not None:
+        config.virustotal_enabled = settings.virustotal_enabled
+    if settings.virustotal_api_key is not None and not settings.virustotal_api_key.startswith("*"):
+        config.virustotal_api_key = settings.virustotal_api_key
+    config.to_file(get_config_path())
+    reload_config()
+    return {"status": "updated", "section": "virustotal"}
 
 
 @router.post("/config/test/{integration}")
