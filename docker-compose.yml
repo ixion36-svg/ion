@@ -11,16 +11,32 @@ services:
     container_name: ion-postgres
     restart: unless-stopped
 
-    # Slow query logging — anything > 100ms hits the log so we can find
-    # bottlenecks under real load. log_statement=none keeps the noise down
-    # (we only want SLOW queries, not every SELECT).
+    # Tuned for a 4 GB container on a 64 GB host (v0.9.86).
     #
-    # max_connections = 320: covers the v0.9.82 ION pool ceiling
-    # (4 uvicorn workers × (25 pool + 50 overflow) = 300 peak) with a
-    # ~20-connection headroom for psql / admin / reserved_connections.
-    # Default Postgres is 100 which was the real hard-wall under load.
+    # shared_buffers     1 GB   — 25% of container RAM, the standard rule
+    # effective_cache_size 3 GB — tells the planner the OS cache is large;
+    #                             encourages index scans over seq scans
+    # work_mem          32 MB   — per-sort/hash memory; 50 concurrent users
+    #                             × ~2 active sorts each = ~3.2 GB peak
+    # maintenance_work_mem 256 MB — VACUUM, CREATE INDEX
+    # wal_buffers       16 MB   — larger WAL buffer for burst writes
+    # random_page_cost   1.1    — SSD assumption (default 4.0 is spinning disk)
+    # max_connections   320     — covers ION pool ceiling (4 workers × 75)
+    # log_min_duration_statement 100 — slow-query log for >100ms
     command:
       - postgres
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=3GB
+      - -c
+      - work_mem=32MB
+      - -c
+      - maintenance_work_mem=256MB
+      - -c
+      - wal_buffers=16MB
+      - -c
+      - random_page_cost=1.1
       - -c
       - max_connections=320
       - -c
