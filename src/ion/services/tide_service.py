@@ -75,14 +75,30 @@ class TideService:
         self.enabled = cfg.get("enabled", False) and bool(self.url) and bool(self.api_key)
         self.verify = get_ssl_verify() if cfg.get("verify_ssl", True) else False
         self.space = cfg.get("space") or os.environ.get("ION_TIDE_SPACE", "default")
-        # TIDE 4.x multi-tenant: optional client/tenant id. If the API key
-        # is single-tenant, this can be left blank — TIDE will infer it.
-        # If multi-tenant, the server returns HTTP 400 without it.
         self.client_id = cfg.get("client_id") or ""
-        # Resolved-once cache for single-tenant auto-discovery. Populated the
-        # first time we hit a 400 "client_id required" or a successful
-        # discover_clients() call, so we don't re-discover on every query.
         self._resolved_client_id: Optional[str] = None
+
+        # Startup diagnostic — log exactly what's configured so TIDE issues
+        # are diagnosable from `docker logs ion` without guessing.
+        if self.enabled:
+            logger.info(
+                "TIDE service initialized: url=%s space=%s client_id=%s "
+                "api_key=%s...%s verify_ssl=%s",
+                self.url, self.space,
+                self.client_id[:8] if self.client_id else "(auto)",
+                self.api_key[:4] if self.api_key else "?",
+                self.api_key[-4:] if self.api_key else "?",
+                self.verify,
+            )
+        else:
+            missing = []
+            if not cfg.get("enabled", False):
+                missing.append("ION_TIDE_ENABLED=false")
+            if not self.url:
+                missing.append("ION_TIDE_URL empty")
+            if not self.api_key:
+                missing.append("ION_TIDE_API_KEY empty")
+            logger.warning("TIDE service DISABLED: %s", ", ".join(missing) or "unknown reason")
 
     async def query_async(self, sql: str, retries: int = 1) -> Optional[dict]:
         """Async wrapper around _query that doesn't block the event loop.
@@ -174,9 +190,16 @@ class TideService:
                     try:
                         data = resp.json()
                     except Exception:
+                        logger.error("TIDE 200 but response is not JSON: %s", resp.text[:200])
                         tide_breaker.record_failure()
                         _cache_put(sql, None)
                         return None
+                    rows = data.get("rows", []) if isinstance(data, dict) else []
+                    elapsed = round((time.time() - start_t) * 1000)
+                    logger.debug(
+                        "TIDE query OK: %d rows in %dms | %s",
+                        len(rows), elapsed, sql[:80],
+                    )
                     _cache_put(sql, data)
                     return data
 
@@ -215,19 +238,53 @@ class TideService:
                 # but don't retry (they are deterministic).
                 if resp.status_code in (401, 403, 404):
                     try:
-                        detail = (resp.json() or {}).get("detail", "")
+                        body = resp.json() or {}
+                        detail = body.get("detail", "")
                     except Exception:
-                        detail = resp.text[:200]
+                        body = {}
+                        detail = resp.text[:300]
                     logger.error(
-                        "TIDE %d: %s (check ION_TIDE_API_KEY / ION_TIDE_CLIENT_ID)",
+                        "TIDE %d: %s | url=%s client_id=%s api_key=%s...%s | sql=%s",
                         resp.status_code, detail,
+                        self.url, tenant or "(none)",
+                        self.api_key[:4] if self.api_key else "?",
+                        self.api_key[-4:] if self.api_key else "?",
+                        sql[:60],
                     )
+                    if resp.status_code == 401:
+                        logger.error(
+                            "TIDE 401 diagnosis: API key is invalid or was created "
+                            "on TIDE 3.x without created_by_user_id. Create a new "
+                            "key in TIDE 4.x admin and update ION_TIDE_API_KEY."
+                        )
+                    elif resp.status_code == 403:
+                        logger.error(
+                            "TIDE 403 diagnosis: API key owner has no access to "
+                            "client_id=%s. Check TIDE admin → Users → ensure the "
+                            "API key owner is assigned to the target tenant via "
+                            "user_clients.",
+                            tenant or "(auto)",
+                        )
+                    elif resp.status_code == 404:
+                        logger.error(
+                            "TIDE 404 diagnosis: Tenant database not found for "
+                            "client_id=%s. Run create_tenant_db() in TIDE admin "
+                            "or check that clients.db_filename is set.",
+                            tenant or "(auto)",
+                        )
                     tide_breaker.record_failure()
                     _cache_put(sql, None)
                     return None
 
                 # Hard fail — 4xx or out of retries on 5xx.
-                logger.warning("TIDE query failed: %s", resp.status_code)
+                try:
+                    detail = (resp.json() or {}).get("detail", resp.text[:200])
+                except Exception:
+                    detail = resp.text[:200]
+                logger.warning(
+                    "TIDE query failed: HTTP %d: %s | sql=%s",
+                    resp.status_code, detail, sql[:60],
+                )
                 tide_breaker.record_failure()
                 _cache_put(sql, None)
                 return None
@@ -259,13 +316,30 @@ class TideService:
             logger.warning("TIDE discover_clients error: %s", type(e).__name__)
             return []
         if resp.status_code == 404:
-            # TIDE 3.x — endpoint not present
+            logger.info("TIDE discover_clients: 404 (TIDE 3.x or endpoint missing)")
+            return []
+        if resp.status_code == 401:
+            logger.error(
+                "TIDE discover_clients: 401 — API key rejected. Key may be "
+                "from TIDE 3.x (no created_by_user_id). Create a new key in "
+                "TIDE 4.x admin."
+            )
             return []
         if resp.status_code != 200:
-            logger.warning("TIDE discover_clients %d", resp.status_code)
+            try:
+                detail = (resp.json() or {}).get("detail", resp.text[:200])
+            except Exception:
+                detail = resp.text[:200]
+            logger.warning("TIDE discover_clients %d: %s", resp.status_code, detail)
             return []
         try:
-            return (resp.json() or {}).get("clients", []) or []
+            clients = (resp.json() or {}).get("clients", []) or []
+            logger.info(
+                "TIDE discover_clients: %d tenant(s) — %s",
+                len(clients),
+                ", ".join(c.get("name", "?") for c in clients[:5]),
+            )
+            return clients
         except Exception:
             return []
 
