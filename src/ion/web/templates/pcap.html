@@ -199,6 +199,13 @@
             <button class="pcap-tab" data-panel="files" id="tab-files" style="display:none">Extracted Files <span id="files-count-badge" class="badge" style="display:none"></span></button>
             <button class="pcap-tab" data-panel="ja3" id="tab-ja3" style="display:none">JA3 Fingerprints <span id="ja3-count-badge" class="badge" style="display:none"></span></button>
             <button class="pcap-tab" data-panel="creds" id="tab-creds" style="display:none">Credentials <span id="creds-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab" data-panel="ja3s" id="tab-ja3s" style="display:none">JA3S <span id="ja3s-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab" data-panel="hassh" id="tab-hassh" style="display:none">HASSH <span id="hassh-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab" data-panel="smb" id="tab-smb" style="display:none">SMB <span id="smb-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab" data-panel="kerberos" id="tab-kerberos" style="display:none">Kerberos <span id="kerberos-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab" data-panel="httpfiles" id="tab-httpfiles" style="display:none">HTTP Files <span id="httpfiles-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab" data-panel="arp" id="tab-arp" style="display:none">ARP <span id="arp-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab" data-panel="b64" id="tab-b64" style="display:none">Base64 <span id="b64-count-badge" class="badge" style="display:none"></span></button>
             <button class="pcap-tab" data-panel="graph" id="tab-graph">Network Graph</button>
             <button class="pcap-tab" data-panel="findings">Findings <span id="findings-count-badge" class="badge" style="display:none"></span></button>
             <button class="pcap-tab" data-panel="threatintel">Threat Intel <span id="ti-count-badge" class="badge" style="display:none"></span></button>
@@ -215,6 +222,13 @@
         <div class="pcap-panel" id="panel-files"></div>
         <div class="pcap-panel" id="panel-ja3"></div>
         <div class="pcap-panel" id="panel-creds"></div>
+        <div class="pcap-panel" id="panel-ja3s"></div>
+        <div class="pcap-panel" id="panel-hassh"></div>
+        <div class="pcap-panel" id="panel-smb"></div>
+        <div class="pcap-panel" id="panel-kerberos"></div>
+        <div class="pcap-panel" id="panel-httpfiles"></div>
+        <div class="pcap-panel" id="panel-arp"></div>
+        <div class="pcap-panel" id="panel-b64"></div>
         <div class="pcap-panel" id="panel-graph"></div>
         <div class="pcap-panel" id="panel-findings"></div>
         <div class="pcap-panel" id="panel-threatintel"></div>
@@ -369,6 +383,13 @@
         renderExtractedFiles(d);
         renderJA3(d);
         renderCredentials(d);
+        renderJA3S(d);
+        renderHASSH(d);
+        renderSMB(d);
+        renderKerberos(d);
+        renderHTTPFiles(d);
+        renderARP(d);
+        renderBase64(d);
         renderNetworkGraph(d);
         renderFindings(d);
         renderThreatIntel(d);
@@ -624,6 +645,141 @@
             <td style="font-size:.78rem;color:var(--text-secondary)">${esc(c.detail)}</td>
         </tr>`).join('')}
         </tbody></table>`;
+    }
+
+    // ── JA3S (Server TLS Fingerprints) ──
+    function renderJA3S(d) {
+        const fps = d.ja3s_fingerprints || [];
+        const tab = document.getElementById('tab-ja3s');
+        const badge = document.getElementById('ja3s-count-badge');
+        if (!fps.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        const badCount = fps.filter(f => f.known_malware).length;
+        badge.style.display = 'inline';
+        badge.textContent = fps.length;
+        badge.style.cssText = `display:inline;background:${badCount ? 'var(--sev-critical)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
+        document.getElementById('panel-ja3s').innerHTML = `<h3>JA3S Server Fingerprints (${fps.length})</h3>
+        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">TLS ServerHello fingerprints. Pairs with JA3 for C2 server identification.</p>
+        <table class="pcap-table"><thead><tr><th>JA3S Hash</th><th>Server</th><th>Client</th><th>Port</th><th>Malware Match</th></tr></thead><tbody>
+        ${fps.map(f => `<tr style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
+            <td><code style="font-size:.72rem">${esc(f.ja3s_hash)}</code></td>
+            <td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td><td>${f.src_port}</td>
+            <td>${f.known_malware ? `<span style="color:var(--sev-critical);font-weight:700">${esc(f.known_malware)}</span>` : '<span style="color:var(--text-secondary)">No match</span>'}</td>
+        </tr>`).join('')}</tbody></table>`;
+    }
+
+    // ── HASSH (SSH Fingerprints) ──
+    function renderHASSH(d) {
+        const fps = d.hassh_fingerprints || [];
+        const tab = document.getElementById('tab-hassh');
+        const badge = document.getElementById('hassh-count-badge');
+        if (!fps.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        badge.style.display = 'inline';
+        badge.textContent = fps.length;
+        badge.style.cssText = 'display:inline;background:var(--primary);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        document.getElementById('panel-hassh').innerHTML = `<h3>HASSH SSH Fingerprints (${fps.length})</h3>
+        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">SSH KEX_INIT fingerprints for client and server identification.</p>
+        <table class="pcap-table"><thead><tr><th>HASSH Hash</th><th>Direction</th><th>Source</th><th>Destination</th><th>SSH Version</th><th>Match</th></tr></thead><tbody>
+        ${fps.map(f => `<tr style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
+            <td><code style="font-size:.72rem">${esc(f.hassh_hash)}</code></td>
+            <td>${esc(f.direction)}</td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
+            <td style="font-size:.78rem">${esc(f.ssh_version || '-')}</td>
+            <td>${f.known_malware ? `<span style="color:var(--sev-critical);font-weight:700">${esc(f.known_malware)}</span>` : '-'}</td>
+        </tr>`).join('')}</tbody></table>`;
+    }
+
+    // ── SMB Transfers ──
+    function renderSMB(d) {
+        const items = d.smb_transfers || [];
+        const tab = document.getElementById('tab-smb');
+        const badge = document.getElementById('smb-count-badge');
+        if (!items.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        badge.style.display = 'inline';
+        badge.textContent = items.length;
+        badge.style.cssText = 'display:inline;background:var(--warning);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        document.getElementById('panel-smb').innerHTML = `<h3>SMB File Operations (${items.length})</h3>
+        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">SMB/CIFS file operations detected on port 445/139. May indicate lateral movement.</p>
+        <table class="pcap-table"><thead><tr><th>Command</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
+        ${items.map(s => `<tr><td><strong>${esc(s.command)}</strong></td><td>${esc(s.src_ip)}</td><td>${esc(s.dst_ip)}</td><td style="font-size:.78rem;color:var(--text-secondary)">${esc(s.detail)}</td></tr>`).join('')}
+        </tbody></table>`;
+    }
+
+    // ── Kerberos Tickets ──
+    function renderKerberos(d) {
+        const items = d.kerberos_tickets || [];
+        const tab = document.getElementById('tab-kerberos');
+        const badge = document.getElementById('kerberos-count-badge');
+        if (!items.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        badge.style.display = 'inline';
+        badge.textContent = items.length;
+        badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        document.getElementById('panel-kerberos').innerHTML = `<h3>Kerberos Traffic (${items.length})</h3>
+        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">Kerberos authentication messages on port 88. AS-REP/TGS-REP may contain extractable tickets.</p>
+        <table class="pcap-table"><thead><tr><th>Type</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
+        ${items.map(k => `<tr><td><strong>${esc(k.msg_type)}</strong></td><td>${esc(k.src_ip)}</td><td>${esc(k.dst_ip)}</td><td style="font-size:.78rem">${esc(k.detail)}</td></tr>`).join('')}
+        </tbody></table>`;
+    }
+
+    // ── HTTP Files ──
+    function renderHTTPFiles(d) {
+        const items = d.http_files || [];
+        const tab = document.getElementById('tab-httpfiles');
+        const badge = document.getElementById('httpfiles-count-badge');
+        if (!items.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        badge.style.display = 'inline';
+        badge.textContent = items.length;
+        badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        document.getElementById('panel-httpfiles').innerHTML = `<h3>HTTP File Transfers (${items.length})</h3>
+        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">Files reconstructed from HTTP response bodies via Content-Type headers.</p>
+        <table class="pcap-table"><thead><tr><th>Filename</th><th>Content-Type</th><th>Size</th><th>MD5</th><th>Source</th><th>Destination</th></tr></thead><tbody>
+        ${items.map(f => `<tr>
+            <td><strong>${esc(f.filename)}</strong></td><td>${esc(f.content_type)}</td><td>${fmtBytes(f.size)}</td>
+            <td><code style="font-size:.7rem">${esc(f.md5)}</code></td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
+        </tr>`).join('')}</tbody></table>`;
+    }
+
+    // ── ARP Anomalies ──
+    function renderARP(d) {
+        const items = d.arp_anomalies || [];
+        const tab = document.getElementById('tab-arp');
+        const badge = document.getElementById('arp-count-badge');
+        if (!items.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        badge.style.display = 'inline';
+        badge.textContent = items.length;
+        badge.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        document.getElementById('panel-arp').innerHTML = `<h3>ARP Anomalies (${items.length})</h3>
+        <p style="color:var(--sev-critical);font-size:.82rem;margin-bottom:12px;font-weight:600;">MAC addresses claiming multiple IPs — possible ARP spoofing / MITM.</p>
+        <table class="pcap-table"><thead><tr><th>MAC</th><th>IPs Claimed</th><th>Severity</th><th>Detail</th></tr></thead><tbody>
+        ${items.map(a => `<tr style="background:rgba(248,81,73,.05);">
+            <td><code>${esc(a.mac)}</code></td><td>${(a.ips||[]).map(ip => esc(ip)).join(', ')}</td>
+            <td><span style="color:var(--sev-${a.severity});font-weight:700">${esc(a.severity)}</span></td>
+            <td style="font-size:.78rem">${esc(a.detail)}</td>
+        </tr>`).join('')}</tbody></table>`;
+    }
+
+    // ── Base64 Payloads ──
+    function renderBase64(d) {
+        const items = d.base64_payloads || [];
+        const tab = document.getElementById('tab-b64');
+        const badge = document.getElementById('b64-count-badge');
+        if (!items.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        badge.style.display = 'inline';
+        badge.textContent = items.length;
+        badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        document.getElementById('panel-b64').innerHTML = `<h3>Base64 Encoded Payloads (${items.length})</h3>
+        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">Base64-encoded scripts or binary payloads found in HTTP streams. May indicate obfuscated C2 or malware delivery.</p>
+        <table class="pcap-table"><thead><tr><th>Type</th><th>Encoded Size</th><th>Decoded Size</th><th>Source</th><th>Destination</th><th>Preview</th></tr></thead><tbody>
+        ${items.map(b => `<tr style="background:rgba(248,81,73,.05);">
+            <td><strong>${esc(b.type)}</strong></td><td>${fmtBytes(b.encoded_length)}</td><td>${fmtBytes(b.decoded_length)}</td>
+            <td>${esc(b.src_ip)}</td><td>${esc(b.dst_ip)}:${b.port}</td>
+            <td><code style="font-size:.68rem;word-break:break-all;max-width:300px;display:inline-block;overflow:hidden;text-overflow:ellipsis">${esc(b.preview)}</code></td>
+        </tr>`).join('')}</tbody></table>`;
     }
 
     // ── Network Graph (vis-network) ──
