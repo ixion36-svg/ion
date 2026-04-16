@@ -65,7 +65,12 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application source, seed scripts, and entrypoint
 COPY src/ src/
-COPY seed_*.py /app/
+# Only ship production seed scripts — dev-only seeds (alerts, observables,
+# skills_team, etc.) contain hardcoded test data and should not be in the image.
+COPY seed_all.py seed_ion_data.py seed_knowledge_base.py \
+     seed_knowledge_base_blueteam.py seed_knowledge_base_foundations.py \
+     seed_knowledge_base_security_fundamentals.py \
+     seed_playbooks.py seed_soc_templates.py /app/
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
