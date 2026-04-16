@@ -117,19 +117,15 @@ services:
     environment:
       # PostgreSQL connection
       - ION_DATABASE_URL=postgresql://ion:${ION_DB_PASSWORD:-ion2025}@postgres:5432/ion
-      # Ollama connection (when enabled via --profile ai)
-      - ION_OLLAMA_URL=http://ollama:11434
+      # Ollama LLM — defaults to the compose Ollama container when the
+      # `ai` profile is enabled. Override in .env to point at a remote
+      # Ollama host (e.g. ION_OLLAMA_URL=http://gpu-box:11434).
+      - ION_OLLAMA_URL=${ION_OLLAMA_URL:-http://ollama:11434}
       # uvicorn workers — 4 sized for ION's 50-user max ceiling.
-      # KNOWN ISSUE: each worker re-runs the background-task starters in
-      # server.py (Kibana sync, Analytics Engine, TIDE sync, CyAB reminders).
-      # Periodic polls are idempotent (just wasted CPU); CyAB review
-      # notifications duplicate on each startup. Fix via pg advisory lock
-      # leader election in a future pass.
+      # Background tasks (Kibana sync, Analytics Engine, TIDE sync,
+      # Network Mapper, CyAB reminders) run on ONE worker via pg
+      # advisory lock leader election (v0.9.71+).
       - ION_WORKERS=${ION_WORKERS:-4}
-      # Note: ION_OLLAMA_MODEL is loaded from .env. On Docker Desktop for
-      # Windows the host VM is ~4GB and qwen2.5:3b will OOM the runner —
-      # set ION_OLLAMA_MODEL=qwen2.5:0.5b in .env for dev. Prod boxes with
-      # more RAM can use 3b/7b for higher-quality AI tutor narratives.
       # Optional: Trust a self-signed CA for OpenCTI, ES, Keycloak, etc.
       # - ION_CA_BUNDLE=/etc/ssl/certs/custom-ca.pem
 
