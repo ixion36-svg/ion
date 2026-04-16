@@ -80,8 +80,8 @@ class Config:
     elasticsearch_case_index: str = "ion-cases"  # Index for synced case documents
     elasticsearch_verify_ssl: bool = False
     # User mapping for alert assignment
-    elasticsearch_user_index: str = ""  # ES index containing user profiles (e.g., ion-users)
-    elasticsearch_user_field: str = ""  # Field in user index with display names (e.g., ion.user)
+    elasticsearch_user_index: str = "ion-users"  # ES index containing user profiles
+    elasticsearch_user_field: str = "ion.user"  # Field in user index with display names
     elasticsearch_assignment_field: str = "kibana.alert.workflow_user"  # Field on alerts to write assignment
 
     # Ollama AI integration
@@ -191,8 +191,8 @@ class Config:
             elasticsearch_alert_index=data.get("elasticsearch_alert_index", ".alerts-security.alerts-production"),
             elasticsearch_case_index=data.get("elasticsearch_case_index", "ion-cases"),
             elasticsearch_verify_ssl=data.get("elasticsearch_verify_ssl", False),
-            elasticsearch_user_index=data.get("elasticsearch_user_index", ""),
-            elasticsearch_user_field=data.get("elasticsearch_user_field", ""),
+            elasticsearch_user_index=data.get("elasticsearch_user_index", "ion-users"),
+            elasticsearch_user_field=data.get("elasticsearch_user_field", "ion.user"),
             elasticsearch_assignment_field=data.get("elasticsearch_assignment_field", "kibana.alert.workflow_user"),
             # Ollama AI integration
             ollama_enabled=data.get("ollama_enabled", True),
