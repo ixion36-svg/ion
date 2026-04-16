@@ -47,7 +47,64 @@ class JA3Fingerprint:
     dst_ip: str
     dst_port: int
     sni: str = ""
-    known_malware: str = ""  # label if hash matches known bad
+    known_malware: str = ""
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in self.__dict__.items()}
+
+
+@dataclass
+class JA3SFingerprint:
+    """A TLS ServerHello fingerprint (JA3S)."""
+    ja3s_hash: str
+    ja3s_str: str
+    src_ip: str
+    dst_ip: str
+    src_port: int
+    known_malware: str = ""
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in self.__dict__.items()}
+
+
+@dataclass
+class HASSHFingerprint:
+    """An SSH client/server fingerprint (HASSH)."""
+    hassh_hash: str
+    hassh_str: str
+    src_ip: str
+    dst_ip: str
+    direction: str = "client"  # "client" or "server"
+    ssh_version: str = ""
+    known_malware: str = ""
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in self.__dict__.items()}
+
+
+@dataclass
+class SMBTransfer:
+    """An SMB file operation detected in the capture."""
+    src_ip: str
+    dst_ip: str
+    command: str  # e.g. "SMB2_CREATE", "SMB2_WRITE", "SMB1_TRANS2"
+    filename: str = ""
+    detail: str = ""
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in self.__dict__.items()}
+
+
+@dataclass
+class KerberosTicket:
+    """A Kerberos ticket extracted from traffic."""
+    msg_type: str  # AS-REQ, AS-REP, TGS-REQ, TGS-REP
+    src_ip: str
+    dst_ip: str
+    realm: str = ""
+    principal: str = ""
+    cipher: str = ""
+    detail: str = ""
 
     def to_dict(self) -> dict:
         return {k: v for k, v in self.__dict__.items()}
@@ -88,11 +145,18 @@ class PcapResult:
     isakmp_sessions: list = field(default_factory=list)
     findings: list = field(default_factory=list)
     verdict: dict = field(default_factory=dict)
-    # New — added by the enhanced analyzers
+    # Enhanced analyzers
     extracted_files: list = field(default_factory=list)
     ja3_fingerprints: list = field(default_factory=list)
+    ja3s_fingerprints: list = field(default_factory=list)
+    hassh_fingerprints: list = field(default_factory=list)
     credential_captures: list = field(default_factory=list)
-    network_graph: dict = field(default_factory=dict)  # {nodes, edges} for vis-network
+    smb_transfers: list = field(default_factory=list)
+    kerberos_tickets: list = field(default_factory=list)
+    http_files: list = field(default_factory=list)
+    arp_anomalies: list = field(default_factory=list)
+    base64_payloads: list = field(default_factory=list)
+    network_graph: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -156,10 +220,23 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
 
     timestamps = []
     packet_count = 0
+    arp_table: dict[str, set[str]] = {}  # MAC → set of IPs (for ARP spoofing detection)
 
     for ts, raw in reader:
         packet_count += 1
         timestamps.append(ts)
+
+        # ARP detection (link layer, before IP extraction)
+        try:
+            eth = dpkt.ethernet.Ethernet(raw)
+            if eth.type == dpkt.ethernet.ETH_TYPE_ARP and isinstance(eth.data, dpkt.arp.ARP):
+                arp = eth.data
+                if arp.op in (1, 2):  # REQUEST or REPLY
+                    sender_mac = ":".join(f"{b:02x}" for b in arp.sha)
+                    sender_ip = socket.inet_ntoa(arp.spa)
+                    arp_table.setdefault(sender_mac, set()).add(sender_ip)
+        except Exception:
+            pass
 
         ip_pkt = _extract_ip(raw)
         if ip_pkt is None:
@@ -262,16 +339,31 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     # Summarise ISAKMP sessions for the results
     result.isakmp_sessions = _summarise_isakmp(isakmp_sessions)
 
-    # ── Enhanced analyzers (file extraction, JA3, credentials, graph) ──
+    # ARP spoofing detection: a MAC claiming multiple IPs
+    for mac, ips in arp_table.items():
+        if len(ips) > 1:
+            result.arp_anomalies.append({
+                "mac": mac,
+                "ips": sorted(ips),
+                "severity": "high" if len(ips) > 2 else "medium",
+                "detail": f"MAC {mac} is claiming {len(ips)} different IPs — possible ARP spoofing",
+            })
+
+    # ── Enhanced analyzers ──
     try:
-        # Re-parse for TCP stream reassembly (separate pass for safety)
         buf.seek(0)
-        streams, tls_hellos = _reassemble_tcp_streams(buf, pcap_reader_cls)
+        streams, tls_hellos, tls_server_hellos, ssh_pkts = _reassemble_tcp_streams(buf, pcap_reader_cls)
         result.extracted_files = [f.to_dict() for f in _extract_files_from_streams(streams)]
         result.ja3_fingerprints = [j.to_dict() for j in _compute_ja3(tls_hellos)]
+        result.ja3s_fingerprints = [j.to_dict() for j in _compute_ja3s(tls_server_hellos)]
+        result.hassh_fingerprints = [h.to_dict() for h in _compute_hassh(ssh_pkts)]
         result.credential_captures = [c.to_dict() for c in _extract_credentials(streams)]
+        result.smb_transfers = [s.to_dict() for s in _detect_smb(streams)]
+        result.kerberos_tickets = _detect_kerberos(streams)
+        result.http_files = _extract_http_files(streams)
+        result.base64_payloads = _detect_base64_payloads(streams)
     except Exception:
-        pass  # Non-fatal — core analysis above still provides value
+        pass  # Non-fatal
 
     # Build network graph from conversations
     try:
@@ -321,14 +413,16 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
 # ---------------------------------------------------------------------------
 
 def _reassemble_tcp_streams(buf: io.BytesIO, reader_cls):
-    """Two-pass: reassemble TCP streams and collect TLS ClientHello messages."""
-    streams: dict[tuple, bytearray] = {}  # (src_ip, src_port, dst_ip, dst_port) → payload
-    tls_hellos: list[dict] = []
+    """Two-pass: reassemble TCP streams and collect TLS + SSH handshakes."""
+    streams: dict[tuple, bytearray] = {}
+    tls_hellos: list[dict] = []      # ClientHello (type 0x01)
+    tls_server_hellos: list[dict] = []  # ServerHello (type 0x02)
+    ssh_packets: list[dict] = []     # SSH KEX_INIT messages
 
     try:
         reader = reader_cls(buf)
     except Exception:
-        return streams, tls_hellos
+        return streams, tls_hellos, tls_server_hellos, ssh_packets
 
     for ts, raw in reader:
         ip = _extract_ip(raw)
@@ -349,20 +443,52 @@ def _reassemble_tcp_streams(buf: io.BytesIO, reader_cls):
         key = (src_ip, tcp.sport, dst_ip, tcp.dport)
         if key not in streams:
             streams[key] = bytearray()
-        # Cap stream size at 10 MB to avoid memory issues
         if len(streams[key]) < 10 * 1024 * 1024:
             streams[key].extend(tcp.data)
 
-        # Detect TLS ClientHello (content type 0x16, handshake type 0x01)
         data = bytes(tcp.data)
-        if len(data) > 5 and data[0] == 0x16 and data[5] == 0x01:
-            tls_hellos.append({
-                "src_ip": src_ip, "dst_ip": dst_ip,
-                "src_port": tcp.sport, "dst_port": tcp.dport,
-                "data": data,
-            })
 
-    return streams, tls_hellos
+        # TLS handshakes (content type 0x16)
+        if len(data) > 5 and data[0] == 0x16:
+            hs_type = data[5]
+            if hs_type == 0x01:  # ClientHello
+                tls_hellos.append({
+                    "src_ip": src_ip, "dst_ip": dst_ip,
+                    "src_port": tcp.sport, "dst_port": tcp.dport,
+                    "data": data,
+                })
+            elif hs_type == 0x02:  # ServerHello
+                tls_server_hellos.append({
+                    "src_ip": src_ip, "dst_ip": dst_ip,
+                    "src_port": tcp.sport, "dst_port": tcp.dport,
+                    "data": data,
+                })
+
+        # SSH KEX_INIT (SSH-2.0 protocol, message code 20 = SSH_MSG_KEXINIT)
+        if (tcp.sport == 22 or tcp.dport == 22) and len(data) > 6:
+            # SSH binary packet: packet_length(4) + padding_length(1) + msg_type(1)
+            # Also capture SSH version banner ("SSH-2.0-...")
+            if data[:4] == b"SSH-":
+                ssh_packets.append({
+                    "src_ip": src_ip, "dst_ip": dst_ip,
+                    "src_port": tcp.sport, "dst_port": tcp.dport,
+                    "type": "banner",
+                    "data": data,
+                })
+            elif len(data) > 5:
+                try:
+                    pkt_len = struct.unpack("!I", data[:4])[0]
+                    if 4 < pkt_len < len(data) and data[5] == 20:  # SSH_MSG_KEXINIT
+                        ssh_packets.append({
+                            "src_ip": src_ip, "dst_ip": dst_ip,
+                            "src_port": tcp.sport, "dst_port": tcp.dport,
+                            "type": "kexinit",
+                            "data": data,
+                        })
+                except Exception:
+                    pass
+
+    return streams, tls_hellos, tls_server_hellos, ssh_packets
 
 
 # ---------------------------------------------------------------------------
@@ -1982,3 +2108,427 @@ def _shannon_entropy(s: str) -> float:
     freq = collections.Counter(s.lower())
     length = len(s)
     return -sum((c / length) * math.log2(c / length) for c in freq.values())
+
+
+# ---------------------------------------------------------------------------
+# JA3S — TLS ServerHello fingerprinting
+# ---------------------------------------------------------------------------
+
+_KNOWN_BAD_JA3S: dict[str, str] = {
+    "ae4edc6faf64d08308082ad26be60767": "Cobalt Strike",
+    "fd4bc6cea4877646ccd62f0792ec0b62": "Cobalt Strike",
+    "b742b407517bac9536a77a7b0fee28e9": "Cobalt Strike (4.x)",
+    "15af977ce25de452b96affa2addb1036": "Cobalt Strike (HTTPS)",
+    "ec74a5c51106f0419184d0dd08fb05bc": "Metasploit",
+    "298c3ea8e9f786f2e5c3c08e0f93f708": "Trickbot C2",
+    "4a55e90e5c823cc77d52d10e828dda2b": "Gozi/ISFB",
+}
+
+
+def _compute_ja3s(server_hellos: list[dict]) -> list[JA3SFingerprint]:
+    """Compute JA3S fingerprints from TLS ServerHello messages."""
+    fingerprints: list[JA3SFingerprint] = []
+    seen: set[str] = set()
+
+    for hello in server_hellos:
+        data = hello["data"]
+        try:
+            ja3s_str, ja3s_hash = _parse_server_hello_ja3s(data)
+        except Exception:
+            continue
+        if not ja3s_hash:
+            continue
+        dedup = f'{hello["src_ip"]}:{hello["dst_ip"]}:{ja3s_hash}'
+        if dedup in seen:
+            continue
+        seen.add(dedup)
+        fingerprints.append(JA3SFingerprint(
+            ja3s_hash=ja3s_hash,
+            ja3s_str=ja3s_str,
+            src_ip=hello["src_ip"],
+            dst_ip=hello["dst_ip"],
+            src_port=hello["src_port"],
+            known_malware=_KNOWN_BAD_JA3S.get(ja3s_hash, ""),
+        ))
+    return fingerprints
+
+
+def _parse_server_hello_ja3s(data: bytes) -> tuple[str, str]:
+    """Parse TLS ServerHello → JA3S = md5(TLSVersion,Cipher,Extensions)."""
+    if len(data) < 44 or data[0] != 0x16 or data[5] != 0x02:
+        return "", ""
+
+    # Record header: type(1) + version(2) + length(2) = 5 bytes
+    # Handshake header: type(1) + length(3) = 4 bytes → offset 9
+    # ServerHello: server_version(2) + random(32) + session_id_length(1)
+    offset = 9
+    if offset + 2 > len(data):
+        return "", ""
+    tls_version = struct.unpack("!H", data[offset:offset + 2])[0]
+    offset += 2 + 32  # skip random
+
+    if offset >= len(data):
+        return "", ""
+    session_id_len = data[offset]
+    offset += 1 + session_id_len
+
+    if offset + 2 > len(data):
+        return "", ""
+    cipher = struct.unpack("!H", data[offset:offset + 2])[0]
+    offset += 2
+
+    # Skip compression method (1 byte)
+    if offset >= len(data):
+        return "", ""
+    offset += 1
+
+    # Extensions
+    extensions = []
+    if offset + 2 <= len(data):
+        ext_len = struct.unpack("!H", data[offset:offset + 2])[0]
+        offset += 2
+        ext_end = offset + ext_len
+        while offset + 4 <= min(ext_end, len(data)):
+            ext_type = struct.unpack("!H", data[offset:offset + 2])[0]
+            ext_data_len = struct.unpack("!H", data[offset + 2:offset + 4])[0]
+            # Skip GREASE values
+            if (ext_type & 0x0f0f) != 0x0a0a:
+                extensions.append(str(ext_type))
+            offset += 4 + ext_data_len
+
+    ja3s_str = f"{tls_version},{cipher},{'-'.join(extensions)}"
+    ja3s_hash = hashlib.md5(ja3s_str.encode()).hexdigest()
+    return ja3s_str, ja3s_hash
+
+
+# ---------------------------------------------------------------------------
+# HASSH — SSH fingerprinting
+# ---------------------------------------------------------------------------
+
+_KNOWN_BAD_HASSH: dict[str, str] = {
+    "ec7378c1a92f5a8dde7e8b7a1ddf33d1": "Cobalt Strike SSH",
+    "06046964c022c6407d15a27b12a6f4fb": "Paramiko (Python SSH)",
+}
+
+
+def _compute_hassh(ssh_packets: list[dict]) -> list[HASSHFingerprint]:
+    """Compute HASSH fingerprints from SSH KEX_INIT messages."""
+    fingerprints: list[HASSHFingerprint] = []
+    seen: set[str] = set()
+    banners: dict[str, str] = {}  # ip → SSH banner
+
+    for pkt in ssh_packets:
+        if pkt["type"] == "banner":
+            raw = pkt["data"]
+            try:
+                banner = raw[:raw.index(b"\r\n")].decode("ascii", errors="replace") if b"\r\n" in raw else raw[:64].decode("ascii", errors="replace")
+            except Exception:
+                banner = ""
+            banners[pkt["src_ip"]] = banner
+            continue
+
+        if pkt["type"] != "kexinit":
+            continue
+
+        data = pkt["data"]
+        try:
+            hassh_str, hassh_hash = _parse_ssh_kexinit(data)
+        except Exception:
+            continue
+        if not hassh_hash:
+            continue
+
+        direction = "server" if pkt["src_port"] == 22 else "client"
+        dedup = f'{pkt["src_ip"]}:{pkt["dst_ip"]}:{hassh_hash}'
+        if dedup in seen:
+            continue
+        seen.add(dedup)
+        fingerprints.append(HASSHFingerprint(
+            hassh_hash=hassh_hash,
+            hassh_str=hassh_str,
+            src_ip=pkt["src_ip"],
+            dst_ip=pkt["dst_ip"],
+            direction=direction,
+            ssh_version=banners.get(pkt["src_ip"], ""),
+            known_malware=_KNOWN_BAD_HASSH.get(hassh_hash, ""),
+        ))
+    return fingerprints
+
+
+def _parse_ssh_kexinit(data: bytes) -> tuple[str, str]:
+    """Parse SSH_MSG_KEXINIT → HASSH = md5(kex_algs,enc_algs,mac_algs,comp_algs).
+
+    Binary packet: length(4) + padding_length(1) + msg_type(1=20) + cookie(16)
+    Then name-lists: each is uint32 length + comma-separated string.
+    """
+    if len(data) < 26:
+        return "", ""
+    # Skip packet length(4) + padding_length(1) + msg_type(1) + cookie(16) = 22
+    offset = 22
+    name_lists = []
+    # We need 4 name-lists for HASSH: kex_algorithms, encryption_algorithms_c2s,
+    # mac_algorithms_c2s, compression_algorithms_c2s (indices 0, 2, 4, 6 of the
+    # 10 name-lists in KEX_INIT).
+    all_lists = []
+    for i in range(10):
+        if offset + 4 > len(data):
+            break
+        nl_len = struct.unpack("!I", data[offset:offset + 4])[0]
+        offset += 4
+        if offset + nl_len > len(data):
+            break
+        nl = data[offset:offset + nl_len].decode("ascii", errors="replace")
+        all_lists.append(nl)
+        offset += nl_len
+
+    if len(all_lists) < 7:
+        return "", ""
+
+    # HASSH (client): kex[0], enc_c2s[2], mac_c2s[4], comp_c2s[6]
+    hassh_str = ";".join([all_lists[0], all_lists[2], all_lists[4], all_lists[6]])
+    hassh_hash = hashlib.md5(hassh_str.encode()).hexdigest()
+    return hassh_str, hassh_hash
+
+
+# ---------------------------------------------------------------------------
+# SMB file transfer detection
+# ---------------------------------------------------------------------------
+
+def _detect_smb(streams: dict) -> list[SMBTransfer]:
+    """Detect SMB/CIFS file operations in TCP streams on port 445/139."""
+    results: list[SMBTransfer] = []
+    seen: set[str] = set()
+
+    for (src_ip, sport, dst_ip, dport), payload in streams.items():
+        if dport not in (445, 139) and sport not in (445, 139):
+            continue
+        data = bytes(payload)
+        if len(data) < 10:
+            continue
+
+        # SMB2 magic: \xFE\x53\x4D\x42
+        offset = 0
+        while offset < len(data) - 64:
+            pos = data.find(b"\xfeSMB", offset)
+            if pos == -1:
+                break
+            if pos + 16 > len(data):
+                break
+            try:
+                cmd = struct.unpack("<H", data[pos + 12:pos + 14])[0]
+            except Exception:
+                offset = pos + 4
+                continue
+            cmd_names = {
+                0x0005: "SMB2_CREATE",
+                0x0006: "SMB2_CLOSE",
+                0x0008: "SMB2_READ",
+                0x0009: "SMB2_WRITE",
+                0x000e: "SMB2_FIND",
+            }
+            cmd_name = cmd_names.get(cmd)
+            if cmd_name:
+                key = f"{src_ip}:{dst_ip}:{cmd_name}"
+                if key not in seen:
+                    seen.add(key)
+                    results.append(SMBTransfer(
+                        src_ip=src_ip, dst_ip=dst_ip,
+                        command=cmd_name,
+                        detail=f"SMB2 {cmd_name} detected on port {dport}",
+                    ))
+            offset = pos + 64
+            if len(results) >= 50:
+                break
+        if len(results) >= 50:
+            break
+
+    # SMB1 fallback: \xFF\x53\x4D\x42
+    if len(results) < 50:
+        for (src_ip, sport, dst_ip, dport), payload in streams.items():
+            if dport not in (445, 139) and sport not in (445, 139):
+                continue
+            data = bytes(payload)
+            if data.find(b"\xffSMB") != -1:
+                key = f"{src_ip}:{dst_ip}:SMB1"
+                if key not in seen:
+                    seen.add(key)
+                    results.append(SMBTransfer(
+                        src_ip=src_ip, dst_ip=dst_ip,
+                        command="SMB1",
+                        detail="Legacy SMB1 traffic detected",
+                    ))
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Kerberos ticket detection
+# ---------------------------------------------------------------------------
+
+def _detect_kerberos(streams: dict) -> list[dict]:
+    """Detect Kerberos AS-REQ/AS-REP/TGS-REQ/TGS-REP on port 88."""
+    results: list[dict] = []
+
+    for (src_ip, sport, dst_ip, dport), payload in streams.items():
+        if dport != 88 and sport != 88:
+            continue
+        data = bytes(payload)
+        if len(data) < 10:
+            continue
+
+        # Kerberos uses ASN.1 DER encoding. The application tags are:
+        # AS-REQ: 0x6a (application 10), AS-REP: 0x6b (application 11)
+        # TGS-REQ: 0x6c (application 12), TGS-REP: 0x6d (application 13)
+        msg_types = {
+            0x6a: "AS-REQ", 0x6b: "AS-REP",
+            0x6c: "TGS-REQ", 0x6d: "TGS-REP",
+        }
+        for tag_byte, msg_type in msg_types.items():
+            if tag_byte in data[:4]:
+                results.append({
+                    "msg_type": msg_type,
+                    "src_ip": src_ip,
+                    "dst_ip": dst_ip,
+                    "detail": f"{msg_type} detected ({src_ip} → {dst_ip})",
+                })
+                break
+        if len(results) >= 100:
+            break
+    return results
+
+
+# ---------------------------------------------------------------------------
+# HTTP file reassembly
+# ---------------------------------------------------------------------------
+
+def _extract_http_files(streams: dict) -> list[dict]:
+    """Extract files from HTTP response bodies via Content-Type + Content-Disposition."""
+    files: list[dict] = []
+    seen: set[str] = set()
+
+    for (src_ip, sport, dst_ip, dport), payload in streams.items():
+        if sport not in (80, 8080, 8443, 443) and dport not in (80, 8080):
+            continue
+        data = bytes(payload)
+        # Look for HTTP response headers
+        idx = 0
+        while idx < len(data) - 20:
+            resp_start = data.find(b"HTTP/1.", idx)
+            if resp_start == -1:
+                break
+            header_end = data.find(b"\r\n\r\n", resp_start)
+            if header_end == -1:
+                break
+            headers_raw = data[resp_start:header_end].decode("ascii", errors="replace")
+            body_start = header_end + 4
+
+            # Parse Content-Type and Content-Length
+            content_type = ""
+            content_length = 0
+            filename = ""
+            for line in headers_raw.split("\r\n"):
+                lower = line.lower()
+                if lower.startswith("content-type:"):
+                    content_type = line.split(":", 1)[1].strip().split(";")[0].strip()
+                elif lower.startswith("content-length:"):
+                    try:
+                        content_length = int(line.split(":", 1)[1].strip())
+                    except ValueError:
+                        pass
+                elif lower.startswith("content-disposition:") and "filename=" in lower:
+                    try:
+                        fn_part = line.split("filename=")[1].strip().strip('"').strip("'")
+                        filename = fn_part.split(";")[0].strip()
+                    except Exception:
+                        pass
+
+            # Only care about non-text content types that indicate file transfers
+            interesting_types = (
+                "application/", "image/", "audio/", "video/",
+                "font/", "model/",
+            )
+            if content_type and any(content_type.startswith(t) for t in interesting_types):
+                body = data[body_start:body_start + min(content_length, 5 * 1024 * 1024)] if content_length else b""
+                md5 = hashlib.md5(body).hexdigest() if body else ""
+                if md5 and md5 not in seen:
+                    seen.add(md5)
+                    ext = content_type.split("/")[-1].split(";")[0][:10]
+                    files.append({
+                        "filename": filename or f"http_file_{len(files)+1}.{ext}",
+                        "content_type": content_type,
+                        "size": content_length or len(body),
+                        "md5": md5,
+                        "src_ip": src_ip,
+                        "dst_ip": dst_ip,
+                    })
+            idx = body_start + max(content_length, 1)
+            if len(files) >= 50:
+                break
+        if len(files) >= 50:
+            break
+    return files
+
+
+# ---------------------------------------------------------------------------
+# Base64 payload detection
+# ---------------------------------------------------------------------------
+
+import base64 as _b64
+import re as _re
+
+_B64_PATTERN = _re.compile(rb"[A-Za-z0-9+/]{40,}={0,2}")
+
+
+def _detect_base64_payloads(streams: dict) -> list[dict]:
+    """Scan HTTP bodies and DNS-adjacent streams for base64-encoded payloads."""
+    results: list[dict] = []
+    seen: set[str] = set()
+
+    for (src_ip, sport, dst_ip, dport), payload in streams.items():
+        # Focus on HTTP and high-port streams
+        if dport not in (80, 443, 8080, 8443, 8000, 8888) and sport not in (80, 443, 8080):
+            continue
+        data = bytes(payload)
+        if len(data) < 60:
+            continue
+
+        for m in _B64_PATTERN.finditer(data):
+            candidate = m.group()
+            if len(candidate) < 40:
+                continue
+            try:
+                decoded = _b64.b64decode(candidate, validate=True)
+            except Exception:
+                continue
+            if len(decoded) < 20:
+                continue
+
+            # Check if decoded content looks interesting (has printable + non-printable mix
+            # suggesting encoded binary, or starts with known script patterns)
+            printable_ratio = sum(1 for b in decoded[:200] if 32 <= b < 127) / min(len(decoded), 200)
+            is_script = decoded[:20].lower().startswith((
+                b"powershell", b"cmd /c", b"bash ", b"#!/", b"import ",
+                b"<script", b"function ", b"var ", b"eval(",
+            ))
+            is_binary = printable_ratio < 0.7
+            if not is_script and not is_binary:
+                continue
+
+            preview = decoded[:80].decode("ascii", errors="replace")
+            key = hashlib.md5(candidate[:100]).hexdigest()
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append({
+                "src_ip": src_ip,
+                "dst_ip": dst_ip,
+                "encoded_length": len(candidate),
+                "decoded_length": len(decoded),
+                "type": "script" if is_script else "binary",
+                "preview": preview[:120],
+                "port": dport,
+            })
+            if len(results) >= 20:
+                break
+        if len(results) >= 20:
+            break
+    return results
