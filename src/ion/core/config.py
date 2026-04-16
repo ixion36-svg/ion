@@ -372,8 +372,9 @@ def get_config() -> Config:
                 _config = Config()
 
         # Override with environment variables
-        if os.environ.get("ION_BASE_URL"):
-            _config.base_url = os.environ.get("ION_BASE_URL", "").rstrip("/")
+        _env_base_url = os.environ.get("ION_BASE_URL", "").strip()
+        if _env_base_url:
+            _config.base_url = _env_base_url.rstrip("/")
         if os.environ.get("ION_CA_BUNDLE"):
             _config.ca_bundle = os.environ.get("ION_CA_BUNDLE", "")
         if os.environ.get("ION_SSL_CERT"):
