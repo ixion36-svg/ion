@@ -458,7 +458,7 @@
         </section>
 
         <!-- Arkime Settings -->
-        <div class="settings-section" data-section="arkime" style="display:none;">
+        <section id="arkime" class="settings-section">
             <h2>Arkime Integration</h2>
             <p class="section-description">Configure Arkime for PCAP download and session search from alerts.</p>
             <form onsubmit="saveSettings(event, 'arkime')">
@@ -474,10 +474,10 @@
                 <div class="form-group"><label for="arkime_password">Password</label><input type="password" id="arkime_password" name="arkime_password" placeholder="Leave blank to keep current"></div>
                 <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
             </form>
-        </div>
+        </section>
 
         <!-- Ollama AI Settings -->
-        <div class="settings-section" data-section="ollama" style="display:none;">
+        <section id="ollama" class="settings-section">
             <h2>Ollama AI</h2>
             <p class="section-description">Configure the Ollama LLM for AI chat, morning briefing narratives, and training plan generation.</p>
             <form onsubmit="saveSettings(event, 'ollama')">
@@ -488,10 +488,10 @@
                 <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ollama_verify_ssl" name="ollama_verify_ssl"> Verify SSL Certificate</label></div>
                 <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
             </form>
-        </div>
+        </section>
 
         <!-- AbuseIPDB Settings -->
-        <div class="settings-section" data-section="abuseipdb" style="display:none;">
+        <section id="abuseipdb" class="settings-section">
             <h2>AbuseIPDB</h2>
             <p class="section-description">IP address reputation lookups for observable enrichment.</p>
             <form onsubmit="saveSettings(event, 'abuseipdb')">
@@ -499,10 +499,10 @@
                 <div class="form-group"><label for="abuseipdb_api_key">API Key</label><input type="password" id="abuseipdb_api_key" name="abuseipdb_api_key" placeholder="Leave blank to keep current"><span class="form-help" id="abuseipdb_api_key_status"></span></div>
                 <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
             </form>
-        </div>
+        </section>
 
         <!-- VirusTotal Settings -->
-        <div class="settings-section" data-section="virustotal" style="display:none;">
+        <section id="virustotal" class="settings-section">
             <h2>VirusTotal</h2>
             <p class="section-description">File hash and URL reputation lookups for observable enrichment.</p>
             <form onsubmit="saveSettings(event, 'virustotal')">
@@ -510,7 +510,7 @@
                 <div class="form-group"><label for="virustotal_api_key">API Key</label><input type="password" id="virustotal_api_key" name="virustotal_api_key" placeholder="Leave blank to keep current"><span class="form-help" id="virustotal_api_key_status"></span></div>
                 <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
             </form>
-        </div>
+        </section>
 
         <!-- OIDC Settings -->
         <section id="oidc" class="settings-section">
