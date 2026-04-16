@@ -107,8 +107,10 @@ services:
       # Optional: Mount custom config file
       # - ./config.json:/data/.ion/config.json:ro
 
-      # Optional: Mount a self-signed CA certificate bundle
-      # - ./ca.pem:/etc/ssl/certs/custom-ca.pem:ro
+      # Self-signed CA certificate bundle — mount your internal CA so ION
+      # trusts ES, Kibana, Keycloak, TIDE, Arkime, OpenCTI connections.
+      # Then set ION_CA_BUNDLE=/etc/ssl/certs/custom-ca.pem in .env.
+      - ${ION_CA_CERT:-/dev/null}:/etc/ssl/certs/custom-ca.pem:ro
 
     # Load environment variables from .env file
     env_file:
@@ -126,8 +128,8 @@ services:
       # Network Mapper, CyAB reminders) run on ONE worker via pg
       # advisory lock leader election (v0.9.71+).
       - ION_WORKERS=${ION_WORKERS:-4}
-      # Optional: Trust a self-signed CA for OpenCTI, ES, Keycloak, etc.
-      # - ION_CA_BUNDLE=/etc/ssl/certs/custom-ca.pem
+      # CA bundle — set ION_CA_BUNDLE in .env when using the cert mount above
+      - ION_CA_BUNDLE=${ION_CA_BUNDLE:-}
 
     networks:
       - ion-net
