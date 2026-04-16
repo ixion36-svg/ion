@@ -292,6 +292,49 @@ class ArkimeService:
         except httpx.HTTPError as e:
             raise ArkimeError(f"Arkime session search error: {e}") from e
 
+    async def find_sessions_by_ip(
+        self,
+        node: str,
+        ip: str,
+        *,
+        hours: int = 1,
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Search Arkime for sessions involving an IP within a time window.
+
+        Fallback when community_id is not available on the alert. Searches
+        both source and destination so any traffic involving the IP is found.
+        """
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        expression = f'(ip.src == {ip} || ip.dst == {ip}) && node == "{node}"'
+        params = {
+            "expression": expression,
+            "length": str(limit),
+            "startTime": str(int(((__import__("time").time()) - hours * 3600))),
+            "stopTime": str(int(__import__("time").time())),
+            "fields": self._SESSION_FIELDS,
+        }
+        headers = await self._headers()
+        try:
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/sessions",
+                    auth=self._auth(),
+                    headers=headers,
+                    params=params,
+                )
+            if resp.status_code != 200:
+                raise ArkimeError(
+                    f"Arkime IP session search failed: HTTP {resp.status_code}",
+                    status_code=resp.status_code,
+                )
+            payload = resp.json()
+            data = payload.get("data") if isinstance(payload, dict) else None
+            return data if isinstance(data, list) else []
+        except httpx.HTTPError as e:
+            raise ArkimeError(f"Arkime IP session search error: {e}") from e
+
     # ── PCAP download ──────────────────────────────────────────────────────
     async def download_pcap_by_community_id(
         self,

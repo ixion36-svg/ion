@@ -56,6 +56,8 @@ class ElasticsearchAlert:
     # (Arkime capture node name).
     network_community_id: Optional[str] = None
     arkime_node: Optional[str] = None
+    source_ip: Optional[str] = None
+    destination_ip: Optional[str] = None
 
     def __post_init__(self):
         if self.tags is None:
@@ -87,6 +89,8 @@ class ElasticsearchAlert:
             "source_system": self.source_system,
             "network_community_id": self.network_community_id,
             "arkime_node": self.arkime_node,
+            "source_ip": self.source_ip,
+            "destination_ip": self.destination_ip,
         }
 
 
@@ -721,6 +725,22 @@ class ElasticsearchService:
         if arkime_node is not None:
             arkime_node = str(arkime_node)
 
+        # Source / destination IPs (ECS standard fields)
+        source_ip = (
+            _f(source, "source.ip")
+            or _f(source, "client.ip")
+            or source.get("src_ip")
+        )
+        if isinstance(source_ip, list):
+            source_ip = source_ip[0] if source_ip else None
+        destination_ip = (
+            _f(source, "destination.ip")
+            or _f(source, "server.ip")
+            or source.get("dst_ip")
+        )
+        if isinstance(destination_ip, list):
+            destination_ip = destination_ip[0] if destination_ip else None
+
         # Tags
         tags = source.get("tags", [])
         if isinstance(tags, str):
@@ -923,6 +943,8 @@ class ElasticsearchService:
             source_system=source_system,
             network_community_id=network_community_id,
             arkime_node=arkime_node,
+            source_ip=source_ip,
+            destination_ip=destination_ip,
         )
 
     async def get_related_alerts(

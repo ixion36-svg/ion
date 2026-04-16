@@ -90,8 +90,9 @@ class EnrichedObservable(BaseModel):
 
 class ArkimePreviewResponse(BaseModel):
     alert_id: str
-    network_community_id: str
+    network_community_id: Optional[str] = None
     arkime_node: str
+    search_mode: str = "community_id"  # "community_id" or "ip_time"
     arkime_session_id: Optional[str] = None  # resolved internal session id
     session_metadata: Optional[Dict[str, Any]] = None
     other_matches: int = 0  # extra sessions matching the same community_id
@@ -229,7 +230,13 @@ async def _enrich_observables(
 
 
 async def _fetch_alert_for_arkime(alert_id: str) -> Dict[str, Any]:
-    """Fetch an alert from ES and verify it has the Arkime linkage fields."""
+    """Fetch an alert from ES and verify it has an Arkime node field.
+
+    v0.9.86: relaxed from requiring BOTH network.community_id AND node to
+    requiring only node. When community_id is absent the preview endpoint
+    falls back to an IP+time search on Arkime instead of an exact
+    community-id match.
+    """
     es = ElasticsearchService()
     if not es.is_configured:
         raise HTTPException(status_code=503, detail="Elasticsearch is not configured")
@@ -237,17 +244,10 @@ async def _fetch_alert_for_arkime(alert_id: str) -> Dict[str, Any]:
     if not alerts:
         raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
     alert = alerts[0]
-    if not alert.network_community_id or not alert.arkime_node:
-        missing = []
-        if not alert.network_community_id:
-            missing.append("network.community_id")
-        if not alert.arkime_node:
-            missing.append("node")
+    if not alert.arkime_node:
         raise HTTPException(
             status_code=400,
-            detail=(
-                f"Alert {alert_id} has no Arkime linkage — missing: {', '.join(missing)}"
-            ),
+            detail=f"Alert {alert_id} has no Arkime node field",
         )
     return alert.to_dict()
 
@@ -299,21 +299,57 @@ async def arkime_preview(
         )
 
     warnings: List[str] = []
+    search_mode = "community_id"
 
-    # Resolve the Community ID to an Arkime session and download the PCAP.
-    try:
-        result = await svc.download_pcap_by_community_id(node, community_id)
-    except ArkimeError as e:
-        status = e.status_code if e.status_code in (401, 403, 404) else 502
-        raise HTTPException(status_code=status, detail=safe_error(e))
+    if community_id:
+        # Exact match via Community ID flow hash (preferred path).
+        try:
+            result = await svc.download_pcap_by_community_id(node, community_id)
+        except ArkimeError as e:
+            status = e.status_code if e.status_code in (401, 403, 404) else 502
+            raise HTTPException(status_code=status, detail=safe_error(e))
+    else:
+        # Fallback: no community_id — search Arkime by source/dest IP from
+        # the alert. Broader results, but still useful for investigation.
+        search_mode = "ip_time"
+        src_ip = alert.get("source_ip") or ""
+        dst_ip = alert.get("destination_ip") or ""
+        search_ip = src_ip or dst_ip
+        if not search_ip:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Alert {alert_id} has no community_id, source_ip, or "
+                       f"destination_ip — cannot search Arkime",
+            )
+        warnings.append(
+            f"No community_id on this alert — searched Arkime by IP "
+            f"({search_ip}) instead. Results may include unrelated sessions."
+        )
+        try:
+            sessions = await svc.find_sessions_by_ip(node, search_ip, hours=2)
+        except ArkimeError as e:
+            status = e.status_code if e.status_code in (401, 403, 404) else 502
+            raise HTTPException(status_code=status, detail=safe_error(e))
+        if not sessions:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No Arkime sessions found for IP {search_ip} on node {node}",
+            )
+        primary = sessions[0]
+        arkime_sid = primary.get("id") or primary.get("_id")
+        if not arkime_sid:
+            raise HTTPException(status_code=500, detail="Arkime session missing id")
+        pcap_bytes = await svc.download_pcap(node, str(arkime_sid))
+        result = {"pcap": pcap_bytes, "session": primary, "other_matches": sessions[1:]}
+
     pcap_bytes: bytes = result["pcap"]
     session_meta: Dict[str, Any] = result.get("session") or {}
     other_matches: List[Dict[str, Any]] = result.get("other_matches") or []
     arkime_session_id = str(session_meta.get("id") or "") or None
     if other_matches:
         warnings.append(
-            f"{len(other_matches)} additional Arkime session(s) matched this "
-            f"Community ID — only the first was downloaded."
+            f"{len(other_matches)} additional Arkime session(s) matched — "
+            f"only the first was downloaded."
         )
 
     # Parse + analyse
@@ -336,8 +372,9 @@ async def arkime_preview(
 
     return ArkimePreviewResponse(
         alert_id=alert_id,
-        network_community_id=community_id,
+        network_community_id=community_id or None,
         arkime_node=node,
+        search_mode=search_mode,
         arkime_session_id=arkime_session_id,
         session_metadata=session_meta,
         other_matches=len(other_matches),
