@@ -6,7 +6,7 @@ from typing import Generator, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, String
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
@@ -47,6 +47,7 @@ def list_assets(
     os_filter: str = Query("", description="Filter by OS name"),
     environment: str = Query("", description="Filter by environment"),
     criticality: str = Query("", description="Filter by criticality"),
+    source_system: str = Query("", description="Filter by source system name"),
     last_seen_within: str = Query("", description="24h, 7d, 30d, or empty for all"),
     archived: bool = Query(False, description="Include archived assets"),
     offset: int = Query(0, ge=0),
@@ -82,6 +83,9 @@ def list_assets(
         q = q.filter(NetworkAsset.environment == environment)
     if criticality:
         q = q.filter(NetworkAsset.criticality == criticality)
+    if source_system:
+        # JSON array contains — works on both Postgres (cast) and SQLite
+        q = q.filter(NetworkAsset.source_systems.cast(String).ilike(f"%{source_system}%"))
 
     if last_seen_within:
         now = datetime.now(timezone.utc)
@@ -229,6 +233,17 @@ def get_stats(
     # Total unique IPs
     total_ips = session.query(func.count(func.distinct(NetworkAssetIP.ip))).scalar() or 0
 
+    # Distinct source systems across all assets
+    all_assets = session.query(NetworkAsset.source_systems).filter(
+        NetworkAsset.archived_at.is_(None),
+        NetworkAsset.source_systems.isnot(None),
+    ).all()
+    source_sys_set = set()
+    for (systems,) in all_assets:
+        if isinstance(systems, list):
+            source_sys_set.update(systems)
+    source_systems = sorted(source_sys_set)
+
     return {
         "total_assets": total,
         "seen_24h": seen_24h,
@@ -236,6 +251,7 @@ def get_stats(
         "os_breakdown": os_breakdown,
         "environment_breakdown": env_breakdown,
         "criticality_breakdown": crit_breakdown,
+        "source_systems": source_systems,
     }
 
 

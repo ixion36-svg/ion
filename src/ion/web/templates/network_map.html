@@ -63,6 +63,9 @@
       <option value="low">Low</option>
       <option value="unknown">Unknown</option>
     </select>
+    <select id="filter-system" onchange="loadAssets()" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
+      <option value="">All Systems</option>
+    </select>
     <select id="filter-seen" onchange="loadAssets()" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
       <option value="">All Time</option>
       <option value="24h">Last 24h</option>
@@ -177,6 +180,7 @@ function clearFilters() {
   $('filter-search').value = '';
   $('filter-env').value = '';
   $('filter-crit').value = '';
+  $('filter-system').value = '';
   $('filter-seen').value = '';
   currentPage = 0;
   loadAssets();
@@ -218,6 +222,14 @@ async function loadStats() {
     $('stat-seen24').textContent = d.seen_24h ?? '—';
     $('stat-ips').textContent = d.total_ips ?? '—';
     $('stat-os-count').textContent = Object.keys(d.os_breakdown || {}).length;
+    // Populate source system dropdown
+    const sysSel = $('filter-system');
+    const curVal = sysSel.value;
+    sysSel.innerHTML = '<option value="">All Systems</option>';
+    for (const sys of (d.source_systems || [])) {
+      sysSel.innerHTML += `<option value="${esc(sys)}">${esc(sys)}</option>`;
+    }
+    sysSel.value = curVal;
   } catch(e) { console.warn('stats failed', e); }
 }
 
@@ -229,6 +241,8 @@ async function loadAssets() {
   if (env) params.set('environment', env);
   const crit = $('filter-crit').value;
   if (crit) params.set('criticality', crit);
+  const sys = $('filter-system').value;
+  if (sys) params.set('source_system', sys);
   const seen = $('filter-seen').value;
   if (seen) params.set('last_seen_within', seen);
   params.set('offset', String(currentPage * PAGE_SIZE));
@@ -244,6 +258,8 @@ async function loadAssets() {
   } catch(e) {
     $('assets-tbody').innerHTML = '<tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">Failed to load</td></tr>';
   }
+  // Re-render graph if it's the active view
+  if (currentView === 'graph') renderGraph();
 }
 
 function renderTable(assets) {
@@ -454,9 +470,22 @@ const SYSTEM_COLORS = [
 ];
 
 async function renderGraph() {
-  // Fetch all assets (up to 200 for the graph)
+  // Fetch assets using the same filters as the table view
+  const params = new URLSearchParams();
+  const search = $('filter-search').value.trim();
+  if (search) params.set('search', search);
+  const env = $('filter-env').value;
+  if (env) params.set('environment', env);
+  const crit = $('filter-crit').value;
+  if (crit) params.set('criticality', crit);
+  const sys = $('filter-system').value;
+  if (sys) params.set('source_system', sys);
+  const seen = $('filter-seen').value;
+  if (seen) params.set('last_seen_within', seen);
+  params.set('limit', '200');
+
   try {
-    const r = await fetch('/api/network-map/assets?limit=200', {credentials:'same-origin'});
+    const r = await fetch('/api/network-map/assets?' + params, {credentials:'same-origin'});
     if (!r.ok) return;
     const d = await r.json();
     allAssetsCache = d.assets || [];
