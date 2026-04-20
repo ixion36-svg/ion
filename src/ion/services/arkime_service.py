@@ -408,12 +408,19 @@ class ArkimeService:
         """Download the raw PCAP bytes for a single Arkime session.
 
         Arkime 5.x URL pattern:
-            {base}/api/session/{node}/{sessionId}/pcap
+            {base}/api/session/{node}/3@{sessionId}/pcap
+
+        The ``3@`` prefix is required by Arkime's session routing — it
+        tells the viewer which DB version the session belongs to.
         """
         if not self.is_configured:
             raise ArkimeError("Arkime is not configured")
         if not node or not session_id:
             raise ArkimeError("Both `node` and `session_id` are required")
+
+        # Ensure 3@ prefix (don't double-add if already present)
+        if not session_id.startswith("3@"):
+            session_id = f"3@{session_id}"
 
         url = f"{self.url}/api/session/{node}/{session_id}/pcap"
         headers = await self._headers({"Accept": "application/vnd.tcpdump.pcap"})
