@@ -63,63 +63,32 @@ class ArkimeError(Exception):
 class ArkimeService:
     """Thin async client for the Arkime viewer API.
 
-    Holds a cached OAuth2 access token but no persistent HTTP client — each
-    request opens its own short-lived AsyncClient. Multiple concurrent
-    requests may each trigger a token refresh if the cached token is stale;
-    that's harmless because Keycloak returns a fresh token per call and the
-    cache is last-write-wins.
+    Auth: Basic auth (username/password) or API key. Arkime uses HTTP
+    Digest auth natively — httpx.DigestAuth handles the 401 challenge
+    automatically.
+
+    Configuration (.env):
+        ION_ARKIME_URL=https://arkime.example.com
+        ION_ARKIME_USERNAME=admin
+        ION_ARKIME_PASSWORD=password
+        ION_ARKIME_VERIFY_SSL=false
     """
 
     def __init__(
         self,
         url: Optional[str] = None,
-        keycloak_issuer: Optional[str] = None,
-        keycloak_client_id: Optional[str] = None,
-        keycloak_client_secret: Optional[str] = None,
-        keycloak_scope: Optional[str] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
         api_key: Optional[str] = None,
         verify_ssl: Optional[bool] = None,
+        **_kwargs,  # Accept and ignore legacy keycloak_* args
     ):
         config = get_arkime_config()
         self.url = (url if url is not None else config.get("url", "")).rstrip("/")
-        self.keycloak_issuer = (
-            keycloak_issuer
-            if keycloak_issuer is not None
-            else config.get("keycloak_issuer", "")
-        ).rstrip("/")
-        self.keycloak_client_id = (
-            keycloak_client_id
-            if keycloak_client_id is not None
-            else config.get("keycloak_client_id", "")
-        )
-        self.keycloak_client_secret = (
-            keycloak_client_secret
-            if keycloak_client_secret is not None
-            else config.get("keycloak_client_secret", "")
-        )
-        self.keycloak_scope = (
-            keycloak_scope
-            if keycloak_scope is not None
-            else config.get("keycloak_scope", "openid")
-        )
         self.username = username if username is not None else config.get("username", "")
         self.password = password if password is not None else config.get("password", "")
         self.api_key = api_key if api_key is not None else config.get("api_key", "")
         self.verify_ssl = verify_ssl if verify_ssl is not None else config.get("verify_ssl", True)
-
-        # OAuth2 token cache
-        self._access_token: Optional[str] = None
-        self._token_expires_at: float = 0.0  # unix seconds
-
-    @property
-    def _has_keycloak(self) -> bool:
-        return bool(
-            self.keycloak_issuer
-            and self.keycloak_client_id
-            and self.keycloak_client_secret
-        )
 
     @property
     def _has_basic(self) -> bool:
@@ -127,92 +96,19 @@ class ArkimeService:
 
     @property
     def is_configured(self) -> bool:
-        return bool(
-            self.url and (self._has_keycloak or self.api_key or self._has_basic)
-        )
-
-    # ── Keycloak client_credentials grant ──────────────────────────────────
-    async def _get_access_token(self) -> str:
-        """Return a cached or freshly-minted Keycloak access token."""
-        now = time.time()
-        if self._access_token and (self._token_expires_at - 30) > now:
-            return self._access_token
-
-        token_url = f"{self.keycloak_issuer}/protocol/openid-connect/token"
-        data = {
-            "grant_type": "client_credentials",
-            "client_id": self.keycloak_client_id,
-            "client_secret": self.keycloak_client_secret,
-        }
-        if self.keycloak_scope:
-            data["scope"] = self.keycloak_scope
-
-        logger.info(
-            "Arkime Keycloak token request: issuer=%s client_id=%s",
-            self.keycloak_issuer, self.keycloak_client_id,
-        )
-
-        try:
-            async with httpx.AsyncClient(verify=self.verify_ssl, timeout=20.0) as client:
-                resp = await client.post(token_url, data=data)
-        except httpx.ConnectError as e:
-            raise ArkimeError(
-                f"Keycloak connection failed: {e} (issuer={self.keycloak_issuer})"
-            ) from e
-        except httpx.HTTPError as e:
-            raise ArkimeError(f"Keycloak token request failed: {e}") from e
-
-        if resp.status_code != 200:
-            detail = ""
-            try:
-                payload = resp.json()
-                detail = payload.get("error_description") or payload.get("error") or ""
-            except ValueError:
-                detail = resp.text[:200]
-            logger.error(
-                "Arkime Keycloak token failed: HTTP %d %s (issuer=%s client_id=%s)",
-                resp.status_code, detail, self.keycloak_issuer, self.keycloak_client_id,
-            )
-            raise ArkimeError(
-                f"Keycloak token request failed: HTTP {resp.status_code} {detail}".strip(),
-                status_code=resp.status_code,
-            )
-        payload = resp.json()
-        token = payload.get("access_token")
-        expires_in = int(payload.get("expires_in", 60))
-        if not token:
-            raise ArkimeError("Keycloak response missing access_token")
-        self._access_token = token
-        self._token_expires_at = now + expires_in
-        return token
+        return bool(self.url and (self.api_key or self._has_basic))
 
     async def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        """Build request headers — Keycloak Bearer → Digest key → (basic on request).
-
-        If Keycloak token fetch fails, falls back to API key or digest auth
-        rather than blocking the entire request.
-        """
+        """Build request headers with optional API key auth."""
         headers: Dict[str, str] = {"Accept": "application/json"}
-        if self._has_keycloak:
-            try:
-                token = await self._get_access_token()
-                headers["Authorization"] = f"Bearer {token}"
-            except ArkimeError as e:
-                logger.warning("Keycloak auth failed, falling back: %s", e)
-                # Fall through to API key or digest
-                if self.api_key:
-                    headers["Authorization"] = f"Digest {self.api_key}"
-        elif self.api_key:
+        if self.api_key:
             headers["Authorization"] = f"Digest {self.api_key}"
         if extra:
             headers.update(extra)
         return headers
 
     def _auth(self) -> Optional[httpx.DigestAuth]:
-        """Digest auth fallback. Used when Keycloak/API-key auth is handled
-        in headers, but also as a fallback if those fail.
-        Always returns DigestAuth when username/password are configured —
-        httpx only sends it when the server challenges with 401."""
+        """Digest auth for username/password. httpx handles the 401 challenge."""
         if self._has_basic:
             return httpx.DigestAuth(self.username, self.password)
         return None
@@ -226,17 +122,10 @@ class ArkimeService:
 
     # ── Probes ─────────────────────────────────────────────────────────────
     async def test_connection(self) -> Dict[str, Any]:
-        """Verify we can talk to Arkime. Returns status dict for the UI.
-
-        With Keycloak auth this doubles as a Keycloak liveness check — the
-        token fetch happens before the Arkime call.
-        """
+        """Verify we can talk to Arkime. Returns status dict for the UI."""
         if not self.is_configured:
             return {"connected": False, "error": "Arkime is not configured"}
-        try:
-            headers = await self._headers()
-        except ArkimeError as e:
-            return {"connected": False, "url": self.url, "error": str(e)}
+        headers = await self._headers()
         try:
             async with await self._client() as client:
                 resp = await client.get(
@@ -253,12 +142,8 @@ class ArkimeService:
                 return {
                     "connected": True,
                     "url": self.url,
-                    "user": data.get("userId") or self.keycloak_client_id or self.username or "",
-                    "auth_mode": (
-                        "keycloak" if self._has_keycloak
-                        else "api_key" if self.api_key
-                        else "basic"
-                    ),
+                    "user": data.get("userId") or self.username or "",
+                    "auth_mode": "api_key" if self.api_key else "digest",
                 }
             return {
                 "connected": False,
@@ -364,8 +249,8 @@ class ArkimeService:
         params = {
             "expression": expression,
             "length": str(limit),
-            "startTime": str(int(((__import__("time").time()) - hours * 3600))),
-            "stopTime": str(int(__import__("time").time())),
+            "startTime": str(int(time.time() - hours * 3600)),
+            "stopTime": str(int(time.time())),
             "fields": self._SESSION_FIELDS,
         }
         headers = await self._headers()
