@@ -93,6 +93,41 @@
         </div>
       </section>
 
+      <!-- ───── Live IOC Feed ───── -->
+      <section>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-sans font-semibold text-lg text-white">Live IOC Feed</h2>
+          <div class="flex items-center gap-2">
+            <select id="tl-ioc-score" onchange="window._tlLoadIOCFeed()" class="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300 font-mono">
+              <option value="0">All scores</option>
+              <option value="50">Score ≥ 50</option>
+              <option value="75" selected>Score ≥ 75</option>
+              <option value="90">Score ≥ 90</option>
+            </select>
+            <button onclick="window._tlLoadIOCFeed()" class="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300 hover:bg-white/10 transition">Refresh</button>
+          </div>
+        </div>
+        <div class="rounded-[14px] border border-white/5 bg-ink-900/40 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-[13px]">
+              <thead>
+                <tr class="border-b border-white/5">
+                  <th class="text-center px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider w-14">Score</th>
+                  <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Type</th>
+                  <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Value</th>
+                  <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Labels</th>
+                  <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Source</th>
+                  <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Created</th>
+                </tr>
+              </thead>
+              <tbody id="tl-ioc-body">
+                <tr><td colspan="6" class="px-4 py-6 text-center text-slate-500 text-sm animate-pulse">Loading IOC feed&hellip;</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- ───── Kill Chain Mini-Matrix ───── -->
       <section>
         <h2 class="font-sans font-semibold text-lg text-white mb-3">ATT&CK Kill Chain Coverage</h2>
@@ -568,14 +603,52 @@
       loading.classList.add("hidden");
       content.classList.remove("hidden");
 
-      // Load reports in parallel (non-blocking)
+      // Load reports + IOC feed in parallel (non-blocking)
       loadReports();
+      window._tlLoadIOCFeed();
     } catch (err) {
       loading.classList.add("hidden");
       document.getElementById("tl-error-msg").textContent = "Failed to load: " + err.message;
       errorEl.classList.remove("hidden");
     }
   }
+
+  // ── IOC Feed ──
+  window._tlLoadIOCFeed = async function() {
+    const tbody = document.getElementById("tl-ioc-body");
+    const minScore = document.getElementById("tl-ioc-score").value || "0";
+    tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500 text-sm animate-pulse">Loading&hellip;</td></tr>';
+    try {
+      const resp = await fetch("/api/threat-landscape/ioc-feed?limit=25&min_score=" + minScore);
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const data = await resp.json();
+      const indicators = data.indicators || [];
+      if (!indicators.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500 text-sm">No indicators found.</td></tr>';
+        return;
+      }
+      let html = "";
+      for (const i of indicators) {
+        const score = i.score || 0;
+        const scoreColor = score >= 90 ? "text-red-400 bg-red-500/15" : score >= 70 ? "text-amber-400 bg-amber-500/15" : score >= 40 ? "text-violet-400 bg-violet-500/15" : "text-slate-400 bg-slate-500/15";
+        const labels = (i.labels || []).slice(0, 3).map(l =>
+          '<span class="inline-block px-1 py-0.5 rounded text-[9px] border" style="color:' + (l.color||'#94a3b8') + ';border-color:' + (l.color||'#94a3b8') + '33;background:' + (l.color||'#94a3b8') + '15">' + esc(l.value) + '</span>'
+        ).join(" ");
+        const created = i.created ? new Date(i.created).toLocaleDateString("en-GB", {day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}) : "--";
+        html += '<tr class="border-b border-white/5 hover:bg-white/5 transition-colors">';
+        html += '<td class="px-3 py-2 text-center"><span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ' + scoreColor + '">' + score + '</span></td>';
+        html += '<td class="px-3 py-2 text-[10px] text-slate-400 font-mono">' + esc(i.ioc_type) + '</td>';
+        html += '<td class="px-3 py-2 text-xs text-slate-200 font-mono break-all max-w-xs">' + esc(i.ioc_value) + '</td>';
+        html += '<td class="px-3 py-2">' + (labels || '<span class="text-slate-600">--</span>') + '</td>';
+        html += '<td class="px-3 py-2 text-[11px] text-slate-400">' + esc(i.source || "--") + '</td>';
+        html += '<td class="px-3 py-2 text-[11px] text-slate-500 font-mono">' + created + '</td>';
+        html += '</tr>';
+      }
+      tbody.innerHTML = html;
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-4 text-center text-ion-coral text-xs">Failed: ' + esc(e.message) + '</td></tr>';
+    }
+  };
 
   // ── Reports ──
   let _expandedReportId = null;

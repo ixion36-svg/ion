@@ -196,6 +196,78 @@ async def get_report_detail(
         raise HTTPException(status_code=502, detail=safe_error(e, "threat_landscape"))
 
 
+@router.get("/ioc-feed")
+async def get_ioc_feed(
+    limit: int = Query(30, ge=1, le=100),
+    min_score: int = Query(0, ge=0, le=100),
+    user: User = Depends(require_permission("observable:read")),
+):
+    """Live IOC feed — most recently created indicators from OpenCTI."""
+    service = get_opencti_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=503, detail="OpenCTI integration is not configured")
+    try:
+        # Build filter for minimum score if set
+        variables = {"first": limit}
+        score_filter = ""
+        if min_score > 0:
+            score_filter = f', filters: {{ mode: and, filters: [{{ key: "x_opencti_score", values: ["{min_score}"], operator: gte }}], filterGroups: [] }}'
+
+        data = await service._graphql(f"""
+            query RecentIndicators($first: Int) {{
+                indicators(first: $first, orderBy: created, orderMode: desc{score_filter}) {{
+                    edges {{
+                        node {{
+                            id
+                            name
+                            pattern
+                            indicator_types
+                            valid_from
+                            x_opencti_score
+                            created
+                            objectLabel {{ value color }}
+                            createdBy {{ name }}
+                        }}
+                    }}
+                }}
+            }}
+        """, variables)
+
+        indicators = []
+        for edge in data.get("indicators", {}).get("edges", []):
+            n = edge["node"]
+            # Parse pattern to extract type + value
+            pattern = n.get("pattern") or ""
+            ioc_type = ""
+            ioc_value = pattern
+            if ":" in pattern and "=" in pattern:
+                try:
+                    parts = pattern.strip("[]").split(":", 1)
+                    ioc_type = parts[0].strip()
+                    ioc_value = parts[1].split("=", 1)[1].strip().strip("'\"")
+                except (IndexError, ValueError):
+                    pass
+
+            indicators.append({
+                "id": n.get("id"),
+                "pattern": pattern,
+                "ioc_type": ioc_type,
+                "ioc_value": ioc_value,
+                "types": n.get("indicator_types") or [],
+                "score": n.get("x_opencti_score"),
+                "created": n.get("created"),
+                "valid_from": n.get("valid_from"),
+                "source": (n.get("createdBy") or {}).get("name"),
+                "labels": [
+                    {"value": l.get("value"), "color": l.get("color")}
+                    for l in (n.get("objectLabel") or [])
+                ],
+            })
+        return {"indicators": indicators}
+    except OpenCTIError as e:
+        raise HTTPException(status_code=502, detail=safe_error(e, "threat_landscape"))
+
+
 @router.post("/ai-summary")
 async def ai_threat_summary(
     user: User = Depends(require_permission("observable:read")),
