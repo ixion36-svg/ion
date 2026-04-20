@@ -147,9 +147,18 @@ class ArkimeService:
         if self.keycloak_scope:
             data["scope"] = self.keycloak_scope
 
+        logger.info(
+            "Arkime Keycloak token request: issuer=%s client_id=%s",
+            self.keycloak_issuer, self.keycloak_client_id,
+        )
+
         try:
             async with httpx.AsyncClient(verify=self.verify_ssl, timeout=20.0) as client:
                 resp = await client.post(token_url, data=data)
+        except httpx.ConnectError as e:
+            raise ArkimeError(
+                f"Keycloak connection failed: {e} (issuer={self.keycloak_issuer})"
+            ) from e
         except httpx.HTTPError as e:
             raise ArkimeError(f"Keycloak token request failed: {e}") from e
 
@@ -160,6 +169,10 @@ class ArkimeService:
                 detail = payload.get("error_description") or payload.get("error") or ""
             except ValueError:
                 detail = resp.text[:200]
+            logger.error(
+                "Arkime Keycloak token failed: HTTP %d %s (issuer=%s client_id=%s)",
+                resp.status_code, detail, self.keycloak_issuer, self.keycloak_client_id,
+            )
             raise ArkimeError(
                 f"Keycloak token request failed: HTTP {resp.status_code} {detail}".strip(),
                 status_code=resp.status_code,
@@ -174,11 +187,21 @@ class ArkimeService:
         return token
 
     async def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        """Build request headers — Keycloak Bearer → Digest key → (basic on request)."""
+        """Build request headers — Keycloak Bearer → Digest key → (basic on request).
+
+        If Keycloak token fetch fails, falls back to API key or digest auth
+        rather than blocking the entire request.
+        """
         headers: Dict[str, str] = {"Accept": "application/json"}
         if self._has_keycloak:
-            token = await self._get_access_token()
-            headers["Authorization"] = f"Bearer {token}"
+            try:
+                token = await self._get_access_token()
+                headers["Authorization"] = f"Bearer {token}"
+            except ArkimeError as e:
+                logger.warning("Keycloak auth failed, falling back: %s", e)
+                # Fall through to API key or digest
+                if self.api_key:
+                    headers["Authorization"] = f"Digest {self.api_key}"
         elif self.api_key:
             headers["Authorization"] = f"Digest {self.api_key}"
         if extra:
@@ -186,9 +209,10 @@ class ArkimeService:
         return headers
 
     def _auth(self) -> Optional[httpx.DigestAuth]:
-        """Only used for dev/non-SSO setups. Arkime uses HTTP Digest auth."""
-        if self._has_keycloak or self.api_key:
-            return None
+        """Digest auth fallback. Used when Keycloak/API-key auth is handled
+        in headers, but also as a fallback if those fail.
+        Always returns DigestAuth when username/password are configured —
+        httpx only sends it when the server challenges with 401."""
         if self._has_basic:
             return httpx.DigestAuth(self.username, self.password)
         return None
