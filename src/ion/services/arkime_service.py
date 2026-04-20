@@ -99,18 +99,26 @@ class ArkimeService:
         return bool(self.url and (self.api_key or self._has_basic))
 
     async def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        """Build request headers with optional API key auth."""
+        """Build request headers with auth.
+
+        Sends Basic auth directly in the header — works with both nginx
+        basic auth proxies and Arkime's native auth.
+        """
         headers: Dict[str, str] = {"Accept": "application/json"}
-        if self.api_key:
+        if self._has_basic:
+            import base64
+            creds = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
+            headers["Authorization"] = f"Basic {creds}"
+        elif self.api_key:
             headers["Authorization"] = f"Digest {self.api_key}"
         if extra:
             headers.update(extra)
         return headers
 
-    def _auth(self) -> Optional[httpx.DigestAuth]:
-        """Digest auth for username/password. httpx handles the 401 challenge."""
+    def _auth(self) -> Optional[httpx.BasicAuth]:
+        """BasicAuth fallback — httpx resends on 401 challenge."""
         if self._has_basic:
-            return httpx.DigestAuth(self.username, self.password)
+            return httpx.BasicAuth(self.username, self.password)
         return None
 
     async def _client(self) -> httpx.AsyncClient:
