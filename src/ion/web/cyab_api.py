@@ -993,6 +993,34 @@ def _snapshot_or_live(session: Session, snapshot_key: str, live_fn, live_kwargs:
     return live_fn(**live_kwargs)
 
 
+@router.get("/tide/de/spaces", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_spaces():
+    """List available SIEM spaces from TIDE detection_rules.
+
+    Returns the distinct space values and rule counts so the UI can
+    offer a space selector dropdown. The currently active space is
+    also included.
+    """
+    svc = get_tide_service()
+    if not svc.enabled:
+        return {"spaces": [], "active": "default"}
+    spaces = svc.get_available_spaces()
+    return {"spaces": spaces, "active": svc.space}
+
+
+@router.post("/tide/de/spaces/{space}", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_set_space(space: str):
+    """Switch the active TIDE space filter.
+
+    All subsequent TIDE queries will filter by this space value.
+    """
+    svc = get_tide_service()
+    if not svc.enabled:
+        return {"ok": False, "error": "TIDE not configured"}
+    svc.set_space(space)
+    return {"ok": True, "active": space}
+
+
 @router.get("/tide/de/sync-status", dependencies=[Depends(require_permission("alert:read"))])
 def tide_de_sync_status(session: Session = Depends(get_db_session)):
     """Return the health / freshness of the TIDE snapshot cache."""

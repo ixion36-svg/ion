@@ -5,6 +5,7 @@ indicators, and threat actors associated with given IOC values.
 """
 
 from typing import Optional, Dict, Any, List
+import asyncio
 import logging
 import httpx
 
@@ -44,6 +45,23 @@ class OpenCTIService:
         "source_ip": {"entity_type": "IPv4-Addr", "filter_key": "value"},
         "destination_ip": {"entity_type": "IPv4-Addr", "filter_key": "value"},
     }
+
+    MITRE_TACTIC_ORDER = [
+        ("reconnaissance", "Reconnaissance"),
+        ("resource-development", "Resource Development"),
+        ("initial-access", "Initial Access"),
+        ("execution", "Execution"),
+        ("persistence", "Persistence"),
+        ("privilege-escalation", "Privilege Escalation"),
+        ("defense-evasion", "Defense Evasion"),
+        ("credential-access", "Credential Access"),
+        ("discovery", "Discovery"),
+        ("lateral-movement", "Lateral Movement"),
+        ("collection", "Collection"),
+        ("command-and-control", "Command and Control"),
+        ("exfiltration", "Exfiltration"),
+        ("impact", "Impact"),
+    ]
 
     def __init__(
         self,
@@ -1058,6 +1076,488 @@ class OpenCTIService:
                 continue
             result = await self.enrich_observable(obs_type, obs_value)
             results.append(result)
+        return results
+
+    # ------------------------------------------------------------------
+    # Threat Landscape analytics
+    # ------------------------------------------------------------------
+
+    async def get_threat_landscape_overview(
+        self, actor_limit: int = 20, malware_limit: int = 15
+    ) -> Dict[str, Any]:
+        """Return a high-level threat landscape overview.
+
+        Returns:
+            Dict with keys ``actors``, ``tactic_heatmap``, ``malware_trends``.
+        """
+        result: Dict[str, Any] = {
+            "actors": [],
+            "tactic_heatmap": {},
+            "malware_trends": [],
+        }
+
+        # Step 1 — fetch intrusion sets
+        actor_query = """
+        query LandscapeActors($first: Int) {
+            intrusionSets(first: $first, orderBy: modified, orderMode: desc) {
+                edges {
+                    node {
+                        id
+                        name
+                        aliases
+                        modified
+                        confidence
+                        primary_motivation
+                        first_seen
+                        last_seen
+                    }
+                }
+            }
+        }
+        """
+        try:
+            actor_data = await self._graphql(actor_query, {"first": actor_limit})
+        except OpenCTIError as exc:
+            logger.warning("Threat landscape: intrusion set query failed: %s", exc)
+            return result
+
+        actor_edges = actor_data.get("intrusionSets", {}).get("edges", [])
+        actor_ids: List[str] = []
+        actors_by_id: Dict[str, Dict[str, Any]] = {}
+        for edge in actor_edges:
+            node = edge.get("node", {})
+            aid = node.get("id")
+            if not aid:
+                continue
+            actor_ids.append(aid)
+            actors_by_id[aid] = {
+                "id": aid,
+                "name": node.get("name"),
+                "aliases": node.get("aliases") or [],
+                "modified": node.get("modified"),
+                "confidence": node.get("confidence"),
+                "primary_motivation": node.get("primary_motivation"),
+                "first_seen": node.get("first_seen"),
+                "last_seen": node.get("last_seen"),
+                "ttp_count": 0,
+                "malware_count": 0,
+                "target_sectors": [],
+            }
+
+        # Step 2 — relationships + malware in parallel
+        async def _fetch_relationships() -> Dict:
+            if not actor_ids:
+                return {}
+            rel_query = """
+            query LandscapeRels($filters: FilterGroup) {
+                stixCoreRelationships(filters: $filters, first: 500) {
+                    edges {
+                        node {
+                            relationship_type
+                            from {
+                                ... on IntrusionSet { id }
+                            }
+                            to {
+                                ... on AttackPattern {
+                                    name
+                                    x_mitre_id
+                                    entity_type
+                                    killChainPhases {
+                                        kill_chain_name
+                                        phase_name
+                                    }
+                                }
+                                ... on Malware {
+                                    name
+                                    entity_type
+                                }
+                                ... on Sector {
+                                    name
+                                    entity_type
+                                }
+                                ... on Identity {
+                                    name
+                                    entity_type
+                                    identity_class
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            """
+            rel_filters = {
+                "mode": "and",
+                "filters": [
+                    {
+                        "key": "fromId",
+                        "values": actor_ids,
+                        "operator": "eq",
+                        "mode": "or",
+                    },
+                    {
+                        "key": "relationship_type",
+                        "values": ["uses", "targets"],
+                        "operator": "eq",
+                        "mode": "or",
+                    },
+                ],
+                "filterGroups": [],
+            }
+            try:
+                return await self._graphql(rel_query, {"filters": rel_filters})
+            except OpenCTIError as exc:
+                logger.warning("Threat landscape: relationship query failed: %s", exc)
+                return {}
+
+        async def _fetch_malware() -> Dict:
+            mw_query = """
+            query LandscapeMalware($first: Int) {
+                malwares(first: $first, orderBy: modified, orderMode: desc) {
+                    edges {
+                        node {
+                            id
+                            name
+                            modified
+                            malware_types
+                            is_family
+                            reports {
+                                pageInfo {
+                                    globalCount
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            """
+            try:
+                return await self._graphql(mw_query, {"first": malware_limit})
+            except OpenCTIError as exc:
+                logger.warning("Threat landscape: malware query failed: %s", exc)
+                return {}
+
+        rel_data, mw_data = await asyncio.gather(
+            _fetch_relationships(), _fetch_malware()
+        )
+
+        # Step 3 — process relationships
+        tactic_heatmap: Dict[str, int] = {}
+        for edge in rel_data.get("stixCoreRelationships", {}).get("edges", []):
+            node = edge.get("node", {})
+            from_actor = (node.get("from") or {}).get("id")
+            target = node.get("to") or {}
+            entity_type = target.get("entity_type", "")
+            rel_type = node.get("relationship_type", "")
+
+            actor_entry = actors_by_id.get(from_actor) if from_actor else None
+
+            if entity_type == "Attack-Pattern" and rel_type == "uses":
+                if actor_entry is not None:
+                    actor_entry["ttp_count"] += 1
+                # Build tactic heatmap
+                for phase in target.get("killChainPhases") or []:
+                    phase_name = phase.get("phase_name", "")
+                    if phase_name:
+                        tactic_heatmap[phase_name] = tactic_heatmap.get(phase_name, 0) + 1
+
+            elif entity_type == "Malware" and rel_type == "uses":
+                if actor_entry is not None:
+                    actor_entry["malware_count"] += 1
+
+            elif rel_type == "targets":
+                sector_name = target.get("name")
+                if not sector_name:
+                    continue
+                is_sector = (
+                    entity_type == "Sector"
+                    or (entity_type == "Identity" and target.get("identity_class") == "class")
+                )
+                if is_sector and actor_entry is not None:
+                    if sector_name not in actor_entry["target_sectors"]:
+                        actor_entry["target_sectors"].append(sector_name)
+
+        result["tactic_heatmap"] = tactic_heatmap
+
+        # Step 4 — enrich actors with country mapper
+        actors_list = list(actors_by_id.values())
+        for actor in actors_list:
+            code = get_country_code(actor.get("name", ""), actor.get("aliases"))
+            actor["country_code"] = code
+            actor["country_name"] = get_country_name(code)
+            actor["country_flag"] = country_code_to_flag(code)
+        result["actors"] = actors_list
+
+        # Step 5 — malware trends
+        for edge in mw_data.get("malwares", {}).get("edges", []):
+            node = edge.get("node", {})
+            reports_info = node.get("reports") or {}
+            page_info = reports_info.get("pageInfo") or {}
+            report_count = page_info.get("globalCount", 0)
+            result["malware_trends"].append({
+                "name": node.get("name"),
+                "modified": node.get("modified"),
+                "types": node.get("malware_types") or [],
+                "is_family": node.get("is_family", False),
+                "report_count": report_count,
+            })
+
+        return result
+
+    async def get_actor_deep_dive(self, actor_id: str) -> Dict[str, Any]:
+        """Return detailed data for a single intrusion set / threat actor.
+
+        Args:
+            actor_id: OpenCTI internal ID of the intrusion set.
+
+        Returns:
+            Dict with techniques_by_tactic, malware_arsenal, targeted info, etc.
+        """
+        tactic_display = {slug: label for slug, label in self.MITRE_TACTIC_ORDER}
+
+        result: Dict[str, Any] = {
+            "id": actor_id,
+            "name": None,
+            "description": None,
+            "aliases": [],
+            "first_seen": None,
+            "last_seen": None,
+            "motivation": None,
+            "techniques_by_tactic": {},
+            "malware_arsenal": [],
+            "targeted_countries": [],
+            "targeted_sectors": [],
+            "cves_exploited": [],
+            "country_code": None,
+            "country_name": None,
+            "country_flag": None,
+        }
+
+        # Step 1 — fetch the intrusion set
+        actor_query = """
+        query ActorDeepDive($id: String!) {
+            intrusionSet(id: $id) {
+                id
+                name
+                description
+                aliases
+                first_seen
+                last_seen
+                primary_motivation
+                confidence
+                modified
+            }
+        }
+        """
+        try:
+            actor_data = await self._graphql(actor_query, {"id": actor_id})
+        except OpenCTIError as exc:
+            logger.warning("Actor deep dive: intrusion set query failed: %s", exc)
+            return result
+
+        actor = actor_data.get("intrusionSet")
+        if not actor:
+            return result
+
+        result["id"] = actor.get("id", actor_id)
+        result["name"] = actor.get("name")
+        result["description"] = actor.get("description")
+        result["aliases"] = actor.get("aliases") or []
+        result["first_seen"] = actor.get("first_seen")
+        result["last_seen"] = actor.get("last_seen")
+        result["motivation"] = actor.get("primary_motivation")
+
+        # Step 2 — fetch ALL relationships from this actor
+        rel_query = """
+        query ActorDeepDiveRels($filters: FilterGroup) {
+            stixCoreRelationships(filters: $filters, first: 500) {
+                edges {
+                    node {
+                        relationship_type
+                        to {
+                            ... on AttackPattern {
+                                name
+                                x_mitre_id
+                                entity_type
+                                killChainPhases {
+                                    kill_chain_name
+                                    phase_name
+                                }
+                            }
+                            ... on Malware {
+                                name
+                                entity_type
+                                malware_types
+                            }
+                            ... on Country {
+                                name
+                                entity_type
+                            }
+                            ... on Sector {
+                                name
+                                entity_type
+                            }
+                            ... on Identity {
+                                name
+                                entity_type
+                                identity_class
+                            }
+                            ... on Vulnerability {
+                                name
+                                entity_type
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """
+        rel_filters = {
+            "mode": "and",
+            "filters": [
+                {
+                    "key": "fromId",
+                    "values": [actor_id],
+                    "operator": "eq",
+                    "mode": "or",
+                },
+            ],
+            "filterGroups": [],
+        }
+        try:
+            rel_data = await self._graphql(rel_query, {"filters": rel_filters})
+        except OpenCTIError as exc:
+            logger.warning("Actor deep dive: relationship query failed: %s", exc)
+            # Return partial data — actor info without relationships
+            code = get_country_code(result.get("name", ""), result.get("aliases"))
+            result["country_code"] = code
+            result["country_name"] = get_country_name(code)
+            result["country_flag"] = country_code_to_flag(code)
+            return result
+
+        # Step 3 — process relationships
+        techniques_by_tactic: Dict[str, List[Dict[str, str]]] = {}
+        malware_seen: set = set()
+        sector_seen: set = set()
+        country_seen: set = set()
+        cve_seen: set = set()
+
+        for edge in rel_data.get("stixCoreRelationships", {}).get("edges", []):
+            node = edge.get("node", {})
+            rel_type = node.get("relationship_type", "")
+            target = node.get("to") or {}
+            entity_type = target.get("entity_type", "")
+            name = target.get("name", "")
+
+            if entity_type == "Attack-Pattern" and rel_type == "uses":
+                mitre_id = target.get("x_mitre_id", "")
+                phases = target.get("killChainPhases") or []
+                if phases:
+                    phase_slug = phases[0].get("phase_name", "unknown")
+                else:
+                    phase_slug = "unknown"
+                display_tactic = tactic_display.get(phase_slug, phase_slug.replace("-", " ").title())
+                entry = {"mitre_id": mitre_id, "name": name}
+                techniques_by_tactic.setdefault(display_tactic, []).append(entry)
+
+            elif entity_type == "Malware" and rel_type == "uses":
+                if name and name not in malware_seen:
+                    malware_seen.add(name)
+                    result["malware_arsenal"].append({
+                        "name": name,
+                        "types": target.get("malware_types") or [],
+                    })
+
+            elif entity_type == "Country" and rel_type == "targets":
+                if name and name not in country_seen:
+                    country_seen.add(name)
+                    code = get_country_code(name)
+                    result["targeted_countries"].append({
+                        "name": name,
+                        "code": code,
+                        "flag": country_code_to_flag(code),
+                    })
+
+            elif rel_type == "targets":
+                is_sector = (
+                    entity_type == "Sector"
+                    or (entity_type == "Identity" and target.get("identity_class") == "class")
+                )
+                if is_sector and name and name not in sector_seen:
+                    sector_seen.add(name)
+                    result["targeted_sectors"].append(name)
+
+            elif entity_type == "Vulnerability":
+                if name and name not in cve_seen:
+                    cve_seen.add(name)
+                    result["cves_exploited"].append({"name": name})
+
+        # Order techniques by the canonical MITRE tactic order
+        ordered: Dict[str, List[Dict[str, str]]] = {}
+        for slug, display in self.MITRE_TACTIC_ORDER:
+            if display in techniques_by_tactic:
+                ordered[display] = techniques_by_tactic.pop(display)
+        # Append any remaining (unmapped) tactics
+        for tactic, techs in techniques_by_tactic.items():
+            ordered[tactic] = techs
+        result["techniques_by_tactic"] = ordered
+
+        # Step 5 — enrich actor with country mapper
+        code = get_country_code(result.get("name", ""), result.get("aliases"))
+        result["country_code"] = code
+        result["country_name"] = get_country_name(code)
+        result["country_flag"] = country_code_to_flag(code)
+
+        return result
+
+    async def get_top_malware(self, limit: int = 15) -> List[Dict[str, Any]]:
+        """Return the most recently modified malware entries from OpenCTI.
+
+        Args:
+            limit: Maximum number of malware entries to return.
+
+        Returns:
+            List of dicts with name, modified, types, report_count, description.
+        """
+        query = """
+        query TopMalware($first: Int) {
+            malwares(first: $first, orderBy: modified, orderMode: desc) {
+                edges {
+                    node {
+                        name
+                        modified
+                        malware_types
+                        is_family
+                        description
+                        reports {
+                            pageInfo {
+                                globalCount
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """
+        try:
+            data = await self._graphql(query, {"first": limit})
+        except OpenCTIError as exc:
+            logger.warning("Top malware query failed: %s", exc)
+            return []
+
+        results: List[Dict[str, Any]] = []
+        for edge in data.get("malwares", {}).get("edges", []):
+            node = edge.get("node", {})
+            reports_info = node.get("reports") or {}
+            page_info = reports_info.get("pageInfo") or {}
+            report_count = page_info.get("globalCount", 0)
+            results.append({
+                "name": node.get("name"),
+                "modified": node.get("modified"),
+                "types": node.get("malware_types") or [],
+                "report_count": report_count,
+                "description": node.get("description"),
+            })
         return results
 
 

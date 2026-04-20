@@ -18,6 +18,9 @@
     <span id="de-tide-badge" title="Click for sync status" class="inline-flex items-center gap-2 h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300 cursor-pointer hover:bg-white/10 transition">
       <span class="de-tide-dot h-1.5 w-1.5 rounded-full bg-ion-lime"></span> TIDE
     </span>
+    <select id="de-space-select" onchange="deChangeSpace(this.value)" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300 font-mono cursor-pointer hover:bg-white/10 transition appearance-none" style="min-width:120px;" title="SIEM / Kibana space filter">
+      <option value="">Loading spaces…</option>
+    </select>
     <button onclick="deSyncTide()" title="Pull fresh data from TIDE now" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Sync TIDE</button>
     <button onclick="deRefresh()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">Refresh</button>
   </div>
@@ -1601,8 +1604,48 @@ async function deCheckSyncStatus() {
     } catch (e) {}
 }
 
+/* ── Space selector ────────────────────────────── */
+async function deLoadSpaces() {
+    const sel = $('de-space-select');
+    try {
+        const data = await apiFetch('/tide/de/spaces');
+        const spaces = data.spaces || [];
+        const active = data.active || 'default';
+        if (!spaces.length) {
+            sel.innerHTML = '<option value="default">default</option>';
+            return;
+        }
+        sel.innerHTML = spaces.map(s => {
+            const selected = s.space === active ? ' selected' : '';
+            return `<option value="${s.space}"${selected}>${s.space} (${s.rule_count})</option>`;
+        }).join('');
+    } catch (e) {
+        sel.innerHTML = '<option value="default">default</option>';
+    }
+}
+
+window.deChangeSpace = async function(space) {
+    if (!space) return;
+    try {
+        await fetch(API + '/tide/de/spaces/' + encodeURIComponent(space), {
+            method: 'POST', credentials: 'include'
+        });
+        // Reset cached data and reload current tab
+        _loaded = {posture:false, killchains:false, rules:false, execution:false, readiness:false, progression:false, gaps:false, d3fend:false, emulation:false, vulns:false};
+        _postureData = null;
+        _killChainsData = null;
+        _gapsData = null;
+        _vulnsCache = null;
+        _d3fendCache = null;
+        _emCache = null;
+        loadTab(_activeTab);
+    } catch (e) {
+        console.warn('Space switch failed:', e);
+    }
+};
+
 /* ── Init ─────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => { loadTab('posture'); deCheckSyncStatus(); });
+document.addEventListener('DOMContentLoaded', () => { deLoadSpaces(); loadTab('posture'); deCheckSyncStatus(); });
 
 })();
 </script>

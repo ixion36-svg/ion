@@ -1011,12 +1011,43 @@ class TideService:
             },
         }
 
+    def get_available_spaces(self) -> list[dict]:
+        """Discover available Kibana spaces (SIEM filter values) from detection_rules.
+
+        Returns a list of {"space": "...", "rule_count": N} for each distinct
+        space in the tenant's detection_rules table.
+        """
+        if not self.enabled:
+            return []
+        result = self._query(
+            "SELECT space, COUNT(*) as rule_count "
+            "FROM detection_rules GROUP BY space ORDER BY rule_count DESC"
+        )
+        if not result:
+            return []
+        return [
+            {"space": r["space"], "rule_count": r["rule_count"]}
+            for r in result["rows"]
+        ]
+
+    def set_space(self, space: str) -> None:
+        """Switch the active space filter for all subsequent queries."""
+        self.space = space
+        # Clear the query cache since results are space-dependent
+        with _CACHE_LOCK:
+            _QUERY_CACHE.clear()
+        logger.info("TIDE space switched to: %s", space)
+
     def test_connection(self) -> dict:
         if not self.enabled:
             return {"ok": False, "error": "TIDE integration not configured"}
         result = self._query(f"SELECT count(*) as rule_count FROM detection_rules WHERE space = '{self.space}'")
         if result and result["rows"]:
-            return {"ok": True, "rule_count": result["rows"][0]["rule_count"]}
+            return {
+                "ok": True,
+                "rule_count": result["rows"][0]["rule_count"],
+                "space": self.space,
+            }
         return {"ok": False, "error": "Failed to query TIDE"}
 
 

@@ -41,6 +41,7 @@ from ion.web.pcap_api import router as pcap_router
 from ion.web.arkime_api import router as arkime_router
 from ion.web.forensics_api import router as forensics_router
 from ion.web.threat_intel_api import router as threat_intel_router
+from ion.web.threat_landscape_api import router as threat_landscape_router
 from ion.web.threat_watch_gap_api import router as threat_watch_gap_router
 from ion.web.cyab_api import router as cyab_router
 from ion.web.social_api import router as social_router
@@ -257,6 +258,7 @@ app.include_router(engineering_analytics_router, prefix="/api/engineering/analyt
 app.include_router(cyab_router, prefix="/api/cyab")
 app.include_router(threat_intel_router, prefix="/api/threat-intel")
 app.include_router(threat_watch_gap_router, prefix="/api/threat-intel")
+app.include_router(threat_landscape_router, prefix="/api")
 app.include_router(shift_handover_router, prefix="/api")
 app.include_router(entity_timeline_router, prefix="/api")
 app.include_router(analyst_efficiency_router, prefix="/api")
@@ -698,6 +700,12 @@ async def observables_page(request: Request, user: User = Depends(require_page_p
 async def threat_intel_page(request: Request, user: User = Depends(require_page_permission("observable:read"))):
     """Render the threat intel page."""
     return templates.TemplateResponse(request=request, name="threat_intel.html")
+
+
+@app.get("/threat-landscape", response_class=HTMLResponse)
+async def threat_landscape_page(request: Request, user: User = Depends(require_page_permission("observable:read"))):
+    """Render the threat landscape analytics page."""
+    return templates.TemplateResponse(request=request, name="threat_landscape.html")
 
 
 @app.get("/tools", response_class=HTMLResponse)
