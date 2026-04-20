@@ -1,7 +1,7 @@
 """Repository for Document operations."""
 
 from typing import Optional, List
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ion.models.document import Document, DocumentVersion
@@ -13,6 +13,19 @@ class DocumentRepository:
 
     def __init__(self, session: Session):
         self.session = session
+
+    def count(self) -> int:
+        """Fast count without loading objects."""
+        return self.session.execute(select(func.count(Document.id))).scalar() or 0
+
+    def list_recent(self, limit: int = 5) -> List[Document]:
+        """Return the N most recently updated documents (lightweight)."""
+        stmt = (
+            select(Document)
+            .order_by(Document.updated_at.desc())
+            .limit(limit)
+        )
+        return list(self.session.execute(stmt).scalars().all())
 
     def create(
         self,

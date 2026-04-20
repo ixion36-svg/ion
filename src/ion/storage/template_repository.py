@@ -1,7 +1,7 @@
 """Repository for Template operations."""
 
 from typing import Optional, List
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ion.models.template import Template, Tag, Variable
@@ -12,6 +12,24 @@ class TemplateRepository:
 
     def __init__(self, session: Session):
         self.session = session
+
+    def count(self) -> int:
+        """Fast count without loading objects."""
+        return self.session.execute(select(func.count(Template.id))).scalar() or 0
+
+    def count_tags(self) -> int:
+        """Fast tag count without loading objects."""
+        return self.session.execute(select(func.count(Tag.id))).scalar() or 0
+
+    def list_recent(self, limit: int = 5) -> List[Template]:
+        """Return the N most recently updated templates (lightweight)."""
+        stmt = (
+            select(Template)
+            .options(selectinload(Template.tags))
+            .order_by(Template.updated_at.desc())
+            .limit(limit)
+        )
+        return list(self.session.execute(stmt).scalars().all())
 
     def create(
         self,

@@ -2258,16 +2258,13 @@ async def get_dashboard(
     services: Services = Depends(get_services),
 ):
     """Get comprehensive dashboard data including GitLab tasks."""
-    # Basic stats
-    templates = services.template.list_templates()
-    documents = services.render.list_documents()
-    tags = services.template.list_tags()
-
-    # Recent documents (last 5)
-    recent_docs = sorted(documents, key=lambda d: d.updated_at, reverse=True)[:5]
-
-    # Recent templates (last 5)
-    recent_templates = sorted(templates, key=lambda t: t.updated_at, reverse=True)[:5]
+    # Lightweight counts + recent items — avoids loading all templates/docs
+    # just to count them (was 600ms+, now ~5ms).
+    template_count = services.template.template_repo.count()
+    document_count = services.document_repo.count()
+    tag_count = services.template.template_repo.count_tags()
+    recent_templates = services.template.template_repo.list_recent(5)
+    recent_docs = services.document_repo.list_recent(5)
 
     # Fetch GitLab and Elasticsearch data in parallel with short timeouts
     async def fetch_gitlab_data():
@@ -2365,9 +2362,9 @@ async def get_dashboard(
             "focus_role": focus_role.name if focus_role else None,
         },
         "stats": {
-            "templates_count": len(templates),
-            "documents_count": len(documents),
-            "tags_count": len(tags),
+            "templates_count": template_count,
+            "documents_count": document_count,
+            "tags_count": tag_count,
         },
         "recent_templates": [
             {
