@@ -2313,23 +2313,21 @@ async def get_dashboard(
                 from ion.services.elasticsearch_service import ElasticsearchService
                 es_service = ElasticsearchService()
                 if es_service.is_configured:
-                    connection = await es_service.test_connection()
-                    if connection.get("connected"):
-                        data["connected"] = True
-                        data["cluster_name"] = connection.get("cluster_name")
-                        # Fetch recent alerts + histogram in parallel — the
-                        # sparkline on the dashboard reads alerts_histogram.
+                    # Skip test_connection() — the alerts query itself will
+                    # fail fast if ES is down, saving a redundant round-trip.
+                    try:
                         alerts, histogram = await asyncio.gather(
                             es_service.get_alerts(hours=24, limit=10),
                             es_service.get_alerts_histogram(hours=24, interval="1h"),
                         )
-                        data["alerts"] = [a.to_dict() for a in alerts]
+                        data["connected"] = True
+                        data["alerts"] = [a.to_dict(include_raw=False) for a in alerts]
                         data["total_alerts"] = len(alerts)
                         data["critical_count"] = sum(1 for a in alerts if a.severity == "critical")
                         data["high_count"] = sum(1 for a in alerts if a.severity == "high")
                         data["alerts_histogram"] = histogram or []
-                    else:
-                        data["error"] = connection.get("error", "Connection failed")
+                    except Exception:
+                        data["error"] = "Elasticsearch connection failed"
             except Exception as e:
                 data["error"] = safe_error(e)
         return data
@@ -3405,7 +3403,9 @@ async def get_es_alerts(
         ns_map = bulk_resolve(session, (a.source_system for a in alerts))
         out_alerts = []
         for a in alerts:
-            d = a.to_dict()
+            # Exclude raw_data from list view — saves ~65% of payload.
+            # Frontend fetches raw_data on demand via GET /alerts/{id}/raw.
+            d = a.to_dict(include_raw=False)
             res = ns_map.get(a.source_system) if a.source_system else None
             if res:
                 d["cyab_system_id"] = res.get("cyab_system_id")
@@ -3420,6 +3420,7 @@ async def get_es_alerts(
             "hours": hours,
             "enabled": True,
             "configured": True,
+            "arkime_enabled": get_config().arkime_enabled,
         }
     except ElasticsearchError as e:
         logger.warning("Elasticsearch connection error fetching alerts: %s", e)
@@ -3432,6 +3433,21 @@ async def get_es_alerts(
             "connection_error": True,
             "message": safe_error(e),
         }
+
+
+@router.get("/elasticsearch/alerts/{alert_id}/raw")
+async def get_alert_raw_data(
+    alert_id: str,
+    current_user: User = Depends(require_permission("alert:read")),
+):
+    """Fetch raw_data for a single alert — called on demand when the detail panel opens."""
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=503, detail="Elasticsearch is not configured")
+    alerts = await service.get_alerts_by_ids([alert_id])
+    if not alerts:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return {"raw_data": alerts[0].raw_data}
 
 
 @router.get("/elasticsearch/alerts/systems")

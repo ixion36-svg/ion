@@ -916,6 +916,18 @@ class StructuredLogger:
             extra=extra,
         )
 
+    def debug(self, message: str, *args, **kwargs) -> None:
+        """Log a debug message."""
+        self.logger.debug(message, *args, **kwargs)
+
+    def info(self, message: str, *args, **kwargs) -> None:
+        """Log an info message."""
+        self.logger.info(message, *args, **kwargs)
+
+    def warning(self, message: str, *args, **kwargs) -> None:
+        """Log a warning message."""
+        self.logger.warning(message, *args, **kwargs)
+
     def error(
         self,
         message: str,

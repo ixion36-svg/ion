@@ -185,12 +185,12 @@ class ArkimeService:
             headers.update(extra)
         return headers
 
-    def _auth(self) -> Optional[httpx.BasicAuth]:
-        """Only used for dev/non-SSO basic-auth setups."""
+    def _auth(self) -> Optional[httpx.DigestAuth]:
+        """Only used for dev/non-SSO setups. Arkime uses HTTP Digest auth."""
         if self._has_keycloak or self.api_key:
             return None
         if self._has_basic:
-            return httpx.BasicAuth(self.username, self.password)
+            return httpx.DigestAuth(self.username, self.password)
         return None
 
     async def _client(self) -> httpx.AsyncClient:
@@ -261,10 +261,14 @@ class ArkimeService:
 
         Returns a list of session documents (possibly empty). The PCAP
         download endpoint needs the `id` field from one of these docs.
+        When *node* is empty the node filter is omitted so sessions from
+        any capture node can match.
         """
         if not self.is_configured:
             raise ArkimeError("Arkime is not configured")
-        expression = f'communityId == "{community_id}" && node == "{node}"'
+        expression = f'communityId == "{community_id}"'
+        if node:
+            expression += f' && node == "{node}"'
         params = {
             "expression": expression,
             "length": str(limit),
@@ -304,10 +308,13 @@ class ArkimeService:
 
         Fallback when community_id is not available on the alert. Searches
         both source and destination so any traffic involving the IP is found.
+        When *node* is empty the node filter is omitted.
         """
         if not self.is_configured:
             raise ArkimeError("Arkime is not configured")
-        expression = f'(ip.src == {ip} || ip.dst == {ip}) && node == "{node}"'
+        expression = f'(ip.src == {ip} || ip.dst == {ip})'
+        if node:
+            expression += f' && node == "{node}"'
         params = {
             "expression": expression,
             "length": str(limit),
@@ -354,15 +361,19 @@ class ArkimeService:
         sessions = await self.find_sessions_by_community_id(node, community_id)
         if not sessions:
             raise ArkimeError(
-                f"No Arkime sessions matched community_id={community_id} on "
-                f"node={node}",
+                f"No Arkime sessions matched community_id={community_id}"
+                + (f" on node={node}" if node else ""),
                 status_code=404,
             )
         primary = sessions[0]
         arkime_session_id = primary.get("id") or primary.get("_id")
         if not arkime_session_id:
             raise ArkimeError("Arkime session document missing `id` field")
-        pcap_bytes = await self.download_pcap(node, str(arkime_session_id))
+        # Resolve node from the session result when the alert didn't carry one
+        resolved_node = node or primary.get("node") or ""
+        if not resolved_node:
+            raise ArkimeError("Cannot determine Arkime node for PCAP download")
+        pcap_bytes = await self.download_pcap(resolved_node, str(arkime_session_id))
         return {
             "pcap": pcap_bytes,
             "session": primary,

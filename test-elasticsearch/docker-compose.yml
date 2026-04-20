@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.11
     container_name: elasticsearch-test
     environment:
       - discovery.type=single-node
@@ -21,7 +21,7 @@ services:
       retries: 5
 
   kibana:
-    image: docker.elastic.co/kibana/kibana:8.17.1
+    image: docker.elastic.co/kibana/kibana:8.19.11
     container_name: kibana-test
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
@@ -32,6 +32,23 @@ services:
       - XPACK_REPORTING_ENCRYPTIONKEY=c9h5e1g3d7f4h0c6e8g2d5f9h1c3e7g4
     ports:
       - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  arkime:
+    image: mosajjal/arkime:latest
+    container_name: arkime-test
+    environment:
+      - ARKIME_ELASTICSEARCH=http://elastic:DocforgeTest2025@elasticsearch:9200
+      - ARKIME_ADMINCREDS=arkime:arkime
+      - ARKIME_AUTOINIT=true
+      - ARKIME_PASSWORDSECRET=ion-arkime-dev-secret
+      - ARKIME_INTERFACE=eth0
+      - ARKIME_VIEWHOST=0.0.0.0
+      - ARKIME_USERAUTHIPS=0.0.0.0/0
+    ports:
+      - "8005:8005"
     depends_on:
       elasticsearch:
         condition: service_healthy

@@ -3302,6 +3302,7 @@ let entityFilter = null; // { type: 'host'|'user'|'rule', value: '...' }
 let autoRefreshEnabled = true;
 let autoRefreshTimer = null;
 let currentDetailAlert = null;
+let arkimeEnabled = false;  // Set from API response — true when ION has Arkime configured
 let triageCache = {}; // { es_alert_id: { status, priority, case_id, ... } }
 let casesData = []; // cached list of cases
 let selectedAlertIds = new Set(); // for bulk operations
@@ -3531,6 +3532,7 @@ async function loadAlerts() {
         }
 
         allAlerts = data.alerts || [];
+        arkimeEnabled = !!data.arkime_enabled;
         applyFilters();
         renderThreatBanner();
         renderAnalytics();
@@ -6862,7 +6864,7 @@ function renderAlerts() {
                     <button class="quick-action-btn" onclick="quickAssignToMe('${escapeHtml(a.id)}')" title="Assign to me"><i class="icon-user-check"></i></button>
                     <button class="quick-action-btn" onclick="quickStatusChange('${escapeHtml(a.id)}', 'acknowledged')" title="Acknowledge"><i class="icon-search"></i></button>
                     <button class="quick-action-btn" onclick="showCreateCaseForm('${escapeHtml(a.id)}')" title="Create case"><i class="icon-folder-plus"></i></button>
-                    ${a.arkime_node ? `<a class="quick-action-btn arkime-action-btn" href="/alerts/${encodeURIComponent(a.id)}/arkime" title="Arkime PCAP analysis${a.network_community_id ? '' : ' (IP search — no community ID)'}" onclick="event.stopPropagation()" style="color:#6de4ff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></a>` : ''}
+                    ${(arkimeEnabled && (a.network_community_id || a.source_ip || a.destination_ip || a.arkime_node)) ? `<a class="quick-action-btn arkime-action-btn" href="/alerts/${encodeURIComponent(a.id)}/arkime" title="Arkime PCAP analysis${a.network_community_id ? '' : ' (IP search — no community ID)'}" onclick="event.stopPropagation()" style="color:#6de4ff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></a>` : ''}
                 </div>
             </td>
         </tr>
@@ -8071,6 +8073,21 @@ async function showAlertDetail(alertId) {
         </div>`;
     }
 
+    // Arkime PCAP button — shown when Arkime is configured and alert has network context
+    if (arkimeEnabled && (alert.network_community_id || alert.source_ip || alert.destination_ip || alert.arkime_node)) {
+        const arkimeHint = alert.network_community_id
+            ? `Community ID: ${escapeHtml(alert.network_community_id)}`
+            : `IP search: ${escapeHtml(alert.source_ip || alert.destination_ip || '')}`;
+        html += `<div class="ai-analysis-bar" style="margin-top:0.25rem;">
+            <a class="ai-assist-btn" href="/alerts/${encodeURIComponent(alert.id)}/arkime"
+               style="background:rgba(109,228,255,0.12);border-color:rgba(109,228,255,0.3);color:#6de4ff;text-decoration:none;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
+                Arkime PCAP Analysis
+            </a>
+            <span style="color:var(--ion-text-secondary);font-size:0.75rem;margin-left:0.5rem;">${arkimeHint}</span>
+        </div>`;
+    }
+
     // Tabs (added Comments and Case)
     html += `
     <div class="detail-tabs">
@@ -8093,7 +8110,7 @@ async function showAlertDetail(alertId) {
         <div class="loading">Loading case info...</div>
     </div>
     <div id="detail-tab-rawdata" class="detail-tab-content">
-        <div class="raw-data-container">${syntaxHighlightJSON(alert.raw_data)}</div>
+        <div class="raw-data-container" id="raw-data-content">${alert.raw_data ? syntaxHighlightJSON(alert.raw_data) : '<div class="loading">Click to load raw data...</div>'}</div>
     </div>`;
 
     body.innerHTML = html;
@@ -8150,6 +8167,20 @@ function switchDetailTab(tabId, btn) {
     document.querySelectorAll('.detail-tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`detail-tab-${tabId}`).classList.add('active');
+    // Lazy-load raw data on first click
+    if (tabId === 'rawdata' && currentDetailAlert && !currentDetailAlert.raw_data) {
+        const container = document.getElementById('raw-data-content');
+        if (container && container.querySelector('.loading')) {
+            container.innerHTML = '<div class="loading">Loading raw data...</div>';
+            fetch(`/api/elasticsearch/alerts/${encodeURIComponent(currentDetailAlert.id)}/raw`)
+                .then(r => r.json())
+                .then(data => {
+                    currentDetailAlert.raw_data = data.raw_data;
+                    container.innerHTML = syntaxHighlightJSON(data.raw_data);
+                })
+                .catch(() => { container.innerHTML = '<div class="error">Failed to load raw data</div>'; });
+        }
+    }
 }
 
 // =========================================================================

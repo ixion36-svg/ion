@@ -67,9 +67,14 @@ class ElasticsearchAlert:
         if self.geo_data is None:
             self.geo_data = {}
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for API response."""
-        return {
+    def to_dict(self, include_raw: bool = True) -> Dict[str, Any]:
+        """Convert to dictionary for API response.
+
+        Args:
+            include_raw: Include the full raw_data field. Set False for list
+                views to cut ~65% of payload size.
+        """
+        d = {
             "id": self.id,
             "title": self.title,
             "severity": self.severity,
@@ -81,7 +86,6 @@ class ElasticsearchAlert:
             "host": self.host,
             "user": self.user,
             "tags": self.tags,
-            "raw_data": self.raw_data,
             "mitre_technique_id": self.mitre_technique_id,
             "mitre_technique_name": self.mitre_technique_name,
             "mitre_tactic_name": self.mitre_tactic_name,
@@ -92,6 +96,9 @@ class ElasticsearchAlert:
             "source_ip": self.source_ip,
             "destination_ip": self.destination_ip,
         }
+        if include_raw:
+            d["raw_data"] = self.raw_data
+        return d
 
 
 class ElasticsearchError(Exception):
@@ -1316,6 +1323,7 @@ class ElasticsearchService:
             body = {
                 "signal_ids": alert_ids,
                 "status": workflow_status,
+                "conflicts": "proceed",
             }
 
             verify_ssl = kibana_config.get("verify_ssl", True) if kibana_config.get("enabled") else self.verify_ssl
@@ -1345,15 +1353,15 @@ class ElasticsearchService:
                         return True
                     # Do NOT log response.text — Kibana 401/403 bodies can echo
                     # auth headers / cookies. Status code is enough to debug.
-                    logger.debug(
-                        "Kibana API path returned non-200 (status=%d)",
-                        response.status_code,
+                    logger.warning(
+                        "Kibana API workflow_status update: %s returned %d for %d alerts (status=%s)",
+                        api_path, response.status_code, len(alert_ids), workflow_status,
                     )
 
             return False
 
         except Exception as e:
-            logger.debug("Kibana API workflow_status update failed: %s", e)
+            logger.warning("Kibana API workflow_status update failed: %s", e)
             return False
 
     async def _update_via_es_direct(

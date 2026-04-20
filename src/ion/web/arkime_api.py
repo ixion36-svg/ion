@@ -230,12 +230,13 @@ async def _enrich_observables(
 
 
 async def _fetch_alert_for_arkime(alert_id: str) -> Dict[str, Any]:
-    """Fetch an alert from ES and verify it has an Arkime node field.
+    """Fetch an alert from ES for the Arkime workflow.
 
-    v0.9.86: relaxed from requiring BOTH network.community_id AND node to
-    requiring only node. When community_id is absent the preview endpoint
-    falls back to an IP+time search on Arkime instead of an exact
-    community-id match.
+    The alert needs at least one piece of network context — community_id,
+    source/destination IP, or arkime_node — so we can search Arkime for
+    matching sessions.  The node field is optional: when absent, the
+    Arkime session search runs without a node filter and the node is
+    resolved from the matched session result.
     """
     es = ElasticsearchService()
     if not es.is_configured:
@@ -244,12 +245,20 @@ async def _fetch_alert_for_arkime(alert_id: str) -> Dict[str, Any]:
     if not alerts:
         raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
     alert = alerts[0]
-    if not alert.arkime_node:
+    d = alert.to_dict()
+    has_network = (
+        d.get("network_community_id")
+        or d.get("arkime_node")
+        or d.get("source_ip")
+        or d.get("destination_ip")
+    )
+    if not has_network:
         raise HTTPException(
             status_code=400,
-            detail=f"Alert {alert_id} has no Arkime node field",
+            detail=f"Alert {alert_id} has no network context (community_id, "
+                   f"node, or IPs) — cannot search Arkime",
         )
-    return alert.to_dict()
+    return d
 
 
 # ════════════════════════════════ Routes ════════════════════════════════
@@ -333,19 +342,28 @@ async def arkime_preview(
         if not sessions:
             raise HTTPException(
                 status_code=404,
-                detail=f"No Arkime sessions found for IP {search_ip} on node {node}",
+                detail=f"No Arkime sessions found for IP {search_ip}"
+                       + (f" on node {node}" if node else ""),
             )
         primary = sessions[0]
         arkime_sid = primary.get("id") or primary.get("_id")
         if not arkime_sid:
             raise HTTPException(status_code=500, detail="Arkime session missing id")
-        pcap_bytes = await svc.download_pcap(node, str(arkime_sid))
+        resolved_node = node or primary.get("node") or ""
+        if not resolved_node:
+            raise HTTPException(
+                status_code=500,
+                detail="Cannot determine Arkime node from session result",
+            )
+        pcap_bytes = await svc.download_pcap(resolved_node, str(arkime_sid))
         result = {"pcap": pcap_bytes, "session": primary, "other_matches": sessions[1:]}
 
     pcap_bytes: bytes = result["pcap"]
     session_meta: Dict[str, Any] = result.get("session") or {}
     other_matches: List[Dict[str, Any]] = result.get("other_matches") or []
     arkime_session_id = str(session_meta.get("id") or "") or None
+    # Resolve the definitive node from the session when the alert didn't carry one
+    resolved_node = node or session_meta.get("node") or ""
     if other_matches:
         warnings.append(
             f"{len(other_matches)} additional Arkime session(s) matched — "
@@ -355,7 +373,7 @@ async def arkime_preview(
     # Parse + analyse
     try:
         parse_result = pcap_service.parse_pcap(
-            pcap_bytes, f"arkime-{node}-{arkime_session_id or 'session'}.pcap"
+            pcap_bytes, f"arkime-{resolved_node or 'unknown'}-{arkime_session_id or 'session'}.pcap"
         )
     except Exception as e:
         raise HTTPException(
@@ -373,7 +391,7 @@ async def arkime_preview(
     return ArkimePreviewResponse(
         alert_id=alert_id,
         network_community_id=community_id or None,
-        arkime_node=node,
+        arkime_node=resolved_node,
         search_mode=search_mode,
         arkime_session_id=arkime_session_id,
         session_metadata=session_meta,
@@ -532,8 +550,8 @@ def _render_arkime_note_markdown(
         "## Arkime PCAP Analysis",
         "",
         f"**Alert:** `{alert.get('id')}` — {alert.get('title') or '(no title)'}",
-        f"**Community ID:** `{alert.get('network_community_id')}`",
-        f"**Arkime node:** `{alert.get('arkime_node')}`",
+        f"**Community ID:** `{alert.get('network_community_id') or '(none — IP search)'}`",
+        f"**Arkime node:** `{alert.get('arkime_node') or '(auto-resolved)'}`",
         f"**PCAP size:** {body.pcap_size_bytes:,} bytes",
         "",
     ]
