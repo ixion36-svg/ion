@@ -89,6 +89,9 @@ class ArkimeService:
         self.password = password if password is not None else config.get("password", "")
         self.api_key = api_key if api_key is not None else config.get("api_key", "")
         self.verify_ssl = verify_ssl if verify_ssl is not None else config.get("verify_ssl", True)
+        # Auth mode: "basic" for nginx/proxy setups, "digest" for native Arkime
+        import os
+        self.auth_mode = os.environ.get("ION_ARKIME_AUTH_MODE", "basic").lower()
 
     @property
     def _has_basic(self) -> bool:
@@ -99,13 +102,10 @@ class ArkimeService:
         return bool(self.url and (self.api_key or self._has_basic))
 
     async def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        """Build request headers with auth.
-
-        Sends Basic auth directly in the header — works with both nginx
-        basic auth proxies and Arkime's native auth.
-        """
+        """Build request headers. For basic auth mode, sends credentials
+        directly in the header. For digest mode, leaves auth to _auth()."""
         headers: Dict[str, str] = {"Accept": "application/json"}
-        if self._has_basic:
+        if self._has_basic and self.auth_mode == "basic":
             import base64
             creds = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
             headers["Authorization"] = f"Basic {creds}"
@@ -115,9 +115,11 @@ class ArkimeService:
             headers.update(extra)
         return headers
 
-    def _auth(self) -> Optional[httpx.BasicAuth]:
-        """BasicAuth fallback — httpx resends on 401 challenge."""
+    def _auth(self):
+        """Auth object for httpx — Digest for native Arkime, Basic for proxies."""
         if self._has_basic:
+            if self.auth_mode == "digest":
+                return httpx.DigestAuth(self.username, self.password)
             return httpx.BasicAuth(self.username, self.password)
         return None
 
