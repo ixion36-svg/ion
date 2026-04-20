@@ -308,15 +308,37 @@ class ArkimeService:
                     params=params,
                 )
             if resp.status_code != 200:
+                body_preview = (resp.text or "")[:200]
+                logger.warning(
+                    "Arkime session search HTTP %d: %s", resp.status_code, body_preview,
+                )
                 raise ArkimeError(
                     f"Arkime session search failed: HTTP {resp.status_code}",
                     status_code=resp.status_code,
                 )
-            payload = resp.json()
+            # Guard against non-JSON responses (e.g. HTML login redirect)
+            content_type = resp.headers.get("content-type", "")
+            if "json" not in content_type:
+                body_preview = (resp.text or "")[:200]
+                logger.warning(
+                    "Arkime returned non-JSON (%s): %s", content_type, body_preview,
+                )
+                raise ArkimeError(
+                    f"Arkime returned non-JSON response ({content_type}). "
+                    f"Check auth — this usually means a login redirect.",
+                )
+            try:
+                payload = resp.json()
+            except Exception:
+                raise ArkimeError(
+                    f"Arkime response is not valid JSON: {(resp.text or '')[:100]}"
+                )
             data = payload.get("data") if isinstance(payload, dict) else None
             if isinstance(data, list):
                 return data
             return []
+        except ArkimeError:
+            raise
         except httpx.HTTPError as e:
             raise ArkimeError(f"Arkime session search error: {e}") from e
 
@@ -356,13 +378,33 @@ class ArkimeService:
                     params=params,
                 )
             if resp.status_code != 200:
+                body_preview = (resp.text or "")[:200]
+                logger.warning(
+                    "Arkime IP session search HTTP %d: %s", resp.status_code, body_preview,
+                )
                 raise ArkimeError(
                     f"Arkime IP session search failed: HTTP {resp.status_code}",
                     status_code=resp.status_code,
                 )
-            payload = resp.json()
+            content_type = resp.headers.get("content-type", "")
+            if "json" not in content_type:
+                body_preview = (resp.text or "")[:200]
+                logger.warning(
+                    "Arkime IP search returned non-JSON (%s): %s", content_type, body_preview,
+                )
+                raise ArkimeError(
+                    f"Arkime returned non-JSON response ({content_type}). Check auth config.",
+                )
+            try:
+                payload = resp.json()
+            except Exception:
+                raise ArkimeError(
+                    f"Arkime response is not valid JSON: {(resp.text or '')[:100]}"
+                )
             data = payload.get("data") if isinstance(payload, dict) else None
             return data if isinstance(data, list) else []
+        except ArkimeError:
+            raise
         except httpx.HTTPError as e:
             raise ArkimeError(f"Arkime IP session search error: {e}") from e
 
