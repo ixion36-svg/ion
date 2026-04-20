@@ -83,7 +83,119 @@
         </div>
       </section>
 
-      <!-- ───── Latest Threat Reports ───── -->
+      <!-- ───── Tabs ───── -->
+      <div class="flex items-center gap-1 p-1 rounded-lg bg-white/5 border border-white/10 mb-6 overflow-x-auto">
+        <button onclick="tlTab('overview')" data-tltab="overview" class="tl-tab-btn px-4 py-2 rounded-md text-xs font-semibold text-ink-950 bg-ion-cyan shadow-[0_0_18px_-4px_rgba(109,228,255,0.8)] whitespace-nowrap transition">Overview</button>
+        <button onclick="tlTab('actors')" data-tltab="actors" class="tl-tab-btn px-4 py-2 rounded-md text-xs font-semibold text-slate-400 hover:text-white whitespace-nowrap transition">Threat Actors</button>
+        <button onclick="tlTab('ioc')" data-tltab="ioc" class="tl-tab-btn px-4 py-2 rounded-md text-xs font-semibold text-slate-400 hover:text-white whitespace-nowrap transition">IOC Feed</button>
+        <button onclick="tlTab('reports')" data-tltab="reports" class="tl-tab-btn px-4 py-2 rounded-md text-xs font-semibold text-slate-400 hover:text-white whitespace-nowrap transition">Reports</button>
+        <button onclick="tlTab('analytics')" data-tltab="analytics" class="tl-tab-btn px-4 py-2 rounded-md text-xs font-semibold text-slate-400 hover:text-white whitespace-nowrap transition">Analytics</button>
+      </div>
+
+      <!-- ═══ TAB: Overview ═══ -->
+      <div id="tl-tab-overview" class="tl-tab-panel space-y-6">
+
+      <!-- Kill Chain Mini-Matrix (moved to overview) -->
+      <section>
+        <h2 class="font-sans font-semibold text-lg text-white mb-3">ATT&CK Kill Chain Coverage</h2>
+        <div class="rounded-xl border border-white/5 bg-ink-900/40 p-5 overflow-x-auto">
+          <div id="tl-killchain" class="flex gap-1 min-w-[700px]"></div>
+        </div>
+      </section>
+
+      <!-- Top 5 actors preview -->
+      <section>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-sans font-semibold text-lg text-white">Top Threat Actors</h2>
+          <button onclick="tlTab('actors')" class="text-[11px] text-ion-cyan hover:text-white transition">View all &rarr;</button>
+        </div>
+        <div id="tl-overview-actors" class="rounded-[14px] border border-white/5 bg-ink-900/40 p-4">
+          <div class="text-slate-500 text-sm animate-pulse">Loading...</div>
+        </div>
+      </section>
+
+      <!-- Top 5 IOCs preview -->
+      <section>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-sans font-semibold text-lg text-white">Latest High-Score IOCs</h2>
+          <button onclick="tlTab('ioc')" class="text-[11px] text-ion-cyan hover:text-white transition">View feed &rarr;</button>
+        </div>
+        <div id="tl-overview-iocs" class="rounded-[14px] border border-white/5 bg-ink-900/40 p-4">
+          <div class="text-slate-500 text-sm animate-pulse">Loading...</div>
+        </div>
+      </section>
+
+      </div><!-- /overview tab -->
+
+      <!-- ═══ TAB: Threat Actors ═══ -->
+      <div id="tl-tab-actors" class="tl-tab-panel hidden space-y-6">
+
+      <section>
+        <h2 class="font-sans font-semibold text-lg text-white mb-3">Top Active Threat Actors</h2>
+        <div class="rounded-[14px] border border-white/5 bg-ink-900/40 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-[13px]">
+              <thead>
+                <tr class="border-b border-white/5">
+                  <th class="text-left px-4 py-3 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">Name</th>
+                  <th class="text-left px-4 py-3 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">Aliases</th>
+                  <th class="text-center px-4 py-3 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">TTPs</th>
+                  <th class="text-center px-4 py-3 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">Malware</th>
+                  <th class="text-left px-4 py-3 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">Sectors</th>
+                  <th class="text-left px-4 py-3 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">Modified</th>
+                </tr>
+              </thead>
+              <tbody id="tl-actors-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      </div><!-- /actors tab -->
+
+      <!-- ═══ TAB: IOC Feed ═══ -->
+      <div id="tl-tab-ioc" class="tl-tab-panel hidden space-y-6">
+
+      <section>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-sans font-semibold text-lg text-white">Live IOC Feed</h2>
+          <div class="flex items-center gap-2">
+            <select id="tl-ioc-score" onchange="window._tlLoadIOCFeed()" class="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300 font-mono">
+              <option value="0">All scores</option>
+              <option value="50">Score &ge; 50</option>
+              <option value="75" selected>Score &ge; 75</option>
+              <option value="90">Score &ge; 90</option>
+            </select>
+            <button onclick="window._tlLoadIOCFeed()" class="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300 hover:bg-white/10 transition">Refresh</button>
+          </div>
+        </div>
+        <div class="rounded-[14px] border border-white/5 bg-ink-900/40 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-[13px]">
+              <thead>
+                <tr class="border-b border-white/5">
+                  <th class="text-center px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider w-14">Score</th>
+                  <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Type</th>
+                  <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Value</th>
+                  <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Labels</th>
+                  <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Source</th>
+                  <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Created</th>
+                  <th class="text-center px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider w-28">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="tl-ioc-body">
+                <tr><td colspan="7" class="px-4 py-6 text-center text-slate-500 text-sm animate-pulse">Loading IOC feed&hellip;</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      </div><!-- /ioc tab -->
+
+      <!-- ═══ TAB: Reports ═══ -->
+      <div id="tl-tab-reports" class="tl-tab-panel hidden space-y-6">
+
       <section>
         <h2 class="font-sans font-semibold text-lg text-white mb-3">Latest Threat Reports</h2>
         <div class="rounded-[14px] border border-white/5 bg-ink-900/40 overflow-hidden">
@@ -118,6 +230,7 @@
                   <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Labels</th>
                   <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Source</th>
                   <th class="text-left px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Created</th>
+                  <th class="text-center px-3 py-2.5 text-slate-500 font-semibold text-[10px] uppercase tracking-wider w-28">Actions</th>
                 </tr>
               </thead>
               <tbody id="tl-ioc-body">
@@ -128,35 +241,10 @@
         </div>
       </section>
 
-      <!-- ───── Kill Chain Mini-Matrix ───── -->
-      <section>
-        <h2 class="font-sans font-semibold text-lg text-white mb-3">ATT&CK Kill Chain Coverage</h2>
-        <div class="rounded-xl border border-white/5 bg-ink-900/40 p-5 overflow-x-auto">
-          <div id="tl-killchain" class="flex gap-1 min-w-[700px]"></div>
-        </div>
-      </section>
+      </div><!-- /reports tab -->
 
-      <!-- ───── Top Actors Table ───── -->
-      <section>
-        <h2 class="font-sans font-semibold text-lg text-white mb-3">Top Active Threat Actors</h2>
-        <div class="rounded-[14px] border border-white/5 bg-ink-900/40 overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-[13px]">
-              <thead>
-                <tr class="border-b border-white/5">
-                  <th class="text-left px-4 py-3 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">Name</th>
-                  <th class="text-left px-4 py-3 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">Aliases</th>
-                  <th class="text-center px-4 py-3 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">TTPs</th>
-                  <th class="text-center px-4 py-3 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">Malware</th>
-                  <th class="text-left px-4 py-3 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">Sectors</th>
-                  <th class="text-left px-4 py-3 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">Modified</th>
-                </tr>
-              </thead>
-              <tbody id="tl-actors-body"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+      <!-- ═══ TAB: Analytics ═══ -->
+      <div id="tl-tab-analytics" class="tl-tab-panel hidden space-y-6">
 
       <!-- ───── Tactic Distribution + Country Targets + Malware ───── -->
       <section class="grid grid-cols-12 gap-6">
@@ -205,6 +293,8 @@
 
       </section>
 
+      </div><!-- /analytics tab -->
+
     </div><!-- /tl-content -->
   </div>
 </div>
@@ -236,6 +326,34 @@
 
   let _expandedActorId = null;
   let _overviewData = null;
+  let _activeTab = 'overview';
+  let _tabLoaded = { overview: false, actors: false, ioc: false, reports: false, analytics: false };
+
+  // ── Tab switching ──
+  window.tlTab = function(tab) {
+    _activeTab = tab;
+    document.querySelectorAll('.tl-tab-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('.tl-tab-btn').forEach(b => {
+      b.className = b.className
+        .replace(/text-ink-950 bg-ion-cyan shadow-\[0_0_18px_-4px_rgba\(109,228,255,0\.8\)\]/g, '')
+        .replace(/text-slate-400/g, '')
+        .trim() + ' text-slate-400 hover:text-white';
+    });
+    const panel = document.getElementById('tl-tab-' + tab);
+    if (panel) panel.classList.remove('hidden');
+    const btn = document.querySelector('[data-tltab="' + tab + '"]');
+    if (btn) {
+      btn.className = btn.className
+        .replace(/text-slate-400 hover:text-white/g, '')
+        .trim() + ' text-ink-950 bg-ion-cyan shadow-[0_0_18px_-4px_rgba(109,228,255,0.8)]';
+    }
+    // Lazy-load tab data on first visit
+    if (!_tabLoaded[tab]) {
+      _tabLoaded[tab] = true;
+      if (tab === 'ioc') window._tlLoadIOCFeed();
+      if (tab === 'reports') loadReports();
+    }
+  };
 
   function esc(s) {
     if (!s) return "";
@@ -602,10 +720,17 @@
 
       loading.classList.add("hidden");
       content.classList.remove("hidden");
+      _tabLoaded.overview = true;
+      _tabLoaded.analytics = true; // rendered from same data
 
-      // Load reports + IOC feed in parallel (non-blocking)
-      loadReports();
-      window._tlLoadIOCFeed();
+      // Overview previews
+      renderOverviewActors(data.actors || []);
+
+      // Fetch a small IOC preview for the overview tab
+      fetch("/api/threat-landscape/ioc-feed?limit=5&min_score=75")
+        .then(r => r.json())
+        .then(d => renderOverviewIOCs(d.indicators || []))
+        .catch(() => {});
     } catch (err) {
       loading.classList.add("hidden");
       document.getElementById("tl-error-msg").textContent = "Failed to load: " + err.message;
@@ -624,7 +749,7 @@
       const data = await resp.json();
       const indicators = data.indicators || [];
       if (!indicators.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-slate-500 text-sm">No indicators found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-6 text-center text-slate-500 text-sm">No indicators found.</td></tr>';
         return;
       }
       let html = "";
@@ -635,6 +760,9 @@
           '<span class="inline-block px-1 py-0.5 rounded text-[9px] border" style="color:' + (l.color||'#94a3b8') + ';border-color:' + (l.color||'#94a3b8') + '33;background:' + (l.color||'#94a3b8') + '15">' + esc(l.value) + '</span>'
         ).join(" ");
         const created = i.created ? new Date(i.created).toLocaleDateString("en-GB", {day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}) : "--";
+        const safeVal = esc(i.ioc_value).replace(/'/g, "\\'");
+        const safeType = esc(i.ioc_type).replace(/'/g, "\\'");
+        const safeSrc = esc(i.source || "opencti").replace(/'/g, "\\'");
         html += '<tr class="border-b border-white/5 hover:bg-white/5 transition-colors">';
         html += '<td class="px-3 py-2 text-center"><span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ' + scoreColor + '">' + score + '</span></td>';
         html += '<td class="px-3 py-2 text-[10px] text-slate-400 font-mono">' + esc(i.ioc_type) + '</td>';
@@ -642,12 +770,83 @@
         html += '<td class="px-3 py-2">' + (labels || '<span class="text-slate-600">--</span>') + '</td>';
         html += '<td class="px-3 py-2 text-[11px] text-slate-400">' + esc(i.source || "--") + '</td>';
         html += '<td class="px-3 py-2 text-[11px] text-slate-500 font-mono">' + created + '</td>';
+        html += '<td class="px-3 py-2 text-center whitespace-nowrap">';
+        html += '<button onclick="window._tlTrackIOC(\'' + safeType + '\',\'' + safeVal + '\',\'' + safeSrc + '\',this)" class="px-1.5 py-0.5 rounded text-[9px] font-medium bg-ion-lime/10 text-ion-lime border border-ion-lime/20 hover:bg-ion-lime/20 transition mr-1" title="Add to watchlist">Watch</button>';
+        html += '<button onclick="window._tlSearchIOC(\'' + safeVal + '\')" class="px-1.5 py-0.5 rounded text-[9px] font-medium bg-ion-cyan/10 text-ion-cyan border border-ion-cyan/20 hover:bg-ion-cyan/20 transition mr-1" title="Search alerts for this IOC">Hunt</button>';
+        html += '<button onclick="navigator.clipboard.writeText(\'' + safeVal + '\');this.textContent=\'Copied\';setTimeout(()=>this.textContent=\'Copy\',1500)" class="px-1.5 py-0.5 rounded text-[9px] font-medium bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10 transition" title="Copy value">Copy</button>';
+        html += '</td>';
         html += '</tr>';
       }
       tbody.innerHTML = html;
     } catch (e) {
       tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-4 text-center text-ion-coral text-xs">Failed: ' + esc(e.message) + '</td></tr>';
     }
+  };
+
+  // ── Overview Previews ──
+  function renderOverviewActors(actors) {
+    const el = document.getElementById("tl-overview-actors");
+    if (!actors || !actors.length) { el.innerHTML = '<div class="text-slate-500 text-sm">No actors.</div>'; return; }
+    let html = '<div class="space-y-2">';
+    for (const a of actors.slice(0, 5)) {
+      const flag = a.country_flag || '';
+      html += '<div class="flex items-center gap-3 py-1.5">';
+      html += '<span class="text-ion-cyan font-semibold text-sm flex-shrink-0">' + (flag ? flag + ' ' : '') + esc(a.name) + '</span>';
+      html += '<span class="text-slate-500 text-xs">' + (a.ttp_count||0) + ' TTPs</span>';
+      html += '<span class="text-slate-500 text-xs">' + (a.malware_count||0) + ' malware</span>';
+      html += '<span class="flex-1"></span>';
+      html += '<span class="text-slate-600 text-[10px] font-mono">' + ((a.modified||'').substring(0,10)) + '</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  }
+
+  function renderOverviewIOCs(indicators) {
+    const el = document.getElementById("tl-overview-iocs");
+    if (!indicators || !indicators.length) { el.innerHTML = '<div class="text-slate-500 text-sm">No IOCs.</div>'; return; }
+    let html = '<div class="space-y-1.5">';
+    for (const i of indicators.slice(0, 5)) {
+      const score = i.score || 0;
+      const scoreColor = score >= 90 ? "text-red-400" : score >= 70 ? "text-amber-400" : "text-slate-400";
+      html += '<div class="flex items-center gap-3 py-1">';
+      html += '<span class="font-mono text-[11px] font-bold w-7 text-right ' + scoreColor + '">' + score + '</span>';
+      html += '<span class="text-[10px] text-slate-500 font-mono w-20">' + esc(i.ioc_type) + '</span>';
+      html += '<span class="text-xs text-slate-200 font-mono truncate flex-1">' + esc(i.ioc_value) + '</span>';
+      html += '<span class="text-[10px] text-slate-500">' + esc(i.source || '') + '</span>';
+      html += '</div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  }
+
+  // ── IOC Actions ──
+  window._tlTrackIOC = async function(iocType, iocValue, source, btn) {
+    btn.disabled = true;
+    btn.textContent = '...';
+    try {
+      const resp = await fetch("/api/threat-landscape/ioc-feed/track", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ioc_type: iocType, ioc_value: iocValue, source: source}),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || "HTTP " + resp.status);
+      }
+      btn.textContent = 'Watched';
+      btn.className = btn.className.replace(/bg-ion-lime\/10/g, 'bg-ion-lime/30');
+      btn.disabled = true;
+    } catch (e) {
+      btn.textContent = 'Failed';
+      btn.disabled = false;
+      setTimeout(() => { btn.textContent = 'Watch'; }, 2000);
+    }
+  };
+
+  window._tlSearchIOC = function(iocValue) {
+    // Navigate to alerts page with the IOC as a search filter
+    window.location.href = '/alerts?search=' + encodeURIComponent(iocValue);
   };
 
   // ── Reports ──

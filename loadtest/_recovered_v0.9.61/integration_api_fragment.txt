@@ -1,0 +1,50 @@
+        }
+
+    except Exception as e:
+        return {"configured": True, "error": safe_error(e, "integration_status")}
+
+
+@router.get("/metrics/data-flows")
+async def get_data_flow_metrics(
+    hours: int = Query(24, ge=1, le=168, description="Time window in hours"),
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(require_integration_access),
+):
+    """Get data flow metrics between integrations."""
+    from ion.services.elasticsearch_service import ElasticsearchService
+
+    log_service = get_integration_log_service()
+
+    # Get log stats for each integration
+    log_stats = log_service.get_log_stats(hours=hours, session=session)
+
+    # Get webhook stats
+    webhook_service = get_webhook_service()
+    webhooks = webhook_service.list_webhooks(session=session)
+
+    webhook_stats = {
+        "total_webhooks": len(webhooks),
+        "active_webhooks": sum(1 for w in webhooks if w.is_active),
+        "total_triggers": sum(w.trigger_count for w in webhooks),
+    }
+
+    # Get Elasticsearch document flow
+    es_service = ElasticsearchService()
+    es_flow = {}
+    if es_service.is_configured:
+        try:
+            index_stats = await es_service.get_index_stats()
+            es_flow = {
+                "documents_indexed": index_stats.get("index_total", 0),
+                "searches_performed": index_stats.get("search_total", 0),
+                "current_docs": index_stats.get("total_docs", 0),
+            }
+        except Exception:
+            es_flow = {"error": "Failed to get ES stats"}
+
+    return {
+        "time_window_hours": hours,
+        "integration_activity": log_stats,
+        "webhooks": webhook_stats,
+        "elasticsearch": es_flow,
+    }

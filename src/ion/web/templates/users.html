@@ -177,6 +177,52 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+.role-widgets { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.role-widget { display: block; cursor: pointer; }
+.role-widget-input { display: none; }
+.role-widget-card {
+  border: 2px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: rgba(15,23,42,0.6);
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.role-widget:hover .role-widget-card { border-color: rgba(255,255,255,0.12); background: rgba(15,23,42,0.8); }
+.role-widget-input:checked ~ .role-widget-card {
+  border-color: var(--role-color, #6de4ff);
+  background: rgba(15,23,42,0.9);
+  box-shadow: 0 0 16px -4px var(--role-color, #6de4ff);
+}
+.role-widget-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.role-widget-icon { font-size: 16px; }
+.role-widget-tier {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--role-color, #6de4ff); font-family: 'JetBrains Mono', monospace;
+}
+.role-widget-check {
+  margin-left: auto; font-size: 14px; color: var(--role-color, #6de4ff);
+  opacity: 0; transition: opacity 0.2s;
+}
+.role-widget-input:checked ~ .role-widget-card .role-widget-check { opacity: 1; }
+.role-widget-name {
+  font-size: 13px; font-weight: 600; color: #e2e8f0; text-transform: capitalize;
+  margin-bottom: 2px;
+}
+.role-widget-desc { font-size: 11px; color: #64748b; line-height: 1.4; margin-bottom: 8px; }
+.role-widget-caps { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px; }
+.role-cap-pill {
+  font-size: 9px; padding: 1px 6px; border-radius: 4px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+  color: #94a3b8; font-weight: 500;
+}
+.role-widget-input:checked ~ .role-widget-card .role-cap-pill {
+  background: color-mix(in srgb, var(--role-color) 10%, transparent);
+  border-color: color-mix(in srgb, var(--role-color) 20%, transparent);
+  color: var(--role-color);
+}
+.role-widget-perms { font-size: 10px; color: #475569; font-family: 'JetBrains Mono', monospace; }
+</style>
 <script>
 let availableRoles = [];
 
@@ -192,17 +238,61 @@ async function loadRoles() {
     }
 }
 
+// Role metadata for widget rendering
+const ROLE_META = {
+  admin:              { tier: 'Admin',    color: '#f87171', icon: '&#9881;',  short: 'Full system access' },
+  analyst:            { tier: 'L1',       color: '#6de4ff', icon: '&#128270;', short: 'Alert triage & case creation' },
+  senior_analyst:     { tier: 'L2',       color: '#6de4ff', icon: '&#128269;', short: 'Case closure & enrichment' },
+  principal_analyst:  { tier: 'L3',       color: '#6de4ff', icon: '&#127919;', short: 'Playbooks, forensics & security' },
+  lead:               { tier: 'Lead',     color: '#a78bfa', icon: '&#128101;', short: 'Team oversight & operations' },
+  forensic:           { tier: 'DFIR',     color: '#f59e0b', icon: '&#128373;', short: 'Evidence & forensic investigations' },
+  soc_engineer:       { tier: 'Eng L1',   color: '#22c55e', icon: '&#128295;', short: 'Log onboarding & tooling' },
+  senior_engineer:    { tier: 'Eng L2',   color: '#22c55e', icon: '&#9881;',  short: 'Detection engineering & pipelines' },
+  platform_engineer:  { tier: 'Eng L3',   color: '#22c55e', icon: '&#127959;', short: 'Infrastructure & architecture' },
+  engineering:        { tier: 'Eng',      color: '#22c55e', icon: '&#128736;', short: 'Full engineering access' },
+};
+
+// Group permissions into capability areas for display
+function permissionCapabilities(perms) {
+  const caps = [];
+  if (perms.some(p => p.startsWith('alert:')))      caps.push('Alerts');
+  if (perms.some(p => p.startsWith('case:')))        caps.push('Cases');
+  if (perms.some(p => p.startsWith('observable:')))  caps.push('Observables');
+  if (perms.some(p => p.startsWith('playbook:')))    caps.push('Playbooks');
+  if (perms.some(p => p.startsWith('forensic:')))    caps.push('Forensics');
+  if (perms.some(p => p.startsWith('integration:'))) caps.push('Integrations');
+  if (perms.some(p => p.startsWith('security:')))    caps.push('Security');
+  if (perms.some(p => p.startsWith('system:')))      caps.push('System');
+  if (perms.includes('ai:chat'))                     caps.push('AI');
+  if (perms.includes('discover:read'))               caps.push('Discover');
+  return caps;
+}
+
 function renderRoleCheckboxes() {
-    const containers = ['new-user-roles', 'edit-user-roles'];
-    containers.forEach(containerId => {
-        const container = document.getElementById(containerId);
-        container.innerHTML = availableRoles.map(role => `
-            <label class="checkbox-label">
-                <input type="checkbox" value="${role.name}" name="${containerId}">
-                ${role.name} <span class="role-description">${role.description || ''}</span>
-            </label>
-        `).join('');
-    });
+  const containers = ['new-user-roles', 'edit-user-roles'];
+  containers.forEach(containerId => {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '<div class="role-widgets">' + availableRoles.map(role => {
+      const meta = ROLE_META[role.name] || { tier: '?', color: '#64748b', icon: '&#9632;', short: role.description || '' };
+      const caps = permissionCapabilities(role.permissions || []);
+      const permCount = (role.permissions || []).length;
+      return `
+        <label class="role-widget" style="--role-color:${meta.color}">
+          <input type="checkbox" value="${role.name}" name="${containerId}" class="role-widget-input">
+          <div class="role-widget-card">
+            <div class="role-widget-header">
+              <span class="role-widget-icon">${meta.icon}</span>
+              <span class="role-widget-tier">${meta.tier}</span>
+              <span class="role-widget-check">&#10003;</span>
+            </div>
+            <div class="role-widget-name">${role.name.replace(/_/g, ' ')}</div>
+            <div class="role-widget-desc">${meta.short}</div>
+            <div class="role-widget-caps">${caps.map(c => '<span class="role-cap-pill">' + c + '</span>').join('')}</div>
+            <div class="role-widget-perms">${permCount} permissions</div>
+          </div>
+        </label>`;
+    }).join('') + '</div>';
+  });
 }
 
 async function loadUsers() {

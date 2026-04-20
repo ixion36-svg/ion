@@ -77,6 +77,7 @@
     <div class="flex items-center gap-1 p-0.5 rounded-md bg-white/5 border border-white/5 ml-2">
       <button id="view-table-btn" onclick="setView('table')" class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-white bg-white/10">Table</button>
       <button id="view-graph-btn" onclick="setView('graph')" class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">Graph</button>
+      <button id="view-topology-btn" onclick="setView('topology')" class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">Topology</button>
     </div>
   </section>
 
@@ -84,22 +85,35 @@
   <section id="graph-view" class="rise d-4 rounded-xl border border-white/5 bg-ink-900/50 mb-6" style="display:none;">
     <div class="flex items-center justify-between px-4 py-3 border-b border-white/5">
       <div class="flex items-center gap-3">
-        <span class="label-tiny text-slate-500">Network Topology</span>
-        <span class="text-[11px] text-slate-500">Hosts grouped by source system · colored by criticality · sized by event volume</span>
+        <span class="label-tiny text-slate-500">Network Diagram</span>
+        <span class="text-[11px] text-slate-500">Hierarchical view · subnets as switches · hosts as endpoints</span>
       </div>
       <div class="flex items-center gap-3 text-[10px]">
+        <span class="flex items-center gap-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6de4ff" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6" y2="6.01"/><line x1="10" y1="6" x2="10" y2="6.01"/></svg> Switch/Subnet</span>
+        <span class="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/><line x1="4" y1="9" x2="20" y2="9"/></svg> Server</span>
+        <span class="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/></svg> Workstation</span>
         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#ff6c6c]"></span> Critical</span>
         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#f8b33a]"></span> High</span>
-        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#9a8cff]"></span> Medium</span>
-        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#64748b]"></span> Low</span>
-        <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-[#6de4ff]"></span> Source System</span>
       </div>
     </div>
-    <div id="network-graph" style="height:600px;width:100%;"></div>
+    <div id="network-graph" style="height:700px;width:100%;background:#07080c;"></div>
+  </section>
+
+  <!-- Topology view -->
+  <section id="topology-view" class="rise d-4 mb-6" style="display:none;">
+    <div class="rounded-xl border border-white/5 bg-ink-900/50 p-4">
+      <div class="flex items-center justify-between mb-4">
+        <span class="label-tiny text-slate-500">Subnet Topology</span>
+        <span class="text-[11px] text-slate-500">Assets grouped by /24 subnet · colored by worst criticality</span>
+      </div>
+      <div id="topology-content" class="space-y-3">
+        <div class="text-slate-500 text-sm animate-pulse text-center py-12">Loading topology...</div>
+      </div>
+    </div>
   </section>
 
   <!-- Asset table -->
-  <section class="rise d-4 rounded-xl border border-white/5 bg-ink-900/50 overflow-x-auto">
+  <section id="table-view" class="rise d-4 rounded-xl border border-white/5 bg-ink-900/50 overflow-x-auto">
     <table class="w-full text-[13px]">
       <thead>
         <tr class="border-b border-white/5 text-left">
@@ -149,26 +163,34 @@ let allAssetsCache = [];
 
 function setView(view) {
   currentView = view;
-  $('view-table-btn').className = 'px-2.5 py-1 rounded-[5px] text-[11px] font-medium ' + (view === 'table' ? 'text-white bg-white/10' : 'text-slate-500 hover:text-slate-300');
-  $('view-graph-btn').className = 'px-2.5 py-1 rounded-[5px] text-[11px] font-medium ' + (view === 'graph' ? 'text-white bg-white/10' : 'text-slate-500 hover:text-slate-300');
+  const active = 'text-white bg-white/10';
+  const inactive = 'text-slate-500 hover:text-slate-300';
+  const base = 'px-2.5 py-1 rounded-[5px] text-[11px] font-medium ';
+  $('view-table-btn').className = base + (view === 'table' ? active : inactive);
+  $('view-graph-btn').className = base + (view === 'graph' ? active : inactive);
+  $('view-topology-btn').className = base + (view === 'topology' ? active : inactive);
 
-  const tableSection = document.querySelector('section.rise.d-4:not(#graph-view)') || document.querySelector('[id$="-tbody"]')?.closest('section');
-  // Find the table section (next sibling after graph-view)
   const graphEl = $('graph-view');
-  const tableEl = graphEl.nextElementSibling;
+  const topoEl = $('topology-view');
+  const tableEl = $('table-view');
+
+  graphEl.style.display = 'none';
+  topoEl.style.display = 'none';
+  if (tableEl) tableEl.style.display = 'none';
 
   if (view === 'graph') {
-    if (tableEl) tableEl.style.display = 'none';
     graphEl.style.display = '';
     renderGraph();
+  } else if (view === 'topology') {
+    topoEl.style.display = '';
+    renderTopology();
   } else {
     if (tableEl) tableEl.style.display = '';
-    graphEl.style.display = 'none';
   }
 }
 
 let currentPage = 0;
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 200;
 let debounceTimer = null;
 
 function debounceLoad() {
@@ -258,8 +280,9 @@ async function loadAssets() {
   } catch(e) {
     $('assets-tbody').innerHTML = '<tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">Failed to load</td></tr>';
   }
-  // Re-render graph if it's the active view
+  // Re-render active visualization view
   if (currentView === 'graph') renderGraph();
+  if (currentView === 'topology') renderTopology();
 }
 
 function renderTable(assets) {
@@ -464,13 +487,14 @@ const CRIT_COLORS = {
   unknown:  { bg: '#475569', border: '#334155', font: '#fff' },
 };
 
-const SYSTEM_COLORS = [
-  '#6de4ff', '#86f0a0', '#f8b33a', '#ff6c6c', '#9a8cff',
-  '#f472b6', '#60a5fa', '#34d399', '#fbbf24', '#a78bfa',
-];
+function ipToSubnet(ip) {
+  if (!ip) return null;
+  const parts = ip.split('.');
+  if (parts.length !== 4) return null;
+  return parts.slice(0, 3).join('.') + '.0/24';
+}
 
-async function renderGraph() {
-  // Fetch assets using the same filters as the table view
+async function fetchGraphAssets() {
   const params = new URLSearchParams();
   const search = $('filter-search').value.trim();
   if (search) params.set('search', search);
@@ -482,134 +506,177 @@ async function renderGraph() {
   if (sys) params.set('source_system', sys);
   const seen = $('filter-seen').value;
   if (seen) params.set('last_seen_within', seen);
-  params.set('limit', '200');
+  params.set('limit', '2000');
 
   try {
     const r = await fetch('/api/network-map/assets?' + params, {credentials:'same-origin'});
-    if (!r.ok) return;
+    if (!r.ok) return [];
     const d = await r.json();
     allAssetsCache = d.assets || [];
-  } catch(e) { return; }
+    return allAssetsCache;
+  } catch(e) { return []; }
+}
 
-  if (!allAssetsCache.length) {
+// Detect device type from OS/hostname for icon selection
+function detectDeviceType(asset) {
+  const h = (asset.display_hostname || '').toLowerCase();
+  const os = (asset.os_name || '').toLowerCase();
+  if (/fw|firewall|palo|fortigate|asa|pfsense/.test(h)) return 'firewall';
+  if (/^(rt|rtr|router|gw|gateway)/.test(h)) return 'router';
+  if (/^(sw|switch|nexus|catalyst)/.test(h)) return 'switch';
+  if (/srv|server|dc|sql|web|app|db|mail|dns|ad|exchange|vcenter|esxi/.test(h)) return 'server';
+  if (/linux|ubuntu|centos|rhel|debian|amazon/.test(os)) return 'server';
+  if (/windows server/.test(os)) return 'server';
+  if (/wks|workstation|desktop|laptop|pc-|lt-/.test(h)) return 'workstation';
+  if (/windows 1[01]|windows 11|macos|mac os/.test(os)) return 'workstation';
+  return 'device';
+}
+
+// SVG icon data URIs for Cisco-style device shapes
+const DEVICE_ICONS = {
+  firewall:    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><rect x="4" y="8" width="40" height="32" rx="3" fill="#1e293b" stroke="#f87171" stroke-width="2"/><line x1="24" y1="8" x2="24" y2="40" stroke="#f87171" stroke-width="1.5" stroke-dasharray="3,2"/><text x="24" y="28" fill="#f87171" font-family="monospace" font-size="10" text-anchor="middle">FW</text></svg>'),
+  router:      'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="18" fill="#1e293b" stroke="#6de4ff" stroke-width="2"/><line x1="10" y1="24" x2="38" y2="24" stroke="#6de4ff" stroke-width="1.5"/><line x1="24" y1="10" x2="24" y2="38" stroke="#6de4ff" stroke-width="1.5"/><circle cx="24" cy="24" r="4" fill="#6de4ff"/></svg>'),
+  switch:      'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="56" height="32" viewBox="0 0 56 32"><rect x="2" y="2" width="52" height="28" rx="3" fill="#1e293b" stroke="#6de4ff" stroke-width="2"/><circle cx="12" cy="16" r="2.5" fill="#22c55e"/><circle cx="20" cy="16" r="2.5" fill="#22c55e"/><circle cx="28" cy="16" r="2.5" fill="#6de4ff"/><circle cx="36" cy="16" r="2.5" fill="#6de4ff"/><circle cx="44" cy="16" r="2.5" fill="#475569"/></svg>'),
+  server:      'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="48" viewBox="0 0 40 48"><rect x="4" y="2" width="32" height="44" rx="2" fill="#1e293b" stroke="#a78bfa" stroke-width="1.5"/><rect x="8" y="6" width="24" height="8" rx="1" fill="#0f172a" stroke="#334155" stroke-width="1"/><circle cx="28" cy="10" r="2" fill="#22c55e"/><rect x="8" y="18" width="24" height="8" rx="1" fill="#0f172a" stroke="#334155" stroke-width="1"/><circle cx="28" cy="22" r="2" fill="#22c55e"/><rect x="8" y="30" width="24" height="8" rx="1" fill="#0f172a" stroke="#334155" stroke-width="1"/><circle cx="28" cy="34" r="2" fill="#475569"/></svg>'),
+  workstation: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40"><rect x="4" y="4" width="32" height="22" rx="2" fill="#1e293b" stroke="#64748b" stroke-width="1.5"/><rect x="8" y="8" width="24" height="14" rx="1" fill="#0f172a"/><line x1="14" y1="30" x2="26" y2="30" stroke="#64748b" stroke-width="2"/><line x1="20" y1="26" x2="20" y2="30" stroke="#64748b" stroke-width="1.5"/></svg>'),
+  device:      'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36"><rect x="4" y="4" width="28" height="28" rx="4" fill="#1e293b" stroke="#475569" stroke-width="1.5"/><circle cx="18" cy="18" r="6" fill="none" stroke="#64748b" stroke-width="1.5"/><circle cx="18" cy="18" r="2" fill="#64748b"/></svg>'),
+};
+
+async function renderGraph() {
+  const assets = await fetchGraphAssets();
+
+  if (!assets.length) {
     $('network-graph').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;font-size:13px;">No assets to visualize. Run a sync first.</div>';
     return;
   }
 
-  // Build nodes + edges
   const nodes = [];
   const edges = [];
-  const systemSet = new Map(); // system_name → node_id
   let nextId = 1;
 
-  // Collect all source systems
-  for (const a of allAssetsCache) {
-    for (const sys of (a.source_systems || [])) {
-      if (!systemSet.has(sys)) {
-        const sysId = nextId++;
-        systemSet.set(sys, sysId);
-        const colorIdx = (systemSet.size - 1) % SYSTEM_COLORS.length;
-        nodes.push({
-          id: sysId,
-          label: sys,
-          shape: 'box',
-          size: 30,
-          font: { size: 13, color: '#07080c', bold: true, face: 'Geist, sans-serif' },
-          color: {
-            background: SYSTEM_COLORS[colorIdx],
-            border: SYSTEM_COLORS[colorIdx],
-            highlight: { background: '#fff', border: SYSTEM_COLORS[colorIdx] },
-          },
-          borderWidth: 2,
-          margin: 12,
-          _type: 'system',
-        });
-      }
-    }
+  // Group assets by subnet
+  const subnetGroups = new Map();
+  for (const a of assets) {
+    const subnet = ipToSubnet(a.primary_ip) || 'no-ip';
+    if (!subnetGroups.has(subnet)) subnetGroups.set(subnet, []);
+    subnetGroups.get(subnet).push(a);
   }
 
-  // Add host nodes
-  for (const a of allAssetsCache) {
-    const hostId = nextId++;
-    const crit = CRIT_COLORS[a.criticality] || CRIT_COLORS.unknown;
-    const evtScale = Math.max(8, Math.min(30, Math.log10(Math.max(1, a.event_count)) * 6));
-    const label = a.display_hostname.length > 20 ? a.display_hostname.slice(0, 18) + '…' : a.display_hostname;
-    const ipLabel = a.primary_ip ? '\n' + a.primary_ip : '';
+  // Sort subnets by host count (largest first)
+  const sortedSubnets = [...subnetGroups.entries()].sort((a, b) => b[1].length - a[1].length);
 
+  // Create a core "backbone" node
+  const coreId = nextId++;
+  nodes.push({
+    id: coreId,
+    label: 'Core Network',
+    shape: 'image',
+    image: DEVICE_ICONS.router,
+    size: 28,
+    font: { size: 12, color: '#6de4ff', face: 'Geist, sans-serif', vadjust: 30 },
+    level: 0,
+    _type: 'core',
+  });
+
+  // Create subnet switch nodes + host nodes
+  for (const [subnet, hosts] of sortedSubnets) {
+    const switchId = nextId++;
+    const label = subnet === 'no-ip' ? 'No IP Assigned' : subnet;
+    const hostCount = hosts.length;
+
+    // Subnet as a switch
     nodes.push({
-      id: hostId,
-      label: label + ipLabel,
-      shape: 'dot',
-      size: evtScale,
-      font: { size: 10, color: '#94a3b8', face: 'JetBrains Mono, monospace', multi: true },
-      color: { background: crit.bg, border: crit.border, highlight: { background: '#fff', border: crit.border } },
-      borderWidth: 1.5,
-      _type: 'host',
-      _assetId: a.id,
-      title: `${a.display_hostname}\n${a.primary_ip || ''}\nOS: ${[a.os_name, a.os_version].filter(Boolean).join(' ') || '?'}\nCriticality: ${a.criticality}\nEvents: ${(a.event_count || 0).toLocaleString()}`,
+      id: switchId,
+      label: label + '\n' + hostCount + ' host' + (hostCount !== 1 ? 's' : ''),
+      shape: 'image',
+      image: DEVICE_ICONS.switch,
+      size: 22,
+      font: { size: 11, color: '#94a3b8', face: 'JetBrains Mono, monospace', vadjust: 22, multi: true },
+      level: 1,
+      _type: 'subnet',
     });
 
-    // Connect to source systems
-    for (const sys of (a.source_systems || [])) {
-      const sysId = systemSet.get(sys);
-      if (sysId) {
-        edges.push({
-          from: sysId,
-          to: hostId,
-          color: { color: 'rgba(100,116,139,0.15)', highlight: 'rgba(109,228,255,0.5)' },
-          width: 0.8,
-          smooth: { type: 'continuous' },
-        });
-      }
-    }
+    // Connect switch to core
+    edges.push({
+      from: coreId,
+      to: switchId,
+      color: { color: '#334155', highlight: '#6de4ff' },
+      width: 2,
+      dashes: false,
+      smooth: false,
+    });
 
-    // If no source systems, create orphan group
-    if (!(a.source_systems || []).length) {
-      if (!systemSet.has('_untagged')) {
-        const uid = nextId++;
-        systemSet.set('_untagged', uid);
-        nodes.push({
-          id: uid, label: 'Untagged', shape: 'box', size: 25,
-          font: { size: 12, color: '#07080c', face: 'Geist, sans-serif' },
-          color: { background: '#475569', border: '#475569' },
-          borderWidth: 2, margin: 10, _type: 'system',
-        });
-      }
-      edges.push({ from: systemSet.get('_untagged'), to: hostId, color: { color: 'rgba(100,116,139,0.1)' }, width: 0.5 });
+    // Add host nodes
+    for (const a of hosts) {
+      const hostId = nextId++;
+      const devType = detectDeviceType(a);
+      const crit = CRIT_COLORS[a.criticality] || CRIT_COLORS.unknown;
+      const name = a.display_hostname.length > 16 ? a.display_hostname.slice(0, 14) + '…' : a.display_hostname;
+      const ipShort = a.primary_ip ? a.primary_ip.split('.').pop() : '';
+
+      nodes.push({
+        id: hostId,
+        label: name + (ipShort ? '\n.' + ipShort : ''),
+        shape: 'image',
+        image: DEVICE_ICONS[devType] || DEVICE_ICONS.device,
+        size: devType === 'server' ? 20 : devType === 'firewall' ? 22 : 16,
+        font: { size: 9, color: '#94a3b8', face: 'JetBrains Mono, monospace', vadjust: devType === 'server' ? 28 : 22, multi: true },
+        level: 2,
+        borderWidth: a.criticality === 'critical' ? 3 : a.criticality === 'high' ? 2 : 0,
+        color: { border: crit.border },
+        _type: 'host',
+        _assetId: a.id,
+        title: a.display_hostname + '\n' + (a.primary_ip || '') + '\nOS: ' + ([a.os_name, a.os_version].filter(Boolean).join(' ') || '?') + '\nType: ' + devType + '\nCriticality: ' + a.criticality + '\nEvents: ' + (a.event_count || 0).toLocaleString(),
+      });
+
+      edges.push({
+        from: switchId,
+        to: hostId,
+        color: { color: '#1e293b', highlight: '#334155' },
+        width: 1,
+        smooth: false,
+      });
     }
   }
 
-  // Render with vis-network
+  // Render
   const container = $('network-graph');
   container.innerHTML = '';
 
   const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
   const options = {
-    physics: {
-      solver: 'forceAtlas2Based',
-      forceAtlas2Based: {
-        gravitationalConstant: -40,
-        centralGravity: 0.005,
-        springLength: 120,
-        springConstant: 0.04,
-        damping: 0.85,
+    layout: {
+      hierarchical: {
+        enabled: true,
+        direction: 'UD',
+        sortMethod: 'directed',
+        levelSeparation: 160,
+        nodeSpacing: 60,
+        treeSpacing: 80,
+        blockShifting: true,
+        edgeMinimization: true,
       },
-      stabilization: { iterations: 200, fit: true },
     },
+    physics: false,
     interaction: {
       hover: true,
       tooltipDelay: 100,
       zoomView: true,
       dragView: true,
+      dragNodes: true,
+      navigationButtons: false,
+      keyboard: { enabled: true },
     },
-    nodes: { shadow: { enabled: true, color: 'rgba(0,0,0,0.3)', size: 6 } },
-    edges: { shadow: false },
+    nodes: {
+      shadow: false,
+      chosen: { node: function(values) { values.shadow = true; values.shadowColor = 'rgba(109,228,255,0.3)'; values.shadowSize = 10; } },
+    },
+    edges: { shadow: false, chosen: false },
   };
 
   if (graphNetwork) graphNetwork.destroy();
   graphNetwork = new vis.Network(container, data, options);
 
-  // Click handler — open drawer on host click
   graphNetwork.on('click', function(params) {
     if (params.nodes.length === 1) {
       const nodeId = params.nodes[0];
@@ -619,6 +686,131 @@ async function renderGraph() {
       }
     }
   });
+}
+
+// ── Topology View ─────────────────────────────────────────
+
+const TOPO_CRIT_COLORS = {
+  critical: 'bg-red-400',
+  high: 'bg-amber-400',
+  medium: 'bg-violet-400',
+  low: 'bg-slate-400',
+  unknown: 'bg-slate-600',
+};
+
+const TOPO_CRIT_TEXT = {
+  critical: 'text-red-400',
+  high: 'text-amber-400',
+  medium: 'text-violet-400',
+  low: 'text-slate-400',
+  unknown: 'text-slate-500',
+};
+
+const TOPO_CRIT_PILL = {
+  critical: 'bg-red-400/10 text-red-400 border-red-400/20',
+  high: 'bg-amber-400/10 text-amber-400 border-amber-400/20',
+  medium: 'bg-violet-400/10 text-violet-400 border-violet-400/20',
+  low: 'bg-slate-400/10 text-slate-400 border-slate-400/20',
+  unknown: 'bg-white/5 text-slate-500 border-white/10',
+};
+
+const CRIT_RANK = { critical: 4, high: 3, medium: 2, low: 1, unknown: 0 };
+
+async function renderTopology() {
+  const container = $('topology-content');
+  container.innerHTML = '<div class="text-slate-500 text-sm animate-pulse text-center py-12">Loading topology...</div>';
+
+  // Try the dedicated subnets endpoint first, fall back to client-side grouping
+  let subnets = null;
+  try {
+    const r = await fetch('/api/network-map/subnets', {credentials:'same-origin'});
+    if (r.ok) {
+      const d = await r.json();
+      subnets = d.subnets || d;
+    }
+  } catch(e) {}
+
+  if (!subnets) {
+    // Fall back: fetch all assets and group client-side
+    const assets = await fetchGraphAssets();
+    if (!assets.length) {
+      container.innerHTML = '<div class="text-slate-500 text-sm text-center py-12">No assets found. Run a sync or adjust filters.</div>';
+      return;
+    }
+    // Group by /24 subnet
+    const grouped = new Map();
+    for (const a of assets) {
+      const subnet = ipToSubnet(a.primary_ip) || 'Unknown';
+      if (!grouped.has(subnet)) grouped.set(subnet, []);
+      grouped.get(subnet).push(a);
+    }
+    subnets = Array.from(grouped.entries()).map(([cidr, hosts]) => {
+      const worstCrit = hosts.reduce((w, h) => (CRIT_RANK[h.criticality] || 0) > (CRIT_RANK[w] || 0) ? h.criticality : w, 'unknown');
+      const envs = [...new Set(hosts.map(h => h.environment).filter(Boolean))];
+      const totalEvents = hosts.reduce((s, h) => s + (h.event_count || 0), 0);
+      return { cidr, host_count: hosts.length, worst_criticality: worstCrit, environments: envs, total_events: totalEvents, hosts };
+    });
+  }
+
+  // Sort by host count descending
+  subnets.sort((a, b) => (b.host_count || 0) - (a.host_count || 0));
+
+  if (!subnets.length) {
+    container.innerHTML = '<div class="text-slate-500 text-sm text-center py-12">No subnets to display.</div>';
+    return;
+  }
+
+  container.innerHTML = subnets.map((s, idx) => {
+    const crit = s.worst_criticality || 'unknown';
+    const critPill = TOPO_CRIT_PILL[crit] || TOPO_CRIT_PILL.unknown;
+    const envTags = (s.environments || []).map(e => `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium uppercase ${ENV_CLS[e] || ENV_CLS.unknown} border">${esc(e)}</span>`).join(' ');
+    const hosts = s.hosts || [];
+
+    const hostCards = hosts.map(h => {
+      const os = [h.os_name, h.os_version].filter(Boolean).join(' ') || '—';
+      const hCrit = h.criticality || 'unknown';
+      const dotCls = TOPO_CRIT_COLORS[hCrit] || TOPO_CRIT_COLORS.unknown;
+      return `<div class="rounded-lg border border-white/5 bg-white/[0.02] p-3 cursor-pointer hover:bg-white/[0.04] transition" onclick="openDetail(${h.id})">
+        <div class="flex items-center gap-2 mb-1.5">
+          <span class="w-2 h-2 rounded-full ${dotCls} flex-shrink-0"></span>
+          <span class="font-mono text-[12px] text-ion-cyan truncate">${esc(h.display_hostname)}</span>
+        </div>
+        <div class="text-[11px] text-slate-400 space-y-0.5 pl-4">
+          <div class="font-mono">${esc(h.primary_ip || '—')}</div>
+          <div>${esc(os)}</div>
+          <div class="text-slate-500">${relTime(h.last_seen)}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="rounded-xl border border-white/5 bg-ink-900/40 overflow-hidden" id="topo-subnet-${idx}">
+      <div class="px-4 py-3 flex items-center gap-4 cursor-pointer hover:bg-white/5 transition" onclick="toggleSubnet(${idx})">
+        <svg id="topo-chevron-${idx}" class="w-4 h-4 text-slate-500 transform transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="font-mono text-[13px] text-white font-semibold">${esc(s.cidr)}</span>
+        <span class="text-[11px] text-slate-400">${s.host_count} host${s.host_count === 1 ? '' : 's'}</span>
+        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${critPill}">${esc(crit)}</span>
+        <div class="flex items-center gap-1.5">${envTags}</div>
+        <span class="ml-auto text-[11px] text-slate-500 tabular-nums">${(s.total_events || 0).toLocaleString()} events</span>
+      </div>
+      <div id="topo-body-${idx}" class="px-4 pb-4 hidden">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+          ${hostCards}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleSubnet(idx) {
+  const body = $('topo-body-' + idx);
+  const chevron = $('topo-chevron-' + idx);
+  if (body.classList.contains('hidden')) {
+    body.classList.remove('hidden');
+    chevron.classList.add('rotate-90');
+  } else {
+    body.classList.add('hidden');
+    chevron.classList.remove('rotate-90');
+  }
 }
 
 // Initial load

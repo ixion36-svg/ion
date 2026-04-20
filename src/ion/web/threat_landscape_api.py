@@ -4,12 +4,25 @@ import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
 from ion.models.user import User
 from ion.services.opencti_service import get_opencti_service, OpenCTIError
 from ion.services.ollama_service import get_ollama_service, OllamaError
 from ion.core.safe_errors import safe_error
+from ion.storage.database import get_engine, get_session_factory
+from ion.core.config import get_config
+
+
+def get_db_session():
+    engine = get_engine(get_config().db_path)
+    factory = get_session_factory(engine)
+    session = factory()
+    try:
+        yield session
+    finally:
+        session.close()
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +279,57 @@ async def get_ioc_feed(
         return {"indicators": indicators}
     except OpenCTIError as e:
         raise HTTPException(status_code=502, detail=safe_error(e, "threat_landscape"))
+
+
+@router.post("/ioc-feed/track")
+async def track_ioc(
+    data: dict,
+    user: User = Depends(require_permission("observable:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Add an IOC from the feed to ION's observable watchlist.
+
+    Creates the observable if it doesn't exist, then adds to watchlist.
+    """
+    ioc_type = data.get("ioc_type", "")
+    ioc_value = data.get("ioc_value", "")
+    source = data.get("source", "opencti-feed")
+
+    if not ioc_value:
+        raise HTTPException(status_code=400, detail="ioc_value is required")
+
+    from ion.services.observable_service import ObservableService
+    obs_svc = ObservableService(session)
+
+    # Map common STIX types to ION observable types
+    type_map = {
+        "domain-name": "domain-name",
+        "ipv4-addr": "ipv4-addr",
+        "ipv6-addr": "ipv6-addr",
+        "url": "url",
+        "email-addr": "email-addr",
+    }
+    resolved_type = type_map.get(ioc_type, ioc_type or "domain-name")
+
+    try:
+        observable, created = obs_svc.get_or_create(resolved_type, ioc_value)
+        observable.notes = (
+            (observable.notes + "\n" if observable.notes else "")
+            + f"Tracked from IOC feed ({source})"
+        )
+        # Add to watchlist
+        if not observable.is_watched:
+            observable.is_watched = True
+            observable.watch_reason = f"IOC feed ({source})"
+        session.commit()
+        return {
+            "ok": True,
+            "observable_id": observable.id,
+            "created": created,
+            "watched": True,
+        }
+    except (ValueError, Exception) as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/ai-summary")

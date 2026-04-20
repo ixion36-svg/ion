@@ -51,7 +51,7 @@ def list_assets(
     last_seen_within: str = Query("", description="24h, 7d, 30d, or empty for all"),
     archived: bool = Query(False, description="Include archived assets"),
     offset: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=10000),
     current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
@@ -109,6 +109,77 @@ def list_assets(
         "limit": limit,
         "assets": [_asset_to_dict(a) for a in assets],
     }
+
+
+@router.get("/subnets")
+def list_subnets(
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Aggregate assets by /24 subnet for topology view."""
+    from collections import defaultdict
+    import ipaddress
+
+    assets = session.query(NetworkAsset).filter(
+        NetworkAsset.archived_at.is_(None)
+    ).all()
+
+    subnets = defaultdict(lambda: {
+        "hosts": [], "ips": set(), "os_families": set(),
+        "environments": set(), "criticalities": set(),
+        "total_events": 0,
+    })
+
+    for a in assets:
+        d = _asset_to_dict(a)
+        ip = d.get("primary_ip")
+        if not ip:
+            # Put assets without IPs in a special group
+            subnet_key = "no-ip"
+        else:
+            try:
+                net = ipaddress.ip_network(ip + "/24", strict=False)
+                subnet_key = str(net)
+            except ValueError:
+                subnet_key = "invalid"
+
+        s = subnets[subnet_key]
+        s["hosts"].append({
+            "id": d["id"],
+            "hostname": d["display_hostname"],
+            "ip": ip,
+            "os": d.get("os_name", ""),
+            "criticality": d.get("criticality", "unknown"),
+            "environment": d.get("environment", "unknown"),
+            "event_count": d.get("event_count", 0),
+            "last_seen": d.get("last_seen"),
+        })
+        if ip:
+            s["ips"].add(ip)
+        if d.get("os_name"):
+            s["os_families"].add(d["os_name"])
+        if d.get("environment"):
+            s["environments"].add(d["environment"])
+        if d.get("criticality"):
+            s["criticalities"].add(d["criticality"])
+        s["total_events"] += d.get("event_count", 0)
+
+    result = []
+    for subnet, data in sorted(subnets.items()):
+        crit_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "unknown": 4}
+        worst = min(data["criticalities"], key=lambda c: crit_order.get(c, 5)) if data["criticalities"] else "unknown"
+        result.append({
+            "subnet": subnet,
+            "host_count": len(data["hosts"]),
+            "ip_count": len(data["ips"]),
+            "os_families": sorted(data["os_families"]),
+            "environments": sorted(data["environments"]),
+            "worst_criticality": worst,
+            "total_events": data["total_events"],
+            "hosts": sorted(data["hosts"], key=lambda h: h.get("ip") or ""),
+        })
+
+    return {"subnets": result, "total_subnets": len(result), "total_assets": len(assets)}
 
 
 @router.get("/assets/{asset_id}")
