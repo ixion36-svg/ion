@@ -533,6 +533,24 @@ async def arkime_commit(
 
     session.commit()
 
+    # Sync new case to Kibana with alert attachment
+    if case_just_created:
+        try:
+            from ion.services.kibana_sync_helpers import sync_new_case_to_kibana
+            kibana_result = sync_new_case_to_kibana(
+                case_number=case.case_number,
+                title=case.title,
+                description=case.description,
+                severity=case.severity or "medium",
+                alert_ids=[alert_id],
+            )
+            if kibana_result:
+                case.kibana_case_id = kibana_result["kibana_case_id"]
+                case.kibana_case_version = kibana_result.get("kibana_case_version")
+                session.commit()
+        except Exception as e:
+            logger.warning("Failed to sync Arkime case to Kibana: %s", e)
+
     return ArkimeCommitResponse(
         case_id=case.id,
         case_number=case.case_number,

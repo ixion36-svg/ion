@@ -459,6 +459,24 @@ def push_to_kibana_best_effort(case: AlertCase) -> Optional[str]:
     if kibana_id:
         case.kibana_case_id = kibana_id
         case.kibana_case_version = result.get("version")
+
+        # Attach the linked alerts to the Kibana case
+        alert_ids = list(case.source_alert_ids or [])
+        if alert_ids:
+            try:
+                space_id = kibana_service.config.get("space_id", "default")
+                alert_index = f".alerts-security.alerts-{space_id}"
+                kibana_service.attach_alerts_to_case(
+                    case_id=kibana_id,
+                    alert_ids=alert_ids,
+                    alert_index=alert_index,
+                )
+                logger.info(
+                    "Attached %d alerts to Kibana case %s", len(alert_ids), kibana_id,
+                )
+            except Exception as e:
+                logger.warning("Failed to attach alerts to Kibana case %s: %s", kibana_id, e)
+
     return kibana_id
 
 
