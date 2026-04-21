@@ -51,6 +51,20 @@ _NOISE_SID_PREFIXES = ("S-1-5-18", "S-1-5-19", "S-1-5-20", "S-1-0-0")
 # Minimum length for string values to avoid garbage single-char observables
 _MIN_VALUE_LEN = 2
 
+# URL prefixes that are rule metadata/references, NOT event observables.
+# Kibana Security alerts include MITRE URLs, Elastic docs, etc. at the
+# top level — these pollute observable lists if not filtered.
+_REFERENCE_URL_PREFIXES = (
+    "https://attack.mitre.org/",
+    "https://www.elastic.co/",
+    "https://docs.elastic.co/",
+    "https://learn.microsoft.com/",
+    "https://github.com/elastic/",
+    "https://github.com/SigmaHQ/",
+    "https://www.virustotal.com/",
+    "https://cve.mitre.org/",
+)
+
 
 def _get_nested(data: dict, dotted_key: str) -> Any:
     """Retrieve a nested value using dot notation.
@@ -99,6 +113,14 @@ def extract_observables_from_raw(raw_data: dict) -> List[Dict[str, str]]:
         if obs_type in ("target_user", "subject_user", "user_account", "hostname",
                         "source_hostname", "destination_hostname") and value.isdigit():
             return
+        # Drop reference/documentation URLs (MITRE, Elastic docs, etc.) —
+        # these are rule metadata, not event observables
+        if obs_type in ("url", "domain"):
+            if any(value.startswith(prefix) for prefix in _REFERENCE_URL_PREFIXES):
+                return
+            # Also drop if the URL is a reference field, not an event field
+            if "attack.mitre.org" in value or "elastic.co" in value:
+                return
         if (obs_type, value) not in seen:
             seen.add((obs_type, value))
             observables.append({"type": obs_type, "value": value})
@@ -165,7 +187,7 @@ def extract_observables_from_raw(raw_data: dict) -> List[Dict[str, str]]:
     _extract_field(["user.id"], "user_account")
 
     # =====================================================================
-    # URLs and Domains
+    # URLs and Domains — only event-related URLs, not rule references
     # =====================================================================
     _extract_field(["url.full", "url.original"], "url")
     _extract_field(["url.domain", "dns.question.name"], "domain")
@@ -173,8 +195,8 @@ def extract_observables_from_raw(raw_data: dict) -> List[Dict[str, str]]:
     # =====================================================================
     # File Information
     # =====================================================================
-    _extract_field(["file.path", "file.name"], "file_path")
-    _extract_field(["process.executable"], "process_path")
+    _extract_field(["file.path", "file.name", "winlog.event_data.TargetFilename"], "file_path")
+    _extract_field(["process.executable", "winlog.event_data.Image"], "process_path")
     _extract_field(["file.hash.sha256", "process.hash.sha256"], "sha256")
     _extract_field(["file.hash.md5", "process.hash.md5"], "md5")
     _extract_field(["file.hash.sha1", "process.hash.sha1"], "sha1")
@@ -182,10 +204,15 @@ def extract_observables_from_raw(raw_data: dict) -> List[Dict[str, str]]:
     # =====================================================================
     # Process Information
     # =====================================================================
-    _extract_field(["process.name"], "process_name")
-    _extract_field(["process.command_line", "process.args"], "command_line")
-    _extract_field(["process.parent.name"], "parent_process")
-    _extract_field(["process.parent.executable"], "parent_process_path")
+    _extract_field(["process.name", "winlog.event_data.Image"], "process_name")
+    _extract_field([
+        "process.command_line",
+        "feature_command_line",
+        "process.args",
+        "winlog.event_data.CommandLine",
+    ], "command_line")
+    _extract_field(["process.parent.name", "winlog.event_data.ParentImage"], "parent_process")
+    _extract_field(["process.parent.executable", "winlog.event_data.ParentCommandLine"], "parent_process_path")
 
     # =====================================================================
     # Email
