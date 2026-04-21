@@ -240,8 +240,13 @@ class CachedStaticFiles(_StaticFiles):
 
 app.mount("/static", CachedStaticFiles(directory=BASE_DIR / "static"), name="static")
 
-# Setup templates
+# Setup templates with bytecode cache (compiled once, not per-request)
+from jinja2 import FileSystemBytecodeCache as _J2Cache
+_bytecode_cache_dir = Path("/tmp/ion-jinja2-cache")
+_bytecode_cache_dir.mkdir(exist_ok=True)
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+templates.env.bytecode_cache = _J2Cache(str(_bytecode_cache_dir))
+templates.env.auto_reload = _debug_mode  # Only reload in debug
 templates.env.globals["ion_version"] = ion.__version__
 
 # Include API routes

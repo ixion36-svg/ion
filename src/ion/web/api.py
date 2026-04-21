@@ -227,13 +227,14 @@ def get_services(session: Session = Depends(get_db_session)) -> Services:
 # =============================================================================
 
 @router.post("/auth/login")
+@limiter.limit("10/minute")
 async def login(
     request: Request,
     login_request: LoginRequest,
     response: Response,
     session: Session = Depends(get_db_session),
 ):
-    """Login and create session."""
+    """Login and create session. Rate-limited to 10/min per IP."""
     auth_service = AuthService(session)
     ip_address = get_client_ip(request)
     user_agent = request.headers.get("User-Agent")
@@ -559,6 +560,7 @@ async def bulk_resolve_elastic_uids(
 
 
 @router.post("/auth/change-password")
+@limiter.limit("5/minute")
 async def change_password(
     password_request: ChangePasswordRequest,
     request: Request,
@@ -2230,12 +2232,100 @@ async def revert_document_to_version(
 # Health check endpoint (no auth required)
 @router.get("/health")
 async def health_check():
-    """Simple health check for Docker/load balancers."""
+    """Health check for Docker/load balancers. Returns basic status."""
     from ion.storage.database import get_engine
     from ion import __version__
     engine = get_engine()
-    db_type = engine.dialect.name  # "postgresql" or "sqlite"
+    db_type = engine.dialect.name
     return {"status": "ok", "database": db_type, "version": __version__}
+
+
+@router.get("/health/deep")
+async def deep_health_check():
+    """Deep health check — probes all integrations. Not for load balancers
+    (too slow), but useful for dashboards and monitoring."""
+    from ion.storage.database import get_engine
+    from ion import __version__
+    from ion.core.config import get_config
+
+    config = get_config()
+    engine = get_engine()
+    checks = {"database": engine.dialect.name, "version": __version__}
+
+    # Elasticsearch
+    try:
+        es_svc = get_elasticsearch_service()
+        if es_svc.is_configured:
+            es_result = await es_svc.test_connection()
+            checks["elasticsearch"] = {
+                "status": "ok" if es_result.get("connected") else "error",
+                "cluster": es_result.get("cluster_name"),
+            }
+        else:
+            checks["elasticsearch"] = {"status": "not_configured"}
+    except Exception as e:
+        checks["elasticsearch"] = {"status": "error", "error": str(e)[:100]}
+
+    # TIDE
+    try:
+        from ion.services.tide_service import get_tide_service
+        tide = get_tide_service()
+        if tide.enabled:
+            result = tide.test_connection()
+            checks["tide"] = {
+                "status": "ok" if result.get("ok") else "error",
+                "rules": result.get("rule_count", 0),
+                "space": result.get("space"),
+            }
+        else:
+            checks["tide"] = {"status": "not_configured"}
+    except Exception as e:
+        checks["tide"] = {"status": "error", "error": str(e)[:100]}
+
+    # Ollama
+    try:
+        from ion.services.ollama_service import get_ollama_service
+        ollama = get_ollama_service()
+        avail = await ollama.is_available()
+        checks["ollama"] = {"status": "ok" if avail else "unavailable"}
+    except Exception as e:
+        checks["ollama"] = {"status": "error", "error": str(e)[:100]}
+
+    # OpenCTI
+    try:
+        from ion.services.opencti_service import get_opencti_service
+        opencti = get_opencti_service()
+        if opencti.is_configured:
+            result = await opencti.test_connection()
+            checks["opencti"] = {
+                "status": "ok" if result.get("connected") else "error",
+            }
+        else:
+            checks["opencti"] = {"status": "not_configured"}
+    except Exception as e:
+        checks["opencti"] = {"status": "error", "error": str(e)[:100]}
+
+    # Arkime
+    try:
+        from ion.services.arkime_service import get_arkime_service
+        arkime = get_arkime_service()
+        if arkime.is_configured:
+            result = await arkime.test_connection()
+            checks["arkime"] = {
+                "status": "ok" if result.get("connected") else "error",
+                "auth_mode": result.get("auth_mode"),
+            }
+        else:
+            checks["arkime"] = {"status": "not_configured"}
+    except Exception as e:
+        checks["arkime"] = {"status": "error", "error": str(e)[:100]}
+
+    overall = "ok" if all(
+        c.get("status") in ("ok", "not_configured")
+        for c in checks.values() if isinstance(c, dict)
+    ) else "degraded"
+
+    return {"status": overall, "checks": checks}
 
 
 # Stats endpoint
