@@ -127,15 +127,14 @@ class ArkimeService:
         return None
 
     async def _client(self) -> httpx.AsyncClient:
-        global _arkime_client
-        if _arkime_client is None or _arkime_client.is_closed:
-            _arkime_client = httpx.AsyncClient(
-                verify=self.verify_ssl,
-                timeout=60.0,  # PCAP downloads can be slow
-                follow_redirects=True,
-                limits=httpx.Limits(max_connections=5, max_keepalive_connections=3),
-            )
-        return _arkime_client
+        # Fresh client per request — Arkime's digest auth requires a fresh
+        # 401 challenge-response per connection. Shared clients cause stale
+        # nonce errors after the first request.
+        return httpx.AsyncClient(
+            verify=self.verify_ssl,
+            timeout=60.0,
+            follow_redirects=True,
+        )
 
     # ── Probes ─────────────────────────────────────────────────────────────
     async def test_connection(self) -> Dict[str, Any]:
@@ -144,12 +143,12 @@ class ArkimeService:
             return {"connected": False, "error": "Arkime is not configured"}
         headers = await self._headers()
         try:
-            client = await self._client()
-            resp = await client.get(
-                f"{self.url}/api/user",
-                auth=self._auth(),
-                headers=headers,
-            )
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/user",
+                    auth=self._auth(),
+                    headers=headers,
+                )
             if resp.status_code == 200:
                 data: Dict[str, Any] = {}
                 try:
@@ -202,13 +201,13 @@ class ArkimeService:
         }
         headers = await self._headers()
         try:
-            client = await self._client()
-            resp = await client.get(
-                f"{self.url}/api/sessions",
-                auth=self._auth(),
-                headers=headers,
-                params=params,
-            )
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/sessions",
+                    auth=self._auth(),
+                    headers=headers,
+                    params=params,
+                )
             if resp.status_code != 200:
                 body_preview = (resp.text or "")[:200]
                 logger.warning(
@@ -272,13 +271,13 @@ class ArkimeService:
         }
         headers = await self._headers()
         try:
-            client = await self._client()
-            resp = await client.get(
-                f"{self.url}/api/sessions",
-                auth=self._auth(),
-                headers=headers,
-                params=params,
-            )
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/sessions",
+                    auth=self._auth(),
+                    headers=headers,
+                    params=params,
+                )
             if resp.status_code != 200:
                 body_preview = (resp.text or "")[:200]
                 logger.warning(
@@ -369,12 +368,12 @@ class ArkimeService:
         url = f"{self.url}/api/session/{node}/{session_id}/pcap"
         headers = await self._headers({"Accept": "application/vnd.tcpdump.pcap"})
         try:
-            client = await self._client()
-            resp = await client.get(
-                url,
-                auth=self._auth(),
-                headers=headers,
-            )
+            async with await self._client() as client:
+                resp = await client.get(
+                    url,
+                    auth=self._auth(),
+                    headers=headers,
+                )
             if resp.status_code == 404:
                 raise ArkimeError(
                     f"Arkime session {session_id} not found on node {node}",
