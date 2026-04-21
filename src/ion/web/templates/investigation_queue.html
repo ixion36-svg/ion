@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+
+{% block title %}Investigation Queue · ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+  <!-- Header -->
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="h-1.5 w-1.5 rounded-full bg-ion-lime pulse-cyan"></span>
+        <span class="label-tiny text-ion-lime">Autonomous investigation</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Investigation Queue</h1>
+      <p class="mt-3 text-[13px] text-slate-400 max-w-2xl">Live view of the autonomous investigation pipeline. Running jobs, recently completed verdicts, and on-demand controls.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button onclick="iqRefresh()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+        <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Refresh
+      </button>
+      <button onclick="iqRunSweep()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+        <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>Run sweep now
+      </button>
+    </div>
+  </section>
+
+  <!-- Manual-trigger card -->
+  <section class="rounded-[12px] border border-white/5 bg-ink-900/50 p-5 mb-6">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="label-tiny text-slate-500">Manual trigger</span>
+    </div>
+    <form id="iq-manual-form" onsubmit="iqManualSubmit(event)" class="flex flex-wrap items-end gap-3">
+      <label class="flex flex-col gap-1 text-[12px] text-slate-300 flex-1 min-w-[280px]">
+        Alert ID (ES <code>_id</code>)
+        <input name="alert_id" required class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" placeholder="e.g. 7c4fd2abc…">
+      </label>
+      <label class="flex items-center gap-2 text-[12px] text-slate-300">
+        <input name="force" type="checkbox" class="accent-ion-cyan">
+        Force re-run
+      </label>
+      <button type="submit" class="h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition">Investigate alert</button>
+      <span id="iq-manual-status" class="text-[12px] text-slate-400"></span>
+    </form>
+  </section>
+
+  <!-- Counts / summary strip -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 p-4">
+      <div class="label-tiny text-slate-500">Running</div>
+      <div id="iq-count-running" class="text-[28px] font-semibold text-ion-cyan mt-1">—</div>
+    </div>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 p-4">
+      <div class="label-tiny text-slate-500">Pending</div>
+      <div id="iq-count-pending" class="text-[28px] font-semibold text-[#a78bfa] mt-1">—</div>
+    </div>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 p-4">
+      <div class="label-tiny text-slate-500">Recent completed</div>
+      <div id="iq-count-completed" class="text-[28px] font-semibold text-[#4ade80] mt-1">—</div>
+    </div>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 p-4">
+      <div class="label-tiny text-slate-500">Recent failed</div>
+      <div id="iq-count-failed" class="text-[28px] font-semibold text-[#f87171] mt-1">—</div>
+    </div>
+  </div>
+
+  <!-- Running / pending jobs -->
+  <section class="mb-10">
+    <h2 class="text-[14px] font-semibold text-white mb-3">Running &amp; Pending</h2>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
+      <table class="data-table w-full">
+        <thead>
+          <tr class="text-[11px] uppercase tracking-wider text-slate-500">
+            <th class="px-4 py-3 text-left">Status</th>
+            <th class="px-4 py-3 text-left">Started</th>
+            <th class="px-4 py-3 text-left">Signature</th>
+            <th class="px-4 py-3 text-left">Host</th>
+            <th class="px-4 py-3 text-left">User</th>
+            <th class="px-4 py-3 text-left">Alert ID</th>
+            <th class="px-4 py-3 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="iq-running-tbody">
+          <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Recently completed -->
+  <section class="mb-10">
+    <h2 class="text-[14px] font-semibold text-white mb-3">Recently completed (last 20)</h2>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
+      <table class="data-table w-full">
+        <thead>
+          <tr class="text-[11px] uppercase tracking-wider text-slate-500">
+            <th class="px-4 py-3 text-left">Completed</th>
+            <th class="px-4 py-3 text-left">Signature</th>
+            <th class="px-4 py-3 text-left">Host</th>
+            <th class="px-4 py-3 text-left">Verdict</th>
+            <th class="px-4 py-3 text-left">Severity</th>
+            <th class="px-4 py-3 text-left">Duration</th>
+            <th class="px-4 py-3 text-left">Model</th>
+            <th class="px-4 py-3 text-left">Summary</th>
+          </tr>
+        </thead>
+        <tbody id="iq-completed-tbody">
+          <tr><td colspan="8" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Recent failures -->
+  <section>
+    <h2 class="text-[14px] font-semibold text-white mb-3">Recent failures</h2>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
+      <table class="data-table w-full">
+        <thead>
+          <tr class="text-[11px] uppercase tracking-wider text-slate-500">
+            <th class="px-4 py-3 text-left">When</th>
+            <th class="px-4 py-3 text-left">Signature</th>
+            <th class="px-4 py-3 text-left">Alert ID</th>
+            <th class="px-4 py-3 text-left">Summary / error</th>
+          </tr>
+        </thead>
+        <tbody id="iq-failed-tbody">
+          <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+</div>
+
+<style>
+  .data-table tbody tr { border-top: 1px solid rgba(255,255,255,0.04); }
+  .data-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+  .data-table td { padding: 0.7rem 1rem; font-size: 12px; color: #cbd5e1; vertical-align: top; }
+  .iq-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .iq-pill-tp       { background: rgba(239,68,68,0.15);  color: #f87171; }
+  .iq-pill-fp       { background: rgba(100,116,139,0.2); color: #94a3b8; }
+  .iq-pill-benign   { background: rgba(34,197,94,0.15);  color: #4ade80; }
+  .iq-pill-inc      { background: rgba(245,158,11,0.15); color: #fbbf24; }
+  .iq-pill-pending  { background: rgba(139,92,246,0.15); color: #a78bfa; }
+  .iq-pill-running  { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .iq-pill-completed{ background: rgba(34,197,94,0.15);  color: #4ade80; }
+  .iq-pill-failed   { background: rgba(239,68,68,0.15);  color: #f87171; }
+  .iq-pill-sev-low     { background: rgba(148,163,184,0.15); color: #cbd5e1; }
+  .iq-pill-sev-medium  { background: rgba(245,158,11,0.15);  color: #fbbf24; }
+  .iq-pill-sev-high    { background: rgba(249,115,22,0.15);  color: #fb923c; }
+  .iq-pill-sev-critical{ background: rgba(239,68,68,0.2);    color: #f87171; }
+  .iq-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: #94a3b8; }
+</style>
+
+<script>
+(function() {
+  const refreshMs = 10000;
+  let refreshTimer = null;
+
+  function iqEscape(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+  function iqFmtTime(iso) {
+    if (!iso) return "—";
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString(undefined, { hour12: false });
+    } catch (e) { return iso; }
+  }
+  function iqFmtDuration(ms) {
+    if (ms == null) return "—";
+    if (ms < 1000) return ms + " ms";
+    const s = ms / 1000;
+    if (s < 60) return s.toFixed(1) + "s";
+    const m = Math.floor(s / 60);
+    const rem = Math.round(s % 60);
+    return `${m}m ${rem}s`;
+  }
+  function iqVerdictPill(v) {
+    if (!v) return '<span class="iq-pill iq-pill-inc">—</span>';
+    const cls = {
+      "true_positive":  "iq-pill-tp",
+      "false_positive": "iq-pill-fp",
+      "benign":         "iq-pill-benign",
+      "inconclusive":   "iq-pill-inc",
+    }[v] || "iq-pill-inc";
+    return `<span class="iq-pill ${cls}">${iqEscape(v.replace("_", " "))}</span>`;
+  }
+  function iqSeverityPill(s) {
+    if (!s) return '<span class="iq-pill iq-pill-sev-low">—</span>';
+    const cls = {
+      "low":"iq-pill-sev-low", "medium":"iq-pill-sev-medium",
+      "high":"iq-pill-sev-high", "critical":"iq-pill-sev-critical",
+    }[s] || "iq-pill-sev-low";
+    return `<span class="iq-pill ${cls}">${iqEscape(s)}</span>`;
+  }
+  function iqStatusPill(s) {
+    const cls = ({
+      "pending":"iq-pill-pending", "running":"iq-pill-running",
+      "completed":"iq-pill-completed", "failed":"iq-pill-failed",
+    })[s] || "iq-pill-pending";
+    return `<span class="iq-pill ${cls}">${iqEscape(s || '?')}</span>`;
+  }
+
+  async function iqFetch() {
+    try {
+      const res = await fetch('/api/investigate/jobs', { credentials: 'same-origin' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    } catch (e) {
+      console.warn('Failed to load investigation jobs:', e);
+      return { running:[], pending:[], completed:[], failed:[] };
+    }
+  }
+
+  function iqRenderRow_active(inv) {
+    return `
+      <tr>
+        <td>${iqStatusPill(inv.status)}</td>
+        <td>${iqEscape(iqFmtTime(inv.created_at))}</td>
+        <td title="${iqEscape(inv.alert_signature)}">${iqEscape(inv.alert_signature || "—")}</td>
+        <td>${iqEscape(inv.host || "—")}</td>
+        <td>${iqEscape(inv.user_name || "—")}</td>
+        <td class="iq-mono">${iqEscape((inv.alert_id_ref||"").slice(0,16))}</td>
+        <td><a class="text-ion-cyan hover:underline text-[12px]" href="/investigations?focus=${inv.id}">Open</a></td>
+      </tr>`;
+  }
+  function iqRenderRow_completed(inv) {
+    const summary = (inv.summary_text || "").slice(0, 240);
+    return `
+      <tr>
+        <td>${iqEscape(iqFmtTime(inv.completed_at))}</td>
+        <td title="${iqEscape(inv.alert_signature)}">${iqEscape(inv.alert_signature || "—")}</td>
+        <td>${iqEscape(inv.host || "—")}</td>
+        <td>${iqVerdictPill(inv.verdict)}</td>
+        <td>${iqSeverityPill(inv.severity_assessment)}</td>
+        <td>${iqEscape(iqFmtDuration(inv.duration_ms))}</td>
+        <td class="iq-mono">${iqEscape(inv.llm_model_used || "—")}</td>
+        <td title="${iqEscape(inv.summary_text || '')}">${iqEscape(summary) || "—"}</td>
+      </tr>`;
+  }
+  function iqRenderRow_failed(inv) {
+    const summary = (inv.summary_text || "").slice(0, 400);
+    return `
+      <tr>
+        <td>${iqEscape(iqFmtTime(inv.completed_at || inv.created_at))}</td>
+        <td title="${iqEscape(inv.alert_signature)}">${iqEscape(inv.alert_signature || "—")}</td>
+        <td class="iq-mono">${iqEscape((inv.alert_id_ref||"").slice(0,16))}</td>
+        <td>${iqEscape(summary) || "—"}</td>
+      </tr>`;
+  }
+
+  async function iqLoad() {
+    const data = await iqFetch();
+    const active = [
+      ...(data.running || []),
+      ...(data.pending || []),
+    ];
+    document.getElementById('iq-count-running').textContent = (data.running || []).length;
+    document.getElementById('iq-count-pending').textContent = (data.pending || []).length;
+    document.getElementById('iq-count-completed').textContent = (data.completed || []).length;
+    document.getElementById('iq-count-failed').textContent = (data.failed || []).length;
+
+    const runTb = document.getElementById('iq-running-tbody');
+    if (active.length === 0) {
+      runTb.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500 text-[12px]">No active investigations.</td></tr>';
+    } else {
+      runTb.innerHTML = active.map(iqRenderRow_active).join('');
+    }
+
+    const compTb = document.getElementById('iq-completed-tbody');
+    const completed = data.completed || [];
+    if (completed.length === 0) {
+      compTb.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500 text-[12px]">No completed investigations yet.</td></tr>';
+    } else {
+      compTb.innerHTML = completed.map(iqRenderRow_completed).join('');
+    }
+
+    const failTb = document.getElementById('iq-failed-tbody');
+    const failed = data.failed || [];
+    if (failed.length === 0) {
+      failTb.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-slate-500 text-[12px]">No recent failures.</td></tr>';
+    } else {
+      failTb.innerHTML = failed.map(iqRenderRow_failed).join('');
+    }
+  }
+
+  async function iqRunSweep() {
+    try {
+      const res = await fetch('/api/investigate/sweep', {
+        method: 'POST',
+        credentials: 'same-origin',
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      await iqLoad();
+    } catch (e) {
+      console.warn('Sweep trigger failed:', e);
+      alert('Sweep trigger failed: ' + e.message);
+    }
+  }
+
+  async function iqManualSubmit(ev) {
+    ev.preventDefault();
+    const form = document.getElementById('iq-manual-form');
+    const fd = new FormData(form);
+    const alert_id = (fd.get('alert_id') || '').toString().trim();
+    const force = !!fd.get('force');
+    if (!alert_id) return;
+
+    const status = document.getElementById('iq-manual-status');
+    status.textContent = 'Submitting…';
+    try {
+      const res = await fetch('/api/investigate', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alert_id, force }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
+      if (data.queued) {
+        status.textContent = 'Queued.';
+      } else if (data.investigation_id) {
+        status.textContent = `Existing investigation #${data.investigation_id} (${data.status}). Use Force to re-run.`;
+      } else {
+        status.textContent = 'Submitted.';
+      }
+      await iqLoad();
+    } catch (e) {
+      status.textContent = 'Error: ' + e.message;
+    }
+  }
+
+  function iqRefresh() { iqLoad(); }
+
+  window.iqLoad = iqLoad;
+  window.iqRefresh = iqRefresh;
+  window.iqRunSweep = iqRunSweep;
+  window.iqManualSubmit = iqManualSubmit;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    iqLoad();
+    refreshTimer = setInterval(iqLoad, refreshMs);
+  });
+})();
+</script>
+{% endblock %}

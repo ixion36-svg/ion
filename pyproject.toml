@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ion"
-version = "0.9.91"
+version = "0.9.95"
 description = "Intelligent Operating Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -27,6 +27,10 @@ dependencies = [
     "bcrypt>=4.0.0,<4.1",
     "python-jose[cryptography]>=3.3.0",
     "httpx>=0.25.0",
+    "aiosmtplib>=3.0.0",
+    "email-validator>=2.0.0",
+    "ldap3>=2.9",
+    "croniter>=2.0.0",
     "slowapi>=0.1.9",
     "ecs-logging>=2.0.0",
     "python-json-logger>=2.0.0",

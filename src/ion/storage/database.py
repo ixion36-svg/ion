@@ -74,6 +74,9 @@ LOCK_TIDE_BG_SYNC           = 1011
 # 1012 was LOCK_CYAB_REVIEW_CHECK — removed in v0.9.76 with the notifications feature
 LOCK_ANALYTICS_BG_LOOP      = 1013
 LOCK_NETMAP_BG_SYNC         = 1014
+LOCK_SCHEDULER_BG           = 1015
+LOCK_INVESTIGATION_BG       = 1016
+LOCK_CASE_GROUPER_BG        = 1017
 
 
 @contextmanager
@@ -121,17 +124,17 @@ def advisory_lock(engine: Engine, lock_id: int, *, hold_until_close: bool = Fals
             # Pin the connection to module state so the lock survives the
             # rest of the worker's lifetime. Do NOT close.
             _pinned_lock_conns[lock_id] = conn
-            return
-        if acquired:
+        else:
+            if acquired:
+                try:
+                    conn.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": lock_id})
+                    conn.commit()
+                except Exception:
+                    pass
             try:
-                conn.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": lock_id})
-                conn.commit()
+                conn.close()
             except Exception:
                 pass
-        try:
-            conn.close()
-        except Exception:
-            pass
 
 
 def run_locked(

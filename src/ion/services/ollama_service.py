@@ -10,6 +10,8 @@ from enum import Enum
 from collections import defaultdict
 import httpx
 
+from ion.services.pii_anon_service import TokenMap, get_pii_anon_service
+
 logger = logging.getLogger(__name__)
 
 
@@ -412,8 +414,25 @@ class OllamaService:
 
     @property
     def client(self) -> httpx.AsyncClient:
-        """Get or create HTTP client."""
-        if self._client is None or self._client.is_closed:
+        """Get or create HTTP client bound to the *current* event loop.
+
+        Background investigations run each call under a fresh ``asyncio.run``
+        loop in a worker thread. httpx binds its internal transports to the
+        loop that was running at construction time — so a singleton client
+        created on a different (already-closed) loop raises
+        ``RuntimeError: Event loop is closed`` on every later call. We detect
+        a loop change and rebuild.
+        """
+        import asyncio as _asyncio
+        try:
+            current_loop = _asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
+        bound_loop = getattr(self, "_client_loop", None)
+        loop_changed = current_loop is not None and bound_loop is not current_loop
+
+        if self._client is None or self._client.is_closed or loop_changed:
             from ion.core.config import get_ssl_verify
             verify = get_ssl_verify(self.verify_ssl)
             self._client = httpx.AsyncClient(
@@ -421,6 +440,7 @@ class OllamaService:
                 timeout=httpx.Timeout(self.timeout, connect=10.0),
                 verify=verify,
             )
+            self._client_loop = current_loop
         return self._client
 
     async def close(self):
@@ -519,21 +539,32 @@ class OllamaService:
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         user_id: int = 0,
+        anon_map: Optional[TokenMap] = None,
+        bypass_queue: bool = False,
     ) -> Dict[str, Any]:
-        """Send a chat message and get a response (non-streaming)."""
+        """Send a chat message and get a response (non-streaming).
+
+        ``bypass_queue=True`` skips the per-user rate limiter and the shared
+        ``asyncio.Semaphore`` queue. Use it for background work that runs
+        in its own worker-thread event loop (investigation service, etc.) —
+        the Semaphore binds to the loop where the queue was first created
+        and raises cross-loop errors when reused elsewhere.
+        """
         model = model or self.default_model
+        request_id: Optional[str] = None
 
-        # Check rate limit
-        allowed, wait_time = await self._queue.check_rate_limit(user_id)
-        if not allowed:
-            raise OllamaError(f"Rate limited. Please wait {wait_time:.1f} seconds before trying again.")
+        if not bypass_queue:
+            # Check rate limit
+            allowed, wait_time = await self._queue.check_rate_limit(user_id)
+            if not allowed:
+                raise OllamaError(f"Rate limited. Please wait {wait_time:.1f} seconds before trying again.")
 
-        # Acquire queue slot
-        acquired, position, request_id = await self._queue.acquire_with_wait(user_id, timeout=300)
-        if not acquired:
-            if position == -1:
-                raise OllamaError("Server busy. Queue is full. Please try again later.")
-            raise OllamaError("Request timed out waiting in queue. Please try again.")
+            # Acquire queue slot
+            acquired, position, request_id = await self._queue.acquire_with_wait(user_id, timeout=300)
+            if not acquired:
+                if position == -1:
+                    raise OllamaError("Server busy. Queue is full. Please try again later.")
+                raise OllamaError("Request timed out waiting in queue. Please try again.")
 
         try:
             # Build messages with system prompt
@@ -544,6 +575,13 @@ class OllamaService:
                 full_messages.append({"role": "system", "content": SYSTEM_PROMPTS[context_type]})
 
             full_messages.extend(messages)
+
+            anon = get_pii_anon_service()
+            anon_active = anon_map is not None and anon.is_enabled()
+            if anon_active:
+                for msg in full_messages:
+                    if msg.get("role") != "system" and isinstance(msg.get("content"), str):
+                        msg["content"] = anon.tokenize_text(msg["content"], anon_map)
 
             num_predict = max_tokens or DEFAULT_NUM_PREDICT
 
@@ -563,8 +601,12 @@ class OllamaService:
             response.raise_for_status()
             data = response.json()
 
+            content = data.get("message", {}).get("content", "")
+            if anon_active:
+                content = anon.detokenize_text(content, anon_map)
+
             return {
-                "content": data.get("message", {}).get("content", ""),
+                "content": content,
                 "model": model,
                 "done": True,
                 "total_duration": data.get("total_duration"),
@@ -578,7 +620,11 @@ class OllamaService:
             logger.error("Chat failed: %s", e)
             raise OllamaError(f"Chat failed: {e}")
         finally:
-            await self._queue.release(request_id)
+            if request_id is not None:
+                try:
+                    await self._queue.release(request_id)
+                except Exception:
+                    pass
 
     async def chat_stream(
         self,
@@ -589,6 +635,7 @@ class OllamaService:
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         user_id: int = 0,
+        anon_map: Optional[TokenMap] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Send a chat message and stream the response."""
         model = model or self.default_model
@@ -622,6 +669,13 @@ class OllamaService:
 
             full_messages.extend(messages)
 
+            anon = get_pii_anon_service()
+            anon_active = anon_map is not None and anon.is_enabled()
+            if anon_active:
+                for msg in full_messages:
+                    if msg.get("role") != "system" and isinstance(msg.get("content"), str):
+                        msg["content"] = anon.tokenize_text(msg["content"], anon_map)
+
             num_predict = max_tokens or DEFAULT_NUM_PREDICT
 
             async with self.client.stream(
@@ -643,8 +697,11 @@ class OllamaService:
                     if line:
                         import json
                         data = json.loads(line)
+                        chunk = data.get("message", {}).get("content", "")
+                        if anon_active:
+                            chunk = anon.detokenize_text(chunk, anon_map)
                         yield {
-                            "content": data.get("message", {}).get("content", ""),
+                            "content": chunk,
                             "done": data.get("done", False),
                             "model": model,
                         }

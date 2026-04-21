@@ -1,0 +1,606 @@
+{% extends "base.html" %}
+
+{% block title %}Investigation Memory · ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+  <!-- Header -->
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="h-1.5 w-1.5 rounded-full bg-ion-lime pulse-cyan"></span>
+        <span class="label-tiny text-ion-lime">Autonomous SOC memory</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Investigation Memory</h1>
+      <p class="mt-3 text-[13px] text-slate-400 max-w-2xl">Past investigations, IOC sighting history, and known false-positive signatures used to rehydrate context on repeat alerts.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button onclick="imRefresh()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+        <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Refresh
+      </button>
+      <button onclick="imShowFpModal()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+        <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>New FP signature
+      </button>
+    </div>
+  </section>
+
+  <!-- Tabs -->
+  <div class="flex items-center gap-1 mb-6 border-b border-white/5">
+    <button id="im-tab-inv" class="im-tab im-tab-active" onclick="imSwitchTab('inv')">Investigations</button>
+    <button id="im-tab-iocs" class="im-tab" onclick="imSwitchTab('iocs')">IOC Sightings</button>
+    <button id="im-tab-fps" class="im-tab" onclick="imSwitchTab('fps')">False Positives</button>
+  </div>
+
+  <!-- =============== Investigations Tab =============== -->
+  <section id="im-pane-inv" class="im-pane">
+    <div class="flex flex-wrap items-end gap-2 mb-4">
+      <div class="flex-1 min-w-[200px]">
+        <label class="label-tiny block mb-1 text-slate-500">Signature</label>
+        <input type="text" id="im-filter-signature" class="h-9 w-full rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" placeholder="e.g. Suspicious PowerShell" oninput="imDebouncedLoadInv()">
+      </div>
+      <div>
+        <label class="label-tiny block mb-1 text-slate-500">Verdict</label>
+        <select id="im-filter-verdict" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" onchange="imLoadInvestigations()">
+          <option value="">All</option>
+          <option value="true_positive">True positive</option>
+          <option value="false_positive">False positive</option>
+          <option value="benign">Benign</option>
+          <option value="inconclusive">Inconclusive</option>
+        </select>
+      </div>
+      <div>
+        <label class="label-tiny block mb-1 text-slate-500">Status</label>
+        <select id="im-filter-status" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" onchange="imLoadInvestigations()">
+          <option value="">All</option>
+          <option value="pending">Pending</option>
+          <option value="running">Running</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+        </select>
+      </div>
+      <div>
+        <label class="label-tiny block mb-1 text-slate-500">Host</label>
+        <input type="text" id="im-filter-host" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" oninput="imDebouncedLoadInv()">
+      </div>
+      <div>
+        <label class="label-tiny block mb-1 text-slate-500">From</label>
+        <input type="date" id="im-filter-from" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" onchange="imLoadInvestigations()">
+      </div>
+      <div>
+        <label class="label-tiny block mb-1 text-slate-500">To</label>
+        <input type="date" id="im-filter-to" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" onchange="imLoadInvestigations()">
+      </div>
+      <button class="h-9 px-3 rounded-md bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10 text-[12px] font-semibold" onclick="imClearInvFilters()">Clear</button>
+    </div>
+
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
+      <table class="data-table w-full">
+        <thead>
+          <tr class="text-[11px] uppercase tracking-wider text-slate-500">
+            <th class="px-4 py-3 text-left">When</th>
+            <th class="px-4 py-3 text-left">Signature</th>
+            <th class="px-4 py-3 text-left">Host</th>
+            <th class="px-4 py-3 text-left">User</th>
+            <th class="px-4 py-3 text-left">Status</th>
+            <th class="px-4 py-3 text-left">Verdict</th>
+            <th class="px-4 py-3 text-left">Severity</th>
+            <th class="px-4 py-3 text-left">Duration</th>
+          </tr>
+        </thead>
+        <tbody id="im-inv-tbody">
+          <tr><td colspan="8" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading investigations…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- =============== IOC Sightings Tab =============== -->
+  <section id="im-pane-iocs" class="im-pane hidden">
+    <div class="flex flex-wrap items-end gap-2 mb-4">
+      <div>
+        <label class="label-tiny block mb-1 text-slate-500">Type</label>
+        <select id="im-ioc-type" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" onchange="imLoadIocs()">
+          <option value="">All types</option>
+          <option value="ip">IP</option>
+          <option value="domain">Domain</option>
+          <option value="url">URL</option>
+          <option value="sha256">SHA256</option>
+          <option value="sha1">SHA1</option>
+          <option value="md5">MD5</option>
+          <option value="email">Email</option>
+          <option value="filename">Filename</option>
+        </select>
+      </div>
+      <div>
+        <label class="label-tiny block mb-1 text-slate-500">Flag</label>
+        <select id="im-ioc-bad" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" onchange="imLoadIocs()">
+          <option value="">All</option>
+          <option value="true">Known bad</option>
+          <option value="false">Not known bad</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
+      <table class="data-table w-full">
+        <thead>
+          <tr class="text-[11px] uppercase tracking-wider text-slate-500">
+            <th class="px-4 py-3 text-left">Type</th>
+            <th class="px-4 py-3 text-left">Value</th>
+            <th class="px-4 py-3 text-left">Seen</th>
+            <th class="px-4 py-3 text-left">First</th>
+            <th class="px-4 py-3 text-left">Last</th>
+            <th class="px-4 py-3 text-left">Flags</th>
+            <th class="px-4 py-3 text-left">Last inv</th>
+          </tr>
+        </thead>
+        <tbody id="im-iocs-tbody">
+          <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading IOC sightings…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- =============== False Positives Tab =============== -->
+  <section id="im-pane-fps" class="im-pane hidden">
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
+      <table class="data-table w-full">
+        <thead>
+          <tr class="text-[11px] uppercase tracking-wider text-slate-500">
+            <th class="px-4 py-3 text-left">Enabled</th>
+            <th class="px-4 py-3 text-left">Rule</th>
+            <th class="px-4 py-3 text-left">Signature</th>
+            <th class="px-4 py-3 text-left">Host pattern</th>
+            <th class="px-4 py-3 text-left">User pattern</th>
+            <th class="px-4 py-3 text-left">Confidence</th>
+            <th class="px-4 py-3 text-left">Hits</th>
+            <th class="px-4 py-3 text-left">Last match</th>
+            <th class="px-4 py-3 text-left">Reason</th>
+            <th class="px-4 py-3 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="im-fps-tbody">
+          <tr><td colspan="10" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading FP signatures…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+</div>
+
+<!-- Investigation detail modal -->
+<div class="modal" id="im-inv-modal" style="display:none">
+  <div class="modal-content modal-large">
+    <div class="modal-header">
+      <h2 id="im-inv-modal-title">Investigation</h2>
+      <button class="modal-close" onclick="imCloseInvModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="im-inv-modal-body">Loading…</div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="imCloseInvModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- New FP modal -->
+<div class="modal" id="im-fp-modal" style="display:none">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>New false-positive signature</h2>
+      <button class="modal-close" onclick="imCloseFpModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="im-fp-form" onsubmit="imSubmitFp(event)" class="flex flex-col gap-3">
+        <label class="flex flex-col gap-1 text-[12px] text-slate-300">Rule ID
+          <input name="rule_id" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
+        </label>
+        <label class="flex flex-col gap-1 text-[12px] text-slate-300">Rule name
+          <input name="rule_name" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
+        </label>
+        <label class="flex flex-col gap-1 text-[12px] text-slate-300">Alert signature
+          <input name="alert_signature" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
+        </label>
+        <label class="flex flex-col gap-1 text-[12px] text-slate-300">Host pattern (fnmatch, e.g. <code>DEV-*</code>)
+          <input name="host_pattern" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
+        </label>
+        <label class="flex flex-col gap-1 text-[12px] text-slate-300">User pattern (fnmatch)
+          <input name="user_pattern" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
+        </label>
+        <label class="flex flex-col gap-1 text-[12px] text-slate-300">Reason <span class="text-ion-coral">*</span>
+          <textarea name="reason" required rows="3" class="rounded-md bg-ink-900 border border-white/10 px-3 py-2 text-[12px] text-white"></textarea>
+        </label>
+        <label class="flex flex-col gap-1 text-[12px] text-slate-300">Confidence (0-100)
+          <input name="confidence" type="number" min="0" max="100" value="80" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
+        </label>
+        <p class="text-[11px] text-slate-500">At least one of Rule ID / Rule name / Alert signature is required.</p>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="imCloseFpModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="imSubmitFp(event)">Create</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .im-tab {
+    padding: 0.6rem 1.1rem;
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .im-tab:hover { color: #e2e8f0; }
+  .im-tab-active { color: #ffffff; border-bottom-color: #6de4ff; }
+  .im-pane.hidden { display: none; }
+  .data-table tbody tr { border-top: 1px solid rgba(255,255,255,0.04); }
+  .data-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+  .data-table td { padding: 0.7rem 1rem; font-size: 12px; color: #cbd5e1; vertical-align: top; }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .pill-tp { background: rgba(239,68,68,0.15); color: #f87171; }
+  .pill-fp { background: rgba(100,116,139,0.2); color: #94a3b8; }
+  .pill-benign { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .pill-inc { background: rgba(245,158,11,0.15); color: #fbbf24; }
+  .pill-pending { background: rgba(139,92,246,0.15); color: #a78bfa; }
+  .pill-running { background: rgba(59,130,246,0.15); color: #60a5fa; }
+  .pill-completed { background: rgba(34,197,94,0.15); color: #4ade80; }
+  .pill-failed { background: rgba(239,68,68,0.15); color: #f87171; }
+  .pill-sev-low { background: rgba(148,163,184,0.15); color: #cbd5e1; }
+  .pill-sev-medium { background: rgba(245,158,11,0.15); color: #fbbf24; }
+  .pill-sev-high { background: rgba(249,115,22,0.15); color: #fb923c; }
+  .pill-sev-critical { background: rgba(239,68,68,0.2); color: #f87171; }
+</style>
+
+<script>
+(function() {
+  // ---- Tab state --------------------------------------------------------
+  function imSwitchTab(name) {
+    const tabs = ['inv', 'iocs', 'fps'];
+    tabs.forEach(t => {
+      const tab = document.getElementById('im-tab-' + t);
+      const pane = document.getElementById('im-pane-' + t);
+      if (!tab || !pane) return;
+      if (t === name) {
+        tab.classList.add('im-tab-active');
+        pane.classList.remove('hidden');
+      } else {
+        tab.classList.remove('im-tab-active');
+        pane.classList.add('hidden');
+      }
+    });
+    if (name === 'inv')  imLoadInvestigations();
+    if (name === 'iocs') imLoadIocs();
+    if (name === 'fps')  imLoadFps();
+  }
+  window.imSwitchTab = imSwitchTab;
+
+  // ---- Helpers ----------------------------------------------------------
+  function imEscape(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+  function imFmtDate(iso) {
+    if (!iso) return '-';
+    try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
+  }
+  function imVerdictPill(v) {
+    if (!v) return '<span class="pill pill-inc">—</span>';
+    const map = {
+      true_positive: ['pill-tp', 'TP'],
+      false_positive: ['pill-fp', 'FP'],
+      benign: ['pill-benign', 'Benign'],
+      inconclusive: ['pill-inc', 'Inconclusive'],
+    };
+    const [cls, label] = map[v] || ['pill-inc', v];
+    return `<span class="pill ${cls}">${imEscape(label)}</span>`;
+  }
+  function imStatusPill(s) {
+    const map = {
+      pending: 'pill-pending',
+      running: 'pill-running',
+      completed: 'pill-completed',
+      failed: 'pill-failed',
+    };
+    return `<span class="pill ${map[s] || 'pill-pending'}">${imEscape(s)}</span>`;
+  }
+  function imSeverityPill(sev) {
+    if (!sev) return '-';
+    return `<span class="pill pill-sev-${imEscape(sev)}">${imEscape(sev)}</span>`;
+  }
+  function imDuration(ms) {
+    if (ms === null || ms === undefined) return '-';
+    if (ms < 1000) return ms + ' ms';
+    return (ms / 1000).toFixed(1) + ' s';
+  }
+
+  let imInvDebounce = null;
+  function imDebouncedLoadInv() {
+    clearTimeout(imInvDebounce);
+    imInvDebounce = setTimeout(imLoadInvestigations, 300);
+  }
+  window.imDebouncedLoadInv = imDebouncedLoadInv;
+
+  function imClearInvFilters() {
+    ['im-filter-signature', 'im-filter-verdict', 'im-filter-status',
+     'im-filter-host', 'im-filter-from', 'im-filter-to'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    imLoadInvestigations();
+  }
+  window.imClearInvFilters = imClearInvFilters;
+
+  // ---- Investigations ---------------------------------------------------
+  async function imLoadInvestigations() {
+    const params = new URLSearchParams();
+    const sig = document.getElementById('im-filter-signature').value.trim();
+    const ver = document.getElementById('im-filter-verdict').value;
+    const stat = document.getElementById('im-filter-status').value;
+    const host = document.getElementById('im-filter-host').value.trim();
+    const from = document.getElementById('im-filter-from').value;
+    const to = document.getElementById('im-filter-to').value;
+    if (sig)  params.set('alert_signature', sig);
+    if (ver)  params.set('verdict', ver);
+    if (stat) params.set('status', stat);
+    if (host) params.set('host', host);
+    if (from) params.set('from_date', from);
+    if (to)   params.set('to_date', to);
+
+    const tbody = document.getElementById('im-inv-tbody');
+    tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading…</td></tr>';
+
+    try {
+      const res = await fetch('/api/investigations?' + params.toString());
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const rows = data.investigations || [];
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500 text-[12px]">No investigations found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => `
+        <tr style="cursor:pointer" onclick="imShowInv(${r.id})">
+          <td>${imEscape(imFmtDate(r.created_at))}</td>
+          <td><span class="text-white font-medium">${imEscape(r.alert_signature)}</span></td>
+          <td>${imEscape(r.host || '-')}</td>
+          <td>${imEscape(r.user_name || '-')}</td>
+          <td>${imStatusPill(r.status)}</td>
+          <td>${imVerdictPill(r.verdict)}</td>
+          <td>${imSeverityPill(r.severity_assessment)}</td>
+          <td>${imEscape(imDuration(r.duration_ms))}</td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-ion-coral text-[12px]">Failed to load: ${imEscape(e.message)}</td></tr>`;
+    }
+  }
+  window.imLoadInvestigations = imLoadInvestigations;
+
+  async function imShowInv(id) {
+    document.getElementById('im-inv-modal').style.display = 'flex';
+    document.getElementById('im-inv-modal-title').textContent = 'Investigation #' + id;
+    const body = document.getElementById('im-inv-modal-body');
+    body.innerHTML = 'Loading…';
+    try {
+      const res = await fetch('/api/investigations/' + id);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const r = await res.json();
+      const actions = r.recommended_actions ? JSON.stringify(r.recommended_actions, null, 2) : '(none)';
+      const iocs = r.ioc_snapshot ? JSON.stringify(r.ioc_snapshot, null, 2) : '(none)';
+      body.innerHTML = `
+        <div class="grid grid-cols-2 gap-3 text-[12px] text-slate-300 mb-4">
+          <div><span class="text-slate-500">Alert ref:</span> ${imEscape(r.alert_id_ref)}</div>
+          <div><span class="text-slate-500">Signature:</span> ${imEscape(r.alert_signature)}</div>
+          <div><span class="text-slate-500">Host:</span> ${imEscape(r.host || '-')}</div>
+          <div><span class="text-slate-500">User:</span> ${imEscape(r.user_name || '-')}</div>
+          <div><span class="text-slate-500">Status:</span> ${imStatusPill(r.status)}</div>
+          <div><span class="text-slate-500">Verdict:</span> ${imVerdictPill(r.verdict)}</div>
+          <div><span class="text-slate-500">Severity:</span> ${imSeverityPill(r.severity_assessment)}</div>
+          <div><span class="text-slate-500">Model:</span> ${imEscape(r.llm_model_used || '-')}</div>
+          <div><span class="text-slate-500">Tokens:</span> ${imEscape(r.tokens_used ?? '-')}</div>
+          <div><span class="text-slate-500">Duration:</span> ${imEscape(imDuration(r.duration_ms))}</div>
+          <div><span class="text-slate-500">Started:</span> ${imEscape(imFmtDate(r.created_at))}</div>
+          <div><span class="text-slate-500">Completed:</span> ${imEscape(imFmtDate(r.completed_at))}</div>
+        </div>
+        <div class="mb-3">
+          <div class="label-tiny text-slate-500 mb-1">Summary</div>
+          <div class="rounded-md border border-white/5 bg-ink-900/70 p-3 text-[12px] text-slate-200 whitespace-pre-wrap">${imEscape(r.summary_text || '(none)')}</div>
+        </div>
+        <div class="mb-3">
+          <div class="label-tiny text-slate-500 mb-1">Recommended actions</div>
+          <pre class="rounded-md border border-white/5 bg-ink-900/70 p-3 text-[11px] text-slate-300 overflow-x-auto">${imEscape(actions)}</pre>
+        </div>
+        <div>
+          <div class="label-tiny text-slate-500 mb-1">IOC snapshot</div>
+          <pre class="rounded-md border border-white/5 bg-ink-900/70 p-3 text-[11px] text-slate-300 overflow-x-auto">${imEscape(iocs)}</pre>
+        </div>
+      `;
+    } catch (e) {
+      body.innerHTML = `<div class="text-ion-coral text-[12px]">Failed to load: ${imEscape(e.message)}</div>`;
+    }
+  }
+  window.imShowInv = imShowInv;
+
+  function imCloseInvModal() {
+    document.getElementById('im-inv-modal').style.display = 'none';
+  }
+  window.imCloseInvModal = imCloseInvModal;
+
+  // ---- IOC sightings ----------------------------------------------------
+  async function imLoadIocs() {
+    const params = new URLSearchParams();
+    const type = document.getElementById('im-ioc-type').value;
+    const bad = document.getElementById('im-ioc-bad').value;
+    if (type) params.set('ioc_type', type);
+    if (bad === 'true')  params.set('is_known_bad', 'true');
+    if (bad === 'false') params.set('is_known_bad', 'false');
+
+    const tbody = document.getElementById('im-iocs-tbody');
+    tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading…</td></tr>';
+
+    try {
+      const res = await fetch('/api/iocs?' + params.toString());
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const rows = data.iocs || [];
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500 text-[12px]">No IOC sightings yet.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const flags = [];
+        if (r.is_known_bad)  flags.push('<span class="pill pill-tp">bad</span>');
+        if (r.is_known_good) flags.push('<span class="pill pill-benign">good</span>');
+        return `
+          <tr>
+            <td><span class="pill pill-pending">${imEscape(r.ioc_type)}</span></td>
+            <td class="font-mono text-white">${imEscape(r.ioc_value)}</td>
+            <td>${imEscape(r.seen_count)}</td>
+            <td>${imEscape(imFmtDate(r.first_seen_at))}</td>
+            <td>${imEscape(imFmtDate(r.last_seen_at))}</td>
+            <td>${flags.join(' ') || '-'}</td>
+            <td>${r.last_investigation_id ? '#' + r.last_investigation_id : '-'}</td>
+          </tr>
+        `;
+      }).join('');
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-ion-coral text-[12px]">Failed to load: ${imEscape(e.message)}</td></tr>`;
+    }
+  }
+  window.imLoadIocs = imLoadIocs;
+
+  // ---- FP signatures ----------------------------------------------------
+  async function imLoadFps() {
+    const tbody = document.getElementById('im-fps-tbody');
+    tbody.innerHTML = '<tr><td colspan="10" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading…</td></tr>';
+    try {
+      const res = await fetch('/api/fps');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const rows = data.fps || [];
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="10" class="px-4 py-8 text-center text-slate-500 text-[12px]">No FP signatures yet. Create one with the New FP signature button.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td>${r.enabled
+              ? '<span class="pill pill-benign">on</span>'
+              : '<span class="pill pill-fp">off</span>'}</td>
+          <td>${imEscape(r.rule_name || r.rule_id || '-')}</td>
+          <td>${imEscape(r.alert_signature || '-')}</td>
+          <td class="font-mono">${imEscape(r.host_pattern || '-')}</td>
+          <td class="font-mono">${imEscape(r.user_pattern || '-')}</td>
+          <td>${imEscape(r.confidence)}%</td>
+          <td>${imEscape(r.hit_count)}</td>
+          <td>${imEscape(imFmtDate(r.last_matched_at))}</td>
+          <td class="max-w-xs truncate" title="${imEscape(r.reason)}">${imEscape(r.reason)}</td>
+          <td class="whitespace-nowrap">
+            <button class="text-[11px] text-ion-cyan hover:underline" onclick="imToggleFp(${r.id})">${r.enabled ? 'Disable' : 'Enable'}</button>
+            <button class="text-[11px] text-ion-coral hover:underline ml-2" onclick="imDeleteFp(${r.id})">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      tbody.innerHTML = `<tr><td colspan="10" class="px-4 py-8 text-center text-ion-coral text-[12px]">Failed to load: ${imEscape(e.message)}</td></tr>`;
+    }
+  }
+  window.imLoadFps = imLoadFps;
+
+  async function imToggleFp(id) {
+    try {
+      const res = await fetch(`/api/fps/${id}/toggle`, { method: 'PATCH' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      imLoadFps();
+    } catch (e) { alert('Toggle failed: ' + e.message); }
+  }
+  window.imToggleFp = imToggleFp;
+
+  async function imDeleteFp(id) {
+    if (!confirm('Delete FP signature #' + id + '?')) return;
+    try {
+      const res = await fetch(`/api/fps/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      imLoadFps();
+    } catch (e) { alert('Delete failed: ' + e.message); }
+  }
+  window.imDeleteFp = imDeleteFp;
+
+  function imShowFpModal() {
+    document.getElementById('im-fp-form').reset();
+    document.getElementById('im-fp-modal').style.display = 'flex';
+  }
+  window.imShowFpModal = imShowFpModal;
+
+  function imCloseFpModal() {
+    document.getElementById('im-fp-modal').style.display = 'none';
+  }
+  window.imCloseFpModal = imCloseFpModal;
+
+  async function imSubmitFp(evt) {
+    if (evt) evt.preventDefault();
+    const form = document.getElementById('im-fp-form');
+    const fd = new FormData(form);
+    const payload = {};
+    for (const [k, v] of fd.entries()) {
+      if (v !== '' && v !== null) payload[k] = v;
+    }
+    if (payload.confidence !== undefined) payload.confidence = parseInt(payload.confidence, 10) || 80;
+    if (!payload.reason) {
+      alert('Reason is required.');
+      return;
+    }
+    if (!payload.rule_id && !payload.rule_name && !payload.alert_signature) {
+      alert('At least one of Rule ID / Rule name / Alert signature is required.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/fps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || 'HTTP ' + res.status);
+      }
+      imCloseFpModal();
+      imSwitchTab('fps');
+    } catch (e) { alert('Create failed: ' + e.message); }
+  }
+  window.imSubmitFp = imSubmitFp;
+
+  // ---- Refresh current tab ---------------------------------------------
+  function imRefresh() {
+    const active = document.querySelector('.im-tab-active');
+    if (!active) { imLoadInvestigations(); return; }
+    if (active.id === 'im-tab-inv')  imLoadInvestigations();
+    if (active.id === 'im-tab-iocs') imLoadIocs();
+    if (active.id === 'im-tab-fps')  imLoadFps();
+  }
+  window.imRefresh = imRefresh;
+
+  // ---- Initial load ----------------------------------------------------
+  document.addEventListener('DOMContentLoaded', imLoadInvestigations);
+  // If DOMContentLoaded already fired (HTMX swap), load now.
+  if (document.readyState !== 'loading') imLoadInvestigations();
+})();
+</script>
+{% endblock %}

@@ -85,6 +85,13 @@ from ion.web.dashboard_layout_api import router as dashboard_layout_router
 from ion.web.report_scheduler_api import router as report_scheduler_router
 from ion.web.playbook_action_api import router as playbook_action_router
 from ion.web.cyber_range_api import router as cyber_range_router
+from ion.web.smtp_api import router as smtp_router
+from ion.web.enrichment_api import router as enrichment_router
+from ion.web.alert_prompt_api import router as alert_prompt_router
+from ion.web.investigation_memory_api import router as investigation_memory_router
+from ion.web.scheduler_api import router as scheduler_router
+from ion.web.investigation_api import router as investigation_router
+from ion.web.case_grouper_api import router as case_grouper_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -294,6 +301,13 @@ app.include_router(dashboard_layout_router, prefix="/api")
 app.include_router(report_scheduler_router, prefix="/api")
 app.include_router(playbook_action_router, prefix="/api")
 app.include_router(cyber_range_router, prefix="/api")
+app.include_router(smtp_router, prefix="/api/smtp")
+app.include_router(enrichment_router, prefix="/api/enrichment")
+app.include_router(alert_prompt_router, prefix="")
+app.include_router(investigation_memory_router)
+app.include_router(scheduler_router, prefix="")
+app.include_router(investigation_router, prefix="")
+app.include_router(case_grouper_router, prefix="")
 
 
 def _validate_startup_config():
@@ -392,7 +406,8 @@ async def startup_event():
         LOCK_SEED_FORENSIC_PB, LOCK_SEED_CAPABILITY_KB,
         LOCK_KIBANA_BG_SYNC, LOCK_SKILLS_DAILY_SNAPSHOT,
         LOCK_SEED_ANALYTICS_JOBS, LOCK_ANALYTICS_BG_LOOP,
-        LOCK_TIDE_BG_SYNC,
+        LOCK_TIDE_BG_SYNC, LOCK_SCHEDULER_BG, LOCK_INVESTIGATION_BG,
+        LOCK_CASE_GROUPER_BG,
     )
     engine = get_engine(config.db_path)
     factory = get_session_factory(engine)
@@ -446,6 +461,17 @@ async def startup_event():
         from ion.services.forensic_seed_service import seed_forensic_playbooks
         seed_forensic_playbooks()
     run_locked(engine, LOCK_SEED_FORENSIC_PB, "seed_forensic_playbooks", _seed_forensic)
+
+    # ---------------------------------------------------------------
+    # Seed default Alert Prompt Templates (per-rule LLM prompts).
+    # Idempotent — no-op when any rows already exist, so running
+    # without an advisory lock across workers is safe.
+    # ---------------------------------------------------------------
+    try:
+        from ion.services.alert_prompt_service import seed_default_templates
+        seed_default_templates()
+    except Exception as e:
+        logger.warning("seed_default_alert_prompts failed: %s", e)
 
     # ---------------------------------------------------------------
     # Seed KnowledgeArticle rows for Role Match capability_keys
@@ -531,6 +557,56 @@ async def startup_event():
     run_locked(engine, LOCK_NETMAP_BG_SYNC, "netmap_bg_sync", _start_netmap_sync,
                hold_until_close=True)
 
+    # ---------------------------------------------------------------
+    # Generic job scheduler background loop (single worker —
+    # hold_until_close). Honours ION_SCHEDULER_ENABLED / _INTERVAL_S.
+    # ---------------------------------------------------------------
+    def _start_scheduler():
+        if not config.scheduler_enabled:
+            logger.info("Generic scheduler disabled (config.scheduler_enabled=False)")
+            return
+        from ion.services.scheduler_service import run_scheduler_loop
+        try:
+            interval = int(os.environ.get("ION_SCHEDULER_INTERVAL_S", str(config.scheduler_interval_s)))
+        except ValueError:
+            interval = config.scheduler_interval_s
+        run_scheduler_loop(interval_s=interval)
+        logger.info("Generic scheduler background loop started")
+    run_locked(engine, LOCK_SCHEDULER_BG, "scheduler_bg_loop", _start_scheduler,
+               hold_until_close=True)
+
+    # ---------------------------------------------------------------
+    # Autonomous investigation background sweep (single worker —
+    # hold_until_close). Honours ION_INVESTIGATION_LOOP_ENABLED.
+    # ---------------------------------------------------------------
+    def _start_investigation_loop():
+        if not config.investigation_loop_enabled:
+            logger.info("Investigation loop disabled (config.investigation_loop_enabled=False)")
+            return
+        from ion.services.investigation_service import start_investigation_loop_if_enabled
+        start_investigation_loop_if_enabled(engine=engine)
+        logger.info("Autonomous investigation loop startup attempted")
+    run_locked(engine, LOCK_INVESTIGATION_BG, "investigation_bg_loop", _start_investigation_loop,
+               hold_until_close=True)
+
+    # ---------------------------------------------------------------
+    # Case grouper background loop (single worker — hold_until_close).
+    # Honours ION_CASE_GROUPER_ENABLED / _INTERVAL_S.
+    # ---------------------------------------------------------------
+    def _start_case_grouper():
+        if not config.case_grouper_enabled:
+            logger.info("Case grouper disabled (config.case_grouper_enabled=False)")
+            return
+        from ion.services.case_grouper_service import run_grouper_loop
+        try:
+            interval = int(os.environ.get("ION_CASE_GROUPER_INTERVAL_S", str(config.case_grouper_interval_s)))
+        except ValueError:
+            interval = config.case_grouper_interval_s
+        run_grouper_loop(interval_s=interval)
+        logger.info("Case grouper background loop started")
+    run_locked(engine, LOCK_CASE_GROUPER_BG, "case_grouper_bg_loop", _start_case_grouper,
+               hold_until_close=True)
+
     # Version compatibility checks for connectors that declare supported ranges
     try:
         from ion.services.connectors import get_connector_registry
@@ -586,6 +662,12 @@ async def dashboard_v2(request: Request, user: User = Depends(require_page_auth)
 async def templates_page(request: Request, user: User = Depends(require_page_permission("template:read"))):
     """Render the templates page."""
     return templates.TemplateResponse(request=request, name="templates.html")
+
+
+@app.get("/scheduler", response_class=HTMLResponse)
+async def scheduler_page(request: Request, user: User = Depends(require_page_auth)):
+    """Render the generic job scheduler page."""
+    return templates.TemplateResponse(request=request, name="scheduler.html")
 
 
 @app.get("/templates/new", response_class=HTMLResponse)

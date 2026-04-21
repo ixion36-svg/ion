@@ -267,23 +267,38 @@ def execute_action(session: Session, log_id: int) -> dict:
     session.commit()
 
     try:
-        # --- Simulated execution ---
-        result = {
-            "simulated": True,
-            "message": f"Action would execute: {action_type} on {log_entry.target}",
-            "integration": action.target_integration if action else "unknown",
-            "executed_at": now.isoformat(),
-        }
+        # --- Real execution via adapter layer ---
+        import asyncio
+        from ion.services.playbook_executor_service import get_playbook_executor_service
 
-        log_entry.status = "completed"
-        log_entry.result = json.dumps(result)
-        log_entry.error = None
+        executor_service = get_playbook_executor_service()
+
+        async def _run():
+            return await executor_service.execute_action(
+                action_row=action,
+                target_value=log_entry.target,
+                params={},
+                db=None,
+            )
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop is None:
+            exec_result = asyncio.run(_run())
+        else:
+            exec_result = loop.run_until_complete(_run())
+
+        executor_service.apply_result_to_log(session, log_entry, exec_result)
         session.commit()
         session.refresh(log_entry)
 
         logger.info(
-            "Action log %d executed (simulated): %s on %s",
-            log_id, action_type, log_entry.target,
+            "Action log %d executed (adapter=%s, success=%s, dry_run=%s): %s on %s",
+            log_id, exec_result.adapter, exec_result.success, exec_result.dry_run,
+            action_type, log_entry.target,
         )
 
     except Exception as exc:

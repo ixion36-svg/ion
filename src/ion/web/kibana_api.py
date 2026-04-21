@@ -120,7 +120,7 @@ async def list_kibana_cases(
         result_inprog = service.list_cases(status="in-progress", page=page, per_page=per_page)
         combined = result_open.get("cases", []) + result_inprog.get("cases", [])
         # Sort by updated_at desc
-        combined.sort(key=lambda c: c.get("updated_at", ""), reverse=True)
+        combined.sort(key=lambda c: c.get("updated_at") or "", reverse=True)
         result = {
             "cases": combined[:per_page],
             "total": result_open.get("total", 0) + result_inprog.get("total", 0),

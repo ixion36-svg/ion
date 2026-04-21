@@ -2,10 +2,89 @@
 
 from __future__ import annotations
 
+import json
 import logging
-from typing import Any, Optional
+import re
+from typing import Any, Iterable, List, Optional
 
 logger = logging.getLogger(__name__)
+
+
+_TECHNIQUE_ID_RE = re.compile(r"\bT\d{4}(?:\.\d{3})?\b", re.IGNORECASE)
+
+_SCAN_FIELDS = (
+    "rule.id",
+    "rule.name",
+    "rule.description",
+    "rule.groups",
+    "rule.tags",
+    "tags",
+    "kibana.alert.rule.rule_id",
+    "kibana.alert.rule.name",
+    "kibana.alert.rule.description",
+    "kibana.alert.rule.tags",
+    "signal.rule.threat",
+    "threat.technique.id",
+    "threat.technique.name",
+    "threat.tactic.id",
+    "threat.tactic.name",
+    "event.category",
+    "message",
+)
+
+
+def _walk(obj: Any) -> Iterable[str]:
+    """Yield every string value contained in a nested dict/list structure."""
+    if obj is None:
+        return
+    if isinstance(obj, str):
+        yield obj
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            yield from _walk(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from _walk(v)
+
+
+def _lookup_dotted(obj: Any, path: str) -> Any:
+    """Return the value at dotted path, or None. Handles flattened keys too
+    (e.g. if the event has `kibana.alert.rule.name` as a literal string key)."""
+    if not isinstance(obj, dict):
+        return None
+    if path in obj:
+        return obj[path]
+    current: Any = obj
+    for part in path.split("."):
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+        else:
+            return None
+    return current
+
+
+def tag_alert(alert: dict) -> List[str]:
+    """Extract MITRE ATT&CK technique IDs referenced by an alert.
+
+    Scans a curated set of rule/threat/category fields for strings matching
+    the `T\\d{4}(\\.\\d{3})?` pattern. Deduped and sorted. Returns `[]` for
+    alerts with no recognisable technique references.
+
+    This is the canonical entry point used by the autonomous investigation
+    loop to tag alerts without requiring the Detection Engine to have done
+    the mapping upstream.
+    """
+    if not alert or not isinstance(alert, dict):
+        return []
+    collected: set[str] = set()
+    for path in _SCAN_FIELDS:
+        val = _lookup_dotted(alert, path)
+        if val is None:
+            continue
+        for s in _walk(val):
+            for match in _TECHNIQUE_ID_RE.findall(s):
+                collected.add(match.upper())
+    return sorted(collected)
 
 
 def _coverage_color(rule_count: int) -> str:

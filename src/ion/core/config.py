@@ -110,6 +110,17 @@ class Config:
     # VirusTotal integration
     virustotal_enabled: bool = False
     virustotal_api_key: str = ""  # VirusTotal API key
+    virustotal_url: str = "https://www.virustotal.com"
+    virustotal_verify_ssl: bool = True
+    virustotal_timeout: int = 30
+    virustotal_rate_limit: int = 4  # requests/minute (free tier)
+
+    # Shodan integration
+    shodan_enabled: bool = False
+    shodan_api_key: str = ""
+    shodan_url: str = "https://api.shodan.io"
+    shodan_verify_ssl: bool = True
+    shodan_timeout: int = 30
 
     # AbuseIPDB integration
     abuseipdb_enabled: bool = False
@@ -122,6 +133,87 @@ class Config:
     tide_verify_ssl: bool = False
     tide_space: str = "default"  # Kibana space where TIDE rules live (e.g., default, production)
     tide_client_id: str = ""  # TIDE 4.x tenant (client) id. Leave blank for single-tenant API keys.
+
+    # Generic job scheduler
+    scheduler_enabled: bool = True
+    scheduler_interval_s: int = 30
+
+    # Case grouper (auto-group alerts into [Auto] cases)
+    case_grouper_enabled: bool = True
+    case_grouper_interval_s: int = 60
+    case_grouper_window_minutes: int = 15
+    case_grouper_push_to_kibana: bool = True
+    case_grouper_auto_investigate: bool = True
+    # Delay in seconds between successive investigation enqueues so Ollama's
+    # parallel slots don't all fill at once (preventing 120s HTTP timeouts).
+    # With per-case investigation (default) this is rarely triggered.
+    case_grouper_stagger_s: float = 3.0
+    # Minimum number of similar alerts in the window before they are grouped
+    # into a single [Auto] case. Set >1 to let small bursts accumulate.
+    case_grouper_min_cluster_size: int = 1
+    # Maximum alerts attached to a single auto-case. Once reached, new matching
+    # alerts create a fresh case. Prevents runaway mega-cases.
+    case_grouper_max_alerts_per_case: int = 20
+    # If True, grouper runs ONE investigation per case (cluster-level) instead
+    # of one per alert. Reduces LLM load ~N× and gives AI full cluster context.
+    case_grouper_investigate_per_case: bool = True
+
+    # PII anonymising proxy (tokenises sensitive fields before LLM calls)
+    pii_anon_enabled: bool = False
+    pii_fields_file: str = ""  # optional override; empty = use packaged default
+
+    # Investigation loop
+    investigation_loop_enabled: bool = True
+    investigation_sweep_interval_s: int = 900
+    investigation_max_per_sweep: int = 50
+    investigation_llm_timeout_s: int = 120
+
+    # --- Active response executors ---
+    exec_dry_run: bool = True          # Safety: default TRUE; no real calls made
+    exec_default_timeout_s: int = 20
+
+    # Firewall REST webhook (block_ip)
+    exec_firewall_url: str = ""
+    exec_firewall_api_key: str = ""
+    exec_firewall_verify_ssl: bool = True
+
+    # DNS sinkhole (block_domain)
+    exec_dns_sinkhole_url: str = ""
+    exec_dns_sinkhole_api_key: str = ""
+    exec_dns_sinkhole_verify_ssl: bool = True
+
+    # EDR webhook (quarantine_host)
+    exec_edr_url: str = ""
+    exec_edr_api_key: str = ""
+    exec_edr_verify_ssl: bool = True
+
+    # Email gateway (block_sender)
+    exec_email_gateway_url: str = ""
+    exec_email_gateway_api_key: str = ""
+    exec_email_gateway_verify_ssl: bool = True
+
+    # Active Directory LDAP (disable_account, reset_password)
+    exec_ad_ldap_uri: str = ""
+    exec_ad_bind_dn: str = ""
+    exec_ad_bind_password: str = ""
+    exec_ad_user_search_base: str = ""
+    exec_ad_verify_ssl: bool = True
+
+    # Generic webhook catch-all
+    exec_generic_webhook_api_key: str = ""
+
+    # SMTP / email notification integration
+    smtp_enabled: bool = False
+    smtp_host: str = ""  # e.g., smtp.gmail.com or mail.example.com
+    smtp_port: int = 587  # 587 for STARTTLS, 465 for implicit TLS
+    smtp_username: str = ""  # SMTP auth username (leave blank for unauthenticated relays)
+    smtp_password: str = ""  # SMTP auth password
+    smtp_from_address: str = ""  # Sender address, e.g., ion-noreply@example.com
+    smtp_from_name: str = "ION"  # Display name for the From header
+    smtp_use_tls: bool = False  # Implicit TLS (port 465). Mutually exclusive with STARTTLS.
+    smtp_use_starttls: bool = True  # Upgrade plaintext connection to TLS (port 587)
+    smtp_timeout: int = 30  # Socket timeout in seconds
+    smtp_verify_ssl: bool = True  # Verify server certificate
 
     @classmethod
     def from_file(cls, path: Path) -> "Config":
@@ -217,6 +309,16 @@ class Config:
             # VirusTotal integration
             virustotal_enabled=data.get("virustotal_enabled", False),
             virustotal_api_key=data.get("virustotal_api_key", ""),
+            virustotal_url=data.get("virustotal_url", "https://www.virustotal.com"),
+            virustotal_verify_ssl=data.get("virustotal_verify_ssl", True),
+            virustotal_timeout=data.get("virustotal_timeout", 30),
+            virustotal_rate_limit=data.get("virustotal_rate_limit", 4),
+            # Shodan integration
+            shodan_enabled=data.get("shodan_enabled", False),
+            shodan_api_key=data.get("shodan_api_key", ""),
+            shodan_url=data.get("shodan_url", "https://api.shodan.io"),
+            shodan_verify_ssl=data.get("shodan_verify_ssl", True),
+            shodan_timeout=data.get("shodan_timeout", 30),
             # AbuseIPDB integration
             abuseipdb_enabled=data.get("abuseipdb_enabled", False),
             abuseipdb_api_key=data.get("abuseipdb_api_key", ""),
@@ -227,6 +329,60 @@ class Config:
             tide_verify_ssl=data.get("tide_verify_ssl", False),
             tide_space=data.get("tide_space", "default"),
             tide_client_id=data.get("tide_client_id", ""),
+            # Generic scheduler
+            scheduler_enabled=data.get("scheduler_enabled", True),
+            scheduler_interval_s=data.get("scheduler_interval_s", 30),
+            # Case grouper
+            case_grouper_enabled=data.get("case_grouper_enabled", True),
+            case_grouper_interval_s=data.get("case_grouper_interval_s", 60),
+            case_grouper_window_minutes=data.get("case_grouper_window_minutes", 15),
+            case_grouper_push_to_kibana=data.get("case_grouper_push_to_kibana", True),
+            case_grouper_auto_investigate=data.get("case_grouper_auto_investigate", True),
+            case_grouper_stagger_s=data.get("case_grouper_stagger_s", 3.0),
+            case_grouper_min_cluster_size=data.get("case_grouper_min_cluster_size", 1),
+            case_grouper_max_alerts_per_case=data.get("case_grouper_max_alerts_per_case", 20),
+            case_grouper_investigate_per_case=data.get("case_grouper_investigate_per_case", True),
+            # PII anonymising proxy
+            pii_anon_enabled=data.get("pii_anon_enabled", False),
+            pii_fields_file=data.get("pii_fields_file", ""),
+            # Investigation loop
+            investigation_loop_enabled=data.get("investigation_loop_enabled", True),
+            investigation_sweep_interval_s=data.get("investigation_sweep_interval_s", 900),
+            investigation_max_per_sweep=data.get("investigation_max_per_sweep", 50),
+            investigation_llm_timeout_s=data.get("investigation_llm_timeout_s", 120),
+            # Active response executors
+            exec_dry_run=data.get("exec_dry_run", True),
+            exec_default_timeout_s=data.get("exec_default_timeout_s", 20),
+            exec_firewall_url=data.get("exec_firewall_url", ""),
+            exec_firewall_api_key=data.get("exec_firewall_api_key", ""),
+            exec_firewall_verify_ssl=data.get("exec_firewall_verify_ssl", True),
+            exec_dns_sinkhole_url=data.get("exec_dns_sinkhole_url", ""),
+            exec_dns_sinkhole_api_key=data.get("exec_dns_sinkhole_api_key", ""),
+            exec_dns_sinkhole_verify_ssl=data.get("exec_dns_sinkhole_verify_ssl", True),
+            exec_edr_url=data.get("exec_edr_url", ""),
+            exec_edr_api_key=data.get("exec_edr_api_key", ""),
+            exec_edr_verify_ssl=data.get("exec_edr_verify_ssl", True),
+            exec_email_gateway_url=data.get("exec_email_gateway_url", ""),
+            exec_email_gateway_api_key=data.get("exec_email_gateway_api_key", ""),
+            exec_email_gateway_verify_ssl=data.get("exec_email_gateway_verify_ssl", True),
+            exec_ad_ldap_uri=data.get("exec_ad_ldap_uri", ""),
+            exec_ad_bind_dn=data.get("exec_ad_bind_dn", ""),
+            exec_ad_bind_password=data.get("exec_ad_bind_password", ""),
+            exec_ad_user_search_base=data.get("exec_ad_user_search_base", ""),
+            exec_ad_verify_ssl=data.get("exec_ad_verify_ssl", True),
+            exec_generic_webhook_api_key=data.get("exec_generic_webhook_api_key", ""),
+            # SMTP integration
+            smtp_enabled=data.get("smtp_enabled", False),
+            smtp_host=data.get("smtp_host", ""),
+            smtp_port=data.get("smtp_port", 587),
+            smtp_username=data.get("smtp_username", ""),
+            smtp_password=data.get("smtp_password", ""),
+            smtp_from_address=data.get("smtp_from_address", ""),
+            smtp_from_name=data.get("smtp_from_name", "ION"),
+            smtp_use_tls=data.get("smtp_use_tls", False),
+            smtp_use_starttls=data.get("smtp_use_starttls", True),
+            smtp_timeout=data.get("smtp_timeout", 30),
+            smtp_verify_ssl=data.get("smtp_verify_ssl", True),
         )
 
     def to_file(self, path: Path) -> None:
@@ -315,6 +471,16 @@ class Config:
                     # VirusTotal integration
                     "virustotal_enabled": self.virustotal_enabled,
                     "virustotal_api_key": self.virustotal_api_key,
+                    "virustotal_url": self.virustotal_url,
+                    "virustotal_verify_ssl": self.virustotal_verify_ssl,
+                    "virustotal_timeout": self.virustotal_timeout,
+                    "virustotal_rate_limit": self.virustotal_rate_limit,
+                    # Shodan integration
+                    "shodan_enabled": self.shodan_enabled,
+                    "shodan_api_key": self.shodan_api_key,
+                    "shodan_url": self.shodan_url,
+                    "shodan_verify_ssl": self.shodan_verify_ssl,
+                    "shodan_timeout": self.shodan_timeout,
                     # AbuseIPDB integration
                     "abuseipdb_enabled": self.abuseipdb_enabled,
                     "abuseipdb_api_key": self.abuseipdb_api_key,
@@ -325,6 +491,60 @@ class Config:
                     "tide_verify_ssl": self.tide_verify_ssl,
                     "tide_space": self.tide_space,
                     "tide_client_id": self.tide_client_id,
+                    # Generic scheduler
+                    "scheduler_enabled": self.scheduler_enabled,
+                    "scheduler_interval_s": self.scheduler_interval_s,
+                    # Case grouper
+                    "case_grouper_enabled": self.case_grouper_enabled,
+                    "case_grouper_interval_s": self.case_grouper_interval_s,
+                    "case_grouper_window_minutes": self.case_grouper_window_minutes,
+                    "case_grouper_push_to_kibana": self.case_grouper_push_to_kibana,
+                    "case_grouper_auto_investigate": self.case_grouper_auto_investigate,
+                    "case_grouper_stagger_s": self.case_grouper_stagger_s,
+                    "case_grouper_min_cluster_size": self.case_grouper_min_cluster_size,
+                    "case_grouper_max_alerts_per_case": self.case_grouper_max_alerts_per_case,
+                    "case_grouper_investigate_per_case": self.case_grouper_investigate_per_case,
+                    # PII anonymising proxy
+                    "pii_anon_enabled": self.pii_anon_enabled,
+                    "pii_fields_file": self.pii_fields_file,
+                    # Investigation loop
+                    "investigation_loop_enabled": self.investigation_loop_enabled,
+                    "investigation_sweep_interval_s": self.investigation_sweep_interval_s,
+                    "investigation_max_per_sweep": self.investigation_max_per_sweep,
+                    "investigation_llm_timeout_s": self.investigation_llm_timeout_s,
+                    # Active response executors
+                    "exec_dry_run": self.exec_dry_run,
+                    "exec_default_timeout_s": self.exec_default_timeout_s,
+                    "exec_firewall_url": self.exec_firewall_url,
+                    "exec_firewall_api_key": self.exec_firewall_api_key,
+                    "exec_firewall_verify_ssl": self.exec_firewall_verify_ssl,
+                    "exec_dns_sinkhole_url": self.exec_dns_sinkhole_url,
+                    "exec_dns_sinkhole_api_key": self.exec_dns_sinkhole_api_key,
+                    "exec_dns_sinkhole_verify_ssl": self.exec_dns_sinkhole_verify_ssl,
+                    "exec_edr_url": self.exec_edr_url,
+                    "exec_edr_api_key": self.exec_edr_api_key,
+                    "exec_edr_verify_ssl": self.exec_edr_verify_ssl,
+                    "exec_email_gateway_url": self.exec_email_gateway_url,
+                    "exec_email_gateway_api_key": self.exec_email_gateway_api_key,
+                    "exec_email_gateway_verify_ssl": self.exec_email_gateway_verify_ssl,
+                    "exec_ad_ldap_uri": self.exec_ad_ldap_uri,
+                    "exec_ad_bind_dn": self.exec_ad_bind_dn,
+                    "exec_ad_bind_password": self.exec_ad_bind_password,
+                    "exec_ad_user_search_base": self.exec_ad_user_search_base,
+                    "exec_ad_verify_ssl": self.exec_ad_verify_ssl,
+                    "exec_generic_webhook_api_key": self.exec_generic_webhook_api_key,
+                    # SMTP integration
+                    "smtp_enabled": self.smtp_enabled,
+                    "smtp_host": self.smtp_host,
+                    "smtp_port": self.smtp_port,
+                    "smtp_username": self.smtp_username,
+                    "smtp_password": self.smtp_password,
+                    "smtp_from_address": self.smtp_from_address,
+                    "smtp_from_name": self.smtp_from_name,
+                    "smtp_use_tls": self.smtp_use_tls,
+                    "smtp_use_starttls": self.smtp_use_starttls,
+                    "smtp_timeout": self.smtp_timeout,
+                    "smtp_verify_ssl": self.smtp_verify_ssl,
                 },
                 f,
                 indent=2,
@@ -517,6 +737,26 @@ def get_config() -> Config:
             _config.virustotal_enabled = _get_env_bool("ION_VIRUSTOTAL_ENABLED")
         if os.environ.get("ION_VIRUSTOTAL_API_KEY"):
             _config.virustotal_api_key = os.environ.get("ION_VIRUSTOTAL_API_KEY", "")
+        if os.environ.get("ION_VIRUSTOTAL_URL"):
+            _config.virustotal_url = os.environ.get("ION_VIRUSTOTAL_URL", "")
+        if os.environ.get("ION_VIRUSTOTAL_VERIFY_SSL"):
+            _config.virustotal_verify_ssl = _get_env_bool("ION_VIRUSTOTAL_VERIFY_SSL", True)
+        if os.environ.get("ION_VIRUSTOTAL_TIMEOUT"):
+            _config.virustotal_timeout = int(os.environ.get("ION_VIRUSTOTAL_TIMEOUT", "30"))
+        if os.environ.get("ION_VIRUSTOTAL_RATE_LIMIT"):
+            _config.virustotal_rate_limit = int(os.environ.get("ION_VIRUSTOTAL_RATE_LIMIT", "4"))
+
+        # Shodan environment overrides
+        if os.environ.get("ION_SHODAN_ENABLED"):
+            _config.shodan_enabled = _get_env_bool("ION_SHODAN_ENABLED", False)
+        if os.environ.get("ION_SHODAN_API_KEY"):
+            _config.shodan_api_key = os.environ.get("ION_SHODAN_API_KEY", "")
+        if os.environ.get("ION_SHODAN_URL"):
+            _config.shodan_url = os.environ.get("ION_SHODAN_URL", "")
+        if os.environ.get("ION_SHODAN_VERIFY_SSL"):
+            _config.shodan_verify_ssl = _get_env_bool("ION_SHODAN_VERIFY_SSL", True)
+        if os.environ.get("ION_SHODAN_TIMEOUT"):
+            _config.shodan_timeout = int(os.environ.get("ION_SHODAN_TIMEOUT", "30"))
 
         # AbuseIPDB environment overrides
         if os.environ.get("ION_ABUSEIPDB_ENABLED"):
@@ -537,6 +777,135 @@ def get_config() -> Config:
             _config.tide_space = os.environ.get("ION_TIDE_SPACE", "default")
         if os.environ.get("ION_TIDE_CLIENT_ID"):
             _config.tide_client_id = os.environ.get("ION_TIDE_CLIENT_ID", "")
+
+        # Generic scheduler env overrides
+        if os.environ.get("ION_SCHEDULER_ENABLED"):
+            _config.scheduler_enabled = _get_env_bool("ION_SCHEDULER_ENABLED", True)
+        if os.environ.get("ION_SCHEDULER_INTERVAL_S"):
+            try:
+                _config.scheduler_interval_s = int(os.environ.get("ION_SCHEDULER_INTERVAL_S", "30"))
+            except ValueError:
+                pass
+
+        # Case grouper env overrides
+        if os.environ.get("ION_CASE_GROUPER_ENABLED"):
+            _config.case_grouper_enabled = _get_env_bool("ION_CASE_GROUPER_ENABLED", True)
+        if os.environ.get("ION_CASE_GROUPER_INTERVAL_S"):
+            try:
+                _config.case_grouper_interval_s = int(os.environ.get("ION_CASE_GROUPER_INTERVAL_S", "60"))
+            except ValueError:
+                pass
+        if os.environ.get("ION_CASE_GROUPER_WINDOW_MINUTES"):
+            try:
+                _config.case_grouper_window_minutes = int(os.environ.get("ION_CASE_GROUPER_WINDOW_MINUTES", "15"))
+            except ValueError:
+                pass
+        if os.environ.get("ION_CASE_GROUPER_PUSH_TO_KIBANA"):
+            _config.case_grouper_push_to_kibana = _get_env_bool("ION_CASE_GROUPER_PUSH_TO_KIBANA", True)
+        if os.environ.get("ION_CASE_GROUPER_AUTO_INVESTIGATE"):
+            _config.case_grouper_auto_investigate = _get_env_bool("ION_CASE_GROUPER_AUTO_INVESTIGATE", True)
+        if os.environ.get("ION_CASE_GROUPER_STAGGER_S"):
+            try:
+                _config.case_grouper_stagger_s = float(os.environ.get("ION_CASE_GROUPER_STAGGER_S", "3.0"))
+            except ValueError:
+                pass
+        if os.environ.get("ION_CASE_GROUPER_MIN_CLUSTER_SIZE"):
+            try:
+                _config.case_grouper_min_cluster_size = int(os.environ.get("ION_CASE_GROUPER_MIN_CLUSTER_SIZE", "1"))
+            except ValueError:
+                pass
+        if os.environ.get("ION_CASE_GROUPER_MAX_ALERTS_PER_CASE"):
+            try:
+                _config.case_grouper_max_alerts_per_case = int(os.environ.get("ION_CASE_GROUPER_MAX_ALERTS_PER_CASE", "20"))
+            except ValueError:
+                pass
+        if os.environ.get("ION_CASE_GROUPER_INVESTIGATE_PER_CASE"):
+            _config.case_grouper_investigate_per_case = _get_env_bool("ION_CASE_GROUPER_INVESTIGATE_PER_CASE", True)
+
+        # PII anonymising proxy env overrides
+        if os.environ.get("ION_PII_ANON_ENABLED"):
+            _config.pii_anon_enabled = _get_env_bool("ION_PII_ANON_ENABLED", False)
+        if os.environ.get("ION_PII_FIELDS_FILE"):
+            _config.pii_fields_file = os.environ.get("ION_PII_FIELDS_FILE", "")
+
+        # Investigation loop env overrides
+        if os.environ.get("ION_INVESTIGATION_LOOP_ENABLED"):
+            _config.investigation_loop_enabled = _get_env_bool("ION_INVESTIGATION_LOOP_ENABLED", True)
+        if os.environ.get("ION_INVESTIGATION_SWEEP_INTERVAL_S"):
+            _config.investigation_sweep_interval_s = int(os.environ.get("ION_INVESTIGATION_SWEEP_INTERVAL_S", "900"))
+        if os.environ.get("ION_INVESTIGATION_MAX_PER_SWEEP"):
+            _config.investigation_max_per_sweep = int(os.environ.get("ION_INVESTIGATION_MAX_PER_SWEEP", "50"))
+        if os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S"):
+            _config.investigation_llm_timeout_s = int(os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S", "120"))
+
+        # Active response executor overrides
+        if os.environ.get("ION_EXEC_DRY_RUN"):
+            _config.exec_dry_run = _get_env_bool("ION_EXEC_DRY_RUN", True)
+        if os.environ.get("ION_EXEC_DEFAULT_TIMEOUT_S"):
+            try:
+                _config.exec_default_timeout_s = int(os.environ["ION_EXEC_DEFAULT_TIMEOUT_S"])
+            except ValueError:
+                pass
+        if os.environ.get("ION_EXEC_FIREWALL_URL"):
+            _config.exec_firewall_url = os.environ.get("ION_EXEC_FIREWALL_URL", "")
+        if os.environ.get("ION_EXEC_FIREWALL_API_KEY"):
+            _config.exec_firewall_api_key = os.environ.get("ION_EXEC_FIREWALL_API_KEY", "")
+        if os.environ.get("ION_EXEC_FIREWALL_VERIFY_SSL"):
+            _config.exec_firewall_verify_ssl = _get_env_bool("ION_EXEC_FIREWALL_VERIFY_SSL", True)
+        if os.environ.get("ION_EXEC_DNS_SINKHOLE_URL"):
+            _config.exec_dns_sinkhole_url = os.environ.get("ION_EXEC_DNS_SINKHOLE_URL", "")
+        if os.environ.get("ION_EXEC_DNS_SINKHOLE_API_KEY"):
+            _config.exec_dns_sinkhole_api_key = os.environ.get("ION_EXEC_DNS_SINKHOLE_API_KEY", "")
+        if os.environ.get("ION_EXEC_DNS_SINKHOLE_VERIFY_SSL"):
+            _config.exec_dns_sinkhole_verify_ssl = _get_env_bool("ION_EXEC_DNS_SINKHOLE_VERIFY_SSL", True)
+        if os.environ.get("ION_EXEC_EDR_URL"):
+            _config.exec_edr_url = os.environ.get("ION_EXEC_EDR_URL", "")
+        if os.environ.get("ION_EXEC_EDR_API_KEY"):
+            _config.exec_edr_api_key = os.environ.get("ION_EXEC_EDR_API_KEY", "")
+        if os.environ.get("ION_EXEC_EDR_VERIFY_SSL"):
+            _config.exec_edr_verify_ssl = _get_env_bool("ION_EXEC_EDR_VERIFY_SSL", True)
+        if os.environ.get("ION_EXEC_EMAIL_GATEWAY_URL"):
+            _config.exec_email_gateway_url = os.environ.get("ION_EXEC_EMAIL_GATEWAY_URL", "")
+        if os.environ.get("ION_EXEC_EMAIL_GATEWAY_API_KEY"):
+            _config.exec_email_gateway_api_key = os.environ.get("ION_EXEC_EMAIL_GATEWAY_API_KEY", "")
+        if os.environ.get("ION_EXEC_EMAIL_GATEWAY_VERIFY_SSL"):
+            _config.exec_email_gateway_verify_ssl = _get_env_bool("ION_EXEC_EMAIL_GATEWAY_VERIFY_SSL", True)
+        if os.environ.get("ION_EXEC_AD_LDAP_URI"):
+            _config.exec_ad_ldap_uri = os.environ.get("ION_EXEC_AD_LDAP_URI", "")
+        if os.environ.get("ION_EXEC_AD_BIND_DN"):
+            _config.exec_ad_bind_dn = os.environ.get("ION_EXEC_AD_BIND_DN", "")
+        if os.environ.get("ION_EXEC_AD_BIND_PASSWORD"):
+            _config.exec_ad_bind_password = os.environ.get("ION_EXEC_AD_BIND_PASSWORD", "")
+        if os.environ.get("ION_EXEC_AD_USER_SEARCH_BASE"):
+            _config.exec_ad_user_search_base = os.environ.get("ION_EXEC_AD_USER_SEARCH_BASE", "")
+        if os.environ.get("ION_EXEC_AD_VERIFY_SSL"):
+            _config.exec_ad_verify_ssl = _get_env_bool("ION_EXEC_AD_VERIFY_SSL", True)
+        if os.environ.get("ION_EXEC_GENERIC_WEBHOOK_API_KEY"):
+            _config.exec_generic_webhook_api_key = os.environ.get("ION_EXEC_GENERIC_WEBHOOK_API_KEY", "")
+
+        # SMTP environment overrides
+        if os.environ.get("ION_SMTP_ENABLED"):
+            _config.smtp_enabled = _get_env_bool("ION_SMTP_ENABLED", False)
+        if os.environ.get("ION_SMTP_HOST"):
+            _config.smtp_host = os.environ.get("ION_SMTP_HOST", "")
+        if os.environ.get("ION_SMTP_PORT"):
+            _config.smtp_port = int(os.environ.get("ION_SMTP_PORT", "587"))
+        if os.environ.get("ION_SMTP_USERNAME"):
+            _config.smtp_username = os.environ.get("ION_SMTP_USERNAME", "")
+        if os.environ.get("ION_SMTP_PASSWORD"):
+            _config.smtp_password = os.environ.get("ION_SMTP_PASSWORD", "")
+        if os.environ.get("ION_SMTP_FROM_ADDRESS"):
+            _config.smtp_from_address = os.environ.get("ION_SMTP_FROM_ADDRESS", "")
+        if os.environ.get("ION_SMTP_FROM_NAME"):
+            _config.smtp_from_name = os.environ.get("ION_SMTP_FROM_NAME", "ION")
+        if os.environ.get("ION_SMTP_USE_TLS"):
+            _config.smtp_use_tls = _get_env_bool("ION_SMTP_USE_TLS", False)
+        if os.environ.get("ION_SMTP_USE_STARTTLS"):
+            _config.smtp_use_starttls = _get_env_bool("ION_SMTP_USE_STARTTLS", True)
+        if os.environ.get("ION_SMTP_TIMEOUT"):
+            _config.smtp_timeout = int(os.environ.get("ION_SMTP_TIMEOUT", "30"))
+        if os.environ.get("ION_SMTP_VERIFY_SSL"):
+            _config.smtp_verify_ssl = _get_env_bool("ION_SMTP_VERIFY_SSL", True)
 
     return _config
 

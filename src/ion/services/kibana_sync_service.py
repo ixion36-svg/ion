@@ -64,6 +64,18 @@ class KibanaSyncService:
                 if comment_text.startswith("**") and ":**" in comment_text[:50]:
                     continue
 
+                # Skip ION-originated comments (investigation results etc.) that
+                # were pushed up by this instance. Any comment whose first
+                # non-empty line carries the HTML-comment origin marker is ours.
+                # The second check covers legacy investigation comments pushed
+                # before the marker was added.
+                stripped = comment_text.lstrip()
+                first_line = stripped.splitlines()[0] if stripped else ""
+                if first_line.startswith("<!-- ion-origin:"):
+                    continue
+                if first_line.startswith("### Investigation #"):
+                    continue
+
                 # Format the comment with Kibana attribution
                 formatted_content = f"[From Kibana - {created_by}] {comment_text}"
 
@@ -487,6 +499,35 @@ class KibanaSyncService:
                             session.add(triage)
                             session.flush()
                         triage.case_id = new_case.id
+
+                    # Trigger autonomous investigation on each alert added to this newly-synced case.
+                    # Fire-and-forget, never raises out of the sync path.
+                    try:
+                        from ion.services.investigation_service import get_investigation_service
+                        investigation_service = get_investigation_service()
+                        for alert_id in (source_alert_ids or []):
+                            try:
+                                try:
+                                    loop = asyncio.get_running_loop()
+                                    loop.create_task(
+                                        investigation_service.investigate_alert(
+                                            alert_id=alert_id, force=False, triggered_by="kibana_sync",
+                                        )
+                                    )
+                                except RuntimeError:
+                                    # No running loop — run in a background thread
+                                    import threading
+                                    def _bg(aid=alert_id):
+                                        asyncio.run(
+                                            investigation_service.investigate_alert(
+                                                alert_id=aid, force=False, triggered_by="kibana_sync",
+                                            )
+                                        )
+                                    threading.Thread(target=_bg, daemon=True).start()
+                            except Exception as inv_exc:
+                                logger.debug("Enqueue investigation failed for %s: %s", alert_id, inv_exc)
+                    except Exception as hook_exc:
+                        logger.warning("Kibana-sync investigation hook failed: %s", hook_exc)
 
                     # Push standardized description back to Kibana
                     kibana_version = kibana_case.get("version")

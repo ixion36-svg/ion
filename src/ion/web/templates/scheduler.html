@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}Job Scheduler - ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-3 mb-4">
+      <svg class="w-4 h-4 text-ion-lime"><use href="#i-activity"/></svg>
+      <span class="label-tiny text-ion-lime">Automation</span>
+    </div>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Job Scheduler</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Run arbitrary handlers on a cron schedule. Every dispatch is recorded with duration, status and output.</p>
+  </div>
+  <div class="flex items-center gap-2 flex-wrap">
+    <button class="btn btn-secondary" onclick="schRefresh()">Refresh</button>
+    <button class="btn btn-primary" onclick="schOpenForm()">+ New Job</button>
+  </div>
+</section>
+
+<div id="sch-content"><div class="sch-loading"><span class="sch-spinner"></span> Loading jobs...</div></div>
+
+<div class="sch-modal-bg" id="sch-modal-bg">
+  <div class="sch-modal">
+    <div class="sch-modal-head">
+      <div class="sch-modal-title" id="sch-modal-title">New Job</div>
+      <button class="sch-modal-close" onclick="schCloseForm()" aria-label="Close">&times;</button>
+    </div>
+    <form class="sch-modal-body" id="sch-form" onsubmit="return schSubmit(event)">
+      <input type="hidden" id="sch-id" value="">
+
+      <div class="sch-row">
+        <div class="sch-field">
+          <label>Name *</label>
+          <input id="sch-name" type="text" required maxlength="200" placeholder="Daily IOC sync">
+        </div>
+        <div class="sch-field">
+          <label>Handler *</label>
+          <select id="sch-handler" required></select>
+        </div>
+      </div>
+
+      <div class="sch-row">
+        <div class="sch-field">
+          <label>Cron expression *</label>
+          <input id="sch-cron" type="text" required maxlength="120" placeholder="*/5 * * * *">
+          <small class="sch-hint">5-field crontab (min hour dom mon dow). Example: <code>0 3 * * *</code> = 3am daily.</small>
+        </div>
+        <div class="sch-field">
+          <label>Enabled</label>
+          <select id="sch-enabled">
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="sch-field">
+        <label>Description</label>
+        <textarea id="sch-desc" rows="2" placeholder="What does this job do?"></textarea>
+      </div>
+
+      <div class="sch-field">
+        <label>Params (JSON)</label>
+        <textarea id="sch-params" rows="4" placeholder='{"foo": "bar"}'></textarea>
+        <small class="sch-hint">Passed to the handler as a dict. Leave blank for {}.</small>
+      </div>
+
+      <div class="sch-form-actions">
+        <button type="button" class="btn btn-secondary" onclick="schCloseForm()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="sch-modal-bg" id="sch-exec-bg">
+  <div class="sch-modal">
+    <div class="sch-modal-head">
+      <div class="sch-modal-title" id="sch-exec-title">Recent executions</div>
+      <button class="sch-modal-close" onclick="schCloseExec()" aria-label="Close">&times;</button>
+    </div>
+    <div class="sch-modal-body" id="sch-exec-body">
+      <div class="sch-loading"><span class="sch-spinner"></span> Loading...</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
+{% endblock %}
+
+{% block scripts %}
+<style>
+.sch-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.sch-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:sch-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes sch-spin{to{transform:rotate(360deg)}}
+.sch-empty{text-align:center;padding:60px 24px;color:var(--text-secondary)}
+.sch-empty h3{color:var(--text-primary);margin-bottom:8px}
+
+.sch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
+.sch-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;border-left:4px solid var(--border);position:relative}
+.sch-card.ok{border-left-color:var(--mitre-covered,#3fb950)}
+.sch-card.err{border-left-color:var(--sev-critical,#f85149)}
+.sch-card.off{border-left-color:var(--text-secondary);opacity:.7}
+.sch-card.run{border-left-color:var(--sev-medium,#d29922)}
+
+.sch-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
+.sch-card-name{font-size:.95rem;font-weight:700;color:var(--text-primary);line-height:1.2}
+.sch-card-handler{font-size:.66rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;font-family:'JetBrains Mono',monospace}
+.sch-card-status{font-size:.66rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:3px 9px;border-radius:99px;flex-shrink:0}
+.sch-card-status.ok{background:rgba(63,185,80,.15);color:var(--mitre-covered,#3fb950)}
+.sch-card-status.err{background:rgba(248,81,73,.18);color:var(--sev-critical,#f85149)}
+.sch-card-status.off{background:rgba(99,110,123,.18);color:var(--text-secondary)}
+.sch-card-status.run{background:rgba(210,153,34,.18);color:var(--sev-medium,#d29922)}
+.sch-card-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-top:8px;font-size:.72rem;color:var(--text-secondary)}
+.sch-card-meta strong{color:var(--text-primary);font-family:'JetBrains Mono',monospace}
+.sch-card-cron{grid-column:1/-1;font-family:'JetBrains Mono',monospace;background:var(--bg-tertiary);padding:4px 8px;border-radius:var(--radius);display:inline-block;width:fit-content}
+.sch-card-actions{margin-top:10px;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.sch-iconbtn{background:none;border:1px solid var(--border);color:var(--text-secondary);padding:3px 9px;border-radius:var(--radius);cursor:pointer;font-size:.7rem;font-weight:600}
+.sch-iconbtn:hover{border-color:var(--primary);color:var(--primary)}
+.sch-iconbtn.danger:hover{border-color:var(--sev-critical,#f85149);color:var(--sev-critical,#f85149)}
+
+.sch-modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:none;z-index:1000;align-items:center;justify-content:center;padding:24px}
+.sch-modal-bg.show{display:flex}
+.sch-modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);max-width:720px;width:100%;max-height:90vh;overflow:auto}
+.sch-modal-head{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg-secondary)}
+.sch-modal-title{font-size:1.05rem;font-weight:700;color:var(--text-primary)}
+.sch-modal-close{background:none;border:none;color:var(--text-secondary);font-size:1.4rem;cursor:pointer;padding:0;line-height:1}
+.sch-modal-body{padding:20px 22px}
+.sch-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.sch-field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.sch-field label{font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.sch-field input,.sch-field select,.sch-field textarea{background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:8px 10px;border-radius:var(--radius);font:inherit;font-size:.85rem}
+.sch-field textarea{font-family:'JetBrains Mono',monospace;font-size:.78rem}
+.sch-field input:focus,.sch-field select:focus,.sch-field textarea:focus{outline:none;border-color:var(--primary)}
+.sch-hint{color:var(--text-secondary);font-size:.7rem;margin-top:2px}
+.sch-hint code{background:var(--bg-tertiary);padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace}
+.sch-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+
+.sch-exec-row{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;font-size:.78rem}
+.sch-exec-row.ok{border-left:4px solid var(--mitre-covered,#3fb950)}
+.sch-exec-row.err{border-left:4px solid var(--sev-critical,#f85149)}
+.sch-exec-row.run{border-left:4px solid var(--sev-medium,#d29922)}
+.sch-exec-head{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;color:var(--text-primary);font-weight:600}
+.sch-exec-meta{color:var(--text-secondary);font-family:'JetBrains Mono',monospace;font-size:.72rem}
+.sch-exec-err{color:var(--sev-critical,#f85149);margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:.72rem;white-space:pre-wrap;word-break:break-word}
+
+@media (max-width: 768px) {
+  .sch-grid { grid-template-columns: 1fr; }
+  .sch-row { grid-template-columns: 1fr; }
+  .sch-card-meta { grid-template-columns: 1fr; }
+}
+</style>
+<script>
+const SCH_API = '/api/scheduler';
+let schCache = [];
+let schHandlers = [];
+
+function schEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function schFmtTime(iso){if(!iso)return'never';try{const d=new Date(iso);const diff=(Date.now()-d.getTime())/1000;if(diff<0){const a=-diff;if(a<60)return'in '+Math.round(a)+'s';if(a<3600)return'in '+Math.round(a/60)+'m';if(a<86400)return'in '+Math.round(a/3600)+'h';return'in '+Math.round(a/86400)+'d';}if(diff<60)return Math.round(diff)+'s ago';if(diff<3600)return Math.round(diff/60)+'m ago';if(diff<86400)return Math.round(diff/3600)+'h ago';return Math.round(diff/86400)+'d ago';}catch(e){return iso}}
+
+async function schBootstrap() {
+  try {
+    const r = await fetch(SCH_API + '/handlers');
+    if (r.ok) {
+      const data = await r.json();
+      schHandlers = data.handlers || [];
+    }
+  } catch (e) {}
+  await schLoad();
+}
+
+async function schLoad() {
+  const c = document.getElementById('sch-content');
+  c.innerHTML = '<div class="sch-loading"><span class="sch-spinner"></span> Loading jobs...</div>';
+  try {
+    const r = await fetch(SCH_API + '/jobs');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    schCache = data.jobs || [];
+    schRender();
+  } catch (e) {
+    c.innerHTML = `<div class="sch-loading" style="color:var(--sev-critical,#f85149)">${schEsc(e.message || 'Failed to load')}</div>`;
+  }
+}
+
+function schRender() {
+  const c = document.getElementById('sch-content');
+  if (!schCache.length) {
+    c.innerHTML = `<div class="sch-empty">
+      <h3>No scheduled jobs yet</h3>
+      <p>Create a job to run a registered handler on a cron schedule.</p>
+      <button class="btn btn-primary" style="margin-top:14px" onclick="schOpenForm()">+ New Job</button>
+    </div>`;
+    return;
+  }
+  const cards = schCache.map(j => {
+    let cls = j.enabled ? (j.last_status === 'error' ? 'err' : (j.last_status === 'running' ? 'run' : 'ok')) : 'off';
+    let statusTxt = !j.enabled ? 'disabled' : (j.last_status || 'pending');
+    return `
+      <div class="sch-card ${cls}">
+        <div class="sch-card-head">
+          <div>
+            <div class="sch-card-name">${schEsc(j.name)}</div>
+            <div class="sch-card-handler">${schEsc(j.handler_key)}</div>
+          </div>
+          <span class="sch-card-status ${cls}">${schEsc(statusTxt)}</span>
+        </div>
+        ${j.description ? `<div style="color:var(--text-secondary);font-size:.78rem;margin-top:4px">${schEsc(j.description)}</div>` : ''}
+        <div class="sch-card-meta">
+          <span class="sch-card-cron">${schEsc(j.cron_expr)}</span>
+          <span>next: <strong>${schFmtTime(j.next_run_at)}</strong></span>
+          <span>last: <strong>${schFmtTime(j.last_run_at)}</strong></span>
+        </div>
+        <div class="sch-card-actions">
+          <button class="sch-iconbtn" onclick="schRun(${j.id})">Run now</button>
+          <button class="sch-iconbtn" onclick="schShowExec(${j.id}, '${schEsc(j.name)}')">History</button>
+          <button class="sch-iconbtn" onclick="schOpenForm(${j.id})">Edit</button>
+          <button class="sch-iconbtn danger" onclick="schDelete(${j.id})">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+  c.innerHTML = `<div class="sch-grid">${cards}</div>`;
+}
+
+async function schRefresh() { await schLoad(); }
+
+function schOpenForm(jobId) {
+  const sel = document.getElementById('sch-handler');
+  sel.innerHTML = schHandlers.map(h => `<option value="${schEsc(h)}">${schEsc(h)}</option>`).join('') || '<option value="noop">noop</option>';
+
+  if (jobId) {
+    const j = schCache.find(x => x.id === jobId);
+    if (!j) return;
+    document.getElementById('sch-modal-title').textContent = 'Edit Job';
+    document.getElementById('sch-id').value = j.id;
+    document.getElementById('sch-name').value = j.name;
+    document.getElementById('sch-cron').value = j.cron_expr;
+    document.getElementById('sch-handler').value = j.handler_key;
+    document.getElementById('sch-desc').value = j.description || '';
+    document.getElementById('sch-params').value = j.params_json || '';
+    document.getElementById('sch-enabled').value = j.enabled ? 'true' : 'false';
+  } else {
+    document.getElementById('sch-modal-title').textContent = 'New Job';
+    document.getElementById('sch-id').value = '';
+    document.getElementById('sch-form').reset();
+    document.getElementById('sch-cron').value = '*/15 * * * *';
+  }
+  document.getElementById('sch-modal-bg').classList.add('show');
+}
+
+function schCloseForm() {
+  document.getElementById('sch-modal-bg').classList.remove('show');
+}
+
+async function schSubmit(ev) {
+  ev.preventDefault();
+  const id = document.getElementById('sch-id').value;
+  const paramsRaw = document.getElementById('sch-params').value.trim();
+  let params = null;
+  if (paramsRaw) {
+    try { params = JSON.parse(paramsRaw); }
+    catch(e) { alert('Params must be valid JSON: ' + e.message); return false; }
+  }
+  const payload = {
+    name: document.getElementById('sch-name').value.trim(),
+    cron_expr: document.getElementById('sch-cron').value.trim(),
+    handler_key: document.getElementById('sch-handler').value,
+    description: document.getElementById('sch-desc').value.trim() || null,
+    params: params,
+    enabled: document.getElementById('sch-enabled').value === 'true',
+  };
+  try {
+    const url = id ? `${SCH_API}/jobs/${id}` : `${SCH_API}/jobs`;
+    const r = await fetch(url, {
+      method: id ? 'PUT' : 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      throw new Error(body.detail || ('HTTP ' + r.status));
+    }
+    schCloseForm();
+    await schLoad();
+  } catch (e) {
+    alert('Save failed: ' + (e.message || e));
+  }
+  return false;
+}
+
+async function schDelete(id) {
+  if (!confirm('Delete this job and its execution history?')) return;
+  try {
+    const r = await fetch(`${SCH_API}/jobs/${id}`, { method: 'DELETE' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    await schLoad();
+  } catch (e) {
+    alert('Delete failed: ' + (e.message || e));
+  }
+}
+
+async function schRun(id) {
+  try {
+    const r = await fetch(`${SCH_API}/jobs/${id}/run`, { method: 'POST' });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      throw new Error(body.detail || ('HTTP ' + r.status));
+    }
+    await schLoad();
+  } catch (e) {
+    alert('Run failed: ' + (e.message || e));
+  }
+}
+
+async function schShowExec(id, name) {
+  document.getElementById('sch-exec-title').textContent = 'Executions — ' + name;
+  const body = document.getElementById('sch-exec-body');
+  body.innerHTML = '<div class="sch-loading"><span class="sch-spinner"></span> Loading...</div>';
+  document.getElementById('sch-exec-bg').classList.add('show');
+  try {
+    const r = await fetch(`${SCH_API}/jobs/${id}/executions?limit=50`);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    const execs = data.executions || [];
+    if (!execs.length) {
+      body.innerHTML = '<div class="sch-empty"><h3>No executions yet</h3><p>Trigger the job manually or wait for the next scheduled run.</p></div>';
+      return;
+    }
+    body.innerHTML = execs.map(e => {
+      const cls = e.status === 'success' ? 'ok' : (e.status === 'error' ? 'err' : 'run');
+      return `<div class="sch-exec-row ${cls}">
+        <div class="sch-exec-head">
+          <span>${schEsc(e.status)}</span>
+          <span class="sch-exec-meta">${schFmtTime(e.started_at)}${e.duration_ms != null ? ' · ' + e.duration_ms + 'ms' : ''}</span>
+        </div>
+        <div class="sch-exec-meta">started: ${schEsc(e.started_at || '')} · completed: ${schEsc(e.completed_at || '—')}</div>
+        ${e.error_text ? `<div class="sch-exec-err">${schEsc(e.error_text)}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch (e) {
+    body.innerHTML = `<div class="sch-loading" style="color:var(--sev-critical,#f85149)">${schEsc(e.message || 'Failed to load')}</div>`;
+  }
+}
+
+function schCloseExec() {
+  document.getElementById('sch-exec-bg').classList.remove('show');
+}
+
+document.addEventListener('DOMContentLoaded', schBootstrap);
+</script>
+{% endblock %}

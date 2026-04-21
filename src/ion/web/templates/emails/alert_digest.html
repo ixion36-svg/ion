@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ subject }}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f4f6f8; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#1f2937;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f4f6f8; padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" style="background-color:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background-color:#111827; padding:20px 24px; color:#f9fafb;">
+              <div style="font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:#9ca3af;">ION SOC Platform</div>
+              <div style="font-size:22px; font-weight:600; margin-top:4px;">Alert digest</div>
+              <div style="font-size:13px; color:#d1d5db; margin-top:4px;">
+                {{ alert_count }} alert{% if alert_count != 1 %}s{% endif %} &middot; generated {{ generated_at|datetimeformat }}
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px;">
+              {% if alerts %}
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
+                <thead>
+                  <tr>
+                    <th align="left" style="font-size:11px; letter-spacing:0.05em; text-transform:uppercase; color:#6b7280; padding:8px 8px; border-bottom:1px solid #e5e7eb;">Severity</th>
+                    <th align="left" style="font-size:11px; letter-spacing:0.05em; text-transform:uppercase; color:#6b7280; padding:8px 8px; border-bottom:1px solid #e5e7eb;">Title</th>
+                    <th align="left" style="font-size:11px; letter-spacing:0.05em; text-transform:uppercase; color:#6b7280; padding:8px 8px; border-bottom:1px solid #e5e7eb;">Source</th>
+                    <th align="left" style="font-size:11px; letter-spacing:0.05em; text-transform:uppercase; color:#6b7280; padding:8px 8px; border-bottom:1px solid #e5e7eb;">When</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for alert in alerts %}
+                  {% set sev = (alert.severity or 'medium')|lower %}
+                  {% if sev in ('critical','high') %}
+                    {% set sev_bg = '#fee2e2' %}{% set sev_fg = '#991b1b' %}
+                  {% elif sev == 'medium' %}
+                    {% set sev_bg = '#fef3c7' %}{% set sev_fg = '#92400e' %}
+                  {% elif sev == 'low' %}
+                    {% set sev_bg = '#dbeafe' %}{% set sev_fg = '#1e40af' %}
+                  {% else %}
+                    {% set sev_bg = '#e5e7eb' %}{% set sev_fg = '#374151' %}
+                  {% endif %}
+                  <tr>
+                    <td style="padding:10px 8px; border-bottom:1px solid #f3f4f6; vertical-align:top;">
+                      <span style="display:inline-block; padding:2px 8px; border-radius:9999px; background-color:{{ sev_bg }}; color:{{ sev_fg }}; font-size:11px; font-weight:600; text-transform:uppercase;">{{ sev }}</span>
+                    </td>
+                    <td style="padding:10px 8px; border-bottom:1px solid #f3f4f6; vertical-align:top;">
+                      <div style="font-weight:600; color:#111827; font-size:14px;">
+                        {{ alert.title or alert.rule_name or alert.name or 'Untitled alert' }}
+                      </div>
+                      {% if alert.id %}
+                      <div style="font-size:12px; color:#6b7280; margin-top:2px;">ID: {{ alert.id }}</div>
+                      {% endif %}
+                      {% if alert.description %}
+                      <div style="font-size:13px; color:#374151; margin-top:6px;">{{ alert.description }}</div>
+                      {% endif %}
+                    </td>
+                    <td style="padding:10px 8px; border-bottom:1px solid #f3f4f6; vertical-align:top; font-size:13px; color:#374151;">
+                      {{ alert.source or alert.rule_name or '-' }}
+                    </td>
+                    <td style="padding:10px 8px; border-bottom:1px solid #f3f4f6; vertical-align:top; font-size:13px; color:#374151; white-space:nowrap;">
+                      {{ (alert.created_at or alert['@timestamp'] or alert.timestamp)|datetimeformat }}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              {% else %}
+              <p style="font-size:14px; color:#374151;">No alerts to report in this window.</p>
+              {% endif %}
+
+              {% if ion_base_url %}
+              <div style="margin-top:28px;">
+                <a href="{{ ion_base_url }}/alerts" style="display:inline-block; background-color:#2563eb; color:#ffffff; padding:10px 18px; border-radius:6px; text-decoration:none; font-size:14px; font-weight:600;">Open alerts in ION</a>
+              </div>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 24px; background-color:#f9fafb; font-size:12px; color:#6b7280; border-top:1px solid #e5e7eb;">
+              This message was sent automatically by {{ from_name }}. Do not reply.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

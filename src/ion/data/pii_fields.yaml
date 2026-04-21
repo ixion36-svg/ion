@@ -1,0 +1,40 @@
+# Fields to anonymize in SIEM events before LLM processing.
+# Each field defines a match rule, a token prefix, and whether to also find
+# occurrences of the value anywhere in free-text fields (smart_find).
+fields:
+  - name: user_principal_name
+    match_paths: ["user.name", "user.full_name", "user.email", "winlog.event_data.TargetUserName", "winlog.event_data.SubjectUserName"]
+    token_prefix: USER
+    smart_find_in_text: true
+    strategy: exact_value  # tokenize the exact string
+  - name: hostname
+    match_paths: ["host.name", "host.hostname", "winlog.computer_name", "agent.hostname", "agent.name"]
+    token_prefix: HOST
+    smart_find_in_text: true
+    strategy: exact_value
+  - name: private_ip
+    match_paths: ["source.ip", "destination.ip", "client.ip", "server.ip", "host.ip"]
+    token_prefix: IP
+    smart_find_in_text: true
+    strategy: regex
+    regex: "^(10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|169\\.254\\.|fc[0-9a-f][0-9a-f]:|fd[0-9a-f][0-9a-f]:|::1$)"
+  - name: email
+    match_paths: ["user.email", "email.from.address", "email.to.address"]
+    token_prefix: EMAIL
+    smart_find_in_text: true
+    strategy: exact_value
+
+# Fields that should be preserved verbatim (explicit whitelist so operators
+# can audit what leaves the stack):
+preserve_paths:
+  - "event.action"
+  - "event.category"
+  - "rule.id"
+  - "rule.name"
+  - "rule.groups"
+  - "file.hash.*"
+  - "process.hash.*"
+  - "url.full"
+  - "url.domain"
+  - "process.command_line"
+  - "process.name"
