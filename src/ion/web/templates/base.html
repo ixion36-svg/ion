@@ -79,7 +79,7 @@
 
             <!-- Engineering — detection & infrastructure -->
             <div class="tw-drop" data-drop id="nav-group-engineering">
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/detection-engineering') or p.startswith('/cyab') or p.startswith('/log-sources') or p.startswith('/data-flow') or p.startswith('/engineering-analytics') or p.startswith('/network-map') %}is-active{% endif %}">Engineering
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/detection-engineering') or p.startswith('/cyab') or p.startswith('/log-sources') or p.startswith('/data-flow') or p.startswith('/engineering-analytics') or p.startswith('/network-map') or p.startswith('/topology') or p.startswith('/architecture') or p.startswith('/security') %}is-active{% endif %}">Engineering
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
@@ -89,6 +89,9 @@
                 <a href="/network-map" class="tw-drop-item {% if p.startswith('/network-map') %}is-active{% endif %}">Network Map</a>
                 <a href="/data-flow" class="tw-drop-item {% if p.startswith('/data-flow') %}is-active{% endif %}">Data Flow</a>
                 <a href="/engineering-analytics" class="tw-drop-item {% if p.startswith('/engineering-analytics') %}is-active{% endif %}">System Analytics</a>
+                <a href="/topology" id="nav-topology-link" class="tw-drop-item {% if p.startswith('/topology') %}is-active{% endif %}" style="display:none;">Topology</a>
+                <a href="/architecture" id="nav-architecture-link" class="tw-drop-item {% if p.startswith('/architecture') %}is-active{% endif %}" style="display:none;">Architecture</a>
+                <a href="/security" id="nav-security-link" class="tw-drop-item {% if p.startswith('/security') %}is-active{% endif %}" style="display:none;">Security</a>
               </div>
             </div>
 
@@ -118,6 +121,7 @@
                 <a href="/shift-handover" class="tw-drop-item {% if p.startswith('/shift-handover') %}is-active{% endif %}">Shift Handover</a>
                 <a href="/daily-standup" class="tw-drop-item {% if p == '/daily-standup' %}is-active{% endif %}">Daily Standup</a>
                 <a href="/alert-prompts" class="tw-drop-item {% if p.startswith('/alert-prompts') %}is-active{% endif %}">Alert Prompts</a>
+                <a href="/tools" class="tw-drop-item {% if p.startswith('/tools') %}is-active{% endif %}">SOC Tools</a>
                 <a href="/scheduler" class="tw-drop-item {% if p == '/scheduler' %}is-active{% endif %}">Job Scheduler</a>
               </div>
             </div>
@@ -179,6 +183,7 @@
                 <a href="/integrations" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Integrations</a>
                 <a href="/gitlab" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">GitLab</a>
                 <a href="/audit-logs" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Audit Logs</a>
+                <a href="/service-accounts" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Service Accounts</a>
               </div>
             </div>
           </div>
