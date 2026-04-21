@@ -109,13 +109,14 @@
 
             <!-- Operations — shift ops, config, scheduling -->
             <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p == '/analyst' or p == '/briefing' or p.startswith('/shift-handover') or p.startswith('/alert-prompts') or p == '/scheduler' or p.startswith('/tools') %}is-active{% endif %}">Operations
+              <button class="tw-nav-link tw-drop-btn {% if p == '/analyst' or p == '/briefing' or p.startswith('/shift-handover') or p == '/daily-standup' or p.startswith('/alert-prompts') or p == '/scheduler' or p.startswith('/tools') %}is-active{% endif %}">Operations
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
                 <a href="/analyst" class="tw-drop-item {% if p == '/analyst' or p.startswith('/tools') %}is-active{% endif %}">SOC Workspace</a>
                 <a href="/briefing" class="tw-drop-item {% if p == '/briefing' %}is-active{% endif %}">Morning Briefing</a>
                 <a href="/shift-handover" class="tw-drop-item {% if p.startswith('/shift-handover') %}is-active{% endif %}">Shift Handover</a>
+                <a href="/daily-standup" class="tw-drop-item {% if p == '/daily-standup' %}is-active{% endif %}">Daily Standup</a>
                 <a href="/alert-prompts" class="tw-drop-item {% if p.startswith('/alert-prompts') %}is-active{% endif %}">Alert Prompts</a>
                 <a href="/scheduler" class="tw-drop-item {% if p == '/scheduler' %}is-active{% endif %}">Job Scheduler</a>
               </div>

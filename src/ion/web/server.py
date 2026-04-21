@@ -93,6 +93,7 @@ from ion.web.report_scheduler_api import router as report_scheduler_router
 from ion.web.playbook_action_api import router as playbook_action_router
 from ion.web.cyber_range_api import router as cyber_range_router
 from ion.web.webhook_api import router as webhook_router
+from ion.web.daily_standup_api import router as daily_standup_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -315,6 +316,7 @@ app.include_router(scheduler_router, prefix="")
 app.include_router(investigation_router, prefix="")
 app.include_router(case_grouper_router, prefix="")
 app.include_router(webhook_router, prefix="/api")
+app.include_router(daily_standup_router, prefix="/api")
 
 
 def _validate_startup_config():
@@ -948,6 +950,12 @@ async def maturity_page(request: Request, user: User = Depends(require_page_perm
 async def shift_handover_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the Shift Handover Report page."""
     return templates.TemplateResponse(request=request, name="shift_handover.html")
+
+
+@app.get("/daily-standup", response_class=HTMLResponse)
+async def daily_standup_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Daily SOC Standup / Duty Check page."""
+    return templates.TemplateResponse(request=request, name="daily_standup.html")
 
 
 

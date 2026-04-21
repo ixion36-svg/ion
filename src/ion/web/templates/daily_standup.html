@@ -1,0 +1,600 @@
+{% extends "base.html" %}
+{% block title %}Daily Standup · ION{% endblock %}
+{% block content %}
+<div class="ion-tw ion-tw-page grain text-slate-200 overflow-x-hidden">
+  <div class="fixed inset-0 bg-grid pointer-events-none opacity-40 z-0"></div>
+  <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-14 md:py-20">
+
+    <!-- ── Header ── -->
+    <section class="flex flex-wrap items-end justify-between gap-6 mb-10 md:mb-14 rise d-1">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="h-1.5 w-1.5 rounded-full bg-ion-cyan pulse-cyan"></span>
+          <span class="label-tiny text-ion-cyan">Daily operations</span>
+        </div>
+        <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Daily SOC Standup</h1>
+        <p class="mt-4 max-w-2xl text-[15px] text-slate-400 leading-relaxed">Duty check report &mdash; automated health checks, log monitoring, and sign-off</p>
+        <div class="mt-3 flex items-center gap-4 text-[12px] text-slate-500 font-mono">
+          <span id="ds-date"></span>
+          <span id="ds-clock"></span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button onclick="runChecks()" id="btn-run-checks" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+          <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg> Run Checks
+        </button>
+        <button onclick="exportPDF()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+          <svg class="w-3.5 h-3.5"><use href="#i-download"/></svg> Export PDF
+        </button>
+        <button onclick="saveStandup()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+          <svg class="w-3.5 h-3.5"><use href="#i-check-circle"/></svg> Save &amp; Sign Off
+        </button>
+      </div>
+    </section>
+
+    <!-- S1: ES Cluster Health -->
+    <div class="mb-6"><div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 1</div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2">
+            <svg class="w-4 h-4 text-ion-cyan"><use href="#i-database"/></svg> ES Cluster Health
+          </h2>
+          <span id="es-status-badge" class="px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-[0.12em] border">--</span>
+        </div>
+        <div id="es-cluster-body" class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[13px]">
+          <div class="text-slate-400">Nodes: <span id="es-nodes" class="text-white font-semibold">--</span></div>
+          <div class="text-slate-400">Shards: <span id="es-shards" class="text-white font-semibold">--</span></div>
+          <div class="text-slate-400">Indices: <span id="es-indices" class="text-white font-semibold">--</span></div>
+          <div class="text-slate-400">Store: <span id="es-store" class="text-white font-semibold">--</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- S2: Critical Alerts (Last 24h) -->
+    <div class="mb-6"><div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 2</div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2">
+            <svg class="w-4 h-4 text-ion-coral"><use href="#i-shield-alert"/></svg> Critical Alerts (Last 24h)
+          </h2>
+          <div class="flex items-center gap-3 text-[12px]">
+            <span class="text-ion-coral font-semibold">Critical: <span id="kpi-critical">--</span></span>
+            <span class="text-ion-amber font-semibold">High: <span id="kpi-high">--</span></span>
+          </div>
+        </div>
+        <div id="alerts-table-wrap" class="overflow-x-auto">
+          <table class="w-full text-[12px]">
+            <thead><tr><th class="dth">Time</th><th class="dth">Severity</th><th class="dth">Rule Name</th><th class="dth">Host</th><th class="dth">Status</th></tr></thead>
+            <tbody id="alerts-tbody"><tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
+          </table>
+        </div>
+        <div class="mt-3 text-right">
+          <a href="/alerts" class="text-[12px] text-slate-400 hover:text-ion-cyan transition flex items-center gap-1 justify-end">
+            View all in Alerts <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- S3: Stale Cases -->
+    <div class="mb-6"><div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 3</div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2">
+            <svg class="w-4 h-4 text-ion-amber"><use href="#i-clock"/></svg> Stale Cases (Open &gt; 24h)
+          </h2>
+          <span class="text-[12px] text-ion-amber font-semibold">Count: <span id="kpi-stale">--</span></span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-[12px]">
+            <thead><tr><th class="dth">Case #</th><th class="dth">Title</th><th class="dth">Severity</th><th class="dth">Assigned To</th><th class="dth">Hours Open</th></tr></thead>
+            <tbody id="stale-tbody"><tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- S4: DC + WEF Log Health -->
+    <div class="mb-6"><div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 4</div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- DC Log Health -->
+        <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+          <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-3">
+            <svg class="w-4 h-4 text-ion-iris"><use href="#i-server"/></svg> DC Log Health
+          </h2>
+          <div class="grid grid-cols-3 gap-3 mb-4 text-[12px]">
+            <div class="text-slate-400">Events 24h: <span id="dc-total" class="text-white font-semibold">--</span></div>
+            <div class="text-slate-400">Hosts w/ gaps: <span id="dc-gaps" class="text-white font-semibold">--</span></div>
+            <div class="text-slate-400">Below avg: <span id="dc-below" class="text-white font-semibold">--</span></div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-[12px]">
+              <thead><tr><th class="dth">Hostname</th><th class="dth">Events 24h</th><th class="dth">7d Avg</th><th class="dth">Below Avg</th><th class="dth">Gap Hours</th><th class="dth">Status</th></tr></thead>
+              <tbody id="dc-tbody"><tr><td colspan="6" class="px-3 py-6 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- WEF Log Health -->
+        <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+          <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-3">
+            <svg class="w-4 h-4 text-ion-iris"><use href="#i-server"/></svg> WEF Log Health
+          </h2>
+          <div class="grid grid-cols-3 gap-3 mb-4 text-[12px]">
+            <div class="text-slate-400">Events 24h: <span id="wef-total" class="text-white font-semibold">--</span></div>
+            <div class="text-slate-400">Hosts w/ gaps: <span id="wef-gaps" class="text-white font-semibold">--</span></div>
+            <div class="text-slate-400">Below avg: <span id="wef-below" class="text-white font-semibold">--</span></div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-[12px]">
+              <thead><tr><th class="dth">Hostname</th><th class="dth">Events 24h</th><th class="dth">7d Avg</th><th class="dth">Below Avg</th><th class="dth">Gap Hours</th><th class="dth">Status</th></tr></thead>
+              <tbody id="wef-tbody"><tr><td colspan="6" class="px-3 py-6 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- S5: Arkime High-Risk Country Traffic -->
+    <div class="mb-6">
+      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 5</div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
+          <svg class="w-4 h-4 text-ion-coral"><use href="#i-globe"/></svg> Arkime High-Risk Country Traffic
+        </h2>
+        <div id="arkime-countries" class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div class="ds-country-card" data-country="RU"><span class="text-[18px]">&#x1F1F7;&#x1F1FA;</span><div class="text-[12px] text-slate-300 font-semibold">Russia</div><div class="text-[11px] text-slate-500">Sessions: <span class="ds-country-count" id="ark-ru">--</span></div></div>
+          <div class="ds-country-card" data-country="CN"><span class="text-[18px]">&#x1F1E8;&#x1F1F3;</span><div class="text-[12px] text-slate-300 font-semibold">China</div><div class="text-[11px] text-slate-500">Sessions: <span class="ds-country-count" id="ark-cn">--</span></div></div>
+          <div class="ds-country-card" data-country="IR"><span class="text-[18px]">&#x1F1EE;&#x1F1F7;</span><div class="text-[12px] text-slate-300 font-semibold">Iran</div><div class="text-[11px] text-slate-500">Sessions: <span class="ds-country-count" id="ark-ir">--</span></div></div>
+          <div class="ds-country-card" data-country="KP"><span class="text-[18px]">&#x1F1F0;&#x1F1F5;</span><div class="text-[12px] text-slate-300 font-semibold">North Korea</div><div class="text-[11px] text-slate-500">Sessions: <span class="ds-country-count" id="ark-kp">--</span></div></div>
+          <div class="ds-country-card" data-country="SY"><span class="text-[18px]">&#x1F1F8;&#x1F1FE;</span><div class="text-[12px] text-slate-300 font-semibold">Syria</div><div class="text-[11px] text-slate-500">Sessions: <span class="ds-country-count" id="ark-sy">--</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- S6: Rule Failures -->
+    <div class="mb-6">
+      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 6</div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
+          <svg class="w-4 h-4 text-ion-amber"><use href="#i-alert-triangle"/></svg> Rule Failures
+        </h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-[12px]">
+            <thead><tr><th class="dth">Rule Name</th><th class="dth">Failure Count</th><th class="dth">Last Failure</th></tr></thead>
+            <tbody id="rules-tbody"><tr><td colspan="3" class="px-3 py-8 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- S7: ServiceNow Incidents -->
+    <div class="mb-6">
+      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 7</div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
+          <svg class="w-4 h-4 text-ion-cyan"><use href="#i-file-text"/></svg> ServiceNow Incidents
+        </h2>
+        <textarea id="snow-incidents" rows="4" placeholder="Paste or type ongoing ServiceNow incidents..."
+          class="w-full rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 px-4 py-3 focus:border-ion-cyan/50 focus:bg-white/8 transition resize-y"></textarea>
+      </div>
+    </div>
+
+    <!-- S8: Threat Landscape AI Summary -->
+    <div class="mb-6">
+      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 8</div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2">
+            <svg class="w-4 h-4 text-ion-iris"><use href="#i-sparkles"/></svg> Threat Landscape AI Summary
+          </h2>
+          <button onclick="generateThreatSummary()" class="inline-flex items-center gap-2 h-8 px-3 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[11px] font-semibold transition">
+            <svg class="w-3 h-3"><use href="#i-sparkles"/></svg> Generate Summary
+          </button>
+        </div>
+        <div id="threat-summary" class="text-[13px] text-slate-400 leading-relaxed mb-5 min-h-[60px]">Click "Generate Summary" to produce an AI briefing.</div>
+        <div class="border-t border-white/5 pt-4">
+          <h3 class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Reports of Interest</h3>
+          <div id="threat-reports" class="space-y-2 text-[12px] text-slate-400">No reports loaded.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- S9: Daily Meetings -->
+    <div class="mb-6">
+      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 9</div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
+          <svg class="w-4 h-4 text-ion-lime"><use href="#i-check-circle"/></svg> Daily Meetings
+        </h2>
+        <div class="space-y-2" id="meetings-checklist">
+          <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition cursor-pointer text-[13px] text-slate-300">
+            <input type="checkbox" class="ds-meeting-cb accent-ion-cyan" data-item="standup"> Morning standup attended
+          </label>
+          <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition cursor-pointer text-[13px] text-slate-300">
+            <input type="checkbox" class="ds-meeting-cb accent-ion-cyan" data-item="handover"> Shift handover reviewed
+          </label>
+          <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition cursor-pointer text-[13px] text-slate-300">
+            <input type="checkbox" class="ds-meeting-cb accent-ion-cyan" data-item="case_review"> Case review completed
+          </label>
+          <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition cursor-pointer text-[13px] text-slate-300">
+            <input type="checkbox" class="ds-meeting-cb accent-ion-cyan" data-item="threat_intel"> Threat intel briefing reviewed
+          </label>
+          <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition cursor-pointer text-[13px] text-slate-300">
+            <input type="checkbox" class="ds-meeting-cb accent-ion-cyan" data-item="action_items"> Action items from previous day checked
+          </label>
+          <div class="flex items-center gap-3 px-3 py-2">
+            <input type="checkbox" class="ds-meeting-cb accent-ion-cyan" data-item="custom" id="cb-custom">
+            <input type="text" id="custom-meeting-item" placeholder="Custom item..." class="flex-1 h-8 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 focus:border-ion-cyan/50 transition">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- S10: Additional Notes -->
+    <div class="mb-6">
+      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 10</div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
+          <svg class="w-4 h-4 text-slate-400"><use href="#i-edit"/></svg> Additional Notes
+        </h2>
+        <textarea id="additional-notes" rows="5" placeholder="Free-form notes for today's report..."
+          class="w-full rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 px-4 py-3 focus:border-ion-cyan/50 focus:bg-white/8 transition resize-y"></textarea>
+      </div>
+    </div>
+
+    <!-- S11: Sign-Off -->
+    <div class="mb-24">
+      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 11</div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
+          <svg class="w-4 h-4 text-ion-lime"><use href="#i-lock"/></svg> Sign-Off
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold" for="signoff-analyst">Duty Analyst</label>
+            <input id="signoff-analyst" type="text" placeholder="Analyst name" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 focus:border-ion-cyan/50 transition">
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Sign-Off Timestamp</label>
+            <div id="signoff-time" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-slate-400 flex items-center">Not signed off</div>
+          </div>
+        </div>
+        <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition cursor-pointer text-[13px] text-slate-300">
+          <input type="checkbox" id="signoff-confirm" class="accent-ion-cyan"> I confirm all daily checks have been completed
+        </label>
+      </div>
+    </div>
+
+  </div><!-- /inner container -->
+</div><!-- /ion-tw -->
+
+<!-- ── Sticky Action Bar ── -->
+<div class="ion-tw fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-ink-950/90 backdrop-blur-md">
+  <div class="mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 h-14 flex items-center justify-between">
+    <div class="flex items-center gap-2 text-[12px]">
+      <span id="save-status" class="text-slate-500">Unsaved changes</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="exportPDF()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+        <svg class="w-3.5 h-3.5"><use href="#i-download"/></svg> Export PDF
+      </button>
+      <button onclick="saveStandup()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+        <svg class="w-3.5 h-3.5"><use href="#i-check-circle"/></svg> Save &amp; Sign Off
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.dth{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:600;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.05)}
+.ds-country-card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 8px;border-radius:10px;border:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.02);transition:border-color .2s,background .2s}
+.ds-country-card.highlighted{border-color:rgba(255,108,108,.4);background:rgba(255,108,108,.08)}
+.ds-country-count.active{color:#ff6c6c;font-weight:700}
+.ds-spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.1);border-top-color:rgba(109,228,255,.8);border-radius:50%;animation:ds-spin .7s linear infinite}
+@keyframes ds-spin{to{transform:rotate(360deg)}}
+.ds-status-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.ds-pill-ok{background:rgba(163,230,53,.1);color:#a3e635;border:1px solid rgba(163,230,53,.2)}
+.ds-pill-warning{background:rgba(245,158,11,.1);color:#f59e0b;border:1px solid rgba(245,158,11,.2)}
+.ds-pill-critical{background:rgba(255,108,108,.1);color:#ff6c6c;border:1px solid rgba(255,108,108,.2)}
+.ds-sev-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.ds-sev-critical{background:rgba(255,108,108,.12);color:#ff6c6c;border:1px solid rgba(255,108,108,.25)}
+.ds-sev-high{background:rgba(245,158,11,.12);color:#f59e0b;border:1px solid rgba(245,158,11,.25)}
+.ds-sev-medium{background:rgba(139,92,246,.12);color:#8b5cf6;border:1px solid rgba(139,92,246,.25)}
+.ds-sev-low{background:rgba(148,163,184,.1);color:#94a3b8;border:1px solid rgba(148,163,184,.2)}
+.ds-hours-red{color:#ff6c6c;font-weight:700}
+.ds-hours-amber{color:#f59e0b;font-weight:700}
+.ds-hours-yellow{color:#eab308;font-weight:600}
+.ds-gap-row{background:rgba(255,108,108,.04)}
+</style>
+<script>
+/* ── Daily Standup JS ─────────────────────────────── */
+const DS = {checksData: null, threatSummary: null, dirty: true};
+
+function esc(s) { if (s == null) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+function fmtTime(iso) { if (!iso) return '--'; try { return new Date(iso).toLocaleString(); } catch { return iso; } }
+function fmtShort(iso) { if (!iso) return '--'; try { const d = new Date(iso); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); } catch { return iso; } }
+
+/* ── Live clock ── */
+function tickClock() {
+  const now = new Date();
+  document.getElementById('ds-date').textContent = now.toLocaleDateString('en-GB', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+  document.getElementById('ds-clock').textContent = now.toUTCString().slice(-12, -4) + ' UTC';
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+/* ── Severity pill helper ── */
+function sevPill(sev) {
+  const s = (sev || '').toLowerCase();
+  const cls = {critical:'ds-sev-critical',high:'ds-sev-high',medium:'ds-sev-medium',low:'ds-sev-low'}[s] || 'ds-sev-low';
+  return `<span class="ds-sev-pill ${cls}">${esc(sev)}</span>`;
+}
+
+/* ── Status pill ── */
+function statusPill(status) {
+  const s = (status || '').toUpperCase();
+  if (s === 'CRITICAL') return '<span class="ds-status-pill ds-pill-critical">CRITICAL</span>';
+  if (s === 'WARNING')  return '<span class="ds-status-pill ds-pill-warning">WARNING</span>';
+  return '<span class="ds-status-pill ds-pill-ok">OK</span>';
+}
+
+/* ── Hours-open colour ── */
+function hoursClass(h) {
+  if (h > 72) return 'ds-hours-red';
+  if (h > 48) return 'ds-hours-amber';
+  return 'ds-hours-yellow';
+}
+
+/* ── Spinner for tables ── */
+function spinner(cols) { return `<tr><td colspan="${cols}" class="px-3 py-8 text-center text-slate-500"><span class="ds-spinner"></span> Loading...</td></tr>`; }
+
+/* ── S1: ES Cluster ── */
+function renderCluster(es) {
+  if (!es) return;
+  const badge = document.getElementById('es-status-badge');
+  const status = (es.status || 'unknown').toLowerCase();
+  badge.textContent = status;
+  badge.className = 'px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-[0.12em] border ';
+  if (status === 'green')       badge.className += 'bg-ion-lime/10 text-ion-lime border-ion-lime/20';
+  else if (status === 'yellow') badge.className += 'bg-ion-amber/10 text-ion-amber border-ion-amber/20';
+  else                          badge.className += 'bg-ion-coral/10 text-ion-coral border-ion-coral/20';
+  document.getElementById('es-nodes').textContent   = es.number_of_nodes ?? '--';
+  document.getElementById('es-shards').textContent  = es.active_shards ?? '--';
+  document.getElementById('es-indices').textContent = es.indices_count ?? '--';
+  document.getElementById('es-store').textContent   = es.store_size ?? '--';
+}
+
+/* ── S2: Critical Alerts ── */
+function renderAlerts(alerts) {
+  const crit = (alerts || []).filter(a => (a.severity||'').toLowerCase() === 'critical').length;
+  const high = (alerts || []).filter(a => (a.severity||'').toLowerCase() === 'high').length;
+  document.getElementById('kpi-critical').textContent = crit;
+  document.getElementById('kpi-high').textContent = high;
+  const tbody = document.getElementById('alerts-tbody');
+  if (!alerts || !alerts.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No critical/high alerts in last 24h</td></tr>'; return; }
+  const rows = alerts.slice(0, 15);
+  tbody.innerHTML = rows.map(a => `<tr class="border-b border-white/5 hover:bg-white/[.02]">
+    <td class="px-3 py-2 text-slate-400 font-mono">${fmtShort(a.timestamp)}</td>
+    <td class="px-3 py-2">${sevPill(a.severity)}</td>
+    <td class="px-3 py-2 text-white truncate max-w-[260px]">${esc(a.rule_name)}</td>
+    <td class="px-3 py-2 text-slate-300">${esc(a.host)}</td>
+    <td class="px-3 py-2 text-slate-400">${esc(a.status)}</td>
+  </tr>`).join('');
+}
+
+/* ── S3: Stale Cases ── */
+function renderStaleCases(cases) {
+  document.getElementById('kpi-stale').textContent = (cases || []).length;
+  const tbody = document.getElementById('stale-tbody');
+  if (!cases || !cases.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No stale cases</td></tr>'; return; }
+  tbody.innerHTML = cases.map(c => {
+    const h = c.hours_open ?? 0;
+    return `<tr class="border-b border-white/5 hover:bg-white/[.02]">
+      <td class="px-3 py-2 text-white font-mono">${esc(c.case_number)}</td>
+      <td class="px-3 py-2 text-slate-300 truncate max-w-[260px]">${esc(c.title)}</td>
+      <td class="px-3 py-2">${sevPill(c.severity)}</td>
+      <td class="px-3 py-2 text-slate-400">${esc(c.assigned_to)}</td>
+      <td class="px-3 py-2 font-mono ${hoursClass(h)}">${h.toFixed(1)}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── S4: Log Health (DC + WEF) ── */
+function renderLogHealth(prefix, data) {
+  document.getElementById(prefix + '-total').textContent = data.total_events ?? '--';
+  document.getElementById(prefix + '-gaps').textContent  = data.hosts_with_gaps ?? '--';
+  document.getElementById(prefix + '-below').textContent = data.hosts_below_avg ?? '--';
+  const tbody = document.getElementById(prefix + '-tbody');
+  const hosts = data.hosts || [];
+  if (!hosts.length) { tbody.innerHTML = `<tr><td colspan="6" class="px-3 py-6 text-center text-slate-500">No host data</td></tr>`; return; }
+  tbody.innerHTML = hosts.map(h => `<tr class="border-b border-white/5 hover:bg-white/[.02] ${h.gap_hours > 0 ? 'ds-gap-row' : ''}">
+    <td class="px-3 py-2 text-white font-mono">${esc(h.hostname)}</td>
+    <td class="px-3 py-2 text-slate-300 tabular-nums">${h.events_24h ?? '--'}</td>
+    <td class="px-3 py-2 text-slate-400 tabular-nums">${h.avg_7d ?? '--'}</td>
+    <td class="px-3 py-2 ${h.below_avg ? 'text-ion-amber' : 'text-slate-400'}">${h.below_avg ? 'Y' : 'N'}</td>
+    <td class="px-3 py-2 text-slate-300 tabular-nums">${h.gap_hours ?? 0}</td>
+    <td class="px-3 py-2">${statusPill(h.status)}</td>
+  </tr>`).join('');
+}
+
+/* ── S5: Arkime ── */
+function renderArkime(countries) {
+  const map = {};
+  (countries || []).forEach(c => { map[c.code] = c.sessions || 0; });
+  ['RU','CN','IR','KP','SY'].forEach(code => {
+    const el = document.getElementById('ark-' + code.toLowerCase());
+    const count = map[code] || 0;
+    if (el) { el.textContent = count; if (count > 0) el.classList.add('active'); else el.classList.remove('active'); }
+    const card = document.querySelector(`.ds-country-card[data-country="${code}"]`);
+    if (card) { if (count > 0) card.classList.add('highlighted'); else card.classList.remove('highlighted'); }
+  });
+}
+
+/* ── S6: Rule Failures ── */
+function renderRuleFailures(failures) {
+  const tbody = document.getElementById('rules-tbody');
+  if (!failures || !failures.length) { tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-8 text-center text-slate-500">No rule failures detected</td></tr>'; return; }
+  tbody.innerHTML = failures.map(f => `<tr class="border-b border-white/5 hover:bg-white/[.02]">
+    <td class="px-3 py-2 text-white">${esc(f.rule_name)}</td>
+    <td class="px-3 py-2 text-ion-amber font-mono">${f.failure_count ?? 0}</td>
+    <td class="px-3 py-2 text-slate-400 font-mono">${fmtTime(f.last_failure)}</td>
+  </tr>`).join('');
+}
+
+/* ── Load all checks ── */
+async function loadChecks() {
+  // Show spinners
+  ['alerts-tbody','stale-tbody','dc-tbody','wef-tbody','rules-tbody'].forEach(id => {
+    document.getElementById(id).innerHTML = spinner(id === 'rules-tbody' ? 3 : id.startsWith('dc') || id.startsWith('wef') ? 6 : 5);
+  });
+  try {
+    const r = await fetch('/api/daily-standup/checks');
+    if (!r.ok) throw new Error('Failed to load checks');
+    const data = await r.json();
+    DS.checksData = data;
+    renderCluster(data.cluster);
+    renderAlerts(data.critical_alerts);
+    renderStaleCases(data.stale_cases);
+    if (data.dc_log_health) renderLogHealth('dc', data.dc_log_health);
+    if (data.wef_log_health) renderLogHealth('wef', data.wef_log_health);
+    renderRuleFailures(data.rule_failures);
+  } catch (e) {
+    console.error('loadChecks error:', e);
+  }
+}
+
+/* ── Arkime traffic ── */
+async function loadArkimeTraffic() {
+  try {
+    const r = await fetch('/api/daily-standup/arkime/high-risk-traffic');
+    if (!r.ok) throw new Error('Arkime fetch failed');
+    const data = await r.json();
+    renderArkime(data.countries || []);
+  } catch (e) {
+    console.warn('Arkime traffic not available:', e.message);
+  }
+}
+
+/* ── Threat summary ── */
+async function generateThreatSummary() {
+  const el = document.getElementById('threat-summary');
+  el.innerHTML = '<span class="ds-spinner"></span> Generating AI summary...';
+  try {
+    const r = await fetch('/api/threat-landscape/ai-summary', {method: 'POST'});
+    if (!r.ok) throw new Error('AI summary request failed');
+    const data = await r.json();
+    DS.threatSummary = data.summary || data.content || '';
+    el.innerHTML = `<div class="whitespace-pre-wrap">${esc(DS.threatSummary)}</div>`;
+  } catch (e) {
+    el.innerHTML = `<span class="text-ion-amber">${esc(e.message)}</span>`;
+  }
+}
+
+/* ── Reports of interest ── */
+async function loadReports() {
+  const el = document.getElementById('threat-reports');
+  try {
+    const r = await fetch('/api/threat-landscape/reports?limit=5');
+    if (!r.ok) throw new Error('Reports fetch failed');
+    const data = await r.json();
+    const reports = data.reports || data || [];
+    if (!reports.length) { el.textContent = 'No reports available.'; return; }
+    el.innerHTML = reports.map(rpt => `<div class="flex items-center gap-2 py-1">
+      <svg class="w-3 h-3 text-ion-cyan shrink-0"><use href="#i-file-text"/></svg>
+      <a href="${esc(rpt.url || '#')}" target="_blank" class="text-slate-300 hover:text-ion-cyan transition truncate">${esc(rpt.title || rpt.name || 'Untitled')}</a>
+      <span class="text-slate-600 text-[11px] shrink-0">${fmtShort(rpt.published || rpt.created_at)}</span>
+    </div>`).join('');
+  } catch (e) {
+    el.innerHTML = `<span class="text-slate-500">${esc(e.message)}</span>`;
+  }
+}
+
+/* ── Run all checks in parallel ── */
+async function runChecks() {
+  const btn = document.getElementById('btn-run-checks');
+  btn.disabled = true; btn.innerHTML = '<span class="ds-spinner"></span> Running...';
+  await Promise.all([loadChecks(), loadArkimeTraffic(), loadReports()]);
+  btn.disabled = false; btn.innerHTML = '<svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg> Run Checks';
+  markDirty();
+}
+
+/* ── Collect form state ── */
+function collectState() {
+  const meetings = {};
+  document.querySelectorAll('.ds-meeting-cb').forEach(cb => { meetings[cb.dataset.item] = cb.checked; });
+  return {
+    checks_data: DS.checksData,
+    threat_summary: DS.threatSummary,
+    servicenow_incidents: document.getElementById('snow-incidents').value,
+    additional_notes: document.getElementById('additional-notes').value,
+    meetings: meetings,
+    custom_meeting_item: document.getElementById('custom-meeting-item').value,
+    signoff_analyst: document.getElementById('signoff-analyst').value,
+    signoff_confirmed: document.getElementById('signoff-confirm').checked,
+    signoff_time: document.getElementById('signoff-confirm').checked ? new Date().toISOString() : null
+  };
+}
+
+/* ── Save ── */
+async function saveStandup() {
+  // Set sign-off timestamp if confirmed
+  if (document.getElementById('signoff-confirm').checked) {
+    document.getElementById('signoff-time').textContent = new Date().toLocaleString() + ' UTC';
+  }
+  const state = collectState();
+  try {
+    const r = await fetch('/api/daily-standup/save', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(state)});
+    if (!r.ok) throw new Error('Save failed');
+    document.getElementById('save-status').innerHTML = '<span class="text-ion-lime">Saved</span>';
+    DS.dirty = false;
+    if (typeof showToast === 'function') showToast('Standup saved', 'success');
+  } catch (e) {
+    document.getElementById('save-status').innerHTML = '<span class="text-ion-coral">Save failed</span>';
+    if (typeof showToast === 'function') showToast(e.message, 'error');
+  }
+}
+
+/* ── Export PDF ── */
+async function exportPDF() {
+  const state = collectState();
+  try {
+    const r = await fetch('/api/daily-standup/pdf', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(state)});
+    if (!r.ok) throw new Error('PDF export failed');
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `daily-standup-${new Date().toISOString().slice(0,10)}.pdf`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  } catch (e) {
+    if (typeof showToast === 'function') showToast(e.message, 'error');
+  }
+}
+
+/* ── Dirty tracking ── */
+function markDirty() {
+  DS.dirty = true;
+  document.getElementById('save-status').innerHTML = '<span class="text-slate-500">Unsaved changes</span>';
+}
+document.addEventListener('input', markDirty);
+document.addEventListener('change', markDirty);
+
+/* ── Init: populate analyst name from session ── */
+document.addEventListener('DOMContentLoaded', () => {
+  const nameEl = document.getElementById('user-name');
+  if (nameEl && nameEl.textContent && nameEl.textContent !== 'Loading\u2026') {
+    document.getElementById('signoff-analyst').value = nameEl.textContent;
+  } else {
+    // Fallback: wait for app.js user load
+    const obs = new MutationObserver(() => {
+      if (nameEl && nameEl.textContent && nameEl.textContent !== 'Loading\u2026') {
+        document.getElementById('signoff-analyst').value = nameEl.textContent;
+        obs.disconnect();
+      }
+    });
+    if (nameEl) obs.observe(nameEl, {childList: true, characterData: true, subtree: true});
+  }
+});
+</script>
+{% endblock %}
