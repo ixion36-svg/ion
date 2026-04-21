@@ -191,41 +191,80 @@ def _extract_observables_from_pcap(analysis: Dict[str, Any]) -> List[EnrichedObs
 async def _enrich_observables(
     observables: List[EnrichedObservable],
 ) -> List[EnrichedObservable]:
-    """Batch-enrich an observable list via OpenCTI. Mutates in place and
-    returns the same list for chaining. Swallows per-item errors into the
-    `error` field so one bad lookup doesn't poison the whole batch."""
-    opencti = get_opencti_service()
-    if not opencti.is_configured:
-        for o in observables:
-            o.error = "opencti not configured"
-        return observables
-    payload = [{"type": o.type, "value": o.value} for o in observables]
-    try:
-        results = await opencti.enrich_batch(payload)
-    except Exception as e:
-        err = safe_error(e)
-        for o in observables:
-            o.error = err
-        return observables
+    """Batch-enrich an observable list via OpenCTI, VirusTotal, and Shodan.
 
-    # Zip results back onto the observables in order
-    for o, res in zip(observables, results):
-        if not isinstance(res, dict):
-            continue
-        if res.get("error"):
-            o.error = res.get("error")
-            continue
-        o.found = bool(res.get("found"))
-        labels = res.get("labels") or []
-        o.labels = [l for l in labels if isinstance(l, str)]
-        actors = res.get("threat_actors") or []
-        o.threat_actors = [
-            a.get("name") if isinstance(a, dict) else str(a)
-            for a in actors
-            if a
-        ]
-        indicators = res.get("indicators") or []
-        o.indicator_count = len(indicators) if isinstance(indicators, list) else 0
+    Enrichment sources:
+    - OpenCTI: all observable types (threat intel, labels, actors)
+    - VirusTotal: IPs, domains, URLs, file hashes (malicious score)
+    - Shodan: IPs (open ports, services, org)
+
+    Swallows per-item errors so one bad lookup doesn't poison the batch.
+    """
+    # 1. OpenCTI enrichment
+    opencti = get_opencti_service()
+    if opencti.is_configured:
+        payload = [{"type": o.type, "value": o.value} for o in observables]
+        try:
+            results = await opencti.enrich_batch(payload)
+            for o, res in zip(observables, results):
+                if not isinstance(res, dict):
+                    continue
+                if res.get("error"):
+                    o.error = res.get("error")
+                    continue
+                o.found = bool(res.get("found"))
+                labels = res.get("labels") or []
+                o.labels = [l for l in labels if isinstance(l, str)]
+                actors = res.get("threat_actors") or []
+                o.threat_actors = [
+                    a.get("name") if isinstance(a, dict) else str(a)
+                    for a in actors if a
+                ]
+                indicators = res.get("indicators") or []
+                o.indicator_count = len(indicators) if isinstance(indicators, list) else 0
+        except Exception as e:
+            logger.debug("OpenCTI batch enrichment failed: %s", e)
+
+    # 2. VirusTotal enrichment (IPs, domains, hashes)
+    try:
+        from ion.services.virustotal_service import get_virustotal_service
+        vt = get_virustotal_service()
+        if vt and vt.is_configured:
+            vt_types = {"ipv4-addr", "domain-name", "url", "file-sha256", "file-sha1", "file-md5"}
+            for o in observables:
+                if o.type in vt_types and not o.found:
+                    try:
+                        result = await vt.lookup(o.type, o.value)
+                        if result and result.get("found"):
+                            o.found = True
+                            if result.get("malicious"):
+                                o.labels = list(set(o.labels + ["malicious"]))
+                            if result.get("score") is not None:
+                                o.indicator_count = max(o.indicator_count, result["score"])
+                    except Exception:
+                        pass
+    except ImportError:
+        pass
+
+    # 3. Shodan enrichment (IPs only)
+    try:
+        from ion.services.shodan_service import get_shodan_service
+        shodan = get_shodan_service()
+        if shodan and shodan.is_configured:
+            for o in observables:
+                if o.type == "ipv4-addr" and not o.found:
+                    try:
+                        result = await shodan.lookup(o.value)
+                        if result and result.get("found"):
+                            o.found = True
+                            ports = result.get("ports", [])
+                            if ports:
+                                o.labels = list(set(o.labels + [f"ports:{','.join(str(p) for p in ports[:5])}"]))
+                    except Exception:
+                        pass
+    except ImportError:
+        pass
+
     return observables
 
 
