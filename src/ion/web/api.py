@@ -5835,6 +5835,20 @@ async def get_alert_triage(
                     })
                     if _hit.raw_data:
                         alert_dict["_source"] = _hit.raw_data
+                    # Auto-extract observables if triage exists but has none
+                    if triage and not triage.observables and _hit.raw_data:
+                        try:
+                            populated = _populate_triage_observables(
+                                triage, _hit.host, _hit.user, _hit.raw_data
+                            )
+                            if populated:
+                                session.commit()
+                                # Refresh triage_data with the new observables
+                                if triage_data:
+                                    triage_data["observables"] = triage.observables
+                        except Exception:
+                            session.rollback()
+
         except Exception as _es_err:
             logger.debug("Triage memory: ES lookup failed for %s: %s", alert_id, _es_err)
 
@@ -5907,19 +5921,24 @@ async def update_alert_triage(
         session.add(triage)
         session.flush()
 
-    # Snapshot source_system on first triage touch so we keep attribution
-    # even after ES rotates the underlying alert document. Lookup is async
-    # but only fires on first-touch — subsequent updates skip it.
-    if is_new or not triage.source_system:
+    # Snapshot source_system + auto-extract observables on first triage touch
+    if is_new or not triage.source_system or not triage.observables:
         try:
             from ion.services.elasticsearch_service import ElasticsearchService
             _es = ElasticsearchService()
             if _es.is_configured:
                 _hits = await _es.get_alerts_by_ids([alert_id])
-                if _hits and _hits[0].source_system:
-                    triage.source_system = _hits[0].source_system
+                if _hits:
+                    _hit = _hits[0]
+                    if not triage.source_system and _hit.source_system:
+                        triage.source_system = _hit.source_system
+                    # Auto-extract observables from raw alert data
+                    if not triage.observables and _hit.raw_data:
+                        _populate_triage_observables(
+                            triage, _hit.host, _hit.user, _hit.raw_data
+                        )
         except Exception as e:
-            logger.debug(f"Failed to snapshot source_system for {alert_id}: {e}")
+            logger.debug(f"Failed to snapshot/extract for {alert_id}: {e}")
 
     status_changed = False
     if data.status is not None:
