@@ -35,7 +35,14 @@ from ion.services.observable_extractor import extract_observables_from_raw
 
 # Rate limiter - uses IP address as key
 # Global default: 120 requests/minute per IP. Individual endpoints can override.
-limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
+# Disable with ION_RATE_LIMIT_ENABLED=false in .env
+import os as _os
+_rate_limit_enabled = _os.environ.get("ION_RATE_LIMIT_ENABLED", "true").lower() not in ("false", "0", "no")
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["120/minute"],
+    enabled=_rate_limit_enabled,
+)
 
 # OIDC state cookie name for CSRF protection
 OIDC_STATE_COOKIE_NAME = "oidc_state"
