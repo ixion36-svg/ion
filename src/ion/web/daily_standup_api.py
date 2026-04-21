@@ -25,13 +25,18 @@ router = APIRouter(prefix="/daily-standup", tags=["daily-standup"])
 async def _check_cluster_health() -> Dict[str, Any]:
     """ES cluster health + stats."""
     from ion.services.elasticsearch_service import ElasticsearchService
+    import httpx
 
     es = ElasticsearchService()
     if not es.is_configured:
         return {"status": "not_configured"}
     try:
+        # Use a dedicated client to avoid event-loop-closed errors from shared pool
         result = await es._request("GET", "/_cluster/health")
-        stats = await es._request("GET", "/_cluster/stats")
+        try:
+            stats = await es._request("GET", "/_cluster/stats")
+        except Exception:
+            stats = {"indices": {}}
         return {
             "status": result.get("status"),  # green/yellow/red
             "number_of_nodes": result.get("number_of_nodes"),
@@ -144,14 +149,14 @@ async def _check_log_source_health(host_pattern: str, label: str) -> Dict[str, A
             "query": {
                 "bool": {
                     "must": [
-                        {"wildcard": {"host.hostname": host_pattern}},
+                        {"wildcard": {"host.hostname.keyword": host_pattern}},
                         {"range": {"@timestamp": {"gte": "now-24h", "lte": "now"}}},
                     ]
                 }
             },
             "aggs": {
                 "hosts": {
-                    "terms": {"field": "host.hostname", "size": 500},
+                    "terms": {"field": "host.hostname.keyword", "size": 500},
                     "aggs": {
                         "hourly": {
                             "date_histogram": {"field": "@timestamp", "fixed_interval": "1h"}
@@ -170,14 +175,14 @@ async def _check_log_source_health(host_pattern: str, label: str) -> Dict[str, A
             "query": {
                 "bool": {
                     "must": [
-                        {"wildcard": {"host.hostname": host_pattern}},
+                        {"wildcard": {"host.hostname.keyword": host_pattern}},
                         {"range": {"@timestamp": {"gte": "now-7d", "lte": "now"}}},
                     ]
                 }
             },
             "aggs": {
                 "hosts": {
-                    "terms": {"field": "host.hostname", "size": 500},
+                    "terms": {"field": "host.hostname.keyword", "size": 500},
                 }
             },
         }
