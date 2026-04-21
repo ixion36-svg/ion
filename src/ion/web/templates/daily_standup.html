@@ -101,42 +101,30 @@
         <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
           <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-3">
             <svg class="w-4 h-4 text-ion-iris"><use href="#i-server"/></svg> DC Log Health
+            <span id="dc-overall-light" class="ds-rag-light ds-rag-grey"></span>
           </h2>
-          <div class="grid grid-cols-3 gap-3 mb-4 text-[12px]">
+          <div class="grid grid-cols-3 gap-3 mb-3 text-[12px]">
             <div class="text-slate-400">Events 24h: <span id="dc-total" class="text-white font-semibold">--</span></div>
             <div class="text-slate-400">Hosts w/ gaps: <span id="dc-gaps" class="text-white font-semibold">--</span></div>
             <div class="text-slate-400">Below avg: <span id="dc-below" class="text-white font-semibold">--</span></div>
           </div>
-          <div class="flex items-center justify-between mb-2">
-            <span id="dc-summary" class="text-[11px] text-slate-500"></span>
-            <button onclick="toggleLogHosts('dc')" id="dc-toggle" class="text-[10px] text-ion-cyan hover:text-white transition">Show all</button>
-          </div>
-          <div class="overflow-x-auto max-h-[320px] overflow-y-auto">
-            <table class="w-full text-[12px]">
-              <thead class="sticky top-0 bg-ink-900/95"><tr><th class="dth">Hostname</th><th class="dth">Events 24h</th><th class="dth">7d Avg</th><th class="dth">Below Avg</th><th class="dth">Gap Hours</th><th class="dth">Status</th></tr></thead>
-              <tbody id="dc-tbody"><tr><td colspan="6" class="px-3 py-6 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
-            </table>
+          <div id="dc-hosts-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            <div class="text-slate-500 text-[11px] col-span-full text-center py-4 animate-pulse">Loading...</div>
           </div>
         </div>
         <!-- WEF Log Health -->
         <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
           <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-3">
             <svg class="w-4 h-4 text-ion-iris"><use href="#i-server"/></svg> WEF Log Health
+            <span id="wef-overall-light" class="ds-rag-light ds-rag-grey"></span>
           </h2>
-          <div class="grid grid-cols-3 gap-3 mb-4 text-[12px]">
+          <div class="grid grid-cols-3 gap-3 mb-3 text-[12px]">
             <div class="text-slate-400">Events 24h: <span id="wef-total" class="text-white font-semibold">--</span></div>
             <div class="text-slate-400">Hosts w/ gaps: <span id="wef-gaps" class="text-white font-semibold">--</span></div>
             <div class="text-slate-400">Below avg: <span id="wef-below" class="text-white font-semibold">--</span></div>
           </div>
-          <div class="flex items-center justify-between mb-2">
-            <span id="wef-summary" class="text-[11px] text-slate-500"></span>
-            <button onclick="toggleLogHosts('wef')" id="wef-toggle" class="text-[10px] text-ion-cyan hover:text-white transition">Show all</button>
-          </div>
-          <div class="overflow-x-auto max-h-[320px] overflow-y-auto">
-            <table class="w-full text-[12px]">
-              <thead class="sticky top-0 bg-ink-900/95"><tr><th class="dth">Hostname</th><th class="dth">Events 24h</th><th class="dth">7d Avg</th><th class="dth">Below Avg</th><th class="dth">Gap Hours</th><th class="dth">Status</th></tr></thead>
-              <tbody id="wef-tbody"><tr><td colspan="6" class="px-3 py-6 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
-            </table>
+          <div id="wef-hosts-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            <div class="text-slate-500 text-[11px] col-span-full text-center py-4 animate-pulse">Loading...</div>
           </div>
         </div>
       </div>
@@ -325,6 +313,21 @@
 .ds-hours-amber{color:#f59e0b;font-weight:700}
 .ds-hours-yellow{color:#eab308;font-weight:600}
 .ds-gap-row{background:rgba(255,108,108,.04)}
+/* RAG traffic lights */
+.ds-rag-light{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid rgba(255,255,255,.1)}
+.ds-rag-green{background:#22c55e;box-shadow:0 0 8px rgba(34,197,94,.6)}
+.ds-rag-amber{background:#f59e0b;box-shadow:0 0 8px rgba(245,158,11,.6);animation:ds-rag-pulse 1.5s ease-in-out infinite}
+.ds-rag-red{background:#ef4444;box-shadow:0 0 10px rgba(239,68,68,.7);animation:ds-rag-pulse 0.8s ease-in-out infinite}
+.ds-rag-grey{background:#475569}
+@keyframes ds-rag-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+/* Host widget card */
+.ds-host-widget{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.02);transition:border-color .2s}
+.ds-host-widget.ds-hw-ok{border-color:rgba(34,197,94,.15)}
+.ds-host-widget.ds-hw-warning{border-color:rgba(245,158,11,.25);background:rgba(245,158,11,.04)}
+.ds-host-widget.ds-hw-critical{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.06)}
+.ds-host-widget .ds-hw-light{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.ds-host-widget .ds-hw-name{font-family:'JetBrains Mono',monospace;font-size:10px;color:#e2e8f0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds-host-widget .ds-hw-meta{font-size:9px;color:#64748b;text-align:right;white-space:nowrap}
 </style>
 <script>
 /* ── Daily Standup JS ─────────────────────────────── */
@@ -422,61 +425,50 @@ function renderStaleCases(data) {
   }).join('');
 }
 
-/* ── S4: Log Health (DC + WEF) ── */
-const _logHostData = {};  // stores full host lists for toggle
-const _logShowAll = { dc: false, wef: false };
-
+/* ── S4: Log Health (DC + WEF) — RAG widget cards ── */
 function renderLogHealth(prefix, data) {
   document.getElementById(prefix + '-total').textContent = (data.total_events_24h ?? data.total_events ?? '--').toLocaleString();
   document.getElementById(prefix + '-gaps').textContent  = data.hosts_with_gaps ?? '--';
   document.getElementById(prefix + '-below').textContent = data.hosts_below_average ?? data.hosts_below_avg ?? '--';
+
   const hosts = data.hosts || [];
-  _logHostData[prefix] = hosts;
-
-  const problems = hosts.filter(h => h.status !== 'ok');
-  const okCount = hosts.length - problems.length;
-  const summary = document.getElementById(prefix + '-summary');
-  summary.textContent = problems.length
-    ? `${problems.length} issue${problems.length > 1 ? 's' : ''} / ${hosts.length} hosts`
-    : `All ${hosts.length} hosts healthy`;
-
-  const toggle = document.getElementById(prefix + '-toggle');
-  toggle.textContent = _logShowAll[prefix] ? `Hide OK (${okCount})` : `Show all (${hosts.length})`;
-  toggle.style.display = hosts.length > 0 ? '' : 'none';
-
-  _renderLogRows(prefix);
-}
-
-function _renderLogRows(prefix) {
-  const tbody = document.getElementById(prefix + '-tbody');
-  const hosts = _logHostData[prefix] || [];
-  const showAll = _logShowAll[prefix];
-  const visible = showAll ? hosts : hosts.filter(h => h.status !== 'ok');
+  const grid = document.getElementById(prefix + '-hosts-grid');
 
   if (!hosts.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="px-3 py-6 text-center text-slate-500">No host data</td></tr>';
+    grid.innerHTML = '<div class="text-slate-500 text-[11px] col-span-full text-center py-4">No host data</div>';
     return;
   }
-  if (!visible.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-center text-ion-lime text-[11px]">All ' + hosts.length + ' hosts reporting normally — click Show all to expand</td></tr>';
-    return;
-  }
-  tbody.innerHTML = visible.map(h => `<tr class="border-b border-white/5 hover:bg-white/[.02] ${h.status !== 'ok' ? 'ds-gap-row' : ''}">
-    <td class="px-3 py-2 text-white font-mono text-[11px]">${esc(h.hostname)}</td>
-    <td class="px-3 py-2 text-slate-300 tabular-nums">${(h.count_24h ?? h.events_24h ?? '--').toLocaleString()}</td>
-    <td class="px-3 py-2 text-slate-400 tabular-nums">${(h.avg_7d ?? '--').toLocaleString()}</td>
-    <td class="px-3 py-2 ${h.below_average || h.below_avg ? 'text-ion-amber font-semibold' : 'text-slate-500'}">${h.below_average || h.below_avg ? 'YES' : '-'}</td>
-    <td class="px-3 py-2 text-slate-300 tabular-nums ${(h.gap_hours ?? 0) > 0 ? 'text-ion-coral font-semibold' : ''}">${h.gap_hours ?? 0}</td>
-    <td class="px-3 py-2">${statusPill(h.status)}</td>
-  </tr>`).join('');
-}
 
-function toggleLogHosts(prefix) {
-  _logShowAll[prefix] = !_logShowAll[prefix];
-  const hosts = _logHostData[prefix] || [];
-  const okCount = hosts.filter(h => h.status === 'ok').length;
-  document.getElementById(prefix + '-toggle').textContent = _logShowAll[prefix] ? `Hide OK (${okCount})` : `Show all (${hosts.length})`;
-  _renderLogRows(prefix);
+  // Determine overall RAG status for the section header light
+  const hasCritical = hosts.some(h => h.status === 'critical');
+  const hasWarning = hosts.some(h => h.status === 'warning');
+  const overallLight = document.getElementById(prefix + '-overall-light');
+  if (overallLight) {
+    overallLight.className = 'ds-rag-light ' + (hasCritical ? 'ds-rag-red' : hasWarning ? 'ds-rag-amber' : 'ds-rag-green');
+  }
+
+  // Render host widget cards
+  grid.innerHTML = hosts.map(h => {
+    const name = h.hostname || h.display_hostname || '?';
+    const events = (h.count_24h ?? h.events_24h ?? 0).toLocaleString();
+    const avg = (h.avg_7d ?? 0).toLocaleString();
+    const gaps = h.gap_hours ?? 0;
+    const status = h.status || 'ok';
+    const belowAvg = h.below_average || h.below_avg;
+
+    // RAG light colour
+    const lightClass = status === 'critical' ? 'ds-rag-red' : status === 'warning' ? 'ds-rag-amber' : 'ds-rag-green';
+    const widgetClass = status === 'critical' ? 'ds-hw-critical' : status === 'warning' ? 'ds-hw-warning' : 'ds-hw-ok';
+
+    // Build tooltip
+    const tooltip = name + '\\nEvents 24h: ' + events + '\\n7d avg: ' + avg + '\\nGap hours: ' + gaps + (belowAvg ? '\\n⚠ Below average' : '');
+
+    return '<div class="ds-host-widget ' + widgetClass + '" title="' + tooltip + '">'
+      + '<div class="ds-hw-light ' + lightClass + '"></div>'
+      + '<div class="ds-hw-name">' + esc(name) + '</div>'
+      + '<div class="ds-hw-meta">' + events + (gaps > 0 ? '<br><span style="color:#ef4444;">' + gaps + 'h gap</span>' : '') + '</div>'
+      + '</div>';
+  }).join('');
 }
 
 /* ── S5: Arkime ── */
