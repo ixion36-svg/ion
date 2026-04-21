@@ -159,6 +159,16 @@
       </div>
     </div>
 
+    <!-- S5b: Arkime Node Stats -->
+    <div class="mb-6">
+      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
+          <svg class="w-4 h-4 text-ion-cyan"><use href="#i-server"/></svg> Arkime Capture Nodes
+        </h2>
+        <div id="arkime-nodes" class="text-slate-500 text-[12px] animate-pulse">Loading node stats...</div>
+      </div>
+    </div>
+
     <!-- S6: Rule Failures -->
     <div class="mb-6">
       <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 6</div>
@@ -479,6 +489,51 @@ function renderArkime(countries) {
   });
 }
 
+/* ── S5b: Arkime Node Stats ── */
+function renderArkimeNodes(data) {
+  const el = document.getElementById('arkime-nodes');
+  if (!data || data.error) {
+    el.innerHTML = '<span class="text-ion-coral text-xs">' + esc(data?.error || 'Failed to load') + '</span>';
+    return;
+  }
+  if (!data.configured) { el.innerHTML = '<span class="text-slate-500">Arkime not configured</span>'; return; }
+  const nodes = data.nodes || [];
+  if (!nodes.length) { el.innerHTML = '<span class="text-slate-500">No capture nodes found</span>'; return; }
+
+  function fmtBytes(b) {
+    if (!b || b === 0) return '0 B';
+    const u = ['B','KB','MB','GB','TB'];
+    const i = Math.min(Math.floor(Math.log(b) / Math.log(1024)), u.length - 1);
+    return (b / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + u[i];
+  }
+
+  let html = '<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">';
+  for (const n of nodes) {
+    const hasDrops = (n.dropped || 0) + (n.es_dropped || 0) + (n.overload_dropped || 0) > 0;
+    const dropClass = hasDrops ? 'border-ion-coral/30' : 'border-white/5';
+    html += `<div class="rounded-lg border ${dropClass} bg-white/[0.02] p-4">`;
+    html += `<div class="flex items-center justify-between mb-3">`;
+    html += `<span class="text-sm font-semibold text-white font-mono">${esc(n.name)}</span>`;
+    html += `<span class="text-[10px] text-slate-500">CPU: ${n.cpu}%</span>`;
+    html += `</div>`;
+    html += `<div class="grid grid-cols-3 gap-2 text-[11px]">`;
+    html += `<div><div class="text-slate-500">Packets</div><div class="text-white font-mono">${(n.packets_24h || 0).toLocaleString()}</div></div>`;
+    html += `<div><div class="text-slate-500">Data</div><div class="text-white font-mono">${fmtBytes(n.bytes_24h)}</div></div>`;
+    html += `<div><div class="text-slate-500">Sessions</div><div class="text-white font-mono">${(n.sessions_24h || 0).toLocaleString()}</div></div>`;
+    html += `<div><div class="text-slate-500">Pkt/s</div><div class="text-ion-cyan font-mono">${n.packets_per_sec || 0}</div></div>`;
+    html += `<div><div class="text-slate-500">Bytes/s</div><div class="text-ion-cyan font-mono">${fmtBytes(n.bytes_per_sec)}</div></div>`;
+    html += `<div><div class="text-slate-500">Sess/s</div><div class="text-ion-cyan font-mono">${n.sessions_per_sec || 0}</div></div>`;
+    if (hasDrops) {
+      html += `<div><div class="text-slate-500">Dropped</div><div class="text-ion-coral font-mono font-semibold">${(n.dropped || 0).toLocaleString()}</div></div>`;
+      html += `<div><div class="text-slate-500">ES Drop</div><div class="text-ion-coral font-mono">${(n.es_dropped || 0).toLocaleString()}</div></div>`;
+      html += `<div><div class="text-slate-500">Overload</div><div class="text-ion-coral font-mono">${(n.overload_dropped || 0).toLocaleString()}</div></div>`;
+    }
+    html += `</div></div>`;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
 /* ── S6: Rule Failures ── */
 function renderRuleFailures(failures) {
   const tbody = document.getElementById('rules-tbody');
@@ -515,12 +570,20 @@ async function loadChecks() {
 /* ── Arkime traffic ── */
 async function loadArkimeTraffic() {
   try {
-    const r = await fetch('/api/daily-standup/arkime/high-risk-traffic');
-    if (!r.ok) throw new Error('Arkime fetch failed');
-    const data = await r.json();
-    renderArkime(data.countries || []);
+    const [trafficResp, nodesResp] = await Promise.all([
+      fetch('/api/daily-standup/arkime/high-risk-traffic'),
+      fetch('/api/daily-standup/arkime/node-stats'),
+    ]);
+    if (trafficResp.ok) {
+      const data = await trafficResp.json();
+      renderArkime(data.countries || []);
+    }
+    if (nodesResp.ok) {
+      const data = await nodesResp.json();
+      renderArkimeNodes(data);
+    }
   } catch (e) {
-    console.warn('Arkime traffic not available:', e.message);
+    console.warn('Arkime data not available:', e.message);
   }
 }
 

@@ -642,3 +642,82 @@ async def check_arkime_high_risk(
             )
 
     return {"countries": results, "total": sum(r["session_count"] for r in results)}
+
+
+@router.get("/arkime/node-stats")
+async def arkime_node_stats(
+    current_user: User = Depends(require_permission("alert:read")),
+):
+    """Pull per-node capture stats from Arkime — packets, bytes, sessions, drops."""
+    from ion.services.arkime_service import get_arkime_service
+
+    svc = get_arkime_service()
+    if not svc.is_configured:
+        return {"configured": False}
+
+    try:
+        headers = await svc._headers()
+        client = await svc._client()
+
+        # Node stats
+        resp = await client.get(
+            f"{svc.url}/api/stats",
+            auth=svc._auth(),
+            headers=headers,
+        )
+        if resp.status_code != 200:
+            return {"configured": True, "error": f"HTTP {resp.status_code}"}
+
+        content_type = resp.headers.get("content-type", "")
+        if "json" not in content_type:
+            return {"configured": True, "error": "Non-JSON response from Arkime"}
+
+        data = resp.json()
+        nodes = []
+        for node in data.get("data", []):
+            nodes.append({
+                "name": node.get("nodeName", "?"),
+                "id": node.get("id", "?"),
+                "cpu": node.get("cpu", 0),
+                "memory": node.get("memory", 0),
+                "packets_24h": node.get("deltaPackets", 0),
+                "bytes_24h": node.get("deltaBytes", 0),
+                "sessions_24h": node.get("deltaSessions", 0),
+                "dropped": node.get("deltaDropped", 0),
+                "es_dropped": node.get("deltaESDropped", 0),
+                "overload_dropped": node.get("deltaOverloadDropped", 0),
+                "packets_per_sec": node.get("deltaPacketsPerSec", 0),
+                "bytes_per_sec": node.get("deltaBytesPerSec", 0),
+                "sessions_per_sec": node.get("deltaSessionsPerSec", 0),
+                "disk_queue": node.get("diskQueue", 0),
+                "close_queue": node.get("closeQueue", 0),
+                "free_space_g": node.get("freeSpaceG", 0),
+                "current_time": node.get("currentTime", 0),
+            })
+
+        # Also grab ES health through Arkime
+        es_health = {}
+        try:
+            es_resp = await client.get(
+                f"{svc.url}/api/eshealth",
+                auth=svc._auth(),
+                headers=headers,
+            )
+            if es_resp.status_code == 200 and "json" in es_resp.headers.get("content-type", ""):
+                es_health = es_resp.json()
+        except Exception:
+            pass
+
+        return {
+            "configured": True,
+            "node_count": len(nodes),
+            "nodes": nodes,
+            "es_health": {
+                "status": es_health.get("status", "unknown"),
+                "nodes": es_health.get("number_of_nodes", 0),
+                "shards": es_health.get("active_shards", 0),
+                "unassigned": es_health.get("unassigned_shards", 0),
+            },
+        }
+    except Exception as e:
+        return {"configured": True, "error": str(e)[:100]}
