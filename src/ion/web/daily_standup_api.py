@@ -609,42 +609,79 @@ async def check_arkime_high_risk(
         "KP": "North Korea",
         "SY": "Syria",
     }
-    results: List[Dict[str, Any]] = []
 
+    # First get the list of nodes
+    headers = await svc._headers()
+    client = await svc._client()
+    nodes = []
+    try:
+        stats_resp = await client.get(
+            f"{svc.url}/api/stats", auth=svc._auth(), headers=headers,
+        )
+        if stats_resp.status_code == 200:
+            content_type = stats_resp.headers.get("content-type", "")
+            if "json" in content_type:
+                for n in stats_resp.json().get("data", []):
+                    nodes.append(n.get("nodeName") or n.get("id") or "unknown")
+    except Exception:
+        pass
+    if not nodes:
+        nodes = ["default"]
+
+    start_time = str(int((datetime.now(timezone.utc) - timedelta(hours=24)).timestamp()))
+    stop_time = str(int(datetime.now(timezone.utc).timestamp()))
+
+    results: List[Dict[str, Any]] = []
     for code, name in countries.items():
-        try:
-            headers = await svc._headers()
-            client = await svc._client()
-            resp = await client.get(
-                f"{svc.url}/api/sessions",
-                auth=svc._auth(),
-                headers=headers,
-                params={
-                    "expression": f"country == {code}",
-                    "startTime": str(
-                        int((datetime.now(timezone.utc) - timedelta(hours=24)).timestamp())
-                    ),
-                    "stopTime": str(int(datetime.now(timezone.utc).timestamp())),
-                    "length": "0",  # just want the count
-                },
-            )
-            if resp.status_code == 200:
-                body = resp.json()
-                total = body.get("recordsFiltered", 0)
-                results.append({"country_code": code, "country": name, "session_count": total})
-            else:
-                results.append(
-                    {
-                        "country_code": code,
-                        "country": name,
-                        "session_count": 0,
-                        "error": f"HTTP {resp.status_code}",
-                    }
+        country_result = {
+            "country_code": code,
+            "country": name,
+            "session_count": 0,
+            "nodes": [],
+        }
+
+        for node_name in nodes:
+            try:
+                resp = await client.get(
+                    f"{svc.url}/api/sessions",
+                    auth=svc._auth(),
+                    headers=headers,
+                    params={
+                        "expression": f'country == {code} && node == "{node_name}"',
+                        "startTime": start_time,
+                        "stopTime": stop_time,
+                        "length": "5",
+                        "fields": "id,node,srcIp,dstIp,ipProtocol,protocol,bytes,packets,firstPacket,lastPacket",
+                    },
                 )
-        except Exception as e:
-            results.append(
-                {"country_code": code, "country": name, "session_count": 0, "error": str(e)[:80]}
-            )
+                if resp.status_code == 200:
+                    content_type = resp.headers.get("content-type", "")
+                    if "json" not in content_type:
+                        continue
+                    body = resp.json()
+                    count = body.get("recordsFiltered", 0)
+                    sessions = []
+                    for s in (body.get("data") or [])[:5]:
+                        sessions.append({
+                            "src_ip": s.get("srcIp"),
+                            "dst_ip": s.get("dstIp"),
+                            "protocol": s.get("protocol") or s.get("ipProtocol"),
+                            "bytes": s.get("bytes", 0),
+                            "packets": s.get("packets", 0),
+                            "first_packet": s.get("firstPacket"),
+                            "last_packet": s.get("lastPacket"),
+                        })
+                    if count > 0:
+                        country_result["nodes"].append({
+                            "node": node_name,
+                            "session_count": count,
+                            "sessions": sessions,
+                        })
+                        country_result["session_count"] += count
+            except Exception as e:
+                country_result.setdefault("errors", []).append(f"{node_name}: {str(e)[:60]}")
+
+        results.append(country_result)
 
     return {"countries": results, "total": sum(r["session_count"] for r in results)}
 

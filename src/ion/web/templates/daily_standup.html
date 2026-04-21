@@ -385,13 +385,14 @@ function renderCluster(es) {
 }
 
 /* ── S2: Critical Alerts ── */
-function renderAlerts(alerts) {
-  const crit = (alerts || []).filter(a => (a.severity||'').toLowerCase() === 'critical').length;
-  const high = (alerts || []).filter(a => (a.severity||'').toLowerCase() === 'high').length;
-  document.getElementById('kpi-critical').textContent = crit;
-  document.getElementById('kpi-high').textContent = high;
+function renderAlerts(data) {
+  // data is {critical_count, high_count, total, alerts: [...]}
+  const alertData = data || {};
+  const alerts = alertData.alerts || [];
+  document.getElementById('kpi-critical').textContent = alertData.critical_count ?? 0;
+  document.getElementById('kpi-high').textContent = alertData.high_count ?? 0;
   const tbody = document.getElementById('alerts-tbody');
-  if (!alerts || !alerts.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No critical/high alerts in last 24h</td></tr>'; return; }
+  if (!alerts.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No critical/high alerts in last 24h</td></tr>'; return; }
   const rows = alerts.slice(0, 15);
   tbody.innerHTML = rows.map(a => `<tr class="border-b border-white/5 hover:bg-white/[.02]">
     <td class="px-3 py-2 text-slate-400 font-mono">${fmtShort(a.timestamp)}</td>
@@ -403,10 +404,12 @@ function renderAlerts(alerts) {
 }
 
 /* ── S3: Stale Cases ── */
-function renderStaleCases(cases) {
-  document.getElementById('kpi-stale').textContent = (cases || []).length;
+function renderStaleCases(data) {
+  const caseData = data || {};
+  const cases = caseData.cases || [];
+  document.getElementById('kpi-stale').textContent = caseData.count ?? cases.length;
   const tbody = document.getElementById('stale-tbody');
-  if (!cases || !cases.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No stale cases</td></tr>'; return; }
+  if (!cases.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No stale cases</td></tr>'; return; }
   tbody.innerHTML = cases.map(c => {
     const h = c.hours_open ?? 0;
     return `<tr class="border-b border-white/5 hover:bg-white/[.02]">
@@ -478,14 +481,40 @@ function toggleLogHosts(prefix) {
 
 /* ── S5: Arkime ── */
 function renderArkime(countries) {
+  const list = countries || [];
   const map = {};
-  (countries || []).forEach(c => { map[c.code] = c.sessions || 0; });
+  list.forEach(c => { map[c.country_code] = c; });
+
   ['RU','CN','IR','KP','SY'].forEach(code => {
+    const c = map[code] || {};
+    const count = c.session_count || 0;
     const el = document.getElementById('ark-' + code.toLowerCase());
-    const count = map[code] || 0;
     if (el) { el.textContent = count; if (count > 0) el.classList.add('active'); else el.classList.remove('active'); }
     const card = document.querySelector(`.ds-country-card[data-country="${code}"]`);
-    if (card) { if (count > 0) card.classList.add('highlighted'); else card.classList.remove('highlighted'); }
+    if (card) {
+      if (count > 0) card.classList.add('highlighted'); else card.classList.remove('highlighted');
+      // Add per-node breakdown below the count
+      let detailEl = card.querySelector('.ds-node-detail');
+      if (!detailEl) { detailEl = document.createElement('div'); detailEl.className = 'ds-node-detail'; card.appendChild(detailEl); }
+      if (count > 0 && c.nodes && c.nodes.length) {
+        let html = '';
+        c.nodes.forEach(n => {
+          html += '<div style="font-size:9px;color:#94a3b8;margin-top:4px;text-align:left;width:100%;">';
+          html += '<span style="color:#6de4ff;">' + esc(n.node) + '</span>: ' + n.session_count + ' session' + (n.session_count !== 1 ? 's' : '');
+          if (n.sessions && n.sessions.length) {
+            n.sessions.forEach(s => {
+              const proto = s.protocol || '?';
+              const bytes = s.bytes ? (s.bytes > 1048576 ? (s.bytes/1048576).toFixed(1)+'MB' : s.bytes > 1024 ? (s.bytes/1024).toFixed(0)+'KB' : s.bytes+'B') : '0B';
+              html += '<div style="padding-left:8px;color:#64748b;">' + esc(s.src_ip||'?') + ' &rarr; ' + esc(s.dst_ip||'?') + ' [' + esc(proto) + '] ' + bytes + '</div>';
+            });
+          }
+          html += '</div>';
+        });
+        detailEl.innerHTML = html;
+      } else {
+        detailEl.innerHTML = '';
+      }
+    }
   });
 }
 
@@ -535,9 +564,11 @@ function renderArkimeNodes(data) {
 }
 
 /* ── S6: Rule Failures ── */
-function renderRuleFailures(failures) {
+function renderRuleFailures(data) {
+  const failData = data || {};
+  const failures = failData.rules || (Array.isArray(data) ? data : []);
   const tbody = document.getElementById('rules-tbody');
-  if (!failures || !failures.length) { tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-8 text-center text-slate-500">No rule failures detected</td></tr>'; return; }
+  if (!failures.length) { tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-8 text-center text-slate-500">No rule failures detected</td></tr>'; return; }
   tbody.innerHTML = failures.map(f => `<tr class="border-b border-white/5 hover:bg-white/[.02]">
     <td class="px-3 py-2 text-white">${esc(f.rule_name)}</td>
     <td class="px-3 py-2 text-ion-amber font-mono">${f.failure_count ?? 0}</td>
@@ -556,7 +587,7 @@ async function loadChecks() {
     if (!r.ok) throw new Error('Failed to load checks');
     const data = await r.json();
     DS.checksData = data;
-    renderCluster(data.cluster);
+    renderCluster(data.cluster_health);
     renderAlerts(data.critical_alerts);
     renderStaleCases(data.stale_cases);
     if (data.dc_log_health) renderLogHealth('dc', data.dc_log_health);
