@@ -88,6 +88,13 @@ class ElasticsearchAlert:
     arkime_node: Optional[str] = None
     source_ip: Optional[str] = None
     destination_ip: Optional[str] = None
+    # Process & file context — critical for triage
+    process_name: Optional[str] = None
+    command_line: Optional[str] = None
+    parent_process_name: Optional[str] = None
+    file_name: Optional[str] = None
+    file_hash: Optional[str] = None
+    file_path: Optional[str] = None
 
     def __post_init__(self):
         if self.tags is None:
@@ -121,6 +128,12 @@ class ElasticsearchAlert:
             "mitre_tactic_name": self.mitre_tactic_name,
             "geo_data": self.geo_data,
             "source_system": self.source_system,
+            "process_name": self.process_name,
+            "command_line": self.command_line,
+            "parent_process_name": self.parent_process_name,
+            "file_name": self.file_name,
+            "file_hash": self.file_hash,
+            "file_path": self.file_path,
             "network_community_id": self.network_community_id,
             "arkime_node": self.arkime_node,
             "source_ip": self.source_ip,
@@ -714,15 +727,20 @@ class ElasticsearchService:
             title
         )
 
-        # Host
+        # Host — prefer FQDN (host.hostname), fall back to short name
         host = (
-            _f(source, "host.name") or
             _f(source, "host.hostname") or
+            _f(source, "host.name") or
             _f(source, "agent.hostname") or
-            source.get("hostname")
+            _f(source, "agent.name") or
+            _f(source, "observer.hostname") or
+            source.get("hostname") or
+            source.get("host_name")
         )
         if isinstance(host, dict):
-            host = host.get("name")
+            host = host.get("hostname") or host.get("name")
+        if isinstance(host, list):
+            host = host[0] if host else None
 
         # User
         user = (
@@ -732,6 +750,53 @@ class ElasticsearchService:
         )
         if isinstance(user, dict):
             user = user.get("name")
+
+        # Process context — ECS process.* fields
+        process_name = (
+            _f(source, "process.name")
+            or _f(source, "process.executable")
+            or _f(source, "winlog.event_data.Image")
+        )
+        if isinstance(process_name, dict):
+            process_name = process_name.get("name")
+        # Extract just the filename from a full path
+        if process_name and ('\\' in str(process_name) or '/' in str(process_name)):
+            process_name = str(process_name).rsplit('\\', 1)[-1].rsplit('/', 1)[-1]
+
+        command_line = (
+            _f(source, "process.command_line")
+            or _f(source, "process.args")
+            or _f(source, "winlog.event_data.CommandLine")
+        )
+        if isinstance(command_line, list):
+            command_line = " ".join(str(a) for a in command_line)
+
+        parent_process_name = (
+            _f(source, "process.parent.name")
+            or _f(source, "process.parent.executable")
+            or _f(source, "winlog.event_data.ParentImage")
+        )
+        if isinstance(parent_process_name, dict):
+            parent_process_name = parent_process_name.get("name")
+        if parent_process_name and ('\\' in str(parent_process_name) or '/' in str(parent_process_name)):
+            parent_process_name = str(parent_process_name).rsplit('\\', 1)[-1].rsplit('/', 1)[-1]
+
+        # File context
+        file_name = (
+            _f(source, "file.name")
+            or _f(source, "file.path")
+            or _f(source, "winlog.event_data.TargetFilename")
+        )
+        file_path_val = _f(source, "file.path") or _f(source, "file.directory")
+        file_hash = (
+            _f(source, "file.hash.sha256")
+            or _f(source, "file.hash.sha1")
+            or _f(source, "file.hash.md5")
+            or _f(source, "process.hash.sha256")
+            or _f(source, "process.hash.md5")
+        )
+        if isinstance(file_hash, dict):
+            file_hash = file_hash.get("sha256") or file_hash.get("sha1") or file_hash.get("md5")
 
         # Arkime PCAP linkage — `network.community_id` holds the Community ID
         # flow hash (shared between Zeek/Suricata/Arkime), and `node` carries
@@ -980,6 +1045,12 @@ class ElasticsearchService:
             arkime_node=arkime_node,
             source_ip=source_ip,
             destination_ip=destination_ip,
+            process_name=process_name,
+            command_line=command_line,
+            parent_process_name=parent_process_name,
+            file_name=file_name,
+            file_hash=file_hash,
+            file_path=file_path_val,
         )
 
     async def get_related_alerts(
