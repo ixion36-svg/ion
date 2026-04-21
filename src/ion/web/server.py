@@ -92,13 +92,6 @@ from ion.web.dashboard_layout_api import router as dashboard_layout_router
 from ion.web.report_scheduler_api import router as report_scheduler_router
 from ion.web.playbook_action_api import router as playbook_action_router
 from ion.web.cyber_range_api import router as cyber_range_router
-from ion.web.smtp_api import router as smtp_router
-from ion.web.enrichment_api import router as enrichment_router
-from ion.web.alert_prompt_api import router as alert_prompt_router
-from ion.web.investigation_memory_api import router as investigation_memory_router
-from ion.web.scheduler_api import router as scheduler_router
-from ion.web.investigation_api import router as investigation_router
-from ion.web.case_grouper_api import router as case_grouper_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db

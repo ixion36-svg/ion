@@ -30,6 +30,8 @@ dependencies = [
     "aiosmtplib>=3.0.0",
     "email-validator>=2.0.0",
     "ldap3>=2.9",
+    # PII anonymisation field config
+    "pyyaml>=6.0",
     "croniter>=2.0.0",
     "slowapi>=0.1.9",
     "ecs-logging>=2.0.0",

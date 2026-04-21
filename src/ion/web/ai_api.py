@@ -246,7 +246,13 @@ async def chat(
     payload: ChatRequest,
     current_user: User = Depends(get_current_user),
 ):
-    """Send a chat message to the AI (non-streaming)."""
+    """Send a chat message to the AI (non-streaming).
+
+    When PII anonymisation is enabled (ION_PII_ANON_ENABLED=true), user
+    messages are tokenised before reaching the LLM, and the response is
+    detokenised before returning to the analyst. This prevents sensitive
+    data (IPs, hostnames, usernames) from reaching the model.
+    """
     service = get_ollama_service()
 
     # Check if service is available
@@ -259,6 +265,20 @@ async def chat(
     try:
         messages = [{"role": m.role, "content": m.content} for m in payload.messages]
 
+        # PII anonymisation — tokenise user messages before LLM
+        pii_mapping = None
+        try:
+            from ion.services.pii_anon_service import get_pii_anon_service
+            pii = get_pii_anon_service()
+            if pii.is_enabled():
+                from ion.services.pii_anon_service import TokenMap
+                pii_mapping = TokenMap()
+                for msg in messages:
+                    if msg["role"] == "user":
+                        msg["content"] = pii.tokenize_text(msg["content"], pii_mapping)
+        except Exception:
+            pass  # PII service unavailable — proceed without
+
         result = await service.chat(
             messages=messages,
             model=payload.model,
@@ -268,8 +288,18 @@ async def chat(
             user_id=current_user.id,
         )
 
+        content = result["content"]
+
+        # PII detokenisation — restore real values in the response
+        if pii_mapping and pii_mapping.reverse:
+            try:
+                from ion.services.pii_anon_service import get_pii_anon_service
+                content = get_pii_anon_service().detokenize_text(content, pii_mapping)
+            except Exception:
+                pass
+
         return ChatResponse(
-            content=result["content"],
+            content=content,
             model=result["model"],
             done=result["done"],
             duration_ms=result.get("total_duration", 0) // 1_000_000 if result.get("total_duration") else None,
@@ -504,6 +534,16 @@ async def analyze_alert(
     if not await service.is_available():
         raise HTTPException(status_code=503, detail="AI service not available")
 
+    # PII anonymisation — tokenise alert data before LLM
+    pii_mapping = None
+    try:
+        from ion.services.pii_anon_service import get_pii_anon_service
+        pii = get_pii_anon_service()
+        if pii.is_enabled():
+            alert_data, pii_mapping = pii.tokenize_event(alert_data)
+    except Exception:
+        pass
+
     # Build analysis prompt
     prompt = f"""Analyze this security alert and provide:
 1. A brief summary of what happened
@@ -520,11 +560,18 @@ Alert Data:
         result = await service.chat(
             messages=[{"role": "user", "content": prompt}],
             context_type="analyst",
-            temperature=0.3,  # Lower temperature for more focused analysis
+            temperature=0.3,
             user_id=current_user.id,
         )
+        content = result["content"]
+        # PII detokenisation
+        if pii_mapping and pii_mapping.reverse:
+            try:
+                content = get_pii_anon_service().detokenize_text(content, pii_mapping)
+            except Exception:
+                pass
         return {
-            "analysis": result["content"],
+            "analysis": content,
             "model": result["model"],
         }
     except OllamaError as e:
