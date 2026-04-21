@@ -1280,6 +1280,111 @@ async def download_edited_file(
     )
 
 
+# =============================================================================
+# NL-to-ES Query Generation
+# =============================================================================
+
+NL_TO_ES_SYSTEM_PROMPT = """\
+You are an Elasticsearch query generator for a SOC platform. Your job is to \
+translate natural-language security questions into Elasticsearch Query DSL (JSON).
+
+The indices use Elastic Common Schema (ECS) fields. Key fields:
+- source.ip, destination.ip — network endpoints
+- host.name — hostname
+- user.name — account name
+- process.name, process.command_line — process info
+- event.action, event.category, event.outcome — event metadata
+- rule.name — detection rule that fired
+- threat.tactic.name, threat.technique.name — MITRE ATT&CK mapping
+- file.hash.sha256, file.hash.md5, file.hash.sha1 — file hashes
+- url.full, url.domain — URL fields
+- dns.question.name — DNS queries
+- network.community_id — network flow identifier
+
+Alert-specific fields:
+- kibana.alert.severity — alert severity (critical, high, medium, low)
+- kibana.alert.workflow_status — open, acknowledged, closed
+- @timestamp — event time (ISO 8601)
+
+Common query constructs:
+- "bool" with "must", "should", "must_not", "filter"
+- "term" / "terms" for exact match
+- "match" / "match_phrase" for text search
+- "range" for time/numeric ranges (use "now-24h", "now-7d", etc.)
+- "wildcard" for pattern matching
+- "exists" to check field presence
+
+Rules:
+1. Output ONLY a single JSON object — no markdown fences, no explanation text.
+2. The JSON must have exactly these keys:
+   {"query": { ... }, "explanation": "one-line human summary", "index": "<pattern>"}
+3. Default index pattern: ".alerts-security.alerts-default" for alert queries, \
+"logs-*" for raw log queries.
+4. Always include a time filter on @timestamp unless the user specifies "all time".
+5. Default time range: last 24 hours ("now-24h").
+"""
+
+
+@router.post("/nl-to-query")
+async def nl_to_query(
+    data: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """Translate natural language to Elasticsearch query DSL."""
+    question = (data.get("question") or "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="'question' field is required")
+
+    service = get_ollama_service()
+    if not await service.is_available():
+        raise HTTPException(status_code=503, detail="AI service (Ollama) is not available")
+
+    try:
+        result = await service.chat(
+            messages=[{"role": "user", "content": question}],
+            context_type="engineering",
+            temperature=0.1,
+            max_tokens=2048,
+            user_id=current_user.id,
+            system_prompt=NL_TO_ES_SYSTEM_PROMPT,
+        )
+
+        raw = result["content"].strip()
+
+        # Strip markdown code fences if the model wrapped its output
+        if raw.startswith("```"):
+            # Remove opening fence (```json or ```)
+            raw = re.sub(r"^```[a-zA-Z]*\n?", "", raw)
+            # Remove closing fence
+            raw = re.sub(r"\n?```\s*$", "", raw)
+            raw = raw.strip()
+
+        parsed = json.loads(raw)
+
+        # Validate required keys
+        if "query" not in parsed:
+            raise ValueError("LLM response missing 'query' key")
+
+        return {
+            "query": parsed["query"],
+            "explanation": parsed.get("explanation", ""),
+            "index": parsed.get("index", ".alerts-security.alerts-default"),
+            "model": result.get("model"),
+        }
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=422,
+            detail="AI returned invalid JSON. Try rephrasing your question.",
+        )
+    except OllamaError as e:
+        raise HTTPException(status_code=503, detail=safe_error(e))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error("NL-to-query error: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=safe_error(e))
+
+
 def get_files_context(user_id: int) -> str:
     """Build context string from uploaded files for AI."""
     user_files = get_user_files(user_id)

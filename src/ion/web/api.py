@@ -4552,6 +4552,84 @@ async def update_case(
             session.add(closure_note)
             if case.kibana_case_id:
                 sync_note_to_kibana(case.kibana_case_id, current_user.username, closure_note.content)
+
+            # --- Auto-FP suppression: create KFP + investigation memory ---
+            if data.closure_reason == "false_positive":
+                try:
+                    _fp_rule_names: list[str] = []
+                    _fp_hosts: list[str] = []
+                    _fp_users: list[str] = []
+
+                    # Pull matching info from case-level structured fields
+                    if case.triggered_rules:
+                        _fp_rule_names.extend(case.triggered_rules)
+                    if case.affected_hosts:
+                        _fp_hosts.extend(case.affected_hosts)
+                    if case.affected_users:
+                        _fp_users.extend(case.affected_users)
+
+                    # Supplement from linked ES alerts when possible
+                    if case.source_alert_ids:
+                        try:
+                            from ion.services.elasticsearch_service import ElasticsearchService
+                            _es_svc = ElasticsearchService()
+                            if _es_svc.is_configured:
+                                _linked = await _es_svc.get_alerts_by_ids(case.source_alert_ids)
+                                for _la in _linked:
+                                    if _la.rule_name and _la.rule_name not in _fp_rule_names:
+                                        _fp_rule_names.append(_la.rule_name)
+                                    if _la.host and _la.host not in _fp_hosts:
+                                        _fp_hosts.append(_la.host)
+                                    if _la.user and _la.user not in _fp_users:
+                                        _fp_users.append(_la.user)
+                        except Exception as _es_err:
+                            logger.debug("Auto-FP: could not enrich from ES: %s", _es_err)
+
+                    kfp = KnownFalsePositive(
+                        title=f"Auto-FP: {case.title}",
+                        description=f"Automatically created when case {case.case_number} was closed as false positive. {data.closure_notes or ''}".strip(),
+                        match_rules=_fp_rule_names or None,
+                        match_hosts=_fp_hosts or None,
+                        match_users=_fp_users or None,
+                        is_active=True,
+                        created_by_id=current_user.id,
+                        source_case_id=case.id,
+                    )
+                    session.add(kfp)
+
+                    # Also record in investigation memory for future FP detection
+                    try:
+                        from ion.services.investigation_memory_service import get_investigation_memory_service
+                        _mem = get_investigation_memory_service()
+                        for _rn in (_fp_rule_names or []):
+                            _mem.record_fp(
+                                reason=f"Case {case.case_number} closed as FP",
+                                confidence=80,
+                                recorded_by=current_user.id,
+                                rule_name=_rn,
+                                alert_signature=_rn,
+                                host_pattern=_fp_hosts[0] if _fp_hosts else None,
+                                user_pattern=_fp_users[0] if _fp_users else None,
+                            )
+                        if not _fp_rule_names:
+                            _mem.record_fp(
+                                reason=f"Case {case.case_number} closed as FP",
+                                confidence=70,
+                                recorded_by=current_user.id,
+                                alert_signature=case.title,
+                                host_pattern=_fp_hosts[0] if _fp_hosts else None,
+                                user_pattern=_fp_users[0] if _fp_users else None,
+                            )
+                    except Exception as _mem_err:
+                        logger.warning("Auto-FP: investigation memory record failed: %s", _mem_err)
+
+                    logger.info(
+                        "Auto-FP created for case %s (rules=%s, hosts=%s)",
+                        case.case_number, _fp_rule_names, _fp_hosts,
+                    )
+                except Exception as _fp_err:
+                    logger.warning("Auto-FP creation failed for case %s: %s", case.case_number, _fp_err)
+
         # Reopening: clear closure fields
         elif new_status != "closed" and old_status == "closed":
             case.closure_reason = None
@@ -5381,7 +5459,11 @@ async def get_alert_triage(
     current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
-    """Get triage state and comments for an alert."""
+    """Get triage state and comments for an alert.
+
+    Also queries investigation memory for prior investigations, IOC context,
+    and false-positive likelihood so the analyst sees relevant history inline.
+    """
     triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
     comments = (
         session.query(Note)
@@ -5407,6 +5489,84 @@ async def get_alert_triage(
             "source_system": triage.source_system,
         }
 
+    # ------------------------------------------------------------------
+    # Investigation memory enrichment
+    # ------------------------------------------------------------------
+    prior_investigations: list = []
+    ioc_context: dict = {}
+    fp_likelihood: dict = {"is_fp": False, "reason": None}
+
+    try:
+        from ion.services.investigation_memory_service import get_investigation_memory_service
+        mem_svc = get_investigation_memory_service()
+
+        # Build a lightweight alert dict for memory lookups. Use triage
+        # fields + try fetching the live ES alert for richer data.
+        alert_dict: dict = {"_id": alert_id}
+        _rule_name = None
+        _source_ip = None
+        _dest_ip = None
+
+        try:
+            from ion.services.elasticsearch_service import ElasticsearchService
+            _es = ElasticsearchService()
+            if _es.is_configured:
+                _hits = await _es.get_alerts_by_ids([alert_id])
+                if _hits:
+                    _hit = _hits[0]
+                    _rule_name = _hit.rule_name
+                    _source_ip = _hit.source_ip
+                    _dest_ip = _hit.destination_ip
+                    alert_dict.update({
+                        "rule_name": _rule_name,
+                        "rule.name": _rule_name,
+                        "host.name": _hit.host,
+                        "user.name": _hit.user,
+                        "source.ip": _source_ip,
+                        "destination.ip": _dest_ip,
+                    })
+                    if _hit.raw_data:
+                        alert_dict["_source"] = _hit.raw_data
+        except Exception as _es_err:
+            logger.debug("Triage memory: ES lookup failed for %s: %s", alert_id, _es_err)
+
+        # 1. Prior investigations for the same rule/signature
+        if _rule_name:
+            past = mem_svc.past_for_signature(_rule_name, limit=5)
+            for inv in past:
+                prior_investigations.append({
+                    "id": inv.id,
+                    "verdict": inv.verdict,
+                    "severity": inv.severity_assessment,
+                    "summary": (inv.summary_text or "")[:200],
+                    "created_at": inv.created_at.isoformat() if inv.created_at else None,
+                })
+
+        # 2. IOC sightings for source/dest IPs
+        for _ioc_label, _ioc_val in [("source_ip", _source_ip), ("destination_ip", _dest_ip)]:
+            if _ioc_val:
+                sighting = mem_svc.lookup_ioc("ip", _ioc_val)
+                if sighting:
+                    ioc_context[_ioc_label] = {
+                        "value": sighting.ioc_value,
+                        "seen_count": sighting.seen_count,
+                        "is_known_bad": sighting.is_known_bad,
+                        "is_known_good": sighting.is_known_good,
+                        "last_seen": sighting.last_seen_at.isoformat() if sighting.last_seen_at else None,
+                    }
+
+        # 3. FP likelihood
+        is_fp, fp_sig = mem_svc.is_likely_fp(alert_dict)
+        if is_fp and fp_sig:
+            fp_likelihood = {
+                "is_fp": True,
+                "reason": fp_sig.reason,
+                "confidence": fp_sig.confidence,
+                "rule_name": fp_sig.rule_name,
+            }
+    except Exception as _mem_err:
+        logger.debug("Triage memory enrichment failed for %s: %s", alert_id, _mem_err)
+
     return {
         "triage": triage_data,
         "comments": [
@@ -5418,6 +5578,9 @@ async def get_alert_triage(
             }
             for c in comments
         ],
+        "prior_investigations": prior_investigations,
+        "ioc_context": ioc_context,
+        "fp_likelihood": fp_likelihood,
     }
 
 
