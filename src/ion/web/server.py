@@ -92,6 +92,7 @@ from ion.web.dashboard_layout_api import router as dashboard_layout_router
 from ion.web.report_scheduler_api import router as report_scheduler_router
 from ion.web.playbook_action_api import router as playbook_action_router
 from ion.web.cyber_range_api import router as cyber_range_router
+from ion.web.webhook_api import router as webhook_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -313,6 +314,7 @@ app.include_router(investigation_memory_router)
 app.include_router(scheduler_router, prefix="")
 app.include_router(investigation_router, prefix="")
 app.include_router(case_grouper_router, prefix="")
+app.include_router(webhook_router, prefix="/api")
 
 
 def _validate_startup_config():

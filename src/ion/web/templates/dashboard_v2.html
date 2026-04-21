@@ -63,8 +63,19 @@
       </div>
     </section>
 
+    <!-- ── Customize toggle ── -->
+    <div class="flex justify-end mb-4">
+      <button onclick="toggleDashConfig()" class="text-[11px] text-slate-500 hover:text-slate-300 transition flex items-center gap-1">
+        <svg class="w-3 h-3"><use href="#i-settings"/></svg> Customize
+      </button>
+    </div>
+    <div id="dash-config" style="display:none" class="mb-6 p-4 rounded-xl border border-white/5 bg-ink-900/50">
+      <div class="text-[11px] text-slate-500 uppercase tracking-wider mb-3">Show/Hide Sections</div>
+      <div class="flex flex-wrap gap-3" id="dash-config-items"></div>
+    </div>
+
     <!-- ── MAIN GRID ── -->
-    <main class="grid grid-cols-12 gap-6">
+    <main id="hero-section" class="grid grid-cols-12 gap-6">
 
       <!-- ┌─── LEFT: CRITICAL FEED (HERO) ───┐ -->
       <section class="col-span-12 lg:col-span-8 min-w-0 rise d-2">
@@ -106,7 +117,7 @@
       </section>
 
       <!-- ┌─── RIGHT: KPI STACK ───┐ -->
-      <aside class="col-span-12 lg:col-span-4 min-w-0 flex flex-col gap-5 lg:gap-6">
+      <aside id="kpi-section" class="col-span-12 lg:col-span-4 min-w-0 flex flex-col gap-5 lg:gap-6">
 
         <!-- KPI 1 -->
         <div class="rise d-3 rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-8 lg:px-6 lg:py-10 hover:border-white/10 transition">
@@ -188,7 +199,7 @@
     </main>
 
     <!-- ═══════════════════ SECONDARY ROW ═══════════════════ -->
-    <section class="grid grid-cols-12 gap-6 mt-10 lg:mt-14">
+    <section id="cases-section" class="grid grid-cols-12 gap-6 mt-10 lg:mt-14">
 
       <!-- My open cases -->
       <div class="col-span-12 lg:col-span-5 min-w-0 rise d-4 rounded-[16px] border border-white/5 bg-ink-900/40 px-6 py-8 lg:px-6 lg:py-10">
@@ -236,7 +247,7 @@
       </div>
 
       <!-- Shift handover — real data from /api/shift-handover/report -->
-      <div class="col-span-12 lg:col-span-3 min-w-0 rise d-6 rounded-[16px] border border-white/5 bg-ink-900/40 px-6 py-8 lg:px-6 lg:py-10">
+      <div id="handover-section" class="col-span-12 lg:col-span-3 min-w-0 rise d-6 rounded-[16px] border border-white/5 bg-ink-900/40 px-6 py-8 lg:px-6 lg:py-10">
         <div class="flex items-center justify-between mb-5">
           <div class="flex items-baseline gap-3">
             <span id="handover-window-label" class="label-tiny text-slate-500">Last 8h</span>
@@ -647,6 +658,50 @@
     }
   }
 
+  // ── Dashboard customization ────────────────────────────────
+  const DASH_SECTIONS = [
+    {id: 'hero-section', label: 'Threat Feed', default: true},
+    {id: 'kpi-section', label: 'KPI Cards', default: true},
+    {id: 'cases-section', label: 'My Cases', default: true},
+    {id: 'handover-section', label: 'Shift Handover', default: true},
+  ];
+
+  function loadDashPrefs() {
+    const saved = JSON.parse(localStorage.getItem('ion_dash_prefs') || '{}');
+    DASH_SECTIONS.forEach(s => {
+      const visible = saved[s.id] !== undefined ? saved[s.id] : s.default;
+      const el = document.getElementById(s.id);
+      if (el) el.style.display = visible ? '' : 'none';
+    });
+  }
+
+  function toggleDashConfig() {
+    const panel = document.getElementById('dash-config');
+    panel.style.display = panel.style.display === 'none' ? '' : 'none';
+    if (panel.style.display !== 'none') renderDashConfig();
+  }
+
+  function renderDashConfig() {
+    const saved = JSON.parse(localStorage.getItem('ion_dash_prefs') || '{}');
+    const container = document.getElementById('dash-config-items');
+    container.innerHTML = DASH_SECTIONS.map(s => {
+      const checked = saved[s.id] !== undefined ? saved[s.id] : s.default;
+      return `<label class="flex items-center gap-2 text-[12px] text-slate-300 cursor-pointer">
+        <input type="checkbox" ${checked ? 'checked' : ''} onchange="saveDashPref('${s.id}', this.checked)">
+        ${s.label}
+      </label>`;
+    }).join('');
+  }
+
+  function saveDashPref(id, visible) {
+    const saved = JSON.parse(localStorage.getItem('ion_dash_prefs') || '{}');
+    saved[id] = visible;
+    localStorage.setItem('ion_dash_prefs', JSON.stringify(saved));
+    const el = document.getElementById(id);
+    if (el) el.style.display = visible ? '' : 'none';
+  }
+
   loadDashboard();
+  loadDashPrefs();
 </script>
 {% endblock %}

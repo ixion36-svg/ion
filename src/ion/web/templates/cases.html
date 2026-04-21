@@ -2487,6 +2487,7 @@ function renderPanelContent(c) {
         html += '<a class="btn" href="' + esc(c.kibana_url) + '" target="_blank" rel="noopener">View in Kibana</a>';
     }
     html += '<button class="btn" onclick="toggleCasePlaybookBrowser(' + c.id + ')">Start Playbook</button>';
+    html += '<a class="btn" href="/api/elasticsearch/alerts/cases/' + c.id + '/pdf" target="_blank" rel="noopener" title="Export case as PDF">Export PDF</a>';
     html += '</div>';
     html += '<div id="case-playbook-browser-' + c.id + '" style="display:none;"></div>';
 

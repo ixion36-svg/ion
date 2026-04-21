@@ -219,6 +219,31 @@
     .tw-drop-item.is-active { color: #6de4ff; background: rgba(109, 228, 255, 0.08); }
     /* legacy text decoration reset for header anchors */
     .ion-tw a { text-decoration: none; }
+
+    /* Light mode overrides for Tailwind pages */
+    [data-theme="light"] .ion-tw-page {
+      --tw-bg-opacity: 1;
+      color: #1e293b;
+    }
+    [data-theme="light"] .ion-tw-page .bg-ink-900\/50,
+    [data-theme="light"] .ion-tw-page .bg-ink-900\/40,
+    [data-theme="light"] .ion-tw-page .bg-ink-900\/60,
+    [data-theme="light"] .ion-tw-page .bg-ink-950\/60 {
+      background: rgba(241, 245, 249, 0.8) !important;
+    }
+    [data-theme="light"] .ion-tw-page .border-white\/5,
+    [data-theme="light"] .ion-tw-page .border-white\/10 {
+      border-color: rgba(0, 0, 0, 0.08) !important;
+    }
+    [data-theme="light"] .ion-tw-page .text-slate-200 { color: #1e293b !important; }
+    [data-theme="light"] .ion-tw-page .text-slate-300 { color: #334155 !important; }
+    [data-theme="light"] .ion-tw-page .text-slate-400 { color: #64748b !important; }
+    [data-theme="light"] .ion-tw-page .text-slate-500 { color: #94a3b8 !important; }
+    [data-theme="light"] .ion-tw-page .text-white { color: #0f172a !important; }
+    [data-theme="light"] .ion-tw-page .bg-white\/5 { background: rgba(0, 0, 0, 0.03) !important; }
+    [data-theme="light"] .ion-tw-page .hover\:bg-white\/5:hover { background: rgba(0, 0, 0, 0.06) !important; }
+    [data-theme="light"] .ion-tw-page .bg-grid { opacity: 0.15 !important; }
+    [data-theme="light"] .ion-tw-page .grain { background-image: none !important; }
     </style>
 
     <script>
@@ -390,5 +415,60 @@
     <script src="/static/js/quill.js"></script>
     <script src="/static/js/notepad.js?v=0.9.28"></script>
     {% block scripts %}{% endblock %}
+
+<!-- Keyboard shortcuts overlay -->
+<div id="shortcuts-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);" onclick="if(event.target===this)this.style.display='none'">
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:520px;max-height:80vh;overflow-y:auto;background:#0f172a;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:24px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="font-size:18px;font-weight:600;color:white;">Keyboard Shortcuts</h2>
+      <button onclick="document.getElementById('shortcuts-overlay').style.display='none'" style="color:#64748b;background:none;border:none;font-size:20px;cursor:pointer;">&times;</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">?</kbd> <span style="color:#94a3b8;margin-left:8px;">This help</span></div>
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">g a</kbd> <span style="color:#94a3b8;margin-left:8px;">Go to Alerts</span></div>
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">g c</kbd> <span style="color:#94a3b8;margin-left:8px;">Go to Cases</span></div>
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">g d</kbd> <span style="color:#94a3b8;margin-left:8px;">Go to Dashboard</span></div>
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">g o</kbd> <span style="color:#94a3b8;margin-left:8px;">Go to Observables</span></div>
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">g t</kbd> <span style="color:#94a3b8;margin-left:8px;">Go to Threat Landscape</span></div>
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">g s</kbd> <span style="color:#94a3b8;margin-left:8px;">Go to SOC Workspace</span></div>
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">g h</kbd> <span style="color:#94a3b8;margin-left:8px;">Go to Shift Handover</span></div>
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">g e</kbd> <span style="color:#94a3b8;margin-left:8px;">Go to Detection Engineering</span></div>
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">g n</kbd> <span style="color:#94a3b8;margin-left:8px;">Go to Network Map</span></div>
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">g i</kbd> <span style="color:#94a3b8;margin-left:8px;">Go to AI Chat</span></div>
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">Ctrl+Shift+N</kbd> <span style="color:#94a3b8;margin-left:8px;">Toggle Notepad</span></div>
+      <div><kbd style="background:#1e293b;padding:2px 8px;border-radius:4px;border:1px solid #334155;font-family:monospace;font-size:11px;color:#94a3b8;">Esc</kbd> <span style="color:#94a3b8;margin-left:8px;">Close modal/drawer</span></div>
+    </div>
+  </div>
+</div>
+<script>
+// Keyboard shortcuts -- "g" prefix for navigation
+(function() {
+  var gPressed = false;
+  var gTimer = null;
+  document.addEventListener('keydown', function(e) {
+    // Don't trigger in input/textarea
+    if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName) || e.target.isContentEditable) return;
+
+    if (e.key === '?') {
+      document.getElementById('shortcuts-overlay').style.display = '';
+      return;
+    }
+
+    if (e.key === 'g' && !gPressed) {
+      gPressed = true;
+      clearTimeout(gTimer);
+      gTimer = setTimeout(function() { gPressed = false; }, 1000);
+      return;
+    }
+
+    if (gPressed) {
+      gPressed = false;
+      clearTimeout(gTimer);
+      var routes = {a:'/alerts',c:'/cases',d:'/',o:'/observables',t:'/threat-landscape',s:'/analyst',h:'/shift-handover',e:'/detection-engineering',n:'/network-map',i:'/chat'};
+      if (routes[e.key]) { window.location.href = routes[e.key]; }
+    }
+  });
+})();
+</script>
 </body>
 </html>

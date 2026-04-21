@@ -1,8 +1,146 @@
-# ION
+# ION - Intelligent Operating Network
 
-**Intelligent Operating Network** — v0.9.43
+![Version](https://img.shields.io/badge/version-0.9.98-blue)
+![Python](https://img.shields.io/badge/python-3.14-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Docker](https://img.shields.io/badge/docker-ixion36%2Fion-blue)
+![Platform](https://img.shields.io/badge/platform-linux%20%7C%20docker-lightgrey)
 
-A comprehensive Security Operations Center (SOC) platform for the **Guarded Glass** team. ION integrates Elasticsearch alerts, OpenCTI threat intelligence, TIDE detection engineering, and Ollama AI into a unified workspace for alert triage, case management, threat hunting, and SOC operations.
+A full-stack Security Operations Centre platform for threat detection, investigation, and response. ION integrates Elasticsearch alerts, OpenCTI threat intelligence, TIDE detection engineering, Arkime PCAP analysis, and Ollama AI into a unified workspace for SOC teams.
+
+---
+
+## Key Features
+
+### Investigation
+- **Alert Triage** -- Elasticsearch 8.x alert queue with severity filtering, MITRE ATT&CK mappings, workflow status sync, and auto-investigation queue
+- **Case Management** -- Create cases from alerts, kanban board, Kibana case sync, closure reasons, affected hosts/users tracking
+- **Observables** -- IOC tracking with batch OpenCTI enrichment, staleness detection, whitelisting
+- **Entity Timeline** -- Unified cross-source timeline for any host, IP, or user across all ION data
+- **Attack Stories** -- Auto-correlate alerts into multi-step attack narratives with kill chain visualisation
+- **AI Chat** -- Ollama-powered analysis, document generation, triage assistance, NL-to-Elasticsearch queries
+- **Case Similarity & Triage Suggestions** -- Historical closure data suggests FP/TP; find similar past cases by rules, hosts, observables, and MITRE techniques
+- **Discover** -- Raw Elasticsearch query builder and saved searches
+- **Threat Hunting** -- Hypothesis-driven hunting workbench with query attachments and IOC tracking
+
+### Response
+- **Playbooks** -- 25+ SOC playbooks with step-by-step execution tracking and effectiveness analytics
+- **Forensics Pipeline** -- Full DFIR workflow: evidence chain of custody, timeline, IOC extraction, forensic playbooks
+- **PCAP Analysis** -- Upload packet captures for protocol analysis (12 heuristic detectors), file extraction, JA3 fingerprinting, credential detection, network graph
+- **Arkime Integration** -- One-click alert-to-PCAP-to-case workflow with Keycloak client_credentials auth
+- **Automated Actions** -- 6 response actions (block IP, disable account, quarantine host, DNS sinkhole, email block, webhook) with approval workflow
+- **Case Grouper** -- Automated alert correlation into case clusters
+
+### Threat Intelligence
+- **OpenCTI Integration** -- Threat landscape, actor deep-dive, live IOC feed, reports, watchlist with country attribution
+- **Threat Hunting Workbench** -- Create hunts, attach queries, track IOCs found
+- **Attack Stories** -- Multi-step attack narrative reconstruction with kill chain visualisation
+- **Knowledge Graph** -- Visual relationship mapping across threat data
+- **Canaries** -- Honeypot token deployment and monitoring
+- **Threat Watch Gap Alerts** -- Auto-alerting when watched actors gain new techniques you lack coverage for
+
+### Detection Engineering
+- **TIDE Integration** -- 7-tab analytics: posture, use cases, rules, execution reports, actor readiness, gap analysis, MITRE coverage
+- **MITRE ATT&CK Navigator Export** -- One-click ATT&CK Navigator layer JSON from TIDE coverage
+- **D3FEND Mapping** -- Defensive technique coverage analysis
+- **Emulation** -- Adversary emulation plan management
+- **Multi-Framework Compliance** -- Map TIDE rules to NIST CSF, ISO 27001, ACSC Essential Eight, and more
+- **Space Selector** -- Kibana space-aware detection rule scoping
+
+### Infrastructure
+- **Network Map / CMDB** -- Automated network asset discovery and topology visualisation
+- **Log Source Health** -- Monitor ingestion status, detect silent log sources, data volume tracking
+- **Data Flow** -- Pipeline visualisation showing ArcSight+NiFi vs Elastic+NiFi data flows
+- **CyAB (Cyber Assurance Board)** -- System registry with data source templates, per-system use case coverage, alert rollups
+- **System Analytics** -- Per-system detection posture and TIDE integration metrics
+
+### Reporting
+- **SOC Health Scorecard** -- 5-dimension maturity assessment (A-F grade): detection, operations, team, knowledge, integrations
+- **Executive Reports** -- Auto-generated weekly/monthly PDF/HTML reports with trends, metrics, and notable incidents
+- **Analyst Efficiency** -- Per-analyst MTTR, false positive rates, hourly activity, team comparison
+- **Compliance Hub** -- Multi-framework mapping with coverage scores and gap identification
+- **SOC Maturity Assessment** -- SOC-CMM based maturity model evaluation
+- **Incident Cost Calculator** -- Estimate incident cost from case data: analyst hours, downtime, severity weighting
+- **Report Scheduler** -- Schedule executive, health, and compliance reports on daily/weekly/monthly cadence
+
+### Operations
+- **SOC Workspace** -- Command centre dashboard with 12 configurable widgets, role-filtered, per-user layout
+- **Morning Briefing** -- AI-generated daily threat and operations briefing
+- **Shift Handover** -- Auto-generated end-of-shift report: cases, alerts, highlights, pending items
+- **On-Call / Duty IM** -- Roster management, one-click escalation, escalation log
+- **Job Scheduler** -- Cron-based background job scheduling with execution history
+- **Alert Prompt Templates** -- Pre-built AI prompt templates for common alert types
+- **SLA Management** -- Response time targets per severity, compliance tracking, breach detection
+- **Bulk Operations** -- Multi-select alerts for bulk acknowledge, assign, or close
+- **Communication Templates** -- 6 pre-built incident notification templates with variable substitution
+
+### Knowledge & Training
+- **Knowledge Base** -- 590+ articles across SOC, blue team, forensics, and security fundamentals
+- **Training Simulator** -- 8 scored scenarios: phishing, credential dumping, Kerberoasting, Golden Ticket, DCSync, GPO malware, ransomware, VPN false positive
+- **Cyber Range** -- Hands-on technical lab exercises
+- **Role Match** -- Career skills self-assessment across 5 SOC roles with personalised training recommendations
+- **Skills & Training** -- Self-assessment, career pathways, certifications, team skill overview
+- **ION Guide** -- Interactive reference with visual UI mockups, role-based filtering, workflow diagrams
+- **Social Hub** -- Team announcements, recognition, emoji reactions
+- **Notes** -- Personal analyst notepad with folders and auto-save
+- **Documents** -- Document management and version tracking
+
+### AI (Ollama)
+- AI-powered chat with contextual awareness (alerts, cases, observables)
+- Alert analysis and triage suggestions
+- Natural language to Elasticsearch query translation
+- Threat briefing generation
+- PII anonymisation for safe data sharing
+- Investigation memory and context persistence
+
+### Security
+- **RBAC** -- 10 built-in roles: admin, analyst (L1), senior_analyst (L2), principal_analyst (L3), lead, forensic, soc_engineer (L1), senior_engineer (L2), platform_engineer (L3), engineering
+- **Focus Mode** -- Users with multiple roles can switch active role context via dashboard
+- **OIDC / Keycloak SSO** -- Full OpenID Connect integration with auto user provisioning and role mapping
+- **Rate Limiting** -- Per-endpoint rate limiting via slowapi
+- **Audit Logs** -- Comprehensive audit trail of all user actions
+- **Security Headers** -- CSP, HSTS, X-Frame-Options, Permissions-Policy
+- **Account Lockout** -- Configurable failed login threshold with automatic lockout
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Python 3.14 / FastAPI / SQLAlchemy 2.0 |
+| Frontend | Jinja2 server-rendered HTML + Vanilla JS + Tailwind CSS |
+| Database | PostgreSQL 16 (Docker) / SQLite (local dev) |
+| Search & Alerts | Elasticsearch 8.x |
+| Case Sync | Kibana 8.x |
+| Threat Intel | OpenCTI (GraphQL) |
+| Detection Engineering | TIDE (DuckDB + FastAPI) |
+| PCAP | Arkime (full packet capture) |
+| AI / LLM | Ollama (local, air-gap safe) |
+| PDF Generation | WeasyPrint |
+| JSON Serialisation | orjson (5-10x faster than stdlib) |
+| Auth | bcrypt, python-jose (JWT), OIDC/Keycloak |
+| Container | Docker Compose |
+
+---
+
+## Integrations
+
+| System | Purpose |
+|--------|---------|
+| **Elasticsearch** | Alert ingestion, log search, discover queries |
+| **Kibana** | Case sync, space-aware detection scoping |
+| **TIDE** | Detection rule analytics, MITRE coverage, gap analysis |
+| **OpenCTI** | Threat intelligence: actors, campaigns, IOCs, reports |
+| **Arkime** | Full packet capture retrieval by community ID |
+| **Keycloak** | OIDC SSO, role mapping, Arkime auth |
+| **Ollama** | Local LLM for AI chat, analysis, briefings |
+| **GitLab** | Change tracking, CI/CD integration |
+| **VirusTotal** | Observable enrichment (file hashes, URLs, IPs) |
+| **Shodan** | Internet-facing asset intelligence |
+| **GreyNoise** | IP noise/benign classification |
+
+---
 
 ## Quick Start
 
@@ -13,163 +151,197 @@ cd ion
 
 # Configure
 cp .env.deploy .env
-# Edit .env — replace REPLACE_WITH_ placeholders with your actual IPs
+# Edit .env — set your Elasticsearch URL, passwords, and integration endpoints
 
 # Deploy (pulls pre-built image + PostgreSQL)
 docker compose up -d
 
-# Access at http://localhost:8000
-# Login: admin / admin2025 (or your ION_ADMIN_PASSWORD)
+# The seeder container automatically populates the knowledge base and playbooks on first run.
+
+# Access ION
+# http://localhost:8000
+# Login: admin / admin2025 (or your ION_ADMIN_PASSWORD value)
 ```
 
-## Architecture
-
-```
-docker compose up -d
-  │
-  ├── ion-postgres    PostgreSQL 16 (database)
-  ├── ion             ION application (FastAPI + Jinja2)
-  └── ion-seeder      One-shot data seeder (KB articles, playbooks)
-
-External integrations (your infrastructure):
-  ├── Elasticsearch   Alert data + log storage
-  ├── Kibana          Case sync
-  ├── OpenCTI         Threat intelligence
-  ├── TIDE            Detection engineering (DuckDB)
-  └── Ollama          Local LLM (optional)
-```
-
-## Features
-
-### Investigation
-| Feature | Description |
-|---------|-------------|
-| **Alert Triage** | ES-integrated alert queue with severity filtering, MITRE mappings, and workflow status sync |
-| **Case Management** | Create cases from alerts, track affected hosts/users, closure reasons, Kibana sync |
-| **Observables** | IOC tracking with batch OpenCTI enrichment, staleness detection, whitelisting |
-| **Threat Intel** | Search OpenCTI actors/campaigns, watchlist with country flag attribution, auto-gap alerting |
-| **Entity Timeline** | Unified cross-source timeline for any host/IP/user across all ION data |
-| **Attack Stories** | Auto-correlate alerts into multi-step attack narratives with kill chain visualization |
-| **Triage Suggestions** | Historical closure data suggests FP/TP based on rule+host patterns |
-| **Case Similarity** | Find similar past cases by matching rules, hosts, observables, MITRE techniques |
-| **AI Chat** | Ollama-powered analysis, document generation, triage assistance |
-| **Discover** | Raw Elasticsearch query builder |
-| **Threat Hunting** | Hypothesis-driven hunting workbench: create hunts, attach queries, track IOCs found |
-
-### Operations
-| Feature | Description |
-|---------|-------------|
-| **On-Call / Duty IM** | Roster management, one-click escalation to Duty Incident Manager, escalation log |
-| **Shift Handover** | Auto-generated end-of-shift report: cases, alerts, highlights, pending items |
-| **SLA Management** | Response time targets per severity, compliance tracking, breach detection, at-risk alerts |
-| **Bulk Operations** | Multi-select alerts for bulk acknowledge, assign, or close |
-| **Playbooks** | 25+ SOC playbooks with step tracking and effectiveness analytics |
-| **Forensics** | Full DFIR workflow: evidence chain of custody, timeline, IOC extraction |
-| **PCAP Analyzer** | Upload packet captures for protocol analysis (12 heuristic detectors) |
-| **Analyst Efficiency** | Per-analyst MTTR, FP rates, hourly activity, team comparison |
-| **Analytics Engine** | 6 automated jobs: risk scoring, repeat offenders, rule noise, case metrics |
-
-### Engineering
-| Feature | Description |
-|---------|-------------|
-| **Detection Engineering** | 7-tab TIDE analytics: posture, kill chains, rules, execution, actor readiness, gaps |
-| **Rule Tuning** | Cross-reference TIDE rules with closure outcomes: FP-heavy, high-value, silent rules |
-| **SOC Health Scorecard** | 5-dimension maturity assessment (A-F grade): detection, operations, team, knowledge, integrations |
-| **NIST Compliance** | Map TIDE rules to 13 NIST CSF controls with coverage scores |
-| **MITRE Navigator Export** | One-click ATT&CK Navigator layer JSON from TIDE coverage |
-| **Executive Report** | Auto-generated weekly/monthly PDF/HTML with trends, metrics, notable incidents |
-| **Service Accounts** | Lifecycle tracker: password age, rotation targets, risk levels, stale detection |
-| **Automated Actions** | 6 response actions (block IP, disable account, quarantine host) with approval workflow |
-| **Report Scheduler** | Schedule executive/health/compliance reports on daily/weekly/monthly cadence |
-| **Change Log** | Track config/rule changes with approval and rollback |
-| **Alert Patterns** | Detect persistent, periodic, burst, and sporadic alert patterns |
-| **Incident Cost Calculator** | Estimate incident cost from case data: analyst hours, downtime, by severity |
-
-### Knowledge
-| Feature | Description |
-|---------|-------------|
-| **ION Guide** | Interactive reference with visual UI mockups, role-based filtering, workflow diagrams |
-| **Training Simulator** | 8 scored scenarios: phishing, credential dumping, Kerberoasting, Golden Ticket, DCSync, GPO malware, ransomware, VPN false positive |
-| **Knowledge Base** | 590+ articles across SOC, blue team, forensics, security fundamentals |
-| **Skills & Training** | Self-assessment, career pathways, certifications, team overview |
-| **Social Hub** | Team announcements, recognition, emoji reactions |
-| **Communication Templates** | 6 pre-built incident notification templates with variable substitution |
-| **Notes** | Personal analyst notepad with folders and auto-save |
-| **Dashboard Customization** | 12 configurable widgets, role-filtered, per-user layout |
-| **Saved Searches** | Bookmark queries, pin favorites, usage tracking |
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Backend | Python 3.14 / FastAPI / SQLAlchemy |
-| Frontend | Vanilla JS + Jinja2 server-rendered HTML |
-| Database | PostgreSQL 16 (Docker) / SQLite (local dev) |
-| Search | Elasticsearch 8.x |
-| Threat Intel | OpenCTI (GraphQL) |
-| Detection | TIDE (DuckDB + FastAPI) |
-| AI | Ollama (local LLM) |
-| PDF | WeasyPrint |
-| Container | Docker Compose |
-
-## Configuration
-
-Copy `.env.deploy` to `.env` and configure:
+To include the built-in Ollama LLM service:
 
 ```bash
-# Database (auto-configured by docker-compose)
-ION_DATABASE_URL=postgresql://ion:ion2025@postgres:5432/ion
-
-# Admin
-ION_ADMIN_PASSWORD=your-secure-password
-
-# Elasticsearch
-ION_ELASTICSEARCH_URL=http://your-es-ip:9200
-ION_ELASTICSEARCH_USERNAME=elastic
-ION_ELASTICSEARCH_PASSWORD=your-password
-
-# TIDE Detection Engineering
-ION_TIDE_URL=https://your-tide-ip
-ION_TIDE_API_KEY=your-api-key
-ION_TIDE_VERIFY_SSL=false
-
-# OpenCTI Threat Intelligence
-ION_OPENCTI_URL=http://your-opencti-ip:8080
-ION_OPENCTI_TOKEN=your-token
-
-# Ollama AI (optional)
-ION_OLLAMA_ENABLED=true
-ION_OLLAMA_URL=http://your-ollama-ip:11434
-ION_OLLAMA_MODEL=llama3.2:latest
+docker compose --profile ai up -d
 ```
+
+---
+
+## Environment Variables
+
+### Server
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_PORT` | `8000` | HTTP listen port |
+| `ION_HOST` | `0.0.0.0` | Bind address |
+| `ION_WORKERS` | `4` | Uvicorn worker count |
+| `ION_BASE_URL` | -- | Public URL for OIDC redirect URIs |
+| `ION_ADMIN_PASSWORD` | `admin2025` | Initial admin account password |
+| `ION_DEBUG_MODE` | `false` | Enable /docs and /redoc endpoints |
+| `ION_COOKIE_SECURE` | `false` | Force Secure flag on session cookies |
+| `ION_SECRET_KEY` | auto | JWT signing key |
+
+### Database
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_DATABASE_URL` | `postgresql://ion:ion2025@postgres:5432/ion` | PostgreSQL connection string |
+| `ION_DB_PASSWORD` | `ion2025` | PostgreSQL password (used by compose) |
+| `ION_DATA_DIR` | `/data` | Persistent data directory (Docker) |
+
+### Elasticsearch
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_ELASTICSEARCH_URL` | -- | Elasticsearch URL (e.g. `https://es:9200`) |
+| `ION_ELASTICSEARCH_USERNAME` | -- | ES username |
+| `ION_ELASTICSEARCH_PASSWORD` | -- | ES password |
+| `ION_ELASTICSEARCH_API_KEY` | -- | ES API key (alternative to user/pass) |
+| `ION_ELASTICSEARCH_ALERT_INDEX` | -- | Alert index pattern |
+| `ION_ELASTICSEARCH_VERIFY_SSL` | `false` | Verify ES TLS certificate |
+
+### Kibana
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_KIBANA_URL` | -- | Kibana URL for case sync |
+| `ION_KIBANA_USERNAME` | -- | Kibana username |
+| `ION_KIBANA_PASSWORD` | -- | Kibana password |
+| `ION_KIBANA_SPACE_ID` | `production` | Default Kibana space |
+| `ION_KIBANA_VERIFY_SSL` | `false` | Verify Kibana TLS certificate |
+
+### TIDE (Detection Engineering)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_TIDE_ENABLED` | `false` | Enable TIDE integration |
+| `ION_TIDE_URL` | -- | TIDE API base URL |
+| `ION_TIDE_API_KEY` | -- | TIDE API key |
+| `ION_TIDE_VERIFY_SSL` | `false` | Verify TIDE TLS certificate |
+
+### OpenCTI (Threat Intelligence)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_OPENCTI_ENABLED` | `false` | Enable OpenCTI integration |
+| `ION_OPENCTI_URL` | -- | OpenCTI URL |
+| `ION_OPENCTI_TOKEN` | -- | OpenCTI API token |
+| `ION_OPENCTI_VERIFY_SSL` | `false` | Verify OpenCTI TLS certificate |
+
+### Arkime (PCAP)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_ARKIME_ENABLED` | `false` | Enable Arkime integration |
+| `ION_ARKIME_URL` | -- | Arkime viewer URL |
+| `ION_ARKIME_KEYCLOAK_ISSUER` | -- | Keycloak issuer URL for Arkime auth |
+| `ION_ARKIME_KEYCLOAK_CLIENT_ID` | -- | Keycloak client ID |
+| `ION_ARKIME_KEYCLOAK_CLIENT_SECRET` | -- | Keycloak client secret |
+| `ION_ARKIME_VERIFY_SSL` | `false` | Verify Arkime TLS certificate |
+
+### Ollama (AI / LLM)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_OLLAMA_ENABLED` | `true` | Enable Ollama AI features |
+| `ION_OLLAMA_URL` | `http://ollama:11434` | Ollama API URL |
+| `ION_OLLAMA_MODEL` | `llama3.1:8b` | Default model name |
+| `ION_OLLAMA_TIMEOUT` | `120` | Request timeout (seconds) |
+| `ION_OLLAMA_VERIFY_SSL` | `false` | Verify Ollama TLS certificate |
+
+### OIDC / Keycloak (SSO)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_OIDC_ENABLED` | `false` | Enable Keycloak SSO |
+| `ION_OIDC_KEYCLOAK_URL` | -- | Keycloak base URL |
+| `ION_OIDC_REALM` | -- | Keycloak realm name |
+| `ION_OIDC_CLIENT_ID` | -- | OIDC client ID |
+| `ION_OIDC_CLIENT_SECRET` | -- | OIDC client secret |
+| `ION_OIDC_VERIFY_SSL` | `false` | Verify Keycloak TLS certificate |
+
+### TLS / SSL
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_SSL_CERT` | -- | Path to TLS certificate (serve ION over HTTPS) |
+| `ION_SSL_KEY` | -- | Path to TLS private key |
+| `ION_CA_BUNDLE` | -- | Path to custom CA bundle for outbound connections |
+
+### GitLab
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_GITLAB_ENABLED` | `false` | Enable GitLab integration |
+| `ION_GITLAB_URL` | -- | GitLab instance URL |
+| `ION_GITLAB_TOKEN` | -- | GitLab personal access token |
+
+### SMTP (Email Notifications)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_SMTP_ENABLED` | `false` | Enable email notifications |
+| `ION_SMTP_HOST` | -- | SMTP server hostname |
+| `ION_SMTP_PORT` | `587` | SMTP port |
+| `ION_SMTP_USERNAME` | -- | SMTP username |
+| `ION_SMTP_PASSWORD` | -- | SMTP password |
+
+---
 
 ## RBAC Roles
 
-| Role | Level | Key Permissions |
-|------|-------|----------------|
-| Analyst | L1 | Alert triage, cases, observables, playbook execution |
-| Senior Analyst | L2 | L1 + escalated cases, observable trends |
-| Principal Analyst | L3 | L2 + SLA compliance, mentoring |
-| Forensic | — | Forensic investigations, evidence, chain of custody |
-| Lead | — | All analyst + team management, playbook CRUD |
-| Engineering | — | Integrations, system config, detection engineering |
-| Admin | — | Full access + user management |
+| Role | Level | Description |
+|------|-------|-------------|
+| `analyst` | L1 | Alert triage, basic case management, playbook execution |
+| `senior_analyst` | L2 | + case closure, observable enrichment, forensic viewer |
+| `principal_analyst` | L3 | + playbook creation, forensic cases, security dashboard |
+| `lead` | -- | All analyst permissions + team management, full forensic access |
+| `forensic` | -- | Forensic investigations, evidence, chain of custody |
+| `soc_engineer` | L1 | Log onboarding, basic SIEM config, tooling support |
+| `senior_engineer` | L2 | Detection engineering, pipeline management, Elastic admin |
+| `platform_engineer` | L3 | Infrastructure, architecture, security tooling at scale |
+| `engineering` | -- | Full operational + system management access |
+| `admin` | -- | Full access including user management and system settings |
 
-**Focus Mode:** Users with multiple roles can switch between them via the dashboard pill buttons.
+**Focus Mode:** Users assigned multiple roles can switch their active role context via the dashboard, restricting permissions to a single role at a time.
 
-## Default Login
-
-- **Username:** `admin`
-- **Password:** Value of `ION_ADMIN_PASSWORD` (default: `admin2025`)
+---
 
 ## Docker Hub
 
 ```bash
-docker pull ixion36/ion:0.9.43
-# or
 docker pull ixion36/ion:latest
+# or a specific version
+docker pull ixion36/ion:0.9.98
 ```
+
+---
+
+## Project Structure
+
+```
+ion/
+  src/ion/
+    auth/          # Authentication, OIDC, password hashing
+    core/          # Config, logging, error handling, circuit breaker
+    models/        # SQLAlchemy models (35+ modules)
+    services/      # Business logic (80+ service modules)
+    storage/       # Database, repositories, advisory locks
+    web/           # FastAPI routes (60+ API modules), templates, static
+  deploy/          # Nginx config, docker-compose variants, cert generation
+  loadtest/        # Locust load testing framework
+  tests/           # Test suite
+  docker-compose.yml
+  Dockerfile
+```
+
+---
 
 ## License
 
-Proprietary — Guarded Glass Security Toolkit
+MIT

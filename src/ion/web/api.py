@@ -4011,6 +4011,75 @@ async def _background_kibana_case_sync(
         _session.close()
 
 
+async def _background_ai_case_summary(case_id: int, user_id: int) -> None:
+    """Generate AI executive summary when a case is closed."""
+    try:
+        from ion.services.ollama_service import get_ollama_service
+        ollama = get_ollama_service()
+        if not await ollama.is_available():
+            return
+
+        _session = _new_background_session()
+        try:
+            case = _session.query(AlertCase).filter_by(id=case_id).first()
+            if not case:
+                return
+
+            # Build context from case data
+            context = f"Case: {case.case_number} - {case.title}\n"
+            context += f"Severity: {case.severity}\n"
+            context += f"Status: {case.status.value if hasattr(case.status, 'value') else case.status}\n"
+            if case.description:
+                context += f"Description: {case.description[:500]}\n"
+            if case.affected_hosts:
+                context += f"Affected hosts: {', '.join(case.affected_hosts)}\n"
+            if case.affected_users:
+                context += f"Affected users: {', '.join(case.affected_users)}\n"
+            if case.triggered_rules:
+                context += f"Rules: {', '.join(case.triggered_rules)}\n"
+            if case.closure_reason:
+                context += f"Closure reason: {case.closure_reason}\n"
+            if case.closure_notes:
+                context += f"Closure notes: {case.closure_notes}\n"
+
+            # Get notes for context
+            notes = _session.query(Note).filter_by(
+                entity_type=NoteEntityType.CASE,
+                entity_id=str(case_id)
+            ).order_by(Note.created_at.desc()).limit(5).all()
+            if notes:
+                context += "\nInvestigation notes:\n"
+                for n in notes:
+                    context += f"- {n.content[:200]}\n"
+
+            prompt = (
+                "Write a concise executive summary (2-3 paragraphs) for this closed security case. "
+                "Cover: what happened, what was investigated, what was the outcome, and any follow-up actions. "
+                "Write in professional incident report style. No markdown formatting.\n\n"
+                f"{context}"
+            )
+
+            result = await ollama.chat(
+                messages=[{"role": "user", "content": prompt}],
+                context_type="analyst",
+                temperature=0.3,
+                user_id=user_id,
+            )
+
+            summary_note = Note(
+                entity_type=NoteEntityType.CASE,
+                entity_id=str(case_id),
+                user_id=user_id,
+                content=f"**AI Executive Summary**\n\n{result['content']}",
+            )
+            _session.add(summary_note)
+            _session.commit()
+        finally:
+            _session.close()
+    except Exception as e:
+        logger.warning("AI case summary failed for case %s: %s", case_id, e)
+
+
 def _build_kfp_es_doc(kfp) -> dict:
     """Build the Elasticsearch document from a KnownFalsePositive ORM object."""
     now = datetime.now(timezone.utc).isoformat()
@@ -4667,6 +4736,9 @@ async def update_case(
             if case.kibana_case_id:
                 sync_note_to_kibana(case.kibana_case_id, current_user.username, closure_note.content)
 
+            # AI case summary — auto-generate executive summary on close
+            background_tasks.add_task(_background_ai_case_summary, case_id, current_user.id)
+
             # --- Auto-FP suppression: create KFP + investigation memory ---
             if data.closure_reason == "false_positive":
                 try:
@@ -4845,6 +4917,109 @@ async def update_case(
         "dfir_iris_url": dfir_iris_url,
         "message": "Case updated",
     }
+
+
+@router.get("/elasticsearch/alerts/cases/{case_id}/pdf")
+async def export_case_pdf(
+    case_id: int,
+    current_user: User = Depends(require_permission("case:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Export a case as a PDF report."""
+    case = session.query(AlertCase).filter_by(id=case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    # Build HTML for the PDF
+    notes = session.query(Note).filter_by(
+        entity_type=NoteEntityType.CASE,
+        entity_id=str(case_id)
+    ).order_by(Note.created_at.asc()).all()
+
+    # Build the HTML content (use inline styles since WeasyPrint doesn't load external CSS)
+    html = """<html><head><style>
+        body { font-family: 'Helvetica', sans-serif; color: #1a1a2e; padding: 40px; font-size: 12px; line-height: 1.6; }
+        h1 { color: #0f172a; font-size: 24px; border-bottom: 2px solid #6de4ff; padding-bottom: 8px; }
+        h2 { color: #334155; font-size: 16px; margin-top: 24px; }
+        .meta { background: #f1f5f9; padding: 16px; border-radius: 8px; margin: 16px 0; }
+        .meta td { padding: 4px 16px 4px 0; vertical-align: top; }
+        .meta .label { color: #64748b; font-weight: 600; font-size: 11px; text-transform: uppercase; }
+        .severity { display: inline-block; padding: 2px 10px; border-radius: 4px; font-weight: 600; font-size: 11px; }
+        .severity-critical { background: #fecaca; color: #991b1b; }
+        .severity-high { background: #fed7aa; color: #9a3412; }
+        .severity-medium { background: #e9d5ff; color: #6b21a8; }
+        .severity-low { background: #e2e8f0; color: #475569; }
+        .note { border-left: 3px solid #e2e8f0; padding: 8px 16px; margin: 12px 0; }
+        .note-meta { color: #64748b; font-size: 10px; margin-bottom: 4px; }
+        .footer { margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 12px; color: #94a3b8; font-size: 10px; text-align: center; }
+    </style></head><body>"""
+
+    sev = case.severity or "medium"
+    status_val = case.status.value if hasattr(case.status, 'value') else str(case.status)
+
+    from markupsafe import escape as _esc
+    html += f"<h1>{_esc(case.case_number)} — {_esc(case.title or 'Untitled')}</h1>"
+    html += '<div class="meta"><table>'
+    html += f'<tr><td class="label">Status</td><td>{_esc(status_val)}</td></tr>'
+    html += f'<tr><td class="label">Severity</td><td><span class="severity severity-{_esc(sev)}">{_esc(sev.upper())}</span></td></tr>'
+    if case.created_at:
+        html += f'<tr><td class="label">Created</td><td>{case.created_at.strftime("%d %b %Y %H:%M UTC")}</td></tr>'
+    if case.closed_at:
+        html += f'<tr><td class="label">Closed</td><td>{case.closed_at.strftime("%d %b %Y %H:%M UTC")}</td></tr>'
+    if case.closure_reason:
+        html += f'<tr><td class="label">Closure Reason</td><td>{_esc(case.closure_reason)}</td></tr>'
+    if case.assigned_to:
+        html += f'<tr><td class="label">Assigned To</td><td>{_esc(case.assigned_to.display_name or case.assigned_to.username)}</td></tr>'
+    if case.created_by:
+        html += f'<tr><td class="label">Created By</td><td>{_esc(case.created_by.display_name or case.created_by.username)}</td></tr>'
+    if case.affected_hosts:
+        html += f'<tr><td class="label">Affected Hosts</td><td>{_esc(", ".join(case.affected_hosts))}</td></tr>'
+    if case.affected_users:
+        html += f'<tr><td class="label">Affected Users</td><td>{_esc(", ".join(case.affected_users))}</td></tr>'
+    if case.triggered_rules:
+        html += f'<tr><td class="label">Triggered Rules</td><td>{_esc(", ".join(case.triggered_rules))}</td></tr>'
+    html += '</table></div>'
+
+    if case.description:
+        html += f'<h2>Description</h2><p>{_esc(case.description)}</p>'
+
+    if case.evidence_summary:
+        html += f'<h2>Evidence Summary</h2><p>{_esc(case.evidence_summary)}</p>'
+
+    if case.closure_notes:
+        html += f'<h2>Closure Notes</h2><p>{_esc(case.closure_notes)}</p>'
+
+    if notes:
+        html += '<h2>Investigation Notes</h2>'
+        for n in notes:
+            user_name = ""
+            if n.user_id:
+                from ion.models.user import User as UserModel
+                note_user = session.query(UserModel).get(n.user_id)
+                user_name = _esc((note_user.display_name or note_user.username) if note_user else "System")
+            html += '<div class="note">'
+            html += f'<div class="note-meta">{user_name} — {n.created_at.strftime("%d %b %Y %H:%M") if n.created_at else ""}</div>'
+            content = _esc(n.content or "").replace("\n", "<br>")
+            html += f'{content}</div>'
+
+    from datetime import datetime as _dt
+    html += f'<div class="footer">Generated by ION · {_dt.utcnow().strftime("%d %b %Y %H:%M UTC")} · {_esc(case.case_number)}</div>'
+    html += '</body></html>'
+
+    try:
+        from weasyprint import HTML as _WeasyHTML
+        pdf_bytes = _WeasyHTML(string=html).write_pdf()
+    except (ImportError, OSError):
+        # WeasyPrint not available (Windows dev) — return HTML instead
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html)
+
+    filename = f"{case.case_number}-report.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/elasticsearch/alerts/cases/{case_id}/escalate/dfir-iris")
