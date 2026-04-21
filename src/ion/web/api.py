@@ -5846,6 +5846,14 @@ async def get_alert_triage(
                                 # Refresh triage_data with the new observables
                                 if triage_data:
                                     triage_data["observables"] = triage.observables
+                                # Background-enrich the extracted observables
+                                _obs_to_enrich = list(triage.observables or [])
+                                _triage_id = triage.id
+                                if _obs_to_enrich:
+                                    import asyncio
+                                    asyncio.ensure_future(
+                                        _background_enrich_triage_observables(_triage_id, _obs_to_enrich)
+                                    )
                         except Exception:
                             session.rollback()
 
@@ -5937,6 +5945,14 @@ async def update_alert_triage(
                         _populate_triage_observables(
                             triage, _hit.host, _hit.user, _hit.raw_data
                         )
+                        # Background-enrich after extraction
+                        if triage.observables:
+                            _obs = list(triage.observables)
+                            _tid = triage.id
+                            import asyncio
+                            asyncio.ensure_future(
+                                _background_enrich_triage_observables(_tid, _obs)
+                            )
         except Exception as e:
             logger.debug(f"Failed to snapshot/extract for {alert_id}: {e}")
 
@@ -6188,6 +6204,58 @@ async def close_alert(
         "kfp_created": kfp_created,
         "message": f"Alert closed as {label}",
     }
+
+
+async def _background_enrich_triage_observables(triage_id: int, observables: list) -> None:
+    """Background task: enrich extracted observables via OpenCTI and persist results."""
+    try:
+        from ion.services.opencti_service import get_opencti_service
+        opencti = get_opencti_service()
+        if not opencti.is_configured:
+            return
+
+        # Map observable types to OpenCTI lookup types
+        type_map = {
+            "source_ip": "ipv4-addr", "destination_ip": "ipv4-addr", "host_ip": "ipv4-addr",
+            "hostname": "domain-name", "source_hostname": "domain-name", "destination_hostname": "domain-name",
+            "domain": "domain-name", "url": "url",
+            "sha256": "file-sha256", "sha1": "file-sha1", "md5": "file-md5",
+        }
+
+        enriched = []
+        for obs in observables:
+            obs_copy = dict(obs)
+            lookup_type = type_map.get(obs["type"])
+            if lookup_type:
+                try:
+                    result = await opencti.enrich_observable(lookup_type, obs["value"])
+                    if result.get("found"):
+                        obs_copy["enriched"] = True
+                        obs_copy["threat_labels"] = [l.get("value", "") for l in result.get("labels", [])]
+                        obs_copy["threat_actors"] = [
+                            a.get("name", "") for a in result.get("threat_actors", [])
+                        ]
+                        obs_copy["indicator_count"] = len(result.get("indicators", []))
+                        obs_copy["score"] = (result.get("observable") or {}).get("score")
+                except Exception:
+                    pass
+            enriched.append(obs_copy)
+
+        # Persist enriched observables back to triage
+        from ion.core.config import get_config
+        from ion.storage.database import get_engine, get_session_factory
+        from ion.models.alert_triage import AlertTriage
+        engine = get_engine(get_config().db_path)
+        session = get_session_factory(engine)()
+        try:
+            triage = session.query(AlertTriage).filter_by(id=triage_id).first()
+            if triage:
+                triage.observables = enriched
+                session.commit()
+        finally:
+            session.close()
+    except Exception as e:
+        logger.debug("Background observable enrichment failed for triage %s: %s", triage_id, e)
 
 
 def _populate_triage_observables(triage, host=None, user=None, raw_data=None) -> bool:
