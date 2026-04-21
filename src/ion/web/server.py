@@ -55,6 +55,13 @@ from ion.web.soc_health_api import router as soc_health_router
 from ion.web.attack_story_api import router as attack_story_router
 from ion.web.case_similarity_api import router as case_similarity_router
 from ion.web.triage_suggestion_api import router as triage_suggestion_router
+from ion.web.smtp_api import router as smtp_router
+from ion.web.enrichment_api import router as enrichment_router
+from ion.web.alert_prompt_api import router as alert_prompt_router
+from ion.web.investigation_memory_api import router as investigation_memory_router
+from ion.web.scheduler_api import router as scheduler_router
+from ion.web.investigation_api import router as investigation_router
+from ion.web.case_grouper_api import router as case_grouper_router
 from ion.web.mitre_navigator_api import router as mitre_navigator_router
 from ion.web.playbook_analytics_api import router as playbook_analytics_router
 from ion.web.alert_pattern_api import router as alert_pattern_router

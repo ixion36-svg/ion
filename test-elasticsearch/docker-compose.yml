@@ -37,16 +37,12 @@ services:
         condition: service_healthy
 
   arkime:
-    image: mosajjal/arkime:latest
+    build: ./arkime
     container_name: arkime-test
     environment:
       - ARKIME_ELASTICSEARCH=http://elastic:DocforgeTest2025@elasticsearch:9200
-      - ARKIME_ADMINCREDS=arkime:arkime
-      - ARKIME_AUTOINIT=true
-      - ARKIME_PASSWORDSECRET=ion-arkime-dev-secret
-      - ARKIME_INTERFACE=eth0
-      - ARKIME_VIEWHOST=0.0.0.0
-      - ARKIME_USERAUTHIPS=0.0.0.0/0
+      - ARKIME_ADMIN_PASSWORD=arkime
+      - ARKIME_PASSWORD_SECRET=ion-arkime-dev-secret
     ports:
       - "8005:8005"
     depends_on:

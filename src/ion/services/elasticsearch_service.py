@@ -1410,25 +1410,18 @@ class ElasticsearchService:
         """Set arbitrary dotted-path fields on an alert document.
 
         Used by the autonomous investigation loop to persist verdict/severity/
-        MITRE-tag metadata under the `ion.*` namespace. For Kibana-managed
-        `.alerts-*` indices, direct ES writes are blocked by index security —
-        this will 403 and return False. Non-managed alert indices (watcher,
-        custom ion-owned) accept the write.
-
+        MITRE-tag metadata under the `ion.*` namespace.
         Returns True on success, False on failure (logs warning, does not raise).
         """
         if not alert_id or not fields:
             return False
 
-        # Build a painless script that sets each dotted path while creating
-        # intermediate maps as needed. Using params for safe value interpolation.
         set_lines: List[str] = []
         params: Dict[str, Any] = {}
         for idx, (path, value) in enumerate(fields.items()):
             param_name = f"v{idx}"
             params[param_name] = value
             parts = path.split(".")
-            # Ensure each intermediate map exists
             ensure_lines = []
             current_ref = "ctx._source"
             for depth in range(len(parts) - 1):
@@ -1437,7 +1430,6 @@ class ElasticsearchService:
                     f"if ({current_ref} == null) {{ {current_ref} = new HashMap(); }}"
                 )
             set_lines.extend(ensure_lines)
-            # Set the leaf
             leaf_ref = "ctx._source" + "".join(f"['{p}']" for p in parts)
             set_lines.append(f"{leaf_ref} = params.{param_name};")
 
@@ -1463,9 +1455,7 @@ class ElasticsearchService:
                 logger.debug("update_alert: set %d fields on %s", len(fields), alert_id)
                 return True
             logger.warning(
-                "update_alert: no documents updated for alert_id=%s (index=%s); "
-                "likely a Kibana-managed .alerts-* index that blocks direct writes",
-                alert_id, self.alert_index,
+                "update_alert: no documents updated for %s", alert_id,
             )
             return False
         except ElasticsearchError as e:

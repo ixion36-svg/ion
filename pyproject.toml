@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ion"
-version = "0.9.95"
+version = "0.9.96"
 description = "Intelligent Operating Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -46,6 +46,8 @@ dependencies = [
     "orjson>=3.9.0",
     # Used by seed scripts (seed_*.py) that call the ION API via HTTP
     "requests>=2.31.0",
+    # Email validation (pydantic EmailStr field)
+    "email-validator>=2.0.0",
 ]
 
 [project.optional-dependencies]
