@@ -25,6 +25,22 @@ _CACHE_LOCK = threading.Lock()
 _MAX_CACHE_ENTRIES = 256
 
 
+# Shared persistent httpx client — avoids per-request connection overhead.
+_tide_client: Optional[httpx.Client] = None
+
+
+def _get_tide_client(verify_ssl) -> httpx.Client:
+    """Return (and lazily create) the module-level shared sync client."""
+    global _tide_client
+    if _tide_client is None or _tide_client.is_closed:
+        _tide_client = httpx.Client(
+            verify=verify_ssl,
+            timeout=httpx.Timeout(8.0, connect=3.0),
+            limits=httpx.Limits(max_connections=5, max_keepalive_connections=3),
+        )
+    return _tide_client
+
+
 # Statuses we consider transient and retry with backoff.
 _RETRY_STATUSES = {429, 500, 502, 503, 504}
 
@@ -153,18 +169,14 @@ class TideService:
                     payload["client_id"] = tenant
 
                 try:
-                    resp = httpx.post(
+                    client = _get_tide_client(self.verify)
+                    resp = client.post(
                         f"{self.url}/api/external/query",
                         json=payload,
                         headers={
                             "X-TIDE-API-KEY": self.api_key,
                             "Content-Type": "application/json",
                         },
-                        verify=self.verify,
-                        # Tight per-request timeout: 8s read, 3s connect.
-                        # 1 retry max → worst-case ~16s + backoff, fits inside
-                        # the 20s _TIDE_TOTAL_BUDGET_S above.
-                        timeout=httpx.Timeout(8.0, connect=3.0),
                     )
                 except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError) as e:
                     if attempt < retries:
@@ -306,11 +318,10 @@ class TideService:
         if not self.enabled:
             return []
         try:
-            resp = httpx.get(
+            client = _get_tide_client(self.verify)
+            resp = client.get(
                 f"{self.url}/api/external/clients",
                 headers={"X-TIDE-API-KEY": self.api_key},
-                verify=self.verify,
-                timeout=httpx.Timeout(5.0, connect=3.0),
             )
         except Exception as e:
             logger.warning("TIDE discover_clients error: %s", type(e).__name__)
@@ -1062,8 +1073,14 @@ def get_tide_service() -> TideService:
 
 
 def reset_tide_service():
-    global _tide_service
+    global _tide_service, _tide_client
     _tide_service = None
+    if _tide_client is not None and not _tide_client.is_closed:
+        try:
+            _tide_client.close()
+        except Exception:
+            pass
+    _tide_client = None
     # Drop the per-process query cache too — config may have changed.
     with _CACHE_LOCK:
         _QUERY_CACHE.clear()

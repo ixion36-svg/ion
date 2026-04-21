@@ -15,6 +15,21 @@ from ion.services.country_mapper import get_country_code, get_country_name, coun
 
 logger = logging.getLogger(__name__)
 
+# Shared persistent httpx client — avoids per-request connection overhead.
+_opencti_client: Optional[httpx.AsyncClient] = None
+
+
+def _get_opencti_client(verify_ssl, timeout) -> httpx.AsyncClient:
+    """Return (and lazily create) the module-level shared async client."""
+    global _opencti_client
+    if _opencti_client is None or _opencti_client.is_closed:
+        _opencti_client = httpx.AsyncClient(
+            verify=verify_ssl,
+            timeout=timeout,
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+        )
+    return _opencti_client
+
 
 class OpenCTIError(Exception):
     """Exception raised for OpenCTI API errors."""
@@ -120,13 +135,13 @@ class OpenCTIService:
             payload["variables"] = variables
 
         try:
-            async with httpx.AsyncClient(
-                headers=self._get_headers(),
-                verify=get_ssl_verify(self.verify_ssl),
-                # v0.9.82: 10s read, 3s connect — was 30s/10s.
-                timeout=httpx.Timeout(10.0, connect=3.0),
-            ) as client:
-                response = await client.post(graphql_url, json=payload)
+            client = _get_opencti_client(
+                get_ssl_verify(self.verify_ssl),
+                httpx.Timeout(10.0, connect=3.0),
+            )
+            response = await client.post(
+                graphql_url, json=payload, headers=self._get_headers(),
+            )
         except httpx.ConnectError as e:
             opencti_breaker.record_failure()
             raise OpenCTIError(f"Failed to connect to OpenCTI: {e}")
@@ -1575,5 +1590,14 @@ def get_opencti_service() -> OpenCTIService:
 
 def reset_opencti_service():
     """Reset the global OpenCTI service instance (for config changes)."""
-    global _opencti_service
+    global _opencti_service, _opencti_client
     _opencti_service = None
+    if _opencti_client is not None and not _opencti_client.is_closed:
+        # Schedule close on the running loop if available, else best-effort.
+        try:
+            import asyncio
+            loop = asyncio.get_running_loop()
+            loop.create_task(_opencti_client.aclose())
+        except RuntimeError:
+            pass
+    _opencti_client = None

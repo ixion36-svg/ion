@@ -14,6 +14,36 @@ from ion.core.config import get_elasticsearch_config, get_ssl_verify
 
 logger = logging.getLogger(__name__)
 
+# Shared persistent httpx client — avoids per-request connection overhead.
+_es_client: Optional[httpx.AsyncClient] = None
+
+
+def _get_es_client(headers, auth, verify_ssl, timeout) -> httpx.AsyncClient:
+    """Return (and lazily create) the module-level shared async client."""
+    global _es_client
+    if _es_client is None or _es_client.is_closed:
+        _es_client = httpx.AsyncClient(
+            headers=headers,
+            auth=auth,
+            verify=verify_ssl,
+            timeout=timeout,
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+    return _es_client
+
+
+def _close_es_client() -> None:
+    """Close the shared ES client (call on config change)."""
+    global _es_client
+    if _es_client is not None and not _es_client.is_closed:
+        try:
+            import asyncio
+            loop = asyncio.get_running_loop()
+            loop.create_task(_es_client.aclose())
+        except RuntimeError:
+            pass
+    _es_client = None
+
 
 def _redact_url(url: str) -> str:
     """Strip embedded user:password credentials from a URL so it is safe to log."""
@@ -208,15 +238,13 @@ class ElasticsearchService:
             url += f"{sep}ignore_unavailable=true&allow_no_indices=true&expand_wildcards=open,hidden"
 
         try:
-            async with httpx.AsyncClient(
-                headers=self._get_headers(),
-                auth=self._get_auth(),
-                verify=get_ssl_verify(self.verify_ssl),
-                # v0.9.82: 10s read, 3s connect. Was 30s/10s — way too long
-                # for an interactive alert-listing request on a degraded ES.
-                timeout=httpx.Timeout(10.0, connect=3.0),
-            ) as client:
-                response = await client.request(method, url, **kwargs)
+            client = _get_es_client(
+                self._get_headers(),
+                self._get_auth(),
+                get_ssl_verify(self.verify_ssl),
+                httpx.Timeout(10.0, connect=3.0),
+            )
+            response = await client.request(method, url, **kwargs)
         except httpx.ConnectError as e:
             raise ElasticsearchError(f"Failed to connect to Elasticsearch: {e}")
         except httpx.ReadError as e:

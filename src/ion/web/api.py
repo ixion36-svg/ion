@@ -855,19 +855,22 @@ async def list_assignable_users(
     Gated by `alert:read` so every analyst can populate their assignment
     dropdown — `/api/users` requires `user:read` which analysts don't have.
     """
-    user_repo = UserRepository(session)
-    users = user_repo.list_all(include_inactive=False)
-    return {
-        "users": [
-            {
-                "id": u.id,
-                "username": u.username,
-                "display_name": u.display_name or u.username,
-                "has_elastic_profile": bool(getattr(u, "elastic_uid", None)),
-            }
-            for u in users
-        ]
-    }
+    def _query_assignable():
+        user_repo = UserRepository(session)
+        users = user_repo.list_all(include_inactive=False)
+        return {
+            "users": [
+                {
+                    "id": u.id,
+                    "username": u.username,
+                    "display_name": u.display_name or u.username,
+                    "has_elastic_profile": bool(getattr(u, "elastic_uid", None)),
+                }
+                for u in users
+            ]
+        }
+
+    return await asyncio.to_thread(_query_assignable)
 
 
 @router.get("/users", dependencies=[Depends(require_permission("user:read"))])
@@ -876,27 +879,29 @@ async def list_users(
     session: Session = Depends(get_db_session),
 ):
     """List all users (admin only)."""
-    user_repo = UserRepository(session)
-    users = user_repo.list_all(include_inactive=include_inactive)
+    def _query_users():
+        user_repo = UserRepository(session)
+        users = user_repo.list_all(include_inactive=include_inactive)
+        return [
+            {
+                "id": u.id,
+                "username": u.username,
+                "email": u.email,
+                "display_name": u.display_name,
+                "is_active": u.is_active,
+                "last_login": u.last_login.isoformat() if u.last_login else None,
+                "roles": [r.name for r in u.roles],
+                "employment_type": getattr(u, "employment_type", None) or "cs",
+                "elastic_username": getattr(u, "elastic_username", None),
+                "elastic_uid": getattr(u, "elastic_uid", None),
+                "keycloak_sub": getattr(u, "keycloak_sub", None),
+                "gitlab_username": getattr(u, "gitlab_username", None),
+                "created_at": u.created_at.isoformat() if u.created_at else None,
+            }
+            for u in users
+        ]
 
-    return [
-        {
-            "id": u.id,
-            "username": u.username,
-            "email": u.email,
-            "display_name": u.display_name,
-            "is_active": u.is_active,
-            "last_login": u.last_login.isoformat() if u.last_login else None,
-            "roles": [r.name for r in u.roles],
-            "employment_type": getattr(u, "employment_type", None) or "cs",
-            "elastic_username": getattr(u, "elastic_username", None),
-            "elastic_uid": getattr(u, "elastic_uid", None),
-            "keycloak_sub": getattr(u, "keycloak_sub", None),
-            "gitlab_username": getattr(u, "gitlab_username", None),
-            "created_at": u.created_at.isoformat() if u.created_at else None,
-        }
-        for u in users
-    ]
+    return await asyncio.to_thread(_query_users)
 
 
 @router.post("/users", dependencies=[Depends(require_permission("user:create"))])
@@ -2260,11 +2265,39 @@ async def get_dashboard(
     """Get comprehensive dashboard data including GitLab tasks."""
     # Lightweight counts + recent items — avoids loading all templates/docs
     # just to count them (was 600ms+, now ~5ms).
-    template_count = services.template.template_repo.count()
-    document_count = services.document_repo.count()
-    tag_count = services.template.template_repo.count_tags()
-    recent_templates = services.template.template_repo.list_recent(5)
-    recent_docs = services.document_repo.list_recent(5)
+    # Wrapped in to_thread so sync DB calls don't block the event loop.
+    def _fetch_db_stats():
+        tc = services.template.template_repo.count()
+        dc = services.document_repo.count()
+        tgc = services.template.template_repo.count_tags()
+        rt = services.template.template_repo.list_recent(5)
+        rd = services.document_repo.list_recent(5)
+        # Serialize while session is still open (accesses lazy relationships)
+        rt_dicts = [
+            {
+                "id": t.id,
+                "name": t.name,
+                "format": t.format.value if hasattr(t.format, 'value') else t.format,
+                "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+                "tags": [tag.name for tag in t.tags],
+            }
+            for t in rt
+        ]
+        rd_dicts = [
+            {
+                "id": d.id,
+                "name": d.name,
+                "template_name": d.source_template.name if d.source_template else "Unknown",
+                "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+                "status": d.status,
+            }
+            for d in rd
+        ]
+        return tc, dc, tgc, rt_dicts, rd_dicts
+
+    template_count, document_count, tag_count, recent_templates, recent_docs = (
+        await asyncio.to_thread(_fetch_db_stats)
+    )
 
     # Fetch GitLab and Elasticsearch data in parallel with short timeouts
     async def fetch_gitlab_data():
@@ -2366,26 +2399,8 @@ async def get_dashboard(
             "documents_count": document_count,
             "tags_count": tag_count,
         },
-        "recent_templates": [
-            {
-                "id": t.id,
-                "name": t.name,
-                "format": t.format.value if hasattr(t.format, 'value') else t.format,
-                "updated_at": t.updated_at.isoformat() if t.updated_at else None,
-                "tags": [tag.name for tag in t.tags],
-            }
-            for t in recent_templates
-        ],
-        "recent_documents": [
-            {
-                "id": d.id,
-                "name": d.name,
-                "template_name": d.source_template.name if d.source_template else "Unknown",
-                "updated_at": d.updated_at.isoformat() if d.updated_at else None,
-                "status": d.status,
-            }
-            for d in recent_docs
-        ],
+        "recent_templates": recent_templates,
+        "recent_documents": recent_docs,
         "gitlab": gitlab_data,
         "elasticsearch": elasticsearch_data,
     }
@@ -2397,120 +2412,117 @@ async def get_team_metrics(
     session: Session = Depends(get_db_session),
 ):
     """Team performance metrics for Lead dashboard."""
-    from sqlalchemy import func as sqlfunc
-    from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage, AlertTriageStatus
+    # Wrapped in to_thread — this endpoint runs 8+ DB queries (counts,
+    # aggregations, per-assignee lookups) that would block the loop.
+    def _compute_team_metrics():
+        from sqlalchemy import func as sqlfunc
+        from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage, AlertTriageStatus
 
-    now = datetime.utcnow()
+        now = datetime.utcnow()
 
-    # Open cases count
-    open_cases = session.query(sqlfunc.count(AlertCase.id)).filter(
-        AlertCase.status != AlertCaseStatus.CLOSED
-    ).scalar() or 0
+        open_cases = session.query(sqlfunc.count(AlertCase.id)).filter(
+            AlertCase.status != AlertCaseStatus.CLOSED
+        ).scalar() or 0
 
-    # Unassigned open alerts count
-    unassigned_alerts = session.query(sqlfunc.count(AlertTriage.id)).filter(
-        AlertTriage.case_id.is_(None),
-        AlertTriage.status == AlertTriageStatus.OPEN,
-    ).scalar() or 0
+        unassigned_alerts = session.query(sqlfunc.count(AlertTriage.id)).filter(
+            AlertTriage.case_id.is_(None),
+            AlertTriage.status == AlertTriageStatus.OPEN,
+        ).scalar() or 0
 
-    # MTTR - mean time to resolution (last 30 days)
-    thirty_days_ago = now - timedelta(days=30)
-    closed_cases_30d = session.query(AlertCase).filter(
-        AlertCase.closed_at >= thirty_days_ago,
-        AlertCase.closed_at.isnot(None),
-    ).all()
+        thirty_days_ago = now - timedelta(days=30)
+        closed_cases_30d = session.query(AlertCase).filter(
+            AlertCase.closed_at >= thirty_days_ago,
+            AlertCase.closed_at.isnot(None),
+        ).all()
 
-    mttr = None
-    if closed_cases_30d:
-        durations = [(c.closed_at - c.created_at).total_seconds() / 3600 for c in closed_cases_30d]
-        mttr = round(sum(durations) / len(durations), 1)
+        mttr = None
+        if closed_cases_30d:
+            durations = [(c.closed_at - c.created_at).total_seconds() / 3600 for c in closed_cases_30d]
+            mttr = round(sum(durations) / len(durations), 1)
 
-    # Closure rate (7 days)
-    seven_days_ago = now - timedelta(days=7)
-    created_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
-        AlertCase.created_at >= seven_days_ago
-    ).scalar() or 0
-    closed_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
-        AlertCase.closed_at >= seven_days_ago
-    ).scalar() or 0
+        seven_days_ago = now - timedelta(days=7)
+        created_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
+            AlertCase.created_at >= seven_days_ago
+        ).scalar() or 0
+        closed_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
+            AlertCase.closed_at >= seven_days_ago
+        ).scalar() or 0
 
-    # Cases by severity (open only)
-    severity_rows = session.query(
-        AlertCase.severity, sqlfunc.count(AlertCase.id)
-    ).filter(
-        AlertCase.status != AlertCaseStatus.CLOSED
-    ).group_by(AlertCase.severity).all()
-    severity_counts = dict(severity_rows)
+        severity_rows = session.query(
+            AlertCase.severity, sqlfunc.count(AlertCase.id)
+        ).filter(
+            AlertCase.status != AlertCaseStatus.CLOSED
+        ).group_by(AlertCase.severity).all()
+        severity_counts = dict(severity_rows)
 
-    # Cases by assignee
-    assignee_rows = session.query(
-        AlertCase.assigned_to_id,
-        sqlfunc.count(AlertCase.id),
-    ).filter(
-        AlertCase.status != AlertCaseStatus.CLOSED
-    ).group_by(AlertCase.assigned_to_id).all()
+        assignee_rows = session.query(
+            AlertCase.assigned_to_id,
+            sqlfunc.count(AlertCase.id),
+        ).filter(
+            AlertCase.status != AlertCaseStatus.CLOSED
+        ).group_by(AlertCase.assigned_to_id).all()
 
-    # Closed in 7d per assignee
-    closed_by_assignee_rows = session.query(
-        AlertCase.assigned_to_id,
-        sqlfunc.count(AlertCase.id),
-    ).filter(
-        AlertCase.closed_at >= seven_days_ago,
-    ).group_by(AlertCase.assigned_to_id).all()
-    closed_by_assignee = dict(closed_by_assignee_rows)
+        closed_by_assignee_rows = session.query(
+            AlertCase.assigned_to_id,
+            sqlfunc.count(AlertCase.id),
+        ).filter(
+            AlertCase.closed_at >= seven_days_ago,
+        ).group_by(AlertCase.assigned_to_id).all()
+        closed_by_assignee = dict(closed_by_assignee_rows)
 
-    cases_by_assignee = []
-    for user_id, open_count in assignee_rows:
-        if user_id is None:
-            cases_by_assignee.append({
-                "username": "Unassigned",
-                "display_name": "Unassigned",
-                "open_count": open_count,
-                "closed_7d": closed_by_assignee.get(None, 0),
+        cases_by_assignee = []
+        for user_id, open_count in assignee_rows:
+            if user_id is None:
+                cases_by_assignee.append({
+                    "username": "Unassigned",
+                    "display_name": "Unassigned",
+                    "open_count": open_count,
+                    "closed_7d": closed_by_assignee.get(None, 0),
+                })
+            else:
+                user = session.query(User).filter_by(id=user_id).first()
+                cases_by_assignee.append({
+                    "username": user.username if user else "Unknown",
+                    "display_name": user.display_name if user else "Unknown",
+                    "open_count": open_count,
+                    "closed_7d": closed_by_assignee.get(user_id, 0),
+                })
+
+        recent_closures_q = session.query(AlertCase).filter(
+            AlertCase.closed_at.isnot(None)
+        ).order_by(AlertCase.closed_at.desc()).limit(10).all()
+
+        recent_closures = []
+        for c in recent_closures_q:
+            closed_by_user = session.query(User).filter_by(id=c.closed_by_id).first() if c.closed_by_id else None
+            recent_closures.append({
+                "id": c.id,
+                "case_number": c.case_number,
+                "title": c.title,
+                "severity": c.severity,
+                "closure_reason": c.closure_reason,
+                "closed_by": closed_by_user.display_name if closed_by_user else "Unknown",
+                "closed_at": c.closed_at.isoformat() if c.closed_at else None,
             })
-        else:
-            user = session.query(User).filter_by(id=user_id).first()
-            cases_by_assignee.append({
-                "username": user.username if user else "Unknown",
-                "display_name": user.display_name if user else "Unknown",
-                "open_count": open_count,
-                "closed_7d": closed_by_assignee.get(user_id, 0),
-            })
 
-    # Recent closures (last 10)
-    recent_closures_q = session.query(AlertCase).filter(
-        AlertCase.closed_at.isnot(None)
-    ).order_by(AlertCase.closed_at.desc()).limit(10).all()
+        return {
+            "open_cases": open_cases,
+            "unassigned_alerts": unassigned_alerts,
+            "mttr_hours": mttr,
+            "closure_rate_7d": round(closed_7d / created_7d * 100, 1) if created_7d > 0 else None,
+            "created_7d": created_7d,
+            "closed_7d": closed_7d,
+            "cases_by_severity": {
+                "critical": severity_counts.get("critical", 0),
+                "high": severity_counts.get("high", 0),
+                "medium": severity_counts.get("medium", 0),
+                "low": severity_counts.get("low", 0),
+            },
+            "cases_by_assignee": cases_by_assignee,
+            "recent_closures": recent_closures,
+        }
 
-    recent_closures = []
-    for c in recent_closures_q:
-        closed_by_user = session.query(User).filter_by(id=c.closed_by_id).first() if c.closed_by_id else None
-        recent_closures.append({
-            "id": c.id,
-            "case_number": c.case_number,
-            "title": c.title,
-            "severity": c.severity,
-            "closure_reason": c.closure_reason,
-            "closed_by": closed_by_user.display_name if closed_by_user else "Unknown",
-            "closed_at": c.closed_at.isoformat() if c.closed_at else None,
-        })
-
-    return {
-        "open_cases": open_cases,
-        "unassigned_alerts": unassigned_alerts,
-        "mttr_hours": mttr,
-        "closure_rate_7d": round(closed_7d / created_7d * 100, 1) if created_7d > 0 else None,
-        "created_7d": created_7d,
-        "closed_7d": closed_7d,
-        "cases_by_severity": {
-            "critical": severity_counts.get("critical", 0),
-            "high": severity_counts.get("high", 0),
-            "medium": severity_counts.get("medium", 0),
-            "low": severity_counts.get("low", 0),
-        },
-        "cases_by_assignee": cases_by_assignee,
-        "recent_closures": recent_closures,
-    }
+    return await asyncio.to_thread(_compute_team_metrics)
 
 
 # Sample templates endpoint
@@ -3694,53 +3706,58 @@ async def list_cases(
     session: Session = Depends(get_db_session),
 ):
     """List all investigation cases."""
-    query = session.query(AlertCase).options(
-        selectinload(AlertCase.created_by),
-        selectinload(AlertCase.assigned_to),
-        selectinload(AlertCase.triage_entries),
-    )
-    if status:
-        query = query.filter(AlertCase.status == status)
-    cases = query.order_by(AlertCase.created_at.desc()).all()
+    # Wrapped in to_thread — query + serialization access relationships
+    # (created_by, assigned_to, triage_entries, observables) so both must
+    # run in the same thread while the session is open.
+    def _query_cases():
+        query = session.query(AlertCase).options(
+            selectinload(AlertCase.created_by),
+            selectinload(AlertCase.assigned_to),
+            selectinload(AlertCase.triage_entries),
+        )
+        if status:
+            query = query.filter(AlertCase.status == status)
+        cases = query.order_by(AlertCase.created_at.desc()).all()
 
-    # Get DFIR-IRIS service for URL generation
-    iris_service = get_dfir_iris_service()
+        iris_service = get_dfir_iris_service()
 
-    def get_iris_url(case):
-        if case.dfir_iris_case_id:
-            return iris_service.get_case_url(case.dfir_iris_case_id)
-        return None
+        def get_iris_url(case):
+            if case.dfir_iris_case_id:
+                return iris_service.get_case_url(case.dfir_iris_case_id)
+            return None
 
-    return {
-        "cases": [
-            {
-                "id": c.id,
-                "case_number": c.case_number,
-                "title": c.title,
-                "description": c.description,
-                "status": c.status.value if hasattr(c.status, "value") else c.status,
-                "severity": c.severity,
-                "created_by": c.created_by.username if c.created_by else None,
-                "assigned_to": c.assigned_to.username if c.assigned_to else None,
-                "assigned_to_id": c.assigned_to_id,
-                "alert_count": len(c.triage_entries),
-                "affected_hosts": c.affected_hosts,
-                "affected_users": c.affected_users,
-                "triggered_rules": c.triggered_rules,
-                "evidence_summary": c.evidence_summary,
-                "source_alert_ids": c.source_alert_ids,
-                "observables_count": len(c.observables) if c.observables else 0,
-                "kibana_case_id": c.kibana_case_id,
-                "kibana_url": get_kibana_case_url(c.kibana_case_id),
-                "dfir_iris_case_id": c.dfir_iris_case_id,
-                "dfir_iris_url": get_iris_url(c),
-                "closure_reason": c.closure_reason,
-                "created_at": c.created_at.isoformat() if c.created_at else None,
-                "updated_at": c.updated_at.isoformat() if c.updated_at else None,
-            }
-            for c in cases
-        ]
-    }
+        return {
+            "cases": [
+                {
+                    "id": c.id,
+                    "case_number": c.case_number,
+                    "title": c.title,
+                    "description": c.description,
+                    "status": c.status.value if hasattr(c.status, "value") else c.status,
+                    "severity": c.severity,
+                    "created_by": c.created_by.username if c.created_by else None,
+                    "assigned_to": c.assigned_to.username if c.assigned_to else None,
+                    "assigned_to_id": c.assigned_to_id,
+                    "alert_count": len(c.triage_entries),
+                    "affected_hosts": c.affected_hosts,
+                    "affected_users": c.affected_users,
+                    "triggered_rules": c.triggered_rules,
+                    "evidence_summary": c.evidence_summary,
+                    "source_alert_ids": c.source_alert_ids,
+                    "observables_count": len(c.observables) if c.observables else 0,
+                    "kibana_case_id": c.kibana_case_id,
+                    "kibana_url": get_kibana_case_url(c.kibana_case_id),
+                    "dfir_iris_case_id": c.dfir_iris_case_id,
+                    "dfir_iris_url": get_iris_url(c),
+                    "closure_reason": c.closure_reason,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                    "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+                }
+                for c in cases
+            ]
+        }
+
+    return await asyncio.to_thread(_query_cases)
 
 
 _case_es_logger = logging.getLogger(__name__)
@@ -5287,56 +5304,58 @@ async def get_batch_triage(
     if not data.alert_ids:
         return {"triage": {}}
 
-    triages = (
-        session.query(AlertTriage)
-        .filter(AlertTriage.es_alert_id.in_(data.alert_ids))
-        .all()
-    )
-    triage_map = {t.es_alert_id: t for t in triages}
+    # Wrapped in to_thread — multiple DB queries + potential writes per alert
+    # in the batch would block the event loop for the entire batch duration.
+    def _batch_triage():
+        triages = (
+            session.query(AlertTriage)
+            .filter(AlertTriage.es_alert_id.in_(data.alert_ids))
+            .all()
+        )
+        triage_map = {t.es_alert_id: t for t in triages}
 
-    # Sync ES status → ION triage (Kibana → ION direction)
-    if data.es_statuses:
-        valid_statuses = {"open", "acknowledged", "closed"}
-        for alert_id, es_status in data.es_statuses.items():
-            es_status_lower = es_status.lower() if es_status else "open"
-            if es_status_lower not in valid_statuses:
-                continue
+        # Sync ES status → ION triage (Kibana → ION direction)
+        if data.es_statuses:
+            valid_statuses = {"open", "acknowledged", "closed"}
+            for alert_id, es_status in data.es_statuses.items():
+                es_status_lower = es_status.lower() if es_status else "open"
+                if es_status_lower not in valid_statuses:
+                    continue
 
-            triage = triage_map.get(alert_id)
-            if triage:
-                # Update if ES status differs from ION status
-                ion_status = triage.status.value if hasattr(triage.status, "value") else str(triage.status)
-                if ion_status.lower() != es_status_lower:
-                    triage.status = AlertTriageStatus(es_status_lower)
-                    logger.debug("Synced ES status '%s' → ION triage for alert %s", es_status_lower, alert_id)
-            else:
-                # Create triage record from ES status (so ION tracks it)
-                if es_status_lower != "open":
-                    # Only create records for non-open statuses (open is the default)
-                    new_triage = AlertTriage(
-                        es_alert_id=alert_id,
-                        status=AlertTriageStatus(es_status_lower),
-                    )
-                    session.add(new_triage)
-                    triage_map[alert_id] = new_triage
+                triage = triage_map.get(alert_id)
+                if triage:
+                    ion_status = triage.status.value if hasattr(triage.status, "value") else str(triage.status)
+                    if ion_status.lower() != es_status_lower:
+                        triage.status = AlertTriageStatus(es_status_lower)
+                        logger.debug("Synced ES status '%s' → ION triage for alert %s", es_status_lower, alert_id)
+                else:
+                    if es_status_lower != "open":
+                        new_triage = AlertTriage(
+                            es_alert_id=alert_id,
+                            status=AlertTriageStatus(es_status_lower),
+                        )
+                        session.add(new_triage)
+                        triage_map[alert_id] = new_triage
 
-        try:
-            session.commit()
-        except Exception:
-            session.rollback()
-            logger.warning("Failed to sync ES statuses to ION triage")
+            try:
+                session.commit()
+            except Exception:
+                session.rollback()
+                logger.warning("Failed to sync ES statuses to ION triage")
 
-    result = {}
-    for t in triage_map.values():
-        result[t.es_alert_id] = {
-            "status": t.status.value if hasattr(t.status, "value") else t.status,
-            "priority": t.priority,
-            "case_id": t.case_id,
-            "case_number": t.case.case_number if t.case else None,
-            "case_title": t.case.title if t.case else None,
-        }
+        result = {}
+        for t in triage_map.values():
+            result[t.es_alert_id] = {
+                "status": t.status.value if hasattr(t.status, "value") else t.status,
+                "priority": t.priority,
+                "case_id": t.case_id,
+                "case_number": t.case.case_number if t.case else None,
+                "case_title": t.case.title if t.case else None,
+            }
 
-    return {"triage": result}
+        return {"triage": result}
+
+    return await asyncio.to_thread(_batch_triage)
 
 
 @router.get("/elasticsearch/assignment_users")

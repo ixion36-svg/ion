@@ -51,6 +51,9 @@ from ion.core.config import get_arkime_config
 
 logger = logging.getLogger(__name__)
 
+# Shared persistent httpx client — avoids per-request connection overhead.
+_arkime_client: Optional[httpx.AsyncClient] = None
+
 
 class ArkimeError(Exception):
     """Raised for any Arkime viewer API failure."""
@@ -124,11 +127,15 @@ class ArkimeService:
         return None
 
     async def _client(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(
-            verify=self.verify_ssl,
-            timeout=60.0,  # PCAP downloads can be slow
-            follow_redirects=True,
-        )
+        global _arkime_client
+        if _arkime_client is None or _arkime_client.is_closed:
+            _arkime_client = httpx.AsyncClient(
+                verify=self.verify_ssl,
+                timeout=60.0,  # PCAP downloads can be slow
+                follow_redirects=True,
+                limits=httpx.Limits(max_connections=5, max_keepalive_connections=3),
+            )
+        return _arkime_client
 
     # ── Probes ─────────────────────────────────────────────────────────────
     async def test_connection(self) -> Dict[str, Any]:
@@ -137,12 +144,12 @@ class ArkimeService:
             return {"connected": False, "error": "Arkime is not configured"}
         headers = await self._headers()
         try:
-            async with await self._client() as client:
-                resp = await client.get(
-                    f"{self.url}/api/user",
-                    auth=self._auth(),
-                    headers=headers,
-                )
+            client = await self._client()
+            resp = await client.get(
+                f"{self.url}/api/user",
+                auth=self._auth(),
+                headers=headers,
+            )
             if resp.status_code == 200:
                 data: Dict[str, Any] = {}
                 try:
@@ -195,13 +202,13 @@ class ArkimeService:
         }
         headers = await self._headers()
         try:
-            async with await self._client() as client:
-                resp = await client.get(
-                    f"{self.url}/api/sessions",
-                    auth=self._auth(),
-                    headers=headers,
-                    params=params,
-                )
+            client = await self._client()
+            resp = await client.get(
+                f"{self.url}/api/sessions",
+                auth=self._auth(),
+                headers=headers,
+                params=params,
+            )
             if resp.status_code != 200:
                 body_preview = (resp.text or "")[:200]
                 logger.warning(
@@ -265,13 +272,13 @@ class ArkimeService:
         }
         headers = await self._headers()
         try:
-            async with await self._client() as client:
-                resp = await client.get(
-                    f"{self.url}/api/sessions",
-                    auth=self._auth(),
-                    headers=headers,
-                    params=params,
-                )
+            client = await self._client()
+            resp = await client.get(
+                f"{self.url}/api/sessions",
+                auth=self._auth(),
+                headers=headers,
+                params=params,
+            )
             if resp.status_code != 200:
                 body_preview = (resp.text or "")[:200]
                 logger.warning(
@@ -362,12 +369,12 @@ class ArkimeService:
         url = f"{self.url}/api/session/{node}/{session_id}/pcap"
         headers = await self._headers({"Accept": "application/vnd.tcpdump.pcap"})
         try:
-            async with await self._client() as client:
-                resp = await client.get(
-                    url,
-                    auth=self._auth(),
-                    headers=headers,
-                )
+            client = await self._client()
+            resp = await client.get(
+                url,
+                auth=self._auth(),
+                headers=headers,
+            )
             if resp.status_code == 404:
                 raise ArkimeError(
                     f"Arkime session {session_id} not found on node {node}",
@@ -398,5 +405,13 @@ def get_arkime_service() -> ArkimeService:
 
 
 def reset_arkime_service() -> None:
-    global _arkime_service
+    global _arkime_service, _arkime_client
     _arkime_service = None
+    if _arkime_client is not None and not _arkime_client.is_closed:
+        try:
+            import asyncio
+            loop = asyncio.get_running_loop()
+            loop.create_task(_arkime_client.aclose())
+        except RuntimeError:
+            pass
+    _arkime_client = None
