@@ -178,8 +178,33 @@ class KibanaSyncService:
             if current_status != ion_status:
                 case.status = ion_status
                 case.kibana_case_version = kibana_case.get("version")
+
+                # Also sync linked alert triage statuses to match
+                from ion.models.alert_triage import AlertTriage
+                linked_triages = session.query(AlertTriage).filter_by(case_id=case.id).all()
+                synced_alert_ids = []
+                for t in linked_triages:
+                    t.status = ion_status
+                    synced_alert_ids.append(t.es_alert_id)
+
                 session.commit()
                 logger.info(f"Synced status from Kibana for case {case.case_number}: {ion_status}")
+
+                # Sync alert workflow_status to ES/Kibana
+                if synced_alert_ids:
+                    try:
+                        from ion.services.elasticsearch_service import ElasticsearchService
+                        es = ElasticsearchService()
+                        if es.is_configured:
+                            import asyncio
+                            await es.update_alert_workflow_status(synced_alert_ids, ion_status)
+                            logger.info(
+                                f"Synced workflow_status for {len(synced_alert_ids)} alerts "
+                                f"from Kibana case {case.case_number}"
+                            )
+                    except Exception as e:
+                        logger.warning(f"Failed to sync alert workflow from Kibana case: {e}")
+
                 return True
 
             return False
