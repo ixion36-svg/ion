@@ -1358,14 +1358,12 @@ def seed_default_templates(db: Optional[Session] = None) -> int:
     inserted = 0
     try:
         repo = AlertPromptRepository(db)
-        if repo.count() > 0:
-            logger.info(
-                "AlertPromptTemplate seed skipped — %d rows already exist",
-                repo.count(),
-            )
-            return 0
+        # Seed missing templates — check by name to allow adding new defaults
+        existing_names = {t.name for t in repo.list_all()}
 
         for defn in _DEFAULT_TEMPLATES:
+            if defn["name"] in existing_names:
+                continue
             repo.create(
                 name=defn["name"],
                 prompt_text=defn.get("prompt_text", ""),

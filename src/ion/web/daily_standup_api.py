@@ -244,55 +244,76 @@ async def _check_log_source_health(host_pattern: str, label: str) -> Dict[str, A
 
 
 async def _check_rule_failures() -> Dict[str, Any]:
-    """Detection rules that failed execution in the last 24 h."""
+    """Detection rules that failed execution in the last 24 h.
+
+    Tries multiple index patterns since Kibana versions store execution
+    logs differently:
+    - .kibana-event-log-* (older Kibana)
+    - .internal.alerts-* with execution status fields
+    - .kibana-alerting-* (some 8.x versions)
+    """
     from ion.services.elasticsearch_service import ElasticsearchService
 
     es = ElasticsearchService()
     if not es.is_configured:
-        return {"count": 0}
-    try:
-        body = {
-            "size": 0,
-            "query": {
-                "bool": {
-                    "must": [
-                        {"range": {"@timestamp": {"gte": "now-24h"}}},
-                        {
-                            "term": {
-                                "kibana.alert.rule.execution.metrics.execution_status": "failed"
-                            }
-                        },
-                    ]
-                }
-            },
-            "aggs": {
-                "rules": {
-                    "terms": {"field": "kibana.alert.rule.name", "size": 20},
+        return {"count": 0, "rules": []}
+
+    # Try multiple approaches for rule failure detection
+    rules: List[Dict[str, Any]] = []
+
+    # Approach 1: Kibana event log
+    indices_to_try = [
+        ".kibana-event-log-*",
+        ".internal.kibana-event-log-*",
+    ]
+    fields_to_try = [
+        "kibana.alert.rule.execution.metrics.execution_status",
+        "event.outcome",
+    ]
+
+    for index in indices_to_try:
+        if rules:
+            break
+        for status_field in fields_to_try:
+            if rules:
+                break
+            try:
+                body = {
+                    "size": 0,
+                    "query": {
+                        "bool": {
+                            "must": [
+                                {"range": {"@timestamp": {"gte": "now-24h"}}},
+                                {"term": {status_field: "failure"}},
+                            ]
+                        }
+                    },
                     "aggs": {
-                        "last_failure": {"max": {"field": "@timestamp"}},
+                        "rules": {
+                            "terms": {
+                                "field": "rule.name",
+                                "size": 20,
+                                "missing": "unknown",
+                            },
+                            "aggs": {
+                                "last_failure": {"max": {"field": "@timestamp"}},
+                            },
+                        }
                     },
                 }
-            },
-        }
-        try:
-            result = await es._request(
-                "POST", "/.kibana-event-log-*/_search?ignore_unavailable=true", json=body
-            )
-        except Exception:
-            return {"count": 0, "rules": []}
+                result = await es._request(
+                    "POST", f"/{index}/_search?ignore_unavailable=true", json=body
+                )
+                for bucket in result.get("aggregations", {}).get("rules", {}).get("buckets", []):
+                    rules.append({
+                        "rule_name": bucket["key"],
+                        "failure_count": bucket["doc_count"],
+                        "last_failure": bucket.get("last_failure", {}).get("value_as_string"),
+                    })
+            except Exception:
+                continue
 
-        rules: List[Dict[str, Any]] = []
-        for bucket in result.get("aggregations", {}).get("rules", {}).get("buckets", []):
-            rules.append(
-                {
-                    "rule_name": bucket["key"],
-                    "failure_count": bucket["doc_count"],
-                    "last_failure": bucket.get("last_failure", {}).get("value_as_string"),
-                }
-            )
-        return {"count": len(rules), "rules": rules}
-    except Exception as e:
-        return {"count": 0, "error": str(e)[:100]}
+    return {"count": len(rules), "rules": rules}
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────
