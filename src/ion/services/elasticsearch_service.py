@@ -1054,6 +1054,99 @@ class ElasticsearchService:
             file_path=file_path_val,
         )
 
+    async def get_building_blocks(self, alert_id: str) -> List[Dict[str, Any]]:
+        """Fetch building block alerts for an EQL sequence/correlation alert.
+
+        EQL alerts store the real event data (process, file, network) in
+        child "building block" documents linked by ``kibana.alert.group.id``.
+        The parent alert only has the correlation metadata.
+
+        Returns a list of parsed event dicts sorted by timestamp, or an
+        empty list if the alert is not an EQL alert or has no blocks.
+        """
+        try:
+            # First get the parent alert to find its group.id
+            parent_result = await self._request(
+                "POST",
+                f"/{self.alert_index}/_search"
+                "?ignore_unavailable=true&expand_wildcards=open,hidden",
+                json={
+                    "size": 1,
+                    "query": {"ids": {"values": [alert_id]}},
+                    "_source": [
+                        "kibana.alert.group.id",
+                        "kibana.alert.rule.type",
+                    ],
+                },
+            )
+            hits = parent_result.get("hits", {}).get("hits", [])
+            if not hits:
+                return []
+
+            source = hits[0].get("_source", {})
+            _f = self._get_field
+            group_id = _f(source, "kibana.alert.group.id")
+            rule_type = _f(source, "kibana.alert.rule.type")
+
+            if not group_id:
+                return []
+
+            # Fetch all building blocks sharing this group.id
+            bb_result = await self._request(
+                "POST",
+                f"/{self.alert_index}/_search"
+                "?ignore_unavailable=true&expand_wildcards=open,hidden",
+                json={
+                    "size": 100,
+                    "sort": [{"@timestamp": {"order": "asc"}}],
+                    "query": {
+                        "bool": {
+                            "must": [
+                                {"term": {"kibana.alert.group.id": group_id}},
+                                {"exists": {"field": "kibana.alert.building_block_type"}},
+                            ]
+                        }
+                    },
+                },
+            )
+
+            blocks = []
+            for hit in bb_result.get("hits", {}).get("hits", []):
+                src = hit.get("_source", {})
+                block = {
+                    "id": hit.get("_id"),
+                    "timestamp": src.get("@timestamp"),
+                    "rule_name": _f(src, "kibana.alert.rule.name") or _f(src, "rule.name"),
+                    "host": _f(src, "host.hostname") or _f(src, "host.name"),
+                    "user": _f(src, "user.name"),
+                    "process_name": _f(src, "process.name"),
+                    "command_line": (
+                        _f(src, "process.command_line")
+                        or _f(src, "feature_command_line")
+                        or _f(src, "winlog.event_data.CommandLine")
+                    ),
+                    "parent_process": _f(src, "process.parent.name"),
+                    "file_name": _f(src, "file.name") or _f(src, "file.path"),
+                    "file_hash": (
+                        _f(src, "file.hash.sha256")
+                        or _f(src, "file.hash.md5")
+                    ),
+                    "source_ip": _f(src, "source.ip"),
+                    "destination_ip": _f(src, "destination.ip"),
+                    "event_action": _f(src, "event.action"),
+                }
+                # Handle list values
+                for k in ("process_name", "command_line", "source_ip", "destination_ip"):
+                    if isinstance(block[k], list):
+                        block[k] = block[k][0] if block[k] else None
+                blocks.append(block)
+
+            return blocks
+
+        except ElasticsearchError as e:
+            logger.warning("Failed to fetch building blocks for %s: %s", alert_id, e)
+            return []
+
     async def get_related_alerts(
         self,
         alert_id: str,

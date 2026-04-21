@@ -3556,6 +3556,23 @@ async def get_alert_raw_data(
     return {"raw_data": alerts[0].raw_data}
 
 
+@router.get("/elasticsearch/alerts/{alert_id}/sequence")
+async def get_alert_sequence(
+    alert_id: str,
+    current_user: User = Depends(require_permission("alert:read")),
+):
+    """Fetch building block events for an EQL sequence/correlation alert.
+
+    Returns the individual events that make up the correlation — each with
+    full process, file, network context that the parent alert lacks.
+    """
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=503, detail="Elasticsearch is not configured")
+    blocks = await service.get_building_blocks(alert_id)
+    return {"events": blocks, "count": len(blocks)}
+
+
 @router.get("/elasticsearch/alerts/systems")
 async def get_alert_systems(
     current_user: User = Depends(require_permission("alert:read")),

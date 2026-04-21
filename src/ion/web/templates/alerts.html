@@ -8095,6 +8095,7 @@ async function showAlertDetail(alertId) {
         <button class="detail-tab-btn" data-tab="timeline" onclick="switchDetailTab('timeline', this)">Timeline</button>
         <button class="detail-tab-btn" data-tab="comments" onclick="switchDetailTab('comments', this)">Comments</button>
         <button class="detail-tab-btn" data-tab="case" onclick="switchDetailTab('case', this)">Case</button>
+        <button class="detail-tab-btn" data-tab="sequence" onclick="switchDetailTab('sequence', this)">Sequence</button>
         <button class="detail-tab-btn" data-tab="rawdata" onclick="switchDetailTab('rawdata', this)">Raw Data</button>
     </div>
     <div id="detail-tab-related" class="detail-tab-content active">
@@ -8108,6 +8109,9 @@ async function showAlertDetail(alertId) {
     </div>
     <div id="detail-tab-case" class="detail-tab-content">
         <div class="loading">Loading case info...</div>
+    </div>
+    <div id="detail-tab-sequence" class="detail-tab-content">
+        <div id="sequence-content" class="loading">Click to load sequence events...</div>
     </div>
     <div id="detail-tab-rawdata" class="detail-tab-content">
         <div class="raw-data-container" id="raw-data-content">${alert.raw_data ? syntaxHighlightJSON(alert.raw_data) : '<div class="loading">Click to load raw data...</div>'}</div>
@@ -8167,6 +8171,44 @@ function switchDetailTab(tabId, btn) {
     document.querySelectorAll('.detail-tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`detail-tab-${tabId}`).classList.add('active');
+    // Lazy-load sequence events (EQL building blocks) on first click
+    if (tabId === 'sequence' && currentDetailAlert) {
+        const seqEl = document.getElementById('sequence-content');
+        if (seqEl && seqEl.classList.contains('loading')) {
+            seqEl.innerHTML = '<div class="loading">Loading sequence events...</div>';
+            fetch(`/api/elasticsearch/alerts/${encodeURIComponent(currentDetailAlert.id)}/sequence`)
+                .then(r => r.json())
+                .then(data => {
+                    const events = data.events || [];
+                    if (!events.length) {
+                        seqEl.innerHTML = '<div class="empty-state" style="padding:20px;text-align:center;color:#64748b;">No sequence events — this is not an EQL/correlation alert, or building blocks are not available.</div>';
+                        return;
+                    }
+                    let html = '<div style="font-size:11px;color:#64748b;margin-bottom:12px;">' + events.length + ' events in this sequence</div>';
+                    html += '<div class="sequence-timeline">';
+                    events.forEach((ev, i) => {
+                        const ts = ev.timestamp ? new Date(ev.timestamp).toLocaleString() : '';
+                        html += '<div style="border-left:2px solid #334155;padding:8px 0 8px 16px;margin-left:8px;position:relative;">';
+                        html += '<div style="position:absolute;left:-5px;top:12px;width:8px;height:8px;border-radius:50%;background:#6de4ff;"></div>';
+                        html += '<div style="font-size:10px;color:#64748b;margin-bottom:4px;">Step ' + (i+1) + ' &middot; ' + escapeHtml(ts) + '</div>';
+                        if (ev.process_name) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">Process:</span> <span style="color:#e2e8f0;font-family:monospace;font-size:11px;">' + escapeHtml(ev.process_name) + '</span></div>';
+                        if (ev.command_line) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">Command:</span> <span style="color:#f8b33a;font-family:monospace;font-size:10px;word-break:break-all;">' + escapeHtml(ev.command_line) + '</span></div>';
+                        if (ev.parent_process) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">Parent:</span> <span style="color:#94a3b8;font-family:monospace;font-size:11px;">' + escapeHtml(ev.parent_process) + '</span></div>';
+                        if (ev.file_name) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">File:</span> <span style="color:#e2e8f0;font-family:monospace;font-size:11px;">' + escapeHtml(ev.file_name) + '</span></div>';
+                        if (ev.file_hash) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">Hash:</span> <span style="color:#64748b;font-family:monospace;font-size:10px;">' + escapeHtml(ev.file_hash) + '</span></div>';
+                        if (ev.source_ip || ev.destination_ip) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">Network:</span> <span style="color:#e2e8f0;font-family:monospace;font-size:11px;">' + escapeHtml(ev.source_ip || '') + ' &rarr; ' + escapeHtml(ev.destination_ip || '') + '</span></div>';
+                        if (ev.host) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">Host:</span> <span style="color:#e2e8f0;font-size:11px;">' + escapeHtml(ev.host) + '</span></div>';
+                        if (ev.user) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">User:</span> <span style="color:#e2e8f0;font-size:11px;">' + escapeHtml(ev.user) + '</span></div>';
+                        if (ev.event_action) html += '<div><span style="color:#94a3b8;font-size:10px;">Action:</span> <span style="color:#6de4ff;font-size:11px;">' + escapeHtml(ev.event_action) + '</span></div>';
+                        html += '</div>';
+                    });
+                    html += '</div>';
+                    seqEl.innerHTML = html;
+                    seqEl.classList.remove('loading');
+                })
+                .catch(() => { seqEl.innerHTML = '<div class="error">Failed to load sequence</div>'; });
+        }
+    }
     // Lazy-load raw data on first click
     if (tabId === 'rawdata' && currentDetailAlert && !currentDetailAlert.raw_data) {
         const container = document.getElementById('raw-data-content');
