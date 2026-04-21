@@ -765,6 +765,7 @@ class ElasticsearchService:
 
         command_line = (
             _f(source, "process.command_line")
+            or _f(source, "feature_command_line")
             or _f(source, "process.args")
             or _f(source, "winlog.event_data.CommandLine")
         )
