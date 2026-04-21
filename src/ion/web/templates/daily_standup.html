@@ -107,9 +107,13 @@
             <div class="text-slate-400">Hosts w/ gaps: <span id="dc-gaps" class="text-white font-semibold">--</span></div>
             <div class="text-slate-400">Below avg: <span id="dc-below" class="text-white font-semibold">--</span></div>
           </div>
-          <div class="overflow-x-auto">
+          <div class="flex items-center justify-between mb-2">
+            <span id="dc-summary" class="text-[11px] text-slate-500"></span>
+            <button onclick="toggleLogHosts('dc')" id="dc-toggle" class="text-[10px] text-ion-cyan hover:text-white transition">Show all</button>
+          </div>
+          <div class="overflow-x-auto max-h-[320px] overflow-y-auto">
             <table class="w-full text-[12px]">
-              <thead><tr><th class="dth">Hostname</th><th class="dth">Events 24h</th><th class="dth">7d Avg</th><th class="dth">Below Avg</th><th class="dth">Gap Hours</th><th class="dth">Status</th></tr></thead>
+              <thead class="sticky top-0 bg-ink-900/95"><tr><th class="dth">Hostname</th><th class="dth">Events 24h</th><th class="dth">7d Avg</th><th class="dth">Below Avg</th><th class="dth">Gap Hours</th><th class="dth">Status</th></tr></thead>
               <tbody id="dc-tbody"><tr><td colspan="6" class="px-3 py-6 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
             </table>
           </div>
@@ -124,9 +128,13 @@
             <div class="text-slate-400">Hosts w/ gaps: <span id="wef-gaps" class="text-white font-semibold">--</span></div>
             <div class="text-slate-400">Below avg: <span id="wef-below" class="text-white font-semibold">--</span></div>
           </div>
-          <div class="overflow-x-auto">
+          <div class="flex items-center justify-between mb-2">
+            <span id="wef-summary" class="text-[11px] text-slate-500"></span>
+            <button onclick="toggleLogHosts('wef')" id="wef-toggle" class="text-[10px] text-ion-cyan hover:text-white transition">Show all</button>
+          </div>
+          <div class="overflow-x-auto max-h-[320px] overflow-y-auto">
             <table class="w-full text-[12px]">
-              <thead><tr><th class="dth">Hostname</th><th class="dth">Events 24h</th><th class="dth">7d Avg</th><th class="dth">Below Avg</th><th class="dth">Gap Hours</th><th class="dth">Status</th></tr></thead>
+              <thead class="sticky top-0 bg-ink-900/95"><tr><th class="dth">Hostname</th><th class="dth">Events 24h</th><th class="dth">7d Avg</th><th class="dth">Below Avg</th><th class="dth">Gap Hours</th><th class="dth">Status</th></tr></thead>
               <tbody id="wef-tbody"><tr><td colspan="6" class="px-3 py-6 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
             </table>
           </div>
@@ -402,21 +410,60 @@ function renderStaleCases(cases) {
 }
 
 /* ── S4: Log Health (DC + WEF) ── */
+const _logHostData = {};  // stores full host lists for toggle
+const _logShowAll = { dc: false, wef: false };
+
 function renderLogHealth(prefix, data) {
-  document.getElementById(prefix + '-total').textContent = data.total_events ?? '--';
+  document.getElementById(prefix + '-total').textContent = (data.total_events_24h ?? data.total_events ?? '--').toLocaleString();
   document.getElementById(prefix + '-gaps').textContent  = data.hosts_with_gaps ?? '--';
-  document.getElementById(prefix + '-below').textContent = data.hosts_below_avg ?? '--';
-  const tbody = document.getElementById(prefix + '-tbody');
+  document.getElementById(prefix + '-below').textContent = data.hosts_below_average ?? data.hosts_below_avg ?? '--';
   const hosts = data.hosts || [];
-  if (!hosts.length) { tbody.innerHTML = `<tr><td colspan="6" class="px-3 py-6 text-center text-slate-500">No host data</td></tr>`; return; }
-  tbody.innerHTML = hosts.map(h => `<tr class="border-b border-white/5 hover:bg-white/[.02] ${h.gap_hours > 0 ? 'ds-gap-row' : ''}">
-    <td class="px-3 py-2 text-white font-mono">${esc(h.hostname)}</td>
-    <td class="px-3 py-2 text-slate-300 tabular-nums">${h.events_24h ?? '--'}</td>
-    <td class="px-3 py-2 text-slate-400 tabular-nums">${h.avg_7d ?? '--'}</td>
-    <td class="px-3 py-2 ${h.below_avg ? 'text-ion-amber' : 'text-slate-400'}">${h.below_avg ? 'Y' : 'N'}</td>
-    <td class="px-3 py-2 text-slate-300 tabular-nums">${h.gap_hours ?? 0}</td>
+  _logHostData[prefix] = hosts;
+
+  const problems = hosts.filter(h => h.status !== 'ok');
+  const okCount = hosts.length - problems.length;
+  const summary = document.getElementById(prefix + '-summary');
+  summary.textContent = problems.length
+    ? `${problems.length} issue${problems.length > 1 ? 's' : ''} / ${hosts.length} hosts`
+    : `All ${hosts.length} hosts healthy`;
+
+  const toggle = document.getElementById(prefix + '-toggle');
+  toggle.textContent = _logShowAll[prefix] ? `Hide OK (${okCount})` : `Show all (${hosts.length})`;
+  toggle.style.display = hosts.length > 0 ? '' : 'none';
+
+  _renderLogRows(prefix);
+}
+
+function _renderLogRows(prefix) {
+  const tbody = document.getElementById(prefix + '-tbody');
+  const hosts = _logHostData[prefix] || [];
+  const showAll = _logShowAll[prefix];
+  const visible = showAll ? hosts : hosts.filter(h => h.status !== 'ok');
+
+  if (!hosts.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="px-3 py-6 text-center text-slate-500">No host data</td></tr>';
+    return;
+  }
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="px-3 py-4 text-center text-ion-lime text-[11px]">All ' + hosts.length + ' hosts reporting normally — click Show all to expand</td></tr>';
+    return;
+  }
+  tbody.innerHTML = visible.map(h => `<tr class="border-b border-white/5 hover:bg-white/[.02] ${h.status !== 'ok' ? 'ds-gap-row' : ''}">
+    <td class="px-3 py-2 text-white font-mono text-[11px]">${esc(h.hostname)}</td>
+    <td class="px-3 py-2 text-slate-300 tabular-nums">${(h.count_24h ?? h.events_24h ?? '--').toLocaleString()}</td>
+    <td class="px-3 py-2 text-slate-400 tabular-nums">${(h.avg_7d ?? '--').toLocaleString()}</td>
+    <td class="px-3 py-2 ${h.below_average || h.below_avg ? 'text-ion-amber font-semibold' : 'text-slate-500'}">${h.below_average || h.below_avg ? 'YES' : '-'}</td>
+    <td class="px-3 py-2 text-slate-300 tabular-nums ${(h.gap_hours ?? 0) > 0 ? 'text-ion-coral font-semibold' : ''}">${h.gap_hours ?? 0}</td>
     <td class="px-3 py-2">${statusPill(h.status)}</td>
   </tr>`).join('');
+}
+
+function toggleLogHosts(prefix) {
+  _logShowAll[prefix] = !_logShowAll[prefix];
+  const hosts = _logHostData[prefix] || [];
+  const okCount = hosts.filter(h => h.status === 'ok').length;
+  document.getElementById(prefix + '-toggle').textContent = _logShowAll[prefix] ? `Hide OK (${okCount})` : `Show all (${hosts.length})`;
+  _renderLogRows(prefix);
 }
 
 /* ── S5: Arkime ── */

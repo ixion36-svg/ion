@@ -151,7 +151,7 @@ async def _check_log_source_health(host_pattern: str, label: str) -> Dict[str, A
             },
             "aggs": {
                 "hosts": {
-                    "terms": {"field": "host.hostname", "size": 100},
+                    "terms": {"field": "host.hostname", "size": 500},
                     "aggs": {
                         "hourly": {
                             "date_histogram": {"field": "@timestamp", "fixed_interval": "1h"}
@@ -177,7 +177,7 @@ async def _check_log_source_health(host_pattern: str, label: str) -> Dict[str, A
             },
             "aggs": {
                 "hosts": {
-                    "terms": {"field": "host.hostname", "size": 100},
+                    "terms": {"field": "host.hostname", "size": 500},
                 }
             },
         }
