@@ -32,85 +32,92 @@
           <nav id="tw-nav" class="hidden md:flex items-center gap-0.5 text-[13px]">
             <a href="/" class="tw-nav-link {% if p == '/' %}is-active{% endif %}">Dashboard</a>
 
+            <!-- Investigate — core daily analyst triage workflow -->
             <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p == '/analyst' or p == '/briefing' or p.startswith('/alerts') or p.startswith('/cases') or p.startswith('/observables') or p.startswith('/entity-timeline') or p.startswith('/discover') or p.startswith('/chat') or p.startswith('/tools') or p == '/investigate' or p.startswith('/investigations') %}is-active{% endif %}">Investigate
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/alerts') or p.startswith('/cases') or p.startswith('/observables') or p.startswith('/entity-timeline') or p.startswith('/discover') or p.startswith('/chat') %}is-active{% endif %}">Investigate
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
-                <a href="/analyst" class="tw-drop-item {% if p == '/analyst' or p.startswith('/tools') %}is-active{% endif %}">SOC Dashboard</a>
-                <a href="/briefing" class="tw-drop-item {% if p == '/briefing' %}is-active{% endif %}">Morning Briefing</a>
                 <a href="/alerts" class="tw-drop-item {% if p.startswith('/alerts') and '/audit' not in p %}is-active{% endif %}">Alerts</a>
                 <a href="/cases" class="tw-drop-item {% if p.startswith('/cases') %}is-active{% endif %}">Cases</a>
                 <a href="/observables" class="tw-drop-item {% if p.startswith('/observables') %}is-active{% endif %}">Observables</a>
                 <a href="/entity-timeline" class="tw-drop-item {% if p.startswith('/entity-timeline') %}is-active{% endif %}">Entity Timeline</a>
                 <a href="/discover" class="tw-drop-item {% if p.startswith('/discover') %}is-active{% endif %}">Discover</a>
                 <a href="/chat" class="tw-drop-item {% if p.startswith('/chat') %}is-active{% endif %}">AI Chat</a>
-                <a href="/investigate" class="tw-drop-item {% if p == '/investigate' %}is-active{% endif %}">Investigation Queue</a>
-                <a href="/investigations" class="tw-drop-item {% if p.startswith('/investigations') %}is-active{% endif %}">Investigation Memory</a>
               </div>
             </div>
 
+            <!-- Respond — response, forensics, automation -->
+            <div class="tw-drop" data-drop>
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/playbooks') or p.startswith('/forensics') or p.startswith('/pcap') or p == '/investigate' or p.startswith('/investigations') or p == '/case-grouper' %}is-active{% endif %}">Respond
+                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
+              </button>
+              <div class="tw-drop-menu">
+                <a href="/playbooks" class="tw-drop-item {% if p.startswith('/playbooks') %}is-active{% endif %}">Playbooks</a>
+                <a href="/investigate" class="tw-drop-item {% if p == '/investigate' %}is-active{% endif %}">Investigation Queue</a>
+                <a href="/investigations" class="tw-drop-item {% if p.startswith('/investigations') %}is-active{% endif %}">Investigation Memory</a>
+                <a href="/forensics" id="nav-forensics-link" class="tw-drop-item {% if p.startswith('/forensics') %}is-active{% endif %}">Forensics</a>
+                <a href="/pcap" class="tw-drop-item {% if p.startswith('/pcap') %}is-active{% endif %}">PCAP Analyzer</a>
+                <a href="/case-grouper" class="tw-drop-item {% if p == '/case-grouper' %}is-active{% endif %}">Case Grouper</a>
+              </div>
+            </div>
+
+            <!-- Threat Intel — intelligence & hunting -->
             <div class="tw-drop" data-drop>
               <button class="tw-nav-link tw-drop-btn {% if p.startswith('/threat-intel') or p.startswith('/threat-landscape') or p.startswith('/attack-stories') or p.startswith('/threat-hunting') or p.startswith('/canaries') or p.startswith('/knowledge-graph') %}is-active{% endif %}">Threat Intel
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
-                <a href="/threat-intel" class="tw-drop-item {% if p == '/threat-intel' %}is-active{% endif %}">Threat Intel</a>
                 <a href="/threat-landscape" class="tw-drop-item {% if p.startswith('/threat-landscape') %}is-active{% endif %}">Threat Landscape</a>
-                <a href="/attack-stories" class="tw-drop-item {% if p.startswith('/attack-stories') %}is-active{% endif %}">Attack Stories</a>
+                <a href="/threat-intel" class="tw-drop-item {% if p == '/threat-intel' %}is-active{% endif %}">Threat Intel</a>
                 <a href="/threat-hunting" class="tw-drop-item {% if p.startswith('/threat-hunting') %}is-active{% endif %}">Threat Hunting</a>
-                <a href="/canaries" class="tw-drop-item {% if p.startswith('/canaries') %}is-active{% endif %}">Canaries</a>
+                <a href="/attack-stories" class="tw-drop-item {% if p.startswith('/attack-stories') %}is-active{% endif %}">Attack Stories</a>
                 <a href="/knowledge-graph" class="tw-drop-item {% if p.startswith('/knowledge-graph') %}is-active{% endif %}">Knowledge Graph</a>
+                <a href="/canaries" class="tw-drop-item {% if p.startswith('/canaries') %}is-active{% endif %}">Canaries</a>
               </div>
             </div>
 
-            <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/shift-handover') or p.startswith('/playbooks') or p.startswith('/forensics') or p.startswith('/pcap') or p.startswith('/alert-prompts') or p == '/scheduler' or p == '/case-grouper' %}is-active{% endif %}">Operations
-                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
-              </button>
-              <div class="tw-drop-menu">
-                <a href="/shift-handover" class="tw-drop-item {% if p.startswith('/shift-handover') %}is-active{% endif %}">Shift Handover</a>
-                <a href="/playbooks" class="tw-drop-item {% if p.startswith('/playbooks') %}is-active{% endif %}">Playbooks</a>
-                <a href="/alert-prompts" class="tw-drop-item {% if p.startswith('/alert-prompts') %}is-active{% endif %}">Alert Prompt Templates</a>
-                <a href="/forensics" id="nav-forensics-link" class="tw-drop-item {% if p.startswith('/forensics') %}is-active{% endif %}" style="display:none;">Forensics</a>
-                <a href="/pcap" class="tw-drop-item {% if p.startswith('/pcap') %}is-active{% endif %}">PCAP Analyzer</a>
-                <a href="/scheduler" class="tw-drop-item {% if p == '/scheduler' %}is-active{% endif %}">Job Scheduler</a>
-                <a href="/case-grouper" class="tw-drop-item {% if p == '/case-grouper' %}is-active{% endif %}">Case Grouper</a>
-              </div>
-            </div>
-
+            <!-- Engineering — detection & infrastructure -->
             <div class="tw-drop" data-drop id="nav-group-engineering">
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/detection-engineering') or p.startswith('/cyab') or p.startswith('/log-sources') or p.startswith('/data-flow') or p.startswith('/engineering-analytics') or p.startswith('/gitlab') or p.startswith('/topology') or p.startswith('/architecture') or p.startswith('/network-map') or p.startswith('/security') or p.startswith('/integrations') or p.startswith('/users') or p.startswith('/audit-logs') %}is-active{% endif %}">Engineering
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/detection-engineering') or p.startswith('/cyab') or p.startswith('/log-sources') or p.startswith('/data-flow') or p.startswith('/engineering-analytics') or p.startswith('/network-map') %}is-active{% endif %}">Engineering
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
                 <a href="/detection-engineering" class="tw-drop-item {% if p.startswith('/detection-engineering') %}is-active{% endif %}">Detection Engineering</a>
                 <a href="/cyab" class="tw-drop-item {% if p.startswith('/cyab') %}is-active{% endif %}">CyAB</a>
                 <a href="/log-sources" class="tw-drop-item {% if p.startswith('/log-sources') %}is-active{% endif %}">Log Source Health</a>
-                <a href="/data-flow" class="tw-drop-item {% if p.startswith('/data-flow') %}is-active{% endif %}">Data Flow</a>
                 <a href="/network-map" class="tw-drop-item {% if p.startswith('/network-map') %}is-active{% endif %}">Network Map</a>
+                <a href="/data-flow" class="tw-drop-item {% if p.startswith('/data-flow') %}is-active{% endif %}">Data Flow</a>
                 <a href="/engineering-analytics" class="tw-drop-item {% if p.startswith('/engineering-analytics') %}is-active{% endif %}">System Analytics</a>
-                <a href="/gitlab" class="tw-drop-item {% if p.startswith('/gitlab') %}is-active{% endif %}">GitLab</a>
-                <a href="/topology" id="nav-topology-link" class="tw-drop-item {% if p.startswith('/topology') %}is-active{% endif %}" style="display:none;">Topology</a>
-                <a href="/architecture" id="nav-architecture-link" class="tw-drop-item {% if p.startswith('/architecture') %}is-active{% endif %}" style="display:none;">Architecture</a>
-                <a href="/security" id="nav-security-link" class="tw-drop-item {% if p.startswith('/security') %}is-active{% endif %}" style="display:none;">Security</a>
-                <a href="/integrations" id="nav-integrations-link" class="tw-drop-item {% if p.startswith('/integrations') %}is-active{% endif %}" style="display:none;">Integrations</a>
-                <a href="/users" id="nav-admin-links" class="tw-drop-item {% if p.startswith('/users') %}is-active{% endif %}" style="display:none;">Users</a>
-                <a href="/audit-logs" id="nav-audit-link" class="tw-drop-item {% if p.startswith('/audit-logs') %}is-active{% endif %}" style="display:none;">Audit Logs</a>
               </div>
             </div>
 
+            <!-- Reporting — metrics & compliance -->
             <div class="tw-drop" data-drop>
               <button class="tw-nav-link tw-drop-btn {% if p.startswith('/soc-health') or p.startswith('/compliance') or p.startswith('/executive-report') or p.startswith('/analyst-efficiency') or p.startswith('/analytics') or p.startswith('/maturity') %}is-active{% endif %}">Reporting
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
                 <a href="/soc-health" class="tw-drop-item {% if p.startswith('/soc-health') %}is-active{% endif %}">SOC Health</a>
-                <a href="/compliance" class="tw-drop-item {% if p.startswith('/compliance') %}is-active{% endif %}">Compliance</a>
                 <a href="/executive-report" class="tw-drop-item {% if p.startswith('/executive-report') %}is-active{% endif %}">Executive Report</a>
                 <a href="/analyst-efficiency" class="tw-drop-item {% if p.startswith('/analyst-efficiency') %}is-active{% endif %}">Analyst Efficiency</a>
-                <a href="/analytics" class="tw-drop-item {% if p.startswith('/analytics') %}is-active{% endif %}">Analytics Engine</a>
+                <a href="/compliance" class="tw-drop-item {% if p.startswith('/compliance') %}is-active{% endif %}">Compliance</a>
                 <a href="/maturity" class="tw-drop-item {% if p.startswith('/maturity') %}is-active{% endif %}">Maturity</a>
+                <a href="/analytics" class="tw-drop-item {% if p.startswith('/analytics') %}is-active{% endif %}">Analytics Engine</a>
+              </div>
+            </div>
+
+            <!-- Operations — shift ops, config, scheduling -->
+            <div class="tw-drop" data-drop>
+              <button class="tw-nav-link tw-drop-btn {% if p == '/analyst' or p == '/briefing' or p.startswith('/shift-handover') or p.startswith('/alert-prompts') or p == '/scheduler' or p.startswith('/tools') %}is-active{% endif %}">Operations
+                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
+              </button>
+              <div class="tw-drop-menu">
+                <a href="/analyst" class="tw-drop-item {% if p == '/analyst' or p.startswith('/tools') %}is-active{% endif %}">SOC Workspace</a>
+                <a href="/briefing" class="tw-drop-item {% if p == '/briefing' %}is-active{% endif %}">Morning Briefing</a>
+                <a href="/shift-handover" class="tw-drop-item {% if p.startswith('/shift-handover') %}is-active{% endif %}">Shift Handover</a>
+                <a href="/alert-prompts" class="tw-drop-item {% if p.startswith('/alert-prompts') %}is-active{% endif %}">Alert Prompts</a>
+                <a href="/scheduler" class="tw-drop-item {% if p == '/scheduler' %}is-active{% endif %}">Job Scheduler</a>
               </div>
             </div>
 
@@ -130,7 +137,7 @@
               </div>
             </div>
 
-            <a href="/settings" id="nav-settings-link" class="tw-nav-link {% if p.startswith('/settings') %}is-active{% endif %}" style="display:none;">Settings</a>
+            <!-- Settings moved to user dropdown admin section -->
           </nav>
         </div>
 
@@ -162,6 +169,15 @@
                   <span id="ion-mode-label" class="font-mono text-[10px] uppercase tracking-wider text-slate-500">Dark</span>
                 </button>
                 <a href="#" onclick="logout(); return false;" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Sign Out</a>
+              </div>
+              <!-- Admin section — shown via JS when user has admin/engineering role -->
+              <div id="user-dropdown-admin" class="border-t border-white/10 py-1" style="display:none;">
+                <div class="px-4 py-1 text-[10px] text-slate-500 uppercase tracking-wider">Admin</div>
+                <a href="/settings" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Settings</a>
+                <a href="/users" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Users</a>
+                <a href="/integrations" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Integrations</a>
+                <a href="/gitlab" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">GitLab</a>
+                <a href="/audit-logs" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Audit Logs</a>
               </div>
             </div>
           </div>

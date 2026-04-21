@@ -213,6 +213,10 @@ function updateNavForPermissions() {
         if (el) el.style.display = isAdmin ? '' : 'none';
     });
 
+    // User dropdown admin section — visible for admin/engineering roles
+    const adminDropdown = document.getElementById('user-dropdown-admin');
+    if (adminDropdown) adminDropdown.style.display = (isAdmin || isEngineer) ? '' : 'none';
+
     // Forensics link — only visible when user has forensic:read
     const forensicsLink = document.getElementById('nav-forensics-link');
     if (forensicsLink) {
