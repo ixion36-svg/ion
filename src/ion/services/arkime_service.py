@@ -66,17 +66,16 @@ class ArkimeError(Exception):
 class ArkimeService:
     """Thin async client for the Arkime viewer API.
 
-    Auth: explicit ``Authorization`` header only (no httpx auth objects).
-    Username/password yields ``Authorization: Basic <base64>`` by default,
-    or ``Authorization: Digest <base64>`` when ``ION_ARKIME_AUTH_MODE=digest``.
-    An ``ION_ARKIME_API_KEY`` yields ``Authorization: Digest <api_key>``
-    (Arkime's native API-key format).
+    Auth: **Basic only.** v0.10.4 locks Arkime to HTTP Basic auth via an
+    explicit ``Authorization: Basic <base64>`` header. Digest and API-key
+    flows were removed — they were prone to challenge/response issues
+    behind proxies and mixed-auth setups. If your Arkime deployment requires
+    something else, front it with nginx + Basic.
 
     Configuration (.env):
         ION_ARKIME_URL=https://arkime.example.com
         ION_ARKIME_USERNAME=admin
         ION_ARKIME_PASSWORD=password
-        ION_ARKIME_AUTH_MODE=basic   # basic (default) | digest
         ION_ARKIME_VERIFY_SSL=false
     """
 
@@ -85,19 +84,14 @@ class ArkimeService:
         url: Optional[str] = None,
         username: Optional[str] = None,
         password: Optional[str] = None,
-        api_key: Optional[str] = None,
         verify_ssl: Optional[bool] = None,
-        **_kwargs,  # Accept and ignore legacy keycloak_* args
+        **_kwargs,  # Accept and ignore legacy api_key / keycloak_* / auth_mode args
     ):
         config = get_arkime_config()
         self.url = (url if url is not None else config.get("url", "")).rstrip("/")
         self.username = username if username is not None else config.get("username", "")
         self.password = password if password is not None else config.get("password", "")
-        self.api_key = api_key if api_key is not None else config.get("api_key", "")
         self.verify_ssl = verify_ssl if verify_ssl is not None else config.get("verify_ssl", True)
-        # Auth mode: "basic" for nginx/proxy setups, "digest" for native Arkime
-        import os
-        self.auth_mode = os.environ.get("ION_ARKIME_AUTH_MODE", "basic").lower()
 
     @property
     def _has_basic(self) -> bool:
@@ -105,18 +99,16 @@ class ArkimeService:
 
     @property
     def is_configured(self) -> bool:
-        return bool(self.url and (self.api_key or self._has_basic))
+        """Basic auth only — username + password are mandatory."""
+        return bool(self.url and self._has_basic)
 
     async def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        """Build request headers.
+        """Build request headers with HTTP Basic auth.
 
-        Always sends credentials as an explicit ``Authorization`` header
-        — no httpx BasicAuth/DigestAuth objects. This reverts to the
-        pre-httpx-auth behaviour that worked reliably against the
-        production Arkime viewer. The ``ION_ARKIME_AUTH_MODE`` env var
-        is still honoured but only picks the scheme word:
-          - ``basic`` (default) with username/password → ``Authorization: Basic <base64>``
-          - ``digest`` / or api_key set → ``Authorization: Digest <api_key or user:pass>``
+        Single auth path — no httpx auth objects, no digest challenge, no
+        API-key scheme. If ``ION_ARKIME_USERNAME``/``_PASSWORD`` aren't
+        set, ``is_configured`` returns False and callers short-circuit
+        before we ever get here.
         """
         headers: Dict[str, str] = {"Accept": "application/json"}
         if self._has_basic:
@@ -124,10 +116,7 @@ class ArkimeService:
             creds = base64.b64encode(
                 f"{self.username}:{self.password}".encode()
             ).decode()
-            scheme = "Digest" if self.auth_mode == "digest" else "Basic"
-            headers["Authorization"] = f"{scheme} {creds}"
-        elif self.api_key:
-            headers["Authorization"] = f"Digest {self.api_key}"
+            headers["Authorization"] = f"Basic {creds}"
         if extra:
             headers.update(extra)
         return headers
@@ -175,7 +164,7 @@ class ArkimeService:
                     "connected": True,
                     "url": self.url,
                     "user": data.get("userId") or self.username or "",
-                    "auth_mode": "api_key" if self.api_key else "digest",
+                    "auth_mode": "basic",
                 }
             return {
                 "connected": False,
@@ -218,7 +207,7 @@ class ArkimeService:
             "length": str(limit),
             "fields": self._SESSION_FIELDS,
         }
-        logger.debug(
+        logger.info(
             "Arkime community_id search: expression=%r (alert node hint=%r)",
             expression, node,
         )
@@ -399,6 +388,11 @@ class ArkimeService:
 
         url = f"{self.url}/api/session/{node}/{session_id}/pcap"
         headers = await self._headers({"Accept": "application/vnd.tcpdump.pcap"})
+        # Emitted at INFO so `docker compose logs ion | grep "Arkime PCAP GET"`
+        # surfaces the exact URL being requested — useful for debugging 404s
+        # caused by node-name or session-id format mismatches.
+        logger.info("Arkime PCAP GET %s (auth scheme=%s)", url,
+                    headers.get("Authorization", "").split(" ", 1)[0] or "none")
         try:
             async with await self._client() as client:
                 resp = await client.get(

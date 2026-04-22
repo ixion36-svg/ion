@@ -152,6 +152,9 @@ from ion.models.ticker import Ticker, TickerDismissal, TickerKind, TickerSeverit
 from ion.models.tuning_proposal import TuningProposal, TuningProposalStatus  # noqa: F401
 from ion.models.ai_feedback import AIFeedback  # noqa: F401
 
+# v0.10.4: case-similarity embeddings (pgvector-backed).
+from ion.models.case_embedding import CaseEmbedding  # noqa: F401
+
 __all__ = [
     "Base",
     "Template",

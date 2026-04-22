@@ -15,6 +15,7 @@ from urllib.parse import quote as url_quote
 from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File, Form, Depends, Request, Response, Cookie
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.orm import Session, selectinload
 import httpx
 from slowapi import Limiter
@@ -4518,6 +4519,59 @@ async def add_case_note(
         "content": note.content,
         "created_at": note.created_at.isoformat() if note.created_at else None,
     }
+
+
+@router.get("/elasticsearch/alerts/cases/{case_id}/similar")
+async def get_similar_cases(
+    case_id: int,
+    limit: int = 5,
+    min_similarity: float = 0.5,
+    current_user: User = Depends(require_permission("case:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Top-N closed cases most similar to this one (pgvector cosine distance).
+
+    Used by the "Similar cases" sidebar to help analysts spot campaigns and
+    reuse prior closure verdicts. Only returns cases where a human set a
+    closure_reason — excludes open cases and the query case itself.
+    """
+    # Narrow to cases that actually have a human verdict we can trust.
+    # Empty list is a valid answer (Ollama unreachable, or not embedded yet).
+    from ion.models.case_embedding import CaseEmbedding
+
+    target = session.query(CaseEmbedding).filter_by(case_id=case_id).first()
+    if target is None:
+        return {"similar": [], "reason": "query case not embedded yet"}
+
+    # Use pgvector's ORM method so SQLAlchemy + psycopg2 handle type
+    # conversion (numpy ndarray → pgvector literal) via the registered
+    # adapter. Cosine distance: 0 = identical, 1 = orthogonal, 2 = opposite.
+    safe_limit = max(1, min(int(limit), 25))
+    distance = CaseEmbedding.embedding.cosine_distance(target.embedding)
+    rows = (
+        session.query(AlertCase, distance.label("distance"))
+        .join(CaseEmbedding, CaseEmbedding.case_id == AlertCase.id)
+        .filter(AlertCase.id != case_id)
+        .filter(AlertCase.closure_reason.isnot(None))
+        .order_by(distance.asc())
+        .limit(safe_limit)
+        .all()
+    )
+    items = []
+    for case, dist in rows:
+        similarity = 1.0 - float(dist)
+        if similarity < float(min_similarity):
+            continue
+        items.append({
+            "case_id": case.id,
+            "case_number": case.case_number,
+            "title": case.title,
+            "severity": case.severity,
+            "closure_reason": case.closure_reason,
+            "closed_at": case.closed_at.isoformat() if case.closed_at else None,
+            "similarity": round(similarity, 3),
+        })
+    return {"similar": items, "count": len(items)}
 
 
 @router.get("/elasticsearch/alerts/cases/{case_id}")

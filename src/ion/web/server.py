@@ -638,6 +638,22 @@ async def startup_event():
     except Exception as exc:
         logger.warning("Failed to start ticker loop: %s", exc)
 
+    # ---------------------------------------------------------------
+    # Case-embedding background producer — embeds cases via Ollama for
+    # similarity search. Honours ION_EMBEDDING_ENABLED / _INTERVAL_S.
+    # Silently no-ops when Ollama isn't reachable.
+    # ---------------------------------------------------------------
+    def _start_case_embedding_loop():
+        from ion.services.case_embedding_service import (
+            start_case_embedding_if_enabled,
+        )
+        start_case_embedding_if_enabled(engine=engine)
+        logger.info("Case-embedding background loop started")
+    try:
+        _start_case_embedding_loop()
+    except Exception as exc:
+        logger.warning("Failed to start case-embedding loop: %s", exc)
+
     # Version compatibility checks for connectors that declare supported ranges
     try:
         from ion.services.connectors import get_connector_registry

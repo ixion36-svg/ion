@@ -78,6 +78,7 @@ LOCK_SCHEDULER_BG           = 1015
 LOCK_INVESTIGATION_BG       = 1016
 LOCK_CASE_GROUPER_BG        = 1017
 LOCK_TICKER_BG              = 1018
+LOCK_CASE_EMBEDDING_BG      = 1019
 
 
 @contextmanager
@@ -266,6 +267,21 @@ def _run_migrations(engine: Engine) -> None:
     insp = inspect(engine)
     # Use TIMESTAMP for PostgreSQL, DATETIME for SQLite
     dt_type = "TIMESTAMP" if _is_postgres(engine) else "DATETIME"
+
+    # v0.10.4: enable pgvector for case-similarity embeddings. Idempotent.
+    # Runs BEFORE the CREATE TABLE sweep so new tables can use VECTOR columns.
+    if _is_postgres(engine):
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                logger.info("Migrated: CREATE EXTENSION vector (pgvector)")
+        except Exception as exc:
+            logger.warning(
+                "Failed to enable pgvector extension (is the image "
+                "pgvector/pgvector:pg16?): %s", exc,
+            )
+        # Create the HNSW index on case_embeddings — needs the table to
+        # exist, so we defer to after create_all (see _finalize_migrations).
 
     # v0.9.76: drop the notifications table — feature removed. Safe & idempotent.
     if insp.has_table("notifications"):
@@ -738,6 +754,13 @@ def init_db(db_path: Optional[Path] = None) -> Engine:
     engine = get_engine(db_path)
     Base.metadata.create_all(engine)
     _run_migrations(engine)
+    # v0.10.4: HNSW index on case_embeddings.embedding needs the table to
+    # exist first — runs after create_all and the column migrations.
+    try:
+        from ion.models.case_embedding import ensure_hnsw_index
+        ensure_hnsw_index(engine)
+    except Exception as exc:  # pragma: no cover
+        logger.debug("HNSW index creation skipped: %s", exc)
     return engine
 
 

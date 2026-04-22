@@ -2216,6 +2216,8 @@ async function openCaseDetail(caseId) {
         if (c.kibana_case_id) {
             loadKibanaComments(c.kibana_case_id);
         }
+        // Similar cases sidebar — best-effort async load
+        loadSimilarCases(c.id);
     } catch (e) {
         body.innerHTML = '<p style="color:#ef4444;text-align:center;padding:2rem;">Failed to load case details</p>';
     }
@@ -2393,6 +2395,12 @@ function renderPanelContent(c) {
         html += '</div></div>';
     }
 
+    // ── Similar Cases (pgvector-backed, loaded async) ──────
+    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section-title">Similar Closed Cases</div>';
+    html += '<div id="similar-cases-container" style="font-size:0.8rem;color:var(--text-secondary);">Loading…</div>';
+    html += '</div>';
+
     // ── Linked Alerts (enriched) ───────────────────────────
     const alerts = c.alerts || [];
     html += '<div class="cpanel-section">';
@@ -2492,6 +2500,53 @@ function renderPanelContent(c) {
     html += '<div id="case-playbook-browser-' + c.id + '" style="display:none;"></div>';
 
     return html;
+}
+
+// ── Load Similar Cases (pgvector-backed) ──────────────────
+async function loadSimilarCases(caseId) {
+    const container = document.getElementById('similar-cases-container');
+    if (!container) return;
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/similar?limit=5');
+        if (!resp.ok) {
+            container.innerHTML = '<div class="cpanel-empty-hint">Similarity unavailable</div>';
+            return;
+        }
+        const data = await resp.json();
+        const items = data.similar || [];
+        if (!items.length) {
+            const reason = data.reason ? ' (' + esc(data.reason) + ')' : '';
+            container.innerHTML = '<div class="cpanel-empty-hint">No similar closed cases yet' + reason + '</div>';
+            return;
+        }
+        // Colour-code closure_reason — true_positive red-ish, false_positive
+        // green-ish, benign_true_positive amber, others grey. Matches how
+        // detection-eng reads the scorecard.
+        const closureColors = {
+            true_positive: { bg: 'rgba(239,68,68,.14)', color: 'var(--danger,#ef4444)' },
+            false_positive: { bg: 'rgba(34,197,94,.14)', color: 'var(--success,#22c55e)' },
+            benign_true_positive: { bg: 'rgba(245,158,11,.14)', color: 'var(--warning,#f59e0b)' },
+            duplicate: { bg: 'rgba(107,114,128,.14)', color: '#9ca3af' },
+            insufficient_data: { bg: 'rgba(107,114,128,.14)', color: '#9ca3af' },
+            not_applicable: { bg: 'rgba(107,114,128,.14)', color: '#9ca3af' },
+        };
+        container.innerHTML = items.map(s => {
+            const c = closureColors[s.closure_reason] || closureColors.not_applicable;
+            const pct = Math.round((s.similarity || 0) * 100) + '%';
+            return '<div class="cpanel-alert-card" onclick="openCaseDetail(' + s.case_id + ')" style="cursor:pointer;">'
+                +   '<div class="cpanel-alert-card-header">'
+                +     '<a class="cpanel-alert-id" href="javascript:openCaseDetail(' + s.case_id + ')">' + esc(s.case_number || ('#' + s.case_id)) + '</a>'
+                +     '<div class="cpanel-alert-badges">'
+                +       '<span class="cpanel-alert-badge" title="Cosine similarity" style="background:rgba(109,228,255,.12);color:#6de4ff;">' + esc(pct) + '</span>'
+                +       '<span class="cpanel-alert-badge" style="background:' + c.bg + ';color:' + c.color + ';">' + esc((s.closure_reason || '').replace(/_/g, ' ')) + '</span>'
+                +     '</div>'
+                +   '</div>'
+                +   '<div class="cpanel-alert-card-meta">' + esc((s.title || '').slice(0, 120)) + '</div>'
+                + '</div>';
+        }).join('');
+    } catch (e) {
+        container.innerHTML = '<div class="cpanel-empty-hint">Similarity unavailable</div>';
+    }
 }
 
 // ── Load Kibana Comments ───────────────────────────────────

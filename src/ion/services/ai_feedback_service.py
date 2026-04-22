@@ -53,7 +53,7 @@ def record_case_close_feedback(
             inv = (
                 session.execute(
                     select(Investigation)
-                    .where(Investigation.alert_id == alert_id)
+                    .where(Investigation.alert_id_ref == alert_id)
                     .order_by(Investigation.id.desc())
                     .limit(1)
                 ).scalar_one_or_none()

@@ -7,7 +7,10 @@ services:
   # PostgreSQL - Primary Database
   # ======================================================================
   postgres:
-    image: postgres:16-alpine
+    # v0.10.4: switched from postgres:16-alpine to pgvector/pgvector:pg16
+    # — same PG16 (data-compatible), preinstalled pgvector extension for
+    # case-similarity embeddings. Debian-based, ~50 MB larger than alpine.
+    image: pgvector/pgvector:pg16
     container_name: ion-postgres
     restart: unless-stopped
 
@@ -91,7 +94,7 @@ services:
     # build: .  # Uncomment to build from source instead of pulling
 
 
-    image: ixion36/ion:${ION_VERSION:-0.10.2}
+    image: ixion36/ion:${ION_VERSION:-0.10.4}
 
     container_name: ion
     restart: unless-stopped
@@ -239,7 +242,7 @@ services:
   seeder:
 
 
-    image: ixion36/ion:${ION_VERSION:-0.10.2}
+    image: ixion36/ion:${ION_VERSION:-0.10.4}
 
     container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]
