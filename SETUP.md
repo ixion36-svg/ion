@@ -107,22 +107,94 @@ ION_SSL_KEY=/path/to/key.pem
 
 ## Air-Gapped / Siloed Deployment
 
-For environments without internet access:
+For environments without internet access. Starting **v0.10.4**, ION's stack
+has three images that must cross the gap (ION, pgvector, Ollama) **plus** two
+Ollama models that have to live inside the Ollama volume (the chat model and
+`nomic-embed-text` for embeddings). A bundle that only ships the ION image
+is a silent partial upgrade — the app boots, but case similarity, KB RAG, and
+the Similar-Cases sidebar all quietly return nothing.
+
+### What crosses the gap
+
+| Artefact | Why |
+|---|---|
+| `ixion36/ion:<VERSION>` | Application |
+| `pgvector/pgvector:<PG_VERSION>` | Postgres **with pgvector** (not plain postgres) |
+| `ollama/ollama:latest` | LLM host |
+| Chat model (e.g. `llama3.1:8b`) | Bob's reasoning |
+| `nomic-embed-text` model | Embeddings — **new in v0.10.4, silently required by case-similarity + KB RAG** |
+| `docker-compose.yml` | Config (pinned to matching ION + PG versions) |
+| `.env` | Credentials + feature flags |
+
+### Build the bundle (on an internet-connected box)
 
 ```bash
-# On a machine WITH internet:
-docker pull ixion36/ion:latest
-docker pull postgres:16-alpine
-docker save ixion36/ion:latest postgres:16-alpine -o ion-bundle.tar
+# From the repo root
+./scripts/build-offline-package.sh [ion_version] [chat_model] [pg_version]
 
-# Transfer ion-bundle.tar + docker-compose.yml + .env.deploy to the air-gapped machine
-
-# On the air-gapped machine:
-docker load -i ion-bundle.tar
-cp .env.deploy .env
-# Edit .env with your internal IPs
-docker compose up -d
+# Examples
+./scripts/build-offline-package.sh 0.10.9
+./scripts/build-offline-package.sh 0.10.9 llama3.1:8b pg17
+./scripts/build-offline-package.sh 0.10.9 qwen2.5:3b pg16
 ```
+
+Output lands in `./dist/ion-offline-<VERSION>/` and contains:
+
+- `images/` — ION + pgvector + Ollama image tarballs
+- `models/ollama-models.tar.gz` — chat model + `nomic-embed-text` pre-populated
+- `deploy/` — nginx + HTTPS override configs
+- `docker-compose.yml`, `.env` (stamped with `ION_VERSION`, `PG_VERSION`, model names), `load.sh`
+- `MANIFEST.sha256` — integrity manifest
+
+### Transport
+
+Copy the entire `dist/ion-offline-<VERSION>/` directory across your diode / USB / WAN-of-choice.
+
+### Load on the air-gapped side
+
+```bash
+cd ion-offline-<VERSION>/
+chmod +x load.sh
+./load.sh
+
+# load.sh does:
+#   1. sha256sum -c MANIFEST.sha256 (integrity)
+#   2. docker load for each images/*.tar.gz
+#   3. Restore the ollama-models volume (named <project>_ollama-models)
+#   4. Idempotent — safe to re-run
+
+# Then:
+# Edit .env — change the admin password, set ION_BASE_URL, any integrations
+docker compose --profile ai up -d
+```
+
+### Turn on case-similarity + KB RAG (opt-in)
+
+These are **off by default** because they need Ollama reachable. In the
+air-gapped bundle the models are pre-loaded, so all you do is flip the flags
+in `.env`:
+
+```bash
+ION_EMBEDDING_ENABLED=true            # enables case-embedding loop
+ION_FEW_SHOT_EXEMPLARS_ENABLED=true   # Bob's prompt gets similar past cases
+ION_KB_RAG_ENABLED=true               # Bob's prompt gets KB article context
+```
+
+Restart ION (`docker compose restart ion`). Case embeddings catch up in ~15 min; the KB (~392 articles) finishes in ~15 min.
+
+### Picking the right PG_VERSION
+
+Set `PG_VERSION` in `.env` on both sides to match the major version of your existing postgres volume. If you're starting fresh it doesn't matter much — pick `pg16` or `pg17`. If you have existing data, **the pgvector image major must match** (pg15 binaries can't read pg16 data files):
+
+```bash
+# Check your existing postgres version before building the bundle:
+docker exec ion-postgres psql -U ion -d ion -c "SELECT version();"
+# Then use the matching pgvector tag (pg15, pg16, pg17) in the build command.
+```
+
+### Upgrading an air-gapped deployment
+
+The old "just ship the new ION image" shortcut **breaks** from v0.10.4+ because it leaves the old plain-postgres image (no pgvector) and never updates the Ollama models. Always rebuild the full bundle with `build-offline-package.sh` and re-run `load.sh` on the air-gapped side. The loader is idempotent and won't clobber existing data volumes.
 
 ---
 

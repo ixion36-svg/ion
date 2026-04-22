@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.10.9 (2026-04-22)
+
+### Air-gapped deployment — full bundle rebuild
+- `scripts/build-offline-package.sh` rewritten for v0.10.4+ stack:
+  - Adds `pgvector/pgvector:<PG_VERSION>` image (was missing — plain postgres has no pgvector binaries)
+  - Adds `nomic-embed-text` model alongside the chat model in the Ollama volume export (was missing — case-similarity + KB RAG silently no-op without it)
+  - Emits `MANIFEST.sha256` so the air-gapped side can verify transit integrity
+  - Stamps the bundled `.env` with the ION/PG/model versions that were built, so compose defaults can't drift
+  - Removed stale SQLite init path from the deploy helper (ION has been Postgres-only since v0.9.43)
+- **New** `scripts/load-offline-package.sh` — runs on the air-gapped side. Verifies manifest, loads all three images, restores the Ollama models volume with project-name auto-detection, prints next-step commands. Idempotent.
+- Signatures:
+  - `./scripts/build-offline-package.sh [ion_version] [chat_model] [pg_version]`
+  - `./scripts/load-offline-package.sh` (run from bundle dir)
+
+### PG_VERSION env var
+- `docker-compose.yml` postgres line is now `image: pgvector/pgvector:${PG_VERSION:-pg16}` so deployments on pg15/pg17/pg18 can pin via `.env` without hand-editing compose every time they pull
+- Default stays `pg16` for fresh deploys
+
+### Docs
+- `SETUP.md` "Air-Gapped / Siloed Deployment" section rewritten — covers the three-image/two-model reality, PG_VERSION, build + load scripts, the silent-failure mode when `nomic-embed-text` is missing, and why partial upgrades break
+- Makes explicit: from v0.10.4+, you cannot upgrade an air-gapped deployment by shipping just the ION image — the bundle must be rebuilt
+
+### No app code change
+All v0.10.9 changes are in compose/scripts/docs. The ION application image is byte-equivalent to v0.10.8 for users who just want to pull `latest` and keep going.
+
 ## v0.10.8 (2026-04-22) — HOTFIX
 
 ### Fresh-deploy crash: `type "vector" does not exist`

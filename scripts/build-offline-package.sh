@@ -1,316 +1,212 @@
 #!/bin/bash
 # =============================================================================
-# ION - Build Offline Deployment Package
+# ION - Build Offline Deployment Package (v0.10.9+)
 # =============================================================================
 # Run this script on a machine WITH internet access to create an air-gapped
-# deployment package that can be transferred to the secure environment.
+# deployment bundle that can be transferred to the secure environment.
 #
-# Usage: ./scripts/build-offline-package.sh [version] [model]
-# Example: ./scripts/build-offline-package.sh 1.0.0 llama3.1:8b
+# Usage:
+#   ./scripts/build-offline-package.sh [ion_version] [chat_model] [pg_version]
+#
+# Examples:
+#   ./scripts/build-offline-package.sh 0.10.9
+#   ./scripts/build-offline-package.sh 0.10.9 llama3.1:8b pg17
+#
+# What this bundles (v0.10.4+ needs these — previous script missed them):
+#   - ixion36/ion:<VERSION>     Application image
+#   - pgvector/pgvector:<PG>    Postgres + pgvector (not plain postgres!)
+#   - ollama/ollama:latest      LLM host
+#   - Chat model                Bob's reasoning (default llama3.1:8b)
+#   - nomic-embed-text          Embeddings for case similarity + KB RAG
+#                               (NEW in v0.10.4 — silent-fail without it)
 # =============================================================================
 
 set -e
 
-VERSION="${1:-latest}"
-OLLAMA_MODEL="${2:-llama3.1:8b}"
+VERSION="${1:-0.10.9}"
+CHAT_MODEL="${2:-llama3.1:8b}"
+PG_VERSION="${3:-pg16}"
+EMBED_MODEL="nomic-embed-text"
 PACKAGE_NAME="ion-offline-${VERSION}"
 OUTPUT_DIR="./dist/${PACKAGE_NAME}"
 
 echo "=============================================="
-echo "Building ION Offline Package v${VERSION}"
-echo "Including Ollama model: ${OLLAMA_MODEL}"
+echo "ION Offline Bundle Builder"
+echo "=============================================="
+echo "  ION version : ${VERSION}"
+echo "  Chat model  : ${CHAT_MODEL}"
+echo "  Embed model : ${EMBED_MODEL}  (required for case similarity + KB RAG)"
+echo "  PG major    : ${PG_VERSION}   (pgvector/pgvector:${PG_VERSION})"
 echo "=============================================="
 
-# Create output directory
+# ----- Output layout -----
 rm -rf "${OUTPUT_DIR}"
-mkdir -p "${OUTPUT_DIR}"
 mkdir -p "${OUTPUT_DIR}/images"
 mkdir -p "${OUTPUT_DIR}/models"
-
-# Step 1: Build ION Docker image
-echo ""
-echo "[1/6] Building ION Docker image..."
-docker build -t ion:${VERSION} -t ion:latest .
-
-# Step 2: Save ION Docker image as tar
-echo ""
-echo "[2/6] Exporting ION Docker image..."
-docker save ion:${VERSION} | gzip > "${OUTPUT_DIR}/images/ion-${VERSION}.tar.gz"
-
-# Step 3: Pull and save Ollama image
-echo ""
-echo "[3/6] Pulling Ollama Docker image..."
-docker pull ollama/ollama:latest
-docker save ollama/ollama:latest | gzip > "${OUTPUT_DIR}/images/ollama-latest.tar.gz"
-
-# Step 4: Pull Ollama model and export it
-echo ""
-echo "[4/6] Pulling Ollama model: ${OLLAMA_MODEL}..."
-# Start a temporary Ollama container to pull the model
-docker run -d --name ion-ollama-temp -v ion-ollama-temp:/root/.ollama ollama/ollama:latest
-sleep 5
-
-# Pull the model
-docker exec ion-ollama-temp ollama pull ${OLLAMA_MODEL}
-
-# Export the model data
-echo "Exporting model data..."
-docker run --rm -v ion-ollama-temp:/source -v "$(pwd)/${OUTPUT_DIR}/models":/dest alpine \
-    sh -c "cd /source && tar czf /dest/ollama-models.tar.gz ."
-
-# Cleanup temp container
-docker stop ion-ollama-temp
-docker rm ion-ollama-temp
-docker volume rm ion-ollama-temp
-
-# Step 5: Copy deployment files
-echo ""
-echo "[5/6] Copying deployment files..."
-cp docker-compose.yml "${OUTPUT_DIR}/"
-cp .env.example "${OUTPUT_DIR}/.env"
-cp SETUP.md "${OUTPUT_DIR}/" 2>/dev/null || true
-cp README.md "${OUTPUT_DIR}/" 2>/dev/null || true
-
-# Copy HTTPS deployment files
 mkdir -p "${OUTPUT_DIR}/deploy"
 mkdir -p "${OUTPUT_DIR}/deploy/nginx"
 mkdir -p "${OUTPUT_DIR}/deploy/ssl"
+
+# ----- Step 1: ION image -----
+echo ""
+echo "[1/7] Pulling ION application image..."
+docker pull "ixion36/ion:${VERSION}"
+docker save "ixion36/ion:${VERSION}" | gzip > "${OUTPUT_DIR}/images/ion-${VERSION}.tar.gz"
+
+# ----- Step 2: Postgres (pgvector) image -----
+echo ""
+echo "[2/7] Pulling Postgres (pgvector/pgvector:${PG_VERSION})..."
+docker pull "pgvector/pgvector:${PG_VERSION}"
+docker save "pgvector/pgvector:${PG_VERSION}" | gzip > "${OUTPUT_DIR}/images/pgvector-${PG_VERSION}.tar.gz"
+
+# ----- Step 3: Ollama image -----
+echo ""
+echo "[3/7] Pulling Ollama image..."
+docker pull ollama/ollama:latest
+docker save ollama/ollama:latest | gzip > "${OUTPUT_DIR}/images/ollama-latest.tar.gz"
+
+# ----- Step 4: Pre-populate Ollama models (chat + embedding) -----
+echo ""
+echo "[4/7] Pre-populating Ollama models (${CHAT_MODEL} + ${EMBED_MODEL})..."
+
+TEMP_OLLAMA_VOL="ion-ollama-prep-$(date +%s)"
+docker volume create "${TEMP_OLLAMA_VOL}" > /dev/null
+
+docker run -d --name ion-ollama-prep \
+  -v "${TEMP_OLLAMA_VOL}":/root/.ollama \
+  ollama/ollama:latest > /dev/null
+sleep 4
+
+echo "      Pulling chat model: ${CHAT_MODEL}..."
+docker exec ion-ollama-prep ollama pull "${CHAT_MODEL}"
+echo "      Pulling embed model: ${EMBED_MODEL}..."
+docker exec ion-ollama-prep ollama pull "${EMBED_MODEL}"
+
+echo "      Exporting models volume..."
+docker run --rm \
+  -v "${TEMP_OLLAMA_VOL}":/source:ro \
+  -v "$(pwd)/${OUTPUT_DIR}/models":/dest \
+  alpine tar czf /dest/ollama-models.tar.gz -C /source .
+
+docker stop ion-ollama-prep > /dev/null
+docker rm ion-ollama-prep > /dev/null
+docker volume rm "${TEMP_OLLAMA_VOL}" > /dev/null
+
+# ----- Step 5: Copy deployment files -----
+echo ""
+echo "[5/7] Copying deployment files..."
+cp docker-compose.yml "${OUTPUT_DIR}/"
+cp .env.example "${OUTPUT_DIR}/.env" 2>/dev/null || touch "${OUTPUT_DIR}/.env"
+cp SETUP.md "${OUTPUT_DIR}/" 2>/dev/null || true
+cp README.md "${OUTPUT_DIR}/" 2>/dev/null || true
+cp CHANGELOG.md "${OUTPUT_DIR}/" 2>/dev/null || true
 cp -r deploy/* "${OUTPUT_DIR}/deploy/" 2>/dev/null || true
 
-# Create deployment script
-cat > "${OUTPUT_DIR}/deploy.sh" << 'DEPLOY_EOF'
-#!/bin/bash
-# ION Offline Deployment Script
-# Run this on the air-gapped target machine
+# Stamp the .env with the versions this bundle was built for so the air-gap
+# load step can't drift (compose default + bundled image must match).
+{
+  echo ""
+  echo "# Stamped by build-offline-package.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "ION_VERSION=${VERSION}"
+  echo "PG_VERSION=${PG_VERSION}"
+  echo "ION_OLLAMA_MODEL=${CHAT_MODEL}"
+  echo "ION_EMBEDDING_MODEL=${EMBED_MODEL}"
+  echo "# Opt-in feature flags — flip to true after load if you want them:"
+  echo "# ION_EMBEDDING_ENABLED=true"
+  echo "# ION_FEW_SHOT_EXEMPLARS_ENABLED=true"
+  echo "# ION_KB_RAG_ENABLED=true"
+} >> "${OUTPUT_DIR}/.env"
 
-set -e
+# Copy the load script into the bundle so the air-gap side has it.
+cp scripts/load-offline-package.sh "${OUTPUT_DIR}/load.sh" 2>/dev/null || \
+  echo "WARNING: scripts/load-offline-package.sh not found — bundle won't have a load helper"
+chmod +x "${OUTPUT_DIR}/load.sh" 2>/dev/null || true
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-echo "=============================================="
-echo "ION Offline Deployment"
-echo "=============================================="
-
-# Step 1: Load Docker images
-echo ""
-echo "[1/4] Loading Docker images..."
-echo "      Loading ION image..."
-gunzip -c "${SCRIPT_DIR}/images/ion-"*.tar.gz | docker load
-
-echo "      Loading Ollama image..."
-gunzip -c "${SCRIPT_DIR}/images/ollama-latest.tar.gz" | docker load
-
-# Step 2: Load Ollama models
-echo ""
-echo "[2/4] Loading Ollama models..."
-docker volume create ion_ollama-models 2>/dev/null || true
-docker run --rm -v ion_ollama-models:/dest -v "${SCRIPT_DIR}/models":/source alpine \
-    sh -c "cd /dest && tar xzf /source/ollama-models.tar.gz"
-echo "      Models loaded successfully!"
-
-# Step 3: Initialize database
-echo ""
-echo "[3/4] Initializing database..."
-docker volume create ion_ion-data 2>/dev/null || true
-docker run --rm -v ion_ion-data:/data ion:latest \
-    python -c "
-from pathlib import Path
-from ion.storage.database import init_db
-from ion.core.config import Config
-
-data_dir = Path('/data/.ion')
-data_dir.mkdir(parents=True, exist_ok=True)
-db_path = data_dir / 'ion.db'
-
-if not db_path.exists():
-    print('Creating database...')
-    init_db(db_path)
-    config = Config(db_path=db_path, cookie_secure=False)
-    config.to_file(data_dir / 'config.json')
-    print('Database created successfully!')
-else:
-    print('Database already exists.')
-"
-
-# Step 4: Seed default users
-echo ""
-echo "[4/4] Setting up authentication..."
-docker run --rm -v ion_ion-data:/data ion:latest \
-    python -c "
-from pathlib import Path
-from ion.storage.database import get_engine, get_session_factory
-from ion.auth.service import AuthService
-import os
-
-db_path = Path('/data/.ion/ion.db')
-engine = get_engine(db_path)
-factory = get_session_factory(engine)
-session = factory()
-
-auth = AuthService(session)
-auth.seed_permissions()
-auth.seed_roles()
-admin_password = os.environ.get('ION_ADMIN_PASSWORD', 'changeme')
-admin = auth.seed_admin_user(password=admin_password)
-session.commit()
-
-if admin:
-    print('Admin user ready: admin / ' + admin_password)
-    print('WARNING: Change this password immediately!')
-"
-
-echo ""
-echo "=============================================="
-echo "Deployment complete!"
-echo "=============================================="
-echo ""
-echo "To start ION:"
-echo "  cd ${SCRIPT_DIR}"
-echo "  docker-compose up -d"
-echo ""
-echo "Access the web UI at: http://localhost:8000"
-echo ""
-echo "Default credentials:"
-echo "  Username: admin"
-echo "  Password: changeme (or value of ION_ADMIN_PASSWORD)"
-echo ""
-echo "IMPORTANT: Change the admin password after first login!"
-echo ""
-DEPLOY_EOF
-
-chmod +x "${OUTPUT_DIR}/deploy.sh"
-
-# Step 6: Create README
+# ----- Step 6: README.txt -----
 cat > "${OUTPUT_DIR}/README.txt" << README_EOF
 ================================================================================
-ION Offline Deployment Package v${VERSION}
-Intelligent Operating Network
+ION Offline Deployment Bundle
+  ION:    ixion36/ion:${VERSION}
+  PG:     pgvector/pgvector:${PG_VERSION}
+  Ollama: ollama/ollama:latest  +  ${CHAT_MODEL}  +  ${EMBED_MODEL}
 ================================================================================
 
-CONTENTS:
+CONTENTS
+
   images/
-    - ion-${VERSION}.tar.gz    : ION Docker image
-    - ollama-latest.tar.gz       : Ollama LLM service image
+    ion-${VERSION}.tar.gz          — ION application
+    pgvector-${PG_VERSION}.tar.gz            — Postgres + pgvector
+    ollama-latest.tar.gz         — Ollama LLM host
   models/
-    - ollama-models.tar.gz       : Pre-downloaded Ollama model (${OLLAMA_MODEL})
-  deploy/
-    - nginx/                     : Nginx reverse proxy configs
-    - ssl/                       : SSL certificate directory
-    - docker-compose.https.yml   : HTTPS deployment config
-  - docker-compose.yml           : Main deployment config
-  - .env                         : Environment configuration
-  - deploy.sh                    : Deployment script
-  - SETUP.md                     : Quick setup reference
-  - README.md                    : Full documentation
+    ollama-models.tar.gz         — ${CHAT_MODEL} + ${EMBED_MODEL}
+  deploy/                         — nginx + HTTPS compose overrides
+  docker-compose.yml              — v${VERSION} compose
+  .env                            — stamped with ION_VERSION / PG_VERSION
+  load.sh                         — Air-gapped-side loader
+  MANIFEST.sha256                 — Integrity manifest
+  README.txt                      — This file
 
-REQUIREMENTS:
-  - Docker Engine 20.10+
-  - Docker Compose v2+
-  - 8GB+ RAM recommended (for Ollama)
-  - ~2GB disk space for images
-  - ~500MB disk space for models
+DEPLOY (AIR-GAPPED SIDE)
 
-================================================================================
-QUICK START
-================================================================================
+  1. Copy this directory to the target machine.
+  2. Verify integrity:
+       sha256sum -c MANIFEST.sha256
+  3. Run the loader:
+       chmod +x load.sh && ./load.sh
+  4. Start:
+       docker compose --profile ai up -d
+  5. Access http://localhost:8000 — login admin / <ION_ADMIN_PASSWORD in .env>.
 
-  1. chmod +x deploy.sh && ./deploy.sh
-  2. Edit .env to configure integrations (GitLab, OpenCTI, Elasticsearch)
-  3. docker-compose up -d
-  4. Access: http://localhost:8000
-  5. Login: admin / changeme
+OPT-IN FEATURES (uncomment in .env)
 
-================================================================================
-HTTPS DEPLOYMENT (Production)
-================================================================================
+  # Case-similarity embeddings (pgvector-backed)
+  ION_EMBEDDING_ENABLED=true
 
-  1. Place TLS certificates in deploy/ssl/:
-     - server.crt (certificate)
-     - server.key (private key)
+  # Few-shot gold exemplars in Bob's prompt
+  ION_FEW_SHOT_EXEMPLARS_ENABLED=true
 
-  2. Update .env:
-     ION_COOKIE_SECURE=true
+  # KB RAG grounding (embeds the ~392 seeded KB articles)
+  ION_KB_RAG_ENABLED=true
 
-  3. Deploy:
-     docker-compose -f deploy/docker-compose.https.yml up -d
+All three require ${EMBED_MODEL} — already in this bundle.
 
-  4. Access: https://localhost
+WHY A BUNDLE REBUILD IS NEEDED TO UPGRADE
 
-================================================================================
-INTEGRATION CONFIGURATION
-================================================================================
+  ION's v0.10.4+ stack has THREE images that cross the gap (ION, pgvector,
+  Ollama) and TWO models that must live inside the Ollama volume (chat +
+  embedding). A pure ION-image update without re-loading the pgvector image
+  and/or the models volume will leave you with a silent partial upgrade:
+  the app runs but Similar Cases is empty and KB RAG contributes nothing.
 
-Edit .env before starting:
-
-  # GitLab
-  ION_GITLAB_ENABLED=true
-  ION_GITLAB_URL=https://gitlab.example.com
-  ION_GITLAB_TOKEN=your-token
-  ION_GITLAB_PROJECT_ID=1
-
-  # OpenCTI
-  ION_OPENCTI_ENABLED=true
-  ION_OPENCTI_URL=https://opencti.example.com
-  ION_OPENCTI_TOKEN=your-token
-
-  # Elasticsearch
-  ION_ELASTICSEARCH_ENABLED=true
-  ION_ELASTICSEARCH_URL=https://elasticsearch.example.com:9200
-  ION_ELASTICSEARCH_USERNAME=elastic
-  ION_ELASTICSEARCH_PASSWORD=your-password
-
-================================================================================
-AI ASSISTANT
-================================================================================
-
-The Ollama model (${OLLAMA_MODEL}) is pre-loaded and ready to use.
-
-To use a different model:
-  1. Update ION_OLLAMA_MODEL in .env
-  2. Ensure the model is available in the models/ archive
-
-================================================================================
-OPERATIONS
-================================================================================
-
-  Start:    docker-compose up -d
-  Stop:     docker-compose down
-  Logs:     docker-compose logs -f
-  Status:   docker-compose ps
-
-  Backup:
-    docker run --rm -v ion_ion-data:/data -v \$(pwd):/backup \\
-      alpine tar czf /backup/ion-backup.tar.gz -C /data .
-
-  Restore:
-    docker-compose down
-    docker run --rm -v ion_ion-data:/data -v \$(pwd):/backup \\
-      alpine sh -c "rm -rf /data/* && tar xzf /backup/ion-backup.tar.gz -C /data"
-    docker-compose up -d
-
-================================================================================
 README_EOF
 
-# Calculate sizes
+# ----- Step 7: Manifest -----
+echo ""
+echo "[6/7] Writing MANIFEST.sha256..."
+(cd "${OUTPUT_DIR}" && \
+  find . -type f ! -name 'MANIFEST.sha256' -print0 | \
+  xargs -0 sha256sum > MANIFEST.sha256)
+
+echo ""
+echo "[7/7] Bundle ready"
+
 ION_SIZE=$(du -h "${OUTPUT_DIR}/images/ion-${VERSION}.tar.gz" | cut -f1)
+PG_SIZE=$(du -h "${OUTPUT_DIR}/images/pgvector-${PG_VERSION}.tar.gz" | cut -f1)
 OLLAMA_SIZE=$(du -h "${OUTPUT_DIR}/images/ollama-latest.tar.gz" | cut -f1)
 MODEL_SIZE=$(du -h "${OUTPUT_DIR}/models/ollama-models.tar.gz" | cut -f1)
 TOTAL_SIZE=$(du -sh "${OUTPUT_DIR}" | cut -f1)
 
 echo ""
-echo "[6/6] Package created successfully!"
+echo "=============================================="
+echo "  Bundle: ${OUTPUT_DIR}"
+echo "  Sizes:"
+echo "    ION image        ${ION_SIZE}"
+echo "    pgvector (${PG_VERSION}) ${PG_SIZE}"
+echo "    Ollama image     ${OLLAMA_SIZE}"
+echo "    Models (chat+embed)  ${MODEL_SIZE}"
+echo "    Total            ${TOTAL_SIZE}"
+echo "=============================================="
 echo ""
-echo "Package location: ${OUTPUT_DIR}"
-echo ""
-echo "Sizes:"
-echo "  ION image:  ${ION_SIZE}"
-echo "  Ollama image: ${OLLAMA_SIZE}"
-echo "  Ollama model: ${MODEL_SIZE}"
-echo "  Total:        ${TOTAL_SIZE}"
-echo ""
-echo "To deploy on air-gapped machine:"
-echo "  1. Copy '${OUTPUT_DIR}' to the target machine"
-echo "  2. Run: cd ${PACKAGE_NAME} && ./deploy.sh"
-echo "  3. Edit .env to configure integrations"
-echo "  4. Run: docker-compose up -d"
+echo "Transfer '${OUTPUT_DIR}' to the air-gapped target."
+echo "On the target: chmod +x load.sh && ./load.sh"
 echo ""
