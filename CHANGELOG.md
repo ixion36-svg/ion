@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.10.5 (2026-04-22)
+
+### Few-shot gold exemplars for Bob (Bet B of the roadmap)
+- When an alert is investigated, pgvector-retrieve up to 3 past closed cases that:
+  - have `closure_reason IS NOT NULL` (human-closed)
+  - AND have at least one `AIFeedback` row with `agreement=true` (Bob and the human agreed on the verdict)
+  - AND exceed cosine similarity 0.7 to the current alert
+- Inject retrieved cases as a new "Prior Similar Cases (analyst-verified)" section in Bob's system prompt, placed immediately before the Output Contract
+- Uses the existing `EmbeddingService` (nomic-embed-text) and `case_embeddings` table — no new infrastructure
+- Alert text serialisation aligned with `case_embedding_service._case_source_text` so vectors are directly comparable
+- **Opt-in: set `ION_FEW_SHOT_EXEMPLARS_ENABLED=true` in .env.** Default off because fresh installs have no `AIFeedback` rows — the retrieval returns nothing until the ledger populates from real case closures
+
+### Bob closed-case guard
+- `_write_bob_outputs()` now short-circuits when the alert's `AlertTriage` row is `CLOSED` **or** its parent `AlertCase` is `CLOSED` — prevents AI-authored Notes, suggested_verdict updates, observable writes, or tuning proposals from landing on closed case timelines when investigations are re-run (force=True, manual retrigger)
+- INFO-level log line records which condition tripped, for audit
+
+### Env vars
+- `ION_FEW_SHOT_EXEMPLARS_ENABLED` (default false — opt-in)
+
+### Depends on
+- v0.10.4 pgvector infrastructure
+- `ION_EMBEDDING_ENABLED=true` + `nomic-embed-text` pulled in Ollama
+
 ## v0.10.4 (2026-04-22)
 
 ### pgvector + case similarity (Bet 1 of the roadmap)

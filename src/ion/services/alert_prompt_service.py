@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Optional
+import os
+from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,82 @@ from ion.models.alert_prompt import AlertPromptTemplate
 from ion.storage.alert_prompt_repository import AlertPromptRepository
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Few-shot gold exemplars — retrieves past, human-agreed closed cases to
+# inject as reference context into Bob's system prompt. Opt-in via
+# ION_FEW_SHOT_EXEMPLARS_ENABLED — default off because a fresh install has
+# no AIFeedback rows to filter on.
+# ---------------------------------------------------------------------------
+
+
+def _few_shot_enabled() -> bool:
+    return os.environ.get("ION_FEW_SHOT_EXEMPLARS_ENABLED", "").lower() in (
+        "true", "1", "yes",
+    )
+
+
+def _alert_text_for_embedding(alert: dict) -> str:
+    """Serialise an alert to text for embedding.
+
+    Aligned with ``case_embedding_service._case_source_text`` so an alert
+    vector is directly comparable to case vectors (same section order +
+    separators). Pulls from the shapes the investigation pipeline actually
+    produces: ``alert_signature``, ``rule_name``, ``host``, ``user_name``,
+    ``rule_id`` (or nested ``rule.id``).
+    """
+    parts: list[str] = []
+    title = (
+        alert.get("alert_signature")
+        or alert.get("rule_name")
+        or (alert.get("rule") or {}).get("name")
+        or alert.get("title")
+    )
+    if title:
+        parts.append(f"Title: {title}")
+    desc = alert.get("description") or alert.get("message")
+    if desc:
+        parts.append(f"Description: {desc}")
+    host = alert.get("host") or alert.get("host_name")
+    if host:
+        parts.append(f"Hosts: {host}")
+    user = alert.get("user_name") or alert.get("user")
+    if user:
+        parts.append(f"Users: {user}")
+    rule_id = alert.get("rule_id") or (alert.get("rule") or {}).get("id")
+    if rule_id:
+        parts.append(f"Rules: {rule_id}")
+    return "\n".join(parts)
+
+
+def _format_exemplars_for_prompt(exemplars: List[dict]) -> str:
+    """Render the "Prior Similar Cases" section. Empty list → empty string."""
+    if not exemplars:
+        return ""
+    lines = [
+        "\n\n---\n",
+        "## Prior Similar Cases (analyst-verified)\n",
+        "These are past cases with high semantic similarity to the current "
+        "alert, closed by a human analyst whose verdict agreed with a prior "
+        "AI suggestion. Use them as reference — do NOT blindly copy the "
+        "verdict; the current alert may differ in substance even when the "
+        "wording is similar.\n",
+    ]
+    for ex in exemplars:
+        lines.append(
+            f"\n### {ex['case_number']} — `{ex['closure_reason']}` "
+            f"(similarity {ex['similarity']:.2f})\n"
+        )
+        if ex.get("title"):
+            lines.append(f"**Title:** {ex['title']}\n")
+        summary = (ex.get("summary") or "").strip()
+        if summary:
+            lines.append(f"**Summary:** {summary[:400]}\n")
+        notes = (ex.get("closure_notes") or "").strip()
+        if notes:
+            lines.append(f"**Analyst closure notes:** {notes[:400]}\n")
+    return "".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -2870,6 +2947,87 @@ class AlertPromptService:
         """Return best-matching enabled template for the alert, or None."""
         return self.repo.find_matching(alert)
 
+    # -------------------------------------------------- gold exemplars
+
+    def _get_gold_exemplars_for_alert(
+        self,
+        alert: dict,
+        *,
+        k: int = 3,
+        min_similarity: float = 0.7,
+    ) -> List[dict]:
+        """Return up to ``k`` past, human-agreed closed cases similar to
+        ``alert``. Empty list on any failure — never raises.
+
+        Filter: case closed (closure_reason IS NOT NULL) AND at least one
+        AIFeedback row marks ``agreement=True`` (i.e. Bob and the human
+        agreed on the verdict). The agreement filter is critical — we want
+        Bob to learn from cases he got right, not from cases he got wrong.
+        """
+        if not _few_shot_enabled() or self.session is None or not alert:
+            return []
+
+        try:
+            from ion.services.embedding_service import get_embedding_service
+        except Exception:
+            return []
+
+        svc = get_embedding_service()
+        if not svc.is_enabled:
+            return []
+
+        text = _alert_text_for_embedding(alert)
+        if not text:
+            return []
+
+        vec = svc.embed(text)
+        if vec is None:
+            return []
+
+        try:
+            from sqlalchemy import exists
+            from ion.models.ai_feedback import AIFeedback
+            from ion.models.alert_triage import AlertCase
+            from ion.models.case_embedding import CaseEmbedding
+        except Exception as exc:
+            logger.debug("Gold exemplar imports failed: %s", exc)
+            return []
+
+        try:
+            distance = CaseEmbedding.embedding.cosine_distance(vec)
+            agreement_subq = (
+                exists()
+                .where(AIFeedback.case_id == AlertCase.id)
+                .where(AIFeedback.agreement.is_(True))
+            )
+            rows = (
+                self.session.query(AlertCase, distance.label("distance"))
+                .join(CaseEmbedding, CaseEmbedding.case_id == AlertCase.id)
+                .filter(AlertCase.closure_reason.isnot(None))
+                .filter(agreement_subq)
+                .order_by(distance.asc())
+                .limit(max(1, int(k)))
+                .all()
+            )
+        except Exception as exc:
+            logger.debug("Gold exemplar query failed: %s", exc)
+            return []
+
+        out: list[dict] = []
+        for case, dist in rows:
+            similarity = 1.0 - float(dist)
+            if similarity < float(min_similarity):
+                continue
+            out.append({
+                "case_number": case.case_number,
+                "title": case.title,
+                "summary": case.evidence_summary or case.description or "",
+                "closure_reason": case.closure_reason,
+                "closure_notes": case.closure_notes or "",
+                "similarity": similarity,
+            })
+        return out
+
     # ------------------------------------------------------------------ render
 
     def render_system_prompt(
@@ -2933,6 +3091,19 @@ class AlertPromptService:
             if alert:
                 rule_id = AlertPromptRepository._extract_rule_id(alert) or "(unknown)"
                 parts.append(f"\n_Matched alert rule id: `{rule_id}`_\n")
+
+        # v0.10.5: prepend "Prior Similar Cases" if few-shot is enabled and
+        # we have an alert + a DB session. Goes before the Output Contract
+        # so the model has concrete examples to pattern against while still
+        # being reminded of the strict JSON shape immediately after.
+        if alert is not None:
+            try:
+                exemplars = self._get_gold_exemplars_for_alert(alert)
+            except Exception as exc:
+                logger.debug("Gold exemplar retrieval failed: %s", exc)
+                exemplars = []
+            if exemplars:
+                parts.append(_format_exemplars_for_prompt(exemplars))
 
         # Output contract — always appended, with or without a template
         parts.append(_OUTPUT_CONTRACT)

@@ -164,10 +164,48 @@ def _write_bob_outputs(
     1. Alert Note (entity_type=ALERT, entity_id=alert_id) authored by Bob.
     2. AlertTriage.suggested_verdict / suggested_verdict_confidence.
     3. Observable rows for high-confidence IOCs, tagged source:bob.
+    4. TuningProposal on FP verdict with a concrete suggested_change.
+
+    v0.10.5: short-circuits when the alert's triage is already CLOSED or
+    its case is CLOSED — prevents Bob from polluting closed-case timelines
+    when an investigation is re-run (force=True, manual retrigger, etc.).
     """
-    from ion.models.alert_triage import AlertTriage, Note, NoteEntityType
+    from ion.models.alert_triage import (
+        AlertCase, AlertCaseStatus,
+        AlertTriage, AlertTriageStatus,
+        Note, NoteEntityType,
+    )
     from ion.models.observable import Observable, ObservableType
     from ion.services.ai_user import get_bob_user_id
+
+    # Closed-case / closed-triage guard. Bob should NOT append notes or
+    # mutate observables for alerts whose triage or parent case has been
+    # closed — those timelines are considered "done" and additional AI
+    # commentary is noise.
+    triage_guard = (
+        db.query(AlertTriage)
+        .filter(AlertTriage.es_alert_id == alert_id)
+        .one_or_none()
+    )
+    if triage_guard is not None:
+        if triage_guard.status == AlertTriageStatus.CLOSED:
+            logger.info(
+                "Skipping Bob writebacks for alert %s — triage is CLOSED",
+                alert_id,
+            )
+            return
+        if triage_guard.case_id:
+            parent_case = (
+                db.query(AlertCase)
+                .filter(AlertCase.id == triage_guard.case_id)
+                .one_or_none()
+            )
+            if parent_case is not None and parent_case.status == AlertCaseStatus.CLOSED:
+                logger.info(
+                    "Skipping Bob writebacks for alert %s — parent case %d is CLOSED",
+                    alert_id, parent_case.id,
+                )
+                return
 
     bob_id = get_bob_user_id(db)
     if bob_id is None:
