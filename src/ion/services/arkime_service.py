@@ -66,14 +66,17 @@ class ArkimeError(Exception):
 class ArkimeService:
     """Thin async client for the Arkime viewer API.
 
-    Auth: Basic auth (username/password) or API key. Arkime uses HTTP
-    Digest auth natively — httpx.DigestAuth handles the 401 challenge
-    automatically.
+    Auth: explicit ``Authorization`` header only (no httpx auth objects).
+    Username/password yields ``Authorization: Basic <base64>`` by default,
+    or ``Authorization: Digest <base64>`` when ``ION_ARKIME_AUTH_MODE=digest``.
+    An ``ION_ARKIME_API_KEY`` yields ``Authorization: Digest <api_key>``
+    (Arkime's native API-key format).
 
     Configuration (.env):
         ION_ARKIME_URL=https://arkime.example.com
         ION_ARKIME_USERNAME=admin
         ION_ARKIME_PASSWORD=password
+        ION_ARKIME_AUTH_MODE=basic   # basic (default) | digest
         ION_ARKIME_VERIFY_SSL=false
     """
 
@@ -105,13 +108,24 @@ class ArkimeService:
         return bool(self.url and (self.api_key or self._has_basic))
 
     async def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        """Build request headers. For basic auth mode, sends credentials
-        directly in the header. For digest mode, leaves auth to _auth()."""
+        """Build request headers.
+
+        Always sends credentials as an explicit ``Authorization`` header
+        — no httpx BasicAuth/DigestAuth objects. This reverts to the
+        pre-httpx-auth behaviour that worked reliably against the
+        production Arkime viewer. The ``ION_ARKIME_AUTH_MODE`` env var
+        is still honoured but only picks the scheme word:
+          - ``basic`` (default) with username/password → ``Authorization: Basic <base64>``
+          - ``digest`` / or api_key set → ``Authorization: Digest <api_key or user:pass>``
+        """
         headers: Dict[str, str] = {"Accept": "application/json"}
-        if self._has_basic and self.auth_mode == "basic":
+        if self._has_basic:
             import base64
-            creds = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
-            headers["Authorization"] = f"Basic {creds}"
+            creds = base64.b64encode(
+                f"{self.username}:{self.password}".encode()
+            ).decode()
+            scheme = "Digest" if self.auth_mode == "digest" else "Basic"
+            headers["Authorization"] = f"{scheme} {creds}"
         elif self.api_key:
             headers["Authorization"] = f"Digest {self.api_key}"
         if extra:
@@ -119,11 +133,13 @@ class ArkimeService:
         return headers
 
     def _auth(self):
-        """Auth object for httpx — Digest for native Arkime, Basic for proxies."""
-        if self._has_basic:
-            if self.auth_mode == "digest":
-                return httpx.DigestAuth(self.username, self.password)
-            return httpx.BasicAuth(self.username, self.password)
+        """Kept for call-site compatibility — returns None now.
+
+        Previously returned ``httpx.BasicAuth`` / ``httpx.DigestAuth``
+        objects, but we now send credentials exclusively via the
+        ``Authorization`` header (see :meth:`_headers`). Passing
+        ``auth=None`` to httpx is a no-op.
+        """
         return None
 
     async def _client(self) -> httpx.AsyncClient:
@@ -186,19 +202,26 @@ class ArkimeService:
 
         Returns a list of session documents (possibly empty). The PCAP
         download endpoint needs the `id` field from one of these docs.
-        When *node* is empty the node filter is omitted so sessions from
-        any capture node can match.
+
+        Note: ``community_id`` is a globally-unique flow hash by design
+        (identical across all capture nodes observing the same flow), so
+        we do NOT filter by node here — an alert's ``arkime_node`` value
+        often doesn't exactly match the node string stored on the session
+        (hostname vs FQDN, case differences). The caller disambiguates
+        between multi-node matches when downloading the PCAP.
         """
         if not self.is_configured:
             raise ArkimeError("Arkime is not configured")
         expression = f'communityId == "{community_id}"'
-        if node:
-            expression += f' && node == "{node}"'
         params = {
             "expression": expression,
             "length": str(limit),
             "fields": self._SESSION_FIELDS,
         }
+        logger.debug(
+            "Arkime community_id search: expression=%r (alert node hint=%r)",
+            expression, node,
+        )
         headers = await self._headers()
         try:
             async with await self._client() as client:
@@ -328,23 +351,32 @@ class ArkimeService:
         sessions = await self.find_sessions_by_community_id(node, community_id)
         if not sessions:
             raise ArkimeError(
-                f"No Arkime sessions matched community_id={community_id}"
-                + (f" on node={node}" if node else ""),
+                f"No Arkime sessions matched community_id={community_id}",
                 status_code=404,
             )
-        primary = sessions[0]
+        # Prefer a session whose node matches the alert hint, falling back to
+        # the first result when no exact match (Arkime's node string often
+        # doesn't equal the alert's arkime_node — FQDN/case differences).
+        primary: Dict[str, Any] = sessions[0]
+        if node:
+            for s in sessions:
+                if (s.get("node") or "").strip() == node.strip():
+                    primary = s
+                    break
         arkime_session_id = primary.get("id") or primary.get("_id")
         if not arkime_session_id:
             raise ArkimeError("Arkime session document missing `id` field")
-        # Resolve node from the session result when the alert didn't carry one
-        resolved_node = node or primary.get("node") or ""
+        # Resolve node from the chosen session itself — the alert's node hint
+        # may differ in case or FQDN from what Arkime stores.
+        resolved_node = primary.get("node") or node or ""
         if not resolved_node:
             raise ArkimeError("Cannot determine Arkime node for PCAP download")
         pcap_bytes = await self.download_pcap(resolved_node, str(arkime_session_id))
+        other_matches = [s for s in sessions if s is not primary]
         return {
             "pcap": pcap_bytes,
             "session": primary,
-            "other_matches": sessions[1:],
+            "other_matches": other_matches,
         }
 
     async def download_pcap(self, node: str, session_id: str) -> bytes:

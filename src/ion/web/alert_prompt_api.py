@@ -57,6 +57,8 @@ class AlertPromptCreate(BaseModel):
     rule_ids: Optional[List[str]] = None
     rule_groups: Optional[List[str]] = None
     rule_id_pattern: Optional[str] = None
+    mitre_techniques: Optional[List[str]] = None
+    mitre_tactics: Optional[List[str]] = None
     priority: int = 100
     investigation_checklist_text: Optional[str] = None
     severity_hint: Optional[str] = None
@@ -71,6 +73,8 @@ class AlertPromptUpdate(BaseModel):
     rule_ids: Optional[List[str]] = None
     rule_groups: Optional[List[str]] = None
     rule_id_pattern: Optional[str] = None
+    mitre_techniques: Optional[List[str]] = None
+    mitre_tactics: Optional[List[str]] = None
     priority: Optional[int] = None
     investigation_checklist_text: Optional[str] = None
     severity_hint: Optional[str] = None
@@ -97,6 +101,93 @@ def list_alert_prompts(
     repo = AlertPromptRepository(session)
     items = repo.list_all(enabled_only=enabled_only)
     return {"templates": [t.to_dict() for t in items], "count": len(items)}
+
+
+@router.get(
+    "/api/alert-prompts/scorecards",
+    dependencies=[Depends(require_any_permission(_READ_PERMS))],
+)
+def get_all_scorecards(
+    window_days: int = 30,
+    session: Session = Depends(get_db_session),
+):
+    """Per-template AI scorecard from AIFeedback ledger.
+
+    Returns a dict keyed by template_id:
+      {
+        "sample_size": N,
+        "agreement_pct": 0-100 | null,
+        "fp_rate": 0-100,
+        "btp_rate": 0-100,
+        "tp_rate": 0-100,
+        "tuning_needed": bool
+      }
+
+    tuning_needed = agreement_pct < 60 AND sample_size >= 10.
+    """
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import func
+
+    try:
+        from ion.models.ai_feedback import AIFeedback
+    except Exception:
+        return {"window_days": window_days, "scorecards": {}}
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
+
+    rows = (
+        session.query(
+            AIFeedback.alert_prompt_template_id,
+            AIFeedback.agreement,
+            AIFeedback.human_verdict,
+        )
+        .filter(AIFeedback.created_at >= cutoff)
+        .filter(AIFeedback.alert_prompt_template_id.isnot(None))
+        .all()
+    )
+
+    # Aggregate in Python — the sample size per template is bounded by
+    # analyst throughput (order of hundreds/month), so this is fine.
+    buckets: dict[int, dict] = {}
+    for tpl_id, agreement, verdict in rows:
+        b = buckets.setdefault(
+            tpl_id,
+            {"sample_size": 0, "agreed": 0, "evaluated": 0,
+             "fp": 0, "btp": 0, "tp": 0},
+        )
+        b["sample_size"] += 1
+        if agreement is not None:
+            b["evaluated"] += 1
+            if agreement:
+                b["agreed"] += 1
+        if verdict == "false_positive":
+            b["fp"] += 1
+        elif verdict == "benign_true_positive":
+            b["btp"] += 1
+        elif verdict == "true_positive":
+            b["tp"] += 1
+
+    def _pct(num: int, denom: int) -> Optional[float]:
+        if denom <= 0:
+            return None
+        return round(100.0 * num / denom, 1)
+
+    scorecards: dict[int, dict] = {}
+    for tpl_id, b in buckets.items():
+        n = b["sample_size"]
+        agreement_pct = _pct(b["agreed"], b["evaluated"])
+        scorecards[tpl_id] = {
+            "sample_size": n,
+            "agreement_pct": agreement_pct,
+            "fp_rate": _pct(b["fp"], n),
+            "btp_rate": _pct(b["btp"], n),
+            "tp_rate": _pct(b["tp"], n),
+            "tuning_needed": (
+                n >= 10 and agreement_pct is not None and agreement_pct < 60
+            ),
+        }
+
+    return {"window_days": window_days, "scorecards": scorecards}
 
 
 @router.get(
@@ -139,6 +230,8 @@ def create_alert_prompt(
             rule_ids=data.rule_ids,
             rule_groups=data.rule_groups,
             rule_id_pattern=data.rule_id_pattern,
+            mitre_techniques=data.mitre_techniques,
+            mitre_tactics=data.mitre_tactics,
             priority=data.priority,
             investigation_checklist_text=data.investigation_checklist_text,
             severity_hint=data.severity_hint,

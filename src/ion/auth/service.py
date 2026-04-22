@@ -84,6 +84,17 @@ class AuthService:
             self._log_failed_login(username, ip_address, "Account disabled")
             return None, None, "Account is disabled"
 
+        if getattr(user, "is_service_account", False):
+            # Service accounts (AI analysts, integration bots) have no
+            # interactive login path. Their stored password_hash is a
+            # sentinel that passlib cannot identify — use the dummy hash
+            # instead to keep timing stable without raising.
+            password_hasher.verify(password, self._DUMMY_HASH)
+            self._log_failed_login(
+                username, ip_address, "Service account login attempt"
+            )
+            return None, None, "This account cannot be used for interactive login"
+
         # Account lockout (opt-in via ION_ACCOUNT_LOCKOUT_ENABLED)
         lockout_enabled = get_config().account_lockout_enabled
         now = datetime.utcnow()
@@ -521,6 +532,20 @@ class AuthService:
             # Other permissions
             ("discover:read", "discover", "read", "Use discover and hunting tools"),
             ("ai:chat", "ai", "chat", "Use AI chat"),
+            # Alert / case commenting (split from triage/update so AI analyst
+            # can post notes without triage/close authority)
+            ("alert:comment", "alert", "comment", "Add notes/comments to alerts"),
+            ("case:comment", "case", "comment", "Add notes/comments to cases"),
+            ("case:link", "case", "link", "Link alerts / observables to cases"),
+            # Ticker permissions
+            ("ticker:read", "ticker", "read", "View active ticker items"),
+            ("ticker:create", "ticker", "create", "Create manual ticker entries"),
+            ("ticker:manage", "ticker", "manage", "Edit/delete/resolve any ticker entry"),
+            # Tuning proposals (detection engineering feedback queue)
+            ("tuning:read", "tuning", "read", "View tuning proposals"),
+            ("tuning:review", "tuning", "review", "Accept/reject tuning proposals"),
+            # Investigation execution (owned by Bob; humans can kick off too)
+            ("investigation:run", "investigation", "run", "Trigger an AI investigation"),
         ]
 
         permissions = []
@@ -692,6 +717,26 @@ class AuthService:
                     "system:settings",
                 ],
             ),
+            (
+                # Assigned to the Bob service account. Scoped to the actions
+                # an AI analyst needs during autonomous investigation — read
+                # alerts/cases, post notes, suggest observables, post to the
+                # ticker, file tuning proposals. NOT granted: close case,
+                # delete, manage integrations, alter permissions.
+                "ai_analyst",
+                "AI analyst service role (Bob) — investigation, notes, observables, tuning suggestions",
+                True,
+                [
+                    "alert:read", "alert:comment", "alert:triage",
+                    "case:read", "case:comment", "case:link",
+                    "observable:read", "observable:create", "observable:enrich",
+                    "playbook:read",
+                    "ai:chat",
+                    "investigation:run",
+                    "ticker:read", "ticker:create",
+                    "tuning:read",
+                ],
+            ),
         ]
 
         roles = []
@@ -717,6 +762,57 @@ class AuthService:
                 roles.append(role)
 
         return roles
+
+    # Sentinel password hash for service accounts. Not a valid bcrypt/argon2
+    # hash, so password verification against it will always fail — belt-and-
+    # braces behind the is_service_account login block.
+    _SERVICE_ACCOUNT_HASH_SENTINEL = "!SERVICE_ACCOUNT_NO_LOGIN!"
+
+    def seed_bob_user(
+        self,
+        username: str = "bob",
+        email: str = "bob@ion.local",
+        display_name: str = "Bob (AI Analyst)",
+    ) -> Optional[User]:
+        """Create (or top-up) the Bob AI-analyst service user.
+
+        Idempotent. Ensures:
+          - Bob user exists, flagged is_service_account=True, is_active=True.
+          - Bob has the ai_analyst role.
+          - If Bob already exists but is missing the flag or the role, fix it.
+        """
+        ai_role = self.role_repo.get_by_name("ai_analyst")
+
+        existing = self.user_repo.get_by_username(username)
+        if existing:
+            changed = False
+            if not getattr(existing, "is_service_account", False):
+                existing.is_service_account = True
+                changed = True
+            if not existing.is_active:
+                existing.is_active = True
+                changed = True
+            if ai_role and not existing.has_role("ai_analyst"):
+                self.user_repo.add_role(existing, ai_role)
+                changed = True
+            if changed:
+                self.db_session.flush()
+            return existing
+
+        user = self.user_repo.create(
+            username=username,
+            email=email,
+            password_hash=self._SERVICE_ACCOUNT_HASH_SENTINEL,
+            display_name=display_name,
+            must_change_password=False,
+        )
+        user.is_service_account = True
+        self.db_session.flush()
+
+        if ai_role:
+            self.user_repo.add_role(user, ai_role)
+
+        return user
 
     def seed_admin_user(
         self,

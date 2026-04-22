@@ -41,12 +41,13 @@
                     <th>Pattern</th>
                     <th>Priority</th>
                     <th>Severity</th>
+                    <th>AI Scorecard (30d)</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody id="prompts-body">
-                <tr><td colspan="8" class="loading">Loading templates...</td></tr>
+                <tr><td colspan="9" class="loading">Loading templates...</td></tr>
             </tbody>
         </table>
     </div>
@@ -89,7 +90,7 @@
 
                 <div class="form-section">
                     <h4>Matching Rules</h4>
-                    <p class="form-help">At least one matcher should be populated. Match order: exact rule ID &rarr; regex pattern &rarr; rule.groups overlap.</p>
+                    <p class="form-help">At least one matcher should be populated. Match order: exact rule ID &rarr; regex pattern &rarr; MITRE technique (parent&rarr;sub tolerant) &rarr; MITRE tactic &rarr; rule.groups overlap.</p>
                     <div class="form-group">
                         <label for="prompt-rule-ids">Exact Rule IDs (one per line)</label>
                         <textarea id="prompt-rule-ids" class="form-control" rows="3" placeholder="1100&#10;5710"></textarea>
@@ -101,6 +102,16 @@
                     <div class="form-group">
                         <label for="prompt-rule-pattern">Rule ID Regex</label>
                         <input type="text" id="prompt-rule-pattern" class="form-control" placeholder="^sysmon_event_\d+$">
+                    </div>
+                    <div class="form-group">
+                        <label for="prompt-mitre-techniques">MITRE ATT&amp;CK Techniques (one per line)</label>
+                        <textarea id="prompt-mitre-techniques" class="form-control" rows="3" placeholder="T1059&#10;T1059.001&#10;T1110.003"></textarea>
+                        <p class="form-help">Parent technique (<code>T1059</code>) matches alerts tagged with any sub-technique (<code>T1059.001</code>), and vice-versa.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="prompt-mitre-tactics">MITRE ATT&amp;CK Tactics (one per line)</label>
+                        <textarea id="prompt-mitre-tactics" class="form-control" rows="2" placeholder="TA0002&#10;execution"></textarea>
+                        <p class="form-help">Accepts tactic IDs (<code>TA0002</code>) or lowercase names (<code>execution</code>). Case-insensitive.</p>
                     </div>
                 </div>
 
@@ -242,21 +253,49 @@ function arrayToLines(arr) {
 
 async function loadPrompts() {
     const enabledOnly = document.getElementById('filter-enabled-only').checked;
-    const resp = await fetch(`/api/alert-prompts?enabled_only=${enabledOnly}`, { credentials: 'same-origin' });
+    const [resp, scoreResp] = await Promise.all([
+        fetch(`/api/alert-prompts?enabled_only=${enabledOnly}`, { credentials: 'same-origin' }),
+        fetch(`/api/alert-prompts/scorecards`, { credentials: 'same-origin' }),
+    ]);
     if (!resp.ok) {
         document.getElementById('prompts-body').innerHTML =
-            `<tr><td colspan="8" class="loading">Failed to load: ${resp.status}</td></tr>`;
+            `<tr><td colspan="9" class="loading">Failed to load: ${resp.status}</td></tr>`;
         return;
     }
     const data = await resp.json();
     _cache = data.templates || [];
+    try {
+        const scoreData = scoreResp.ok ? await scoreResp.json() : { scorecards: {} };
+        _scorecards = scoreData.scorecards || {};
+    } catch(e) { _scorecards = {}; }
     renderPrompts(_cache);
+}
+let _scorecards = {};
+
+function renderScorecard(tplId) {
+    const s = _scorecards[tplId];
+    if (!s || !s.sample_size) {
+        return '<span style="color:var(--text-secondary); font-size:0.75rem;">no data</span>';
+    }
+    const agree = s.agreement_pct;
+    let color = 'color:var(--text-secondary);';
+    if (agree !== null && agree !== undefined) {
+        if (agree >= 80) color = 'color:#22c55e;';
+        else if (agree >= 60) color = 'color:#f59e0b;';
+        else color = 'color:#ef4444; font-weight:600;';
+    }
+    const flag = s.tuning_needed ? ' <span style="color:#ef4444;" title="Agreement below 60% on 10+ samples — prompt may need tuning">⚠️ tune</span>' : '';
+    const agreeStr = agree !== null && agree !== undefined ? `${agree}%` : '—';
+    return `<div style="${color} font-size:0.78rem;">
+        agree <strong>${agreeStr}</strong> · n=${s.sample_size}${flag}
+        <div style="color:var(--text-secondary); font-size:0.7rem;">TP ${s.tp_rate ?? 0}% · FP ${s.fp_rate ?? 0}% · BTP ${s.btp_rate ?? 0}%</div>
+    </div>`;
 }
 
 function renderPrompts(items) {
     const body = document.getElementById('prompts-body');
     if (!items.length) {
-        body.innerHTML = `<tr><td colspan="8" class="loading">No templates yet. Click "+ New Template" to create one.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="9" class="loading">No templates yet. Click "+ New Template" to create one.</td></tr>`;
         return;
     }
     body.innerHTML = items.map(t => {
@@ -268,14 +307,20 @@ function renderPrompts(items) {
         const statusBadge = t.enabled
             ? `<span class="status-badge status-enabled">Enabled</span>`
             : `<span class="status-badge status-disabled">Disabled</span>`;
+        const techChips = (t.mitre_techniques || []).map(x => `<span class="chip">${esc(x)}</span>`).join('');
+        const tacticChips = (t.mitre_tactics || []).map(x => `<span class="chip">${esc(x)}</span>`).join('');
+        const mitreLine = (techChips || tacticChips)
+            ? `<div style="margin-top:0.3rem; font-size:0.75rem;"><span style="color:var(--text-secondary);">MITRE:</span> ${techChips}${tacticChips}</div>`
+            : '';
         return `
             <tr>
-                <td><strong>${esc(t.name)}</strong><div style="color:var(--text-secondary); font-size:0.8rem;">${esc(t.description || '')}</div></td>
+                <td><strong>${esc(t.name)}</strong><div style="color:var(--text-secondary); font-size:0.8rem;">${esc(t.description || '')}</div>${mitreLine}</td>
                 <td>${ruleIds}</td>
                 <td>${ruleGroups}</td>
                 <td>${pattern}</td>
                 <td>${t.priority}</td>
                 <td>${sev}</td>
+                <td>${renderScorecard(t.id)}</td>
                 <td>${statusBadge}</td>
                 <td>
                     <button class="btn" onclick="editTemplate(${t.id})">Edit</button>
@@ -298,6 +343,8 @@ function resetForm() {
     document.getElementById('prompt-rule-ids').value = '';
     document.getElementById('prompt-rule-groups').value = '';
     document.getElementById('prompt-rule-pattern').value = '';
+    document.getElementById('prompt-mitre-techniques').value = '';
+    document.getElementById('prompt-mitre-tactics').value = '';
     document.getElementById('prompt-text').value = '';
     document.getElementById('prompt-checklist').value = '';
     document.getElementById('prompt-severity').value = '';
@@ -327,6 +374,8 @@ function editTemplate(id) {
     document.getElementById('prompt-rule-ids').value = arrayToLines(t.rule_ids);
     document.getElementById('prompt-rule-groups').value = arrayToLines(t.rule_groups);
     document.getElementById('prompt-rule-pattern').value = t.rule_id_pattern || '';
+    document.getElementById('prompt-mitre-techniques').value = arrayToLines(t.mitre_techniques);
+    document.getElementById('prompt-mitre-tactics').value = arrayToLines(t.mitre_tactics);
     document.getElementById('prompt-text').value = t.prompt_text || '';
     document.getElementById('prompt-checklist').value = t.investigation_checklist_text || '';
     document.getElementById('prompt-severity').value = t.severity_hint || '';
@@ -344,6 +393,8 @@ async function saveTemplate() {
         rule_ids: linesToArray(document.getElementById('prompt-rule-ids').value),
         rule_groups: linesToArray(document.getElementById('prompt-rule-groups').value),
         rule_id_pattern: document.getElementById('prompt-rule-pattern').value.trim() || null,
+        mitre_techniques: linesToArray(document.getElementById('prompt-mitre-techniques').value),
+        mitre_tactics: linesToArray(document.getElementById('prompt-mitre-tactics').value),
         prompt_text: document.getElementById('prompt-text').value,
         investigation_checklist_text: document.getElementById('prompt-checklist').value || null,
         severity_hint: document.getElementById('prompt-severity').value || null,

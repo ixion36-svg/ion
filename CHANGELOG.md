@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.10.3 (2026-04-22)
+
+### AI Analyst — "Bob"
+- New service user `bob` + role `ai_analyst` — AI-authored artefacts (notes, observables, tickers, tuning proposals) attribute to a single identity
+- `User.is_service_account` column — login flow rejects service accounts early
+- New permissions: `alert:comment`, `case:comment`, `case:link`, `ticker:read/create/manage`, `tuning:read/review`, `investigation:run`
+- Bob auto-posts a markdown investigation summary to the alert Notes timeline
+- Bob writes `suggested_verdict` + `suggested_verdict_confidence` onto `AlertTriage` (matches `CaseClosureReason` for 1:1 comparison)
+- Bob auto-extracts high-confidence IOCs from the JSON envelope as `Observable` rows tagged `source:bob`
+- Bob auto-files a `TuningProposal` when verdict is `false_positive` with a concrete `suggested_change`
+
+### MITRE-tiered alert-prompt matcher + canonical output contract
+- `AlertPromptTemplate` gains `mitre_techniques_json` + `mitre_tactics_json`
+- Matcher now 5-tier: exact rule_id → regex → MITRE technique (parent↔sub tolerant) → MITRE tactic → `rule.groups`
+- Canonical JSON output envelope pinned to ION's `CaseClosureReason` — verdict, confidence, severity, analyst_explanation, technical_details, mitre, iocs, recommended_actions, `suggested_closure_reason`, `tuning_recommendation` (the detection-engineering feedback bridge)
+- Ollama `format: "json"` wired through `OllamaService.chat(response_format=…)` so investigations emit strict JSON
+- 50 seeded prompt templates (25 existing + 12 new Sysmon events from Talon + 3 Talon Windows categories + 10 new coverage categories: Entra ID, Okta, MFA fatigue, K8s runtime, CI/CD abuse, macOS persistence, Zeek, DB access anomaly, session hijack, supply-chain)
+- Sysmon 1/3/11 upgraded with exact Wazuh field refs, VirusTotal URL pattern, and a P1/P2/P3 Velociraptor artefact table (Event 1)
+
+### Ticker
+- New `Ticker` + `TickerDismissal` models
+- Background producer (advisory lock `LOCK_TICKER_BG=1018`): flags critical alerts not assigned to a case after `ION_TICKER_CRITICAL_NO_CASE_MIN` minutes (default 10); auto-resolves when the alert is cased
+- REST API + `/tickers` manage page; sticky strip below nav on all pages; critical entries non-dismissable (auto-resolve only)
+- Env: `ION_TICKER_ENABLED`, `ION_TICKER_INTERVAL_S`, `ION_TICKER_CRITICAL_NO_CASE_MIN`
+
+### Tuning proposals
+- `TuningProposal` model + API + `/tuning-proposals` page
+- Accept/reject/duplicate workflow, auto-created from Bob's FP verdicts
+
+### Training foundation (Tier 1)
+- `AIFeedback` ledger — captures `bob_suggested_verdict` vs `human_verdict` on case close, with agreement flag and optional delta reason
+- Per-template scorecard on `/alert-prompts`: 30-day agreement %, FP/BTP/TP rates, "tune" flag when agreement < 60 % on 10+ samples
+- `GET /api/alert-prompts/scorecards` endpoint
+
+### Docs & tests
+- `docs/AI_OUTPUT_CONTRACT.md` — full output schema reference
+- `tests/test_alert_prompt_matcher.py` — matcher unit tests (18 cases)
+
 ## v0.9.43 (2026-04-07)
 ### Security Hardening
 - Circuit breakers on ES, OpenCTI, TIDE, Ollama, Kibana external calls

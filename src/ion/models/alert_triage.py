@@ -169,6 +169,13 @@ class AlertTriage(Base, TimestampMixin):
     analyst_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     observables: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     mitre_techniques: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # AI-suggested verdict — non-binding, the human still closes. Matches
+    # CaseClosureReason enum so detection-engineering tuning can compare
+    # AI suggestions to final human verdicts 1:1.
+    suggested_verdict: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    suggested_verdict_confidence: Mapped[Optional[str]] = mapped_column(
+        String(20), nullable=True
+    )  # low | medium | high
     # Snapshot of the originating system at first triage touch. Lives here
     # (not just on the live ES doc) so attribution survives ES retention
     # rotation. Sourced from data_stream.namespace when the triage is

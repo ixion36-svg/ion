@@ -77,6 +77,7 @@ LOCK_NETMAP_BG_SYNC         = 1014
 LOCK_SCHEDULER_BG           = 1015
 LOCK_INVESTIGATION_BG       = 1016
 LOCK_CASE_GROUPER_BG        = 1017
+LOCK_TICKER_BG              = 1018
 
 
 @contextmanager
@@ -331,6 +332,51 @@ def _run_migrations(engine: Engine) -> None:
                     text("ALTER TABLE alert_triage ADD COLUMN mitre_techniques JSON")
                 )
                 logger.info("Migrated: alert_triage.mitre_techniques")
+        # v0.10.3: Bob's suggested verdict hint on triage rows
+        if "suggested_verdict" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE alert_triage ADD COLUMN suggested_verdict VARCHAR(50)")
+                )
+                logger.info("Migrated: alert_triage.suggested_verdict")
+        if "suggested_verdict_confidence" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE alert_triage ADD COLUMN suggested_verdict_confidence VARCHAR(20)")
+                )
+                logger.info("Migrated: alert_triage.suggested_verdict_confidence")
+
+    # v0.10.3: users.is_service_account for Bob + other service users
+    if insp.has_table("users"):
+        existing = {col["name"] for col in insp.get_columns("users")}
+        if "is_service_account" not in existing:
+            with engine.begin() as conn:
+                # NOT NULL with default 0 — existing rows all become human users
+                conn.execute(
+                    text(
+                        "ALTER TABLE users ADD COLUMN is_service_account BOOLEAN NOT NULL DEFAULT 0"
+                        if not _is_postgres(engine)
+                        else "ALTER TABLE users ADD COLUMN is_service_account BOOLEAN NOT NULL DEFAULT FALSE"
+                    )
+                )
+                logger.info("Migrated: users.is_service_account")
+
+    # v0.10.3: MITRE columns on alert_prompt_templates
+    if insp.has_table("alert_prompt_templates"):
+        existing = {
+            col["name"] for col in insp.get_columns("alert_prompt_templates")
+        }
+        for col_name in ("mitre_techniques_json", "mitre_tactics_json"):
+            if col_name not in existing:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            f"ALTER TABLE alert_prompt_templates ADD COLUMN {col_name} TEXT"
+                        )
+                    )
+                    logger.info(
+                        "Migrated: alert_prompt_templates.%s", col_name
+                    )
 
     # Migrations for playbook_executions table
     if insp.has_table("playbook_executions"):

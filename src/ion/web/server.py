@@ -58,6 +58,8 @@ from ion.web.triage_suggestion_api import router as triage_suggestion_router
 from ion.web.smtp_api import router as smtp_router
 from ion.web.enrichment_api import router as enrichment_router
 from ion.web.alert_prompt_api import router as alert_prompt_router
+from ion.web.tuning_proposal_api import router as tuning_proposal_router
+from ion.web.ticker_api import router as ticker_router
 from ion.web.investigation_memory_api import router as investigation_memory_router
 from ion.web.scheduler_api import router as scheduler_router
 from ion.web.investigation_api import router as investigation_router
@@ -311,6 +313,8 @@ app.include_router(cyber_range_router, prefix="/api")
 app.include_router(smtp_router, prefix="/api/smtp")
 app.include_router(enrichment_router, prefix="/api/enrichment")
 app.include_router(alert_prompt_router, prefix="")
+app.include_router(tuning_proposal_router, prefix="")
+app.include_router(ticker_router, prefix="")
 app.include_router(investigation_memory_router)
 app.include_router(scheduler_router, prefix="")
 app.include_router(investigation_router, prefix="")
@@ -434,6 +438,9 @@ async def startup_event():
             auth_service.seed_roles()
             admin_password = os.environ.get("ION_ADMIN_PASSWORD", "changeme")
             auth_service.seed_admin_user(password=admin_password)
+            # Seed Bob — the AI analyst service account. Must run after
+            # seed_roles so the ai_analyst role exists for assignment.
+            auth_service.seed_bob_user()
             session.commit()
         finally:
             session.close()
@@ -615,6 +622,21 @@ async def startup_event():
         logger.info("Case grouper background loop started")
     run_locked(engine, LOCK_CASE_GROUPER_BG, "case_grouper_bg_loop", _start_case_grouper,
                hold_until_close=True)
+
+    # ---------------------------------------------------------------
+    # Ticker background producer — flags critical alerts without a case.
+    # Honours ION_TICKER_ENABLED / _INTERVAL_S / _CRITICAL_NO_CASE_MIN.
+    # ---------------------------------------------------------------
+    def _start_ticker_loop():
+        from ion.services.ticker_service import start_ticker_if_enabled
+        start_ticker_if_enabled(engine=engine)
+        logger.info("Ticker background loop started")
+    # Note: start_ticker_if_enabled grabs LOCK_TICKER_BG internally, so we
+    # just call it directly (no outer run_locked wrapper).
+    try:
+        _start_ticker_loop()
+    except Exception as exc:
+        logger.warning("Failed to start ticker loop: %s", exc)
 
     # Version compatibility checks for connectors that declare supported ranges
     try:

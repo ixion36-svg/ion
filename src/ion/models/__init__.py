@@ -141,6 +141,17 @@ from ion.models.sla import (
     PlaybookActionLog,
 )
 
+# v0.10.3: alert_prompt, ticker, tuning proposals, AI feedback ledger.
+# Imported eagerly here so Base.metadata registers the tables at startup;
+# otherwise create_all() misses them because callers lazy-import.
+# Order matters: alert_prompt MUST come before tuning_proposal and
+# ai_feedback because they FK to alert_prompt_templates.
+from ion.models.alert_prompt import AlertPromptTemplate  # noqa: F401
+from ion.models.investigation import Investigation  # noqa: F401
+from ion.models.ticker import Ticker, TickerDismissal, TickerKind, TickerSeverity, TickerSourceType  # noqa: F401
+from ion.models.tuning_proposal import TuningProposal, TuningProposalStatus  # noqa: F401
+from ion.models.ai_feedback import AIFeedback  # noqa: F401
+
 __all__ = [
     "Base",
     "Template",

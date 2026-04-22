@@ -354,9 +354,26 @@ async def arkime_preview(
         try:
             result = await svc.download_pcap_by_community_id(node, community_id)
         except ArkimeError as e:
-            status = e.status_code if e.status_code in (401, 403, 404) else 502
-            raise HTTPException(status_code=status, detail=safe_error(e))
-    else:
+            # A 404 on community_id means "no sessions matched the flow hash".
+            # Fall back to IP search when we have IPs to search with —
+            # community_id indexing varies across Arkime installs and a miss
+            # shouldn't block the investigation when IP search can still
+            # find related traffic.
+            if (
+                e.status_code == 404
+                and (alert.get("source_ip") or alert.get("destination_ip"))
+            ):
+                warnings.append(
+                    f"No Arkime session matched community_id={community_id} — "
+                    f"falling back to IP search. Results may include unrelated "
+                    f"sessions from the same hosts."
+                )
+                community_id = ""  # triggers the IP-search branch below
+            else:
+                status = e.status_code if e.status_code in (401, 403, 404) else 502
+                raise HTTPException(status_code=status, detail=safe_error(e))
+
+    if not community_id:
         # Fallback: no community_id — search Arkime by source/dest IP from
         # the alert. Broader results, but still useful for investigation.
         search_mode = "ip_time"

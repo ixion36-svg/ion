@@ -30,122 +30,194 @@ _DEFAULT_TEMPLATES: list[dict] = [
         "name": "Sysmon Event 1 — Process Creation",
         "description": (
             "Investigation guide for Sysmon process-creation telemetry "
-            "(EventID 1). Focus on parent/child chain, command-line, and "
-            "image hashes."
+            "(EventID 1). Focus on parent/child chain, command-line, "
+            "image hashes, and live-forensics artefact collection."
         ),
         "rule_groups": ["sysmon_event_1"],
         "priority": 50,
         "severity_hint": "medium",
         "prompt_text": (
-            "You are investigating a Sysmon process-creation event (EventID 1). "
-            "Focus on the parent-child process chain, command-line arguments, "
-            "image path and hash, integrity level, and user context. Cross-check "
-            "the image hash against threat intel and known LOLBin inventories "
-            "(ATT&CK T1059, T1218). Flag obfuscated command-lines, encoded "
-            "PowerShell, unusual parent processes (e.g. winword.exe spawning "
-            "cmd.exe), writes to Temp/AppData, and signed-binary proxy execution. "
-            "Correlate with Event 3 (network connection) and Event 11 (file "
-            "create) from the same process GUID to build a timeline. Decide "
-            "whether the activity is benign administration, a known tool, or "
-            "suspected adversary execution."
+            "You are investigating a Sysmon Event 1 (process creation) "
+            "alert. Examine the full command-line in "
+            "`data.win.eventdata.commandLine` and the parent command-line "
+            "in `data.win.eventdata.parentCommandLine`. Check "
+            "`data.win.eventdata.image` (child) and "
+            "`data.win.eventdata.parentImage` (parent) — unexpected "
+            "parent/child pairs (winword.exe → cmd.exe, outlook.exe → "
+            "powershell.exe, svchost.exe → unsigned.exe) are strong "
+            "malicious indicators. Inspect "
+            "`data.win.eventdata.integrityLevel` and "
+            "`data.win.eventdata.user`. Decode any base64 / compressed / "
+            "obfuscated command-line content. Extract the SHA256 from "
+            "`data.win.eventdata.hashes` and look it up on VirusTotal: "
+            "https://www.virustotal.com/gui/file/<sha256>. Correlate with "
+            "Sysmon Event 3 (network connections) and Event 11 (file "
+            "writes) sharing the same ProcessGuid. Assign the verdict "
+            "according to the Output Contract (true_positive / "
+            "false_positive / benign_true_positive / inconclusive).\n\n"
+            "If the verdict after desk analysis is suspicious or worse "
+            "(VT verdict >= suspicious, unusual parent/child, decoded "
+            "base64 reveals malicious intent), collect live forensics "
+            "from the affected host via Velociraptor in priority order:\n\n"
+            "| Priority | Artifact | Why for Sysmon Event 1 |\n"
+            "|---|---|---|\n"
+            "| P1 | `Windows.System.Pslist` | Is the process still "
+            "running? Parent/child tree now. |\n"
+            "| P1 | `Windows.Forensics.Prefetch` | First-seen vs repeat "
+            "execution of the binary. |\n"
+            "| P2 | `Windows.Sysinternals.Autoruns` | Did the process "
+            "establish persistence? |\n"
+            "| P2 | `Windows.Forensics.UserAssist` | User-initiated "
+            "double-click vs spawned programmatically. |\n"
+            "| P3 | `Windows.Detection.Yara.Process` | YARA-scan process "
+            "memory for known families. |\n"
+            "| P3 | `Windows.Memory.ProcessDump` | Full memory dump. "
+            "Expensive — confirmed malicious only. |\n"
+            "| P3 | `Windows.NTFS.MFT` | File timeline — when dropped, "
+            "renamed, deleted. |\n\n"
+            "Fold Velociraptor results into `template_specific."
+            "live_forensics`. ATT&CK: T1059 (Command and Scripting "
+            "Interpreter), T1218 (Signed Binary Proxy Execution), T1036 "
+            "(Masquerading)."
         ),
         "investigation_checklist_text": (
-            "- What is the parent process and its full command-line?\n"
-            "- Is the image path a known-good signed binary, or in a user-"
-            "writeable location?\n"
-            "- Does the hash match any threat-intel hit (VT / OpenCTI / TIDE)?\n"
-            "- Does the command-line contain encoded, compressed, or "
-            "obfuscated payloads?\n"
-            "- Is the integrity level elevated vs expected?\n"
-            "- Are there related network connections (Sysmon 3) or file writes "
-            "(Sysmon 11) from the same process GUID?\n"
-            "- Does the activity align with any MITRE ATT&CK technique "
-            "(T1059.*, T1218.*, T1036.*)?"
+            "- What is `parentImage` / `parentCommandLine` — is this a "
+            "normal pair for `image`?\n"
+            "- Is `image` a signed system binary or a file in a user-"
+            "writeable path (Temp, AppData, ProgramData)?\n"
+            "- Does `commandLine` contain base64 (`-enc`), "
+            "compressed/obfuscated, or download-cradle content (IEX, "
+            "certutil -urlcache, bitsadmin /transfer)?\n"
+            "- What SHA256 is reported in `hashes` — look it up at "
+            "https://www.virustotal.com/gui/file/<sha256>\n"
+            "- What is `integrityLevel` — is it elevated unexpectedly?\n"
+            "- Which user (`user`) ran the process? Service account, "
+            "admin, interactive user?\n"
+            "- Related Sysmon 3 (network) or Sysmon 11 (file) events "
+            "sharing the same `processGuid`?\n"
+            "- Which MITRE techniques (T1059.*, T1218.*, T1036.*) "
+            "concretely apply, based on evidence?"
         ),
         "expected_outputs": [
-            "verdict",
-            "mitre_techniques",
+            "process_ancestry",
+            "command_line_analysis",
+            "vt_verdict",
+            "live_forensics",
             "recommended_actions",
-            "ioc_confidence",
         ],
     },
     {
         "name": "Sysmon Event 3 — Network Connection",
         "description": (
             "Investigation guide for Sysmon network-connection telemetry "
-            "(EventID 3). Focus on destination reputation, beaconing, and "
-            "process context."
+            "(EventID 3). Focus on destination reputation, beaconing, "
+            "and process-context."
         ),
         "rule_groups": ["sysmon_event_3"],
         "priority": 50,
         "severity_hint": "medium",
         "prompt_text": (
-            "You are investigating a Sysmon network-connection event (EventID "
-            "3). Determine which process initiated the connection, the "
-            "destination IP/host/port, and whether the traffic pattern looks "
-            "like C2, data staging, or legitimate telemetry. Check the "
-            "destination against TI feeds, passive DNS, and internal asset "
-            "inventory. Look for beaconing cadence, unusual ports for the "
-            "protocol, DNS-over-HTTPS providers, and rare destinations for "
-            "the process. ATT&CK: T1071 (application layer protocol), T1090 "
-            "(proxy), T1105 (ingress tool transfer)."
+            "You are investigating a Sysmon Event 3 (network connection) "
+            "alert. Examine `data.win.eventdata.image` (the initiating "
+            "process), `data.win.eventdata.destinationIp`, "
+            "`data.win.eventdata.destinationHostname`, "
+            "`data.win.eventdata.destinationPort`, and "
+            "`data.win.eventdata.protocol`. Ask: is this process "
+            "*expected* to talk to the internet at all? rundll32, "
+            "regsvr32, certutil, mshta, or newly-created unsigned "
+            "binaries doing outbound is a strong red flag. Reverse-DNS / "
+            "passive-DNS the destination and look up its reputation on "
+            "threat intel (VirusTotal: https://www.virustotal.com/gui/"
+            "ip-address/<ip>, URLScan, GreyNoise). Look for patterns: "
+            "beaconing cadence (regular intervals with jitter), common "
+            "C2 ports (443, 8443, 80, 53), DoH endpoints (1.1.1.1, "
+            "cloudflare-dns.com), and rare-destination-for-process "
+            "anomalies. Correlate with Sysmon 1 (what invoked the "
+            "initiating process) and Sysmon 22 (did it resolve the "
+            "destination first) via shared `processGuid`. ATT&CK: "
+            "T1071 (Application Layer Protocol), T1090 (Proxy), T1105 "
+            "(Ingress Tool Transfer)."
         ),
         "investigation_checklist_text": (
-            "- Which process initiated the connection and is that normal for "
-            "it?\n"
-            "- Is the destination IP/domain on any threat-intel list?\n"
-            "- Is the port/protocol combination unusual for the process?\n"
-            "- Are there repeated connections suggesting beaconing?\n"
-            "- Do passive DNS / WHOIS records suggest recent domain "
-            "registration?\n"
-            "- Is the internal asset known to talk to this destination "
-            "legitimately?\n"
-            "- Are there paired process-create (Sysmon 1) or file-create "
-            "(Sysmon 11) events that explain the origin?"
+            "- Which process (`image`) initiated the connection — is "
+            "outbound traffic expected for it?\n"
+            "- What is `destinationIp` / `destinationHostname` / "
+            "`destinationPort`?\n"
+            "- Does the destination IP / domain appear on TI feeds "
+            "(VirusTotal, GreyNoise, URLScan, OpenCTI)?\n"
+            "- Is the port unusual for the declared `protocol` or for "
+            "the initiating process?\n"
+            "- Is there beaconing cadence (repeated connections at "
+            "near-regular intervals)?\n"
+            "- Did a Sysmon 22 DNS query just precede this (same "
+            "`processGuid`)?\n"
+            "- Did a Sysmon 1 process-create from this `processGuid` "
+            "reveal a suspicious command-line?\n"
+            "- Is the internal host known to talk to this destination "
+            "legitimately (baseline)?"
         ),
         "expected_outputs": [
-            "verdict",
-            "c2_indicators",
+            "destination_reputation",
+            "beaconing_indicators",
+            "process_expected_to_connect",
             "recommended_actions",
-            "ioc_confidence",
         ],
     },
     {
         "name": "Sysmon Event 11 — File Create",
         "description": (
             "Investigation guide for Sysmon file-create telemetry "
-            "(EventID 11). Focus on path, extension, and writing process."
+            "(EventID 11). Focus on path, extension, writing process, "
+            "and the delivery chain."
         ),
         "rule_groups": ["sysmon_event_11"],
         "priority": 50,
         "severity_hint": "medium",
         "prompt_text": (
-            "You are investigating a Sysmon file-create event (EventID 11). "
-            "Identify the writing process, target path, and file type. Flag "
-            "drops into Temp, AppData, Public, Startup, or Task scheduler "
-            "paths. Check for double extensions, masqueraded executables, "
-            "script files (.ps1/.js/.hta/.vbs), and persistence locations. "
-            "Correlate with subsequent Event 1 (execution) or Event 7 "
-            "(image loaded) from the same file. ATT&CK: T1547 (persistence), "
-            "T1105 (tool transfer), T1036 (masquerading)."
+            "You are investigating a Sysmon Event 11 (file create) "
+            "alert. Examine `data.win.eventdata.image` (the writing "
+            "process) and `data.win.eventdata.targetFilename` (full "
+            "path). Flag drops into Temp, AppData (Roaming / Local), "
+            "Public, Startup folders, ProgramData, %WINDIR%\\Tasks, or "
+            "user-writeable service-path locations. Check for "
+            "masquerading patterns: double-extensions (`invoice.pdf.exe`), "
+            "renamed system binaries, script files (.ps1, .js, .hta, "
+            ".vbs, .wsf), and LNK files in autostart locations. Extract "
+            "the SHA256 if available and look it up at "
+            "https://www.virustotal.com/gui/file/<sha256>. Correlate "
+            "forward: did a Sysmon 1 execute the file or Sysmon 7 load "
+            "it shortly after (same `processGuid` chain)? Correlate "
+            "backward: was there a Sysmon 3 network connection or "
+            "Sysmon 22 DNS query from the writing process that matches "
+            "a download? ATT&CK: T1547 (Boot or Logon Autostart "
+            "Execution), T1105 (Ingress Tool Transfer), T1036 "
+            "(Masquerading)."
         ),
         "investigation_checklist_text": (
-            "- Which process wrote the file and is that expected behavior?\n"
-            "- Is the target path a persistence location (Startup, Run keys, "
-            "Scheduled Tasks staging dir)?\n"
-            "- Does the file have a suspicious extension or double extension?\n"
-            "- Is the file signed, and does the signer match the path?\n"
-            "- Was the file subsequently executed (Sysmon 1) or loaded "
-            "(Sysmon 7)?\n"
-            "- Does the hash match any TI hit?\n"
-            "- Is there a matching network download (Sysmon 3) that delivered "
-            "the file?"
+            "- Which process wrote the file (`image`) and is it "
+            "expected to write to that location?\n"
+            "- What is the target path (`targetFilename`) — is it "
+            "user-writeable and/or an autostart location?\n"
+            "- Does the file extension look legitimate or "
+            "double/masqueraded?\n"
+            "- If a hash is available, does the SHA256 appear on "
+            "VirusTotal?\n"
+            "- Was the file later executed (Sysmon 1) or loaded "
+            "(Sysmon 7) within a short window, same `processGuid` "
+            "chain?\n"
+            "- Was there a preceding Sysmon 3 network download or "
+            "Sysmon 22 DNS resolution by the writing process?\n"
+            "- Is the file a LNK, script, or signed system-name "
+            "masquerade?\n"
+            "- Does the activity create persistence (write into Run "
+            "key path, Startup folder, Scheduled Task XML dir)?"
         ),
         "expected_outputs": [
-            "verdict",
-            "persistence_indicators",
+            "writer_expected",
+            "target_path_category",
+            "masquerade_indicators",
+            "delivery_chain",
             "recommended_actions",
-            "ioc_confidence",
         ],
     },
     {
@@ -1222,7 +1294,1560 @@ _DEFAULT_TEMPLATES: list[dict] = [
             "ransomware_family",
         ],
     },
+    # ------------------------------------------------------------------
+    # Sysmon Event Templates (12 — ported from taylorwalton/talon with
+    # ION-native envelope: specific Wazuh/Graylog field references, VT
+    # URL pattern, and structured expected_outputs).
+    # ------------------------------------------------------------------
+    {
+        "name": "Sysmon Event 2 — File Creation Time Changed",
+        "description": (
+            "Investigation guide for Sysmon Event 2 (file creation time "
+            "change — often a timestomping precursor). Many legitimate "
+            "processes change creation time, so context matters."
+        ),
+        "rule_groups": ["sysmon_event_2"],
+        "priority": 40,
+        "severity_hint": "medium",
+        "prompt_text": (
+            "You are investigating a Sysmon Event 2 alert — a process "
+            "explicitly changed a file's creation time. Timestomping is a "
+            "classic anti-forensics technique used to disguise a newly "
+            "dropped backdoor as an old system file, but many legitimate "
+            "processes (installers, archivers, backup tools) also set file "
+            "timestamps. Examine `data.win.eventdata.image` (the process), "
+            "`data.win.eventdata.targetFilename`, and the before/after "
+            "creation time values. Is the target in a system path, a user "
+            "Temp/AppData path, or a web root? Is the writer signed and "
+            "expected to touch that path? Correlate with prior Sysmon Event "
+            "11 (file create) on the same path from the same process GUID "
+            "to see whether this is a drop-then-timestomp pattern. ATT&CK: "
+            "T1070.006 (Indicator Removal: Timestomp)."
+        ),
+        "investigation_checklist_text": (
+            "- Which process changed the file time (`image`) and is it "
+            "expected to modify timestamps?\n"
+            "- What is the target path — system, user-writeable, web "
+            "server root?\n"
+            "- What were the old vs new creation time values?\n"
+            "- Is there a preceding Sysmon 11 file-create from the same "
+            "process GUID?\n"
+            "- Is the file signed and by whom?\n"
+            "- Does the hash appear on VirusTotal? "
+            "(https://www.virustotal.com/gui/file/<hash>)\n"
+            "- Was the file subsequently executed (Sysmon 1) or loaded "
+            "(Sysmon 7)?"
+        ),
+        "expected_outputs": [
+            "timestomp_indicators",
+            "delivery_chain",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Sysmon Event 6 — Driver Loaded",
+        "description": (
+            "Investigation guide for Sysmon Event 6 — a driver loaded on "
+            "the system. Kernel-mode code is a high-trust boundary; "
+            "unsigned or rare drivers warrant close attention."
+        ),
+        "rule_groups": ["sysmon_event_6"],
+        "priority": 25,
+        "severity_hint": "high",
+        "prompt_text": (
+            "You are investigating a Sysmon Event 6 alert — a driver was "
+            "loaded. Drivers run in kernel mode: a malicious driver can "
+            "disable EDR, hide processes, and persist rootkit-style. "
+            "Examine `data.win.eventdata.imageLoaded` (driver path and "
+            "filename), `signature` / `signatureStatus`, and the hashes "
+            "(MD5/SHA1/SHA256/IMPHASH). Is the driver signed by a trusted "
+            "vendor, or is the signature Invalid/Unsigned? Rare driver "
+            "names in odd paths (e.g. Temp, a user profile, C:\\Windows "
+            "directly) are suspicious. Look up the SHA256 on VirusTotal: "
+            "https://www.virustotal.com/gui/file/<hash>. Cross-reference "
+            "against known BYOVD (bring-your-own-vulnerable-driver) lists. "
+            "ATT&CK: T1543.003 (Create Windows Service), T1014 (Rootkit), "
+            "T1068 (Exploitation for Privilege Escalation)."
+        ),
+        "investigation_checklist_text": (
+            "- What is the driver file path and is it a standard driver "
+            "location?\n"
+            "- Is the driver digitally signed and is the signature valid?\n"
+            "- Does the SHA256 hash appear on VirusTotal or BYOVD lists?\n"
+            "- Is the driver name rare across the estate (first-seen / "
+            "low prevalence)?\n"
+            "- Was the driver loaded at boot or on-demand by a user-mode "
+            "process?\n"
+            "- Is there preceding file-create (Sysmon 11) or download "
+            "activity for this .sys file?\n"
+            "- Has this driver been flagged as vulnerable (e.g. "
+            "loldrivers.io)?"
+        ),
+        "expected_outputs": [
+            "driver_signature_state",
+            "byovd_match",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Sysmon Event 7 — Image/DLL Loaded",
+        "description": (
+            "Investigation guide for Sysmon Event 7 — a DLL or module was "
+            "loaded into a process. High-volume; focus on rare loads, "
+            "unsigned DLLs, or DLLs loaded from user-writeable paths."
+        ),
+        "rule_groups": ["sysmon_event_7"],
+        "priority": 40,
+        "severity_hint": "medium",
+        "prompt_text": (
+            "You are investigating a Sysmon Event 7 alert — a module was "
+            "loaded into a process. Sysmon Event 7 is normally configured "
+            "with tight filters because it's extremely noisy, so any alert "
+            "reaching triage is usually pre-filtered on something "
+            "suspicious. Examine `data.win.eventdata.image` (the loading "
+            "process), `data.win.eventdata.imageLoaded` (the DLL), and "
+            "`signatureStatus`. Classic attack patterns to look for: DLL "
+            "side-loading (legitimate signed exe loads an unsigned/rogue "
+            "DLL from its own directory), DLL search-order hijack (DLL in "
+            "user path preempts the system one), and reflective DLL load "
+            "(no file on disk — look at `fileVersion` blank and missing "
+            "on-disk path). Check the SHA256 on VirusTotal. Compare the "
+            "DLL's signer against the loading process's signer — mismatch "
+            "is a strong signal. ATT&CK: T1574.002 (DLL Side-Loading), "
+            "T1574.001 (DLL Search Order Hijacking), T1055.001 "
+            "(Reflective DLL Injection)."
+        ),
+        "investigation_checklist_text": (
+            "- Which process loaded the DLL (`image`) and is the DLL on "
+            "its normal dependency list?\n"
+            "- What is the DLL path — is it user-writeable, next to the "
+            "loading exe (side-load), or standard system32?\n"
+            "- Is the DLL signed, and does the signer match the loading "
+            "process's signer?\n"
+            "- Does the SHA256 hash appear on VirusTotal?\n"
+            "- Is there a matching on-disk file, or does the load look "
+            "reflective (no file version)?\n"
+            "- Was there a preceding file-create (Sysmon 11) putting the "
+            "DLL into that path?\n"
+            "- Is the DLL name rare in your estate?"
+        ),
+        "expected_outputs": [
+            "load_pattern",
+            "signer_mismatch",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Sysmon Event 10 — Process Access (LSASS / Credential Dumping)",
+        "description": (
+            "Investigation guide for Sysmon Event 10 — a process opened "
+            "another process. Heavily filtered, so any alert is usually "
+            "on a sensitive target like LSASS — treat as credential-"
+            "access until proven otherwise."
+        ),
+        "rule_groups": ["sysmon_event_10"],
+        "priority": 15,
+        "severity_hint": "critical",
+        "prompt_text": (
+            "You are investigating a Sysmon Event 10 alert — a process "
+            "opened another process. If the target process is lsass.exe "
+            "with a memory-reading access mask, this is very likely "
+            "credential dumping (Mimikatz, ProcDump, comsvcs.dll "
+            "MiniDump, custom tooling). Examine "
+            "`data.win.eventdata.sourceImage` (the accessor), "
+            "`data.win.eventdata.targetImage` (usually lsass.exe), and "
+            "`data.win.eventdata.grantedAccess` (hex mask). Access masks "
+            "0x1010, 0x1410, 0x1438, 0x143A, 0x1FFFFF are classic "
+            "credential-dump signatures (combinations of "
+            "PROCESS_VM_READ + PROCESS_QUERY_INFORMATION). Verify the "
+            "source image is expected to touch LSASS (Defender, legitimate "
+            "EDR, Autoruns, Process Explorer) vs. a rare/unsigned binary. "
+            "Check `callTrace` for ntdll!NtReadVirtualMemory or "
+            "WerFault-looking signatures often used as LOLBin cover. "
+            "Correlate with Sysmon 1 (what invoked the source image?) "
+            "and with EDR credential-theft alerts. ATT&CK: T1003.001 "
+            "(OS Credential Dumping: LSASS Memory), T1055 (Process "
+            "Injection)."
+        ),
+        "investigation_checklist_text": (
+            "- What is the source process (`sourceImage`) and is it "
+            "expected to access other processes?\n"
+            "- What is the target process — is it lsass.exe or another "
+            "sensitive process?\n"
+            "- What is the `grantedAccess` mask and does it indicate "
+            "memory read or write?\n"
+            "- Does `callTrace` mention ntdll!NtReadVirtualMemory or "
+            "other memory-read primitives?\n"
+            "- Is the source image signed and by whom?\n"
+            "- Was the source image created recently (Sysmon 11) or "
+            "downloaded recently?\n"
+            "- Does the SHA256 appear on VirusTotal or in credential-"
+            "dumping tool signatures?\n"
+            "- Should we immediately isolate the host and force credential "
+            "resets?"
+        ),
+        "expected_outputs": [
+            "granted_access_analysis",
+            "credential_dump_confidence",
+            "compromised_accounts",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Sysmon Event 12 — Registry Key/Value Create/Delete",
+        "description": (
+            "Investigation guide for Sysmon Event 12 — registry key or "
+            "value create/delete. Focus on persistence autostart "
+            "locations and security-tool tampering keys."
+        ),
+        "rule_groups": ["sysmon_event_12"],
+        "priority": 35,
+        "severity_hint": "medium-high",
+        "prompt_text": (
+            "You are investigating a Sysmon Event 12 alert — a registry "
+            "key or value was created or deleted. Examine "
+            "`data.win.eventdata.targetObject` (the key/value path) and "
+            "`data.win.eventdata.image` (the modifying process). "
+            "Sensitive paths: HKLM\\SOFTWARE\\Microsoft\\Windows\\"
+            "CurrentVersion\\Run (user-wide startup), HKCU equivalents, "
+            "Image File Execution Options (debugger hijack), Services "
+            "keys, AppCompat Shims, Winlogon, Policies\\System, and the "
+            "Defender Exclusions tree. Deletion of security keys (e.g. "
+            "SecurityCenter, MpPreference) is high-severity defender "
+            "tampering. Determine whether the modifying process is a "
+            "legitimate installer/updater or an unsigned/LOLBin. "
+            "Correlate with a preceding Sysmon 1 for full command-line "
+            "context. ATT&CK: T1547.001 (Registry Run Keys), T1112 "
+            "(Modify Registry), T1562.001 (Disable or Modify Tools)."
+        ),
+        "investigation_checklist_text": (
+            "- What is the full `targetObject` path and which Windows "
+            "feature does it control?\n"
+            "- Which process modified it (`image`) and is it signed / "
+            "expected?\n"
+            "- Is this a create or delete operation?\n"
+            "- Does the path fall in an autostart / persistence location?\n"
+            "- Does the path relate to Defender / EDR configuration?\n"
+            "- What command-line invoked the process (Sysmon 1 "
+            "correlation)?\n"
+            "- Is there a change ticket or installer run that explains "
+            "this activity?"
+        ),
+        "expected_outputs": [
+            "registry_category",
+            "persistence_or_tamper",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Sysmon Event 13 — Registry Value Set",
+        "description": (
+            "Investigation guide for Sysmon Event 13 — a registry value "
+            "was set (DWORD/QWORD/string). Focus on autostart values, "
+            "IFEO debugger, and security config flips."
+        ),
+        "rule_groups": ["sysmon_event_13"],
+        "priority": 35,
+        "severity_hint": "medium-high",
+        "prompt_text": (
+            "You are investigating a Sysmon Event 13 alert — a registry "
+            "value was set. Examine `data.win.eventdata.targetObject`, "
+            "`data.win.eventdata.details` (the value written), and "
+            "`data.win.eventdata.image`. Red-flag patterns: a new value "
+            "under a Run key pointing at a user-writeable path, "
+            "DisableAntiSpyware / DisableRealtimeMonitoring set to 1 "
+            "under Defender policy, IFEO Debugger set on a legitimate "
+            "binary (redirects its execution), `AppInit_DLLs` modified, "
+            "or PSReadLine history limits zeroed. Determine whether the "
+            "modifying process is legitimate (Windows Update, admin "
+            "console, signed installer) or suspicious (cmd.exe, "
+            "powershell.exe, rundll32.exe). ATT&CK: T1547.001, T1112, "
+            "T1562.001, T1574.012 (IFEO Injection)."
+        ),
+        "investigation_checklist_text": (
+            "- What registry value was set — path plus value name?\n"
+            "- What is the written data (`details`) and does it reference "
+            "a binary path?\n"
+            "- Does the setting control autostart, Defender, or execution "
+            "flow?\n"
+            "- Which process made the change (`image`) — signed or "
+            "unsigned?\n"
+            "- Is the referenced binary in a user-writeable path?\n"
+            "- Correlate with Sysmon 1 for full command-line context.\n"
+            "- Is there a preceding Sysmon 11 file-create that dropped "
+            "the referenced binary?"
+        ),
+        "expected_outputs": [
+            "registry_category",
+            "value_written_analysis",
+            "persistence_or_tamper",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Sysmon Event 14 — Registry Key/Value Renamed",
+        "description": (
+            "Investigation guide for Sysmon Event 14 — a registry key or "
+            "value was renamed. Uncommon; usually persistence evasion or "
+            "config hiding."
+        ),
+        "rule_groups": ["sysmon_event_14"],
+        "priority": 40,
+        "severity_hint": "medium",
+        "prompt_text": (
+            "You are investigating a Sysmon Event 14 alert — a registry "
+            "rename. Registry renames are uncommon, so any alert here is "
+            "interesting. Examine `data.win.eventdata.targetObject` (old "
+            "name) and `data.win.eventdata.newName`, plus "
+            "`data.win.eventdata.image`. Common abuse: renaming a key to "
+            "evade signatured detections, temporarily hiding a "
+            "configuration key while other changes are made, or renaming "
+            "service keys as part of a persistence hand-off. Determine "
+            "whether the surrounding activity (Sysmon 12/13 on related "
+            "keys) aligns with an attack story. ATT&CK: T1112 (Modify "
+            "Registry), T1562 (Impair Defenses)."
+        ),
+        "investigation_checklist_text": (
+            "- What was the old key/value name and what is the new one?\n"
+            "- Which process renamed it (`image`)?\n"
+            "- Is the old path tied to a security product or autostart "
+            "location?\n"
+            "- Are there correlated Sysmon 12/13 events on related keys "
+            "from the same process GUID?\n"
+            "- Does this match a known evasion technique for the "
+            "target key?"
+        ),
+        "expected_outputs": [
+            "rename_intent",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Sysmon Event 15 — File Stream / Mark-of-the-Web",
+        "description": (
+            "Investigation guide for Sysmon Event 15 — named file stream "
+            "created, including Zone.Identifier (Mark of the Web) on "
+            "downloaded files and alternate data streams."
+        ),
+        "rule_groups": ["sysmon_event_15"],
+        "priority": 30,
+        "severity_hint": "high",
+        "prompt_text": (
+            "You are investigating a Sysmon Event 15 alert — a file "
+            "stream was created. The two common cases are: (1) a browser "
+            "writing a Zone.Identifier ADS marking a download as "
+            "internet-origin, which is normal telemetry but valuable for "
+            "delivery-path reconstruction; and (2) creation of an "
+            "alternate data stream (ADS) used to hide payloads — `name` "
+            "is non-empty and the content is executable or script. "
+            "Examine `data.win.eventdata.image` (the writing process), "
+            "`data.win.eventdata.targetFilename`, and the stream contents "
+            "if surfaced. If the target is an exe/script with Zone "
+            "Internet origin, the investigation becomes a delivery-chain "
+            "trace. ATT&CK: T1564.004 (NTFS File Attributes), T1027 "
+            "(Obfuscated Files / Hidden ADS)."
+        ),
+        "investigation_checklist_text": (
+            "- Which process created the stream and is it a browser / "
+            "email client / other expected writer?\n"
+            "- Is this a Zone.Identifier MOTW write or a custom ADS?\n"
+            "- If MOTW: what URL / zone is recorded in the stream?\n"
+            "- If custom ADS: is the content executable or script?\n"
+            "- Was the parent file later executed (Sysmon 1) or loaded "
+            "(Sysmon 7)?\n"
+            "- Does the hash of the parent file appear on VirusTotal?\n"
+            "- Was the MOTW later stripped (common evasion — alternate "
+            "data streams can be removed)?"
+        ),
+        "expected_outputs": [
+            "stream_type",
+            "delivery_origin",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Sysmon Event 16 — Sysmon Configuration Change",
+        "description": (
+            "Investigation guide for Sysmon Event 16 — Sysmon's own "
+            "configuration was changed. Treat as critical: adversaries "
+            "blind telemetry before noisy actions."
+        ),
+        "rule_groups": ["sysmon_event_16"],
+        "priority": 20,
+        "severity_hint": "critical",
+        "prompt_text": (
+            "You are investigating a Sysmon Event 16 alert — Sysmon's "
+            "filtering configuration was updated. Changes here can "
+            "drastically reduce visibility, so even legitimate changes "
+            "must be traceable to a change ticket. Examine "
+            "`data.win.eventdata.configuration` (the new config hash / "
+            "content) and the parent activity around the time of change. "
+            "If no change ticket exists, assume adversary action: they "
+            "may have disabled high-value event IDs (1, 3, 10, 11) or "
+            "added exclusions hiding their tooling. Correlate with the "
+            "account that ran the sysmon.exe update (Sysmon Event 1) and "
+            "confirm it is an authorised admin or SCCM/GPO-driven push. "
+            "ATT&CK: T1562.002 (Disable Windows Event Logging), T1562 "
+            "(Impair Defenses)."
+        ),
+        "investigation_checklist_text": (
+            "- Who or what process triggered the configuration change?\n"
+            "- Is the change associated with an approved admin ticket or "
+            "GPO / SCCM deployment?\n"
+            "- What event IDs or process filters changed? (diff old vs "
+            "new)\n"
+            "- Have any high-value events been newly excluded?\n"
+            "- Is Sysmon still reporting after the change, and is the "
+            "coverage the same or reduced?\n"
+            "- Is there suspicious activity on the host around the same "
+            "time that the change may have been intended to hide?\n"
+            "- Should we roll Sysmon back to the last known-good config?"
+        ),
+        "expected_outputs": [
+            "change_origin",
+            "coverage_impact",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Sysmon Event 17 — Named Pipe Created",
+        "description": (
+            "Investigation guide for Sysmon Event 17 — named pipe "
+            "created. Named pipes are commonly used by malware frameworks "
+            "for IPC (Cobalt Strike, Meterpreter)."
+        ),
+        "rule_groups": ["sysmon_event_17"],
+        "priority": 30,
+        "severity_hint": "medium-high",
+        "prompt_text": (
+            "You are investigating a Sysmon Event 17 alert — a named "
+            "pipe was created. Examine `data.win.eventdata.pipeName` and "
+            "`data.win.eventdata.image`. Cobalt Strike's default pipe "
+            "names (e.g. `\\postex_*`, `\\status_*`, `\\msagent_*`) and "
+            "Meterpreter defaults are well known and should trigger high "
+            "severity if observed. Custom but rare pipe names from "
+            "unsigned processes are also suspicious. Benign cases: "
+            "chrome, slack, teams, office apps, Windows Print Spooler. "
+            "Check whether the creating process is signed, and whether "
+            "the pipe-name pattern appears in public C2 IoC feeds. "
+            "Correlate with Sysmon 18 (pipe connections) to see who "
+            "connected afterwards. ATT&CK: T1055 (Process Injection — "
+            "named pipe IPC), T1559 (Inter-Process Communication)."
+        ),
+        "investigation_checklist_text": (
+            "- What is the pipe name and does it match any known C2 "
+            "framework default?\n"
+            "- Which process created the pipe (`image`) — signed, "
+            "expected, or unsigned / rare?\n"
+            "- Did other processes connect to the pipe (Sysmon 18) and "
+            "from which process?\n"
+            "- Is there prior Sysmon 1/10/11 activity tying the creating "
+            "process to suspicious behaviour?\n"
+            "- Does the pipe name appear in public C2 detection feeds?"
+        ),
+        "expected_outputs": [
+            "c2_framework_match",
+            "ipc_pattern",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Sysmon Event 18 — Named Pipe Connected",
+        "description": (
+            "Investigation guide for Sysmon Event 18 — a client connected "
+            "to a named pipe. Pairs with Event 17 to reconstruct IPC "
+            "chains; SMB remote pipes indicate lateral movement."
+        ),
+        "rule_groups": ["sysmon_event_18"],
+        "priority": 30,
+        "severity_hint": "medium-high",
+        "prompt_text": (
+            "You are investigating a Sysmon Event 18 alert — a process "
+            "connected to a named pipe. Examine `data.win.eventdata."
+            "pipeName`, `data.win.eventdata.image` (the connecting "
+            "process), and `data.win.eventdata.eventType`. Key scenarios: "
+            "(1) remote SMB named-pipe connection (e.g. `\\\\target\\IPC$"
+            "\\svcctl`, `\\\\target\\IPC$\\atsvc`) indicates PsExec-style "
+            "lateral movement; (2) local connect to a C2-framework "
+            "pipe = implant activity; (3) connection to a pipe that was "
+            "just created (Sysmon 17) by a suspicious process = injection "
+            "or module loader pattern. Correlate with Sysmon 1 to see "
+            "what spawned the connecting process. ATT&CK: T1021.002 "
+            "(SMB/Windows Admin Shares), T1055 (Process Injection)."
+        ),
+        "investigation_checklist_text": (
+            "- What pipe was connected to, and is the path local or "
+            "remote (`\\\\host\\IPC$\\...`)?\n"
+            "- Which process connected (`image`) — signed, expected, "
+            "or rare?\n"
+            "- For remote connections: is this a known admin/management "
+            "workflow (PsExec, WMI)?\n"
+            "- Is there a matching Sysmon 17 create on the target "
+            "endpoint?\n"
+            "- Does the pipe name match C2 IoC feeds?\n"
+            "- Correlate with authentication logs (4624) from the source "
+            "host around the same time."
+        ),
+        "expected_outputs": [
+            "pipe_location",
+            "movement_indicator",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Sysmon Event 22 — DNS Query",
+        "description": (
+            "Investigation guide for Sysmon Event 22 — a process executed "
+            "a DNS query. Focus on rare domains, DGA entropy, and "
+            "processes that shouldn't be resolving names."
+        ),
+        "rule_groups": ["sysmon_event_22"],
+        "priority": 45,
+        "severity_hint": "medium",
+        "prompt_text": (
+            "You are investigating a Sysmon Event 22 alert — a process "
+            "performed a DNS query. Examine `data.win.eventdata.image` "
+            "(the resolver) and `data.win.eventdata.queryName` (the "
+            "domain). Determine whether the querying process is expected "
+            "to resolve names at all — rundll32.exe, regsvr32.exe, "
+            "certutil.exe, mshta.exe doing DNS is a strong suspicious "
+            "signal. Check the domain entropy (DGA-like high-entropy "
+            "subdomains), age (recently registered via passive DNS / "
+            "WHOIS), reputation (TI feeds, URLScan), and whether it "
+            "belongs to a known DoH provider (attempted DNS-over-HTTPS "
+            "evasion). Correlate with Sysmon 3 (network connection) to "
+            "see whether the resolution led to a connection attempt. "
+            "ATT&CK: T1071.004 (DNS), T1568 (Dynamic Resolution), "
+            "T1568.002 (Domain Generation Algorithms)."
+        ),
+        "investigation_checklist_text": (
+            "- Which process performed the query (`image`) and is DNS "
+            "expected for it?\n"
+            "- What is the `queryName` — does it look DGA-like, "
+            "typo-squatted, or newly registered?\n"
+            "- Does the domain appear on threat-intel feeds?\n"
+            "- Is the query going to an external DoH resolver (evasion)?\n"
+            "- Was there a follow-up Sysmon 3 (network connection) from "
+            "the same process GUID?\n"
+            "- Does the domain match a known malware family or C2 "
+            "infrastructure?"
+        ),
+        "expected_outputs": [
+            "domain_reputation",
+            "process_expected_to_resolve",
+            "dga_likelihood",
+            "recommended_actions",
+        ],
+    },
+    # ------------------------------------------------------------------
+    # Talon Windows category templates (3 — autoruns, defender, sigcheck).
+    # ------------------------------------------------------------------
+    {
+        "name": "Windows Autoruns — Persistence Review",
+        "description": (
+            "Investigation guide for Sysinternals Autoruns output — "
+            "review autostart entries for suspicious persistence."
+        ),
+        "rule_groups": ["windows_autoruns", "autoruns"],
+        "priority": 40,
+        "severity_hint": "medium-high",
+        "prompt_text": (
+            "You are investigating a Windows Autoruns alert. Autoruns "
+            "enumerates every place Windows launches code at logon/boot "
+            "(Run keys, Startup folders, services, scheduled tasks, "
+            "IFEO, AppInit_DLLs, winlogon hooks, WMI event subscriptions, "
+            "browser/office add-ins). For each suspicious entry, "
+            "determine: what binary runs, who wrote the entry, when, and "
+            "is the binary signed / expected in that location. User-"
+            "writeable paths, unsigned binaries, and rare autostart "
+            "categories (WMI, AppInit, image file execution options) are "
+            "high-signal. Cross-reference the payload hash against "
+            "VirusTotal. ATT&CK: T1547 (Boot or Logon Autostart), T1053 "
+            "(Scheduled Task), T1543 (Create or Modify System Process), "
+            "T1546 (Event Triggered Execution)."
+        ),
+        "investigation_checklist_text": (
+            "- Which autostart categories contain new or recently "
+            "modified entries?\n"
+            "- What binary path does each entry reference — is the path "
+            "user-writeable?\n"
+            "- Is each entry's binary signed, and by whom?\n"
+            "- When were the entries created, and which account created "
+            "them?\n"
+            "- Do the hashes appear on VirusTotal?\n"
+            "- Are there entries in rare autostart categories (WMI "
+            "subscriptions, AppInit_DLLs, debugger IFEO)?\n"
+            "- Does this match a known persistence family pattern?"
+        ),
+        "expected_outputs": [
+            "persistence_entries_suspicious",
+            "persistence_entries_benign",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Microsoft Defender Detection",
+        "description": (
+            "Investigation guide for Microsoft Defender Antivirus "
+            "alerts. Confirm containment state and dig into the detection "
+            "name, signature, and affected file."
+        ),
+        "rule_groups": ["windows_defender", "microsoft_defender", "defender"],
+        "priority": 20,
+        "severity_hint": "high",
+        "prompt_text": (
+            "You are investigating a Microsoft Defender alert. Defender "
+            "detections can be from the real-time scanner, the scheduled "
+            "scan, or cloud-delivered protection. Examine "
+            "`data.win.eventdata.threatName` (detection name / family), "
+            "`data.win.eventdata.path` (affected file), "
+            "`data.win.eventdata.actionTaken` (quarantined, removed, "
+            "allowed, no action), and `data.win.eventdata.severity`. "
+            "Confirm the sample is actually contained. Look up the "
+            "detection name on Microsoft's malware encyclopedia to "
+            "understand the family and blast radius. Check the SHA256 "
+            "on VirusTotal for consensus. Trace back to the delivery "
+            "chain via Sysmon 1/3/11 and browser / email logs. Pay "
+            "special attention to Defender being disabled, exclusions "
+            "added, or definition updates blocked — those are evasion "
+            "pre-cursors that can precede a new detection from a second "
+            "host with weaker config. ATT&CK: T1204 (User Execution), "
+            "T1566 (Phishing), T1562.001 (Disable or Modify Tools)."
+        ),
+        "investigation_checklist_text": (
+            "- What is the detection name / signature / family?\n"
+            "- What was the Defender action (quarantined, removed, "
+            "allowed, detected-only)?\n"
+            "- Is the file currently contained, or is it still on disk?\n"
+            "- What is the affected path — system, user, removable "
+            "media?\n"
+            "- Does the SHA256 hash match on VirusTotal?\n"
+            "- What was the delivery vector (email, web, USB, lateral "
+            "movement)?\n"
+            "- Did the same sample appear on other hosts in the estate?\n"
+            "- Were Defender signatures up-to-date at the time of "
+            "detection?"
+        ),
+        "expected_outputs": [
+            "containment_state",
+            "malware_family",
+            "blast_radius",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Sysinternals sigcheck — Unsigned/Suspicious Binary",
+        "description": (
+            "Investigation guide for Sysinternals sigcheck results "
+            "highlighting unsigned or mis-signed binaries in expected-"
+            "signed paths."
+        ),
+        "rule_groups": ["windows_sigcheck", "sigcheck"],
+        "priority": 40,
+        "severity_hint": "medium-high",
+        "prompt_text": (
+            "You are investigating a sigcheck alert — a binary in a "
+            "normally-signed location was found unsigned, mis-signed, or "
+            "with a revoked certificate. Examine the file path, the "
+            "signer name (if any), the verification status (Unsigned, "
+            "Invalid, Expired, Revoked), and the product/company fields. "
+            "Indicators: a file in System32/Program Files that is "
+            "unsigned; a signed binary whose signer does not match the "
+            "declared product (e.g. Publisher: Microsoft but signer is "
+            "not Microsoft); a revoked certificate (the cert was "
+            "compromised and CRL'd). Check the SHA256 on VirusTotal. "
+            "Correlate with Sysmon 11 (file create) to see when and how "
+            "the file got into that location. ATT&CK: T1036 "
+            "(Masquerading), T1553 (Subvert Trust Controls), T1036.001 "
+            "(Invalid Code Signature)."
+        ),
+        "investigation_checklist_text": (
+            "- What is the file path — does it normally contain signed "
+            "binaries?\n"
+            "- What is the signature status (Unsigned, Invalid, Expired, "
+            "Revoked)?\n"
+            "- Does the file's declared publisher match the actual "
+            "signer?\n"
+            "- Is this a first-seen file on the host, or a modified "
+            "existing file?\n"
+            "- Does the SHA256 appear on VirusTotal?\n"
+            "- Which process or account placed the file there (Sysmon 11 "
+            "correlation)?\n"
+            "- Are other hosts carrying the same file?"
+        ),
+        "expected_outputs": [
+            "signature_status",
+            "masquerade_indicators",
+            "recommended_actions",
+        ],
+    },
+    # ------------------------------------------------------------------
+    # New category templates (10) — identity, cloud runtime, CI/CD,
+    # macOS, network analytics, data access, session, supply chain.
+    # ------------------------------------------------------------------
+    {
+        "name": "Entra ID — Suspicious Sign-in",
+        "description": (
+            "Investigation guide for Microsoft Entra ID (Azure AD) "
+            "risky sign-ins: impossible travel, unfamiliar locations, "
+            "anonymous IP, token-theft indicators."
+        ),
+        "rule_groups": [
+            "entra_id", "azure_ad_signin", "entra_signin", "risky_signin",
+        ],
+        "rule_id_pattern": r"(?i)(entra|azure.?ad.?sign|risky.?sign|aadsts)",
+        "priority": 25,
+        "severity_hint": "high",
+        "prompt_text": (
+            "You are investigating an Entra ID (Azure AD) suspicious "
+            "sign-in alert. Examine the sign-in log: user principal name, "
+            "app ID, client IP and location, device identifier, "
+            "conditional-access result, authentication method (password, "
+            "FIDO2, PRT, authenticator app), risk detections "
+            "(impossibleTravel, unfamiliarFeatures, anonymousIpAddress, "
+            "passwordSpray, adminConfirmedUserCompromised, "
+            "tokenIssuerAnomaly). Token-theft patterns: sign-in from a "
+            "new IP using an existing primary refresh token without a "
+            "full auth prompt, session reuse across geographies, or a "
+            "user agent change mid-session. Check whether MFA was "
+            "satisfied and how (SMS/voice are weaker than phishing-"
+            "resistant methods). Correlate with Azure AD audit log for "
+            "follow-on actions (OAuth consent grants, new service "
+            "principal credentials, inbox-rule creation). ATT&CK: "
+            "T1078.004 (Valid Accounts: Cloud), T1550.001 (Application "
+            "Access Token), T1111 (Multi-Factor Authentication "
+            "Interception)."
+        ),
+        "investigation_checklist_text": (
+            "- What Entra ID risk detections fired (impossibleTravel, "
+            "anonymousIp, tokenIssuerAnomaly, …)?\n"
+            "- What is the sign-in IP and geolocation vs the user's "
+            "baseline?\n"
+            "- Was MFA satisfied, and by what method (phishing-"
+            "resistant vs SMS/voice)?\n"
+            "- Did the conditional-access policy grant, block, or "
+            "partially grant (MFA satisfied)?\n"
+            "- What app / service principal was the sign-in scoped to?\n"
+            "- Any follow-on activity in Azure AD audit "
+            "(oauth2PermissionGrant, credential adds, mailbox rules)?\n"
+            "- Has the user confirmed / denied the activity?\n"
+            "- Should sessions be revoked (Revoke-AzureADSignedInUser"
+            "AllRefreshToken) and password reset with forced MFA "
+            "re-registration?"
+        ),
+        "expected_outputs": [
+            "risk_detections",
+            "token_theft_indicators",
+            "post_signin_activity",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Okta — Suspicious Activity",
+        "description": (
+            "Investigation guide for Okta suspicious events: factor "
+            "reset, admin role assignment, new sign-in from unknown "
+            "device, bypass of MFA policies."
+        ),
+        "rule_groups": [
+            "okta_system_log", "okta_suspicious", "okta_factor_reset",
+            "okta_admin_change",
+        ],
+        "rule_id_pattern": r"(?i)(okta.?system|okta.?factor|okta.?admin|okta.?suspicious)",
+        "priority": 25,
+        "severity_hint": "high",
+        "prompt_text": (
+            "You are investigating an Okta System Log alert. Examine "
+            "eventType, actor (user / API token / service), target, "
+            "client (IP, user agent, geolocation), authenticationContext "
+            "(interface, externalSessionId), and debugContext. Red-flag "
+            "events: `user.mfa.factor.reset_all` / `reset_single` (MFA "
+            "factor reset — a classic account-takeover pivot), "
+            "`user.account.privilege.grant` (new admin role), "
+            "`policy.rule.deactivate` on MFA policies, `application."
+            "user_membership.add` for sensitive apps, `system.api_token."
+            "create`, `user.authentication.auth_via_mfa` with "
+            "`factor=SMS` on a new device. Correlate with prior sign-ins "
+            "from the same IP and with follow-on access to crown-jewel "
+            "apps (AWS, GitHub, payroll). ATT&CK: T1078 (Valid "
+            "Accounts), T1098 (Account Manipulation), T1556 (Modify "
+            "Authentication Process)."
+        ),
+        "investigation_checklist_text": (
+            "- What Okta eventType fired, and who is the actor?\n"
+            "- What is the client IP, user agent, and geolocation?\n"
+            "- For factor resets: was the reset initiated via support "
+            "ticket, or directly by an authenticated session?\n"
+            "- For privilege grants: what role was assigned and by "
+            "whom?\n"
+            "- For policy changes: which policy, and what did it "
+            "previously enforce?\n"
+            "- Was a new API token minted? If so, what scope?\n"
+            "- What crown-jewel apps did the affected user access "
+            "immediately after this event?\n"
+            "- Should we terminate sessions and force re-enrollment?"
+        ),
+        "expected_outputs": [
+            "event_type_category",
+            "actor_legitimacy",
+            "post_event_access",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "MFA Fatigue / Push Bombing",
+        "description": (
+            "Investigation guide for MFA push-notification flooding — "
+            "attacker spams the user with approve-prompts until one is "
+            "accepted."
+        ),
+        "rule_groups": [
+            "mfa_fatigue", "mfa_push_bombing", "mfa_flood",
+        ],
+        "rule_id_pattern": r"(?i)(mfa.?fatigue|push.?bombing|mfa.?flood|mfa.?spam)",
+        "priority": 25,
+        "severity_hint": "high",
+        "prompt_text": (
+            "You are investigating an MFA fatigue / push-bombing alert. "
+            "The pattern: multiple MFA prompts to the same user within a "
+            "short window from the same source, followed by either a "
+            "successful approve (the user caved) or eventual denial. "
+            "Examine the IdP logs: count of MFA prompts per minute, "
+            "source IP(s), the authenticating application, and whether "
+            "any prompt was approved. Check whether the user's password "
+            "was leaked in a recent breach (haveibeenpwned) — push-"
+            "bombing follows credential theft. If an approve succeeded, "
+            "trace the subsequent session's actions immediately. "
+            "Compensating controls to recommend: number matching, "
+            "phishing-resistant factors (FIDO2), reduced prompt "
+            "frequency, user education callback. ATT&CK: T1621 "
+            "(Multi-Factor Authentication Request Generation), T1078 "
+            "(Valid Accounts)."
+        ),
+        "investigation_checklist_text": (
+            "- How many MFA prompts occurred in what time window?\n"
+            "- What IP / app / user agent generated the prompts?\n"
+            "- Did any prompt succeed (user approved)?\n"
+            "- If approved: what did the authenticated session do "
+            "next?\n"
+            "- Has the user's password been compromised in a known "
+            "breach?\n"
+            "- Is the IdP using number matching / phishing-resistant "
+            "MFA?\n"
+            "- Has the user been contacted to confirm / deny?\n"
+            "- Should the account be immediately session-revoked and "
+            "password reset?"
+        ),
+        "expected_outputs": [
+            "prompt_count",
+            "approval_outcome",
+            "mfa_factor_strength",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Container / Kubernetes Runtime Anomaly",
+        "description": (
+            "Investigation guide for container runtime anomalies — shell "
+            "in container, privileged exec, host filesystem mount, "
+            "service-account token abuse."
+        ),
+        "rule_groups": [
+            "container_runtime", "k8s_runtime", "falco_alert",
+            "container_escape", "kubectl_exec",
+        ],
+        "rule_id_pattern": r"(?i)(container.?runtime|k8s.?runtime|falco|container.?escape|kubectl.?exec)",
+        "priority": 20,
+        "severity_hint": "critical",
+        "prompt_text": (
+            "You are investigating a container / Kubernetes runtime "
+            "anomaly alert (typically from Falco, Sysdig, or the k8s "
+            "audit log). Classify the event: interactive shell spawned "
+            "inside a container (`kubectl exec` or equivalent), process "
+            "launched with host namespace (pid / net / ipc), privileged "
+            "container started, host path mounted into a container "
+            "(/etc/kubernetes, /var/run/docker.sock), service-account "
+            "token read / used externally, or kube-apiserver access from "
+            "an unexpected pod. Establish: which namespace / pod / "
+            "container, which image and image digest, the initiating "
+            "user (human vs service account), and whether the action is "
+            "part of an approved operational runbook. High-severity "
+            "combinations: privileged + host-mount = trivial container "
+            "escape; service-account token usage from outside the "
+            "cluster = supply chain / credential theft. ATT&CK: T1611 "
+            "(Escape to Host), T1610 (Deploy Container), T1613 "
+            "(Container and Resource Discovery), T1552.007 (Container "
+            "API)."
+        ),
+        "investigation_checklist_text": (
+            "- Which namespace / pod / container / image is involved?\n"
+            "- What specific runtime behaviour triggered the alert "
+            "(shell, privileged exec, host mount, token access)?\n"
+            "- Was the container privileged and/or did it mount host "
+            "paths?\n"
+            "- Which user or service account initiated the action?\n"
+            "- Was a service-account token used from outside the cluster "
+            "(source IP mismatch)?\n"
+            "- Is the image trusted (signed, from an internal "
+            "registry)?\n"
+            "- Are there downstream actions (API calls, pod creations, "
+            "secret reads) from the same session?\n"
+            "- Should the pod be killed and the namespace quarantined?"
+        ),
+        "expected_outputs": [
+            "behaviour_category",
+            "escape_risk",
+            "cluster_blast_radius",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "CI/CD Abuse — GitHub Actions / Pipeline",
+        "description": (
+            "Investigation guide for CI/CD pipeline abuse — workflow "
+            "injection, self-hosted runner takeover, secret exfiltration, "
+            "new deploy key."
+        ),
+        "rule_groups": [
+            "github_actions_abuse", "ci_cd_abuse", "pipeline_abuse",
+            "runner_takeover", "secret_leak",
+        ],
+        "rule_id_pattern": r"(?i)(github.?action|ci.?cd|pipeline.?abuse|runner.?takeover|deploy.?key)",
+        "priority": 20,
+        "severity_hint": "critical",
+        "prompt_text": (
+            "You are investigating a CI/CD abuse alert. Pipelines hold "
+            "long-lived secrets (cloud creds, registry tokens, signing "
+            "keys) and execute arbitrary code by design, so compromise "
+            "can hand an attacker the build output distribution channel. "
+            "Classify the event: workflow file (.github/workflows/*.yml) "
+            "modified by an external contributor via a PR that auto-"
+            "runs; self-hosted runner registered without approval; "
+            "GITHUB_TOKEN / OIDC token used from an unexpected job; new "
+            "deploy key / PAT added; secret read by a workflow that "
+            "shouldn't need it; registry publish from a forked PR. "
+            "Examine actor, repo, commit SHA, workflow run ID, the diff "
+            "introduced, and any secret names accessed. Check whether "
+            "branch-protection / required-review was in force. ATT&CK: "
+            "T1552.004 (Private Keys), T1552.007 (Container API / Cloud "
+            "Secret), T1195.002 (Compromise Software Supply Chain), "
+            "T1199 (Trusted Relationship)."
+        ),
+        "investigation_checklist_text": (
+            "- What repo / workflow / run was involved?\n"
+            "- Who is the actor, and are they external, internal, or a "
+            "bot?\n"
+            "- What change was introduced (view diff) — does it exfil "
+            "secrets, add a new runner, or modify release output?\n"
+            "- Was branch protection / required review bypassed, and "
+            "how?\n"
+            "- Which secrets were accessible to the workflow run?\n"
+            "- Did the run register a new self-hosted runner or push to "
+            "a registry / cloud?\n"
+            "- Can we invalidate any secrets that might have "
+            "leaked?\n"
+            "- Should we quarantine the repo and rotate all touched "
+            "secrets?"
+        ),
+        "expected_outputs": [
+            "abuse_pattern",
+            "secrets_exposed",
+            "supply_chain_impact",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "macOS Persistence / Suspicious Execution",
+        "description": (
+            "Investigation guide for macOS suspicious activity — "
+            "LaunchDaemons / LaunchAgents, osascript, Gatekeeper bypass, "
+            "TCC permission grants."
+        ),
+        "rule_groups": [
+            "macos_persistence", "macos_suspicious", "osascript",
+            "launch_agent", "launch_daemon", "tcc_bypass",
+        ],
+        "rule_id_pattern": r"(?i)(macos|osascript|launch.?agent|launch.?daemon|gatekeeper|tcc.?bypass)",
+        "priority": 35,
+        "severity_hint": "medium-high",
+        "prompt_text": (
+            "You are investigating a macOS alert. Common adversary "
+            "behaviours on macOS: LaunchAgent (~/Library/LaunchAgents/) "
+            "or LaunchDaemon (/Library/LaunchDaemons/) plist creation "
+            "for persistence, osascript abuse for AppleScript-based "
+            "execution, curl | bash download cradles, Gatekeeper bypass "
+            "via extended-attribute stripping (`xattr -d "
+            "com.apple.quarantine`), TCC database modifications to grant "
+            "Full Disk Access or Accessibility silently, and unsigned "
+            "kexts / system extensions. Examine the file path, creating "
+            "process, signing status (codesign), quarantine extended "
+            "attribute, and notarization state. Correlate with "
+            "networking (unusual outbound to a download domain) and "
+            "process ancestry. ATT&CK: T1547.011 (Plist File "
+            "Modification), T1059.002 (AppleScript), T1553.001 (Gatekeeper "
+            "Bypass), T1569.001 (Launchctl)."
+        ),
+        "investigation_checklist_text": (
+            "- What is the activity type (plist, osascript, xattr, TCC "
+            "grant, kext load)?\n"
+            "- Which file / plist was created or modified, and in "
+            "whose user directory?\n"
+            "- Is the referenced binary code-signed and notarized?\n"
+            "- Has the quarantine xattr been stripped?\n"
+            "- What is the process ancestry (Terminal, osascript, "
+            "browser, installer)?\n"
+            "- Was there a preceding curl / download / DMG mount that "
+            "delivered the payload?\n"
+            "- Do any TCC database modifications grant sensitive "
+            "permissions without user interaction?\n"
+            "- Is this consistent with a known macOS malware family?"
+        ),
+        "expected_outputs": [
+            "persistence_location",
+            "codesign_state",
+            "delivery_chain",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Zeek Network Anomaly",
+        "description": (
+            "Investigation guide for Zeek (Bro) network anomaly alerts — "
+            "protocol anomalies, long-lived connections, suspicious TLS "
+            "certs, SSH brute force, file extraction."
+        ),
+        "rule_groups": [
+            "zeek", "bro", "zeek_notice", "network_anomaly",
+            "ssl_cert_anomaly",
+        ],
+        "rule_id_pattern": r"(?i)(zeek|bro|network.?anomaly|ssl.?cert.?anom)",
+        "priority": 40,
+        "severity_hint": "medium",
+        "prompt_text": (
+            "You are investigating a Zeek network anomaly alert. Zeek's "
+            "notice framework raises on protocol-level anomalies that "
+            "Sysmon/EDR cannot see: SSH password brute-force via the "
+            "intel framework, long-lived (days-weeks) connections that "
+            "may indicate C2 (Connection::LONG_CONN), self-signed or "
+            "LetsEncrypt TLS certs on short-lived domains, HTTP "
+            "executables served with mismatched MIME types, DNS "
+            "tunnelling detection (high-entropy subdomains), and "
+            "SMB::Discovery. Examine Zeek `conn.log`, `ssl.log`, "
+            "`x509.log`, `dns.log`, `http.log`, and `notice.log` for the "
+            "affected src/dst pair. Pivot to Sysmon / endpoint logs on "
+            "the internal host for the initiating process. If TLS: "
+            "examine the SNI, certificate issuer / subject / validity "
+            "dates, and JA3/JA3S fingerprints against public feeds. "
+            "ATT&CK: T1071 (Application Layer Protocol), T1110 (Brute "
+            "Force), T1572 (Protocol Tunneling), T1573 (Encrypted "
+            "Channel)."
+        ),
+        "investigation_checklist_text": (
+            "- What Zeek notice or analytic fired?\n"
+            "- What are the connection 5-tuple, duration, and byte "
+            "volumes?\n"
+            "- For TLS: SNI, cert issuer/subject, validity, JA3/JA3S?\n"
+            "- For DNS: query entropy, domain age, resolver used?\n"
+            "- For HTTP: URI pattern, user agent, response MIME vs "
+            "actual file type?\n"
+            "- Which internal process initiated the connection (pivot "
+            "to endpoint)?\n"
+            "- Does the external endpoint appear on threat-intel "
+            "feeds?\n"
+            "- Is the pattern consistent with C2, brute force, or "
+            "benign protocol quirk?"
+        ),
+        "expected_outputs": [
+            "anomaly_type",
+            "c2_confidence",
+            "network_evidence",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Database Access Anomaly",
+        "description": (
+            "Investigation guide for database access anomalies — "
+            "unusual query volume, mass-SELECT / export, after-hours "
+            "access, sensitive table access."
+        ),
+        "rule_groups": [
+            "db_access_anomaly", "mass_select", "database_export",
+            "sensitive_table_access",
+        ],
+        "rule_id_pattern": r"(?i)(db.?access|mass.?select|database.?export|sensitive.?table)",
+        "priority": 30,
+        "severity_hint": "high",
+        "prompt_text": (
+            "You are investigating a database access anomaly. Examine "
+            "the audit log / query log: database user, source app, "
+            "source host, queries executed, row counts returned, and "
+            "timing vs the user's baseline. Suspicious patterns: SELECT "
+            "with no WHERE clause against sensitive tables, mass exports "
+            "(COPY TO, bcp, SELECT INTO OUTFILE), privilege escalation "
+            "via new GRANT statements, access to backup or audit tables, "
+            "and after-hours activity from an interactive user. Confirm "
+            "whether the workload belongs to a legitimate reporting / "
+            "ETL / backup job, or an unexpected session. For SaaS DBs "
+            "(Snowflake, BigQuery, Redshift), also review role "
+            "impersonation and cross-account access. ATT&CK: T1213 "
+            "(Data from Information Repositories), T1530 (Data from "
+            "Cloud Storage), T1078 (Valid Accounts)."
+        ),
+        "investigation_checklist_text": (
+            "- Which DB, tables, and columns were accessed?\n"
+            "- What is the volume of rows returned vs the user's "
+            "baseline?\n"
+            "- Which user / app / source host ran the queries?\n"
+            "- Were any sensitive tables (PII, financial, credentials) "
+            "touched?\n"
+            "- Is the workload consistent with a known ETL / reporting "
+            "job?\n"
+            "- For mass exports: what is the destination path / "
+            "bucket?\n"
+            "- Did the session include a privilege grant or role "
+            "change?\n"
+            "- Is there a data-breach notification threshold crossed?"
+        ),
+        "expected_outputs": [
+            "data_sensitivity",
+            "volume_vs_baseline",
+            "export_destination",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Session Hijack / SSO Token Theft",
+        "description": (
+            "Investigation guide for session-token / cookie theft — "
+            "replay of an authenticated session from a new IP or device "
+            "without a fresh auth prompt."
+        ),
+        "rule_groups": [
+            "session_hijack", "token_theft", "cookie_replay",
+            "sso_replay", "prt_theft",
+        ],
+        "rule_id_pattern": r"(?i)(session.?hijack|token.?theft|cookie.?replay|sso.?replay|prt.?theft)",
+        "priority": 15,
+        "severity_hint": "critical",
+        "prompt_text": (
+            "You are investigating a session-hijack / token-theft alert. "
+            "Adversaries bypass MFA by stealing post-auth session cookies "
+            "or primary refresh tokens (PRTs) and replaying them from "
+            "attacker infrastructure. Indicators: same session ID (or "
+            "tokenId / externalSessionId) used from two IPs minutes "
+            "apart, sign-in with an existing token without a full "
+            "interactive MFA challenge, user agent change mid-session, "
+            "geovelocity that is impossible, or access from a known "
+            "residential-proxy or datacenter IP unfamiliar to the user. "
+            "For Entra ID: check `signInEventTypes: interactiveUser` vs "
+            "`nonInteractiveUser` with PRT details. For Okta: same "
+            "`externalSessionId` from two IPs. Pivot to browser logs / "
+            "EDR on the originating host to find the stealer (infostealer "
+            "malware commonly harvests cookies and tokens). Immediate "
+            "action: revoke all sessions, invalidate tokens, reset "
+            "password with forced re-MFA. ATT&CK: T1539 (Steal Web "
+            "Session Cookie), T1550.004 (Web Session Cookie Replay), "
+            "T1528 (Steal Application Access Token)."
+        ),
+        "investigation_checklist_text": (
+            "- What session / token ID was replayed?\n"
+            "- From which IPs / user agents / geolocations?\n"
+            "- How long between the legitimate session and the "
+            "suspected replay?\n"
+            "- Was a fresh MFA challenge required for the suspected "
+            "replay?\n"
+            "- Is there infostealer / suspicious browser-process "
+            "activity on the originating endpoint?\n"
+            "- Which apps did the replayed session access?\n"
+            "- Has the user confirmed / denied the activity?\n"
+            "- Have all sessions been revoked and credentials rotated?"
+        ),
+        "expected_outputs": [
+            "replay_evidence",
+            "origin_compromise",
+            "apps_accessed",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Supply Chain — Malicious Package / Typosquat",
+        "description": (
+            "Investigation guide for suspected malicious dependency "
+            "(npm / pypi / rubygems / maven) — typosquat, compromised "
+            "maintainer, postinstall script abuse."
+        ),
+        "rule_groups": [
+            "supply_chain", "malicious_package", "typosquat",
+            "npm_abuse", "pypi_abuse",
+        ],
+        "rule_id_pattern": r"(?i)(supply.?chain|malicious.?package|typosquat|postinstall|npm.?abuse|pypi.?abuse)",
+        "priority": 20,
+        "severity_hint": "critical",
+        "prompt_text": (
+            "You are investigating a supply-chain alert — a potentially "
+            "malicious package was installed / requested / blocked. "
+            "Malicious-package categories: typosquat (`reqeusts` for "
+            "`requests`), confused-dependency (internal name published "
+            "on public registry), compromised legitimate maintainer "
+            "account, intentional postinstall script that exfiltrates "
+            "`/etc/passwd` or environment variables. Examine the "
+            "package name, version, publish date, maintainer history, "
+            "download count (very low for new malicious packages), and "
+            "any postinstall / install.js hooks. Determine how the "
+            "package arrived: direct `npm install`, transitive "
+            "dependency, lockfile change in a PR, or CI-only install. "
+            "Pivot to build-server processes (Sysmon 1 / Linux "
+            "execve / Falco) during the install to catch payload "
+            "execution. Action: quarantine the package, pin/revert the "
+            "lockfile, scan build servers for persistence, rotate any "
+            "secrets the install script could have seen. ATT&CK: "
+            "T1195.002 (Compromise Software Supply Chain), T1059 "
+            "(Command and Scripting Interpreter), T1552 (Unsecured "
+            "Credentials)."
+        ),
+        "investigation_checklist_text": (
+            "- What package name and version were installed?\n"
+            "- Is the name a typosquat / confused-dependency of an "
+            "internal package?\n"
+            "- Who is the maintainer and what is their publish "
+            "history?\n"
+            "- When was the package first published? (new packages are "
+            "a red flag)\n"
+            "- Does the package have postinstall / preinstall scripts, "
+            "and what do they do?\n"
+            "- Was the install on a developer box, a CI runner, or "
+            "a production host?\n"
+            "- What environment variables / files could the install "
+            "script have read?\n"
+            "- Have we rotated any secrets that the install could have "
+            "leaked?"
+        ),
+        "expected_outputs": [
+            "package_category",
+            "install_surface",
+            "exfil_risk",
+            "recommended_actions",
+        ],
+    },
 ]
+
+
+# ---------------------------------------------------------------------------
+# MITRE ATT&CK backfill for the default templates. Keyed by template name so
+# the list of _DEFAULT_TEMPLATES dicts above stays readable; the seeder merges
+# these in at insert time, and the top-up path applies them to existing rows
+# that pre-date the mitre_* columns.
+# ---------------------------------------------------------------------------
+
+
+_TEMPLATE_MITRE_MAP: dict[str, dict[str, list[str]]] = {
+    # Sysmon core
+    "Sysmon Event 1 — Process Creation": {
+        "techniques": ["T1059", "T1218", "T1036"],
+        "tactics": ["TA0002"],  # Execution
+    },
+    "Sysmon Event 3 — Network Connection": {
+        "techniques": ["T1071", "T1090", "T1105"],
+        "tactics": ["TA0011"],  # Command and Control
+    },
+    "Sysmon Event 11 — File Create": {
+        "techniques": ["T1547", "T1105", "T1036"],
+        "tactics": ["TA0003"],  # Persistence
+    },
+    # Cross-cutting
+    "Authentication Failure": {
+        "techniques": ["T1110", "T1110.003", "T1078"],
+        "tactics": ["TA0006"],  # Credential Access
+    },
+    "Malware Detection": {
+        "techniques": ["T1204", "T1566", "T1105"],
+        "tactics": ["TA0001", "TA0002"],  # Initial Access, Execution
+    },
+    # Elastic Security categories (10)
+    "Credential Access": {
+        "techniques": ["T1003", "T1558", "T1550.002"],
+        "tactics": ["TA0006"],
+    },
+    "Lateral Movement": {
+        "techniques": ["T1021", "T1570", "T1047"],
+        "tactics": ["TA0008"],
+    },
+    "Persistence Mechanism": {
+        "techniques": ["T1053", "T1547", "T1543"],
+        "tactics": ["TA0003"],
+    },
+    "Defense Evasion": {
+        "techniques": ["T1070", "T1055", "T1574", "T1036"],
+        "tactics": ["TA0005"],
+    },
+    "Discovery / Reconnaissance": {
+        "techniques": ["T1046", "T1087", "T1069"],
+        "tactics": ["TA0007"],
+    },
+    "Command and Control (C2)": {
+        "techniques": ["T1071", "T1572", "T1573"],
+        "tactics": ["TA0011"],
+    },
+    "Exfiltration": {
+        "techniques": ["T1041", "T1567", "T1048"],
+        "tactics": ["TA0010"],
+    },
+    "Privilege Escalation": {
+        "techniques": ["T1548", "T1134", "T1068"],
+        "tactics": ["TA0004"],
+    },
+    "Suspicious Execution": {
+        "techniques": ["T1059", "T1218", "T1027"],
+        "tactics": ["TA0002"],
+    },
+    "Initial Access": {
+        "techniques": ["T1566", "T1190", "T1189"],
+        "tactics": ["TA0001"],
+    },
+    # Sigma categories (10)
+    "Web Application Attack": {
+        "techniques": ["T1190", "T1505.003"],
+        "tactics": ["TA0001", "TA0003"],
+    },
+    "Linux/Unix Suspicious Activity": {
+        "techniques": ["T1059.004", "T1053.003", "T1110", "T1548.003"],
+        "tactics": ["TA0002", "TA0003"],
+    },
+    "Cloud Security — AWS": {
+        "techniques": ["T1078.004", "T1562", "T1537"],
+        "tactics": ["TA0005", "TA0010"],
+    },
+    "Cloud Security — Azure": {
+        "techniques": ["T1078.004", "T1098", "T1552.005"],
+        "tactics": ["TA0006", "TA0007"],
+    },
+    "Email Security / BEC": {
+        "techniques": ["T1114", "T1566", "T1534"],
+        "tactics": ["TA0009", "TA0001"],
+    },
+    "DNS Anomaly": {
+        "techniques": ["T1568.002", "T1572", "T1071.004"],
+        "tactics": ["TA0011"],
+    },
+    "Endpoint Security Tampering": {
+        "techniques": ["T1562", "T1070"],
+        "tactics": ["TA0005"],
+    },
+    "Data Loss Prevention (DLP)": {
+        "techniques": ["T1567", "T1052"],
+        "tactics": ["TA0010"],
+    },
+    "Insider Threat": {
+        "techniques": ["T1078", "T1530", "T1213"],
+        "tactics": ["TA0009", "TA0007"],
+    },
+    "Ransomware Indicators": {
+        "techniques": ["T1486", "T1490", "T1489"],
+        "tactics": ["TA0040"],  # Impact
+    },
+    # Sysmon event gap-fills (12 — ported from Talon)
+    "Sysmon Event 2 — File Creation Time Changed": {
+        "techniques": ["T1070.006"],
+        "tactics": ["TA0005"],  # Defense Evasion
+    },
+    "Sysmon Event 6 — Driver Loaded": {
+        "techniques": ["T1543.003", "T1014", "T1068"],
+        "tactics": ["TA0003", "TA0004", "TA0005"],
+    },
+    "Sysmon Event 7 — Image/DLL Loaded": {
+        "techniques": ["T1574.002", "T1574.001", "T1055.001"],
+        "tactics": ["TA0005", "TA0004"],
+    },
+    "Sysmon Event 10 — Process Access (LSASS / Credential Dumping)": {
+        "techniques": ["T1003.001", "T1055"],
+        "tactics": ["TA0006", "TA0005"],
+    },
+    "Sysmon Event 12 — Registry Key/Value Create/Delete": {
+        "techniques": ["T1547.001", "T1112", "T1562.001"],
+        "tactics": ["TA0003", "TA0005"],
+    },
+    "Sysmon Event 13 — Registry Value Set": {
+        "techniques": ["T1547.001", "T1112", "T1562.001", "T1574.012"],
+        "tactics": ["TA0003", "TA0005"],
+    },
+    "Sysmon Event 14 — Registry Key/Value Renamed": {
+        "techniques": ["T1112", "T1562"],
+        "tactics": ["TA0005"],
+    },
+    "Sysmon Event 15 — File Stream / Mark-of-the-Web": {
+        "techniques": ["T1564.004", "T1027"],
+        "tactics": ["TA0005"],
+    },
+    "Sysmon Event 16 — Sysmon Configuration Change": {
+        "techniques": ["T1562.002", "T1562"],
+        "tactics": ["TA0005"],
+    },
+    "Sysmon Event 17 — Named Pipe Created": {
+        "techniques": ["T1055", "T1559"],
+        "tactics": ["TA0005", "TA0011"],
+    },
+    "Sysmon Event 18 — Named Pipe Connected": {
+        "techniques": ["T1021.002", "T1055"],
+        "tactics": ["TA0008", "TA0005"],
+    },
+    "Sysmon Event 22 — DNS Query": {
+        "techniques": ["T1071.004", "T1568", "T1568.002"],
+        "tactics": ["TA0011"],
+    },
+    # Talon Windows categories (3)
+    "Windows Autoruns — Persistence Review": {
+        "techniques": ["T1547", "T1053", "T1543", "T1546"],
+        "tactics": ["TA0003"],
+    },
+    "Microsoft Defender Detection": {
+        "techniques": ["T1204", "T1566", "T1562.001"],
+        "tactics": ["TA0001", "TA0002", "TA0005"],
+    },
+    "Sysinternals sigcheck — Unsigned/Suspicious Binary": {
+        "techniques": ["T1036", "T1553", "T1036.001"],
+        "tactics": ["TA0005"],
+    },
+    # Identity / cloud / CI-CD / macOS / network / data / session /
+    # supply-chain (10)
+    "Entra ID — Suspicious Sign-in": {
+        "techniques": ["T1078.004", "T1550.001", "T1111"],
+        "tactics": ["TA0001", "TA0006"],
+    },
+    "Okta — Suspicious Activity": {
+        "techniques": ["T1078", "T1098", "T1556"],
+        "tactics": ["TA0003", "TA0006"],
+    },
+    "MFA Fatigue / Push Bombing": {
+        "techniques": ["T1621", "T1078"],
+        "tactics": ["TA0001", "TA0006"],
+    },
+    "Container / Kubernetes Runtime Anomaly": {
+        "techniques": ["T1611", "T1610", "T1613", "T1552.007"],
+        "tactics": ["TA0002", "TA0004", "TA0007"],
+    },
+    "CI/CD Abuse — GitHub Actions / Pipeline": {
+        "techniques": ["T1552.004", "T1552.007", "T1195.002", "T1199"],
+        "tactics": ["TA0001", "TA0006"],
+    },
+    "macOS Persistence / Suspicious Execution": {
+        "techniques": ["T1547.011", "T1059.002", "T1553.001", "T1569.001"],
+        "tactics": ["TA0002", "TA0003", "TA0005"],
+    },
+    "Zeek Network Anomaly": {
+        "techniques": ["T1071", "T1110", "T1572", "T1573"],
+        "tactics": ["TA0011", "TA0006"],
+    },
+    "Database Access Anomaly": {
+        "techniques": ["T1213", "T1530", "T1078"],
+        "tactics": ["TA0009", "TA0010"],
+    },
+    "Session Hijack / SSO Token Theft": {
+        "techniques": ["T1539", "T1550.004", "T1528"],
+        "tactics": ["TA0006", "TA0001"],
+    },
+    "Supply Chain — Malicious Package / Typosquat": {
+        "techniques": ["T1195.002", "T1059", "T1552"],
+        "tactics": ["TA0001", "TA0006"],
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Output contract — pinned to ION's CaseClosureReason enum so verdicts feed
+# directly into detection-engineering tuning metrics.
+# ---------------------------------------------------------------------------
+
+
+_OUTPUT_CONTRACT = """
+
+---
+
+## Output Contract — MANDATORY
+
+Respond with **ONE** valid JSON object. No prose, no markdown code fences,
+no commentary outside the JSON. The object MUST conform to this schema:
+
+```jsonc
+{
+  // --- Required envelope (always populate) ---
+  "verdict": "true_positive | false_positive | benign_true_positive | inconclusive",
+  "confidence": "low | medium | high",
+  "severity": "info | low | medium | high | critical",
+  "summary": "1-2 sentence executive summary",
+  "analyst_explanation": "plain-language explanation for an L1 analyst",
+  "technical_details": "expert-level analysis with exact field values",
+  "mitre": {
+    "tactics": ["TA0002"],
+    "techniques": ["T1059.001"]
+  },
+  "recommended_actions": [
+    {"priority": "p1|p2|p3",
+     "action": "specific instruction",
+     "owner": "soc|ir|it|user|auto"}
+  ],
+  "suggested_closure_reason":
+    "true_positive | false_positive | benign_true_positive | duplicate | insufficient_data | not_applicable",
+  "tuning_recommendation": {
+    "rule_needs_tuning": true,
+    "rationale": "one sentence on why, or null if no tuning is needed",
+    "suggested_change": "concrete exclusion/refinement or null"
+  },
+
+  // --- Optional (populate only if relevant) ---
+  "iocs": [
+    {"type": "sha256|md5|ipv4|domain|url|file_path|process_name|command_line|registry_key|email|user|host",
+     "value": "...",
+     "confidence": "low|medium|high",
+     "note": "..."}
+  ],
+  "affected_assets": [
+    {"type": "host|user|account|service",
+     "identifier": "...",
+     "role": "source|target|transit"}
+  ],
+  "timeline": [{"ts": "ISO8601", "event": "...", "source": "..."}],
+  "kill_chain_phase":
+    "reconnaissance|weaponization|delivery|exploitation|installation|c2|actions|unknown",
+  "containment_state": "none|partial|full|not_applicable",
+  "blast_radius": {"hosts_affected": 0, "accounts_affected": 0, "data_impact": "..."},
+  "references": ["url1"],
+  "template_specific": { /* template-specified fields, if any */ }
+}
+```
+
+### Verdict semantics — these MUST match ION's case closure enum:
+
+- **true_positive** — the rule fired on genuinely malicious/unauthorised activity.
+- **false_positive** — the rule fired but the activity is benign; **the rule
+  needs tuning** (fill `tuning_recommendation.suggested_change`).
+- **benign_true_positive** — the rule correctly identified the behaviour it
+  was looking for, but that behaviour is authorised in this environment
+  (e.g. vuln scanner, approved admin tool). Rule is working as designed.
+- **inconclusive** — insufficient evidence to decide; explain what's missing
+  in `technical_details` and set `suggested_closure_reason` to
+  `insufficient_data`.
+
+### Rules
+
+1. Every enum value above is lowercase exactly as shown.
+2. Never invent MITRE IDs — only use IDs you can tie to evidence in the alert.
+3. If you have no IOCs, use `[]` — do not omit the field.
+4. `tuning_recommendation.rule_needs_tuning` is `true` ONLY for
+   `verdict: "false_positive"`.
+5. Output is consumed by automation. Malformed JSON breaks the pipeline.
+"""
+
+
+def _load_list(raw: Optional[str]) -> list:
+    """Decode a JSON list column defensively — returns [] on None/invalid."""
+    if not raw:
+        return []
+    try:
+        val = json.loads(raw)
+        return val if isinstance(val, list) else []
+    except Exception:
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -1252,55 +2877,65 @@ class AlertPromptService:
         template: Optional[AlertPromptTemplate],
         alert: Optional[dict] = None,
     ) -> str:
-        """Merge ION's base security system prompt with the template's guidance.
+        """Merge ION's base security system prompt with the template's guidance
+        and append the canonical JSON output contract.
 
-        If ``template`` is None, returns the base security prompt unchanged.
+        If ``template`` is None, returns the base security prompt plus the
+        output contract so callers still get a structured response.
         """
         # Lazy import to avoid tight coupling at import time
         from ion.services.ollama_service import SYSTEM_PROMPTS
 
         base = SYSTEM_PROMPTS.get("security", "")
-        if template is None:
-            return base
-
         parts: list[str] = [base.rstrip()]
-        parts.append("\n\n---\n")
-        parts.append(f"## Per-Rule Investigation Guide: {template.name}\n")
 
-        if template.description:
-            parts.append(template.description.strip() + "\n")
+        if template is not None:
+            parts.append("\n\n---\n")
+            parts.append(f"## Per-Rule Investigation Guide: {template.name}\n")
 
-        if template.severity_hint:
-            parts.append(
-                f"\nSeverity hint for this rule: **{template.severity_hint}**\n"
-            )
+            if template.description:
+                parts.append(template.description.strip() + "\n")
 
-        if template.prompt_text:
-            parts.append("\n### Investigation Focus\n")
-            parts.append(template.prompt_text.strip() + "\n")
+            if template.severity_hint:
+                parts.append(
+                    f"\nSeverity hint for this rule: **{template.severity_hint}**\n"
+                )
 
-        if template.investigation_checklist_text:
-            parts.append("\n### Checklist — Answer Each\n")
-            parts.append(template.investigation_checklist_text.strip() + "\n")
+            # Pinned MITRE context — helps the model stay anchored on the
+            # techniques/tactics the template is scoped to.
+            techs = _load_list(template.mitre_techniques_json)
+            tactics = _load_list(template.mitre_tactics_json)
+            if techs or tactics:
+                parts.append("\n### Scoped MITRE ATT&CK Context\n")
+                if techs:
+                    parts.append(f"- Techniques: {', '.join(techs)}\n")
+                if tactics:
+                    parts.append(f"- Tactics: {', '.join(tactics)}\n")
 
-        expected = template.expected_outputs_json
-        if expected:
-            try:
-                fields = json.loads(expected)
-                if isinstance(fields, list) and fields:
-                    parts.append("\n### Expected Output Fields\n")
-                    parts.append(
-                        "Produce a structured answer covering: "
-                        + ", ".join(str(f) for f in fields)
-                        + ".\n"
-                    )
-            except Exception:
-                pass
+            if template.prompt_text:
+                parts.append("\n### Investigation Focus\n")
+                parts.append(template.prompt_text.strip() + "\n")
 
-        if alert:
-            rule_id = AlertPromptRepository._extract_rule_id(alert) or "(unknown)"
-            parts.append(f"\n_Matched alert rule id: `{rule_id}`_\n")
+            if template.investigation_checklist_text:
+                parts.append("\n### Checklist — Answer Each\n")
+                parts.append(template.investigation_checklist_text.strip() + "\n")
 
+            expected = _load_list(template.expected_outputs_json)
+            if expected:
+                parts.append("\n### Template-Specific Output Fields\n")
+                parts.append(
+                    "In addition to the required envelope fields below, populate "
+                    "`template_specific` with: "
+                    + ", ".join(str(f) for f in expected)
+                    + ".\n"
+                )
+
+            if alert:
+                rule_id = AlertPromptRepository._extract_rule_id(alert) or "(unknown)"
+                parts.append(f"\n_Matched alert rule id: `{rule_id}`_\n")
+
+        # Output contract — always appended, with or without a template
+        parts.append(_OUTPUT_CONTRACT)
         return "".join(parts)
 
 
@@ -1356,22 +2991,41 @@ def seed_default_templates(db: Optional[Session] = None) -> int:
         close_after = True
 
     inserted = 0
+    topped_up = 0
     try:
         repo = AlertPromptRepository(db)
-        # Seed missing templates — check by name to allow adding new defaults
-        existing_names = {t.name for t in repo.list_all()}
+        # Load existing rows once; we both skip-on-insert and top-up MITRE.
+        existing_by_name = {t.name: t for t in repo.list_all()}
 
         for defn in _DEFAULT_TEMPLATES:
-            if defn["name"] in existing_names:
+            name = defn["name"]
+            mitre = _TEMPLATE_MITRE_MAP.get(name, {})
+            techniques = mitre.get("techniques")
+            tactics = mitre.get("tactics")
+
+            if name in existing_by_name:
+                # Top-up: row pre-dates the MITRE columns — populate them from
+                # the map so existing deployments gain technique/tactic matching
+                # without a manual resync. We only write when currently unset so
+                # user edits are preserved.
+                row = existing_by_name[name]
+                if techniques and not row.mitre_techniques_json:
+                    row.mitre_techniques_json = json.dumps(techniques)
+                    topped_up += 1
+                if tactics and not row.mitre_tactics_json:
+                    row.mitre_tactics_json = json.dumps(tactics)
                 continue
+
             repo.create(
-                name=defn["name"],
+                name=name,
                 prompt_text=defn.get("prompt_text", ""),
                 description=defn.get("description"),
                 enabled=True,
                 rule_ids=defn.get("rule_ids"),
                 rule_groups=defn.get("rule_groups"),
                 rule_id_pattern=defn.get("rule_id_pattern"),
+                mitre_techniques=techniques,
+                mitre_tactics=tactics,
                 priority=defn.get("priority", 100),
                 investigation_checklist_text=defn.get(
                     "investigation_checklist_text"
@@ -1383,7 +3037,11 @@ def seed_default_templates(db: Optional[Session] = None) -> int:
             inserted += 1
 
         db.commit()
-        logger.info("Seeded %d default AlertPromptTemplate rows", inserted)
+        logger.info(
+            "AlertPromptTemplate seed: %d inserted, %d topped-up with MITRE",
+            inserted,
+            topped_up,
+        )
     except Exception:
         db.rollback()
         logger.exception("Failed to seed default AlertPromptTemplate rows")

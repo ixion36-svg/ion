@@ -47,6 +47,12 @@ class User(Base, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Service accounts (AI analysts, integration bots) cannot log in
+    # interactively. The auth flow rejects them early even if an attacker
+    # somehow matches the placeholder password hash.
+    is_service_account: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 

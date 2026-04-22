@@ -570,9 +570,11 @@ function renderRuleFailures(data) {
 
 /* ── Load all checks ── */
 async function loadChecks() {
-  // Show spinners
-  ['alerts-tbody','stale-tbody','dc-tbody','wef-tbody','rules-tbody'].forEach(id => {
-    document.getElementById(id).innerHTML = spinner(id === 'rules-tbody' ? 3 : id.startsWith('dc') || id.startsWith('wef') ? 6 : 5);
+  // Show spinners. dc-tbody / wef-tbody were replaced with RAG traffic-light
+  // widgets in v0.9.35 — guard lookups so missing elements don't throw.
+  ['alerts-tbody','stale-tbody','rules-tbody'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = spinner(id === 'rules-tbody' ? 3 : 5);
   });
   try {
     const r = await fetch('/api/daily-standup/checks');

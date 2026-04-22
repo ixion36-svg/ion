@@ -541,6 +541,7 @@ class OllamaService:
         user_id: int = 0,
         anon_map: Optional[TokenMap] = None,
         bypass_queue: bool = False,
+        response_format: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Send a chat message and get a response (non-streaming).
 
@@ -585,18 +586,23 @@ class OllamaService:
 
             num_predict = max_tokens or DEFAULT_NUM_PREDICT
 
+            request_body: Dict[str, Any] = {
+                "model": model,
+                "messages": full_messages,
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                    "num_predict": num_predict,
+                    "stop": ["<|eot_id|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
+                },
+            }
+            if response_format:
+                # Ollama supports "json" to force valid-JSON output. Unknown
+                # values are passed through unchanged (future-proofing).
+                request_body["format"] = response_format
             response = await self.client.post(
                 "/api/chat",
-                json={
-                    "model": model,
-                    "messages": full_messages,
-                    "stream": False,
-                    "options": {
-                        "temperature": temperature,
-                        "num_predict": num_predict,
-                        "stop": ["<|eot_id|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
-                    },
-                },
+                json=request_body,
             )
             response.raise_for_status()
             data = response.json()

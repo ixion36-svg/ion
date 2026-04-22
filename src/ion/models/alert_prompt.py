@@ -46,6 +46,10 @@ class AlertPromptTemplate(Base, TimestampMixin):
     rule_ids_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     rule_groups_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     rule_id_pattern: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # MITRE ATT&CK matching — techniques are checked parent→sub tolerant
+    # (a template listing T1059 matches an alert tagged T1059.001).
+    mitre_techniques_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    mitre_tactics_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Ordering: lower = higher priority (matches Playbook semantics inverted — see repo)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
@@ -92,6 +96,8 @@ class AlertPromptTemplate(Base, TimestampMixin):
             "rule_ids": _load(self.rule_ids_json),
             "rule_groups": _load(self.rule_groups_json),
             "rule_id_pattern": self.rule_id_pattern,
+            "mitre_techniques": _load(self.mitre_techniques_json),
+            "mitre_tactics": _load(self.mitre_tactics_json),
             "priority": self.priority,
             "prompt_text": self.prompt_text,
             "investigation_checklist_text": self.investigation_checklist_text,

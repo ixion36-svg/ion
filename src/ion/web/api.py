@@ -4741,6 +4741,23 @@ async def update_case(
             case.closed_by_id = current_user.id
             case.closed_at = datetime.utcnow()
 
+            # Capture AIFeedback ledger rows — per-template agreement metrics
+            # feed the detection-engineering scorecard. Best-effort; never
+            # blocks the close.
+            try:
+                from ion.services.ai_feedback_service import (
+                    record_case_close_feedback,
+                )
+                record_case_close_feedback(
+                    case=case,
+                    human_verdict=data.closure_reason,
+                    human_closed_by_id=current_user.id,
+                    delta_reason=data.closure_notes,
+                    session=session,
+                )
+            except Exception as _fb_exc:
+                logger.debug("AIFeedback capture skipped: %s", _fb_exc)
+
             # Add closure note to the case journal and sync to Kibana
             reason_label = data.closure_reason.replace("_", " ").title()
             closure_note = Note(

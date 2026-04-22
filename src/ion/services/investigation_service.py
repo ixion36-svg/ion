@@ -57,6 +57,225 @@ class InvestigationError(Exception):
 
 
 # ---------------------------------------------------------------------------
+# Bob-authored post-investigation writebacks
+# ---------------------------------------------------------------------------
+
+
+_BOB_IOC_TYPE_MAP = {
+    # Output-contract IOC types → ObservableType values
+    "sha256": "sha256",
+    "md5": "md5",
+    "sha1": "sha1",
+    "ipv4": "ipv4",
+    "ipv6": "ipv6",
+    "domain": "domain",
+    "url": "url",
+    "file_path": "filename",
+    "email": "email",
+    "user": "user_account",
+    "host": "hostname",
+    "command_line": None,  # no Observable type; skip
+    "registry_key": None,
+    "process_name": None,
+}
+
+
+def _render_bob_alert_note(parsed: Dict[str, Any]) -> str:
+    """Render a markdown Note body from the JSON envelope.
+
+    Keeps it short and scannable — the full investigation row still has the
+    detail; this is the timeline hook so analysts see Bob's take inline.
+    """
+    verdict = parsed.get("verdict", "inconclusive")
+    confidence = parsed.get("confidence_level") or parsed.get("confidence") or "low"
+    severity = parsed.get("severity", "low")
+    summary = parsed.get("summary", "").strip()
+    analyst = (parsed.get("analyst_explanation") or "").strip()
+
+    mitre = parsed.get("mitre") or {}
+    techs = mitre.get("techniques") or []
+    tactics = mitre.get("tactics") or []
+
+    actions = parsed.get("recommended_actions_structured") or []
+    iocs = parsed.get("iocs") or []
+    tuning = parsed.get("tuning_recommendation") or {}
+
+    lines: list[str] = [
+        f"**🤖 Bob (AI analyst) — `{verdict}`** · confidence `{confidence}` · severity `{severity}`",
+    ]
+    if summary:
+        lines.extend(["", summary])
+    if analyst:
+        lines.extend(["", analyst])
+
+    if techs or tactics:
+        bits = []
+        if techs:
+            bits.append("Techniques: " + ", ".join(f"`{t}`" for t in techs))
+        if tactics:
+            bits.append("Tactics: " + ", ".join(f"`{t}`" for t in tactics))
+        lines.extend(["", "**MITRE:** " + " · ".join(bits)])
+
+    if iocs:
+        lines.extend(["", "**IOCs:**"])
+        for ioc in iocs[:10]:
+            if not isinstance(ioc, dict):
+                continue
+            t = ioc.get("type") or "?"
+            v = ioc.get("value") or "?"
+            c = ioc.get("confidence") or "?"
+            lines.append(f"- `{t}` `{v}` ({c})")
+
+    if actions:
+        lines.extend(["", "**Recommended actions:**"])
+        for a in actions[:10]:
+            if not isinstance(a, dict):
+                continue
+            p = a.get("priority", "p2")
+            act = a.get("action", "")
+            owner = a.get("owner", "soc")
+            lines.append(f"- [{p}] ({owner}) {act}")
+
+    if tuning.get("rule_needs_tuning"):
+        sc = tuning.get("suggested_change") or "(none)"
+        rat = tuning.get("rationale") or ""
+        lines.extend([
+            "",
+            "**Tuning recommendation:** " + sc,
+            rat,
+        ])
+
+    return "\n".join(l for l in lines if l is not None)
+
+
+def _write_bob_outputs(
+    *,
+    db,
+    alert_id: str,
+    investigation_id: int,
+    parsed: Dict[str, Any],
+) -> None:
+    """Write Bob's three post-investigation artefacts in one transaction.
+
+    Runs inside the caller's transaction (does not commit). Best-effort —
+    callers wrap this in try/except because a post-hook failure must not
+    mark the investigation itself as failed.
+
+    1. Alert Note (entity_type=ALERT, entity_id=alert_id) authored by Bob.
+    2. AlertTriage.suggested_verdict / suggested_verdict_confidence.
+    3. Observable rows for high-confidence IOCs, tagged source:bob.
+    """
+    from ion.models.alert_triage import AlertTriage, Note, NoteEntityType
+    from ion.models.observable import Observable, ObservableType
+    from ion.services.ai_user import get_bob_user_id
+
+    bob_id = get_bob_user_id(db)
+    if bob_id is None:
+        logger.debug(
+            "Bob service account not yet seeded; skipping AI-authored writebacks"
+        )
+        return
+
+    # 1) Alert Note ---------------------------------------------------------
+    note_body = _render_bob_alert_note(parsed)
+    if note_body:
+        note = Note(
+            entity_type=NoteEntityType.ALERT,
+            entity_id=str(alert_id),
+            user_id=bob_id,
+            content=note_body,
+        )
+        db.add(note)
+
+    # 2) AlertTriage.suggested_verdict -------------------------------------
+    triage = (
+        db.query(AlertTriage)
+        .filter(AlertTriage.es_alert_id == alert_id)
+        .one_or_none()
+    )
+    verdict = parsed.get("verdict")
+    conf = parsed.get("confidence_level") or "low"
+    if triage is not None and verdict and verdict != "inconclusive":
+        # Only write non-inconclusive verdicts with medium+ confidence so
+        # the hint badge doesn't shout at analysts on weak signals.
+        if conf in ("medium", "high"):
+            # suggested_verdict uses CaseClosureReason naming — the
+            # LLM contract already emits those exact values.
+            triage.suggested_verdict = verdict
+            triage.suggested_verdict_confidence = conf
+
+    # 3) TuningProposal when Bob flagged FP with a concrete change ---------
+    tuning = parsed.get("tuning_recommendation") or {}
+    if (
+        parsed.get("verdict") == "false_positive"
+        and tuning.get("rule_needs_tuning")
+        and (tuning.get("suggested_change") or "").strip()
+    ):
+        from ion.models.tuning_proposal import TuningProposal
+
+        rule_id: Optional[str] = None
+        # Prefer the triage row's rule_id via the investigation record later;
+        # for now derive from the alert id if looks like a rule id, else None.
+        proposal = TuningProposal(
+            investigation_id=investigation_id,
+            alert_id=str(alert_id),
+            rule_id=rule_id,
+            alert_prompt_template_id=None,
+            rationale=(tuning.get("rationale") or None),
+            suggested_change=str(tuning.get("suggested_change")),
+            created_by_id=bob_id,
+        )
+        db.add(proposal)
+
+    # 4) Observables for high-confidence IOCs ------------------------------
+    iocs = parsed.get("iocs") or []
+    for ioc in iocs:
+        if not isinstance(ioc, dict):
+            continue
+        if ioc.get("confidence") != "high":
+            continue
+        raw_type = (ioc.get("type") or "").lower()
+        obs_type_val = _BOB_IOC_TYPE_MAP.get(raw_type)
+        if not obs_type_val:
+            continue
+        try:
+            obs_type = ObservableType(obs_type_val)
+        except ValueError:
+            continue
+        raw_value = (ioc.get("value") or "").strip()
+        if not raw_value:
+            continue
+        try:
+            normalized = Observable.normalize_value(obs_type, raw_value)
+        except Exception:
+            normalized = raw_value.lower()
+        existing = (
+            db.query(Observable)
+            .filter(
+                Observable.type == obs_type,
+                Observable.normalized_value == normalized,
+            )
+            .one_or_none()
+        )
+        if existing is not None:
+            existing.sighting_count = (existing.sighting_count or 0) + 1
+            existing.last_seen = datetime.now(timezone.utc)
+            tags = list(existing.tags or [])
+            if "source:bob" not in tags:
+                tags.append("source:bob")
+                existing.tags = tags
+            continue
+        obs = Observable(
+            type=obs_type,
+            value=raw_value,
+            normalized_value=normalized,
+            tags=["source:bob", f"investigation:{investigation_id}"],
+            notes=ioc.get("note") or None,
+        )
+        db.add(obs)
+
+
+# ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
@@ -163,16 +382,36 @@ def _extract_mitre_tags(alert: dict) -> List[str]:
 def _parse_llm_json(content: str) -> Dict[str, Any]:
     """Extract the first top-level JSON object out of a raw LLM response.
 
-    Returns a dict with verdict / severity / summary / recommended_actions /
-    confidence. Falls back to hard-coded defaults when parsing fails so
-    the investigation always has *something* to write back.
+    Returns the canonical Output Contract envelope with all new fields plus
+    backward-compatible ``verdict / severity / summary / recommended_actions
+    / confidence`` aliases. Falls back to defaults when parsing fails so the
+    investigation always has something to write back.
     """
     defaults: Dict[str, Any] = {
         "verdict": "inconclusive",
         "severity": "low",
         "summary": (content or "").strip()[:2000] or "LLM returned no content.",
         "recommended_actions": [],
+        "recommended_actions_structured": [],
         "confidence": 0,
+        "confidence_level": "low",
+        "analyst_explanation": "",
+        "technical_details": "",
+        "mitre": {"tactics": [], "techniques": []},
+        "iocs": [],
+        "affected_assets": [],
+        "timeline": [],
+        "kill_chain_phase": "unknown",
+        "containment_state": "not_applicable",
+        "blast_radius": None,
+        "references": [],
+        "suggested_closure_reason": "insufficient_data",
+        "tuning_recommendation": {
+            "rule_needs_tuning": False,
+            "rationale": None,
+            "suggested_change": None,
+        },
+        "template_specific": {},
     }
     if not content:
         return defaults
@@ -212,20 +451,52 @@ def _parse_llm_json(content: str) -> Dict[str, Any]:
     verdict = str(parsed.get("verdict") or defaults["verdict"]).lower()
     severity = str(parsed.get("severity") or defaults["severity"]).lower()
     summary = parsed.get("summary") or defaults["summary"]
+
+    # recommended_actions: old shape = list[str]; new shape = list[dict with
+    # priority/action/owner]. Preserve the structured list and flatten to
+    # strings for back-compat callers.
     actions_raw = parsed.get("recommended_actions") or []
     if isinstance(actions_raw, str):
-        actions = [actions_raw]
-    elif isinstance(actions_raw, list):
-        actions = [str(a) for a in actions_raw if a]
-    else:
-        actions = []
-    try:
-        confidence = int(parsed.get("confidence", 0))
-    except (TypeError, ValueError):
-        confidence = 0
-    confidence = max(0, min(100, confidence))
+        actions_raw = [actions_raw]
+    if not isinstance(actions_raw, list):
+        actions_raw = []
+    actions_structured: list[dict] = []
+    actions_flat: list[str] = []
+    for a in actions_raw:
+        if isinstance(a, dict):
+            actions_structured.append({
+                "priority": str(a.get("priority", "")).lower() or "p2",
+                "action": str(a.get("action", "")).strip(),
+                "owner": str(a.get("owner", "")).lower() or "soc",
+            })
+            if a.get("action"):
+                actions_flat.append(str(a.get("action")).strip())
+        elif a:
+            s = str(a).strip()
+            actions_flat.append(s)
+            actions_structured.append({"priority": "p2", "action": s, "owner": "soc"})
 
-    # Normalise known synonyms
+    # Confidence: accept int 0-100 (old) or string low/medium/high (new).
+    conf_raw = parsed.get("confidence", parsed.get("confidence_level", 0))
+    conf_level = "low"
+    conf_int = 0
+    if isinstance(conf_raw, str):
+        s = conf_raw.strip().lower()
+        conf_level = {"low": "low", "medium": "medium", "med": "medium",
+                      "high": "high"}.get(s, "low")
+        conf_int = {"low": 30, "medium": 60, "high": 90}[conf_level]
+    else:
+        try:
+            conf_int = max(0, min(100, int(conf_raw)))
+        except (TypeError, ValueError):
+            conf_int = 0
+        if conf_int >= 75:
+            conf_level = "high"
+        elif conf_int >= 40:
+            conf_level = "medium"
+        else:
+            conf_level = "low"
+
     verdict_map = {
         "true_positive": "true_positive",
         "true-positive": "true_positive",
@@ -233,11 +504,18 @@ def _parse_llm_json(content: str) -> Dict[str, Any]:
         "false_positive": "false_positive",
         "false-positive": "false_positive",
         "fp": "false_positive",
-        "benign": "benign",
+        # Align "benign" legacy output with the new canonical
+        # benign_true_positive so detection-engineering metrics stay coherent.
+        "benign": "benign_true_positive",
+        "benign_true_positive": "benign_true_positive",
+        "benign-true-positive": "benign_true_positive",
+        "btp": "benign_true_positive",
         "inconclusive": "inconclusive",
         "unknown": "inconclusive",
     }
     severity_map = {
+        "info": "info",
+        "informational": "info",
         "low": "low",
         "medium": "medium",
         "med": "medium",
@@ -245,17 +523,77 @@ def _parse_llm_json(content: str) -> Dict[str, Any]:
         "high": "high",
         "critical": "critical",
         "crit": "critical",
-        "info": "low",
     }
     verdict = verdict_map.get(verdict, "inconclusive")
     severity = severity_map.get(severity, "low")
 
+    # Closure reason — default-derived from verdict so every investigation has
+    # a tuning-pipeline-ready value even if the LLM skips the field.
+    closure_default = {
+        "true_positive": "true_positive",
+        "false_positive": "false_positive",
+        "benign_true_positive": "benign_true_positive",
+        "inconclusive": "insufficient_data",
+    }.get(verdict, "insufficient_data")
+    closure = str(parsed.get("suggested_closure_reason") or closure_default).lower()
+    valid_closures = {
+        "true_positive", "false_positive", "benign_true_positive",
+        "duplicate", "insufficient_data", "not_applicable",
+    }
+    if closure not in valid_closures:
+        closure = closure_default
+
+    # Tuning recommendation — object with rule_needs_tuning/rationale/
+    # suggested_change. Guaranteed structure even when the LLM returns None.
+    tuning = parsed.get("tuning_recommendation") or {}
+    if not isinstance(tuning, dict):
+        tuning = {}
+    tuning_out = {
+        "rule_needs_tuning": bool(tuning.get("rule_needs_tuning",
+                                              verdict == "false_positive")),
+        "rationale": tuning.get("rationale") or None,
+        "suggested_change": tuning.get("suggested_change") or None,
+    }
+
+    mitre = parsed.get("mitre") or {}
+    if not isinstance(mitre, dict):
+        mitre = {}
+    mitre_out = {
+        "tactics": [str(t) for t in (mitre.get("tactics") or []) if t],
+        "techniques": [str(t) for t in (mitre.get("techniques") or []) if t],
+    }
+
+    def _list_of(key: str) -> list:
+        val = parsed.get(key) or []
+        return val if isinstance(val, list) else []
+
+    def _dict_or_none(key: str):
+        val = parsed.get(key)
+        return val if isinstance(val, dict) else None
+
     return {
+        # --- Back-compat envelope keys (existing callers) ---
         "verdict": verdict,
         "severity": severity,
         "summary": str(summary)[:4000],
-        "recommended_actions": actions,
-        "confidence": confidence,
+        "recommended_actions": actions_flat,
+        "confidence": conf_int,
+        # --- New envelope keys ---
+        "confidence_level": conf_level,
+        "recommended_actions_structured": actions_structured,
+        "analyst_explanation": str(parsed.get("analyst_explanation") or "")[:4000],
+        "technical_details": str(parsed.get("technical_details") or "")[:8000],
+        "mitre": mitre_out,
+        "iocs": _list_of("iocs"),
+        "affected_assets": _list_of("affected_assets"),
+        "timeline": _list_of("timeline"),
+        "kill_chain_phase": str(parsed.get("kill_chain_phase") or "unknown").lower(),
+        "containment_state": str(parsed.get("containment_state") or "not_applicable").lower(),
+        "blast_radius": _dict_or_none("blast_radius"),
+        "references": _list_of("references"),
+        "suggested_closure_reason": closure,
+        "tuning_recommendation": tuning_out,
+        "template_specific": _dict_or_none("template_specific") or {},
     }
 
 
@@ -877,13 +1215,8 @@ class InvestigationService:
             dumped = str(body)
 
         tail = (
-            "\n\nProduce a strict JSON response with fields: "
-            "`verdict` (one of true_positive | false_positive | benign | "
-            "inconclusive), `severity` (low | medium | high | critical), "
-            "`summary` (string, 1-3 sentences), `recommended_actions` "
-            "(list of strings), `confidence` (integer 0-100). "
-            "Return only the JSON object — no markdown fences, no prose "
-            "before or after."
+            "\n\nRespond with ONE JSON object conforming to the Output Contract "
+            "in the system message. No markdown fences, no prose outside JSON."
         )
         return dumped + tail
 
@@ -922,6 +1255,10 @@ class InvestigationService:
                 # fail cross-loop. Skipping the queue here is safe because
                 # Ollama itself limits concurrent inference.
                 kwargs["bypass_queue"] = True
+            if "response_format" in sig.parameters:
+                # Force JSON-only output — aligns with the Output Contract
+                # appended by AlertPromptService.render_system_prompt().
+                kwargs["response_format"] = "json"
         except (TypeError, ValueError):
             pass
 
@@ -1184,6 +1521,20 @@ class InvestigationService:
                     duration_ms=duration_ms,
                     db=db,
                 )
+                # 12b) Bob-authored writebacks — alert Note, triage hint,
+                # high-confidence IOC observables. Never fatal.
+                try:
+                    _write_bob_outputs(
+                        db=db,
+                        alert_id=alert_id,
+                        investigation_id=inv_id,
+                        parsed=parsed,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Bob-authored writebacks failed for %s: %s",
+                        alert_id, exc,
+                    )
                 db.commit()
                 inv = db.get(Investigation, inv_id)
                 if inv is not None:
@@ -1425,12 +1776,11 @@ class InvestigationService:
             "Memory context:",
             memory_ctx_md or "(no prior investigations for this signature)",
             "",
-            "Produce a strict JSON response for the CLUSTER as a whole with fields: "
-            "verdict (true_positive|false_positive|benign|inconclusive), "
-            "severity (low|medium|high|critical), "
-            "summary (string), "
-            "recommended_actions (list of strings), "
-            "confidence (0-100).",
+            "Analyse the CLUSTER as a whole. Respond with ONE JSON object "
+            "conforming to the Output Contract in the system message. Scope "
+            "every field (verdict, IOCs, affected assets, blast radius, "
+            "recommended actions, tuning) to the cluster, not any single "
+            "alert. No markdown fences, no prose outside JSON.",
         ]
         user_prompt = "\n".join(brief_lines)
 
