@@ -155,6 +155,9 @@ from ion.models.ai_feedback import AIFeedback  # noqa: F401
 # v0.10.4: case-similarity embeddings (pgvector-backed).
 from ion.models.case_embedding import CaseEmbedding  # noqa: F401
 
+# v0.10.6: KB article embeddings for Bob's RAG grounding.
+from ion.models.kb_document_embedding import KBDocumentEmbedding  # noqa: F401
+
 __all__ = [
     "Base",
     "Template",

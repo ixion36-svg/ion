@@ -654,6 +654,23 @@ async def startup_event():
     except Exception as exc:
         logger.warning("Failed to start case-embedding loop: %s", exc)
 
+    # ---------------------------------------------------------------
+    # KB-article embedding background producer — embeds Knowledge Base
+    # documents via Ollama for Bob's RAG grounding at investigation time.
+    # Honours ION_KB_RAG_ENABLED / _INTERVAL_S. Silently no-ops when the
+    # "Knowledge Base" collection hasn't been seeded or Ollama is unreachable.
+    # ---------------------------------------------------------------
+    def _start_kb_embedding_loop():
+        from ion.services.kb_embedding_service import (
+            start_kb_embedding_if_enabled,
+        )
+        start_kb_embedding_if_enabled(engine=engine)
+        logger.info("KB-embedding background loop started")
+    try:
+        _start_kb_embedding_loop()
+    except Exception as exc:
+        logger.warning("Failed to start KB-embedding loop: %s", exc)
+
     # Version compatibility checks for connectors that declare supported ranges
     try:
         from ion.services.connectors import get_connector_registry

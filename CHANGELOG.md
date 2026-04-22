@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.10.6 (2026-04-22)
+
+### KB RAG grounding for Bob (Bet A of the air-gapped roadmap)
+- New `kb_document_embeddings` table (document_id PK + VECTOR(768) + model_name + embedded_at + source_text_hash) with HNSW index on `vector_cosine_ops`
+- New background loop on advisory lock `LOCK_KB_EMBEDDING_BG=1020` (default 5-min interval, batched 20/tick) — embeds Documents under the "Knowledge Base" collection tree (recursive CTE to find descendants)
+- Embeds `name + first 8000 chars of rendered_content` via the same `EmbeddingService` / `nomic-embed-text` pipeline used for case embeddings
+- Re-embeds when source text hash drifts (KB article edited)
+- At investigation time, Bob's prompt gets up to 3 KB articles most similar to the alert (cosine similarity ≥ 0.65 — looser than gold exemplars since KB is topic-level doc)
+- Rendered as "## Knowledge Base Context" section in `render_system_prompt()`, placed BEFORE "Prior Similar Cases" — priority order is: per-rule playbook → KB grounding → prior cases → output contract
+- **100% air-gapped compatible** — same local Ollama model, no external dependencies
+- Opt-in: `ION_KB_RAG_ENABLED=true` (default off, same rationale as case embedding)
+
+### Env vars
+- `ION_KB_RAG_ENABLED` (default false — opt-in)
+- `ION_KB_EMBEDDING_INTERVAL_S` (default 300)
+- `ION_KB_EMBEDDING_BATCH` (default 20)
+
+### Depends on
+- v0.10.4 pgvector infrastructure + `ION_EMBEDDING_ENABLED=true`
+- `nomic-embed-text` pulled in Ollama
+- KB seeded (the `seed_knowledge_base` hook runs on startup — ~392 articles under 28 child collections)
+
+### Ops notes
+- No existing-deployment migration needed beyond `create_all()` picking up the new table
+- Embedding the full ~392 article KB takes roughly 2-3 background passes (20/tick) = ~15 minutes the first time ION boots with the flag on
+- After first pass, only changed articles re-embed
+
 ## v0.10.5 (2026-04-22)
 
 ### Few-shot gold exemplars for Bob (Bet B of the roadmap)

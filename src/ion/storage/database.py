@@ -79,6 +79,7 @@ LOCK_INVESTIGATION_BG       = 1016
 LOCK_CASE_GROUPER_BG        = 1017
 LOCK_TICKER_BG              = 1018
 LOCK_CASE_EMBEDDING_BG      = 1019
+LOCK_KB_EMBEDDING_BG        = 1020
 
 
 @contextmanager
@@ -761,6 +762,12 @@ def init_db(db_path: Optional[Path] = None) -> Engine:
         ensure_hnsw_index(engine)
     except Exception as exc:  # pragma: no cover
         logger.debug("HNSW index creation skipped: %s", exc)
+    # v0.10.6: HNSW index on kb_document_embeddings.embedding.
+    try:
+        from ion.models.kb_document_embedding import ensure_kb_hnsw_index
+        ensure_kb_hnsw_index(engine)
+    except Exception as exc:  # pragma: no cover
+        logger.debug("KB HNSW index creation skipped: %s", exc)
     return engine
 
 

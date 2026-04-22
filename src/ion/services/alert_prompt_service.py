@@ -35,6 +35,12 @@ def _few_shot_enabled() -> bool:
     )
 
 
+def _kb_rag_enabled() -> bool:
+    return os.environ.get("ION_KB_RAG_ENABLED", "").lower() in (
+        "true", "1", "yes",
+    )
+
+
 def _alert_text_for_embedding(alert: dict) -> str:
     """Serialise an alert to text for embedding.
 
@@ -94,6 +100,30 @@ def _format_exemplars_for_prompt(exemplars: List[dict]) -> str:
         notes = (ex.get("closure_notes") or "").strip()
         if notes:
             lines.append(f"**Analyst closure notes:** {notes[:400]}\n")
+    return "".join(lines)
+
+
+def _format_kb_context_for_prompt(hits: List[dict]) -> str:
+    """Render the "Knowledge Base Context" section. Empty list → empty string."""
+    if not hits:
+        return ""
+    lines = [
+        "\n\n---\n",
+        "## Knowledge Base Context\n",
+        "These are ION knowledge base articles most semantically similar to "
+        "the current alert. Treat them as reference documentation — they "
+        "describe investigation approach, playbook guidance, or detection "
+        "background for the topic. They are NOT evidence about this specific "
+        "alert.\n",
+    ]
+    for h in hits:
+        lines.append(
+            f"\n### {h.get('name') or 'Untitled'} "
+            f"(similarity {h['similarity']:.2f})\n"
+        )
+        excerpt = (h.get("excerpt") or "").strip()
+        if excerpt:
+            lines.append(f"{excerpt[:800]}\n")
     return "".join(lines)
 
 
@@ -3028,6 +3058,84 @@ class AlertPromptService:
             })
         return out
 
+    # ------------------------------------------------------ KB RAG context
+
+    def _get_kb_context_for_alert(
+        self,
+        alert: dict,
+        *,
+        k: int = 3,
+        min_similarity: float = 0.65,
+    ) -> List[dict]:
+        """Return up to ``k`` KB articles most similar to ``alert``.
+
+        The similarity threshold is intentionally a bit looser than gold
+        exemplars (0.65 vs 0.7) because KB articles are *topic-level*
+        documentation, so semantic overlap is broader by design — a KB
+        article on "Kerberos attacks" should match alerts about Golden
+        Ticket, Kerberoasting, AS-REP Roasting, etc.
+        """
+        if not _kb_rag_enabled() or self.session is None or not alert:
+            return []
+
+        try:
+            from ion.services.embedding_service import get_embedding_service
+        except Exception:
+            return []
+
+        svc = get_embedding_service()
+        if not svc.is_enabled:
+            return []
+
+        text = _alert_text_for_embedding(alert)
+        if not text:
+            return []
+
+        vec = svc.embed(text)
+        if vec is None:
+            return []
+
+        try:
+            from ion.models.document import Document
+            from ion.models.kb_document_embedding import KBDocumentEmbedding
+        except Exception as exc:
+            logger.debug("KB RAG imports failed: %s", exc)
+            return []
+
+        try:
+            distance = KBDocumentEmbedding.embedding.cosine_distance(vec)
+            rows = (
+                self.session.query(Document, distance.label("distance"))
+                .join(
+                    KBDocumentEmbedding,
+                    KBDocumentEmbedding.document_id == Document.id,
+                )
+                .filter(Document.status == "active")
+                .order_by(distance.asc())
+                .limit(max(1, int(k)))
+                .all()
+            )
+        except Exception as exc:
+            logger.debug("KB RAG query failed: %s", exc)
+            return []
+
+        out: list[dict] = []
+        for doc, dist in rows:
+            similarity = 1.0 - float(dist)
+            if similarity < float(min_similarity):
+                continue
+            # First ~800 chars of rendered content keeps the system prompt
+            # tight. Full article is available via /documents/<id> if the
+            # analyst (or Bob via MCP later) wants more.
+            excerpt = (doc.rendered_content or "")[:800]
+            out.append({
+                "document_id": doc.id,
+                "name": doc.name,
+                "excerpt": excerpt,
+                "similarity": similarity,
+            })
+        return out
+
     # ------------------------------------------------------------------ render
 
     def render_system_prompt(
@@ -3092,10 +3200,22 @@ class AlertPromptService:
                 rule_id = AlertPromptRepository._extract_rule_id(alert) or "(unknown)"
                 parts.append(f"\n_Matched alert rule id: `{rule_id}`_\n")
 
-        # v0.10.5: prepend "Prior Similar Cases" if few-shot is enabled and
-        # we have an alert + a DB session. Goes before the Output Contract
-        # so the model has concrete examples to pattern against while still
-        # being reminded of the strict JSON shape immediately after.
+        # v0.10.6: prepend "Knowledge Base Context" when KB RAG is enabled.
+        # Placed BEFORE the gold exemplars so Bob's prompt priority reads:
+        # per-rule playbook → KB topic grounding → prior cases → output
+        # contract. The KB is general investigation background; gold
+        # exemplars are specific past verdicts; the contract is the format.
+        if alert is not None:
+            try:
+                kb_hits = self._get_kb_context_for_alert(alert)
+            except Exception as exc:
+                logger.debug("KB RAG retrieval failed: %s", exc)
+                kb_hits = []
+            if kb_hits:
+                parts.append(_format_kb_context_for_prompt(kb_hits))
+
+        # v0.10.5: "Prior Similar Cases" if few-shot is enabled and we have
+        # an alert + a DB session.
         if alert is not None:
             try:
                 exemplars = self._get_gold_exemplars_for_alert(alert)
