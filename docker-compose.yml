@@ -94,7 +94,7 @@ services:
     # build: .  # Uncomment to build from source instead of pulling
 
 
-    image: ixion36/ion:${ION_VERSION:-0.10.6}
+    image: ixion36/ion:${ION_VERSION:-0.10.7}
 
     container_name: ion
     restart: unless-stopped
@@ -206,7 +206,15 @@ services:
       # Concurrency settings - adjust based on available RAM
       # Each parallel slot needs ~2-4GB additional RAM
       - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-4}
-      - OLLAMA_MAX_LOADED_MODELS=1
+      # v0.10.7: raised default from 1→2 so Bob's chat model AND
+      # nomic-embed-text both stay resident — every investigation hits
+      # /api/embed then /api/chat back-to-back, and MAX_LOADED_MODELS=1
+      # forced a model swap (+~5-15s load latency) per call. At 2,
+      # qwen2.5:3b (~2GB) + nomic-embed-text (~274MB) = ~2.3GB resident,
+      # well under the 8GB container allocation. Bump higher via .env if
+      # you run a larger chat model (llama3.1:70b ≈ 40GB) AND have RAM
+      # budget for both simultaneously.
+      - OLLAMA_MAX_LOADED_MODELS=${OLLAMA_MAX_LOADED_MODELS:-2}
       # Keep model in memory longer to reduce reload times
       - OLLAMA_KEEP_ALIVE=30m
 
@@ -242,7 +250,7 @@ services:
   seeder:
 
 
-    image: ixion36/ion:${ION_VERSION:-0.10.6}
+    image: ixion36/ion:${ION_VERSION:-0.10.7}
 
     container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]

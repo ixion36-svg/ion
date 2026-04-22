@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.10.7 (2026-04-22)
+
+### Ollama model residency — avoid swap tax on investigations
+- `docker-compose.yml`: `OLLAMA_MAX_LOADED_MODELS` default raised from 1 → 2 (now env-overridable via `${OLLAMA_MAX_LOADED_MODELS:-2}`)
+- Rationale: every investigation calls `/api/embed` (nomic-embed-text) then `/api/chat` (chat model) back-to-back. With only 1 loaded model, Ollama was evicting and reloading on each call, adding ~5-15s per investigation depending on chat-model size
+- At 2 the residency budget is ~2.3GB for the default pair (qwen2.5:3b ~2GB + nomic-embed-text ~274MB) — well under the 8GB Ollama container cap
+- Bump higher via `.env` (`OLLAMA_MAX_LOADED_MODELS=3`) if you run a second chat model (e.g. a larger one for deep investigations) OR a reranker. Mind the container memory limit
+
+### Env vars
+- `OLLAMA_MAX_LOADED_MODELS` (default 2)
+
 ## v0.10.6 (2026-04-22)
 
 ### KB RAG grounding for Bob (Bet A of the air-gapped roadmap)
