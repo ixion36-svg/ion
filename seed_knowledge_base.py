@@ -7,8 +7,8 @@ networking, SIEM, malware analysis, incident response, threat intel, cloud
 security, penetration testing, detection engineering, cryptography, and more.
 
 Usage:
-    cd C:\\Users\\Tomo\\ion
-    C:\\Python314\\python.exe seed_knowledge_base.py
+    cd /path/to/ixion
+    python seed_knowledge_base.py
 """
 import os
 import requests

@@ -12,8 +12,8 @@ Organized into 4 collections under the existing 'Knowledge Base' parent:
   - Risk, Compliance & Operations (~15 articles)
 
 Usage:
-    cd C:\\Users\\Tomo\\ion
-    C:\\Python314\\python.exe seed_knowledge_base_security_fundamentals.py
+    cd /path/to/ixion
+    python seed_knowledge_base_security_fundamentals.py
 """
 import os
 import requests

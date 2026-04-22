@@ -7,8 +7,8 @@ cover networking fundamentals, infrastructure/devices, cryptography/PKI, identit
 and access management, threats/attacks/vulnerabilities, and governance/risk/compliance.
 
 Usage:
-    cd C:\\Users\\Tomo\\ion
-    C:\\Python314\\python.exe seed_knowledge_base_foundations.py
+    cd /path/to/ixion
+    python seed_knowledge_base_foundations.py
 """
 import os
 import requests

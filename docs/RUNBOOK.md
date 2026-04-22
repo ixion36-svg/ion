@@ -228,7 +228,7 @@ The Investigation Queue (`/investigate`) prioritizes cases for analyst attention
 ### Database Issues
 
 - ION uses SQLite locally (`~/.ion/ion.db`) and Postgres in Docker.
-- Always start the server from `C:\Users\Tomo` (not the project dir) so `ion.db` resolves to the right path.
+- Always start the server from your home directory (not the project dir) so `ion.db` resolves to the right path.
 - If columns are missing after a model change, check that a migration was added to `_run_migrations()` -- `create_all()` does not add columns to existing tables.
 
 ### Multi-Worker Startup Deadlocks (Postgres)

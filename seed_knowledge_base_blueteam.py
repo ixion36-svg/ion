@@ -7,8 +7,8 @@ playbooks, alert investigation procedures, blue team tooling, active defense
 and hardening, log analysis deep dives, and SOC analyst tradecraft.
 
 Usage:
-    cd C:\\Users\\Tomo\\ion
-    C:\\Python314\\python.exe seed_knowledge_base_blueteam.py
+    cd /path/to/ixion
+    python seed_knowledge_base_blueteam.py
 """
 import os
 import requests
