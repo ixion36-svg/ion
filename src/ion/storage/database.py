@@ -753,6 +753,23 @@ def init_db(db_path: Optional[Path] = None) -> Engine:
     _session_factory = None
 
     engine = get_engine(db_path)
+
+    # v0.10.8 FIX: enable pgvector BEFORE create_all. Several models carry
+    # VECTOR columns (case_embeddings, kb_document_embeddings) that cannot
+    # be created on a fresh database unless the `vector` type exists.
+    # _run_migrations also runs CREATE EXTENSION, but that happens AFTER
+    # create_all — too late for the initial deploy. Idempotent here, so
+    # no harm in running twice on subsequent boots.
+    if _is_postgres(engine):
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        except Exception as exc:
+            logger.warning(
+                "Early pgvector extension check failed "
+                "(is the image pgvector/pgvector:pg16?): %s", exc,
+            )
+
     Base.metadata.create_all(engine)
     _run_migrations(engine)
     # v0.10.4: HNSW index on case_embeddings.embedding needs the table to

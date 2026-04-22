@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.10.8 (2026-04-22) — HOTFIX
+
+### Fresh-deploy crash: `type "vector" does not exist`
+- `init_db()` was running `Base.metadata.create_all(engine)` BEFORE `_run_migrations()`
+- `create_all` tries to create the `case_embeddings` and `kb_document_embeddings` tables (which carry `VECTOR(768)` columns), but pgvector's `vector` type doesn't exist in a fresh Postgres until `CREATE EXTENSION vector` runs — which was happening inside `_run_migrations()`, too late
+- **Only affects fresh deployments** of v0.10.4+ (where the volume is empty on first boot). Incremental upgrades that evolved through 0.10.3 → 0.10.4 worked because the extension was enabled at migration time and the tables were added after
+- **Fix:** run `CREATE EXTENSION IF NOT EXISTS vector` in `init_db()` BEFORE `create_all`. The same statement still runs inside `_run_migrations()` too (idempotent, no harm)
+
+### Who needs this
+- Anyone deploying ION fresh (empty postgres volume) on v0.10.4, 0.10.5, 0.10.6, or 0.10.7 hit this crash
+- Anyone already running a healthy 0.10.4+ stack is unaffected
+
 ## v0.10.7 (2026-04-22)
 
 ### Ollama model residency — avoid swap tax on investigations
