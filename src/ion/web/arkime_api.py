@@ -343,7 +343,7 @@ async def arkime_preview(
     if not svc.is_configured:
         raise HTTPException(
             status_code=503,
-            detail="Arkime is not configured — set ION_ARKIME_URL + Keycloak creds",
+            detail="Arkime is not configured — set ION_ARKIME_URL + ION_ARKIME_USERNAME + ION_ARKIME_PASSWORD",
         )
 
     warnings: List[str] = []
@@ -354,17 +354,21 @@ async def arkime_preview(
         try:
             result = await svc.download_pcap_by_community_id(node, community_id)
         except ArkimeError as e:
-            # A 404 on community_id means "no sessions matched the flow hash".
-            # Fall back to IP search when we have IPs to search with —
-            # community_id indexing varies across Arkime installs and a miss
-            # shouldn't block the investigation when IP search can still
-            # find related traffic.
-            if (
-                e.status_code == 404
-                and (alert.get("source_ip") or alert.get("destination_ip"))
-            ):
+            # Fall back to IP search on ANY ArkimeError when the alert has
+            # IPs — community_id indexing varies across Arkime installs and
+            # a lookup miss (empty result → 404), timeout, or 5xx should all
+            # hand off to the IP path instead of blocking the investigation.
+            # Only propagate the error when there's no IP fallback possible.
+            has_ips = bool(alert.get("source_ip") or alert.get("destination_ip"))
+            logger.info(
+                "Arkime community_id path failed for alert=%s: %s "
+                "(status=%s, has_ips=%s) — %s",
+                alert_id, e, e.status_code, has_ips,
+                "falling back to IP search" if has_ips else "no IP fallback available",
+            )
+            if has_ips:
                 warnings.append(
-                    f"No Arkime session matched community_id={community_id} — "
+                    f"Arkime community_id lookup failed ({safe_error(e)}) — "
                     f"falling back to IP search. Results may include unrelated "
                     f"sessions from the same hosts."
                 )

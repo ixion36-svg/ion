@@ -19,24 +19,12 @@ There can legitimately be multiple Arkime sessions matching one Community ID
 `download_pcap_by_community_id` returns the FIRST match with a list of any
 additional matches in the metadata.
 
-Authentication
---------------
-Arkime is deployed behind Keycloak SSO, so the preferred auth mode is an
-OAuth2 client_credentials grant against Keycloak to obtain a bearer token,
-then `Authorization: Bearer <token>` on every Arkime request. The token is
-cached in memory until ~30 s before its `exp` claim.
+Authentication: HTTP Basic only (v0.10.4+). Configure via:
 
-Configuration (`.env`):
-    ION_ARKIME_URL=https://viewer.guardedglass.internal
-    ION_ARKIME_KEYCLOAK_ISSUER=https://keycloak.guardedglass.internal/realms/soc
-    ION_ARKIME_KEYCLOAK_CLIENT_ID=ion-arkime-client
-    ION_ARKIME_KEYCLOAK_CLIENT_SECRET=…
-    ION_ARKIME_KEYCLOAK_SCOPE=openid
+    ION_ARKIME_URL=https://arkime.example.com
+    ION_ARKIME_USERNAME=admin
+    ION_ARKIME_PASSWORD=password
     ION_ARKIME_VERIFY_SSL=true|false
-
-For dev / non-SSO setups, basic auth or `Digest <key>` are still honoured via
-`ION_ARKIME_USERNAME`/`ION_ARKIME_PASSWORD`/`ION_ARKIME_API_KEY`, but Keycloak
-takes precedence when configured.
 """
 
 from __future__ import annotations
@@ -50,9 +38,6 @@ import httpx
 from ion.core.config import get_arkime_config
 
 logger = logging.getLogger(__name__)
-
-# Shared persistent httpx client — avoids per-request connection overhead.
-_arkime_client: Optional[httpx.AsyncClient] = None
 
 
 class ArkimeError(Exception):
@@ -121,20 +106,7 @@ class ArkimeService:
             headers.update(extra)
         return headers
 
-    def _auth(self):
-        """Kept for call-site compatibility — returns None now.
-
-        Previously returned ``httpx.BasicAuth`` / ``httpx.DigestAuth``
-        objects, but we now send credentials exclusively via the
-        ``Authorization`` header (see :meth:`_headers`). Passing
-        ``auth=None`` to httpx is a no-op.
-        """
-        return None
-
     async def _client(self) -> httpx.AsyncClient:
-        # Fresh client per request — Arkime's digest auth requires a fresh
-        # 401 challenge-response per connection. Shared clients cause stale
-        # nonce errors after the first request.
         return httpx.AsyncClient(
             verify=self.verify_ssl,
             timeout=60.0,
@@ -151,7 +123,6 @@ class ArkimeService:
             async with await self._client() as client:
                 resp = await client.get(
                     f"{self.url}/api/user",
-                    auth=self._auth(),
                     headers=headers,
                 )
             if resp.status_code == 200:
@@ -216,7 +187,6 @@ class ArkimeService:
             async with await self._client() as client:
                 resp = await client.get(
                     f"{self.url}/api/sessions",
-                    auth=self._auth(),
                     headers=headers,
                     params=params,
                 )
@@ -281,12 +251,15 @@ class ArkimeService:
             "stopTime": str(int(time.time())),
             "fields": self._SESSION_FIELDS,
         }
+        logger.info(
+            "Arkime IP search: expression=%r window=%dh limit=%d",
+            expression, hours, limit,
+        )
         headers = await self._headers()
         try:
             async with await self._client() as client:
                 resp = await client.get(
                     f"{self.url}/api/sessions",
-                    auth=self._auth(),
                     headers=headers,
                     params=params,
                 )
@@ -388,16 +361,11 @@ class ArkimeService:
 
         url = f"{self.url}/api/session/{node}/{session_id}/pcap"
         headers = await self._headers({"Accept": "application/vnd.tcpdump.pcap"})
-        # Emitted at INFO so `docker compose logs ion | grep "Arkime PCAP GET"`
-        # surfaces the exact URL being requested — useful for debugging 404s
-        # caused by node-name or session-id format mismatches.
-        logger.info("Arkime PCAP GET %s (auth scheme=%s)", url,
-                    headers.get("Authorization", "").split(" ", 1)[0] or "none")
+        logger.info("Arkime PCAP GET %s", url)
         try:
             async with await self._client() as client:
                 resp = await client.get(
                     url,
-                    auth=self._auth(),
                     headers=headers,
                 )
             if resp.status_code == 404:
@@ -430,13 +398,5 @@ def get_arkime_service() -> ArkimeService:
 
 
 def reset_arkime_service() -> None:
-    global _arkime_service, _arkime_client
+    global _arkime_service
     _arkime_service = None
-    if _arkime_client is not None and not _arkime_client.is_closed:
-        try:
-            import asyncio
-            loop = asyncio.get_running_loop()
-            loop.create_task(_arkime_client.aclose())
-        except RuntimeError:
-            pass
-    _arkime_client = None

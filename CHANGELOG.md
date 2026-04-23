@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.10.10 (2026-04-23)
+
+### Arkime PCAP fallback — loosened gate + diagnostic logging
+- Preview endpoint now falls back to IP search on **any** `ArkimeError` when the alert has `source_ip` or `destination_ip`, not just `status_code == 404`. Covers the empty-result case, viewer 5xx, and timeouts — previously these returned 404 to the user even when IP search could have resolved the PCAP.
+- Every community_id→IP fallback decision is logged at INFO with alert id, error, and `has_ips` flag so `docker logs ion | grep -i arkime` makes the decision tree visible.
+- `find_sessions_by_ip` now emits an INFO log on every call (mirrors the existing community_id search log). Without it, IP-path calls were silent.
+- Error message for "Arkime not configured" no longer mentions Keycloak — now names the actual env vars (`ION_ARKIME_URL` + `ION_ARKIME_USERNAME` + `ION_ARKIME_PASSWORD`).
+
+### Arkime service — obsolete code removal
+- Dropped Keycloak/OAuth2 module docstring (never implemented — v0.10.4 locked auth to HTTP Basic only).
+- Removed unused `_arkime_client` module-level `httpx.AsyncClient` (never assigned; shared clients were abandoned when digest was ripped out).
+- Removed `_auth()` method (returned `None` always — vestigial from the `httpx.BasicAuth` / `httpx.DigestAuth` era). Auth is sent exclusively via the `Authorization: Basic <base64>` header in `_headers()`.
+- Stripped all `auth=self._auth()` call sites.
+- Simplified stale `_client()` docstring (no more digest challenge/response).
+- Cleaned up stale `reset_arkime_service()` body — no more `_arkime_client.aclose()` dance.
+- Trimmed `Arkime PCAP GET` log line — dropped the now-useless "auth scheme=…" suffix.
+
+### Why this matters
+v0.10.9 users reported "PCAP only works via community_id". The real cause wasn't the node filter (reported node names matched Arkime's stored node exactly in the reported environment) — it was the fallback gate checking only `status_code == 404`, which missed empty-result and non-404 error cases. Combined with the silent IP-search path, operators had no way to diagnose what decision the code was making. Both issues are fixed in this release.
+
+### No schema / config / image-layout changes
+Drop in `ion:0.10.10` alongside the existing v0.10.9 postgres and ollama volumes — no migration required.
+
 ## v0.10.9 (2026-04-22)
 
 ### Air-gapped deployment — full bundle rebuild
