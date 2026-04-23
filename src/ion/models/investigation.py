@@ -85,6 +85,16 @@ class Investigation(Base):
     recommended_actions_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ioc_snapshot_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # v0.10.11: training-loop foundation. Every investigation persists the
+    # rendered user prompt + the model's raw output + the grounded evidence
+    # bullets. Without these, AIFeedback disagreements are uncountable but
+    # undebuggable — you know Bob was wrong, not what he saw.
+    prompt_snapshot: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    raw_response: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # JSON list of {field, value, significance} dicts — the specific alert
+    # fields Bob pointed at when forming the verdict.
+    key_observations_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # Model telemetry
     llm_model_used: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     tokens_used: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

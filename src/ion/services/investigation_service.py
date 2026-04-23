@@ -443,6 +443,7 @@ def _parse_llm_json(content: str) -> Dict[str, Any]:
         "containment_state": "not_applicable",
         "blast_radius": None,
         "references": [],
+        "key_observations": [],
         "suggested_closure_reason": "insufficient_data",
         "tuning_recommendation": {
             "rule_needs_tuning": False,
@@ -629,6 +630,15 @@ def _parse_llm_json(content: str) -> Dict[str, Any]:
         "containment_state": str(parsed.get("containment_state") or "not_applicable").lower(),
         "blast_radius": _dict_or_none("blast_radius"),
         "references": _list_of("references"),
+        "key_observations": [
+            {
+                "field": str(o.get("field", "")).strip(),
+                "value": str(o.get("value", ""))[:500],
+                "significance": str(o.get("significance", ""))[:500],
+            }
+            for o in _list_of("key_observations")
+            if isinstance(o, dict) and o.get("field")
+        ],
         "suggested_closure_reason": closure,
         "tuning_recommendation": tuning_out,
         "template_specific": _dict_or_none("template_specific") or {},
@@ -1209,22 +1219,87 @@ class InvestigationService:
     # ------------------------------------------------------------------ #
 
     def _build_alert_summary(self, alert: dict) -> Dict[str, Any]:
-        return {
-            "rule_name": _get(alert, "rule.name", "kibana.alert.rule.name", "signal.rule.name") or "",
-            "host": _get(alert, "host.name", "host_name", "host") or "",
-            "source_ip": _get(alert, "source.ip", "source_ip") or "",
-            "user_name": _get(alert, "user.name", "user_name") or "",
-            "timestamp": _get(alert, "@timestamp", "timestamp") or "",
-            "severity_original": _get(
-                alert,
-                "kibana.alert.severity",
-                "event.severity",
-                "signal.rule.severity",
-                "severity",
-            )
-            or "",
-            "alert_id": alert.get("_id"),
-        }
+        """Build the structured alert payload the LLM sees.
+
+        Only emits fields that are actually present — avoids null noise
+        that inflates prompt tokens and trains the model to hallucinate
+        values for missing keys. Every field here should be something an
+        analyst would visually inspect on Kibana's alert detail page.
+        """
+        # (key, dot-path aliases) — first non-empty wins
+        field_map: List[Tuple[str, Tuple[str, ...]]] = [
+            # Envelope
+            ("alert_id", ("_id",)),
+            ("timestamp", ("@timestamp", "timestamp")),
+            ("severity_original", (
+                "kibana.alert.severity", "event.severity",
+                "signal.rule.severity", "severity",
+            )),
+            # Rule context — what was the detection looking for?
+            ("rule_name", ("rule.name", "kibana.alert.rule.name", "signal.rule.name")),
+            ("rule_id", ("rule.id", "kibana.alert.rule.rule_id", "signal.rule.rule_id")),
+            ("rule_query", (
+                "kibana.alert.rule.parameters.query",
+                "signal.rule.query", "rule.query",
+            )),
+            ("alert_reason", ("kibana.alert.reason",)),
+            # Host / user
+            ("host", ("host.name", "host_name", "host")),
+            ("host_os", ("host.os.name", "host.os.family")),
+            ("user_name", ("user.name", "user_name")),
+            ("user_domain", ("user.domain",)),
+            ("user_email", ("user.email",)),
+            ("target_user", ("user.target.name", "user.target.full_name")),
+            # Network
+            ("source_ip", ("source.ip", "source_ip")),
+            ("source_port", ("source.port",)),
+            ("destination_ip", ("destination.ip", "destination_ip")),
+            ("destination_port", ("destination.port",)),
+            ("network_transport", ("network.transport",)),
+            ("network_protocol", ("network.protocol",)),
+            ("network_bytes", ("network.bytes",)),
+            ("network_community_id", ("network.community_id",)),
+            # Process / file — the single most load-bearing set for EDR alerts
+            ("process_name", ("process.name",)),
+            ("process_command_line", ("process.command_line",)),
+            ("process_executable", ("process.executable",)),
+            ("process_pid", ("process.pid",)),
+            ("process_hash_sha256", ("process.hash.sha256",)),
+            ("parent_process_name", ("process.parent.name",)),
+            ("parent_process_command_line", ("process.parent.command_line",)),
+            ("parent_process_pid", ("process.parent.pid",)),
+            ("file_path", ("file.path",)),
+            ("file_name", ("file.name",)),
+            ("file_hash_sha256", ("file.hash.sha256",)),
+            ("file_hash_md5", ("file.hash.md5",)),
+            # URL / DNS / HTTP
+            ("url_full", ("url.full", "url.original")),
+            ("url_domain", ("url.domain",)),
+            ("dns_question_name", ("dns.question.name",)),
+            ("dns_question_type", ("dns.question.type",)),
+            ("http_request_method", ("http.request.method",)),
+            ("http_response_status", ("http.response.status_code",)),
+            ("user_agent", ("user_agent.original",)),
+            # Event classification
+            ("event_action", ("event.action",)),
+            ("event_category", ("event.category",)),
+            ("event_code", ("event.code",)),
+            ("event_outcome", ("event.outcome",)),
+            ("event_module", ("event.module",)),
+            ("event_dataset", ("event.dataset",)),
+        ]
+        out: Dict[str, Any] = {}
+        for out_key, aliases in field_map:
+            val = _get(alert, *aliases)
+            # Drop empty strings, None, empty lists — keep 0, False, "false"
+            if val is None:
+                continue
+            if isinstance(val, str) and not val.strip():
+                continue
+            if isinstance(val, (list, dict)) and not val:
+                continue
+            out[out_key] = val
+        return out
 
     def _build_user_prompt_body(
         self,
@@ -1263,8 +1338,8 @@ class InvestigationService:
         system_prompt: str,
         user_body: str,
         anon_map: Any,
-    ) -> Tuple[Dict[str, Any], str, Optional[int], int]:
-        """Run the LLM call; return (parsed, model_name, eval_count, duration_ms).
+    ) -> Tuple[Dict[str, Any], str, Optional[int], int, str]:
+        """Run the LLM call; return (parsed, model_name, eval_count, duration_ms, raw_content).
 
         ``anon_map`` is threaded through as a kwarg if the ollama client
         accepts it — we inspect the function signature so this code keeps
@@ -1279,6 +1354,12 @@ class InvestigationService:
             "system_prompt": system_prompt,
             "context_type": "security",
             "user_id": 0,
+            # v0.10.11: deterministic sampling. Same alert in = same verdict
+            # out. Without this, temperature=0.7 + unseeded sampling produced
+            # wildly different verdicts for identical alerts from the same
+            # host. Accuracy can't be measured while outputs drift randomly.
+            "temperature": 0.0,
+            "max_tokens": 2048,
         }
         # Thread optional kwargs through only if chat() accepts them.
         # This stays tolerant to older OllamaService signatures.
@@ -1297,6 +1378,13 @@ class InvestigationService:
                 # Force JSON-only output — aligns with the Output Contract
                 # appended by AlertPromptService.render_system_prompt().
                 kwargs["response_format"] = "json"
+            # v0.10.11: determinism knobs on the newer OllamaService signature
+            if "seed" in sig.parameters:
+                kwargs["seed"] = 42
+            if "top_p" in sig.parameters:
+                kwargs["top_p"] = 0.1
+            if "top_k" in sig.parameters:
+                kwargs["top_k"] = 1
         except (TypeError, ValueError):
             pass
 
@@ -1319,7 +1407,7 @@ class InvestigationService:
         model = (resp or {}).get("model") or ""
         eval_count = (resp or {}).get("eval_count")
         parsed = _parse_llm_json(content)
-        return parsed, model, eval_count, duration_ms
+        return parsed, model, eval_count, duration_ms, content
 
     # ------------------------------------------------------------------ #
     # Main entry point
@@ -1504,8 +1592,9 @@ class InvestigationService:
             )
 
             # 11) LLM call
+            raw_response_content: str = ""
             try:
-                parsed, model_used, eval_count, llm_ms = await self._call_llm(
+                parsed, model_used, eval_count, llm_ms, raw_response_content = await self._call_llm(
                     system_prompt=system_prompt,
                     user_body=user_body,
                     anon_map=anon_map,
@@ -1558,6 +1647,9 @@ class InvestigationService:
                     tokens=eval_count,
                     duration_ms=duration_ms,
                     db=db,
+                    prompt_snapshot=user_body,
+                    raw_response=raw_response_content,
+                    key_observations=parsed.get("key_observations") or [],
                 )
                 # 12b) Bob-authored writebacks — alert Note, triage hint,
                 # high-confidence IOC observables. Never fatal.

@@ -2893,6 +2893,18 @@ no commentary outside the JSON. The object MUST conform to this schema:
      "action": "specific instruction",
      "owner": "soc|ir|it|user|auto"}
   ],
+  "key_observations": [
+    // The specific evidence you based the verdict on. EVERY entry must cite
+    // a field that actually appears in alert_summary. This is what an
+    // analyst would point at on the Kibana detail page. Example:
+    //   {"field": "process.command_line",
+    //    "value": "powershell.exe -nop -w hidden -enc SQBFAFgA...",
+    //    "significance": "obfuscated base64 payload — common for
+    //                     living-off-the-land execution"}
+    {"field": "process.command_line | destination.ip | ... (must match a key in alert_summary)",
+     "value": "the exact value from that field",
+     "significance": "why this matters for the verdict"}
+  ],
   "suggested_closure_reason":
     "true_positive | false_positive | benign_true_positive | duplicate | insufficient_data | not_applicable",
   "tuning_recommendation": {
@@ -2942,7 +2954,10 @@ no commentary outside the JSON. The object MUST conform to this schema:
 3. If you have no IOCs, use `[]` — do not omit the field.
 4. `tuning_recommendation.rule_needs_tuning` is `true` ONLY for
    `verdict: "false_positive"`.
-5. Output is consumed by automation. Malformed JSON breaks the pipeline.
+5. `key_observations` MUST reference fields that literally appear in the
+   `alert_summary` payload. Do not cite fields that are not present.
+   Missing evidence → verdict must be `inconclusive`.
+6. Output is consumed by automation. Malformed JSON breaks the pipeline.
 """
 
 

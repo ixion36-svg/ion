@@ -135,6 +135,9 @@ def record_investigation_end(
     tokens: Optional[int],
     duration_ms: Optional[int],
     db: Session,
+    prompt_snapshot: Optional[str] = None,
+    raw_response: Optional[str] = None,
+    key_observations: Any = None,
 ) -> Optional[Investigation]:
     """Mark an investigation as completed with its outcome + telemetry."""
     inv = db.get(Investigation, inv_id)
@@ -152,6 +155,12 @@ def record_investigation_end(
     inv.tokens_used = tokens
     inv.duration_ms = duration_ms
     inv.completed_at = _utcnow()
+    if prompt_snapshot is not None:
+        inv.prompt_snapshot = prompt_snapshot[:100_000]  # hard cap for runaway prompts
+    if raw_response is not None:
+        inv.raw_response = raw_response[:100_000]
+    if key_observations is not None:
+        inv.key_observations_json = _to_json(key_observations)
     db.flush()
     return inv
 

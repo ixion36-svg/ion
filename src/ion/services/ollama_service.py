@@ -542,6 +542,9 @@ class OllamaService:
         anon_map: Optional[TokenMap] = None,
         bypass_queue: bool = False,
         response_format: Optional[str] = None,
+        seed: Optional[int] = None,
+        top_p: Optional[float] = None,
+        top_k: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Send a chat message and get a response (non-streaming).
 
@@ -586,15 +589,26 @@ class OllamaService:
 
             num_predict = max_tokens or DEFAULT_NUM_PREDICT
 
+            options: Dict[str, Any] = {
+                "temperature": temperature,
+                "num_predict": num_predict,
+                "stop": ["<|eot_id|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
+            }
+            # Determinism knobs — callers that want repeatable output
+            # (investigation pipeline, golden-set evals) pin seed + top_p/k.
+            # Defaults leave Ollama's sampler on for chat-style UX calls.
+            if seed is not None:
+                options["seed"] = seed
+            if top_p is not None:
+                options["top_p"] = top_p
+            if top_k is not None:
+                options["top_k"] = top_k
+
             request_body: Dict[str, Any] = {
                 "model": model,
                 "messages": full_messages,
                 "stream": False,
-                "options": {
-                    "temperature": temperature,
-                    "num_predict": num_predict,
-                    "stop": ["<|eot_id|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
-                },
+                "options": options,
             }
             if response_format:
                 # Ollama supports "json" to force valid-JSON output. Unknown

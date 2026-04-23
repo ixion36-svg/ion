@@ -1,5 +1,55 @@
 # Changelog
 
+## v0.10.11 (2026-04-23)
+
+### Bob investigation quality — the "wild verdicts" fix
+
+Same alert from the same host was producing wildly different verdicts across investigations. Three compounding root causes fixed in this release.
+
+#### 1. Prompt starvation — expanded alert summary
+Bob was seeing only 7 fields: `rule_name, host, source_ip, user_name, timestamp, severity, alert_id`. That's not enough context to reach a grounded verdict — the model was confabulating to fill the gap, and small models (qwen2.5:3b default) hit different fabrications on each call.
+
+Expanded to ~40 fields, emitted only when present (no null noise). Additions: `kibana.alert.reason` (the human-readable one-liner), `destination_ip` + `destination_port` + `network.*`, full `process.*` tree (name, command_line, executable, pid, sha256 + parent process), `file.*` (path, name, hashes), `url.*`, `dns.question.*`, `http.*`, `user_agent`, `event.action` + `event.category` + `event.code` + `event.outcome` + `event.module` + `event.dataset`, `user.domain` + `user.email` + target user, host OS info, and — load-bearing — the actual **rule query text** (`kibana.alert.rule.parameters.query`) so Bob knows *what the rule was looking for*, not just its name.
+
+Trade-off: prompts are larger, so `num_predict` is bumped from the default to 2048. Investigation calls take longer — the user signed off on slower-but-right.
+
+#### 2. LLM non-determinism
+Investigation Ollama calls ran with `temperature=0.7` and no `seed` / `top_p` / `top_k` pins. Same prompt literally sampled different tokens on every call. Accuracy was unmeasurable under random verdict drift.
+
+Pinned to `temperature=0.0, seed=42, top_p=0.1, top_k=1`. Same alert in = same verdict out. The sampler is fully deterministic when ION drives the call; interactive chat UX (different code path) keeps the old defaults so conversational Bob isn't robotic.
+
+`OllamaService.chat()` gained `seed`, `top_p`, `top_k` keyword parameters — passed through to Ollama's `options` dict only when set, so no behaviour change for callers that don't pass them.
+
+#### 3. Unauditable reasoning → grounded evidence bullets
+The output contract had `analyst_explanation` and `technical_details` (prose), but nothing forced the model to tie its verdict to specific alert fields. New mandatory field:
+
+```jsonc
+"key_observations": [
+  {"field": "process.command_line",
+   "value": "powershell.exe -nop -w hidden -enc SQBFAFgA...",
+   "significance": "obfuscated base64 payload — common for
+                    living-off-the-land execution"}
+]
+```
+
+Rule 5 of the Output Contract now requires every `key_observations` entry to cite a field that literally appears in `alert_summary`. If there's no supporting evidence in the alert, verdict MUST be `inconclusive`. This kills the "confident nonsense" failure mode where Bob asserted a verdict the alert data didn't support.
+
+#### 4. Training loop foundation — persist prompt + response
+
+`Investigation` table gains three nullable TEXT columns (idempotent ALTER TABLE):
+- `prompt_snapshot` — full rendered user prompt sent to Ollama
+- `raw_response` — model's raw output before any parsing
+- `key_observations_json` — parsed evidence bullets
+
+AIFeedback rows already link to `investigation_id`, so per-template accuracy queries can now JOIN to the exact prompt and response that led to each disagreement. Without this, "Bob was wrong N% of the time" was countable but undebuggable — you couldn't see *what* he saw. This is the prerequisite for the Tier-1 automatic prompt-refinement work.
+
+Pre-v0.10.11 investigations stay NULL in the new columns. Hard-capped at 100 KB per column to prevent runaway prompts from bloating the DB.
+
+### Upgrade notes
+- Idempotent migration — safe to pull `ion:0.10.11` alongside existing v0.10.10 Postgres + Ollama volumes
+- Investigation latency will increase. Expected. Verdict quality was the asked-for trade
+- If you want the old chatty sampler for investigations, there is no flag — revert the pinned values in `_call_llm` yourself
+
 ## v0.10.10 (2026-04-23)
 
 ### Arkime PCAP fallback — loosened gate + diagnostic logging

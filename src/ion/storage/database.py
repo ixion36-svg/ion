@@ -697,6 +697,25 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: post_incident_reviews.linked_controls")
 
+    # v0.10.11: Investigation gains prompt snapshot + raw response + key
+    # observations so AIFeedback rows are debuggable (see what Bob saw, not
+    # just whether he was right). Idempotent — checks for column existence
+    # before attempting the ALTER. Nullable — pre-v0.10.11 rows stay NULL.
+    if insp.has_table("investigations"):
+        existing = {col["name"] for col in insp.get_columns("investigations")}
+        new_cols = {
+            "prompt_snapshot": "TEXT",
+            "raw_response": "TEXT",
+            "key_observations_json": "TEXT",
+        }
+        for col_name, col_type in new_cols.items():
+            if col_name not in existing:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(f"ALTER TABLE investigations ADD COLUMN {col_name} {col_type}")
+                    )
+                    logger.info("Migrated: investigations.%s", col_name)
+
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
 
