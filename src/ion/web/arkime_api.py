@@ -394,8 +394,19 @@ async def arkime_preview(
             f"No community_id on this alert — searched Arkime by IP "
             f"({search_ip}) instead. Results may include unrelated sessions."
         )
+        # v0.10.13: anchor the Arkime search window on the alert timestamp,
+        # not on "now". Non-24/7 SOCs investigate alerts hours after they
+        # fire; a now-anchored window would miss the traffic. Falls through
+        # to a now-anchored window inside the service if no timestamp.
+        alert_ts = (
+            alert.get("@timestamp")
+            or alert.get("timestamp")
+            or alert.get("kibana.alert.original_time")
+        )
         try:
-            sessions = await svc.find_sessions_by_ip(node, search_ip, hours=2)
+            sessions = await svc.find_sessions_by_ip(
+                node, search_ip, alert_timestamp=alert_ts,
+            )
         except ArkimeError as e:
             status = e.status_code if e.status_code in (401, 403, 404) else 502
             raise HTTPException(status_code=status, detail=safe_error(e))

@@ -1,5 +1,51 @@
 # Changelog
 
+## v0.10.13 (2026-04-23)
+
+### Arkime — PCAP timeout + alert-anchored IP search (hours-old alert fix)
+
+Production logs from a real air-gapped deploy surfaced two related bugs after v0.10.10's fallback loosening started actually exercising the IP path.
+
+#### 1. PCAP download was cut off at 60 s
+`download_pcap` shared the 60 s session-search client. Arkime assembles PCAPs server-side by walking capture files, and a busy session easily needs 30-120 s to produce before transfer even starts. The short timeout fired mid-stream and surfaced `ArkimeError: Arkime PCAP download error:` — blank — to operators because `str(httpx.ReadTimeout())` is empty.
+
+- New `_pcap_client()` with a dedicated longer timeout (default 300 s)
+- Tunable via `ION_ARKIME_PCAP_TIMEOUT_S` in `.env`
+- All three Arkime httpx error wrappers now include `type(e).__name__` so `ReadTimeout` / `ConnectTimeout` / `SSLError` / `ConnectError` are all distinguishable in logs
+
+#### 2. IP search window was anchored to `now`, not the alert timestamp
+
+`find_sessions_by_ip` used `startTime = now - 2h`, `stopTime = now`. For a 24/7 SOC this is fine; for non-24/7 ops (most SOCs) investigating an 8-hour-old alert, the window misses the traffic entirely. The search would succeed — return zero sessions — and the workflow would dead-end at "no sessions found".
+
+Fixed by anchoring the window on the **alert timestamp** ± `window_minutes` (default 30 min):
+
+```python
+# Before (busted for late investigations):
+startTime = now - 2h
+stopTime = now
+
+# After (v0.10.13):
+alert_epoch = parse(alert["@timestamp"])
+startTime = alert_epoch - 30min
+stopTime = alert_epoch + 30min
+```
+
+- `find_sessions_by_ip` gains `alert_timestamp` + `window_minutes` kwargs
+- Default window tunable via `ION_ARKIME_IP_SEARCH_WINDOW_MIN` (default 30)
+- Legacy `hours` kwarg kept for back-compat (converted to `hours × 60` minutes)
+- Falls back to a now-anchored window only when the alert has no parseable timestamp
+- INFO log now shows the anchor: `Arkime IP search: expression=... window=±30min anchor=alert_ts=1745389524 limit=10`
+
+As a side effect, the narrower window (60 min total vs 120 min) also reduces the PCAP size Arkime has to assemble — directly compounding with the timeout fix for the typical case.
+
+### `.env.deploy`
+Two new optional settings documented in the Arkime section:
+- `ION_ARKIME_PCAP_TIMEOUT_S=300`
+- `ION_ARKIME_IP_SEARCH_WINDOW_MIN=30`
+
+### Upgrade notes
+Drop-in for v0.10.12 — no schema, no compose changes required.
+
 ## v0.10.12 (2026-04-23)
 
 ### AI Scorecard — per-template accuracy dashboard

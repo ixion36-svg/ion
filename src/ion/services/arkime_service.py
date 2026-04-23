@@ -30,12 +30,50 @@ Authentication: HTTP Basic only (v0.10.4+). Configure via:
 from __future__ import annotations
 
 import logging
+import os
 import time
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import httpx
 
 from ion.core.config import get_arkime_config
+
+
+def _parse_alert_epoch(ts: Any) -> Optional[int]:
+    """Best-effort parse of an alert timestamp into epoch seconds.
+
+    ES uses ISO 8601 with a trailing Z (``2026-04-23T08:05:24.140Z``).
+    Returns None for anything we can't parse — callers fall back to a
+    now-anchored window in that case.
+    """
+    if ts is None:
+        return None
+    if isinstance(ts, (int, float)):
+        return int(ts)
+    if isinstance(ts, str):
+        try:
+            normalized = ts.replace("Z", "+00:00")
+            return int(datetime.fromisoformat(normalized).timestamp())
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
+def _env_int(name: str, default: int) -> int:
+    """Read an int env var; fall back to default on missing/malformed."""
+    try:
+        return int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    """Read a float env var; fall back to default on missing/malformed."""
+    try:
+        return float(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
 
 logger = logging.getLogger(__name__)
 
@@ -107,9 +145,26 @@ class ArkimeService:
         return headers
 
     async def _client(self) -> httpx.AsyncClient:
+        """Client for session-search / user-probe calls. Short timeout (60s)."""
         return httpx.AsyncClient(
             verify=self.verify_ssl,
             timeout=60.0,
+            follow_redirects=True,
+        )
+
+    async def _pcap_client(self) -> httpx.AsyncClient:
+        """Longer-timeout client for PCAP downloads.
+
+        Arkime assembles PCAPs server-side by walking capture files — a busy
+        session can easily need 30-120s to produce, plus transfer time. The
+        60s session-search timeout was cutting PCAP downloads off mid-flight
+        and surfacing blank-message ``ArkimeError: Arkime PCAP download
+        error:`` to operators. Default 300s, tunable via
+        ``ION_ARKIME_PCAP_TIMEOUT_S`` for very large sessions.
+        """
+        return httpx.AsyncClient(
+            verify=self.verify_ssl,
+            timeout=_env_float("ION_ARKIME_PCAP_TIMEOUT_S", 300.0),
             follow_redirects=True,
         )
 
@@ -223,37 +278,72 @@ class ArkimeService:
         except ArkimeError:
             raise
         except httpx.HTTPError as e:
-            raise ArkimeError(f"Arkime session search error: {e}") from e
+            raise ArkimeError(
+                f"Arkime session search error: {type(e).__name__}: {e}"
+            ) from e
 
     async def find_sessions_by_ip(
         self,
         node: str,
         ip: str,
         *,
-        hours: int = 1,
+        alert_timestamp: Any = None,
+        window_minutes: Optional[int] = None,
+        hours: Optional[int] = None,  # deprecated: kept for call-site compat
         limit: int = 10,
     ) -> List[Dict[str, Any]]:
         """Search Arkime for sessions involving an IP within a time window.
 
-        Fallback when community_id is not available on the alert. Searches
-        both source and destination so any traffic involving the IP is found.
-        When *node* is empty the node filter is omitted.
+        Fallback when community_id doesn't resolve a session. Searches both
+        source and destination. When *node* is empty the node filter is
+        omitted.
+
+        v0.10.13: the search window now anchors on ``alert_timestamp`` when
+        provided (``± window_minutes``) rather than on wall-clock ``now``.
+        Non-24/7 SOCs frequently investigate alerts hours after they fired;
+        a now-anchored window would miss the traffic entirely in that case.
+        Falls back to a now-anchored window only when no alert timestamp
+        is supplied.
+
+        ``window_minutes`` defaults to ``ION_ARKIME_IP_SEARCH_WINDOW_MIN``
+        (default 30). The legacy ``hours`` kwarg is still honoured — older
+        callers don't need to change. Mixing both: ``window_minutes`` wins.
         """
         if not self.is_configured:
             raise ArkimeError("Arkime is not configured")
         expression = f'(ip.src == {ip} || ip.dst == {ip})'
         if node:
             expression += f' && node == "{node}"'
+
+        # Resolve effective window. Precedence: explicit window_minutes →
+        # legacy hours (×60) → env default → 30min.
+        if window_minutes is None:
+            if hours is not None:
+                window_minutes = hours * 60
+            else:
+                window_minutes = _env_int("ION_ARKIME_IP_SEARCH_WINDOW_MIN", 30)
+
+        alert_epoch = _parse_alert_epoch(alert_timestamp)
+        window_s = window_minutes * 60
+        if alert_epoch is not None:
+            start_ts = alert_epoch - window_s
+            stop_ts = alert_epoch + window_s
+            anchor = f"alert_ts={alert_epoch}"
+        else:
+            start_ts = int(time.time() - window_s)
+            stop_ts = int(time.time())
+            anchor = "now"
+
         params = {
             "expression": expression,
             "length": str(limit),
-            "startTime": str(int(time.time() - hours * 3600)),
-            "stopTime": str(int(time.time())),
+            "startTime": str(start_ts),
+            "stopTime": str(stop_ts),
             "fields": self._SESSION_FIELDS,
         }
         logger.info(
-            "Arkime IP search: expression=%r window=%dh limit=%d",
-            expression, hours, limit,
+            "Arkime IP search: expression=%r window=±%dmin anchor=%s limit=%d",
+            expression, window_minutes, anchor, limit,
         )
         headers = await self._headers()
         try:
@@ -292,7 +382,9 @@ class ArkimeService:
         except ArkimeError:
             raise
         except httpx.HTTPError as e:
-            raise ArkimeError(f"Arkime IP session search error: {e}") from e
+            raise ArkimeError(
+                f"Arkime IP session search error: {type(e).__name__}: {e}"
+            ) from e
 
     # ── PCAP download ──────────────────────────────────────────────────────
     async def download_pcap_by_community_id(
@@ -363,7 +455,7 @@ class ArkimeService:
         headers = await self._headers({"Accept": "application/vnd.tcpdump.pcap"})
         logger.info("Arkime PCAP GET %s", url)
         try:
-            async with await self._client() as client:
+            async with await self._pcap_client() as client:
                 resp = await client.get(
                     url,
                     headers=headers,
@@ -383,7 +475,14 @@ class ArkimeService:
                 raise ArkimeError("Arkime returned an empty PCAP body")
             return body
         except httpx.HTTPError as e:
-            raise ArkimeError(f"Arkime PCAP download error: {e}") from e
+            # Include the exception class name — httpx.ReadTimeout/ConnectTimeout
+            # have empty str() representations and surfacing just "Arkime PCAP
+            # download error:" told operators nothing. With the class name,
+            # timeouts vs connection refusals vs TLS errors are immediately
+            # distinguishable.
+            raise ArkimeError(
+                f"Arkime PCAP download error: {type(e).__name__}: {e}"
+            ) from e
 
 
 # Singleton
