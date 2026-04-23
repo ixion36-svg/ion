@@ -76,6 +76,12 @@ class InvestigationDetail(InvestigationSummary):
     ioc_snapshot: Optional[Any] = None
     prompt_template_id: Optional[int] = None
     created_by: Optional[int] = None
+    # v0.10.11: grounded evidence — list of {field, value, significance}
+    key_observations: Optional[Any] = None
+    # v0.10.11: prompt + raw response snapshots for training-loop debugging.
+    # Admin-only callers include these; standard callers get them elided.
+    prompt_snapshot: Optional[str] = None
+    raw_response: Optional[str] = None
 
 
 class IOCSightingResponse(BaseModel):
@@ -162,6 +168,9 @@ def _inv_to_detail(inv: Investigation) -> InvestigationDetail:
         ioc_snapshot=_maybe_json(inv.ioc_snapshot_json),
         prompt_template_id=inv.prompt_template_id,
         created_by=inv.created_by,
+        key_observations=_maybe_json(inv.key_observations_json),
+        prompt_snapshot=inv.prompt_snapshot,
+        raw_response=inv.raw_response,
     )
     return InvestigationDetail(**base)
 

@@ -404,6 +404,28 @@
       const r = await res.json();
       const actions = r.recommended_actions ? JSON.stringify(r.recommended_actions, null, 2) : '(none)';
       const iocs = r.ioc_snapshot ? JSON.stringify(r.ioc_snapshot, null, 2) : '(none)';
+      // v0.10.12: grounded evidence bullets — each cites a specific field
+      // from the alert payload, so verdicts are auditable rather than
+      // opaque. Falls back to an empty state when the list is null/empty
+      // (investigations from before v0.10.11 won't have this).
+      let obsHtml = '';
+      const obs = Array.isArray(r.key_observations) ? r.key_observations : [];
+      if (obs.length > 0) {
+        obsHtml = `
+          <div class="mb-3">
+            <div class="label-tiny text-slate-500 mb-1">Key observations (grounded evidence)</div>
+            <ul class="rounded-md border border-white/5 bg-ink-900/70 p-3 space-y-2 text-[12px]">
+              ${obs.map(o => `
+                <li class="border-l-2 border-ion-cyan/40 pl-3">
+                  <div class="font-mono text-[11px] text-ion-cyan">${imEscape(o.field || '')}</div>
+                  <div class="text-slate-200 break-all"><code class="text-[11px]">${imEscape(o.value || '')}</code></div>
+                  <div class="text-slate-400 text-[11px] mt-0.5">${imEscape(o.significance || '')}</div>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+      }
       body.innerHTML = `
         <div class="grid grid-cols-2 gap-3 text-[12px] text-slate-300 mb-4">
           <div><span class="text-slate-500">Alert ref:</span> ${imEscape(r.alert_id_ref)}</div>
@@ -423,6 +445,7 @@
           <div class="label-tiny text-slate-500 mb-1">Summary</div>
           <div class="rounded-md border border-white/5 bg-ink-900/70 p-3 text-[12px] text-slate-200 whitespace-pre-wrap">${imEscape(r.summary_text || '(none)')}</div>
         </div>
+        ${obsHtml}
         <div class="mb-3">
           <div class="label-tiny text-slate-500 mb-1">Recommended actions</div>
           <pre class="rounded-md border border-white/5 bg-ink-900/70 p-3 text-[11px] text-slate-300 overflow-x-auto">${imEscape(actions)}</pre>

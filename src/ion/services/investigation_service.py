@@ -98,6 +98,7 @@ def _render_bob_alert_note(parsed: Dict[str, Any]) -> str:
 
     actions = parsed.get("recommended_actions_structured") or []
     iocs = parsed.get("iocs") or []
+    observations = parsed.get("key_observations") or []
     tuning = parsed.get("tuning_recommendation") or {}
 
     lines: list[str] = [
@@ -107,6 +108,21 @@ def _render_bob_alert_note(parsed: Dict[str, Any]) -> str:
         lines.extend(["", summary])
     if analyst:
         lines.extend(["", analyst])
+
+    # v0.10.12: grounded evidence bullets. Each cites a specific field from
+    # the alert payload so the verdict is auditable, not opaque.
+    if observations:
+        lines.extend(["", "**Key observations:**"])
+        for obs in observations[:10]:
+            if not isinstance(obs, dict):
+                continue
+            field = obs.get("field") or ""
+            value = (obs.get("value") or "")[:200]
+            sig = obs.get("significance") or ""
+            if field and sig:
+                lines.append(f"- `{field}` = `{value}` — {sig}")
+            elif field:
+                lines.append(f"- `{field}` = `{value}`")
 
     if techs or tactics:
         bits = []
@@ -1333,17 +1349,19 @@ class InvestigationService:
         )
         return dumped + tail
 
-    async def _call_llm(
+    async def _single_llm_call(
         self,
         system_prompt: str,
         user_body: str,
         anon_map: Any,
+        seed: int,
     ) -> Tuple[Dict[str, Any], str, Optional[int], int, str]:
-        """Run the LLM call; return (parsed, model_name, eval_count, duration_ms, raw_content).
+        """One pass through Ollama — parsed + raw + telemetry.
 
-        ``anon_map`` is threaded through as a kwarg if the ollama client
-        accepts it — we inspect the function signature so this code keeps
-        working whether or not the PII-anon wiring has landed.
+        The seed value controls which sampling path Ollama takes. Pair with
+        the other determinism knobs (temperature=0, top_p=0.1, top_k=1) so
+        that two different seeds actually *explore* different verdicts
+        instead of converging on the same argmax token stream.
         """
         ollama = self._get_ollama()
         if ollama is None:
@@ -1354,15 +1372,11 @@ class InvestigationService:
             "system_prompt": system_prompt,
             "context_type": "security",
             "user_id": 0,
-            # v0.10.11: deterministic sampling. Same alert in = same verdict
-            # out. Without this, temperature=0.7 + unseeded sampling produced
-            # wildly different verdicts for identical alerts from the same
-            # host. Accuracy can't be measured while outputs drift randomly.
+            # v0.10.11: deterministic sampling. Same alert+seed in = same
+            # verdict out. Accuracy can't be measured while outputs drift.
             "temperature": 0.0,
             "max_tokens": 2048,
         }
-        # Thread optional kwargs through only if chat() accepts them.
-        # This stays tolerant to older OllamaService signatures.
         try:
             import inspect
             sig = inspect.signature(ollama.chat)
@@ -1375,12 +1389,9 @@ class InvestigationService:
                 # Ollama itself limits concurrent inference.
                 kwargs["bypass_queue"] = True
             if "response_format" in sig.parameters:
-                # Force JSON-only output — aligns with the Output Contract
-                # appended by AlertPromptService.render_system_prompt().
                 kwargs["response_format"] = "json"
-            # v0.10.11: determinism knobs on the newer OllamaService signature
             if "seed" in sig.parameters:
-                kwargs["seed"] = 42
+                kwargs["seed"] = seed
             if "top_p" in sig.parameters:
                 kwargs["top_p"] = 0.1
             if "top_k" in sig.parameters:
@@ -1408,6 +1419,98 @@ class InvestigationService:
         eval_count = (resp or {}).get("eval_count")
         parsed = _parse_llm_json(content)
         return parsed, model, eval_count, duration_ms, content
+
+    async def _call_llm(
+        self,
+        system_prompt: str,
+        user_body: str,
+        anon_map: Any,
+    ) -> Tuple[Dict[str, Any], str, Optional[int], int, str]:
+        """Run the LLM call; return (parsed, model_name, eval_count, duration_ms, raw_content).
+
+        v0.10.12: self-consistency sampling gated on ION_INVESTIGATION_SAMPLES.
+        Default is 1 (single-seed run, cheapest). Setting 2 runs two passes
+        with different seeds; on agreement the first result is returned with
+        confidence boosted one level. On disagreement the verdict downgrades
+        to ``inconclusive`` — two deterministic runs producing different
+        verdicts means the prompt is genuinely ambiguous, and forcing a
+        confident wrong answer is worse than admitting we don't know.
+        """
+        import os
+
+        try:
+            samples = int(os.environ.get("ION_INVESTIGATION_SAMPLES", "1"))
+        except (TypeError, ValueError):
+            samples = 1
+        samples = max(1, min(3, samples))
+
+        # Single-sample fast path — indistinguishable from v0.10.11 behaviour.
+        if samples == 1:
+            return await self._single_llm_call(
+                system_prompt, user_body, anon_map, seed=42,
+            )
+
+        # Multi-sample path. Seeds chosen to be deterministic across runs
+        # (so two investigations of the same alert hit the same sample
+        # stream) but far apart in hash space to encourage verdict diversity
+        # when the prompt is ambiguous.
+        seed_pool = [42, 1337, 2024]
+        seeds = seed_pool[:samples]
+        results: List[Tuple[Dict[str, Any], str, Optional[int], int, str]] = []
+        for s in seeds:
+            results.append(
+                await self._single_llm_call(
+                    system_prompt, user_body, anon_map, seed=s,
+                )
+            )
+
+        verdicts = [r[0].get("verdict", "inconclusive") for r in results]
+        verdict_set = set(verdicts)
+        total_ms = sum(r[3] for r in results)
+        # Merged raw content preserves every sample so the training loop
+        # can see exactly what each seed produced. Separator chosen to not
+        # collide with JSON syntax or typical prose.
+        merged_content = "\n\n===SAMPLE-BOUNDARY===\n\n".join(r[4] for r in results)
+
+        if len(verdict_set) == 1:
+            # Consensus — every sample agreed. Return first, bump confidence.
+            parsed, model, eval_count, _first_ms, _first_content = results[0]
+            level = parsed.get("confidence_level", "low")
+            bumped = {"low": "medium", "medium": "high", "high": "high"}.get(level, level)
+            parsed["confidence_level"] = bumped
+            parsed["sampling"] = {
+                "samples": samples,
+                "verdicts": verdicts,
+                "consensus": True,
+            }
+            logger.info(
+                "Self-consistency OK — %d samples agreed on verdict=%s",
+                samples, verdicts[0],
+            )
+            return parsed, model, eval_count, total_ms, merged_content
+
+        # Disagreement — two deterministic runs produced different verdicts.
+        # Don't paper over it with a coin flip; mark inconclusive and let an
+        # analyst decide. The AIFeedback ledger will eventually surface
+        # which templates trigger disagreement often — those are the prompts
+        # that need tuning.
+        parsed, model, eval_count, _first_ms, _first_content = results[0]
+        parsed["verdict"] = "inconclusive"
+        parsed["confidence_level"] = "low"
+        parsed["confidence"] = 20
+        parsed["suggested_closure_reason"] = "insufficient_data"
+        split_note = f"[Self-consistency disagreement — samples: {', '.join(verdicts)}] "
+        parsed["summary"] = split_note + (parsed.get("summary") or "")
+        parsed["sampling"] = {
+            "samples": samples,
+            "verdicts": verdicts,
+            "consensus": False,
+        }
+        logger.info(
+            "Self-consistency FAILED — %d samples produced %s; verdict forced to inconclusive",
+            samples, verdicts,
+        )
+        return parsed, model, eval_count, total_ms, merged_content
 
     # ------------------------------------------------------------------ #
     # Main entry point

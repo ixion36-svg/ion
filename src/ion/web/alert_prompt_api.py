@@ -335,3 +335,20 @@ def alert_prompts_page(
         request=request,
         name="alert_prompt_templates.html",
     )
+
+
+@router.get("/ai-scorecard", response_class=HTMLResponse)
+def ai_scorecard_page(
+    request: Request,
+    _user: User = Depends(require_page_auth),
+):
+    """Per-template Bob-vs-human agreement dashboard (v0.10.12).
+
+    Consumes the existing ``/api/alert-prompts/scorecards`` endpoint plus
+    ``/api/alert-prompts`` for template names. Surfaces which templates are
+    pulling their weight and which need tuning attention.
+    """
+    return _templates.TemplateResponse(
+        request=request,
+        name="ai_scorecard.html",
+    )
