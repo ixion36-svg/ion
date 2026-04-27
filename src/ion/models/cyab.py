@@ -211,3 +211,105 @@ class CyabSnapshot(Base):
 
     def __repr__(self) -> str:
         return f"<CyabSnapshot(id={self.id}, system_id={self.system_id}, date={self.snapshot_date})>"
+
+
+# ---------------------------------------------------------------------------
+# v0.10.15: Assessment models — discovery questionnaire results
+#
+# Two granularities:
+#   - CyabAssessment           (org-wide, no FK to a system)
+#   - CyabSystemAssessment     (per CyabSystem, FK)
+#
+# Both immutable + versioned: every submission is a new row, prior versions
+# are kept verbatim so quarter-over-quarter posture trending is possible.
+# Responses are stored as JSON-as-text so the question schema can evolve
+# without an alembic migration; the versioned `schema_version` column
+# tracks which question set the responses were captured against.
+# ---------------------------------------------------------------------------
+
+
+class CyabAssessment(Base):
+    """Org-wide questionnaire submission.
+
+    Captures profile (sector, geo, stack, controls, concerns) once for the
+    whole organisation. Drives baseline use-case ranking + threat-actor
+    relevance for every CyAB system that doesn't override via a
+    `CyabSystemAssessment`.
+    """
+
+    __tablename__ = "cyab_assessments"
+    __table_args__ = (
+        Index("ix_cyab_assessment_submitted_at", "submitted_at"),
+        Index("ix_cyab_assessment_submitted_by", "submitted_by"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    schema_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    submitted_by: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=func.now()
+    )
+
+    # JSON blobs — stored as Text, parsed at read time. JSON-as-text avoids
+    # vendor-specific JSON column types and keeps the homegrown migration
+    # pattern simple (an ALTER TABLE ADD COLUMN TEXT works on PG and SQLite).
+    responses_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    computed_profile_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ranked_use_cases_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ranked_actors_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<CyabAssessment(id={self.id}, submitted_at={self.submitted_at})>"
+
+
+class CyabSystemAssessment(Base):
+    """Per-system questionnaire submission.
+
+    Inherits the org-wide profile and adds system-specific context
+    (criticality, exposure, system controls). Scoring layers a delta on
+    top of the org-wide baseline ranking — so an internet-facing,
+    BYOD-allowing system gets initial-access playbooks ranked higher than
+    its sibling internal-only system.
+    """
+
+    __tablename__ = "cyab_system_assessments"
+    __table_args__ = (
+        Index("ix_cyab_sys_assessment_system", "system_id"),
+        Index("ix_cyab_sys_assessment_submitted_at", "submitted_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    system_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("cyab_systems.id", ondelete="CASCADE"), nullable=False
+    )
+    schema_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    submitted_by: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=func.now()
+    )
+
+    # Optional FK to the org-wide assessment that was current at submit
+    # time. Nullable because per-system assessments can be filed without
+    # an org-wide one (the scoring service falls back to defaults).
+    org_assessment_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("cyab_assessments.id", ondelete="SET NULL"), nullable=True
+    )
+
+    responses_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    computed_profile_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ranked_use_cases_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ranked_actors_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    def __repr__(self) -> str:
+        return (
+            f"<CyabSystemAssessment(id={self.id}, system_id={self.system_id}, "
+            f"submitted_at={self.submitted_at})>"
+        )

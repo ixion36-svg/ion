@@ -10,11 +10,21 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_permission
-from ion.models.cyab import CyabSystem, CyabDataSource, CyabSnapshot, SYSTEM_ICONS
+from ion.models.cyab import (
+    CyabSystem, CyabDataSource, CyabSnapshot,
+    CyabAssessment, CyabSystemAssessment,
+    SYSTEM_ICONS,
+)
 from ion.models.user import User, Role, user_roles
 from ion.web.api import get_db_session
 from ion.services.tide_service import get_tide_service, reset_tide_service
 from ion.services.elasticsearch_service import ElasticsearchService
+from ion.services.cyab_assessment_questions import (
+    SCHEMA_VERSION as ASSESSMENT_SCHEMA_VERSION,
+    get_org_questions,
+    get_system_questions,
+)
+from ion.services import cyab_assessment_service
 from ion.core.config import get_elasticsearch_config
 from ion.core.safe_errors import safe_error
 
@@ -2234,3 +2244,253 @@ def bulk_apply_settings(
 
     session.commit()
     return {"updated": updated, "fields_applied": list(fields.keys())}
+
+
+# ===========================================================================
+# v0.10.15 — Assessment questionnaire endpoints
+#
+# Two granularities (mirrors the model layer):
+#   /api/cyab/assessment            org-wide questionnaire
+#   /api/cyab/systems/{sid}/assessment   per-system questionnaire
+#
+# Both immutable + versioned: every POST creates a new row. The frontend
+# resubmits a fresh assessment rather than editing an existing one.
+# ===========================================================================
+
+
+class AssessmentSubmit(BaseModel):
+    responses: dict
+    notes: Optional[str] = None
+
+
+def _serialise_assessment(row, include_results: bool = True) -> dict:
+    """Serialise a CyabAssessment / CyabSystemAssessment row for the API."""
+    out = {
+        "id": row.id,
+        "schema_version": row.schema_version,
+        "submitted_by": row.submitted_by,
+        "submitted_at": row.submitted_at.isoformat() if row.submitted_at else None,
+        "notes": row.notes,
+        "responses": cyab_assessment_service.parse_json_field(row.responses_json) or {},
+    }
+    if include_results:
+        out["computed_profile"] = cyab_assessment_service.parse_json_field(
+            row.computed_profile_json
+        )
+        out["ranked_use_cases"] = cyab_assessment_service.parse_json_field(
+            row.ranked_use_cases_json
+        ) or []
+        out["ranked_actors"] = cyab_assessment_service.parse_json_field(
+            row.ranked_actors_json
+        ) or []
+    if hasattr(row, "system_id"):
+        out["system_id"] = row.system_id
+        out["org_assessment_id"] = getattr(row, "org_assessment_id", None)
+    return out
+
+
+@router.get("/api/cyab/assessment/questions")
+def get_assessment_questions(
+    current_user: User = Depends(get_current_user),
+):
+    """Return the org-wide + per-system question schemas.
+
+    Schema version is included so the frontend can warn if it loaded a
+    different revision than the server is now serving.
+    """
+    return {
+        "schema_version": ASSESSMENT_SCHEMA_VERSION,
+        "org_questions": get_org_questions(),
+        "system_questions": get_system_questions(),
+    }
+
+
+def _latest_org_assessment(session: Session) -> Optional[CyabAssessment]:
+    """Return the most recent org-wide assessment row (or None)."""
+    return (
+        session.query(CyabAssessment)
+        .order_by(CyabAssessment.id.desc())
+        .first()
+    )
+
+
+def _resolve_playbooks() -> List[dict]:
+    """Pull TIDE playbooks for scoring. Empty list on TIDE failure — the
+    scorer copes (returns an empty ranking)."""
+    try:
+        svc = get_tide_service()
+        if not svc.enabled:
+            return []
+        return svc.get_playbooks_with_kill_chains() or []
+    except Exception as exc:
+        logger_msg = f"TIDE playbook fetch failed: {exc}"
+        # Use safe_error so we don't leak internals into the response
+        # if a downstream call eventually surfaces this.
+        try:
+            from logging import getLogger
+            getLogger(__name__).warning(logger_msg)
+        except Exception:
+            pass
+        return []
+
+
+@router.post("/api/cyab/assessment")
+def submit_org_assessment(
+    body: AssessmentSubmit,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Persist a new org-wide assessment + compute ranked results.
+
+    Always creates a new row — assessments are immutable. Past submissions
+    are kept for trending. The newest is what the per-system overlay
+    inherits as the "current org profile".
+    """
+    responses = body.responses or {}
+    playbooks = _resolve_playbooks()
+    result = cyab_assessment_service.rank_for_assessment(
+        responses=responses,
+        playbooks=playbooks,
+    )
+
+    row = CyabAssessment(
+        schema_version=ASSESSMENT_SCHEMA_VERSION,
+        submitted_by=current_user.id if current_user else None,
+        responses_json=json.dumps(responses, default=str),
+        computed_profile_json=json.dumps(result["computed_profile"], default=str),
+        ranked_use_cases_json=json.dumps(result["ranked_use_cases"], default=str),
+        ranked_actors_json=json.dumps(result["ranked_actors"], default=str),
+        notes=body.notes or None,
+    )
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return _serialise_assessment(row)
+
+
+@router.get("/api/cyab/assessment")
+def list_org_assessments(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+    limit: int = 20,
+):
+    """List org-wide assessments newest-first (no result blob — just
+    metadata + responses, so the trending UI can diff)."""
+    rows = (
+        session.query(CyabAssessment)
+        .order_by(CyabAssessment.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return {
+        "assessments": [_serialise_assessment(r, include_results=False) for r in rows],
+        "count": len(rows),
+    }
+
+
+@router.get("/api/cyab/assessment/latest")
+def get_latest_org_assessment(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Convenience: return the most recent org-wide assessment with
+    results, or 204 when none has been submitted."""
+    row = _latest_org_assessment(session)
+    if not row:
+        return {"assessment": None}
+    return {"assessment": _serialise_assessment(row)}
+
+
+@router.get("/api/cyab/assessment/{assessment_id}")
+def get_org_assessment(
+    assessment_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    row = session.get(CyabAssessment, assessment_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    return _serialise_assessment(row)
+
+
+@router.post("/api/cyab/systems/{system_id}/assessment")
+def submit_system_assessment(
+    system_id: int,
+    body: AssessmentSubmit,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Persist a new per-system assessment + compute results overlaying
+    the latest org-wide profile."""
+    sys = session.get(CyabSystem, system_id)
+    if not sys:
+        raise HTTPException(status_code=404, detail="System not found")
+
+    org_row = _latest_org_assessment(session)
+    org_responses = (
+        cyab_assessment_service.parse_json_field(org_row.responses_json) or {}
+        if org_row else {}
+    )
+    sys_responses = body.responses or {}
+
+    playbooks = _resolve_playbooks()
+    result = cyab_assessment_service.rank_for_assessment(
+        responses=org_responses,
+        playbooks=playbooks,
+        sys_responses=sys_responses,
+    )
+
+    row = CyabSystemAssessment(
+        system_id=system_id,
+        org_assessment_id=org_row.id if org_row else None,
+        schema_version=ASSESSMENT_SCHEMA_VERSION,
+        submitted_by=current_user.id if current_user else None,
+        responses_json=json.dumps(sys_responses, default=str),
+        computed_profile_json=json.dumps(result["computed_profile"], default=str),
+        ranked_use_cases_json=json.dumps(result["ranked_use_cases"], default=str),
+        ranked_actors_json=json.dumps(result["ranked_actors"], default=str),
+        notes=body.notes or None,
+    )
+    session.add(row)
+    session.commit()
+    session.refresh(row)
+    return _serialise_assessment(row)
+
+
+@router.get("/api/cyab/systems/{system_id}/assessment")
+def list_system_assessments(
+    system_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+    limit: int = 10,
+):
+    """List per-system assessments newest-first (latest carries the
+    current ranking shown on the system detail page)."""
+    rows = (
+        session.query(CyabSystemAssessment)
+        .filter(CyabSystemAssessment.system_id == system_id)
+        .order_by(CyabSystemAssessment.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return {
+        "assessments": [_serialise_assessment(r) for r in rows],
+        "count": len(rows),
+    }
+
+
+@router.get("/api/cyab/systems/{system_id}/assessment/latest")
+def get_latest_system_assessment(
+    system_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    row = (
+        session.query(CyabSystemAssessment)
+        .filter(CyabSystemAssessment.system_id == system_id)
+        .order_by(CyabSystemAssessment.id.desc())
+        .first()
+    )
+    if not row:
+        return {"assessment": None}
+    return {"assessment": _serialise_assessment(row)}

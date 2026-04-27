@@ -15,10 +15,16 @@
         <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">CyAB</h1>
         <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Data source ingestion SLAs across all departments.</p>
       </div>
-      <button onclick="openNewSystem()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
-        <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
-        New System
-      </button>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button onclick="openAssessment()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[13px] font-semibold transition">
+          <svg class="w-3.5 h-3.5"><use href="#i-shield"/></svg>
+          Assessment
+        </button>
+        <button onclick="openNewSystem()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+          <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
+          New System
+        </button>
+      </div>
     </section>
 
     <!-- Aggregate metrics -->
@@ -99,6 +105,58 @@
         </div>
         <p id="sys-empty" class="cyab-dash-empty" style="display:none;">No systems found.</p>
     </div>
+</div>
+
+<!-- ======================== ASSESSMENT VIEW (v0.10.15) ======================== -->
+<div id="cyab-assessment" style="display:none;">
+    <section class="flex flex-wrap items-end justify-between gap-6 mb-6 rise d-1">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-3 mb-3">
+          <svg class="w-4 h-4 text-ion-iris"><use href="#i-shield"/></svg>
+          <span class="label-tiny text-ion-iris">Use-case discovery</span>
+        </div>
+        <h1 class="font-sans font-semibold text-[28px] md:text-[34px] leading-tight text-white tracking-[-0.02em]">CyAB Assessment</h1>
+        <p class="mt-2 max-w-2xl text-[13px] text-slate-400">Quick questionnaire that ranks the SOC use cases worth prioritising based on your sector, stack, controls, and concerns. Takes 5–10 minutes. Each submission is kept verbatim — re-answer to track posture over time.</p>
+      </div>
+      <button onclick="closeAssessment()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+        ← Back to dashboard
+      </button>
+    </section>
+
+    <!-- Progress strip -->
+    <div id="asmt-progress" class="cyab-asmt-progress" style="display:none;">
+        <div class="cyab-asmt-progress-track"><div id="asmt-progress-fill" class="cyab-asmt-progress-fill"></div></div>
+        <div id="asmt-progress-label" class="cyab-asmt-progress-label">Step 1 of 4</div>
+    </div>
+
+    <!-- Loading / latest summary panel -->
+    <div id="asmt-latest-panel" class="cyab-asmt-latest" style="display:none;">
+        <div class="cyab-asmt-latest-row">
+            <div>
+                <div class="label-tiny text-slate-500">Last submitted</div>
+                <div id="asmt-latest-when" class="text-[13px] text-slate-200">—</div>
+            </div>
+            <button onclick="startAssessment()" class="cyab-asmt-btn-primary">Start a new assessment</button>
+            <button onclick="viewLatestResults()" class="cyab-asmt-btn-secondary">View latest results</button>
+        </div>
+    </div>
+
+    <div id="asmt-empty-panel" class="cyab-asmt-empty" style="display:none;">
+        <p class="text-[13px] text-slate-400">No assessment yet. The questionnaire ranks SOC use cases against your org profile + threat landscape.</p>
+        <button onclick="startAssessment()" class="cyab-asmt-btn-primary" style="margin-top:0.75rem;">Start assessment</button>
+    </div>
+
+    <!-- Wizard panel -->
+    <form id="asmt-wizard" class="cyab-asmt-wizard" style="display:none;" onsubmit="return false;">
+        <div id="asmt-step-body"></div>
+        <div class="cyab-asmt-wizard-actions">
+            <button type="button" id="asmt-prev-btn" onclick="asmtPrev()" class="cyab-asmt-btn-secondary">← Back</button>
+            <button type="button" id="asmt-next-btn" onclick="asmtNext()" class="cyab-asmt-btn-primary">Next →</button>
+        </div>
+    </form>
+
+    <!-- Results panel -->
+    <div id="asmt-results" class="cyab-asmt-results" style="display:none;"></div>
 </div>
 
 <!-- ======================== DETAIL VIEW ======================== -->
@@ -929,6 +987,51 @@
 .tide-mitre-bar{flex:1;height:4px;background:var(--bg-deep);border-radius:var(--radius);overflow:hidden}
 .tide-mitre-bar-fill{height:100%;border-radius:var(--radius);transition:width .3s}
 @media(max-width:768px){.tide-mitre-grid{grid-template-columns:repeat(2,1fr)}}
+/* CyAB Assessment wizard (v0.10.15) */
+.cyab-asmt-progress{display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem}
+.cyab-asmt-progress-track{flex:1;height:6px;background:var(--bg-deep);border-radius:9999px;overflow:hidden}
+.cyab-asmt-progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--ion-iris,#a78bfa));transition:width .3s;border-radius:9999px}
+.cyab-asmt-progress-label{font-size:0.7rem;color:var(--text-muted);font-weight:600;letter-spacing:0.04em;text-transform:uppercase;white-space:nowrap}
+.cyab-asmt-latest,.cyab-asmt-empty{padding:1rem 1.25rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1rem}
+.cyab-asmt-latest-row{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.cyab-asmt-latest-row > :first-child{flex:1;min-width:120px}
+.cyab-asmt-btn-primary{background:var(--primary);color:var(--bg-deep);border:none;border-radius:var(--radius);padding:0.55rem 1.1rem;font-size:0.78rem;font-weight:600;cursor:pointer;transition:filter .15s}
+.cyab-asmt-btn-primary:hover{filter:brightness(1.1)}
+.cyab-asmt-btn-primary:disabled{opacity:0.5;cursor:not-allowed}
+.cyab-asmt-btn-secondary{background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.55rem 1.1rem;font-size:0.78rem;font-weight:600;cursor:pointer;transition:background .15s}
+.cyab-asmt-btn-secondary:hover{background:var(--bg-secondary)}
+.cyab-asmt-wizard{padding:1.5rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius)}
+.cyab-asmt-wizard-actions{display:flex;justify-content:space-between;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border)}
+.cyab-asmt-section-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin:0 0 0.25rem 0}
+.cyab-asmt-section-hint{font-size:0.75rem;color:var(--text-muted);margin:0 0 1.25rem 0}
+.cyab-asmt-q{margin-bottom:1.25rem;padding:0.85rem 1rem;background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius)}
+.cyab-asmt-q-text{font-size:0.85rem;font-weight:600;color:var(--text-primary);margin:0 0 0.65rem 0;line-height:1.4}
+.cyab-asmt-q-options{display:flex;flex-direction:column;gap:0.4rem}
+.cyab-asmt-q-options label{display:flex;align-items:center;gap:0.55rem;cursor:pointer;font-size:0.78rem;color:var(--text-secondary);padding:0.35rem 0.55rem;border-radius:var(--radius);transition:background .1s;border:1px solid transparent}
+.cyab-asmt-q-options label:hover{background:var(--primary-dim)}
+.cyab-asmt-q-options input[type=radio],.cyab-asmt-q-options input[type=checkbox]{flex-shrink:0;accent-color:var(--primary)}
+.cyab-asmt-q-options label.checked{border-color:var(--primary);background:var(--primary-dim);color:var(--text-primary)}
+.cyab-asmt-q-multi-hint{font-size:0.65rem;color:var(--text-muted);margin-top:0.4rem}
+/* Results */
+.cyab-asmt-results{padding:1.5rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius)}
+.cyab-asmt-results-section{margin-bottom:1.5rem}
+.cyab-asmt-results-section h2{font-size:1rem;font-weight:700;color:var(--text-primary);margin:0 0 0.75rem 0}
+.cyab-asmt-uc-card{padding:0.85rem 1rem;background:var(--bg-deep);border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:var(--radius);margin-bottom:0.6rem}
+.cyab-asmt-uc-header{display:flex;align-items:baseline;gap:0.6rem;margin-bottom:0.35rem;flex-wrap:wrap}
+.cyab-asmt-uc-rank{font-family:'JetBrains Mono','Fira Code',monospace;font-size:0.7rem;color:var(--text-muted);min-width:1.4rem}
+.cyab-asmt-uc-name{font-size:0.88rem;font-weight:600;color:var(--text-primary);flex:1}
+.cyab-asmt-uc-score{font-size:0.7rem;color:var(--text-secondary);background:var(--bg-secondary);padding:0.15rem 0.5rem;border-radius:9999px;font-weight:600}
+.cyab-asmt-uc-desc{font-size:0.72rem;color:var(--text-muted);margin-bottom:0.4rem;font-style:italic}
+.cyab-asmt-uc-reasons{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0.2rem}
+.cyab-asmt-uc-reasons li{font-size:0.72rem;color:var(--text-secondary);padding-left:0.6rem;position:relative}
+.cyab-asmt-uc-reasons li::before{content:'›';position:absolute;left:0;color:var(--primary)}
+.cyab-asmt-actor-card{padding:0.7rem 0.95rem;background:var(--bg-deep);border:1px solid var(--border);border-left:3px solid var(--ion-iris,#a78bfa);border-radius:var(--radius);margin-bottom:0.5rem}
+.cyab-asmt-actor-name{font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.2rem}
+.cyab-asmt-actor-why{font-size:0.72rem;color:var(--text-muted);font-style:italic}
+/* Per-system inline mini-form */
+.cyab-sys-asmt-card{padding:1rem 1.15rem;margin-top:1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius)}
+.cyab-sys-asmt-header{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;margin-bottom:0.6rem;flex-wrap:wrap}
+.cyab-sys-asmt-header h3{font-size:0.88rem;font-weight:700;color:var(--text-primary);margin:0}
 /* TIDE Baseline Coverage (v0.10.14) */
 .tide-baseline-list{display:flex;flex-direction:column;gap:0.5rem}
 .tide-baseline-summary{display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.6rem}
@@ -1198,6 +1301,8 @@ async function deleteSystem(id, name) {
 function showDashboard() {
     document.getElementById('cyab-dashboard').style.display = '';
     document.getElementById('cyab-detail').style.display = 'none';
+    var asmt = document.getElementById('cyab-assessment');
+    if (asmt) asmt.style.display = 'none';
     currentSystemId = null;
     loadDashboard();
 }
@@ -1205,7 +1310,297 @@ function showDashboard() {
 function showDetail() {
     document.getElementById('cyab-dashboard').style.display = 'none';
     document.getElementById('cyab-detail').style.display = 'flex';
+    var asmt = document.getElementById('cyab-assessment');
+    if (asmt) asmt.style.display = 'none';
     updateScore();
+}
+
+// ======================== ASSESSMENT WIZARD (v0.10.15) ========================
+// State carried across wizard steps. Reset on every fresh start.
+var asmtState = {
+    schema: null,           // { schema_version, org_questions[], system_questions[] }
+    step: 0,                // 0..N-1 (sections)
+    sections: [],           // ['Organisation profile', 'Tech stack', ...] in order
+    sectionQuestions: {},   // { sectionName: [questions] }
+    responses: {},          // { question_key: value }
+};
+
+function openAssessment() {
+    document.getElementById('cyab-dashboard').style.display = 'none';
+    document.getElementById('cyab-detail').style.display = 'none';
+    document.getElementById('cyab-assessment').style.display = '';
+    document.getElementById('asmt-wizard').style.display = 'none';
+    document.getElementById('asmt-results').style.display = 'none';
+    document.getElementById('asmt-progress').style.display = 'none';
+    asmtLoadLatest();
+}
+window.openAssessment = openAssessment;
+
+function closeAssessment() {
+    showDashboard();
+}
+window.closeAssessment = closeAssessment;
+
+async function asmtLoadLatest() {
+    var latestPanel = document.getElementById('asmt-latest-panel');
+    var emptyPanel = document.getElementById('asmt-empty-panel');
+    latestPanel.style.display = 'none';
+    emptyPanel.style.display = 'none';
+    try {
+        var res = await api.get('/api/cyab/assessment/latest');
+        var a = res.assessment;
+        if (a && a.submitted_at) {
+            var when = new Date(a.submitted_at);
+            document.getElementById('asmt-latest-when').textContent =
+                when.toLocaleString() + (a.submitted_by ? ' · user #' + a.submitted_by : '');
+            latestPanel.style.display = '';
+            asmtState._latest = a;
+        } else {
+            emptyPanel.style.display = '';
+        }
+    } catch (e) {
+        emptyPanel.style.display = '';
+    }
+}
+
+async function startAssessment() {
+    document.getElementById('asmt-latest-panel').style.display = 'none';
+    document.getElementById('asmt-empty-panel').style.display = 'none';
+    document.getElementById('asmt-results').style.display = 'none';
+    try {
+        var schema = await api.get('/api/cyab/assessment/questions');
+        asmtState.schema = schema;
+        // Group org questions by section, preserving first-seen order.
+        var sections = [];
+        var byS = {};
+        (schema.org_questions || []).forEach(function(q) {
+            var sec = q.section || 'General';
+            if (!(sec in byS)) { byS[sec] = []; sections.push(sec); }
+            byS[sec].push(q);
+        });
+        asmtState.sections = sections;
+        asmtState.sectionQuestions = byS;
+        asmtState.step = 0;
+        asmtState.responses = {};
+        asmtRenderStep();
+        document.getElementById('asmt-wizard').style.display = '';
+        document.getElementById('asmt-progress').style.display = '';
+    } catch (e) {
+        showToast('Failed to load questions: ' + (e.message || e), 'error');
+    }
+}
+window.startAssessment = startAssessment;
+
+function asmtRenderStep() {
+    var sec = asmtState.sections[asmtState.step];
+    var qs = asmtState.sectionQuestions[sec] || [];
+    var body = document.getElementById('asmt-step-body');
+    var html = '<h2 class="cyab-asmt-section-title">' + asmtEsc(sec) + '</h2>' +
+               '<p class="cyab-asmt-section-hint">Step ' + (asmtState.step + 1) +
+               ' of ' + asmtState.sections.length + '</p>';
+    qs.forEach(function(q) { html += asmtRenderQuestion(q); });
+    body.innerHTML = html;
+    // Wire change handlers
+    qs.forEach(function(q) { asmtAttachQuestionHandlers(q); });
+    // Progress bar
+    var pct = Math.round(((asmtState.step) / Math.max(1, asmtState.sections.length)) * 100);
+    document.getElementById('asmt-progress-fill').style.width = pct + '%';
+    document.getElementById('asmt-progress-label').textContent =
+        'Step ' + (asmtState.step + 1) + ' of ' + asmtState.sections.length;
+    // Buttons
+    document.getElementById('asmt-prev-btn').style.visibility = asmtState.step === 0 ? 'hidden' : '';
+    document.getElementById('asmt-next-btn').textContent =
+        asmtState.step === asmtState.sections.length - 1 ? 'Submit ✓' : 'Next →';
+}
+
+function asmtRenderQuestion(q) {
+    var name = q.key;
+    var current = asmtState.responses[name];
+    var optsHtml = (q.options || []).map(function(opt) {
+        var isMulti = q.answer_type === 'multi';
+        var inputType = isMulti ? 'checkbox' : 'radio';
+        var checked = false;
+        if (isMulti) {
+            checked = Array.isArray(current) && current.indexOf(opt.value) !== -1;
+        } else {
+            checked = current === opt.value;
+        }
+        return '<label class="' + (checked ? 'checked' : '') + '">' +
+            '<input type="' + inputType + '" name="' + asmtEsc(name) +
+                '" value="' + asmtEsc(opt.value) + '"' + (checked ? ' checked' : '') + '> ' +
+            '<span>' + asmtEsc(opt.label) + '</span>' +
+        '</label>';
+    }).join('');
+    var multiHint = '';
+    if (q.answer_type === 'multi' && q.multi_max) {
+        multiHint = '<div class="cyab-asmt-q-multi-hint">Select up to ' + q.multi_max + '</div>';
+    } else if (q.answer_type === 'multi') {
+        multiHint = '<div class="cyab-asmt-q-multi-hint">Select all that apply</div>';
+    }
+    return '<div class="cyab-asmt-q" data-key="' + asmtEsc(name) + '">' +
+        '<p class="cyab-asmt-q-text">' + asmtEsc(q.text) + '</p>' +
+        '<div class="cyab-asmt-q-options">' + optsHtml + '</div>' +
+        multiHint +
+    '</div>';
+}
+
+function asmtAttachQuestionHandlers(q) {
+    var wrap = document.querySelector('[data-key="' + q.key + '"]');
+    if (!wrap) return;
+    wrap.querySelectorAll('input').forEach(function(input) {
+        input.addEventListener('change', function() {
+            if (q.answer_type === 'multi') {
+                var checked = Array.from(wrap.querySelectorAll('input:checked'))
+                    .map(function(i) { return i.value; });
+                if (q.multi_max && checked.length > q.multi_max) {
+                    // Reject the last selection — find the just-checked item
+                    // and uncheck it.
+                    input.checked = false;
+                    showToast('Pick at most ' + q.multi_max + ' for this question.', 'info');
+                    return;
+                }
+                asmtState.responses[q.key] = checked;
+            } else {
+                asmtState.responses[q.key] = input.value;
+            }
+            // Update visual checked state on labels
+            wrap.querySelectorAll('label').forEach(function(l) {
+                var i = l.querySelector('input');
+                if (i && i.checked) l.classList.add('checked');
+                else l.classList.remove('checked');
+            });
+        });
+    });
+}
+
+function asmtPrev() {
+    if (asmtState.step > 0) {
+        asmtState.step--;
+        asmtRenderStep();
+    }
+}
+window.asmtPrev = asmtPrev;
+
+async function asmtNext() {
+    if (asmtState.step < asmtState.sections.length - 1) {
+        asmtState.step++;
+        asmtRenderStep();
+        return;
+    }
+    // Last step — submit
+    var btn = document.getElementById('asmt-next-btn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+    try {
+        var res = await api.post('/api/cyab/assessment', { responses: asmtState.responses });
+        document.getElementById('asmt-wizard').style.display = 'none';
+        document.getElementById('asmt-progress').style.display = 'none';
+        asmtRenderResults(res);
+    } catch (e) {
+        showToast('Submit failed: ' + (e.message || e), 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Submit ✓';
+    }
+}
+window.asmtNext = asmtNext;
+
+async function viewLatestResults() {
+    if (!asmtState._latest) return;
+    try {
+        // Re-fetch with results (the /latest endpoint already includes them
+        // but be defensive in case it was a cached metadata-only payload).
+        var res = await api.get('/api/cyab/assessment/' + asmtState._latest.id);
+        document.getElementById('asmt-latest-panel').style.display = 'none';
+        asmtRenderResults(res);
+    } catch (e) {
+        showToast('Failed to load results: ' + (e.message || e), 'error');
+    }
+}
+window.viewLatestResults = viewLatestResults;
+
+function asmtRenderResults(asmt) {
+    var ucs = asmt.ranked_use_cases || [];
+    var actors = asmt.ranked_actors || [];
+    var profile = asmt.computed_profile || {};
+
+    var ucHtml = ucs.length > 0
+        ? ucs.map(function(uc, i) {
+            var reasons = (uc.reasons || []).map(function(r) {
+                return '<li>' + asmtEsc(r) + '</li>';
+            }).join('');
+            return '<div class="cyab-asmt-uc-card">' +
+                '<div class="cyab-asmt-uc-header">' +
+                    '<span class="cyab-asmt-uc-rank">#' + (i + 1) + '</span>' +
+                    '<span class="cyab-asmt-uc-name">' + asmtEsc(uc.name || '') + '</span>' +
+                    '<span class="cyab-asmt-uc-score">' + (uc.score || 0) + ' / 100</span>' +
+                '</div>' +
+                (uc.description
+                    ? '<div class="cyab-asmt-uc-desc">' + asmtEsc(uc.description) + '</div>'
+                    : '') +
+                (reasons ? '<ul class="cyab-asmt-uc-reasons">' + reasons + '</ul>' : '') +
+            '</div>';
+        }).join('')
+        : '<p style="color:var(--text-muted);font-size:0.8rem;">No TIDE playbooks available — check TIDE connectivity in Integrations.</p>';
+
+    var actorsHtml = actors.length > 0
+        ? actors.map(function(a) {
+            return '<div class="cyab-asmt-actor-card">' +
+                '<div class="cyab-asmt-actor-name">' + asmtEsc(a.name || '') + '</div>' +
+                '<div class="cyab-asmt-actor-why">' + asmtEsc(a.why || '') + '</div>' +
+            '</div>';
+        }).join('')
+        : '';
+
+    var when = asmt.submitted_at ? new Date(asmt.submitted_at).toLocaleString() : '—';
+    var weakHtml = '';
+    if (profile.weak_controls && profile.weak_controls.length > 0) {
+        weakHtml = '<p style="font-size:0.78rem;color:var(--text-secondary);margin:0.5rem 0;">' +
+            'Weak/missing controls: ' + profile.weak_controls.map(function(w) {
+                return '<code>' + asmtEsc(w.replace('_weak','')) + '</code>';
+            }).join(', ') + '</p>';
+    }
+
+    var html =
+        '<div class="cyab-asmt-results-section">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;flex-wrap:wrap;gap:0.5rem;">' +
+                '<div>' +
+                    '<h2>Profile snapshot</h2>' +
+                    '<p style="font-size:0.7rem;color:var(--text-muted);margin:0;">Submitted ' + asmtEsc(when) + '</p>' +
+                '</div>' +
+                '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;">' +
+                    '<button onclick="startAssessment()" class="cyab-asmt-btn-secondary">Re-take</button>' +
+                    '<button onclick="closeAssessment()" class="cyab-asmt-btn-primary">Done</button>' +
+                '</div>' +
+            '</div>' +
+            '<p style="font-size:0.78rem;color:var(--text-secondary);margin:0;">' +
+                'Sector: <strong>' + asmtEsc(profile.sector || '—') + '</strong> · ' +
+                'Public profile: <strong>' + asmtEsc(profile.public_profile || '—') + '</strong> · ' +
+                'Stack platforms: <code>' + asmtEsc((profile.stack_platforms || []).join(', ') || '—') + '</code>' +
+            '</p>' +
+            weakHtml +
+        '</div>' +
+        '<div class="cyab-asmt-results-section">' +
+            '<h2>Top use cases to focus on</h2>' +
+            ucHtml +
+        '</div>';
+    if (actorsHtml) {
+        html += '<div class="cyab-asmt-results-section">' +
+            '<h2>Threat actors most likely to target you</h2>' +
+            actorsHtml +
+        '</div>';
+    }
+
+    var panel = document.getElementById('asmt-results');
+    panel.innerHTML = html;
+    panel.style.display = '';
+}
+
+function asmtEsc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, function(c) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
 }
 
 function openNewSystem() {

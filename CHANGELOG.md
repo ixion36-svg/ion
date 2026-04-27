@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.10.15 (2026-04-27)
+
+### CyAB use-case discovery questionnaire — Stream B foundation
+
+New "Assessment" entry-point on the CyAB landing page. A 4-step wizard captures the org's profile (sector, geo, regulated data, public exposure), tech stack (endpoint OS, cloud, identity, email, OT), existing controls (MFA, EDR, backup, awareness), and concerns (top 3 worries, prior incidents, internet exposure) — 17 questions total, mostly yes/no/dropdown so a non-technical respondent can answer in 5–10 minutes.
+
+Submit → ranked top-10 SOC use cases pulled from TIDE's playbook catalogue, each with a score breakdown and human-readable "why this is here" reasons (`You marked 'ransomware' as a top concern`, `MFA control is weak — this playbook covers techniques that exploit that gap`). Plus top-5 threat actors curated by sector with rationale.
+
+Scoring is four weighted sub-scores (out of 100):
+- **TA** (threat-actor relevance, 0–40) — sector-implied concern keywords + prior-incident keywords + public-profile multiplier
+- **ST** (stack applicability, 0–20) — playbook platform mentions vs answered stack
+- **CG** (control-gap penalty, 0–20) — boost when weak controls overlap with playbook coverage
+- **CB** (concern boost, 0–20) — direct keyword match of top-concern values against playbook name/description
+
+### Models + persistence
+
+Two new tables (created via `create_all` on first boot — no migration needed):
+- `cyab_assessments` — org-wide submissions; **immutable**, one row per submit
+- `cyab_system_assessments` — per-`CyabSystem` overlays; same immutability shape; nullable FK to the org-assessment that was current at submit
+
+Every submission stores `responses_json`, `computed_profile_json`, `ranked_use_cases_json`, and `ranked_actors_json`. Older versions stay queryable for trending posture quarter-over-quarter.
+
+`schema_version` column tracks which question set the responses were captured against, so future tweaks to the question list don't break replay of older submissions.
+
+### Endpoints
+
+- `GET /api/cyab/assessment/questions` — current question schema
+- `POST /api/cyab/assessment` — submit + compute results
+- `GET /api/cyab/assessment` — list past submissions (no result blob)
+- `GET /api/cyab/assessment/latest` — most recent with results
+- `GET /api/cyab/assessment/{id}` — full detail
+- `POST /api/cyab/systems/{system_id}/assessment` — per-system submit (overlays latest org profile)
+- `GET /api/cyab/systems/{system_id}/assessment` — per-system list
+- `GET /api/cyab/systems/{system_id}/assessment/latest` — per-system latest
+
+### Out of scope this ship — coming in v0.10.16
+- **Per-system assessment UI** — model + endpoint + scoring work end-to-end via the API, but the per-system 8-question wizard isn't wired into the system detail page yet. Use the org-wide assessment now; per-system overlays land next ship.
+- **Trending UI** — past submissions are persisted but no diff-vs-previous view yet.
+- **OpenCTI cross-reference** — actor list is sector-curated for MVP; OpenCTI lookup is in the design but deferred (sector + concern-driven curation already works for typical SOCs).
+
+### Upgrade
+Drop in `ion:0.10.15` — no schema migration, no `.env` change. Both new tables auto-create on first boot.
+
 ## v0.10.14 (2026-04-27)
 
 ### CyAB system detail — baseline coverage view (replaces MITRE heatmap)
