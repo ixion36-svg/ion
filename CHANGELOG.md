@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.10.18 (2026-04-27)
+
+### Daily Standup DC/WEF checks — configurable + diagnostic
+
+The Domain Controllers and Windows Event Forwarding widgets on `/standup` were silently rendering "No host data" in environments where:
+
+1. The host-name patterns didn't match (`*DCS*` / `*WEF*` were hard-coded)
+2. The ES field name was something other than `host.hostname.keyword` (e.g. `winlog.computer_name.keyword`, `agent.name.keyword`)
+3. Events lived in a different index pattern than `winlogbeat-*` (e.g. `logs-windows.*`, `filebeat-*`, `.ds-logs-windows-*`)
+4. ES was unreachable / auth was failing — the error response was masked as empty hosts
+
+All four cases produced the same "No host data" UI, with no way to tell them apart.
+
+#### Backend
+
+`_check_log_source_health` is now driven by four env vars:
+- `ION_STANDUP_LOG_INDEX` (default `winlogbeat-*`)
+- `ION_STANDUP_HOST_FIELD` (default `host.hostname.keyword`)
+- `ION_STANDUP_DCS_HOSTS` (default `*DCS*`) — comma-separated, OR'd together
+- `ION_STANDUP_WEF_HOSTS` (default `*WEF*`) — same shape
+
+Multiple patterns are allowed per check (e.g. `*DCS*,*DC*,*DOMAIN*`) — the query becomes a `bool > should` with `minimum_should_match: 1`.
+
+Response now includes a `diag` block with the index, field, patterns, total hits, and host count actually used. Error responses include `type(e).__name__` so `ConnectError` / `TimeoutError` / `AuthenticationError` are distinguishable.
+
+#### UI
+
+`renderLogHealth` (in `daily_standup.html`) now distinguishes four states:
+- **`status === 'error'`** → red banner with the actual error text
+- **`status === 'not_configured'`** → amber banner with a hint to set env vars
+- **Empty `hosts: []`** → existing "No host data" message **plus a diagnostic footer**: `Queried winlogbeat-* for host.hostname.keyword matching *DCS* · 0 hits / 0 hosts`
+- **Hosts present** → existing widget grid, unchanged
+
+The diagnostic footer is the load-bearing change — operators can see exactly what was queried and adjust env vars accordingly without redeploying.
+
+#### Upgrade
+Drop in `ion:0.10.18`. No schema changes. Defaults preserve v0.10.17 behaviour exactly. Set `ION_STANDUP_*` in `.env` if your hostnames or indices don't match the defaults.
+
 ## v0.10.17 (2026-04-27)
 
 ### CyAB onboarding wizard — full system creation in one transaction

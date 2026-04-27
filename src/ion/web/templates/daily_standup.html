@@ -425,17 +425,58 @@ function renderStaleCases(data) {
   }).join('');
 }
 
-/* ── S4: Log Health (DC + WEF) — RAG widget cards ── */
+/* ── S4: Log Health (DC + WEF) — RAG widget cards ──
+   v0.10.18: distinguish error / not_configured / empty so silent ES
+   misconfig (wrong field, wrong index, auth fail) doesn't masquerade as
+   "no hosts matched". The diag block from the API tells the operator
+   exactly what was queried so they can adjust ION_STANDUP_* env vars. */
 function renderLogHealth(prefix, data) {
   document.getElementById(prefix + '-total').textContent = (data.total_events_24h ?? data.total_events ?? '--').toLocaleString();
   document.getElementById(prefix + '-gaps').textContent  = data.hosts_with_gaps ?? '--';
   document.getElementById(prefix + '-below').textContent = data.hosts_below_average ?? data.hosts_below_avg ?? '--';
 
-  const hosts = data.hosts || [];
   const grid = document.getElementById(prefix + '-hosts-grid');
+  if (!grid) return;
+  const overallLight = document.getElementById(prefix + '-overall-light');
+
+  function diagFooter(d) {
+    if (!d) return '';
+    var pats = (d.patterns || []).map(function(p) { return '<code class="text-slate-400">' + esc(p) + '</code>'; }).join(', ') || '<em>none</em>';
+    return '<div class="text-[10px] text-slate-600 col-span-full mt-2 text-center">' +
+           'Queried <code class="text-slate-400">' + esc(d.index || '—') + '</code>' +
+           ' for <code class="text-slate-400">' + esc(d.host_field || '—') + '</code>' +
+           ' matching ' + pats +
+           ' &middot; ' + (d.total_hits || 0).toLocaleString() + ' hits / ' +
+           (d.host_count || 0) + ' hosts' +
+           '</div>';
+  }
+
+  // Error states — paint the overall light red and surface the cause.
+  if (data && data.status === 'error') {
+    if (overallLight) overallLight.className = 'ds-rag-light ds-rag-red';
+    grid.innerHTML =
+      '<div class="col-span-full py-3 px-3 rounded border border-red-500/30 bg-red-500/10 text-[12px] text-red-300">' +
+        '<strong>Elasticsearch query failed.</strong> ' + esc(data.error || 'unknown error') +
+      '</div>' + diagFooter(data.diag);
+    return;
+  }
+  if (data && data.status === 'not_configured') {
+    if (overallLight) overallLight.className = 'ds-rag-light ds-rag-amber';
+    grid.innerHTML =
+      '<div class="col-span-full py-3 px-3 rounded border border-amber-500/30 bg-amber-500/10 text-[12px] text-amber-200">' +
+        '<strong>Not configured.</strong> ' + esc(data.error || 'Set ION_ELASTICSEARCH_URL and ION_STANDUP_* env vars.') +
+      '</div>' + diagFooter(data.diag);
+    return;
+  }
+
+  const hosts = data.hosts || [];
 
   if (!hosts.length) {
-    grid.innerHTML = '<div class="text-slate-500 text-[11px] col-span-full text-center py-4">No host data</div>';
+    if (overallLight) overallLight.className = 'ds-rag-light ds-rag-amber';
+    grid.innerHTML =
+      '<div class="text-slate-500 text-[11px] col-span-full text-center py-3">' +
+        'No host data — patterns matched zero hosts in the last 24 h.' +
+      '</div>' + diagFooter(data.diag);
     return;
   }
 

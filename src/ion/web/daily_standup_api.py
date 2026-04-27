@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import json
+import os
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
 
@@ -17,6 +18,49 @@ from ion.models.user import User
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/daily-standup", tags=["daily-standup"])
+
+
+# ── Log-source health config (v0.10.18) ───────────────────────────────────
+#
+# The DC/WEF checks were originally hard-coded to query winlogbeat-* for
+# host.hostname.keyword matching the literal substrings DCS / WEF. Real
+# deployments name their hosts differently (e.g. `corp-dc-01`, `evtfwd-prd`)
+# AND store events in different indices (`logs-windows.*-`, `filebeat-*`,
+# custom data streams). These four env vars let operators point the checks
+# at their actual data without code edits.
+#
+# All defaults preserve v0.10.17 behaviour exactly.
+
+def _parse_patterns(raw: str) -> List[str]:
+    """Split comma- or whitespace-separated patterns, drop blanks."""
+    if not raw:
+        return []
+    parts: List[str] = []
+    for chunk in raw.replace(";", ",").split(","):
+        for sub in chunk.strip().split():
+            s = sub.strip()
+            if s:
+                parts.append(s)
+    return parts
+
+
+def _standup_log_index() -> str:
+    return os.environ.get("ION_STANDUP_LOG_INDEX", "winlogbeat-*").strip() or "winlogbeat-*"
+
+
+def _standup_host_field() -> str:
+    return (
+        os.environ.get("ION_STANDUP_HOST_FIELD", "host.hostname.keyword").strip()
+        or "host.hostname.keyword"
+    )
+
+
+def _standup_dcs_patterns() -> List[str]:
+    return _parse_patterns(os.environ.get("ION_STANDUP_DCS_HOSTS", "*DCS*"))
+
+
+def _standup_wef_patterns() -> List[str]:
+    return _parse_patterns(os.environ.get("ION_STANDUP_WEF_HOSTS", "*WEF*"))
 
 
 # ── Internal check helpers ────────────────────────────────────────────────
@@ -135,28 +179,66 @@ async def _check_stale_cases() -> Dict[str, Any]:
         session.close()
 
 
-async def _check_log_source_health(host_pattern: str, label: str) -> Dict[str, Any]:
-    """Check winlogbeat-* for a host pattern, compare to 7-day average, find gaps."""
+async def _check_log_source_health(
+    patterns: List[str],
+    label: str,
+    *,
+    index: Optional[str] = None,
+    host_field: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Check `index` for hosts matching any of `patterns`, compare to 7-day average, find gaps.
+
+    v0.10.18: ``patterns`` is now a list (multiple wildcards OR'd together)
+    and ``index`` + ``host_field`` are configurable. Returns a ``diag``
+    block in the response so the UI can show ``Queried X for Y → N hosts``
+    when nothing comes back — the v0.10.17 silent-empty masked field-name
+    and index mismatches.
+    """
     from ion.services.elasticsearch_service import ElasticsearchService
+
+    index = index or _standup_log_index()
+    host_field = host_field or _standup_host_field()
+    diag: Dict[str, Any] = {
+        "index": index,
+        "host_field": host_field,
+        "patterns": list(patterns),
+        "total_hits": 0,
+        "host_count": 0,
+    }
 
     es = ElasticsearchService()
     if not es.is_configured:
-        return {"label": label, "status": "not_configured"}
+        return {"label": label, "status": "not_configured", "diag": diag}
+
+    if not patterns:
+        return {
+            "label": label,
+            "status": "not_configured",
+            "error": f"No host patterns configured (set ION_STANDUP_DCS_HOSTS / ION_STANDUP_WEF_HOSTS)",
+            "diag": diag,
+        }
+
+    # Build a `should`-clause across all supplied patterns. minimum_should_match=1
+    # means ANY pattern hit qualifies — operators can safely list "*DCS*", "*DC*"
+    # without one swallowing the other.
+    should_clauses = [{"wildcard": {host_field: p}} for p in patterns]
+
     try:
         # Last 24 h event count per host matching pattern
         body_24h = {
             "size": 0,
             "query": {
                 "bool": {
-                    "must": [
-                        {"wildcard": {"host.hostname.keyword": host_pattern}},
+                    "should": should_clauses,
+                    "minimum_should_match": 1,
+                    "filter": [
                         {"range": {"@timestamp": {"gte": "now-24h", "lte": "now"}}},
-                    ]
+                    ],
                 }
             },
             "aggs": {
                 "hosts": {
-                    "terms": {"field": "host.hostname.keyword", "size": 500},
+                    "terms": {"field": host_field, "size": 500},
                     "aggs": {
                         "hourly": {
                             "date_histogram": {"field": "@timestamp", "fixed_interval": "1h"}
@@ -166,7 +248,7 @@ async def _check_log_source_health(host_pattern: str, label: str) -> Dict[str, A
             },
         }
         result_24h = await es._request(
-            "POST", "/winlogbeat-*/_search?ignore_unavailable=true", json=body_24h
+            "POST", f"/{index}/_search?ignore_unavailable=true", json=body_24h
         )
 
         # 7-day average for comparison
@@ -174,20 +256,21 @@ async def _check_log_source_health(host_pattern: str, label: str) -> Dict[str, A
             "size": 0,
             "query": {
                 "bool": {
-                    "must": [
-                        {"wildcard": {"host.hostname.keyword": host_pattern}},
+                    "should": should_clauses,
+                    "minimum_should_match": 1,
+                    "filter": [
                         {"range": {"@timestamp": {"gte": "now-7d", "lte": "now"}}},
-                    ]
+                    ],
                 }
             },
             "aggs": {
                 "hosts": {
-                    "terms": {"field": "host.hostname.keyword", "size": 500},
+                    "terms": {"field": host_field, "size": 500},
                 }
             },
         }
         result_7d = await es._request(
-            "POST", "/winlogbeat-*/_search?ignore_unavailable=true", json=body_7d
+            "POST", f"/{index}/_search?ignore_unavailable=true", json=body_7d
         )
 
         hosts_24h: Dict[str, Dict[str, Any]] = {}
@@ -230,17 +313,28 @@ async def _check_log_source_health(host_pattern: str, label: str) -> Dict[str, A
             )
 
         total_24h = result_24h.get("hits", {}).get("total", {}).get("value", 0)
+        diag["total_hits"] = total_24h
+        diag["host_count"] = len(hosts_24h)
         return {
             "label": label,
+            "status": "ok",
             "total_events_24h": total_24h,
             "host_count": len(hosts_24h),
             "hosts_with_gaps": len(gaps),
             "hosts_below_average": sum(1 for h in host_summaries if h["below_average"]),
             "hosts": sorted(host_summaries, key=lambda h: h["status"] != "ok", reverse=True),
             "gaps": gaps,
+            "diag": diag,
         }
     except Exception as e:
-        return {"label": label, "status": "error", "error": str(e)[:200]}
+        # type(e).__name__ in the message so connection-vs-auth-vs-query
+        # failures are distinguishable in the UI banner.
+        return {
+            "label": label,
+            "status": "error",
+            "error": f"{type(e).__name__}: {str(e)[:180]}",
+            "diag": diag,
+        }
 
 
 async def _check_rule_failures() -> Dict[str, Any]:
@@ -328,8 +422,8 @@ async def get_daily_checks(
         _check_cluster_health(),
         _check_critical_alerts(),
         _check_stale_cases(),
-        _check_log_source_health("*DCS*", "Domain Controllers"),
-        _check_log_source_health("*WEF*", "Windows Event Forwarding"),
+        _check_log_source_health(_standup_dcs_patterns(), "Domain Controllers"),
+        _check_log_source_health(_standup_wef_patterns(), "Windows Event Forwarding"),
         _check_rule_failures(),
         return_exceptions=True,
     )
