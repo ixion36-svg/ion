@@ -491,7 +491,938 @@ a fundamental rule change.
         points=2,
     )
 
-    print(f"  L1: {course.title} — 1 module, 3 lessons")
+    # ── Module 2 — SIEM Fundamentals (v0.11.5) ───────────────────────────
+    # Authored at BTL1/SANS-equivalent depth. ECS-first throughout — every
+    # KQL snippet uses ECS field names since ION integrates with Elastic.
+    mod2 = _add_module(
+        session, course, order=2,
+        title="SIEM Fundamentals",
+        description_md=(
+            "Pipeline anatomy, the ECS data model, KQL queries, and the "
+            "cluster-investigation pattern. By the end of this module you "
+            "can read a Wazuh-sourced alert document, pivot in Kibana, and "
+            "hand a clean timeline to L2."
+        ),
+        estimated_minutes=180,
+    )
+
+    m2l1 = _add_lesson(
+        session, mod2, order=1,
+        title="What a SIEM is and how data flows through it",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Name the six stages of the SIEM pipeline (ingest → parse → normalise → store → query → alert) and identify which Elastic Stack component owns each
+> 2. Distinguish a SIEM from a plain log aggregator using at least three concrete capability differences
+> 3. Compare cloud-native, on-prem, and hybrid SIEM architectures in terms an L1 cares about (data residency, latency, what you can self-serve vs escalate)
+> 4. Trace a single Windows Security event from generation on the endpoint to visibility in Kibana
+> 5. Identify the failure modes at each pipeline stage that an L1 is likely to notice
+>
+> **Prerequisites.** Module 1 *Alert Triage Fundamentals* completed.
+
+## The six-stage pipeline
+
+A SIEM is not a single product — it's a pipeline that ingests events from heterogeneous sensors, normalises them into a shared schema, stores them in a queryable substrate, and runs detection logic on top. Memorise the six stages — every SIEM you encounter in your career maps onto them:
+
+```mermaid
+flowchart LR
+    subgraph Endpoint
+        A[Sysmon / Security<br/>Event Log] --> B[Winlogbeat]
+        C[auditd / syslog] --> D[Filebeat /<br/>Auditbeat]
+        E[NIC mirror] --> F[Packetbeat]
+    end
+    B --> G[Ingest pipeline<br/>ECS normaliser]
+    D --> G
+    F --> G
+    G --> H[(Elasticsearch<br/>data streams)]
+    H --> I[Kibana Discover]
+    H --> J[Detection engine<br/>scheduled rules]
+    J --> K[(.alerts-security.<br/>alerts-default)]
+    K --> L[ION case ingest]
+    L --> M[Tier-1 analyst]
+```
+
+1. **Ingest** — A sensor (Sysmon, auditd, a firewall, a cloud audit log) emits an event. A shipper picks it up and forwards it. In ION's deployment that's `winlogbeat`, `filebeat`, `packetbeat`, `auditbeat`, or the Wazuh agent.
+2. **Parse** — The raw event (XML for Windows, syslog text for Linux, JSON for cloud) is broken into key/value pairs. In Elastic this happens via Beats processors, ingest pipelines, or Logstash filters. The output is structured but not yet schema-conformant.
+3. **Normalise** — Fields are renamed and re-typed to the canonical schema. ECS is the canonical schema for the Elastic Stack; CIM is the equivalent for Splunk. After this stage, a Windows logon and a Linux SSH login both produce documents with `event.category: ["authentication"]` and `user.name`.
+4. **Store** — Documents are written to a time-series index. Elasticsearch uses index lifecycle management (ILM) to roll indices over (e.g. `winlogbeat-*` becomes `.ds-winlogbeat-2026.04.23-000001`).
+5. **Query** — Analysts and detection rules read the indices via Kibana Discover, Lens, or the search API.
+6. **Alert** — Detection logic (Elastic detection rules, Wazuh rules, EQL queries) runs on a schedule, evaluates conditions, and emits alert documents into a separate index (`.alerts-security.alerts-default`) which ION ingests as cases.
+
+When an alert *doesn't* fire, the failure is almost always at parse, normalise, or query stage. **An L1 who can localise the failure to a stage is already more useful than one who can't.**
+
+## Worked example — tracing a 4625 from endpoint to Kibana
+
+A Windows host `WS-FIN-014.corp.example.org` has a failed logon. Walk through the pipeline:
+
+```mermaid
+sequenceDiagram
+    participant EP as Endpoint
+    participant WB as Winlogbeat
+    participant ES as Elasticsearch
+    participant DR as Detection rule
+    participant ION as ION
+    participant L1 as L1 Analyst
+    EP->>WB: EventID 4625
+    WB->>WB: Parse XML, apply ECS module
+    WB->>ES: POST winlogbeat-* doc
+    Note right of ES: stage: store
+    DR->>ES: every 5min: query last 15min<br/>event.code:"4625" group by source.ip
+    ES-->>DR: 14 hits, src 10.42.7.91
+    DR->>ES: write .alerts-security doc
+    ES-->>ION: alert pulled into case
+    ION->>L1: Case CRIT-2026-04123 opened
+    L1->>ES: Discover pivot: source.ip:"10.42.7.91"
+```
+
+- **Ingest:** Windows writes EventID 4625 to the `Security` channel; `winlogbeat` reads it via `winlogbeat.event_logs` configuration and forwards it.
+- **Parse:** The Beat's Windows module decodes the event XML and extracts `winlog.event_id: "4625"`, `winlog.event_data.TargetUserName: "j.smith"`, `winlog.event_data.IpAddress: "10.42.7.91"`.
+- **Normalise:** The module's ECS processor sets `event.code: "4625"`, `event.action: "logon-failed"`, `event.category: ["authentication"]`, `event.outcome: "failure"`, `user.name: "j.smith"`, `source.ip: "10.42.7.91"`, `host.name: "WS-FIN-014"`.
+- **Store:** The document lands in the data stream backing `winlogbeat-*`, with `@timestamp` set to the event's UTC timestamp.
+- **Query:** Analyst opens Discover with index pattern `winlogbeat-*` and filters `event.code : "4625" and host.name : "WS-FIN-014"`.
+- **Alert:** A detection rule "Multiple Logon Failures from Same Source" runs every 5 minutes, queries the last 15 minutes for `event.code : "4625"` grouped by `source.ip`, and fires when count > 10. The alert document appears in `.alerts-security.alerts-default` and ION pulls it into a case.
+
+## SIEM versus log aggregator
+
+Every shop has a graveyard of "we'll just grep the logs" projects. A SIEM differs from a flat log aggregator (rsyslog-on-a-box, Loki, plain S3) along five axes:
+
+1. **Schema enforcement** — ECS or CIM means a query for `user.name : "alice"` returns Windows logons, SSH logins, and AWS API calls in one result set. Aggregators preserve raw text; you'd have to know each format.
+2. **Detection engine** — A SIEM runs scheduled rules with state (deduplication, suppression, throttling). An aggregator can be hooked up to alerting, but the rule logic, exception handling, and alert document format are bolted on.
+3. **Enrichment** — Threat-intel lookups, GeoIP, asset criticality, user identity attributes — applied at ingest or query time. ION's TIDE/OpenCTI integration enriches IOCs at query time.
+4. **Workflow** — Alert states (acknowledged, in-progress, closed), assignments, comments, runbooks, case handoff. The alert is treated as a long-lived object, not a transient log line.
+5. **Retention tiers** — Hot/warm/cold/frozen storage with ILM. Aggregators usually do not separate detection-relevant retention from compliance retention.
+
+ION layers cases, AI summaries, and ticker workflow on top of an Elastic SIEM, so the SIEM-vs-aggregator distinction matters: when an analyst says *"the data isn't in the SIEM"*, they may mean it's in raw log storage but never normalised. That's a real and recoverable failure, but it requires a different fix than *"the alert didn't fire"*.
+
+## Architectures: cloud, on-prem, hybrid
+
+Three deployment patterns dominate. An L1 should know which one their employer runs because it changes day-to-day workflow:
+
+- **Cloud-native SIEM** — Elastic Cloud, Microsoft Sentinel, Chronicle, Sumo Logic. Storage and compute are vendor-managed. Ingest happens via cloud-side endpoints; on-prem assets ship via agents over TLS. **Pros:** scales without ops effort, vendor handles ILM and shard math. **Cons:** egress costs, data-residency concerns, less visibility into the underlying cluster when something breaks.
+- **On-prem SIEM** — Self-hosted Elasticsearch, Splunk Enterprise, Wazuh manager. Common in regulated industries (healthcare, defence, finance). ION's reference deployment is on-prem-style: a Docker-Compose Elastic + Wazuh stack inside the customer environment. **Pros:** full control over data, no egress, integration with on-prem identity (Keycloak, AD). **Cons:** ops burden — you're responsible for cluster health, backups, ILM tuning.
+- **Hybrid** — A common real-world shape: Wazuh manager on-prem ingesting endpoint events, forwarding alerts to a cloud-hosted Elastic for long-term retention and cross-tenant search.
+
+For an L1, the architecture decision affects: (1) where to look when ingest is delayed (which queue is backed up?), (2) which hostname to use when contacting an asset (the SIEM's view may lag DHCP), (3) what you can self-serve versus what requires the platform team. ION analysts working an on-prem deployment can typically check `docker compose ps` on the SIEM host themselves; analysts on a cloud deployment cannot and must escalate.
+
+## Worked example — "the dashboard says zero events"
+
+Analyst sees `WS-MKT-022` is missing from the asset-coverage dashboard. They check Discover with `host.name : "WS-MKT-022"` over the last 24 hours and see 12,000 events. The dashboard's saved search is filtered on a custom field `asset.criticality : "high"` which is populated by an enrichment pipeline. The host's enrichment record was deleted last week. The pipeline flaw is at the **enrichment** stage — events are flowing, the schema is intact, but the dashboard's filter condition is no longer satisfied. The correct action is to escalate to the detection-engineering team for enrichment repair, not to chase the host as "offline".
+
+## Glossary
+
+- **ECS (Elastic Common Schema)** — Open schema defining canonical field names for security and observability data
+- **Beats** — Lightweight Elastic shippers (Winlogbeat, Filebeat, Packetbeat, Auditbeat)
+- **Ingest pipeline** — Server-side document processor in Elasticsearch that runs before storage
+- **ILM (Index Lifecycle Management)** — Elasticsearch policy mechanism for hot/warm/cold/frozen tier transitions
+- **Data stream** — Append-only abstraction over rolling indices; `winlogbeat-*` is a data stream alias
+- **CIM (Common Information Model)** — Splunk's equivalent of ECS
+- **Detection rule** — Scheduled query that emits an alert document when its condition is satisfied
+- **Sensor** — Source of telemetry (Sysmon, auditd, NetFlow exporter)
+- **Shipper** — Agent forwarding events from sensor to SIEM
+- **Wazuh manager** — Open-source HIDS that produces alert documents consumable by Elastic
+- **Hybrid SIEM** — Architecture mixing on-prem ingest with cloud retention/search
+
+## Further reading
+
+- Elastic Common Schema reference: https://www.elastic.co/guide/en/ecs/current/index.html
+- Elastic Beats overview: https://www.elastic.co/guide/en/beats/libbeat/current/beats-reference.html
+- Wazuh integration with Elastic Stack: https://documentation.wazuh.com/current/installation-guide/wazuh-indexer/index.html
+- BTL1 syllabus: SIEM Domain — Investigating with Splunk / ELK
+- SANS GCIH KSA: Domain 1 — Log Analysis Fundamentals
+""",
+    )
+
+    # Quiz on Lesson 1
+    m2l1q = _add_lesson(
+        session, mod2, order=2,
+        title="Pipeline + architecture quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md=(
+            "Five questions on the pipeline stages, SIEM-vs-aggregator differences, "
+            "and ION's deployment architecture. Pass threshold matches the course "
+            "default — re-read Lesson 1 if you fall short."
+        ),
+    )
+    _add_q(session, m2l1q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Which Elastic Stack component is responsible for the **normalise** stage of the SIEM pipeline?",
+        options=[
+            {"value": "kibana", "label": "Kibana"},
+            {"value": "beats_modules", "label": "Beats modules / ingest pipelines"},
+            {"value": "detection_engine", "label": "The detection engine"},
+            {"value": "ilm", "label": "ILM (Index Lifecycle Management)"},
+        ],
+        correct="beats_modules",
+        explanation_md="**Beats modules** (or Logstash filters / ingest pipelines) apply the ECS schema during ingest. Kibana queries the normalised data and ILM manages index rollover; neither performs normalisation itself.",
+        points=2,
+    )
+    _add_q(session, m2l1q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which capabilities differentiate a SIEM from a plain log aggregator? Pick all that apply.",
+        options=[
+            {"value": "schema", "label": "Schema normalisation"},
+            {"value": "rules", "label": "Scheduled detection rules with suppression"},
+            {"value": "compression", "label": "Compression of stored data"},
+            {"value": "workflow", "label": "Alert lifecycle workflow"},
+            {"value": "tiers", "label": "Hot/warm/cold retention tiers"},
+        ],
+        correct=["schema", "rules", "workflow", "tiers"],
+        explanation_md="Compression is a property of any storage system. The other four capture the value SIEMs add over flat aggregators — schema enforcement, stateful detection, workflow, and tiered retention.",
+        points=3,
+    )
+    _add_q(session, m2l1q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="A failed alert can always be diagnosed by checking whether the underlying events arrived in the index.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** Events may be present but with the wrong schema (parse/normalise failure), or the rule's filter context may exclude them, or the rule may have run during a query-stage outage. Index presence is necessary but not sufficient.",
+        points=1,
+    )
+    _add_q(session, m2l1q, order=4, kind=QuestionKind.SINGLE,
+        stem_md="ION ingests its cases from which Elasticsearch index family by default?",
+        options=[
+            {"value": "winlogbeat", "label": "winlogbeat-*"},
+            {"value": "filebeat", "label": "filebeat-*"},
+            {"value": "alerts", "label": ".alerts-security.alerts-default"},
+            {"value": "metrics", "label": "metrics-*"},
+        ],
+        correct="alerts",
+        explanation_md="Detection rules write to the alerts data stream; ION pulls cases from there, not from the raw Beats indices.",
+        points=2,
+    )
+    _add_q(session, m2l1q, order=5, kind=QuestionKind.SHORTANSWER,
+        stem_md="Name two architectural advantages of an on-prem SIEM relative to a cloud-native one.",
+        options=None,
+        correct=["data residency, no egress costs", "no egress, on-prem identity", "data residency, identity integration", "control over retention, no egress"],
+        explanation_md="Acceptable answers: data residency / no egress costs, tighter integration with on-prem identity providers (AD, Keycloak), full control over retention. Any two are correct.",
+        points=2,
+    )
+
+    # Lesson 2 — ECS data model
+    m2l2 = _add_lesson(
+        session, mod2, order=3,
+        title="Speaking ECS — the data model L1 lives in",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Recall the ten core ECS fields used in 90% of L1 triage queries and identify their data type
+> 2. Map a Windows Security event, a Linux auditd record, and a Sysmon process-creation event to their ECS representations
+> 3. Recognise common ECS pitfalls (case sensitivity, multi-value fields, `event.action` vs `event.code`)
+> 4. Translate between Wazuh `rule.*` fields and ECS `event.*` fields
+> 5. Validate an unfamiliar field by checking the ECS reference rather than guessing
+
+## The ten fields you'll type every shift
+
+ECS defines hundreds of fields, but L1 triage hinges on a small set. Memorise these:
+
+| Field | Type | Meaning | Example |
+| --- | --- | --- | --- |
+| `@timestamp` | date | UTC timestamp of the event itself, not of ingest | `2026-04-23T08:14:22.331Z` |
+| `host.name` | keyword | Hostname per the host's own metadata | `WS-FIN-014` |
+| `user.name` | keyword | Acting user (logged-on, executing, authenticating) | `j.smith` |
+| `source.ip` | ip | Source IP of an event with directionality | `10.42.7.91` |
+| `destination.ip` | ip | Destination IP | `185.220.101.7` |
+| `process.name` | keyword | Executable name without path | `powershell.exe` |
+| `process.command_line` | keyword | Full command line as launched | `powershell.exe -enc JABh...` |
+| `process.parent.name` | keyword | Parent process name | `winword.exe` |
+| `event.action` | keyword | Source-agnostic action verb | `logon-failed`, `process-started` |
+| `event.code` | keyword | Source-specific code | `4625`, `1` (Sysmon) |
+| `event.category` | keyword (array) | High-level category | `["authentication"]`, `["process"]` |
+| `network.transport` | keyword | TCP / UDP / ICMP | `tcp` |
+| `file.path` | keyword | Full path of touched file | `C:\\\\Users\\\\j.smith\\\\AppData\\\\Local\\\\Temp\\\\inv.docm` |
+| `file.hash.sha256` | keyword | SHA-256 of file content | `9f86d081...` |
+
+### Three rules that bite L1 analysts repeatedly
+
+1. **Field names are case-sensitive in KQL.** `User.Name` will silently match nothing.
+2. **`event.category` is an array.** Use `event.category : "process"` (KQL handles array-contains automatically) but be aware aggregations may double-count.
+3. **`event.action` versus `event.code`.** `event.action` is normalised across sources (a Windows logon-failed and a Linux ssh-failed both use `logon-failed`). `event.code` is source-specific (Windows EventID, Sysmon EventID, Wazuh rule ID). Default to `event.action` for cross-source hunts, `event.code` when you specifically need the Windows event ID.
+
+## Worked example — same event, three sources
+
+A user `m.alvarez` authenticates. Three telemetry sources record it; ECS makes the triple queryable in one shot:
+
+- **Windows EventID 4624 (winlogbeat):** `event.category: ["authentication"]`, `event.action: "logged-in"`, `event.outcome: "success"`, `event.code: "4624"`, `user.name: "m.alvarez"`, `host.name: "WS-FIN-021"`.
+- **Linux SSH (filebeat system module):** `event.category: ["authentication"]`, `event.action: "ssh_login"`, `event.outcome: "success"`, `user.name: "m.alvarez"`, `host.name: "lnx-jump-02"`, `source.ip: "10.42.4.18"`.
+- **AWS CloudTrail ConsoleLogin (filebeat aws module):** `event.category: ["authentication"]`, `event.action: "ConsoleLogin"`, `event.outcome: "success"`, `user.name: "m.alvarez"`, `cloud.provider: "aws"`, `aws.cloudtrail.event_name: "ConsoleLogin"`.
+
+A single KQL query `user.name : "m.alvarez" and event.category : "authentication" and @timestamp >= "now-24h"` returns all three. **That's the payoff of ECS** — and the reason ION's alert prompts and pgvector embeddings can stay source-agnostic.
+
+```mermaid
+flowchart TB
+    subgraph Sources
+        W[Windows<br/>Security 4624/4625]
+        S[Sysmon<br/>EID 1/3/11]
+        A[auditd<br/>execve / open]
+        P[Packetbeat<br/>DNS / HTTP]
+        WZ[Wazuh<br/>rule.id]
+    end
+    subgraph ECS
+        E1[event.action]
+        E2[event.category]
+        E3[user.name]
+        E4[host.name]
+        E5[source.ip /<br/>destination.ip]
+        E6[process.*]
+        E7[file.*]
+    end
+    W --> E1 & E2 & E3 & E4 & E5
+    S --> E1 & E2 & E4 & E6
+    A --> E1 & E2 & E3 & E4 & E6 & E7
+    P --> E5 & E2
+    WZ --> E1 & E2
+```
+
+## Worked example — a Sysmon EventID 1 to ECS to KQL
+
+Sysmon raw fields (what the endpoint emits):
+
+```
+ProcessId=8312
+Image=C:\\Windows\\System32\\cmd.exe
+CommandLine="cmd.exe" /c whoami
+ParentImage=C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE
+ParentCommandLine="WINWORD.EXE" /n "C:\\Users\\j.smith\\Downloads\\invoice.docm"
+User=CORP\\j.smith
+```
+
+After ECS normalisation by the winlogbeat sysmon module:
+
+```
+event.code: "1"
+event.action: "process-started"
+event.category: ["process"]
+process.name: "cmd.exe"
+process.executable: "C:\\Windows\\System32\\cmd.exe"
+process.command_line: "\\"cmd.exe\\" /c whoami"
+process.parent.name: "WINWORD.EXE"
+process.parent.command_line: "\\"WINWORD.EXE\\" /n \\"C:\\Users\\j.smith\\Downloads\\invoice.docm\\""
+user.name: "j.smith"
+user.domain: "CORP"
+```
+
+The ECS form is queryable by:
+
+```kql
+process.parent.name : "WINWORD.EXE" and process.name : ("cmd.exe" or "powershell.exe")
+```
+
+A classic Office-spawning-shell hunt mapped to MITRE ATT&CK **T1566.001** (Spearphishing Attachment) followed by **T1059** (Command and Scripting Interpreter).
+
+## How sensors map to ECS
+
+The mapping between sensor and ECS is the responsibility of the Beat/Agent module or the ingest pipeline. Knowing roughly how each common L1 source maps will save you hours when a field "doesn't seem to be populated":
+
+- **Winlogbeat (Security, System, Application channels)** — XML EventData fields end up under `winlog.event_data.*` raw, with the most useful ones promoted to ECS via the Windows module. EventID 4624's `TargetUserName` becomes `user.name`; `IpAddress` becomes `source.ip`; the channel becomes `winlog.channel`.
+- **Sysmon via Winlogbeat-sysmon module** — Sysmon EventID 1 (process create) maps to `event.action: "process-started"`, `process.executable`, `process.command_line`, `process.parent.executable`, `process.hash.sha256`. EventID 3 (network connect) populates `source.ip`, `destination.ip`, `network.transport`.
+- **Auditbeat (auditd module on Linux)** — `event.action: "executed"` for execve, with `process.executable`, `process.args`, `user.name`, `user.effective.name`. File integrity events use `event.action: "modified"` / `"created"` / `"deleted"` and populate `file.path`, `file.hash.sha256`.
+- **Packetbeat** — Protocol-aware passive sniffing. DNS queries map to `dns.question.name`, `dns.resolved_ip`. HTTP requests map to `http.request.method`, `url.full`, `user_agent.original`.
+- **Wazuh agent / Wazuh-Elastic integration** — Wazuh produces its own JSON with `rule.id`, `rule.description`, `rule.level`, `rule.mitre.id` (an array of ATT&CK technique IDs), and `decoder.name`. ION's alert-prompt matcher uses both `rule.id` (5-tier matcher tier 1) and `rule.mitre.technique` (tier 3).
+
+## Common pitfalls and gotchas
+
+- **Field-not-populated versus field-not-present.** `not user.name : *` matches docs where the field is absent. `user.name : ""` matches docs where it's the empty string. Distinct cases, distinct meanings.
+- **Time skew.** `@timestamp` is event time; `event.ingested` is ingest time. If a host's clock drifts, queries on `@timestamp` will mis-align with reality. Spot this by comparing the two fields.
+- **Multi-value categories.** A document may have `event.category: ["network", "session"]`. A query `event.category : "network"` matches; a visualisation grouping by category may double-count.
+- **Truncation.** Long `process.command_line` values can exceed `keyword`'s default `ignore_above` (1024 chars). The `.text` subfield (analysed) is searchable but the `keyword` is not — leading to confusing *"the command line is there but my term query doesn't hit"* results.
+- **ECS version drift.** ECS evolves. ION's stack pins a version; new fields in ECS 8.x may not be present in older indices. Check Discover's field list before assuming a field is absent from the data model.
+
+## Glossary
+
+- **ECS field** — A canonical key under a defined namespace (e.g. `process.command_line`)
+- **Keyword field** — Exact-match string field in Elasticsearch (case-sensitive)
+- **Text field** — Analysed (tokenised) string field; supports full-text search
+- **`@timestamp`** — Event-time, UTC, the primary time axis
+- **`event.ingested`** — Time the document landed in the SIEM (post-pipeline)
+- **`event.action`** — Source-agnostic action verb
+- **`event.code`** — Source-specific event identifier
+- **Multi-value field** — ECS field that legitimately holds an array
+- **Promotion** — Beats-pipeline step that copies a raw field into its ECS counterpart
+- **`winlog.event_data.*`** — Raw Windows EventData container (pre-promotion)
+- **CIM mapping** — Splunk's Common Information Model equivalent (e.g. `src_ip` for `source.ip`)
+
+## Further reading
+
+- ECS field reference: https://www.elastic.co/guide/en/ecs/current/ecs-field-reference.html
+- ECS event categorisation: https://www.elastic.co/guide/en/ecs/current/ecs-category-field-values-reference.html
+- Winlogbeat Windows module: https://www.elastic.co/guide/en/beats/winlogbeat/current/winlogbeat-module-security.html
+- Wazuh ruleset: https://documentation.wazuh.com/current/user-manual/ruleset/index.html
+- MITRE ATT&CK technique references: T1059 (Command and Scripting Interpreter), T1566.001 (Spearphishing Attachment)
+""",
+    )
+
+    # Quiz on Lesson 2
+    m2l2q = _add_lesson(
+        session, mod2, order=4,
+        title="ECS field knowledge — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Six questions on the core ECS fields, source mappings, and pitfalls.",
+    )
+    _add_q(session, m2l2q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Which ECS field stores the **full executed command line** of a process?",
+        options=[
+            {"value": "name", "label": "process.name"},
+            {"value": "executable", "label": "process.executable"},
+            {"value": "command_line", "label": "process.command_line"},
+            {"value": "args", "label": "process.args"},
+        ],
+        correct="command_line",
+        explanation_md="`process.name` is the bare executable name, `process.executable` is the full path, `process.args` is the parsed argument array. `process.command_line` is the unparsed full string.",
+        points=2,
+    )
+    _add_q(session, m2l2q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which fields would you add to a hunt query for *Office spawning a shell*? Pick all that apply.",
+        options=[
+            {"value": "parent_name", "label": "process.parent.name"},
+            {"value": "name", "label": "process.name"},
+            {"value": "os_family", "label": "host.os.family"},
+            {"value": "category", "label": "event.category : \"process\""},
+            {"value": "outcome", "label": "event.outcome"},
+        ],
+        correct=["parent_name", "name", "category"],
+        explanation_md="`host.os.family` is rarely needed because Office is Windows-bound and the parent name already signals that. `event.outcome` doesn't apply meaningfully to process-creation events.",
+        points=3,
+    )
+    _add_q(session, m2l2q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="`event.action` and `event.code` always have the same value for a Windows logon event.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** `event.action` is normalised (`logged-in`, `logon-failed`); `event.code` is the Windows EventID (`4624`, `4625`). They're intentionally distinct.",
+        points=1,
+    )
+    _add_q(session, m2l2q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="Why might a query `user.name : \"alice\"` return zero hits even when Discover shows authentication events for Alice?",
+        options=None,
+        correct=["case sensitivity", "case", "domain prefix", "normalisation gap", "the value is uppercase Alice"],
+        explanation_md="Acceptable: case sensitivity (`Alice` vs `alice`), domain prefix (`CORP\\Alice` stored verbatim), or normalisation gap where the source populates `winlog.event_data.TargetUserName` but the ingest pipeline didn't promote it to `user.name`. Any one is correct.",
+        points=2,
+    )
+    _add_q(session, m2l2q, order=5, kind=QuestionKind.SINGLE,
+        stem_md="A Wazuh alert document's `rule.mitre.technique` field contains `[\"T1059.001\", \"T1566.001\"]`. What does this tell an L1 analyst?",
+        options=[
+            {"value": "invalid", "label": "The alert is invalid because techniques are mutually exclusive"},
+            {"value": "multi", "label": "The Wazuh rule is mapped to multiple ATT&CK techniques and either may apply"},
+            {"value": "twice", "label": "The alert fired twice"},
+            {"value": "first", "label": "Only the first technique is authoritative"},
+        ],
+        correct="multi",
+        explanation_md="ATT&CK technique mappings can be plural — a single rule may legitimately cover multiple techniques (here, PowerShell + Spearphishing Attachment). Both are candidate context.",
+        points=2,
+    )
+    _add_q(session, m2l2q, order=6, kind=QuestionKind.SHORTANSWER,
+        stem_md="Name two ECS fields that always appear on a Sysmon EventID 3 (network connect) document.",
+        options=None,
+        correct=["source.ip, destination.ip", "destination.ip, network.transport", "source.ip, network.transport", "host.name, source.ip", "source.ip and destination.ip"],
+        explanation_md="Acceptable: `source.ip` / `destination.ip` (and/or `source.port` / `destination.port`), `network.transport`, `process.name`, `host.name`. Any two of these.",
+        points=2,
+    )
+
+    # Lesson 3 — KQL
+    m2l3 = _add_lesson(
+        session, mod2, order=5,
+        title="Querying the SIEM with KQL",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Write KQL boolean expressions using `and`, `or`, `not`, parentheses, and field-existence checks
+> 2. Use wildcards, ranges, and lists in KQL queries while avoiding common performance pitfalls
+> 3. Compose triage queries against `winlogbeat-*`, `filebeat-*`, and `logs-*` index patterns
+> 4. Read SPL well enough to translate a basic Splunk detection into KQL
+> 5. Recognise four hunt patterns: failed-auth-by-user, suspicious-child-of-svchost, beaconing detection, newly-registered-domain DNS
+
+## KQL syntax in the depth an L1 actually needs
+
+KQL (Kibana Query Language) is the default in Discover and detection rules. Syntax in the order you'll use it:
+
+- **Term match:** `field : "value"`. Quotes are required if the value contains spaces or special characters.
+- **Boolean:** `and`, `or`, `not`, lowercase. Group with parentheses: `(a or b) and not c`.
+- **Wildcards:** `*` matches zero or more characters in a `keyword` field. `process.name : "power*"` works; leading wildcards (`*shell.exe`) are valid but slow — avoid in scheduled rules.
+- **Lists:** `field : (val1 or val2 or val3)`. Equivalent to multiple ORs but easier to read.
+- **Ranges:** `field >= value`, `field <= value`. For dates use Kibana time tokens: `@timestamp >= "now-1h"`.
+- **Existence:** `field : *` matches any document with the field populated. `not field : *` matches absence.
+- **Nested fields:** ECS dot notation works directly: `process.parent.name : "winword.exe"`.
+- **Escaping:** Backslashes need doubling: `process.executable : "C:\\\\Windows\\\\System32\\\\cmd.exe"`. Colons inside quoted values are fine.
+
+What KQL **does not** give you: aggregation, joins, regex (in Discover proper — Lens has different syntax), temporal correlation. For aggregations you use Lens or the search API; for cross-event correlation in Elastic you use EQL or detection-rule logic. As an L1, you stay in the boolean-filter regime; aggregations come from Lens visualisations or saved searches built by detection engineers.
+
+## Worked example — building a query iteratively
+
+**Goal:** find PowerShell launches by `j.smith` on `WS-FIN-014` in the last 6 hours, where the command line shows base64-encoded payloads.
+
+```mermaid
+flowchart LR
+    A[Goal stated<br/>in English] --> B{Identify<br/>core ECS fields}
+    B --> C[Term filters<br/>field : value]
+    C --> D{Too broad?}
+    D -- yes --> E[Add user,<br/>host, time]
+    E --> D
+    D -- no --> F{Too narrow?}
+    F -- yes --> G[Loosen one<br/>condition]
+    G --> D
+    F -- no --> H[Save / hand to<br/>detection engineer]
+```
+
+- **Start:** `process.name : "powershell.exe"` — too broad.
+- **Add user:** `process.name : "powershell.exe" and user.name : "j.smith"` — still broad if Smith uses PS legitimately.
+- **Add host:** `... and host.name : "WS-FIN-014"`.
+- **Add command-line condition:** `... and process.command_line : *-enc*` — common encoded-command flag.
+- **Add time:** `... and @timestamp >= "now-6h"`.
+- **Final:** `process.name : "powershell.exe" and user.name : "j.smith" and host.name : "WS-FIN-014" and process.command_line : *-enc* and @timestamp >= "now-6h"`.
+
+If this returns 200 hits, the leading wildcard combined with broad command-line text is the bottleneck — replace with `process.command_line : ("*-enc *" or "*-encodedcommand*" or "*-e *")` to anchor the flag.
+
+## Four hunt patterns L1 must read fluently
+
+These four patterns cover most L1 triage queries. **Memorise the shape, not the verbatim string.**
+
+### Pattern A — Failed logons by user, with a threshold
+
+```kql
+event.category : "authentication"
+  and event.outcome : "failure"
+  and user.name : "j.smith"
+  and @timestamp >= "now-24h"
+```
+
+**Triage:** count by `source.ip` in Lens. > 5 distinct sources is suspicious. Cross-reference with successful logon (`event.outcome : "success"`) immediately following.
+
+### Pattern B — Suspicious child of `svchost.exe`
+
+```kql
+process.parent.name : "svchost.exe"
+  and not process.name : (
+    "wuauclt.exe" or "WmiPrvSE.exe" or "TiWorker.exe" or
+    "TrustedInstaller.exe" or "MoUsoCoreWorker.exe" or "sihost.exe"
+  )
+  and host.os.family : "windows"
+```
+
+**Triage:** `svchost.exe` legitimately spawns a known set of children. Anything outside the allow-list (e.g. `cmd.exe`, `powershell.exe`, unknown EXEs) is suspicious. Maps to ATT&CK **T1055** (Process Injection) and **T1543.003** (Windows Service).
+
+### Pattern C — Beaconing detection (read-only at L1; detection engineers tune)
+
+```kql
+event.category : "network"
+  and source.ip : "10.42.7.91"
+  and destination.ip : *
+  and not destination.ip : (10.0.0.0/8 or 172.16.0.0/12 or 192.168.0.0/16)
+  and @timestamp >= "now-6h"
+```
+
+L1 won't compute interval consistency in KQL — that needs Lens or a detection rule. **The L1's job is to read the resulting alert:** "host X made N outbound connections to destination Y at consistent ~60s intervals over 6h". Maps to ATT&CK **T1071** (Application Layer Protocol).
+
+### Pattern D — DNS to newly-registered or low-reputation domains
+
+```kql
+event.category : "network"
+  and event.dataset : "*dns*"
+  and dns.question.name : *
+  and source.ip : 10.42.0.0/16
+  and @timestamp >= "now-1h"
+```
+
+Then enrich with TIDE / OpenCTI in ION. The L1 doesn't compute "newly registered" — TIDE provides the verdict. The query gets the candidate set; the enrichment provides the score. Maps to ATT&CK **T1071.004** (DNS).
+
+## Worked example — reading a real triage query
+
+A detection engineer hands the L1 the following saved search to use during triage:
+
+```kql
+(event.code : "4688" or event.code : "1")
+  and process.parent.name : "WINWORD.EXE"
+  and not process.name : ("WerFault.exe" or "splwow64.exe")
+```
+
+**Line-by-line:**
+
+- `(event.code : "4688" or event.code : "1")` — Windows Process Creation (4688) or Sysmon Process Create (1). Some hosts have one, some both, some neither — this hedges.
+- `process.parent.name : "WINWORD.EXE"` — Word is the parent. Note no path or domain — this matches both legitimate and renamed-Word cases (a renamed process keeping the same `process.name` is itself suspicious; `process.executable` would tell that story).
+- `not process.name : ("WerFault.exe" or "splwow64.exe")` — Word legitimately spawns these (crash reporter, print spooler bridge); excluding them removes noise.
+
+The L1 reads this and understands: *"show me everything Word starts, except the two known-benign helpers"*. They do **not** modify the query without escalating to detection engineering, because the exclusion list is curated.
+
+## SPL contrast and translation
+
+ION uses KQL, but L1 analysts move between employers and you'll encounter Splunk. The translation is mostly mechanical:
+
+- KQL `field : "value"` → SPL `field="value"`
+- KQL `and` / `or` / `not` → SPL `AND` / `OR` / `NOT` (case-sensitive in SPL)
+- KQL `field : *` → SPL `field=*`
+- KQL aggregation? Done in Lens. SPL does it inline: `| stats count by user, src_ip`
+- KQL time range? Time picker. SPL: `earliest=-1h latest=now`
+
+Direct translation example:
+
+```kql
+event.code : "4625" and source.ip : 10.42.0.0/16 and @timestamp >= "now-1h"
+```
+
+```spl
+index=wineventlog EventCode=4625 src_ip=10.42.0.0/16 earliest=-1h
+| stats count by src_ip, user
+```
+
+Note SPL uses CIM (`src_ip`, `user`), not ECS (`source.ip`, `user.name`). **Memorise the half-dozen common mappings:** `src_ip` ↔ `source.ip`, `dest_ip` ↔ `destination.ip`, `user` ↔ `user.name`, `host` ↔ `host.name`, `process` ↔ `process.name`, `command_line` ↔ `process.command_line`.
+
+## High-signal queries to keep in your head
+
+```kql
+process.parent.name : "svchost.exe"
+  and process.name : ("cmd.exe" or "powershell.exe" or "rundll32.exe" or "regsvr32.exe")
+  and @timestamp >= "now-24h"
+```
+
+High-signal hunt for living-off-the-land binaries spawned by `svchost.exe`. Maps to **T1218** (System Binary Proxy Execution).
+
+```kql
+event.code : "1102"
+```
+
+Windows Security log cleared. Single-event hunt — rare and high-signal. Maps to **T1070.001** (Indicator Removal: Clear Windows Event Logs).
+
+```kql
+process.command_line : (*Invoke-Expression* or *IEX*(* or *DownloadString* or *FromBase64String*)
+```
+
+PowerShell encoded-execution patterns. Maps to **T1059.001**. Note: not for production detection (too noisy without further qualifiers); fine for hunt.
+
+## Glossary
+
+- **KQL** — Kibana Query Language; boolean filter language used in Discover and detection rules
+- **EQL** — Event Query Language; Elastic's correlation language (sequence, with-windows, joins)
+- **SPL** — Splunk's Search Processing Language; pipeline-based search and analytics
+- **Wildcard** — `*` in a query value, matching zero or more characters
+- **Leading wildcard** — Wildcard at the start of a value (`*ell.exe`); generally slow
+- **CIDR notation** — `10.42.7.0/24` form for IP ranges; KQL accepts directly on `ip` fields
+- **Existence check** — `field : *` (present) or `not field : *` (absent)
+- **Lens** — Kibana's drag-and-drop aggregation/visualisation tool
+- **Detection rule** — Scheduled query that emits an alert; authored in KQL, EQL, or threshold form
+- **Time picker** — Kibana's time-range selector that sets the implicit `@timestamp` filter
+- **LOLBin** — Living-Off-the-Land Binary; a signed system binary abused by attackers (e.g. `regsvr32.exe`, `rundll32.exe`)
+
+## Further reading
+
+- KQL syntax reference: https://www.elastic.co/guide/en/kibana/current/kuery-query.html
+- Elastic detection rules: https://github.com/elastic/detection-rules
+- EQL syntax: https://www.elastic.co/guide/en/elasticsearch/reference/current/eql-syntax.html
+- LOLBAS project: https://lolbas-project.github.io/
+- MITRE ATT&CK: T1059, T1071, T1218, T1055, T1543.003, T1070.001
+""",
+    )
+
+    # Quiz on Lesson 3
+    m2l3q = _add_lesson(
+        session, mod2, order=6,
+        title="KQL fluency — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Six questions on KQL syntax, performance, and SPL translation.",
+    )
+    _add_q(session, m2l3q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Which KQL expression matches documents where `user.name` is populated **and** not equal to `SYSTEM`?",
+        options=[
+            {"value": "exists_and_not", "label": "user.name : * and not user.name : \"SYSTEM\""},
+            {"value": "neq", "label": "user.name != \"SYSTEM\""},
+            {"value": "not_only", "label": "not user.name : \"SYSTEM\""},
+            {"value": "wild", "label": "user.name : *SYSTEM*"},
+        ],
+        correct="exists_and_not",
+        explanation_md="`not user.name : \"SYSTEM\"` alone matches absence as well as non-SYSTEM. KQL has no `!=` operator. The combined existence + negation form is required.",
+        points=2,
+    )
+    _add_q(session, m2l3q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which KQL queries are likely to perform poorly in scheduled detection rules? Pick all that apply.",
+        options=[
+            {"value": "leading_wild_cmd", "label": "process.command_line : *encoded*"},
+            {"value": "exact_proc", "label": "process.name : \"powershell.exe\""},
+            {"value": "exact_code", "label": "event.code : \"4625\""},
+            {"value": "leading_wild_user", "label": "user.name : *admin*"},
+        ],
+        correct=["leading_wild_cmd", "leading_wild_user"],
+        explanation_md="Leading wildcards on `keyword` fields are expensive. Exact-match term queries are fast.",
+        points=2,
+    )
+    _add_q(session, m2l3q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="KQL supports temporal correlation — for example, *find a 4625 within 60 seconds of a 4624 from the same source.ip*.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** That's EQL territory. KQL is purely a boolean filter language.",
+        points=1,
+    )
+    _add_q(session, m2l3q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="A detection engineer hands you `process.parent.name : \"WINWORD.EXE\" and process.name : (\"cmd.exe\" or \"powershell.exe\")`. State two ATT&CK technique IDs this query is most likely related to.",
+        options=None,
+        correct=["T1566.001 and T1059", "T1566.001, T1059", "T1059 and T1566.001", "T1566 and T1059", "T1059.001 and T1566.001"],
+        explanation_md="**T1566.001** (Spearphishing Attachment, the delivery vector for malicious Office docs) and **T1059** (Command and Scripting Interpreter, with sub-technique T1059.001 for PowerShell or T1059.003 for cmd.exe). Either pair is acceptable.",
+        points=2,
+    )
+    _add_q(session, m2l3q, order=5, kind=QuestionKind.SINGLE,
+        stem_md="Translate `event.code : \"4625\" and source.ip : 10.42.7.0/24` into Splunk SPL using CIM field names.",
+        options=[
+            {"value": "ecs_in_spl", "label": "EventCode=4625 source.ip=10.42.7.0/24"},
+            {"value": "cim_correct", "label": "EventCode=4625 src_ip=10.42.7.0/24"},
+            {"value": "kql_punctuation", "label": "event.code=\"4625\" src_ip=\"10.42.7.0/24\""},
+            {"value": "wrong_index", "label": "index=4625 src=10.42.7.0/24"},
+        ],
+        correct="cim_correct",
+        explanation_md="Splunk's CIM uses `src_ip`, and field names use `=` rather than `:`.",
+        points=2,
+    )
+    _add_q(session, m2l3q, order=6, kind=QuestionKind.SHORTANSWER,
+        stem_md="Why do L1 analysts not author beaconing-detection queries themselves?",
+        options=None,
+        correct=["temporal aggregation", "interval consistency", "outside KQL filter scope", "needs detection rule", "needs Lens", "kql can't aggregate"],
+        explanation_md="Beaconing requires temporal aggregation (interval-consistency analysis), which is outside KQL's filter scope and lives in scheduled detection rules or Lens visualisations curated by detection engineering. L1 consumes the resulting alert, not the math.",
+        points=2,
+    )
+
+    # Lesson 4 — Pivots, timelines, lifecycle
+    m2l4 = _add_lesson(
+        session, mod2, order=7,
+        title="Pivots, timelines, and the alert lifecycle",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Construct a 5-to-10-step pivot chain from a single alert into an incident timeline using the host → user → process → network cluster pattern
+> 2. Decide when a saved search or dashboard answers the question and when it misleads
+> 3. Manage the in-SIEM alert state machine and synchronise it with the ION case workflow
+> 4. Hand off a triaged case to L2 with a coherent timeline, indicators, and the pivots already attempted
+> 5. Recognise three common dashboard pitfalls (time-range mismatch, filter inheritance, index-pattern drift)
+
+## The cluster investigation pattern
+
+A single alert is rarely the full story. The cluster investigation pattern (popularised by Splunk's SURGe team and Hunters' "cluster" formalism, codified in MITRE's PRE-ATT&CK and operator runbooks) gives an L1 a repeatable expansion sequence.
+
+```mermaid
+flowchart TD
+    A[Alert: anchor IOC] --> B[Host context]
+    B --> C[User context]
+    C --> D[Process context]
+    D --> E[Process parent]
+    D --> F[Process children]
+    D --> G[Network destinations]
+    D --> H[File writes]
+    H --> I[File hash]
+    I --> J[Hash across fleet]
+    G --> K[DNS queries]
+    C --> L[Auth on other hosts<br/>lateral movement]
+    A --> M[Auth failures<br/>prior 24h]
+```
+
+Translated to ECS pivots, an L1's standard expansion from a single suspicious destination IP `185.220.101.7`:
+
+1. **Anchor:** `destination.ip : "185.220.101.7"` over the last 7 days. Get all hosts that talked to it.
+2. **Host expansion:** From the result, take `host.name` values. For each host, get all `user.name` values active during the contact window.
+3. **User expansion:** For each user, get all `process.name` values around contact time on that host.
+4. **Process expansion:** For each suspicious process, get its parent (`process.parent.name`) and children (query for `process.parent.name : "<that process>"` on the same host).
+5. **Network expansion:** For each suspicious process, get all `destination.ip` from its network events.
+6. **Lateral expansion:** Take the set of suspicious users and check authentication events on *other* hosts.
+7. **File expansion:** For each suspicious process, query `event.category : "file" and host.name : "<host>"` around the time window — what files did it write or read?
+8. **Hash expansion:** Pull `process.hash.sha256` (or `file.hash.sha256`) and check for the same hash on other hosts in the fleet.
+9. **DNS expansion:** Check `dns.question.name` from the suspicious host around the contact window.
+10. **Authentication failure expansion:** Check for failed logons involving the implicated users in the prior 24 hours — was credential brute-force the entry vector?
+
+By step 10, an L1 has a coherent **five-axis story** (host, user, process, network, file) without leaving Discover. The expansion is mechanical; the analyst's job is to *narrate* the result.
+
+## Worked example — full pivot from an outbound-IP alert
+
+ION case `CRIT-2026-04-118`: *"Outbound connection to known-bad IP 185.220.101.7"*. Anchor: `destination.ip : "185.220.101.7"`.
+
+```mermaid
+sequenceDiagram
+    participant L1 as L1 Analyst
+    participant K as Kibana Discover
+    participant ION as ION
+
+    Note over L1,K: Step 1 — anchor query
+    L1->>K: destination.ip : "185.220.101.7"
+    K-->>L1: WS-MKT-009, 2 events, rundll32.exe, TCP/443 @ 11:47:14Z
+
+    Note over L1,K: Step 2 — host context (auth)
+    L1->>K: host.name:"WS-MKT-009" and event.category:"authentication"<br/>and event.outcome:"success" and time near 11:47
+    K-->>L1: k.patel logged in at 11:32:08Z
+
+    Note over L1,K: Step 3 — process context
+    L1->>K: host:"WS-MKT-009" and user:"k.patel" and event.category:"process"<br/>and time >= 11:32
+    K-->>L1: 11:46:53Z rundll32 spawned by OUTLOOK.EXE<br/>cmdline: rundll32 url.dll,OpenURL https://[redacted]/m.html
+
+    Note over L1,K: Step 4-5 — file + hash spread
+    L1->>K: event.category:"file" + temp dir writes
+    K-->>L1: rad48F2A.tmp written, sha256 abc123...
+    L1->>K: file.hash.sha256:"abc123..." and not host.name:"WS-MKT-009"
+    K-->>L1: same hash on WS-MKT-014 22min later — second host involved
+
+    L1->>ION: case timeline + IOCs + 6 pivot strings
+    L1->>ION: closure_reason: escalated to L2 (phishing-team)
+```
+
+Six pivots in, the L1 has a story: *phishing email → Outlook spawned rundll32 to fetch a remote payload → payload dropped a file in Temp → the file (or its delivery mechanism) reached a second host*. The L1 escalates to L2 with all six query strings, the time window, and the implicated host/user/file IOCs in the case.
+
+## Dashboards and saved searches: when to trust them
+
+Dashboards are condensed views; saved searches are pre-baked queries. Both can mislead.
+
+**Trustworthy when:**
+
+- Owned by detection engineering, version-controlled, with a documented purpose
+- The time range is **explicit** (the panel header shows "last 24h", not relying on the page-level picker silently)
+- The index pattern matches the question (an alert dashboard pulling from `winlogbeat-*` won't show Linux events)
+- Filters are visible and the analyst can read them
+
+**Misleading when:**
+
+- The dashboard inherits the page-level time picker but the question requires a different window
+- The saved search has a hard-coded filter that excludes the case-relevant data (a detection-engineering saved search may exclude `host.name : "DC-01"` because of historical noise; the analyst doesn't see this and reasons "there is no DC activity")
+- The index pattern drifted (a panel pointing at `winlogbeat-7.*` after the cluster upgraded to 8.x will silently return zero)
+- The visualisation rounds (a "top 10 failed-logon source IPs" pie chart hides ranks 11+; a brute-force from rank 11 is invisible)
+
+**Rule for L1:** dashboards are good for *spotting trends*, bad for *answering specific questions about a single alert*. When the case asks *"what happened on host X at time T"*, go to Discover. When the shift handoff asks *"is the failed-logon rate normal"*, look at the dashboard.
+
+## Worked example — when a dashboard hides the answer
+
+L1 sees ION case *"spike in failed logons"* and opens the failed-logon dashboard. The trend panel shows flat. They check Discover with the case's specific query and find a 30× spike concentrated on one host. **The dashboard's panel aggregates fleet-wide; the spike on one host is invisible against the fleet baseline.** The L1 documents this in the case (*"dashboard fleet-aggregate masks per-host spike"*) and uses the per-host Discover query as authoritative.
+
+## Alert lifecycle in the SIEM and ION
+
+An alert is a long-lived object. Its state machine in Elastic Security and ION:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Open
+    Open --> Acknowledged: L1 picks up
+    Acknowledged --> InProgress: triage starts
+    InProgress --> Closed_Resolved: closure reason set
+    InProgress --> Closed_Escalated: L2 handoff
+    Closed_Resolved --> Reopened: new evidence
+    Closed_Escalated --> InProgress: L2 returns
+    Reopened --> InProgress
+    Closed_Resolved --> [*]
+    Closed_Escalated --> [*]
+```
+
+- **Open / new** — Just fired. ION has just created the case.
+- **Acknowledged** — An L1 has picked it up. ION moves the case to "in-progress".
+- **In-progress** — Active triage. Analyst comments accumulate; pivots are saved.
+- **Closed (resolved)** — Triage complete. ION requires a `CaseClosureReason` (true_positive / benign_true_positive / false_positive / duplicate / insufficient_data — see Module 1).
+- **Closed (escalated)** — L1 hands off to L2. The case persists; ION assigns it to the L2 queue.
+
+Every transition is auditable. **Comments in ION are first-class** — they're the thread future-you and future-L2 will read.
+
+A good comment includes: (1) the pivot you ran, verbatim, (2) what you found, (3) why you concluded what you did. A bad comment: *"looks fine, closing"*.
+
+ION-specific: closing with a `CaseClosureReason` feeds the **AIFeedback ledger** and the per-template scorecard. Sloppy reasons skew the Tier-1 training data Bob (the AI analyst service user) consumes for tuning proposals. **L1's discipline on closure-reason matters beyond the immediate case.**
+
+The dual-write problem: if an analyst closes an alert in Kibana Security but ION still shows the case open (or vice versa), the synchronisation is broken. **Standard L1 protocol is to drive state from ION** (the case-management system of record) and let ION's connector update Kibana. Manual closure in Kibana can desync — escalate if you have to do it.
+
+## Worked example — a clean handoff comment
+
+Case `CRIT-2026-04-118`. L1 closure-comment template:
+
+```
+Investigated 11:32-12:05 UTC.
+Alert: outbound to 185.220.101.7 from WS-MKT-009.
+Pivots run:
+  1. destination.ip : "185.220.101.7"  -> 1 host, 2 events
+  2. user @11:32 logon -> k.patel
+  3. parent of rundll32 -> OUTLOOK.EXE (rundll32 url.dll,OpenURL ...)
+  4. file write Temp\\rad48F2A.tmp, sha256 <hash>
+  5. same hash on WS-MKT-014 @12:09
+Conclusion: phishing -> Outlook -> rundll32 dropper, second host involved.
+Escalating to L2 for containment + email-source investigation.
+Closure reason: escalated (L2 assignment: phishing-team).
+```
+
+This comment carries forward the timeline, the verbatim pivots, the IOCs, and the escalation reason. **L2 starts from a hot trail, not cold.**
+
+## Glossary
+
+- **Anchor IOC** — The single indicator that opens the pivot chain (IP, hash, user, process, host)
+- **Pivot** — Moving from one query result to a follow-up query that uses a value from the result
+- **Cluster (investigation)** — A coherent expansion across host/user/process/network/file axes
+- **Saved search** — A stored Discover query (index pattern, KQL, filters, columns)
+- **Dashboard panel** — A visualisation backed by a saved search or Lens query
+- **Time picker** — Kibana's range selector; controls the implicit `@timestamp` filter at page or panel level
+- **Index pattern drift** — When a panel's index pattern stops matching the live indices
+- **Alert state machine** — Open → Acknowledged → In-progress → Closed (resolved | escalated)
+- **`CaseClosureReason`** — ION's pinned enum for reasons a case is closed; load-bearing for AIFeedback
+- **AIFeedback ledger** — ION's per-template scorecard table tracking closure outcomes vs alert prompt
+- **Bob** — ION's AI-analyst service user that consumes feedback for tuning proposals
+- **Lateral movement** — Adversary moving from one host/user to another within the environment
+- **Handoff comment** — Closure comment that carries the case timeline + IOCs forward to L2
+
+## Further reading
+
+- Elastic Security alerts and cases: https://www.elastic.co/guide/en/security/current/alerts-ui-manage.html
+- Elastic Security cases workflow: https://www.elastic.co/guide/en/security/current/cases-overview.html
+- MITRE ATT&CK Lateral Movement tactic: https://attack.mitre.org/tactics/TA0008/
+- BTL1 syllabus: SIEM Domain — Investigation Workflow and Pivoting
+- SANS GCIH KSA: Domain 4 — Incident Handling Process
+""",
+    )
+
+    # Quiz on Lesson 4
+    m2l4q = _add_lesson(
+        session, mod2, order=8,
+        title="Pivots + lifecycle — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Six questions on the cluster pattern, dashboard pitfalls, and alert lifecycle in ION.",
+    )
+    _add_q(session, m2l4q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="What is the **first pivot** in the cluster pattern after the anchor IOC?",
+        options=[
+            {"value": "hash", "label": "File hashes"},
+            {"value": "host", "label": "Host context"},
+            {"value": "dns", "label": "DNS queries"},
+            {"value": "auth_fail", "label": "Authentication failures"},
+        ],
+        correct="host",
+        explanation_md="Host context anchors everything else (without a host you can't meaningfully pivot to user, process, or network for that host).",
+        points=2,
+    )
+    _add_q(session, m2l4q, order=2, kind=QuestionKind.MULTI,
+        stem_md="A dashboard panel shows 0 events. Which are plausible **non-attacker** explanations? Pick all that apply.",
+        options=[
+            {"value": "time", "label": "Time range mismatch with the page picker"},
+            {"value": "filter", "label": "Filter inherited from the dashboard excludes the relevant index"},
+            {"value": "drift", "label": "Index pattern drift after a stack upgrade"},
+            {"value": "saved", "label": "Saved-search hard-coded to exclude a host"},
+            {"value": "rule_off", "label": "Detection rule disabled"},
+        ],
+        correct=["time", "filter", "drift", "saved"],
+        explanation_md="Detection-rule state doesn't directly affect a Discover-backed dashboard panel — it would affect alert dashboards specifically, and even there it would show *fewer* alerts but still a non-zero historical count.",
+        points=3,
+    )
+    _add_q(session, m2l4q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="An L1 closing a Kibana alert manually is the canonical way to close an ION case.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** ION is the case-management system of record; closure is driven from ION and ION's connector updates Kibana. Manual Kibana closure risks desync.",
+        points=1,
+    )
+    _add_q(session, m2l4q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="Name three IOCs you would extract from a process-creation alert and carry into the case timeline.",
+        options=None,
+        correct=["host.name, user.name, process.name", "host, user, process, hash", "host.name, process.command_line, file.hash.sha256", "user, process, parent process"],
+        explanation_md="Acceptable: `host.name`, `user.name`, `process.name` / `process.command_line`, `process.hash.sha256`, `process.parent.name`, source/destination IP if a network event was correlated. Any three.",
+        points=2,
+    )
+    _add_q(session, m2l4q, order=5, kind=QuestionKind.SINGLE,
+        stem_md="A `CaseClosureReason` of **false_positive** is appropriate when:",
+        options=[
+            {"value": "no_events", "label": "The alert fired but the analyst couldn't find the underlying events"},
+            {"value": "btp", "label": "The alert reflects benign expected activity (e.g. authorised admin tool)"},
+            {"value": "rule_wrong", "label": "The detection rule's logic does not actually identify malicious behaviour as designed"},
+            {"value": "dup", "label": "A duplicate of an earlier case"},
+        ],
+        correct="rule_wrong",
+        explanation_md="A *false positive* specifically means the rule's detection is wrong (the activity it flags isn't actually what the rule claims to detect). 'Benign expected activity' is a *benign true positive*. 'Duplicate' is its own closure reason. Distinguishing these is what the AIFeedback ledger relies on.",
+        points=2,
+    )
+    _add_q(session, m2l4q, order=6, kind=QuestionKind.SHORTANSWER,
+        stem_md="Why does the quality of L1 closure comments matter beyond the immediate case in ION?",
+        options=None,
+        correct=["AIFeedback ledger", "feeds AIFeedback", "scorecard", "bob tuning", "training data for bob", "feeds the per-template scorecard"],
+        explanation_md="Closure comments and reasons feed the AIFeedback ledger and per-template scorecard, which in turn feed Tier-1 training data and Bob's tuning proposals. Sloppy or inconsistent closure reasons degrade the AI-analyst service's recommendations and the per-template prompt-quality metrics.",
+        points=2,
+    )
+
+    print(f"  L1: {course.title} — 2 modules, 11 lessons (Module 2 SIEM Fundamentals @ proper depth)")
     return course
 
 

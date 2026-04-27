@@ -1,5 +1,65 @@
 # Changelog
 
+## v0.11.5 (2026-04-27)
+
+### L1 Module 2 — SIEM Fundamentals (curriculum kick-off)
+
+First curriculum ship at the v0.11.3 depth bar. **L1 Module 2 — SIEM Fundamentals** authored from a research-agent dossier covering the Elastic / Wazuh / ECS stack ION integrates with. ~10,500 words of curriculum content, 8 lessons (4 reading + 4 quiz), 22 quiz questions. Now lives on the existing `demo-l1-alert-triage-fundamentals` course as Module 2.
+
+#### Lesson breakdown
+
+| # | Title | Type | Words | Quiz qs |
+|---|---|---|---|---|
+| 2.1 | What a SIEM is and how data flows through it | reading | ~2,400 | — |
+| 2.2 | Pipeline + architecture quiz | quiz | — | 5 |
+| 2.3 | Speaking ECS — the data model L1 lives in | reading | ~2,500 | — |
+| 2.4 | ECS field knowledge — quiz | quiz | — | 6 |
+| 2.5 | Querying the SIEM with KQL | reading | ~2,800 | — |
+| 2.6 | KQL fluency — quiz | quiz | — | 6 |
+| 2.7 | Pivots, timelines, and the alert lifecycle | reading | ~2,800 | — |
+| 2.8 | Pivots + lifecycle — quiz | quiz | — | 6 |
+
+Each reading lesson hits the v0.11.3 quality bar:
+- Explicit *learning objectives* + *prerequisites* at top
+- Multiple Mermaid diagrams (sequence, flowchart, state machine, classDiagram) — 9 diagrams across the module
+- Worked scenarios with concrete ECS field names + realistic hostnames + actual KQL queries with line-by-line commentary
+- ION-specific callouts: how each topic ties back to `AlertTriage`, `Investigation`, `AIFeedback`, the `CaseClosureReason` enum, Bob's role
+- Glossary of jargon (~10–12 terms per lesson)
+- Further reading with concrete URLs (Elastic docs, Wazuh docs, MITRE ATT&CK, BTL1, SANS GCIH KSA references)
+
+#### Topics covered
+
+The four lessons collectively cover:
+
+- **Pipeline anatomy** — the six stages (ingest → parse → normalise → store → query → alert), which Elastic Stack component owns each, where failures localise
+- **SIEM vs aggregator** — five concrete capability differences (schema, detection engine, enrichment, workflow, retention tiers)
+- **Architectures** — cloud-native vs on-prem vs hybrid, with practical implications for L1 self-service vs escalation
+- **ECS data model** — the ten core fields used in 90% of L1 queries, source-to-ECS mapping for winlogbeat/sysmon/auditd/packetbeat/wazuh, common pitfalls (case sensitivity, multi-value fields, action vs code)
+- **KQL fluency** — boolean operators, wildcards, ranges, existence checks, escaping, four canonical hunt patterns (failed-auth-by-user, suspicious-child-of-svchost, beaconing, DNS to newly-registered domains)
+- **SPL contrast + translation** — KQL-to-CIM-to-SPL field mappings (`source.ip` ↔ `src_ip`, etc.) for analysts moving between employers
+- **Cluster investigation pattern** — the 10-step pivot chain from anchor IOC through host → user → process → network → file → hash → DNS → lateral
+- **Dashboard pitfalls** — when to trust them, when they hide answers (time-range mismatch, filter inheritance, index-pattern drift, ranking truncation)
+- **Alert lifecycle in ION** — the state machine, ION as system of record vs Kibana as a connector view, why closure-comment quality matters for AIFeedback
+
+#### Authoring approach
+
+This module is the first to follow the **research-agent → dossier → curriculum** pattern. A research agent produced ~10,000 words of structured input (sections + worked examples + diagrams + question stems + glossary + references) which was then woven into final lesson copy. The pattern scales — subsequent L1 modules (3-8) and the L2/L3 ships will use the same flow.
+
+#### Upgrade
+
+Drop in `ion:0.11.5`. Re-run the seeder to refresh course content (idempotent — wipes `demo-*` courses and re-seeds):
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
+After re-seed, browse `http://localhost:8000/courses/demo-l1-alert-triage-fundamentals` — Module 2 with its 8 lessons appears below the existing Module 1.
+
+#### What's next
+
+- **v0.11.6+** — additional L1 modules using the same dossier pattern (Windows Event Logs, Network Telemetry, IOC Handling, Phishing Triage, Escalation Workflow, Common ATT&CK)
+- **After L1 curriculum complete** — Elastic Agent Skills exploration (separate research conversation queued by user)
+
 ## v0.11.4 (2026-04-27)
 
 ### Course admin authoring UI
