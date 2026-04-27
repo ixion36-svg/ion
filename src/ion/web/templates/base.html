@@ -474,15 +474,49 @@
     <!-- Markdown parser + sanitizer -->
     <script src="/static/js/marked.min.js"></script>
     <script src="/static/js/purify.min.js"></script>
-    <!-- v0.11.2: Mermaid diagrams for course lessons (and any markdown
-         content that wants attack-chain / flowchart visuals). Optional —
-         consumer guards on `typeof mermaid !== 'undefined'` so a missing
-         file gracefully degrades. Drop mermaid.min.js into static/js for
-         air-gap deployments. -->
+    <!-- v0.11.2 / v0.11.3: Mermaid diagrams for course lessons (and any
+         markdown content that wants attack-chain / flowchart visuals).
+         Vendored at ~3.3 MB so air-gap deployments work out of the box.
+         Consumers guard on `typeof mermaid !== 'undefined'` so a missing
+         file would gracefully degrade. -->
     <script src="/static/js/mermaid.min.js" onerror="window.__mermaidMissing=true"></script>
     <script>
       if (typeof mermaid !== 'undefined' && mermaid.initialize) {
         mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
+      }
+      // v0.11.3: configure marked.js to convert ```mermaid fenced blocks
+      // into <div class="mermaid"> so mermaid.run() can pick them up.
+      // Without this hook, mermaid blocks would render as plain
+      // <pre><code class="language-mermaid"> and never become diagrams.
+      if (typeof marked !== 'undefined' && marked.use) {
+        try {
+          marked.use({
+            renderer: {
+              code(token) {
+                // marked v9+ passes a token object; v4-8 passed (code, lang, escaped).
+                // Support both shapes.
+                let code, lang;
+                if (typeof token === 'object' && token !== null) {
+                  code = token.text;
+                  lang = token.lang;
+                } else {
+                  code = token;
+                  lang = arguments[1];
+                }
+                if (lang === 'mermaid') {
+                  // DOMPurify by default strips unknown tags; we configure
+                  // the rendered output by sanitising AFTER this hook with
+                  // ADD_TAGS to keep <div class="mermaid"> intact. See md()
+                  // helper in lesson.html / course_detail.html.
+                  const safe = String(code).replace(/[<>&]/g, c =>
+                    ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+                  return `<div class="mermaid">${safe}</div>`;
+                }
+                return false;
+              }
+            }
+          });
+        } catch (e) { console.warn('marked custom renderer failed:', e); }
       }
     </script>
     <script src="/static/js/app.js?v=0.9.28"></script>

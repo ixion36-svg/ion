@@ -1,5 +1,62 @@
 # Changelog
 
+## v0.11.3 (2026-04-27)
+
+### Course depth bar set + image upload + Mermaid vendored
+
+After v0.11.2 shipped the course framework with deliberately-light demo lessons (~800-1200 words each), feedback was unambiguous: **"more depth and visuals like a proper course in the future"**. This ship sets the BTL1 / SANS-style depth bar so the v0.11.4-6 curriculum ships hit it from day one.
+
+#### Demo lesson rewrites (one per tier)
+
+The first reading lesson of each tier rewritten to proper-course depth — these become the quality template for the full curriculum. ~7,800 words of new curriculum content total:
+
+- **L1 — "What happens to an alert?"** — ~2,300 words. Adds explicit learning objectives, prerequisites, deeper explanation of each lifecycle state with ION's actual data-model fields, a Mermaid sequence diagram of a worked end-to-end alert walk (DEMO-0001 from `seed_test_data.py`), four common-mistake patterns each with a fix, and a glossary + further-reading section. **Two diagrams**: lifecycle flowchart + worked-example sequence.
+- **L2 — "The hunt hypothesis (PEAK methodology)"** — ~2,600 words. Strong-vs-weak hypothesis rewriting with five real anti-pattern examples, the four-element hypothesis template visualised as a Mermaid graph, full PEAK loop diagram, KQL with line-by-line commentary, refinement table covering structural-vs-content exclusions, hunt-log YAML schema for null results. **Three diagrams**.
+- **L3 — "Why purple teaming beats annual pentests"** — ~2,900 words. Full purple-team workflow Mermaid graph, four-tier fidelity decision tree (Alerted / Logged-not-alerted / Unparsed / Not-logged) showing which team owns which gap, scoping-rules section with an exercise-notice template, complete worked T1059.001 cycle from authorisation through scorecard YAML, eight-mistake anti-pattern list. **Two diagrams**.
+
+Every rewritten lesson includes:
+- Explicit *learning objectives* + *prerequisites* at top
+- Multiple sub-sections with named headings
+- Worked scenarios that walk an analyst's actual cognitive process
+- Code blocks with inline line commentary
+- Glossary of jargon introduced
+- Further reading with concrete pointers (ATT&CK, LOLBAS, PEAK, MITRE Evals, etc.)
+
+#### Image upload infrastructure
+
+New endpoint: `POST /api/courses/{slug}/images` accepts multipart-form file uploads with `name_override`. Files land at:
+
+```
+src/ion/web/static/img/courses/<course-slug>/<safe-stem>-<random8>.<ext>
+```
+
+Served by the existing `/static` mount — air-gap safe, no third-party storage, no CDN. Constraints: PNG/JPG/SVG/WebP/GIF, 5 MB cap, requires `playbook:create` permission, streamed write with size enforcement so a malicious giant upload can't OOM the worker. Returns the public URL plus a markdown-ready snippet for paste into lesson content:
+
+```json
+{
+  "url": "/static/img/courses/demo-l1.../lifecycle-x7k2m9q1.png",
+  "markdown": "![lifecycle](/static/img/courses/demo-l1.../lifecycle-x7k2m9q1.png)"
+}
+```
+
+#### Mermaid vendored
+
+`static/js/mermaid.min.js` (Mermaid 10.9.1, ~3.3 MB) is now bundled in the image. Air-gap deployments get diagrams out of the box — no curl-from-CDN required. Marked.js configured with a custom code-block renderer in `base.html` that converts ` ```mermaid ` fenced blocks to `<div class="mermaid">` so `mermaid.run()` picks them up. Without this hook, mermaid blocks would render as plain `<pre><code class="language-mermaid">` and never become diagrams.
+
+#### What's deferred (still v0.11.4)
+
+- Admin authoring UI — pushed to v0.11.4. The image upload endpoint is wired, but admins still edit course content via the seeder until the authoring UI lands.
+- Inline knowledge-check widgets — embedded mini-quizzes within reading lessons. Requires a custom marked.js extension or custom directive parser; deferred.
+- Full L1 / L2 / L3 curriculum — v0.11.4 / .5 / .6 will author the rest of the modules at the bar this ship just set.
+
+#### Upgrade
+
+Drop in `ion:0.11.3`. No schema changes. Run the updated `seed_courses.py` to refresh the demo content (it cleans and re-seeds idempotently):
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
 ## v0.11.2 (2026-04-27)
 
 ### Course framework — L1/L2/L3 SOC analyst training (foundation ship)

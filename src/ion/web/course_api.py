@@ -1,4 +1,4 @@
-"""Training course API + page routes (v0.11.2).
+"""Training course API + page routes (v0.11.2+).
 
 Endpoints split by audience:
 
@@ -11,6 +11,9 @@ Endpoints split by audience:
 - ``POST   /api/lessons/{id}/complete``              mark a READING/LAB lesson complete
 - ``POST   /api/lessons/{id}/submit-quiz``           submit answers; returns score + per-question result
 
+**Author (v0.11.3):**
+- ``POST   /api/courses/{slug}/images``              upload an image asset for a course (PNG/JPG/SVG/WebP only)
+
 **Pages:**
 - ``GET /courses``                                   catalog
 - ``GET /courses/{slug}``                            detail
@@ -21,18 +24,19 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import secrets
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ion.auth.dependencies import get_current_user, require_page_auth
+from ion.auth.dependencies import get_current_user, require_page_auth, require_permission
 from ion.models.course import (
     Course, CourseLevel, CourseModule, Lesson, LessonProgressStatus,
     LessonType, Question, QuestionKind, UserAnswer, UserEnrolment,
@@ -514,6 +518,106 @@ def submit_quiz(
         "total_points": total_points,
         "results": per_question_results,
         "status": prog.status,
+    }
+
+
+# ── Image upload (v0.11.3) ───────────────────────────────────────────────
+
+
+_ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif"}
+_MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB cap
+
+# Static asset root inside the package so the existing /static mount serves
+# course images without extra wiring. Layout:
+#
+#   src/ion/web/static/img/courses/<course-slug>/<unique-name>.<ext>
+#
+# Authors reference these in lesson markdown as:
+#   ![Alt text](/static/img/courses/demo-l1-alert-triage-fundamentals/lifecycle.png)
+_COURSE_IMAGES_ROOT = Path(__file__).resolve().parent / "static" / "img" / "courses"
+
+
+def _safe_slug(s: str) -> str:
+    """Sanitise a string so it's safe as a path component."""
+    s = (s or "").strip().lower()
+    s = re.sub(r"[^a-z0-9_.-]+", "-", s)
+    return s.strip("-.") or "untitled"
+
+
+@router.post("/api/courses/{slug}/images")
+async def upload_course_image(
+    slug: str,
+    file: UploadFile = File(...),
+    name_override: Optional[str] = Form(None),
+    current_user: User = Depends(require_permission("playbook:create")),
+    session: Session = Depends(get_db_session),
+):
+    """Upload an image asset for a course's lessons.
+
+    Files land under ``static/img/courses/<course-slug>/`` and are served
+    by the existing ``/static`` mount. Authors paste the returned URL
+    directly into lesson markdown:
+
+        ![Lifecycle diagram](/static/img/courses/demo-l1.../lifecycle.png)
+
+    Air-gap safe — no external CDNs, no third-party storage. Constraints:
+    - Allowed extensions: png/jpg/svg/webp/gif
+    - 5 MB per file
+    - Author needs ``playbook:create`` permission (mirrors story authoring)
+    """
+    course = session.query(Course).filter(Course.slug == slug).one_or_none()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    raw_name = (name_override or file.filename or "image").strip()
+    ext = Path(raw_name).suffix.lower()
+    if ext not in _ALLOWED_IMAGE_EXT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Extension {ext!r} not allowed (allowed: {sorted(_ALLOWED_IMAGE_EXT)})",
+        )
+
+    # Stem the file name (no extension) and add a random suffix so re-uploads
+    # don't clobber prior files; authors get a stable URL per upload.
+    stem = _safe_slug(Path(raw_name).stem)[:64] or "image"
+    unique = secrets.token_urlsafe(6).replace("_", "").replace("-", "")[:8].lower()
+    fname = f"{stem}-{unique}{ext}"
+
+    course_dir = _COURSE_IMAGES_ROOT / _safe_slug(course.slug)
+    course_dir.mkdir(parents=True, exist_ok=True)
+    target = course_dir / fname
+
+    # Stream + size-cap the read so a malicious giant upload doesn't OOM us.
+    bytes_written = 0
+    chunk_size = 1024 * 1024
+    try:
+        with target.open("wb") as out:
+            while True:
+                chunk = await file.read(chunk_size)
+                if not chunk:
+                    break
+                bytes_written += len(chunk)
+                if bytes_written > _MAX_IMAGE_BYTES:
+                    out.close()
+                    target.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Image exceeds {_MAX_IMAGE_BYTES // (1024 * 1024)} MB cap",
+                    )
+                out.write(chunk)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        target.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"Upload failed: {exc}")
+
+    public_url = f"/static/img/courses/{_safe_slug(course.slug)}/{fname}"
+    return {
+        "url": public_url,
+        "bytes": bytes_written,
+        "filename": fname,
+        "course_slug": course.slug,
+        "markdown": f"![{stem}]({public_url})",
     }
 
 

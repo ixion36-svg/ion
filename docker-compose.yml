@@ -98,7 +98,7 @@ services:
     # build: .  # Uncomment to build from source instead of pulling
 
 
-    image: ixion36/ion:${ION_VERSION:-0.11.2}
+    image: ixion36/ion:${ION_VERSION:-0.11.3}
 
     container_name: ion
     restart: unless-stopped
@@ -254,7 +254,7 @@ services:
   seeder:
 
 
-    image: ixion36/ion:${ION_VERSION:-0.11.2}
+    image: ixion36/ion:${ION_VERSION:-0.11.3}
 
     container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]

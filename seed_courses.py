@@ -136,88 +136,198 @@ def _seed_l1(session: Session, author_id: int) -> Course:
         estimated_minutes=45,
     )
 
-    # Lesson 1.1 — reading: the lifecycle
+    # Lesson 1.1 — reading: the lifecycle (rewritten v0.11.3 to BTL1 depth)
     l1 = _add_lesson(
         session, mod, order=1, title="What happens to an alert?",
-        lesson_type=LessonType.READING, duration_min=10,
+        lesson_type=LessonType.READING, duration_min=22,
         content_md="""
-## The five states an alert moves through
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Name the five states every alert moves through, and identify which one a given alert is currently in
+> 2. Explain who owns each state (L1 / L2 / detection-engineering / IT)
+> 3. Read an `AlertTriage` row in ION and tell from its fields exactly where the alert sits in the lifecycle
+> 4. Recognise the most common L1 anti-pattern (skipping triage and investigating everything) and avoid it
+>
+> **Prerequisites.** None — this is the first lesson of L1. You need access to ION's `/alerts` page to follow the worked example, but you can read this end-to-end first.
 
-Every alert that hits the SOC moves through the same five states, regardless
-of which SIEM, EDR, or detection platform produced it. Knowing them is the
-single most useful mental model for an L1 analyst because it tells you
-**what your job is right now** and **what has to be true before the alert moves on**.
+## Why this is the most useful mental model you'll learn
+
+Working a SOC shift without an alert-lifecycle model is like working a hospital triage desk without one. You'll handle every patient with the same urgency, exhaust yourself, and miss the genuinely sick. The five-state model gives you a consistent answer to two questions you'll be asked thousands of times:
+
+1. *What's the next thing that has to happen for this alert?*
+2. *Whose problem is that — mine, or someone else's?*
+
+Once you can answer those two questions in under five seconds for any alert, you're an effective L1.
+
+## The lifecycle
+
+Every alert — whether it came from Microsoft Defender, Splunk, Elastic Security, CrowdStrike, or a custom regex on a syslog feed — moves through these five states in order:
 
 ```mermaid
 flowchart LR
-    A[1. Ingested] --> B[2. Triaged]
-    B --> C[3. Investigated]
-    C --> D[4. Resolved]
-    D --> E[5. Closed + Tuned]
-    B -.escalate.-> C
-    C -.escalate.-> F[L2/L3]
+    A[1. Ingested<br/>queue] --> B[2. Triaged<br/>L1 decision]
+    B -->|investigate| C[3. Investigated<br/>L1 or L2 active work]
+    B -->|fast close| D[4. Resolved<br/>verdict assigned]
+    C --> D
+    D --> E[5. Closed + Tuned<br/>detection-eng / SOC lead]
+    B -. dup / FP signature .-> D
+    C -. need senior eyes .-> F[Escalate to L2/L3]
     F --> D
 ```
 
+The two dotted edges are the ones new analysts forget. From **Triaged**, you can shortcut directly to **Resolved** if the alert is a known false-positive signature, a duplicate of an open case, or matches a documented benign pattern. From **Investigated**, you can hand off to L2/L3 if the work is genuinely beyond your tier — that's not failure, it's good queue management.
+
 ### 1. Ingested
 
-The detection platform produced the alert and it landed in your queue.
-Nobody has looked at it yet. Good detections produce *fewer* alerts than
-weak ones — if your queue has 800 unprocessed items, that's a tuning
-problem, not a productivity problem.
+The detection rule fired and the alert landed in the queue. Nobody has looked at it yet.
+
+What's true here:
+
+- A row exists somewhere — for ION, it's an `AlertTriage` row with `status = OPEN`, `case_id IS NULL`, and `suggested_verdict IS NULL`
+- The alert carries everything the rule emitted: rule name, MITRE techniques, host, user, source/destination IPs, the raw `kibana.alert.reason` one-liner, and any extracted observables
+- **No human has formed an opinion yet.** Bob (the AI analyst) may have written a `suggested_verdict` if he's enabled, but the human-loop is unstarted
+
+A common mis-read at this stage is judging severity from the *rule name*. A rule called `Suspicious PowerShell Execution` sounds urgent, but the same rule fires a hundred times a day on a SCCM-managed estate with PowerShell-driven config drift. The rule name is a *category*; the severity is whatever the analyst assigns after triage.
+
+If your queue at the start of shift has 800+ unprocessed items, **that is a tuning problem, not a productivity problem.** No analyst can triage 800 items in eight hours without short-cutting. Fixing the noise belongs to detection-engineering, not to working harder.
 
 ### 2. Triaged
 
-An analyst has eyeballed it and made an initial decision: is this worth
-investigating, is it duplicate noise, or is it a known-benign pattern?
-Triage decisions in ION are captured on the `AlertTriage` row as
-`status` (open / acknowledged / closed) and a `suggested_verdict` from
-Bob if the AI analyst has run.
+An analyst has eyeballed it for 10–60 seconds and made an initial decision. Triage is *not* investigation — it's the prioritisation step. Three outcomes are possible:
+
+| Triage outcome | What happens next |
+|---|---|
+| **Worth investigating** | Move to state 3, decide whether L1 takes it or escalate up |
+| **Duplicate / known FP signature** | Skip straight to state 4 with verdict `duplicate` or `false_positive` — record which signature matched |
+| **Insufficient information to decide** | Set `status = ACKNOWLEDGED`, leave `suggested_verdict IS NULL`, and request enrichment (IP rep, hash lookup, asset-criticality lookup); revisit when enrichment comes back |
+
+In ION, triage decisions show up as:
+- `AlertTriage.status` — flips from `OPEN` → `ACKNOWLEDGED` (or → `CLOSED` if fast-closed)
+- `AlertTriage.suggested_verdict` — the analyst's intent, not the final verdict (the final lives on `AlertCase.closure_reason` in state 5)
+- `AlertTriage.assigned_to_id` — picks up the analyst who claimed it
+- `AlertTriage.first_seen_at` — when triage *started*, used for SLA reporting
+
+The discipline at state 2: **triage the whole queue first, then pick what to investigate.** Working alerts in arrival order is the reliable way to spend four hours on a false positive while a critical sits ignored at the bottom of the list.
 
 ### 3. Investigated
 
-Someone is *actively working* on the alert: pulling logs, looking up
-indicators, checking if a real human host did the thing or if a service
-account did. Investigations are the time-expensive part of the job —
-the goal of triage is to make sure you only investigate alerts that
-*deserve* investigation.
+Someone is *actively working* the alert. They're pulling logs, looking up indicators on VirusTotal / OpenCTI / AbuseIPDB, checking whether a service account fired the rule (often benign) or a real human did (more often investigatable), and walking the timeline of what happened around the event.
+
+In ION, investigation work shows up as:
+
+- An `Investigation` row keyed by `alert_id_ref` — Bob writes one of these every time the AI analyst runs on the alert; humans add notes via `Note` rows
+- `AlertTriage.status = ACKNOWLEDGED` and `case_id` set if a case was opened to track the investigation properly
+- One or more `ObservableLink` rows tying extracted IOCs (IPs, hashes, domains) to the case
+- Possibly a `PlaybookExecution` row if a playbook ran during the investigation
+
+This is the time-expensive part of the job. A typical L1 investigation is 5–20 minutes; an L2/L3 investigation can run hours or days. **The point of state 2 (triage) is to make sure that only alerts which deserve a 20-minute investigation actually receive one.**
 
 ### 4. Resolved
 
-A verdict has been reached. ION's `CaseClosureReason` enum captures the
-six allowed values:
+A verdict has been reached. ION's `CaseClosureReason` enum captures the six allowed values — these are the same ones every detection-engineering team measures their detection quality against:
 
-| Value | Meaning |
-|---|---|
-| `true_positive` | The rule fired on real malicious / unauthorised activity |
-| `false_positive` | The rule fired on benign activity — **rule needs tuning** |
-| `benign_true_positive` | Rule fired correctly but the activity is authorised here (vuln scan, admin tool) |
-| `duplicate` | Already covered by another open case |
-| `insufficient_data` | Can't decide — escalating or sleeping on it |
-| `not_applicable` | Out of scope for this SOC (different team owns it) |
+| Value | Meaning | Tuning owed? |
+|---|---|---|
+| `true_positive` | Rule fired on real malicious / unauthorised activity | No |
+| `false_positive` | Rule fired on benign activity — the rule shouldn't have fired | **Yes** — exclusion or refinement |
+| `benign_true_positive` | Rule correctly identified the behaviour, but the activity is authorised in this environment (vuln scanner, sanctioned admin tool) | Scope refinement only |
+| `duplicate` | Already covered by an open case | No |
+| `insufficient_data` | Can't decide — escalating or parking | No (yet) |
+| `not_applicable` | Out of scope for this SOC (different team owns the asset) | No |
+
+The single most-confused L1 distinction is **false_positive vs benign_true_positive**. Get them right and the detection-engineering team writes good tuning; get them wrong and they either delete a useful rule or fail to fix a noisy one.
+
+A vuln scanner triggering the `Port scan from internal asset` rule is `benign_true_positive` — the rule correctly identified port-scan behaviour, the scanner is authorised. A typo'd regex matching every Word document is `false_positive` — the rule shouldn't be firing on those at all.
 
 ### 5. Closed + Tuned
 
-The case is shut. If the verdict was `false_positive` or
-`benign_true_positive`, **a tuning action is owed** — either an exclusion
-on the rule, a whitelist on the asset, or a scope refinement. Without
-the tuning step the same alert reappears tomorrow and your queue grows.
+The case is shut and any tuning actions are recorded. For `false_positive` and `benign_true_positive` verdicts, **a tuning action is owed** — without it, the same alert reappears tomorrow and the queue grows.
 
-### What L1 owns
+In ION, tuning actions show up as:
 
-You are responsible for **states 1 → 2 → 3** — moving alerts from the
-ingestion queue through triage, into either an investigation or a fast
-close. Anything that turns out to be complex enough that you need
-malware analysis or threat-hunting workflows gets escalated to L2.
+- A `TuningProposal` row created from the case detail page — captures the proposed exclusion / refinement / rule deletion
+- The case is `CLOSED` in `AlertCase.status`
+- The verdict is recorded in `AlertCase.closure_reason`
+- `AIFeedback` row written automatically — captures Bob's predicted verdict vs the human's actual verdict for the per-template scorecard
 
-### A common mistake
+The tuning step is what separates a healthy SOC from a noisy one. A SOC that closes 500 false-positives a week without tuning is a SOC that will close 500 false-positives next week too.
 
-New analysts skip state 2 and try to investigate every alert. That works
-for two days. Then the queue overwhelms them. The discipline is: triage
-the whole queue first, *then* pick the highest-severity unaddressed
-alerts to investigate. You can always come back to lower-severity items
-later — but you can't come back to *anything* if you spent four hours
-on a false positive.
+## Worked example — walking a real alert through all five states
+
+Let's trace `DEMO-0001` (the seeded test case from `seed_test_data.py`). This is exactly the path an L1 analyst walks for one alert during a shift:
+
+```mermaid
+sequenceDiagram
+    participant ES as Elasticsearch
+    participant ION as ION
+    participant Bob
+    participant L1 as L1 Analyst
+
+    ES->>ION: alert-demo-001-a fires (Suspicious PowerShell, severity=high)
+    Note over ION: State 1 — Ingested. AlertTriage row, status=OPEN.
+    ION->>Bob: investigate_alert(alert_id)
+    Bob->>Bob: parse cmd_line, extract IOCs, check OpenCTI
+    Bob-->>ION: verdict=true_positive, confidence=high, key_observations cited
+    Note over ION: AlertTriage.suggested_verdict = "true_positive"
+    L1->>ION: claims the alert, reads Bob's narrative + key observations
+    Note over ION: State 2 — Triaged. status=ACKNOWLEDGED, assigned_to=L1.
+    L1->>ION: opens case DEMO-0001, links the alert
+    L1->>ION: pivots to similar-observables panel, sees IP shared with DEMO-0002
+    Note over ION: State 3 — Investigated. case_id linked, observables extracted.
+    L1->>ION: confirms phishing chain, requests host isolation via IT
+    L1->>ION: closes case with closure_reason=true_positive
+    Note over ION: State 4 — Resolved. AlertCase.status=CLOSED.
+    L1->>ION: no tuning needed (TP) — adds note, signs off
+    Note over ION: State 5 — Closed + Tuned. AIFeedback row written automatically.
+```
+
+The whole walk took 8 minutes of L1 time. Bob's investigation took 30 seconds and gave the analyst a strong starting point: a verdict suggestion, three cited key observations (the obfuscated command line, the Outlook parent process, the malicious IP), and three recommended actions. The L1's job wasn't to *redo* Bob's work — it was to **confirm**, **gather the cross-case context Bob couldn't see**, and **decide on the closure verdict**.
+
+That's what good L1 work looks like in 2026: a partnership with the AI analyst, not a competition with it.
+
+## Common mistakes (and how to avoid them)
+
+These are the four mistakes new L1s make most often. All four show up in pre-shift reviews of analyst queue performance.
+
+1. **Skipping triage and investigating every alert.** Works for two days, then the queue overwhelms you. Fix: every shift, *triage the whole queue first* — even if it takes 45 minutes. Then pick the highest-severity unaddressed alerts to investigate.
+
+2. **Closing without tuning on false positives.** The rule will fire again tomorrow. Fix: any `false_positive` or `benign_true_positive` verdict requires either an immediate rule edit or a `TuningProposal` ticket — no exceptions.
+
+3. **Confusing false_positive with benign_true_positive.** Detection-engineering loses signal either way: too many false_positives and they delete useful rules; too many benign_true_positives miscategorised as false_positives and they over-tune. Fix: always ask "did the rule correctly identify the behaviour it looks for?" — if yes, it's benign_true_positive (or true_positive); if no, it's false_positive.
+
+4. **Re-investigating duplicates.** A different rule triggers on the same underlying event — and you investigate it like it's new. Fix: always check ION's "Cross-Case Observable Sightings" panel on case detail before opening a new case. If the IPs / hashes match an open case, link the alert to that case as `duplicate` instead.
+
+## How this maps to ION's data model
+
+ION's tables are designed around the lifecycle. Here's the cheat-sheet:
+
+| Lifecycle state | Primary ION row | Key fields |
+|---|---|---|
+| Ingested | `AlertTriage` | `status=OPEN`, `case_id IS NULL` |
+| Triaged | `AlertTriage` | `status=ACKNOWLEDGED`, `suggested_verdict` set |
+| Investigated | `AlertCase` + `Investigation` + `Note` + `ObservableLink` | `case_id` linked from triage |
+| Resolved | `AlertCase.closure_reason` | the six-value enum |
+| Closed + Tuned | `AlertCase.status=CLOSED`, `TuningProposal`, `AIFeedback` | tuning row exists if FP/BTP |
+
+If you're reading code or writing a query and want to know *which alerts are stuck at which stage*, those columns are the ones to filter on.
+
+## Glossary
+
+- **AlertTriage** — ION's row representing an L1's view on an alert. One per ES alert id.
+- **AlertCase** — ION's row for the formal case opened around one or more linked alerts.
+- **CaseClosureReason** — the six-value enum L1s use to verdict cases (`true_positive` / `false_positive` / `benign_true_positive` / `duplicate` / `insufficient_data` / `not_applicable`).
+- **Bob** — ION's AI analyst service user. Authors automated `Investigation` rows + Note commentary.
+- **TuningProposal** — ticket-shaped row that captures a proposed detection-rule change. Owed for every `false_positive` close.
+- **AIFeedback** — the per-case ledger row that records Bob's predicted verdict vs the human's actual verdict, for scoring per-template Bob accuracy.
+
+## Further reading
+
+- MITRE D3FEND model — the *defensive* counterpart to ATT&CK. Worth bookmarking for tier-2 work.
+- *Crafting the InfoSec Playbook* (O'Reilly, Bollinger / Enright / Valites) — chapter 4 covers the alert lifecycle from a process angle.
+- ION's own docs: `docs/RUNBOOK.md` covers the L1 escalation matrix; `docs/ARCHITECTURE.md` walks the AlertTriage / AlertCase / Investigation row relationships.
+
+---
+
+When you're ready, move on to the **severity rating quiz** to lock in the rubric you'll use thousands of times this year.
 """,
     )
     # Reading lessons have no questions; learner clicks "mark complete".
@@ -420,57 +530,222 @@ def _seed_l2(session: Session, author_id: int) -> Course:
 
     l1 = _add_lesson(
         session, mod, order=1, title="The hunt hypothesis (PEAK methodology)",
-        lesson_type=LessonType.READING, duration_min=12,
+        lesson_type=LessonType.READING, duration_min=25,
         content_md="""
-## Hunting starts with a question, not a query
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Define adversary-driven hunting and explain how it differs from alert response and "exploratory searching"
+> 2. Apply the **PEAK** loop (Prepare → Execute → Act → Know) to a hunt from start to finish
+> 3. Write a *strong* hunt hypothesis using the four-element template (TTP + artefact + data source + window)
+> 4. Recognise weak hypotheses and rewrite them
+> 5. Document a hunt's negative results so the team learns from null findings
+>
+> **Prerequisites.** L1 *Alert Triage Fundamentals* completed. You should be comfortable reading KQL or SPL queries and know what a MITRE ATT&CK technique ID looks like.
 
-A weak hunt is *"let me search for stuff that looks bad"*. A strong hunt
-is *"if **this specific TTP** were happening here, **this specific
-artefact** would be in **this specific data source**"*. You write the
-artefact + data source down before you open the SIEM.
+## Why hunt? Detection alone isn't enough
 
-The PEAK methodology (SURGe / Splunk) breaks a hunt into four parts:
+The SOC's detection layer can only catch threats it has rules for. **Threat hunting fills the gap** — a hypothesis-driven search for adversary behaviour that *no rule has caught yet*. Run consistently, hunting:
+
+- Surfaces gaps in detection coverage *before* a real adversary exploits them
+- Converts those gaps into permanent new detection rules (closing the loop)
+- Builds analyst muscle memory for adversary TTPs that don't fire frequently
+- Provides the data points your CISO uses to defend the SOC's budget at year-end review
+
+A hunt is **not** a one-off "let me poke around the SIEM and see what looks weird". That's exploratory searching, which has its place but isn't repeatable, isn't measurable, and doesn't compound. A real hunt has the same structure every time: a documented hypothesis, a query, a result set you actually walk through, and a recorded outcome — finding or no-finding, both are valuable.
+
+## The PEAK loop
+
+The PEAK methodology was published by SURGe (Splunk's research team) in 2023 and has become the de facto standard for repeatable hunting. It's four phases that loop:
+
+```mermaid
+flowchart LR
+    P[<b>P · Prepare</b><br/>Frame hypothesis<br/>Pick TTP + artefact + data source]
+    E[<b>E · Execute</b><br/>Build the query<br/>Iterate, reduce noise]
+    A[<b>A · Act</b><br/>Open case if found<br/>Document negative result]
+    K[<b>K · Know</b><br/>Convert to detection rule<br/>Update hunt log]
+    P --> E --> A --> K --> P
+    style P fill:#1e3a8a,color:#fff
+    style E fill:#0e7490,color:#fff
+    style A fill:#15803d,color:#fff
+    style K fill:#9a3412,color:#fff
+```
+
+| Phase | Length | What you do | Output |
+|---|---|---|---|
+| **P · Prepare** | 30 min | Frame the hypothesis, pick the TTP, the artefact, the data source, the time window. Define what *success* and *null* both look like. | A 3–5 sentence hypothesis written down before you touch the SIEM |
+| **E · Execute** | 1–4 hrs | Build the query. Iterate to reduce noise without losing signal. Stop when the result set is small enough to *eyeball every row*. | A working query + a short result-set walkthrough |
+| **A · Act** | varies | If you found something — open a case, treat it like an investigation, escalate. If nothing — record the null result with as much detail as a positive finding. | A case OR a hunt-log entry, never silence |
+| **K · Know** | 30–60 min | Convert the successful hunt logic into a permanent detection rule. Capture the negative results in the hunt log so the next hunter doesn't repeat them. | A new detection rule + a hunt-log row |
+
+The loop closes — once you've **K**nown a hunt, the hypothesis you formed in **P** evolves. You learn what your environment actually looks like, what's normal, and what TTPs are worth hypothesising next.
+
+## Anatomy of a strong hypothesis
+
+A strong hypothesis has **four elements**. Skip any one and the hunt collapses into searching:
 
 ```mermaid
 flowchart TD
-    P[P · Prepare] --> E[E · Execute]
-    E --> A[A · Act]
-    A --> K[K · Know]
-    K --> P
+    H[Strong<br/>hypothesis] --> T[1. TTP<br/>Specific MITRE technique]
+    H --> A[2. Artefact<br/>Field or pattern in the data]
+    H --> D[3. Data source<br/>Index, table, log type]
+    H --> W[4. Window<br/>Time range to query]
+    style H fill:#7c3aed,color:#fff
 ```
 
-| Phase | What you do |
-|---|---|
-| **P · Prepare** | Frame the hypothesis. Pick the TTP, the artefact, the data source. Define what success looks like. |
-| **E · Execute** | Build the query. Iterate. *Reduce noise without losing the signal you came for.* |
-| **A · Act** | If you found something, open a case. If nothing, document the negative result. |
-| **K · Know** | Convert the successful hunt logic into a permanent detection rule. Capture the negative results in your hunt log so you don't repeat them. |
+### Element 1 — the TTP
 
-### A worked hypothesis
+A specific MITRE ATT&CK technique (or sub-technique). Not a category, not a tactic, not a vague "lateral movement" — a specific technique ID. *T1218.005 — Mshta* is good. *Defense Evasion* alone is not.
 
-> *"If an adversary used Living-off-the-Land binaries (LoLBins) to bypass
-> EDR, I would see PowerShell or wmic invoking* `mshta` *or* `regsvr32`
-> *with a remote URL argument, on Windows endpoints, in winlogbeat-* in
-> the last 7 days."*
+Why specific? Because adversaries execute *specific* TTPs that produce *specific* artefacts. The more specific the TTP, the more specific the artefact you can hunt for, the smaller the result set, the more likely you find what you came for.
 
-Notice what's specific about that:
+### Element 2 — the artefact
 
-1. **TTP** — LotL via mshta/regsvr32 (T1218.005 + T1218.010)
-2. **Artefact** — `process.command_line` containing both an LoLBin name
-   AND a URL pattern
-3. **Data source** — `winlogbeat-*` from EDR / Sysmon
-4. **Time window** — last 7 days
+The exact field or pattern you'd expect to see if the TTP were happening here. For T1218.005 it might be `process.name = "mshta.exe"` AND `process.command_line` containing both a script-engine reference (`vbscript:`, `javascript:`) AND a URL pattern.
 
-Without all four, you're searching, not hunting. Searching is fine —
-just don't claim it counts as a hunt.
+The artefact is the *bridge* between the abstract TTP and the concrete data. When you write the hypothesis, write the artefact in pseudo-query form so you don't lose it later:
 
-### Why specificity matters
+> Artefact: `process.name == "mshta.exe" AND process.command_line MATCHES /(vbscript|javascript):.*https?:\\/\\//`
 
-Generic hunts (*"any suspicious PowerShell"*) produce so much noise that
-you abandon the hunt or, worse, miss the real finding because it was
-buried at result #4,712. A specific hypothesis has small enough output
-that you can *eyeball every row*. If it doesn't, your hypothesis isn't
-specific enough yet — narrow it.
+### Element 3 — the data source
+
+Which index / table / log type. Be precise — `winlogbeat-*` is fine; `logs` is not. The data source determines:
+
+- Whether the artefact field actually exists (does winlogbeat collect `process.command_line`? *Yes* on Sysmon-equipped hosts; *no* on bare event logs)
+- The fidelity (Sysmon Event 1 captures full command line; native Security 4688 captures truncated unless you've enabled the policy)
+- The retention (are you searching back farther than the index keeps?)
+
+### Element 4 — the window
+
+How far back to look. Standard hunting windows: 7d, 14d, 30d, 90d. Longer windows catch slow-burn campaigns; shorter windows reduce noise. **Start narrow, widen if null.**
+
+A null result over 7 days doesn't mean *no compromise* — it means *not in the last 7 days from this data source*. Widening the window is part of the *Know* loop after a null.
+
+## Worked example — framing a hunt from scratch
+
+Let's frame a hunt for the LotL family of techniques. A real hunt analyst's whiteboard, in order:
+
+```mermaid
+sequenceDiagram
+    participant Hunter
+    participant ATT&CK as ATT&CK Navigator
+    participant Inv as Hunt log
+    participant SIEM
+
+    Hunter->>ATT&CK: Which Defense Evasion sub-techniques fired in recent CTI?
+    ATT&CK-->>Hunter: T1218.005 (Mshta), T1218.010 (Regsvr32) trending
+    Hunter->>Hunter: Pick T1218.005 — concrete enough
+    Hunter->>Hunter: Artefact: mshta.exe spawned via PowerShell/WMIC + URL arg
+    Hunter->>Hunter: Data source: winlogbeat-*  (Sysmon Event 1)
+    Hunter->>Hunter: Window: last 7 days
+    Hunter->>Inv: Hypothesis written down
+    Hunter->>SIEM: Build query, iterate
+    SIEM-->>Hunter: 3 results
+    Hunter->>Hunter: Walk all 3 — all benign sysadmin scripts
+    Hunter->>Inv: A · Act = no compromise; K · Know = convert to rule with sysadmin exclusions
+```
+
+The hypothesis written on the whiteboard:
+
+> *"If an adversary used Living-off-the-Land binaries (LoLBins) to bypass EDR, I would see `powershell.exe` or `wmic.exe` invoking `mshta.exe` or `regsvr32.exe` with a remote URL argument, on Windows endpoints, in `winlogbeat-*` over the last 7 days. Null result is documented; positive result triggers an immediate case + cross-host pivot."*
+
+That sentence has all four elements. Tape it to the wall, then open the SIEM.
+
+A first-pass KQL on `winlogbeat-*`:
+
+```kql
+// 1. Restrict to recent events on the right index pattern
+@timestamp >= "now-7d" and
+// 2. Parent process is one of the unusual launchers
+process.parent.name : ("powershell.exe" or "wmic.exe") and
+// 3. Child process is one of the LoLBins we picked
+process.name : ("mshta.exe" or "regsvr32.exe") and
+// 4. Command line carries a URL — distinguishes LotL download from local-only execution
+process.command_line : (*http://* or *https://*)
+```
+
+Each commented clause maps to one of the four hypothesis elements. If you can't draw that mapping, your query has more (or fewer) clauses than your hypothesis warrants — adjust until they line up.
+
+## Anti-patterns: weak vs strong hypotheses
+
+Five real-world hypotheses I've seen written by junior hunters, with the rewrites:
+
+| Weak | Why it's weak | Rewrite |
+|---|---|---|
+| "Look for suspicious PowerShell" | No artefact, no data source, no window | "T1059.001 — encoded PowerShell launched by Office processes, `process.command_line` matching `-enc` or base64 entropy > 4.5, on `winlogbeat-*` over 14d" |
+| "Hunt for lateral movement" | TTP is a *tactic*, not a technique. No artefact. | "T1021.002 — SMB/Admin shares used by non-admin accounts, `event.code:5140 AND user.role != 'admin'`, on `winlogbeat-security-*` over 7d" |
+| "Look for malicious IPs" | No data source. Hunt vs detection confusion (this is what threat-intel feeds do automatically). | "T1071.001 — outbound HTTPS to IPs newly registered in last 30 days, joined against `threatintel-newly-registered-domains`, on `firewall-*` over 24h" |
+| "Hunt for ransomware" | Ransomware is a *category*, not a TTP. By the time you see ransomware artefacts, you're past prevention. | "T1486 precursors — high volume of `crypto-` or `vssadmin delete` commands per host, on `winlogbeat-sysmon-*` over 24h" |
+| "Find data exfiltration" | Tactic, not technique. No artefact. | "T1567.002 — outbound to cloud-storage providers (Mega, Anonfiles, Dropbox public) > 100MB from non-IT hosts, on `firewall-*` over 7d" |
+
+Notice the rewrites all have a **specific MITRE technique ID**, a **concrete artefact pattern**, a **named index**, and a **time window**. Without those four elements, you can still find things — but you can't repeat the hunt, you can't compare across periods, and you can't convert findings into permanent rules.
+
+## When the result set is too big
+
+Iteration in the **E** phase isn't optional. A first-pass query that returns 4,800 rows is a query that won't be hunted properly — you'll abandon it or skim it badly. Each iteration narrows by adding context, never by removing the artefact:
+
+| Refinement type | Effect | Loses signal? |
+|---|---|---|
+| Exclude signed-binary paths (`process.executable: "C:\\Windows\\System32\\*"`) | Big noise drop on regsvr32-style hunts | No (signed paths are by definition not the LoLBin abuse pattern) |
+| Restrict to non-RFC1918 destination IPs | Massive drop on URL-arg hunts | Sometimes — internal exfil sites get hidden |
+| Exclude known service accounts (e.g. `user.name: not "svc_sccm"`) | Cuts SCCM-driven config-management noise | Only if SCCM is the abused account |
+| Require command-line length > N | Cuts short legit lines | **Often loses signal** — adversaries can chain compact loaders |
+| Exclude alerts already in `critical` state | Cuts working-now alerts | **Loses signal** — they may be unrelated detections this hunt would disambiguate |
+
+General principle: **exclude on structural properties (signed paths, RFC1918, known accounts), not on content properties (length, char set)**. Structural exclusions are unlikely to hide adversary activity; content exclusions often do.
+
+## What "documenting null results" looks like
+
+A hunt that returned zero results is *still a finding*. It tells:
+
+- The next hunter — *don't run this hunt for at least 30 days, the data point is fresh*
+- Detection-engineering — *no signal here on this artefact in this window, move budget elsewhere*
+- The CISO — *we hunted for this and didn't find it; here's the evidence*
+
+A good hunt-log entry has:
+
+```yaml
+hunt_id: HUNT-2026-04-001
+hypothesis: "T1218.005 LotL via mshta launched by PowerShell/WMIC..."
+ttp: T1218.005
+data_source: winlogbeat-*
+window: 7d
+query: |
+  @timestamp >= "now-7d" and
+  process.parent.name : ("powershell.exe" or "wmic.exe") and
+  ...
+result_count: 0
+walk_through_minutes: 0
+findings: null
+known_after:
+  - "Sysmon Event 1 collection is healthy across endpoints (the query
+     hit no exceptions)"
+  - "Confirmed mshta.exe is parsed correctly into process.name field"
+follow_up:
+  - "Re-run in 30 days to catch slow-burn"
+  - "Consider extending to T1218.010 (regsvr32) — already adjacent"
+```
+
+That's a reusable artefact. Three months from now, when someone says *"have we hunted for LotL recently?"*, the answer is in the log.
+
+## Glossary
+
+- **TTP** — Tactic, Technique, Procedure. The MITRE ATT&CK lingo for *what an adversary does*. A hunt picks one, usually a sub-technique.
+- **PEAK** — Prepare, Execute, Act, Know. SURGe's hunt methodology.
+- **LotL** — Living-off-the-Land. Adversary use of legitimate system binaries (PowerShell, mshta, regsvr32, certutil, bitsadmin) to execute malicious activity without dropping new files.
+- **LoLBin** — Living-off-the-Land Binary. The specific binary being abused (mshta.exe, regsvr32.exe, etc.). LOLBAS.io maintains the canonical catalogue.
+- **Artefact** — The specific data point you'd expect to see if the TTP were happening. Bridges the abstract technique to the concrete query.
+- **Hunt log** — Persistent record of every hunt run, finding or null. Often a wiki page, sometimes a structured table.
+- **K · Know phase** — The PEAK phase where hunt logic becomes a permanent detection rule and findings get propagated.
+
+## Further reading
+
+- **PEAK Threat Hunting Framework** (SURGe, Splunk, 2023) — the canonical reference. Search for "PEAK SURGe whitepaper".
+- **LOLBAS Project** — `lolbas-project.github.io` — catalogue of every Windows LoLBin with example commands and detection ideas.
+- **MITRE ATT&CK Navigator** — for picking the next hunt TTP. Filter by sector, campaign, or recent CTI to match your environment's threat profile.
+- **The ThreatHunting Project** — `threathunterz.com` — community library of hunt hypotheses, organised by ATT&CK technique.
+
+---
+
+When you're ready, take the **Building the KQL query** quiz to lock in how each clause of a hunt query maps back to its hypothesis element.
 """,
     )
 
@@ -589,67 +864,251 @@ def _seed_l3(session: Session, author_id: int) -> Course:
 
     l1 = _add_lesson(
         session, mod, order=1, title="Why purple teaming beats annual pentests",
-        lesson_type=LessonType.READING, duration_min=15,
+        lesson_type=LessonType.READING, duration_min=28,
         content_md="""
-## Adversary emulation is detection-validation, not pentesting
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Articulate the difference between **penetration testing** and **adversary emulation** to a non-technical executive
+> 2. Map the four detection-fidelity tiers (Alerted / Logged-not-alerted / Unparsed / Not-logged) to the team that owns the gap
+> 3. Plan a single-TTP purple-team exercise from authorisation through to scorecard
+> 4. Convert a missed detection into a `TuningProposal` ticket with the right scope
+> 5. Avoid the eight common mistakes that wreck early purple-team programs
+>
+> **Prerequisites.** L1 *Alert Triage Fundamentals* and L2 *Threat Hunting with KQL* completed. Familiarity with PowerShell or Bash on a managed endpoint is required for the worked example.
 
-A pentest asks *"can a skilled attacker get in?"* — answer almost always
-*yes*. The result is a list of findings the IT team has to remediate, but
-it tells you nothing about whether your **SOC** would have caught the
-attacker if they'd actually been malicious.
+## Pentests answer the wrong question
+
+Annual pentests ask: *"Can a skilled attacker get in?"* The answer is almost always *yes*. You spend six figures on the engagement, get a 60-page report listing the same OWASP-style findings as last year, and your SOC team — the people who'd actually have to defend against a real intrusion — get nothing actionable from it. The pentesters got in. The remediation list goes to IT. The SOC was a bystander.
+
+Worse, the report tells you almost nothing about your real risk: **whether your SOC would have caught a real adversary if they'd actually been malicious instead of contractually constrained.** A pentester who stays out of EDR's view because they bought the same EDR you have and tuned their tooling against it has proven nothing about whether *Conti* or *FIN7* would also stay out of view.
 
 Adversary emulation flips the question:
 
-> *"For each of the 50 TTPs we know real adversaries against our sector
-> use, can we **detect** them, **respond** to them, and **respond fast
-> enough**?"*
+> *"For each of the TTPs we know real adversaries against our sector use, can we **detect** them, **respond** to them, and **respond fast enough**? Show me the evidence — for every TTP — that we caught it or didn't."*
+
+This is a question with a *measurable* answer. You can put numbers on it. You can track it quarter over quarter. You can defend the SOC budget at year-end review with it. A pentest report cannot.
+
+## The full purple-team flow
+
+A single purple-team cycle is one TTP, one exercise, one scorecard. Run it once a week against a planned curriculum of the TTPs that matter most to your org, and within six months you have empirical detection coverage data for ~25 techniques. That's a defensible posture.
 
 ```mermaid
-flowchart LR
-    A[Pick a TTP] --> B[Atomic Red Team test]
-    B --> C[Execute in a sanctioned way]
-    C --> D[Check SIEM/EDR fired]
-    D -->|Fired| E[Score: detection latency + fidelity]
-    D -->|Missed| F[Open TuningProposal]
-    F --> G[Detection-engineering writes rule]
-    G --> H[Re-run emulation]
-    H --> D
+flowchart TD
+    P[1. Pick TTP<br/>from threat profile] --> A[2. Authorise<br/>CISO + IR signoff]
+    A --> B[3. Pre-brief L1<br/>so they don't open<br/>a real case]
+    B --> X[4. Execute<br/>Atomic Red Team test]
+    X --> C[5. Wait for telemetry<br/>5-30 min ingestion]
+    C --> D{6. Did it fire?}
+    D -->|Alerted at right severity| E[7a. Score: latency + fidelity<br/>Pass]
+    D -->|Logged but no rule| F[7b. Open TuningProposal<br/>Detection gap]
+    D -->|Not in SIEM| G[7c. Logging or telemetry gap<br/>Talk to platform team]
+    E --> S[8. Update scorecard<br/>Pick next TTP]
+    F --> S
+    G --> S
+    S --> P
+    style D fill:#7c2d12,color:#fff
+    style E fill:#15803d,color:#fff
+    style F fill:#a16207,color:#fff
+    style G fill:#991b1b,color:#fff
 ```
 
-### What "catch" means at each fidelity
+Notice step 5 — *wait for telemetry*. New purple-teamers run the test and refresh the SIEM immediately, see no alert, declare a gap, and miss the fact that their EDR has a 15-minute ingestion lag. **Always wait at least 30 minutes before declaring a missed detection.** Half of perceived gaps disappear after coffee.
 
-| Tier | What fired | Action |
+## The four detection-fidelity tiers
+
+When you check whether a TTP fired, the answer is **never just yes/no**. There are four tiers, and they tell different teams different things:
+
+```mermaid
+graph TD
+    Q{Did the SIEM<br/>alert?} -->|Yes — right severity| T1[<b>Tier 1 · Alerted</b><br/>Detection works.<br/>Score: latency, fidelity, severity accuracy.]
+    Q -->|Yes — but wrong<br/>severity / 4hr latency| T1B[<b>Tier 1 with concerns</b><br/>Quality issue.<br/>Detection-eng tunes severity / latency.]
+    Q -->|No alert.<br/>Data IS in SIEM| T2{Field queryable?}
+    T2 -->|Yes — field exists| T3[<b>Tier 2 · Logged not alerted</b><br/>Detection gap.<br/>Detection-eng owns fix.]
+    T2 -->|No — field missing| T4[<b>Tier 3 · Logged not parsed</b><br/>Logging gap.<br/>SIEM team owns fix.]
+    Q -->|No alert.<br/>Data NOT in SIEM| T5[<b>Tier 4 · Not logged</b><br/>Telemetry gap.<br/>Platform team owns fix.<br/>Often a budget conversation.]
+
+    style T1 fill:#15803d,color:#fff
+    style T1B fill:#a16207,color:#fff
+    style T3 fill:#a16207,color:#fff
+    style T4 fill:#9a3412,color:#fff
+    style T5 fill:#991b1b,color:#fff
+```
+
+| Tier | What fired | Owner | Typical fix |
+|---|---|---|---|
+| **1 · Alerted** | High-fidelity rule, right severity | Nobody (it works) | Just record the latency |
+| **1 with concerns** | Rule fired but wrong severity or 4hr latency | Detection-eng | Tune severity / aggregation window |
+| **2 · Logged not alerted** | Activity is in `winlogbeat-*`, field is queryable, no rule matched | Detection-eng | Write or extend a detection rule |
+| **3 · Logged not parsed** | Activity is in the index, but the relevant field doesn't exist as a queryable column | SIEM team | Fix the parser, ECS mapping, or pipeline transform |
+| **4 · Not logged** | Data source isn't being collected at all | Platform / Architecture team | Roll out new data source — usually a budget + agent-deployment conversation |
+
+Calling all four "we missed it" is the single most common mistake in purple-team reporting. The fix for each tier lives with a different team, and conflating them either:
+
+- Blames detection-eng for a *telemetry* problem they can't fix
+- Lets the platform team off the hook for missing data sources by claiming it's a "rule" issue
+- Burns goodwill: detection-eng won't engage with your scorecard if half the "gaps" you flag are actually parsing or telemetry issues
+
+## Scoping rules — what *not* to do is half the discipline
+
+Before you run anything, agree these constraints in writing:
+
+### One TTP per exercise
+
+If you chain T1059.001 → T1547.001 → T1003.001 in one execution, and only one detection fires, you can't tell which step it caught. You think you found two gaps when you might have found one. Or vice versa. Always test atomically.
+
+### Authorisation in writing
+
+CISO + IR lead must sign off, scoped to:
+
+- **The specific MITRE technique ID** (and sub-technique)
+- **The host or hosts** the test will run on
+- **The time window** the test is allowed
+- **The expected blast radius** — what files / processes / network calls it will create
+
+Without authorisation you're conducting unauthorised intrusion testing. *Your* SIEM should catch it. *Your* legal team will pick you up if it does.
+
+### Pre-brief the L1 shift
+
+Tell the L1 team that a sanctioned T1059.001 exercise is happening between 14:00–14:30 on host `ABACWKS042`, with reference number `EX-2026-04-001`. Otherwise they'll see Bob's investigation, open a real case, and waste 30 minutes confirming it's the test you're running. They'll also start to *expect* exercises (good) and stop confusing them with real threats (also good).
+
+The pre-brief format I use:
+
+```
+EXERCISE NOTICE — EX-2026-04-001
+Date: 2026-04-27
+Window: 14:00–14:30
+Host: ABACWKS042 (test workstation, IT Ops scope)
+TTP: T1059.001 — Encoded PowerShell via mshta
+Atomic test: T1059.001-3
+Expected SIEM activity:
+  - Process creation events on Sysmon Event 1
+  - Possible network egress to test.example.com
+Expected outcome:
+  - Rule "Suspicious PowerShell -enc" should fire within 5 min
+  - Severity should be 'high'
+  - Cross-host pivot panel should NOT show this on other hosts
+Run by: <your name>
+Authorised by: <CISO> + <IR lead>
+```
+
+That sentence — exactly that — goes into the exercise log and the L1 chat ahead of execution. After the exercise, the same log gets the result attached.
+
+### Run during business hours for first attempts
+
+You *want* detection-engineering on hand if a gap surfaces. Out-of-hours testing is a *separate* exercise validating *after-hours coverage* — it's a real exercise but it shouldn't be your first run of a TTP. First run in-hours, find the gaps, fix them, then re-run out-of-hours to validate the fix held when the team isn't watching live.
+
+### Use a representative host
+
+A vanilla freshly-imaged VM tells you nothing about your real telemetry. Run on a representative production-mirror host with the same EDR agent, same Sysmon config, same network egress posture as a real workstation in scope. Some orgs maintain a dedicated "purple-team labs" subnet of mirror-config hosts; that's the right pattern.
+
+## Worked example — T1059.001 full cycle
+
+Here's a complete cycle for *Command and Scripting Interpreter: PowerShell* using Atomic Red Team test #3 (mshta executing PowerShell).
+
+### Prepare
+
+ATT&CK Navigator says T1059.001 is in our threat profile (multiple sector-relevant adversaries use it). LOLBAS catalogues mshta as a viable launcher. We pick Atomic test:
+
+```
+T1059.001-3 — Mshta executes PowerShell
+mshta vbscript:CreateObject("Wscript.Shell").Run(
+  "powershell.exe -nop -w hidden -enc <base64-encoded payload>")(window.close)
+```
+
+The base64 payload in the public Atomic test is benign — it just runs `Get-ChildItem` on `C:\` to confirm execution. We use that payload unchanged; modifying it is a separate authorisation conversation.
+
+### Authorise + pre-brief
+
+Exercise notice published to L1 chat at 09:00, scheduled for 14:00. CISO + IR lead initials on the authorisation doc.
+
+### Execute
+
+At 14:02 we run the Atomic test on `ABACWKS042`. The exercise log captures the timestamp.
+
+### Check telemetry — wait 30 minutes
+
+At 14:32 we query the SIEM:
+
+```kql
+@timestamp >= "now-1h" and
+host.name : "ABACWKS042" and
+process.parent.name : "mshta.exe" and
+process.name : "powershell.exe"
+```
+
+We expect 1 result. We get 1 result. Good — the data made it.
+
+### Did it fire?
+
+- Was an alert generated? Check `signal-*` index for alerts on `ABACWKS042` between 14:00–14:35
+- If yes, is it the right rule? `Suspicious PowerShell -enc` should fire — not just `PowerShell launched` (too broad) or `Process Creation` (too noisy)
+- If yes and right rule, what severity? Should be `high` for active LotL
+- What was the latency? Time from execution (14:02) to alert created
+
+Three possible outcomes, three different scorecard entries:
+
+| Result | Tier | Action |
 |---|---|---|
-| **Alerted** | A high-fidelity rule fired with the right severity | Pass — record the latency |
-| **Logged but not alerted** | The activity appears in winlogbeat / EDR but no rule matched it | Detection gap — open a `TuningProposal` |
-| **Logged but unparsed** | The data is there but not in a queryable field | Logging gap — fix the parser / ECS field |
-| **Not logged** | The data source isn't being collected at all | Telemetry gap — talk to the platform team |
+| `Suspicious PowerShell -enc` fired at 14:04 with severity `high` | 1 · Alerted | Pass. Latency 2 min, severity correct. |
+| Same rule fired at 14:04 but with severity `low` | 1 with concerns | Detection-eng tunes severity for `mshta` parent up |
+| No alert. Field `process.command_line` exists in winlogbeat. | 2 · Logged not alerted | Open `TuningProposal`: rule should match `mshta.exe → powershell.exe` parent-child + base64 payload |
+| No alert. `process.command_line` field missing on the index. | 3 · Logged not parsed | SIEM team: fix Sysmon Event 1 parsing for command-line capture |
+| Nothing in winlogbeat at all from `ABACWKS042` for that period. | 4 · Not logged | Platform team: agent dead, GPO drift, or asset isn't onboarded |
 
-The four tiers tell different parts of your org *what to do next*. A
-detection gap is a detection-eng problem; a logging gap is a SIEM-team
-problem; a telemetry gap is a budget/architecture problem. Calling them
-all "we missed it" misses the point.
+### Score and update
 
-### Scoping rules
+Whichever tier we hit, the scorecard row is:
 
-- **One TTP per exercise.** Don't chain attacks. If you chain, you can't
-  tell which detection caught which step.
-- **Pre-announce the exercise window** to the SOC's L1 shift so they
-  don't waste time investigating a known sanctioned test.
-- **Run during business hours** for the first attempt — you want
-  detection-engineering on hand if you find a gap. Out-of-hours testing
-  is a separate exercise validating after-hours response.
-- **Document everything.** The MITRE ATT&CK technique ID, the Atomic
-  test number used, the host you ran it on, the time, and what fired
-  vs what didn't.
+```yaml
+exercise_id: EX-2026-04-001
+ttp: T1059.001
+atomic_test: T1059.001-3
+host: ABACWKS042
+executed_at: 2026-04-27T14:02:14Z
+fired_at: 2026-04-27T14:04:31Z   # or null
+detection_rule: "Suspicious PowerShell -enc"  # or null
+severity_assigned: high
+severity_correct: true
+latency_seconds: 137
+fidelity_tier: 1
+notes: "Clean catch. Latency under 5 min target."
+```
 
-### Don't run unsanctioned tests
+That row goes in the scorecard. Six months in, you have ~25 of these and can answer the CISO with: *"On 22 of 25 in-scope TTPs we have Tier 1 detection. The three Tier 2 gaps are all on cloud-identity TTPs and detection-eng has the rule work in flight."* That's a defensible posture statement. *"We did a pentest and got rooted in 4 hours"* is not.
 
-Even if you're trying to prove a point. Always have a written
-authorisation from the CISO + IR team scoped to the specific TTP and
-window. Without it, what you're doing is *intrusion testing without
-authorisation* — which is the same thing real adversaries do, and your
-SIEM should pick it up. (And your legal team will pick *you* up.)
+## Eight common mistakes when starting purple-team programs
+
+These are real failure modes from actual programs. Avoid them all.
+
+1. **Chaining TTPs in one exercise.** As covered — can't attribute findings. Always atomic.
+2. **No telemetry-ingestion wait.** Declares Tier 4 gaps that are actually 30-second pipeline lag.
+3. **Running on freshly-imaged VMs.** Tells you nothing about your real production telemetry posture.
+4. **Skipping the pre-brief.** Wastes L1 time confirming the test isn't a real attack.
+5. **Conflating detection gaps with logging gaps.** Pisses off detection-eng (you blamed them for a parsing issue) and lets the SIEM team off the hook (they should have fixed the parser).
+6. **Running unsanctioned tests "to prove a point".** Career-limiting move. Always have written authorisation.
+7. **Reporting binary pass/fail.** Loses fidelity-tier nuance. The scorecard needs all four tiers visible.
+8. **Not closing the loop.** A gap found in March that's still a gap in September means the program isn't producing detection improvements. Set a 30-day follow-up cadence on every gap.
+
+## Glossary
+
+- **Adversary emulation** — Controlled execution of adversary TTPs to validate the SOC's ability to detect them. *Detection-validation*, not pentesting.
+- **Atomic Red Team** — Open-source library of single-TTP tests. ~600 tests across most ATT&CK sub-techniques. `atomicredteam.io`.
+- **Caldera** — MITRE's adversary-emulation platform. Heavier than Atomic; chains TTPs into emulated campaigns. Useful for chained-attack exercises *after* atomic coverage is mature.
+- **TTP** — Tactic, Technique, Procedure. Specific adversary behaviour, usually a MITRE ATT&CK sub-technique ID.
+- **Fidelity tier** — Where the detection landed on the four-tier scale (Alerted / Logged-not-alerted / Unparsed / Not-logged). Determines which team owns the fix.
+- **Latency** — Time from TTP execution to alert creation. Sub-5-minutes is the common target for live-triage TTPs; 30-minutes acceptable for slow-burn TTPs (data exfiltration etc.).
+- **Scorecard** — Persistent record of every exercise's TTP, host, fidelity tier, latency, and remediation status. The artefact you defend the SOC budget with.
+
+## Further reading
+
+- **Atomic Red Team** — `atomicredteam.io`. Start with the test catalogue filtered by your sector's threat actors.
+- **MITRE ATT&CK Evaluations** — `attackevals.mitre.org`. MITRE benchmarks vendor EDR products against real APT TTPs. Reading the eval reports for *your* EDR is humbling and useful.
+- **Caldera** — `caldera.mitre.org`. Adversary-emulation platform. Pick this up *after* you've done six months of Atomic-driven exercises.
+- **PEAK Threat Hunting Framework** — see L2 *Threat Hunting with KQL* further reading. Hunting and emulation are the two sides of detection-validation.
+- **Red Canary's annual Threat Detection Report** — empirical data on which TTPs actually got used in real intrusions last year. Use it to prioritise your exercise curriculum.
+
+---
+
+When you're ready, take the **Running an Atomic test for T1059.001** quiz to lock in the analysis flow.
 """,
     )
 
