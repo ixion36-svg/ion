@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.10.20 (2026-04-27)
+
+### Attack Story timeline (Hunters-inspired)
+
+Second of three ships borrowing UX patterns from market SOC tools. This one comes from **Hunters AI's "Attack Story"** — a chronological narrative on the case detail page that aggregates every event tied to the case into a single scannable feed, with Bob's latest verdict surfaced as a header narrative.
+
+#### What's new
+
+A **"Attack Story Timeline"** section on every case detail page (top of the right rail, above "Similar Closed Cases"). Two parts:
+
+1. **Bob's take** header — the latest investigation summary with its verdict pill (true_positive / false_positive / etc.) and the key-observation citations rendered as quote-style indented bullets. No extra LLM call needed; reuses the v0.10.11 `key_observations_json` and `summary_text` already persisted on each Investigation row.
+
+2. **Chronological event feed** — a vertical timeline with kind-coloured markers and per-event detail expansion. Three lanes:
+   - **🟢 Bob** — autonomous investigations with verdict + key-observation citations
+   - **🟡 Analyst** — investigation notes (case status changes, sign-offs, free-text)
+   - **⚪ System** — case lifecycle, alert linkage, observable extraction, playbook starts/completions
+
+A counts strip at the top (`N events · X Bob · Y analyst · Z system`) gives the case-load shape at a glance.
+
+#### Backend
+
+New endpoint `GET /api/elasticsearch/alerts/cases/{case_id}/timeline` aggregates from the existing data sources:
+- `AlertCase.created_at` / `closed_at` — case lifecycle
+- `Note` rows scoped to the case (Bob-authored notes detected via the `🤖 Bob` marker)
+- `AlertTriage` entries for linked alerts
+- `Investigation` rows linked via `alert_id_ref` (verdict + summary + key_observations cited)
+- `ObservableLink` rows for the case (extraction events)
+- `PlaybookExecution` rows for the case (start + complete events)
+
+Returns `{events: [...], narrative: {...}, counts: {...}}`. Events are sorted ascending by timestamp; `narrative` carries the latest Bob investigation for the header.
+
+#### No schema changes
+Pure aggregation of existing data. Drop in `ion:0.10.20`.
+
 ## v0.10.19 (2026-04-27)
 
 ### Observable TLP/PAP/IOC + cross-case sightings panel (TheHive 5 inspired)

@@ -2216,6 +2216,8 @@ async function openCaseDetail(caseId) {
         if (c.kibana_case_id) {
             loadKibanaComments(c.kibana_case_id);
         }
+        // v0.10.20: attack story timeline
+        loadCaseTimeline(c.id);
         // Similar cases sidebar — best-effort async load
         loadSimilarCases(c.id);
         // v0.10.19: cross-case observable sightings (deterministic sibling)
@@ -2397,6 +2399,17 @@ function renderPanelContent(c) {
         html += '</div></div>';
     }
 
+    // ── v0.10.20: Attack Story Timeline (Hunters-inspired) ─
+    // Unified chronological feed: case lifecycle, linked alerts, Bob
+    // investigations (with citations from key_observations), analyst
+    // notes, observable extraction, playbook runs. Latest Bob verdict
+    // surfaces as a narrative header so analysts get the "what happened"
+    // before scanning the rail of events.
+    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section-title">Attack Story Timeline</div>';
+    html += '<div id="case-timeline-container" style="font-size:0.8rem;color:var(--text-secondary);">Loading…</div>';
+    html += '</div>';
+
     // ── Similar Cases (pgvector-backed, loaded async) ──────
     html += '<div class="cpanel-section">';
     html += '<div class="cpanel-section-title">Similar Closed Cases</div>';
@@ -2559,6 +2572,107 @@ async function loadSimilarCases(caseId) {
         }).join('');
     } catch (e) {
         container.innerHTML = '<div class="cpanel-empty-hint">Similarity unavailable</div>';
+    }
+}
+
+// ── v0.10.20: Load Attack Story Timeline ─────────────────
+async function loadCaseTimeline(caseId) {
+    const container = document.getElementById('case-timeline-container');
+    if (!container) return;
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/timeline');
+        if (!resp.ok) {
+            container.innerHTML = '<div class="cpanel-empty-hint">Timeline unavailable</div>';
+            return;
+        }
+        const data = await resp.json();
+        const events = data.events || [];
+        const narrative = data.narrative;
+        const counts = data.counts || {};
+
+        let html = '';
+
+        // Narrative header — Bob's latest verdict at a glance
+        if (narrative) {
+            const verdict = narrative.verdict || '';
+            const verdictColors = {
+                true_positive: { bg: 'rgba(239,68,68,.14)', color: '#fca5a5' },
+                false_positive: { bg: 'rgba(34,197,94,.14)', color: '#86efac' },
+                benign_true_positive: { bg: 'rgba(245,158,11,.14)', color: '#fbbf24' },
+                inconclusive: { bg: 'rgba(148,163,184,.14)', color: '#cbd5e1' },
+            };
+            const vc = verdictColors[verdict] || verdictColors.inconclusive;
+            html += '<div style="padding:0.6rem 0.75rem;margin-bottom:0.6rem;background:rgba(109,228,255,0.06);border:1px solid rgba(109,228,255,0.2);border-radius:0.4rem;">'
+                +     '<div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.35rem;flex-wrap:wrap;">'
+                +       '<span style="font-size:0.6rem;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#6de4ff;">🤖 Bob\'s take</span>';
+            if (verdict) {
+                html +=   '<span class="cpanel-alert-badge" style="background:' + vc.bg + ';color:' + vc.color + ';">' + esc(verdict.replace(/_/g, ' ')) + '</span>';
+            }
+            html +=     '</div>'
+                +     '<div style="font-size:0.78rem;color:var(--text-primary);line-height:1.45;">' + esc((narrative.summary || '').slice(0, 600)) + '</div>';
+            if ((narrative.citations || []).length > 0) {
+                html += '<div style="margin-top:0.45rem;display:flex;flex-direction:column;gap:0.25rem;">';
+                narrative.citations.forEach(function(c) {
+                    if (!c || typeof c !== 'object') return;
+                    const f = c.field || '';
+                    const v = (c.value || '').toString().slice(0, 80);
+                    const sig = c.significance || '';
+                    html += '<div style="font-size:0.7rem;color:var(--text-muted);padding-left:0.5rem;border-left:2px solid rgba(109,228,255,0.4);">'
+                          +   '<code style="color:#6de4ff;font-size:0.68rem;">' + esc(f) + '</code> = '
+                          +   '<code style="font-size:0.68rem;">' + esc(v) + '</code>'
+                          +   (sig ? ' <span style="font-style:italic;">— ' + esc(sig) + '</span>' : '')
+                          + '</div>';
+                });
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+
+        // Counts strip
+        html += '<div style="display:flex;gap:0.4rem;margin-bottom:0.5rem;flex-wrap:wrap;font-size:0.65rem;color:var(--text-muted);">'
+              +   '<span><strong>' + (counts.total || 0) + '</strong> events</span>'
+              +   '<span style="color:rgba(109,228,255,0.8);"><strong>' + (counts.bob || 0) + '</strong> Bob</span>'
+              +   '<span style="color:rgba(245,158,11,0.8);"><strong>' + (counts.analyst || 0) + '</strong> analyst</span>'
+              +   '<span style="color:rgba(148,163,184,0.8);"><strong>' + (counts.system || 0) + '</strong> system</span>'
+              + '</div>';
+
+        if (events.length === 0) {
+            html += '<div class="cpanel-empty-hint">No events yet</div>';
+            container.innerHTML = html;
+            return;
+        }
+
+        // Vertical timeline. Kind drives the marker colour + lane indent
+        // so analyst/Bob/system are visually scannable.
+        const kindMeta = {
+            bob:     { color: '#6de4ff', label: 'BOB',     bg: 'rgba(109,228,255,0.06)' },
+            analyst: { color: '#fbbf24', label: 'ANALYST', bg: 'rgba(245,158,11,0.05)' },
+            system:  { color: '#94a3b8', label: 'SYSTEM',  bg: 'rgba(148,163,184,0.04)' },
+        };
+
+        html += '<div style="position:relative;padding-left:0.5rem;border-left:2px solid var(--border);">';
+        events.forEach(function(e, idx) {
+            const km = kindMeta[e.kind] || kindMeta.system;
+            const ts = e.ts ? new Date(e.ts).toLocaleString() : '';
+            html += '<div style="position:relative;margin-bottom:0.6rem;padding:0.45rem 0.65rem;background:' + km.bg + ';border-radius:0.3rem;">'
+                  +   '<div style="position:absolute;left:-1.05rem;top:0.55rem;width:0.65rem;height:0.65rem;background:' + km.color + ';border-radius:50%;border:2px solid var(--bg-deep);"></div>'
+                  +   '<div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.2rem;flex-wrap:wrap;">'
+                  +     '<span style="font-size:0.55rem;font-weight:700;letter-spacing:0.05em;color:' + km.color + ';">' + km.label + '</span>'
+                  +     '<span style="font-size:0.65rem;color:var(--text-muted);font-family:JetBrains Mono,monospace;">' + esc(ts) + '</span>'
+                  +   '</div>'
+                  +   '<div style="font-size:0.78rem;color:var(--text-primary);font-weight:500;">' + esc(e.title || '') + '</div>';
+            if (e.detail) {
+                const truncated = String(e.detail).length > 220;
+                const shown = String(e.detail).slice(0, 220);
+                html += '<div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.2rem;line-height:1.4;white-space:pre-wrap;">' + esc(shown) + (truncated ? '…' : '') + '</div>';
+            }
+            html += '</div>';
+        });
+        html += '</div>';
+
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<div class="cpanel-empty-hint">Timeline unavailable</div>';
     }
 }
 

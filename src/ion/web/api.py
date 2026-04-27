@@ -4574,6 +4574,212 @@ async def get_similar_cases(
     return {"similar": items, "count": len(items)}
 
 
+@router.get("/elasticsearch/alerts/cases/{case_id}/timeline")
+async def get_case_timeline(
+    case_id: int,
+    current_user: User = Depends(require_permission("case:read")),
+    session: Session = Depends(get_db_session),
+):
+    """v0.10.20 — Attack Story Timeline (Hunters-inspired).
+
+    Aggregates every chronological event tied to a case into a single
+    sorted feed:
+
+    - **system** — case creation, alert linkage, observable extraction,
+      playbook starts/completions, kibana sync events
+    - **analyst** — investigation notes, status changes, sign-offs
+    - **bob** — autonomous investigations with verdict, key observations,
+      and a narrative reference back to the prompt template
+
+    Each event carries ``ts``, ``kind``, ``phase`` (MITRE tactic when
+    derivable), ``title``, ``detail``, ``source_type``, ``source_id``
+    so the UI can render parallel lanes + drill-down.
+
+    Heavy lifting is small: every source already stamps timestamps; this
+    just unions them and sorts.
+    """
+    from ion.models.observable import ObservableLink, ObservableLinkType, Observable
+    from ion.models.investigation import Investigation
+    from ion.models.playbook import PlaybookExecution
+
+    case: Optional[AlertCase] = session.get(AlertCase, case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    events: List[dict] = []
+
+    def _ev(ts, kind, title, *, phase=None, detail=None, source_type=None, source_id=None, citations=None):
+        if ts is None:
+            return
+        events.append({
+            "ts": ts.isoformat() if hasattr(ts, "isoformat") else str(ts),
+            "kind": kind,
+            "phase": phase,
+            "title": title,
+            "detail": detail,
+            "source_type": source_type,
+            "source_id": source_id,
+            "citations": citations or [],
+        })
+
+    # ── Case lifecycle (system) ────────────────────────────────────────────
+    _ev(
+        case.created_at, "system", f"Case opened: {case.title or case.case_number}",
+        detail=f"Severity: {case.severity or 'unspecified'}",
+        source_type="case", source_id=case.id,
+    )
+    if case.closed_at:
+        _ev(
+            case.closed_at, "system", f"Case closed",
+            detail=f"Closure reason: {case.closure_reason or 'unspecified'}",
+            source_type="case", source_id=case.id,
+        )
+
+    # ── Notes (analyst) ────────────────────────────────────────────────────
+    note_rows = (
+        session.query(Note)
+        .filter(Note.entity_type == NoteEntityType.CASE)
+        .filter(Note.entity_id == str(case_id))
+        .order_by(Note.created_at.asc())
+        .all()
+    )
+    for n in note_rows:
+        author = "Analyst"
+        try:
+            if n.user and getattr(n.user, "username", None):
+                author = n.user.username
+        except Exception:
+            pass
+        # Bob-authored notes start with the "🤖 Bob (AI analyst)" marker
+        # added by _render_bob_alert_note. Tagging them as `bob` keeps the
+        # parallel-lane render clean — analyst notes vs Bob commentary.
+        kind = "bob" if (n.content or "").lstrip().startswith("**🤖 Bob") else "analyst"
+        title = "Bob commentary" if kind == "bob" else f"Note from {author}"
+        _ev(
+            n.created_at, kind, title,
+            detail=(n.content or "")[:1200],
+            source_type="note", source_id=n.id,
+        )
+
+    # ── Linked alerts (system) ─────────────────────────────────────────────
+    triage_entries = list(case.triage_entries or [])
+    for t in triage_entries:
+        ts = getattr(t, "created_at", None) or getattr(t, "first_seen_at", None)
+        _ev(
+            ts, "system", f"Alert linked: {(t.es_alert_id or '')[:24]}",
+            detail=f"Status: {getattr(t, 'status', '')}",
+            source_type="alert", source_id=t.es_alert_id,
+        )
+
+    # ── Investigations (Bob) ───────────────────────────────────────────────
+    alert_ids = [t.es_alert_id for t in triage_entries if t.es_alert_id]
+    if alert_ids:
+        inv_rows = (
+            session.query(Investigation)
+            .filter(Investigation.alert_id_ref.in_(alert_ids))
+            .order_by(Investigation.created_at.asc())
+            .all()
+        )
+        for inv in inv_rows:
+            citations = []
+            if inv.key_observations_json:
+                try:
+                    obs_data = json.loads(inv.key_observations_json)
+                    if isinstance(obs_data, list):
+                        citations = obs_data[:5]
+                except Exception:
+                    pass
+            verdict = inv.verdict or "in-progress"
+            ts = inv.completed_at or inv.created_at
+            _ev(
+                ts, "bob",
+                f"Bob investigated alert {(inv.alert_id_ref or '')[:24]} → {verdict}",
+                detail=(inv.summary_text or "")[:1200],
+                source_type="investigation", source_id=inv.id,
+                citations=citations,
+            )
+
+    # ── Observable extraction (system) ─────────────────────────────────────
+    case_obs_links = (
+        session.query(ObservableLink)
+        .filter(ObservableLink.link_type == ObservableLinkType.CASE)
+        .filter(ObservableLink.entity_id == case_id)
+        .all()
+    )
+    if case_obs_links:
+        obs_ids = [l.observable_id for l in case_obs_links]
+        obs_rows = session.query(Observable).filter(Observable.id.in_(obs_ids)).all()
+        obs_by_id = {o.id: o for o in obs_rows}
+        for link in case_obs_links:
+            o = obs_by_id.get(link.observable_id)
+            if not o:
+                continue
+            _ev(
+                link.created_at, "system",
+                f"Observable: {o.value[:64]}",
+                detail=f"Type: {o.type.value if hasattr(o.type, 'value') else o.type} · Threat: {o.threat_level.value if hasattr(o.threat_level, 'value') else o.threat_level}",
+                source_type="observable", source_id=o.id,
+            )
+
+    # ── Playbook executions (system) ───────────────────────────────────────
+    pb_runs = (
+        session.query(PlaybookExecution)
+        .filter(PlaybookExecution.case_id == case_id)
+        .all()
+    )
+    for run in pb_runs:
+        if run.started_at:
+            pb_name = ""
+            try:
+                pb_name = run.playbook.name if run.playbook else ""
+            except Exception:
+                pass
+            _ev(
+                run.started_at, "system",
+                f"Playbook started: {pb_name or '#' + str(run.playbook_id)}",
+                detail=f"Status: {run.status}",
+                source_type="playbook", source_id=run.id,
+            )
+        if run.completed_at:
+            _ev(
+                run.completed_at, "system",
+                f"Playbook finished: outcome={run.outcome or 'n/a'}",
+                detail=(run.outcome_notes or "")[:600],
+                source_type="playbook", source_id=run.id,
+            )
+
+    # Sort chronologically. Stable sort means events at the same instant
+    # keep the order they were appended, which is good — case-creation
+    # naturally precedes first note etc.
+    events.sort(key=lambda e: e["ts"])
+
+    # Surface the latest Bob investigation as the "narrative" header so
+    # the UI can show "Bob's current take" without an extra LLM call.
+    narrative: Optional[dict] = None
+    bob_events = [e for e in events if e["kind"] == "bob" and e["source_type"] == "investigation"]
+    if bob_events:
+        latest = bob_events[-1]
+        narrative = {
+            "summary": latest.get("detail") or latest.get("title"),
+            "verdict": latest["title"].split("→")[-1].strip() if "→" in latest["title"] else None,
+            "investigation_id": latest.get("source_id"),
+            "citations": latest.get("citations") or [],
+            "ts": latest.get("ts"),
+        }
+
+    return {
+        "case_id": case_id,
+        "events": events,
+        "narrative": narrative,
+        "counts": {
+            "total": len(events),
+            "system": sum(1 for e in events if e["kind"] == "system"),
+            "analyst": sum(1 for e in events if e["kind"] == "analyst"),
+            "bob": sum(1 for e in events if e["kind"] == "bob"),
+        },
+    }
+
+
 @router.get("/elasticsearch/alerts/cases/{case_id}/similar-observables")
 async def get_case_similar_observables(
     case_id: int,
