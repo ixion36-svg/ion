@@ -4574,6 +4574,115 @@ async def get_similar_cases(
     return {"similar": items, "count": len(items)}
 
 
+@router.get("/elasticsearch/alerts/cases/{case_id}/similar-observables")
+async def get_case_similar_observables(
+    case_id: int,
+    current_user: User = Depends(require_permission("case:read")),
+    session: Session = Depends(get_db_session),
+):
+    """v0.10.19 — TheHive-style observable linking.
+
+    For each observable attached to this case, finds OTHER cases that
+    share the same (type, normalized_value). The pgvector "similar cases"
+    endpoint above is semantic ("looks like"); this is deterministic
+    ("literally the same indicator").
+
+    Filters out:
+    - Observables marked ``ignore_similarity`` (high-noise values like
+      8.8.8.8, internal DNS resolvers)
+    - Observables marked ``is_whitelisted``
+    - Self-referential matches (same case)
+
+    Response shape:
+    ``{"shared": [{observable, sightings: [{case_id, case_number, title,
+    severity, status, last_seen}, ...]}, ...]}``
+    """
+    from ion.models.observable import Observable, ObservableLink, ObservableLinkType
+
+    # Walk all observables linked to this case via ObservableLink. The
+    # case's `observables` relationship may not exist on every schema
+    # variant, so go through the link table directly.
+    case_links = (
+        session.query(ObservableLink)
+        .filter(ObservableLink.link_type == ObservableLinkType.CASE)
+        .filter(ObservableLink.entity_id == case_id)
+        .all()
+    )
+    case_observable_ids = {link.observable_id for link in case_links}
+    if not case_observable_ids:
+        return {"shared": [], "count": 0}
+
+    case_observables = (
+        session.query(Observable)
+        .filter(Observable.id.in_(case_observable_ids))
+        .filter(Observable.ignore_similarity.is_(False))
+        .filter(Observable.is_whitelisted.is_(False))
+        .all()
+    )
+
+    shared_out: List[dict] = []
+    for obs in case_observables:
+        # Find other cases linking the same observable. The Observable row
+        # is unique per (type, normalized_value), so other-case-link rows
+        # pointing at this same observable.id give us the answer directly
+        # — no need to fan out via normalized_value.
+        sightings_links = (
+            session.query(ObservableLink)
+            .filter(ObservableLink.observable_id == obs.id)
+            .filter(ObservableLink.link_type == ObservableLinkType.CASE)
+            .filter(ObservableLink.entity_id != case_id)
+            .order_by(ObservableLink.created_at.desc())
+            .limit(25)
+            .all()
+        )
+        if not sightings_links:
+            continue
+        # Pull the matched cases in one round-trip.
+        other_case_ids = list({l.entity_id for l in sightings_links})
+        other_cases = (
+            session.query(AlertCase)
+            .filter(AlertCase.id.in_(other_case_ids))
+            .all()
+        )
+        case_by_id = {c.id: c for c in other_cases}
+        sightings_payload = []
+        for link in sightings_links:
+            c = case_by_id.get(link.entity_id)
+            if not c:
+                continue
+            sightings_payload.append({
+                "case_id": c.id,
+                "case_number": c.case_number,
+                "title": c.title,
+                "severity": c.severity,
+                "status": c.status.value if hasattr(c.status, "value") else str(c.status),
+                "last_seen": link.created_at.isoformat() if link.created_at else None,
+            })
+        if not sightings_payload:
+            continue
+        shared_out.append({
+            "observable": {
+                "id": obs.id,
+                "type": obs.type.value if hasattr(obs.type, "value") else str(obs.type),
+                "value": obs.value,
+                "normalized_value": obs.normalized_value,
+                "tlp": obs.tlp,
+                "pap": obs.pap,
+                "is_ioc": obs.is_ioc,
+                "threat_level": obs.threat_level.value if hasattr(obs.threat_level, "value") else str(obs.threat_level),
+                "sighting_count": obs.sighting_count,
+                "first_seen": obs.first_seen.isoformat() if obs.first_seen else None,
+                "last_seen": obs.last_seen.isoformat() if obs.last_seen else None,
+            },
+            "sightings": sightings_payload,
+        })
+
+    # Sort observables by number of cross-case sightings so the analyst
+    # sees the most-shared indicators first.
+    shared_out.sort(key=lambda r: len(r["sightings"]), reverse=True)
+    return {"shared": shared_out, "count": len(shared_out)}
+
+
 @router.get("/elasticsearch/alerts/cases/{case_id}")
 async def get_case_detail(
     case_id: int,

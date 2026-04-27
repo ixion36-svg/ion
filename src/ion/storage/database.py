@@ -697,6 +697,26 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: post_incident_reviews.linked_controls")
 
+    # v0.10.19: Observable gains TheHive-style IOC handling — TLP/PAP
+    # classification, is_ioc flag, and ignore_similarity escape hatch for
+    # high-noise values (8.8.8.8, internal DNS resolvers). All defaults
+    # match the model so existing rows stay valid after migration.
+    if insp.has_table("observables"):
+        existing = {col["name"] for col in insp.get_columns("observables")}
+        new_cols = {
+            "tlp": "VARCHAR(8) NOT NULL DEFAULT 'amber'",
+            "pap": "VARCHAR(8) NOT NULL DEFAULT 'amber'",
+            "is_ioc": "BOOLEAN NOT NULL DEFAULT FALSE",
+            "ignore_similarity": "BOOLEAN NOT NULL DEFAULT FALSE",
+        }
+        for col_name, col_def in new_cols.items():
+            if col_name not in existing:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(f"ALTER TABLE observables ADD COLUMN {col_name} {col_def}")
+                    )
+                    logger.info("Migrated: observables.%s", col_name)
+
     # v0.10.17: CyAB system gains onboarding metadata (contacts + business
     # context). All nullable; pre-v0.10.17 rows stay valid. Idempotent —
     # checks for column existence before each ALTER.

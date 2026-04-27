@@ -107,6 +107,25 @@ class Observable(Base, TimestampMixin):
     tags: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # v0.10.19 — TheHive-style IOC handling
+    # TLP (Traffic Light Protocol) classifies the sensitivity of sharing the
+    # observable: red (do not share), amber, green, clear (formerly white).
+    # PAP (Permissible Actions Protocol) classifies what actions are allowed
+    # on the observable in active investigation: red (passive only), amber
+    # (limited active), green, white (any). Both default to amber — the
+    # safest middle-ground for a freshly-extracted IOC.
+    tlp: Mapped[str] = mapped_column(String(8), default="amber", nullable=False)
+    pap: Mapped[str] = mapped_column(String(8), default="amber", nullable=False)
+    # is_ioc explicitly distinguishes "this is a malicious indicator we're
+    # tracking" from "this value showed up in an alert but might be benign"
+    # (e.g. an internal IP). Drives whether the observable gets pushed to TI
+    # exports and whether it triggers cross-case similarity linking.
+    is_ioc: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Mute the observable from the cross-case similarity panel — useful for
+    # high-frequency values that appear everywhere (8.8.8.8, 1.1.1.1,
+    # corporate DNS resolvers) and would otherwise dominate the panel.
+    ignore_similarity: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     # Watchlist functionality
     is_watched: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     watch_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)

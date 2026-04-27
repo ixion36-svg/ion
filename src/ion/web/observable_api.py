@@ -45,6 +45,11 @@ class ObservableResponse(BaseModel):
     watched_at: Optional[str] = None
     # Auto-enrich
     auto_enrich: bool = True
+    # v0.10.19 — TheHive-style IOC handling
+    tlp: str = "amber"
+    pap: str = "amber"
+    is_ioc: bool = False
+    ignore_similarity: bool = False
 
     class Config:
         from_attributes = True
@@ -63,6 +68,11 @@ class ObservableUpdate(BaseModel):
     notes: Optional[str] = None
     is_whitelisted: Optional[bool] = None
     threat_level: Optional[str] = None
+    # v0.10.19 — TheHive-style IOC handling
+    tlp: Optional[str] = None  # "red" | "amber" | "green" | "clear"
+    pap: Optional[str] = None  # "red" | "amber" | "green" | "white"
+    is_ioc: Optional[bool] = None
+    ignore_similarity: Optional[bool] = None
 
 
 class ObservableSearchRequest(BaseModel):
@@ -150,6 +160,10 @@ def _observable_to_response(obs: Observable) -> ObservableResponse:
         watched_by=obs.watched_by,
         watched_at=obs.watched_at.isoformat() if obs.watched_at else None,
         auto_enrich=obs.auto_enrich,
+        tlp=getattr(obs, "tlp", "amber") or "amber",
+        pap=getattr(obs, "pap", "amber") or "amber",
+        is_ioc=bool(getattr(obs, "is_ioc", False)),
+        ignore_similarity=bool(getattr(obs, "ignore_similarity", False)),
     )
 
 
@@ -186,6 +200,10 @@ def _observable_to_detail(obs: Observable, session: Session) -> ObservableDetail
         enrichment=enrichment_data,
         alert_count=len(obs.alert_links),
         case_count=len(obs.case_links),
+        tlp=getattr(obs, "tlp", "amber") or "amber",
+        pap=getattr(obs, "pap", "amber") or "amber",
+        is_ioc=bool(getattr(obs, "is_ioc", False)),
+        ignore_similarity=bool(getattr(obs, "ignore_similarity", False)),
     )
 
 
@@ -555,7 +573,7 @@ async def update_observable(
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:update")),
 ) -> ObservableDetailResponse:
-    """Update observable tags, notes, or whitelist status."""
+    """Update observable tags, notes, whitelist status, TLP/PAP, IOC flags."""
     service = ObservableService(session)
     observable = service.update(
         observable_id,
@@ -566,6 +584,24 @@ async def update_observable(
     )
     if not observable:
         raise HTTPException(status_code=404, detail="Observable not found")
+
+    # v0.10.19 — direct attribute set for the new TheHive-style fields. The
+    # service.update signature predates these and we don't want to expand
+    # it for a minor addition; setting on the row works the same once we
+    # commit. Validation is light: enum-ish strings normalised to lower.
+    if data.tlp is not None:
+        v = data.tlp.strip().lower()
+        if v in {"red", "amber", "green", "clear", "white"}:
+            observable.tlp = v
+    if data.pap is not None:
+        v = data.pap.strip().lower()
+        if v in {"red", "amber", "green", "clear", "white"}:
+            observable.pap = v
+    if data.is_ioc is not None:
+        observable.is_ioc = bool(data.is_ioc)
+    if data.ignore_similarity is not None:
+        observable.ignore_similarity = bool(data.ignore_similarity)
+
     session.commit()
     return _observable_to_detail(observable, session)
 

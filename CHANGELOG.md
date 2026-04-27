@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.10.19 (2026-04-27)
+
+### Observable TLP/PAP/IOC + cross-case sightings panel (TheHive 5 inspired)
+
+First of three ships borrowing patterns from market SOC tools — this one from **TheHive 5's observable model**. ION already had `sighting_count`, `first_seen`, `last_seen`, threat-level, watchlist, and enrichment history; this fills in the missing TheHive bits.
+
+#### Schema additions on `observables` (4 new columns)
+
+- `tlp` — Traffic Light Protocol (`red`, `amber`, `green`, `clear`/`white`). Default `amber`.
+- `pap` — Permissible Actions Protocol (same scale). Default `amber`.
+- `is_ioc` — explicitly distinguishes "tracked malicious indicator" from "value that showed up in an alert but might be benign". Default false.
+- `ignore_similarity` — escape hatch to mute high-noise values (`8.8.8.8`, `1.1.1.1`, internal DNS resolvers) from the cross-case sightings panel. Default false.
+
+Idempotent ALTER TABLE migration — pre-v0.10.19 rows take the defaults. `Base.metadata.create_all` handles fresh deployments.
+
+#### Cross-case observable sightings panel
+
+New section on the case detail right-rail: **"Cross-Case Observable Sightings"**, sibling to the existing pgvector-driven "Similar Closed Cases" section. Where the pgvector panel asks *"which other cases look semantically similar?"*, this one asks *"which other cases share the literal same indicator value?"*
+
+For every observable attached to the case (skipping `is_whitelisted` + `ignore_similarity`), the panel lists other cases that share that same `(type, normalized_value)` via the existing `ObservableLink` table. Sorted by sighting count — most-shared indicators surface first. TLP and IOC badges render on each row.
+
+Endpoint: `GET /api/elasticsearch/alerts/cases/{case_id}/similar-observables`. Returns `{shared: [{observable, sightings: [{case_id, case_number, title, severity, status, last_seen}]}]}`.
+
+#### `PUT /api/observables/{id}` extended
+
+The existing update endpoint accepts `tlp`, `pap`, `is_ioc`, `ignore_similarity` in addition to the prior tags/notes/whitelist/threat-level. Lightweight enum-string validation (lowercased, restricted to the four canonical values). Other fields unchanged.
+
+#### Upgrade
+Drop in `ion:0.10.19`. Migration runs automatically. No `.env` changes required.
+
 ## v0.10.18 (2026-04-27)
 
 ### Daily Standup DC/WEF checks — configurable + diagnostic
