@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block title %}Stories · ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="h-1.5 w-1.5 rounded-full bg-ion-iris pulse-cyan"></span>
+        <span class="label-tiny text-ion-iris">Automation playbooks</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Stories</h1>
+      <p class="mt-3 text-[13px] text-slate-400 max-w-2xl">
+        JSON-DAG automation playbooks. Linear-only in v0.11.0 — branching + canvas editor land in v0.11.1.
+        Edit raw JSON below; validation runs on save and again at execution time.
+      </p>
+    </div>
+    <button onclick="storiesNew()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+      + New story
+    </button>
+  </section>
+
+  <div class="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4">
+    <!-- List rail -->
+    <aside class="rounded-md border border-white/5 bg-ink-900/40 overflow-hidden">
+      <div class="px-3 py-2 border-b border-white/5 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Stories</div>
+      <ul id="stories-list" class="divide-y divide-white/5 text-[12px]">
+        <li class="px-3 py-3 text-slate-500">Loading…</li>
+      </ul>
+    </aside>
+
+    <!-- Detail / editor -->
+    <main class="rounded-md border border-white/5 bg-ink-900/40 p-4 min-h-[60vh]">
+      <div id="story-detail">
+        <p class="text-slate-500 text-[12px]">Select a story or click <strong>New story</strong> to start.</p>
+        <div class="mt-4">
+          <h3 class="text-[12px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Step types</h3>
+          <div id="step-types-cat" class="space-y-2 text-[12px] text-slate-300"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</div>
+
+<script>
+(function() {
+  function esc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, function(c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  let _stories = [];
+  let _stepTypes = [];
+  let _currentId = null;
+
+  async function loadList() {
+    const ul = document.getElementById('stories-list');
+    try {
+      const r = await fetch('/api/stories');
+      const d = await r.json();
+      _stories = d.stories || [];
+      if (_stories.length === 0) {
+        ul.innerHTML = '<li class="px-3 py-3 text-slate-500">No stories yet</li>';
+        return;
+      }
+      ul.innerHTML = _stories.map(s => `
+        <li class="px-3 py-2 cursor-pointer hover:bg-white/5 ${_currentId === s.id ? 'bg-white/5' : ''}" onclick="storiesOpen(${s.id})">
+          <div class="font-semibold text-slate-200">${esc(s.name)}</div>
+          <div class="text-slate-500 text-[10px] mt-0.5">
+            ${s.enabled ? '<span class="text-ion-lime">●</span> enabled' : '<span class="text-slate-600">○</span> disabled'}
+            · #${s.id}
+          </div>
+        </li>
+      `).join('');
+    } catch (e) {
+      ul.innerHTML = '<li class="px-3 py-3 text-ion-coral">Failed to load: ' + esc(e.message) + '</li>';
+    }
+  }
+
+  async function loadStepTypes() {
+    try {
+      const r = await fetch('/api/stories/step-types');
+      const d = await r.json();
+      _stepTypes = d.step_types || [];
+      const cat = document.getElementById('step-types-cat');
+      if (!cat) return;
+      cat.innerHTML = _stepTypes.map(t => `
+        <div class="rounded border border-white/5 bg-ink-900/70 p-2.5">
+          <div class="font-mono text-[11px] text-ion-cyan">${esc(t.type)}</div>
+          <div class="font-semibold text-slate-300 text-[12px]">${esc(t.label)}</div>
+          <div class="text-[11px] text-slate-500 mt-1">${esc(t.description)}</div>
+          <pre class="mt-1.5 text-[10px] text-slate-400 bg-ink-950/70 px-2 py-1 rounded overflow-x-auto">${esc(t.config_schema_hint)}</pre>
+        </div>
+      `).join('');
+    } catch (e) { /* non-fatal */ }
+  }
+
+  async function storiesOpen(id) {
+    _currentId = id;
+    try {
+      const r = await fetch('/api/stories/' + id);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const s = await r.json();
+      renderEditor(s);
+      loadList();  // re-render to update active state
+    } catch (e) {
+      showToast('Failed to load story: ' + (e.message || e), 'error');
+    }
+  }
+  window.storiesOpen = storiesOpen;
+
+  function storiesNew() {
+    _currentId = null;
+    const blank = {
+      id: null,
+      name: 'New story',
+      description: '',
+      enabled: true,
+      dag: {
+        name: 'New story',
+        schema_version: 1,
+        start: 'note',
+        nodes: [
+          {
+            id: 'note',
+            type: 'case_note',
+            config: { case_id: '{{ trigger.case_id }}', content: 'Hello from a story.' },
+            next: null
+          }
+        ]
+      }
+    };
+    renderEditor(blank);
+    loadList();
+  }
+  window.storiesNew = storiesNew;
+
+  function renderEditor(s) {
+    const detail = document.getElementById('story-detail');
+    const dagJson = JSON.stringify(s.dag || {}, null, 2);
+    detail.innerHTML = `
+      <div class="space-y-3">
+        <div class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-start">
+          <div>
+            <label class="label-tiny text-slate-500 block mb-1">Name</label>
+            <input id="story-name" class="w-full h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[13px] text-white" value="${esc(s.name || '')}">
+          </div>
+          <label class="inline-flex items-center gap-2 mt-5 text-[12px] text-slate-300">
+            <input type="checkbox" id="story-enabled" ${s.enabled ? 'checked' : ''}>
+            Enabled
+          </label>
+        </div>
+        <div>
+          <label class="label-tiny text-slate-500 block mb-1">Description</label>
+          <textarea id="story-description" rows="2" class="w-full rounded-md bg-ink-900 border border-white/10 px-3 py-2 text-[12px] text-slate-200">${esc(s.description || '')}</textarea>
+        </div>
+        <div>
+          <label class="label-tiny text-slate-500 block mb-1">DAG (JSON)</label>
+          <textarea id="story-dag" rows="20" class="w-full rounded-md bg-ink-950 border border-white/10 px-3 py-2 text-[12px] text-slate-200 font-mono leading-relaxed" spellcheck="false">${esc(dagJson)}</textarea>
+        </div>
+        <div id="story-validation" class="hidden text-[11px] rounded border px-3 py-2"></div>
+        <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-white/10">
+          <button onclick="storiesSave(${s.id ?? 'null'})" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition">
+            ${s.id ? 'Save' : 'Create'}
+          </button>
+          ${s.id ? `
+            <button onclick="storiesRun(${s.id})" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+              Run…
+            </button>
+            <button onclick="storiesDelete(${s.id})" class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-ion-coral hover:bg-ion-coral/10 border border-ion-coral/30 text-[12px] font-semibold transition ml-auto">
+              Delete
+            </button>
+          ` : ''}
+        </div>
+        <div id="story-runs"></div>
+      </div>
+    `;
+    if (s.id) loadRuns(s.id);
+  }
+
+  async function storiesSave(id) {
+    let dag;
+    try {
+      dag = JSON.parse(document.getElementById('story-dag').value);
+    } catch (e) {
+      showValidation(['Invalid JSON: ' + e.message]);
+      return;
+    }
+    const body = {
+      name: document.getElementById('story-name').value,
+      description: document.getElementById('story-description').value,
+      enabled: document.getElementById('story-enabled').checked,
+      dag: dag,
+    };
+    try {
+      let resp;
+      if (id) {
+        resp = await fetch('/api/stories/' + id, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      } else {
+        resp = await fetch('/api/stories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      }
+      const data = await resp.json();
+      if (!resp.ok) {
+        const errs = (data.detail && data.detail.validation_errors) || [data.detail || 'unknown error'];
+        showValidation(Array.isArray(errs) ? errs : [String(errs)]);
+        return;
+      }
+      hideValidation();
+      showToast('Saved', 'success');
+      _currentId = data.id;
+      loadList();
+      renderEditor(data);
+    } catch (e) {
+      showToast('Save failed: ' + (e.message || e), 'error');
+    }
+  }
+  window.storiesSave = storiesSave;
+
+  async function storiesDelete(id) {
+    if (!confirm('Delete this story? This cannot be undone.')) return;
+    try {
+      const r = await fetch('/api/stories/' + id, { method: 'DELETE' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      showToast('Deleted', 'success');
+      _currentId = null;
+      document.getElementById('story-detail').innerHTML =
+        '<p class="text-slate-500 text-[12px]">Story deleted. Pick another or create a new one.</p>';
+      loadList();
+    } catch (e) {
+      showToast('Delete failed: ' + (e.message || e), 'error');
+    }
+  }
+  window.storiesDelete = storiesDelete;
+
+  async function storiesRun(id) {
+    const caseStr = prompt('Run against which case_id? (blank to skip)');
+    const alertStr = prompt('Run against which alert_id? (blank to skip)');
+    const body = {};
+    if (caseStr && caseStr.trim()) body.case_id = parseInt(caseStr.trim(), 10);
+    if (alertStr && alertStr.trim()) body.alert_id = alertStr.trim();
+    try {
+      const resp = await fetch('/api/stories/' + id + '/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.detail || ('HTTP ' + resp.status));
+      showToast('Run ' + data.id + ': ' + data.status, data.status === 'completed' ? 'success' : 'error');
+      loadRuns(id);
+    } catch (e) {
+      showToast('Run failed: ' + (e.message || e), 'error');
+    }
+  }
+  window.storiesRun = storiesRun;
+
+  async function loadRuns(id) {
+    const wrap = document.getElementById('story-runs');
+    if (!wrap) return;
+    try {
+      const r = await fetch('/api/stories/' + id + '/runs?limit=10');
+      const d = await r.json();
+      const runs = d.runs || [];
+      if (runs.length === 0) {
+        wrap.innerHTML = '<div class="text-slate-500 text-[11px] mt-3">No runs yet.</div>';
+        return;
+      }
+      wrap.innerHTML = `
+        <h3 class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-4 mb-2">Recent runs</h3>
+        <div class="space-y-2 text-[11px]">
+          ${runs.map(r => `
+            <details class="rounded border border-white/5 bg-ink-900/70">
+              <summary class="px-3 py-2 cursor-pointer flex items-center gap-2 flex-wrap">
+                <span class="font-mono text-slate-500">#${r.id}</span>
+                <span class="${r.status === 'completed' ? 'text-ion-lime' : r.status === 'failed' ? 'text-ion-coral' : 'text-slate-400'}">${esc(r.status)}</span>
+                <span class="text-slate-600">${esc(r.started_at || '')}</span>
+                ${r.case_id ? '<span class="text-slate-500">case=' + r.case_id + '</span>' : ''}
+                ${r.alert_id ? '<span class="text-slate-500">alert=' + esc((r.alert_id || '').slice(0, 24)) + '</span>' : ''}
+              </summary>
+              <pre class="text-[10px] text-slate-300 bg-ink-950/80 px-3 py-2 overflow-x-auto m-0 border-t border-white/5">${esc(JSON.stringify(r.step_outputs, null, 2))}</pre>
+              ${r.error ? '<div class="px-3 py-2 text-ion-coral text-[11px] border-t border-white/5">' + esc(r.error) + '</div>' : ''}
+            </details>
+          `).join('')}
+        </div>
+      `;
+    } catch (e) { /* non-fatal */ }
+  }
+
+  function showValidation(errors) {
+    const el = document.getElementById('story-validation');
+    if (!el) return;
+    el.className = 'block text-[11px] rounded border border-ion-coral/30 bg-ion-coral/10 text-ion-coral px-3 py-2';
+    el.innerHTML = '<strong>Validation errors:</strong><ul class="list-disc pl-4 mt-1">' +
+      errors.map(e => '<li>' + esc(e) + '</li>').join('') + '</ul>';
+  }
+  function hideValidation() {
+    const el = document.getElementById('story-validation');
+    if (el) el.className = 'hidden';
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    loadList();
+    loadStepTypes();
+  });
+})();
+</script>
+{% endblock %}

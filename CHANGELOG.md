@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.11.0 (2026-04-27)
+
+### Stories — JSON-DAG automation playbooks (Tines-inspired)
+
+Third of three ships borrowing patterns from market SOC tools. This one comes from **Tines's Story model** — JSON-DAG playbooks with a small, opinionated step library and explicit conditional edges instead of nested if/else blocks.
+
+This is a **major-version bump** because it introduces a new automation primitive alongside the existing TIDE-driven `Playbook` catalogue. Stories don't replace playbooks — they're user-authored automation for runtime triage / response, where playbooks are detection-engineering artifacts.
+
+#### What ships in v0.11.0 (linear slice)
+
+- **`Story` + `StoryRun` models** — DAG persisted as JSON, every execution captured with per-step output, status, and duration
+- **3 step types** in the executor:
+  - `case_note` — append a templated note to a case
+  - `bob_investigate_alert` — run Bob's autonomous investigation pipeline against an alert and capture verdict + summary
+  - `http_request` — outbound HTTP call, response into context
+- **Tiny templating** — `{{ trigger.alert_id }}` / `{{ nodes.<id>.<field>}}` substitution. Not full Jinja — kept narrow on purpose for security on freshly-imported stories
+- **Linear executor** — walks `start` node forward via each node's `next` until None or error. Validates the DAG up-front (cycle check + unknown-node refs + unknown-step-types)
+- **Admin page at `/stories`** — list rail + raw-JSON editor + run button + recent-runs panel with per-step output expand
+- **Endpoints**:
+  - `GET /api/stories` · `GET /api/stories/{id}` · `POST /api/stories` · `PUT /api/stories/{id}` · `DELETE /api/stories/{id}`
+  - `POST /api/stories/{id}/run` (synchronous; returns the run record)
+  - `GET /api/stories/{id}/runs` · `GET /api/story-runs/{run_id}`
+  - `GET /api/stories/step-types` (public catalogue)
+- **Permissions** — read uses `playbook:read`, create `playbook:create`, update `playbook:update`, delete `playbook:delete`, execute `playbook:execute`
+
+#### What's deferred (to v0.11.1+)
+
+- **Conditional edges** — every node currently has at most one `next`. Branching arrives next ship.
+- **Visual canvas editor** — v0.11.0 ships a JSON textarea with validation. Drag-and-drop graph editor is the obvious follow-up.
+- **More step types** — Page (human-in-the-loop form), Send-to-Story (subroutine), Email/Slack/Teams notifications, OpenCTI enrich, ES query, observable mutate. The step registry is a single dict in `story_executor.py:_STEP_REGISTRY` — adding a step is one function + one entry.
+- **Background execution** — runs are synchronous in v0.11.0 (a `bob_investigate_alert` step blocks ~30 s). Async + WebSocket progress updates land later.
+
+#### Why a new model rather than extending `Playbook`?
+
+Existing playbooks are TIDE-driven detection-engineering artifacts. Stories are user-authored runtime automation — different lifecycle (versioned, importable, executable against arbitrary entities), different audit story, different permission model. Keeping them parallel avoids breaking v0.10.x playbook UI.
+
+#### Upgrade
+Drop in `ion:0.11.0`. New tables (`stories`, `story_runs`) created via `Base.metadata.create_all` on first boot. No `.env` changes required.
+
 ## v0.10.20 (2026-04-27)
 
 ### Attack Story timeline (Hunters-inspired)

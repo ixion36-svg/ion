@@ -158,6 +158,9 @@ from ion.models.case_embedding import CaseEmbedding  # noqa: F401
 # v0.10.6: KB article embeddings for Bob's RAG grounding.
 from ion.models.kb_document_embedding import KBDocumentEmbedding  # noqa: F401
 
+# v0.11.0: JSON-DAG playbook automation (Tines-inspired).
+from ion.models.story import Story, StoryRun  # noqa: F401
+
 __all__ = [
     "Base",
     "Template",
