@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Course · ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1100px] w-full px-4 sm:px-6 py-10 md:py-14">
+
+  <a href="/courses" class="inline-flex items-center gap-1 text-[12px] text-slate-400 hover:text-white mb-4">← Back to courses</a>
+
+  <div id="cd-root">
+    <div class="text-slate-500 text-[13px] py-8 text-center">Loading…</div>
+  </div>
+</div>
+</div>
+
+<style>
+.cd-level-pill{display:inline-block;padding:0.18rem 0.55rem;font-size:0.6rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-radius:9999px}
+.cd-level-L1{background:rgba(34,197,94,0.14);color:#86efac}
+.cd-level-L2{background:rgba(109,228,255,0.14);color:#6de4ff}
+.cd-level-L3{background:rgba(245,158,11,0.14);color:#fbbf24}
+.cd-level-L4{background:rgba(239,68,68,0.14);color:#fca5a5}
+.cd-module{margin-top:1.4rem;padding:1rem 1.2rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.45rem}
+.cd-mod-head{display:flex;align-items:baseline;gap:0.5rem;margin-bottom:0.4rem;flex-wrap:wrap}
+.cd-mod-num{font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text-muted);font-weight:700}
+.cd-mod-title{font-size:1rem;font-weight:700;color:var(--text-primary);flex:1}
+.cd-mod-meta{font-size:0.7rem;color:var(--text-muted)}
+.cd-lesson{display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.75rem;border-radius:0.35rem;background:var(--bg-deep);border:1px solid var(--border);margin-top:0.4rem;text-decoration:none;color:inherit;transition:border-color .12s,background .12s}
+.cd-lesson:hover{border-color:var(--primary);background:var(--primary-dim)}
+.cd-lesson-status{width:0.7rem;height:0.7rem;border-radius:50%;flex-shrink:0;background:var(--text-muted)}
+.cd-status-completed{background:#86efac}
+.cd-status-in_progress{background:#fbbf24}
+.cd-status-failed{background:#fca5a5}
+.cd-lesson-title{flex:1;font-size:0.85rem;font-weight:500;color:var(--text-primary)}
+.cd-lesson-type{font-size:0.6rem;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;padding:0.18rem 0.5rem;border-radius:9999px;background:rgba(255,255,255,0.05);color:var(--text-secondary)}
+.cd-lesson-type-quiz{background:rgba(109,228,255,0.14);color:#6de4ff}
+.cd-lesson-type-lab{background:rgba(245,158,11,0.14);color:#fbbf24}
+.cd-lesson-score{font-size:0.7rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
+.cd-progress{height:6px;background:var(--bg-deep);border-radius:9999px;overflow:hidden;margin-top:0.4rem}
+.cd-progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),#a78bfa);transition:width .3s}
+</style>
+
+<script>
+const SLUG = {{ slug | tojson }};
+
+function escHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+function md(s) {
+  if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') return escHtml(s);
+  return DOMPurify.sanitize(marked.parse(s || ''));
+}
+
+async function loadCourse() {
+  try {
+    const r = await fetch('/api/courses/' + encodeURIComponent(SLUG));
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const c = await r.json();
+    render(c);
+  } catch (e) {
+    document.getElementById('cd-root').innerHTML =
+      '<div class="text-ion-coral py-8 text-center text-[13px]">Failed to load course: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function render(c) {
+  // Aggregate progress numbers across all lessons
+  let total = 0, completed = 0, inProgress = 0;
+  (c.modules || []).forEach(m => {
+    (m.lessons || []).forEach(l => {
+      total++;
+      if (l.user_status === 'completed') completed++;
+      else if (l.user_status === 'in_progress' || l.user_status === 'failed') inProgress++;
+    });
+  });
+  const pct = total ? Math.round(100 * completed / total) : 0;
+
+  let modulesHtml = (c.modules || []).map((m, mIdx) => {
+    const lessonsHtml = (m.lessons || []).map(l => {
+      const statusCls = 'cd-status-' + (l.user_status || 'not_started');
+      const typeCls = l.lesson_type === 'quiz' ? 'cd-lesson-type-quiz' :
+                      l.lesson_type === 'lab'  ? 'cd-lesson-type-lab'  : '';
+      const scoreLabel = (l.user_score != null) ? `<span class="cd-lesson-score">${l.user_score}%</span>` : '';
+      return `<a class="cd-lesson" href="/lessons/${l.id}">
+        <span class="cd-lesson-status ${statusCls}" title="${escHtml(l.user_status)}"></span>
+        <span class="cd-lesson-title">${escHtml(l.title)}</span>
+        <span class="cd-lesson-type ${typeCls}">${escHtml(l.lesson_type)}</span>
+        <span class="cd-lesson-score" title="duration">~${l.duration_min}m</span>
+        ${scoreLabel}
+      </a>`;
+    }).join('');
+    return `<div class="cd-module">
+      <div class="cd-mod-head">
+        <span class="cd-mod-num">Module ${mIdx + 1}</span>
+        <h2 class="cd-mod-title">${escHtml(m.title)}</h2>
+        <span class="cd-mod-meta">~${m.estimated_minutes}m</span>
+      </div>
+      ${m.description_md ? `<div class="prose-md text-[12px] text-slate-400 mb-2">${md(m.description_md)}</div>` : ''}
+      ${lessonsHtml}
+    </div>`;
+  }).join('');
+
+  const enrolBtn = c.enrolment.enrolled
+    ? (c.enrolment.completed_at
+        ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-ion-lime/10 text-ion-lime text-[12px] font-semibold">✓ Completed${c.enrolment.score_pct != null ? ' · ' + c.enrolment.score_pct + '%' : ''}</span>`
+        : `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-white/5 text-slate-300 text-[12px] font-semibold">Enrolled</span>`
+      )
+    : `<button onclick="enrol(${c.id})" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold">Enrol</button>`;
+
+  document.getElementById('cd-root').innerHTML = `
+    <div class="mb-4">
+      <span class="cd-level-pill cd-level-${escHtml(c.level)}">${escHtml(c.level)}</span>
+    </div>
+    <h1 class="text-[28px] font-bold text-white tracking-tight mb-2">${escHtml(c.title)}</h1>
+    <div class="flex flex-wrap items-center gap-3 mb-4">
+      <span class="text-[12px] text-slate-400">⏱ ~${c.estimated_hours} hours</span>
+      <span class="text-[12px] text-slate-400">Pass ≥ ${c.pass_threshold}%</span>
+      <span class="text-[12px] text-slate-400">Progress: ${completed}/${total} (${pct}%)</span>
+      <div style="margin-left:auto;">${enrolBtn}</div>
+    </div>
+    <div class="cd-progress" style="margin-bottom:1rem;"><div class="cd-progress-fill" style="width:${pct}%;"></div></div>
+    <div class="prose-md text-[14px] text-slate-300 leading-relaxed">${md(c.description_md || '')}</div>
+    ${modulesHtml}
+  `;
+}
+
+async function enrol(courseId) {
+  try {
+    const r = await fetch('/api/courses/' + courseId + '/enrol', { method: 'POST' });
+    if (!r.ok) {
+      const e = await r.json();
+      throw new Error(e.detail || ('HTTP ' + r.status));
+    }
+    showToast('Enrolled!', 'success');
+    loadCourse();
+  } catch (e) {
+    showToast('Enrol failed: ' + e.message, 'error');
+  }
+}
+window.enrol = enrol;
+
+document.addEventListener('DOMContentLoaded', loadCourse);
+</script>
+{% endblock %}

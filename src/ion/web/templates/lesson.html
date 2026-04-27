@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}Lesson · ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[920px] w-full px-4 sm:px-6 py-10 md:py-14">
+
+  <a id="ln-back" href="/courses" class="inline-flex items-center gap-1 text-[12px] text-slate-400 hover:text-white mb-4">← Back</a>
+
+  <div id="ln-root">
+    <div class="text-slate-500 text-[13px] py-8 text-center">Loading…</div>
+  </div>
+</div>
+</div>
+
+<style>
+.ln-content{font-size:0.95rem;line-height:1.65;color:var(--text-primary)}
+.ln-content h2{font-size:1.4rem;font-weight:700;margin-top:1.6rem;margin-bottom:0.6rem;color:var(--text-primary)}
+.ln-content h3{font-size:1.15rem;font-weight:700;margin-top:1.3rem;margin-bottom:0.5rem;color:var(--text-primary)}
+.ln-content h4{font-size:1rem;font-weight:700;margin-top:1rem;margin-bottom:0.4rem;color:var(--text-primary)}
+.ln-content p{margin-bottom:0.85rem}
+.ln-content ul,.ln-content ol{margin-left:1.4rem;margin-bottom:0.85rem}
+.ln-content li{margin-bottom:0.3rem}
+.ln-content code{background:var(--bg-deep);padding:0.1rem 0.4rem;border-radius:0.25rem;font-size:0.8rem;font-family:'JetBrains Mono',monospace;color:#a78bfa}
+.ln-content pre{background:var(--bg-deep);padding:0.9rem 1rem;border-radius:0.4rem;overflow-x:auto;margin:0.85rem 0;border:1px solid var(--border)}
+.ln-content pre code{background:none;padding:0;color:var(--text-primary);font-size:0.78rem}
+.ln-content blockquote{border-left:3px solid var(--primary);padding-left:1rem;margin:0.85rem 0;color:var(--text-secondary);font-style:italic}
+.ln-content table{border-collapse:collapse;margin:0.85rem 0;width:100%}
+.ln-content th,.ln-content td{border:1px solid var(--border);padding:0.5rem 0.75rem;font-size:0.85rem}
+.ln-content th{background:var(--bg-secondary);font-weight:700;text-align:left}
+.ln-content a{color:var(--primary);text-decoration:underline}
+.ln-content img{max-width:100%;border-radius:0.4rem;margin:0.6rem 0}
+.ln-content .mermaid{background:var(--bg-deep);border-radius:0.4rem;padding:1rem;margin:0.85rem 0;border:1px solid var(--border)}
+
+.ln-q{padding:1rem 1.2rem;margin-top:0.85rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.45rem}
+.ln-q-stem{font-weight:600;color:var(--text-primary);font-size:0.95rem;margin-bottom:0.6rem;line-height:1.45}
+.ln-q-points{font-size:0.65rem;color:var(--text-muted);float:right;font-family:'JetBrains Mono',monospace}
+.ln-opt{display:flex;gap:0.5rem;align-items:flex-start;padding:0.5rem 0.65rem;border-radius:0.3rem;background:var(--bg-deep);margin-top:0.35rem;cursor:pointer;transition:background .12s,border-color .12s;border:1px solid transparent}
+.ln-opt:hover{background:var(--primary-dim)}
+.ln-opt.checked{background:var(--primary-dim);border-color:var(--primary)}
+.ln-opt input{margin-top:0.15rem;flex-shrink:0;accent-color:var(--primary)}
+.ln-opt-label{font-size:0.85rem;color:var(--text-primary)}
+.ln-shortans{width:100%;padding:0.5rem 0.7rem;background:var(--bg-deep);border:1px solid var(--border);border-radius:0.3rem;color:var(--text-primary);font-size:0.85rem;font-family:'JetBrains Mono',monospace}
+.ln-shortans:focus{outline:none;border-color:var(--primary)}
+
+.ln-result-correct{border-left:3px solid #86efac;padding-left:0.7rem;margin-top:0.4rem;color:#86efac;font-size:0.78rem;font-weight:600}
+.ln-result-wrong{border-left:3px solid #fca5a5;padding-left:0.7rem;margin-top:0.4rem;color:#fca5a5;font-size:0.78rem;font-weight:600}
+.ln-result-explain{font-size:0.8rem;color:var(--text-secondary);margin-top:0.35rem;font-style:italic;line-height:1.45}
+
+.ln-banner{padding:1rem 1.2rem;border-radius:0.45rem;margin:0.85rem 0;font-size:0.9rem}
+.ln-banner-pass{background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);color:#86efac}
+.ln-banner-fail{background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#fca5a5}
+
+.ln-actions{display:flex;gap:0.5rem;margin-top:1.25rem;flex-wrap:wrap}
+.ln-btn-primary{background:var(--primary);color:var(--bg-deep);border:none;border-radius:0.4rem;padding:0.65rem 1.4rem;font-size:0.85rem;font-weight:700;cursor:pointer;transition:filter .15s}
+.ln-btn-primary:hover{filter:brightness(1.1)}
+.ln-btn-primary:disabled{opacity:0.5;cursor:not-allowed}
+.ln-btn-secondary{background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:0.4rem;padding:0.65rem 1.4rem;font-size:0.85rem;font-weight:600;cursor:pointer}
+.ln-btn-secondary:hover{background:var(--bg-secondary)}
+</style>
+
+<script>
+const LESSON_ID = {{ lesson_id | tojson }};
+let _lesson = null;
+let _answers = {};       // {question_id: value}
+let _resultMap = null;   // {question_id: {is_correct, points_earned, points_max, correct_answer, explanation_md}}
+
+function escHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+function md(s) {
+  if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') return escHtml(s);
+  return DOMPurify.sanitize(marked.parse(s || ''));
+}
+
+async function loadLesson() {
+  try {
+    const r = await fetch('/api/lessons/' + LESSON_ID);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    _lesson = await r.json();
+    document.getElementById('ln-back').href = _lesson.course_id
+      ? `/courses/${await slugForCourse(_lesson.course_id)}` : '/courses';
+    render();
+  } catch (e) {
+    document.getElementById('ln-root').innerHTML =
+      '<div class="text-ion-coral py-8 text-center text-[13px]">Failed to load lesson: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+async function slugForCourse(cid) {
+  // Try to find slug from courses list — back link improves with it.
+  try {
+    const r = await fetch('/api/courses?include_unpublished=true');
+    const d = await r.json();
+    const m = (d.courses || []).find(c => c.id === cid);
+    return m ? m.slug : '';
+  } catch { return ''; }
+}
+
+function render() {
+  const l = _lesson;
+  const isQuizLike = (l.lesson_type === 'quiz' || l.lesson_type === 'lab');
+  const labLink = (l.lesson_type === 'lab' && l.lab_target_url)
+    ? `<div class="ln-banner" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;">
+         <strong>🛠 Hands-on lab.</strong> Open <a class="underline" href="${escHtml(l.lab_target_url)}" target="_blank">${escHtml(l.lab_target_url)}</a>
+         in another tab and complete the task before answering the verification questions.
+       </div>` : '';
+
+  let questionsHtml = '';
+  if (isQuizLike && (l.questions || []).length) {
+    questionsHtml = '<h2 style="margin-top:2rem;">Verification questions</h2>' +
+      (l.questions || []).map(q => renderQuestion(q)).join('');
+  }
+
+  const completeBtn = (l.lesson_type === 'reading')
+    ? `<button class="ln-btn-primary" onclick="markComplete()" ${l.user_status === 'completed' ? 'disabled' : ''}>
+         ${l.user_status === 'completed' ? '✓ Completed' : 'Mark complete →'}
+       </button>`
+    : `<button id="ln-submit-btn" class="ln-btn-primary" onclick="submitQuiz()">Submit answers</button>`;
+
+  document.getElementById('ln-root').innerHTML = `
+    <div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">${escHtml(l.lesson_type)}</div>
+    <h1 class="text-[26px] font-bold text-white tracking-tight mb-2">${escHtml(l.title)}</h1>
+    <div class="flex gap-3 text-[12px] text-slate-400 mb-5">
+      <span>⏱ ~${l.duration_min}m</span>
+      ${l.user_score != null ? `<span>Last score: <strong>${l.user_score}%</strong></span>` : ''}
+      ${l.user_attempts > 0 ? `<span>${l.user_attempts} attempt${l.user_attempts !== 1 ? 's' : ''}</span>` : ''}
+    </div>
+    ${labLink}
+    <div id="ln-content" class="ln-content">${md(l.content_md || '')}</div>
+    <div id="ln-questions">${questionsHtml}</div>
+    <div id="ln-banner-slot"></div>
+    <div class="ln-actions">${completeBtn}</div>
+  `;
+
+  // Wire option clicks
+  document.querySelectorAll('.ln-opt').forEach(label => {
+    label.addEventListener('click', () => {
+      const inp = label.querySelector('input');
+      if (!inp) return;
+      // Tiny delay so the input's checked state updates before we read it
+      setTimeout(() => updateAnswer(inp), 0);
+    });
+  });
+  document.querySelectorAll('.ln-shortans').forEach(inp => {
+    inp.addEventListener('input', () => {
+      _answers[parseInt(inp.dataset.qid, 10)] = inp.value;
+    });
+  });
+
+  // Mermaid render — base.html loads the lib; trigger pass after content is in DOM
+  if (typeof mermaid !== 'undefined') {
+    try { mermaid.run({ querySelector: '.mermaid' }); }
+    catch (e) { console.warn('mermaid render failed:', e); }
+  }
+}
+
+function renderQuestion(q) {
+  let body = '';
+  if (q.kind === 'single' || q.kind === 'truefalse') {
+    body = (q.options || []).map(opt =>
+      `<label class="ln-opt"><input type="radio" name="q${q.id}" data-qid="${q.id}" value="${escHtml(opt.value)}">
+        <span class="ln-opt-label">${md(opt.label || opt.value)}</span></label>`
+    ).join('');
+  } else if (q.kind === 'multi') {
+    body = (q.options || []).map(opt =>
+      `<label class="ln-opt"><input type="checkbox" data-qid="${q.id}" value="${escHtml(opt.value)}">
+        <span class="ln-opt-label">${md(opt.label || opt.value)}</span></label>`
+    ).join('');
+  } else if (q.kind === 'shortanswer') {
+    body = `<input type="text" class="ln-shortans" data-qid="${q.id}" placeholder="Your answer…">`;
+  }
+  return `<div class="ln-q" id="ln-q-${q.id}">
+    <span class="ln-q-points">${q.points} pt${q.points !== 1 ? 's' : ''}</span>
+    <div class="ln-q-stem">${md(q.stem_md || '')}</div>
+    ${body}
+    <div id="ln-q-result-${q.id}"></div>
+  </div>`;
+}
+
+function updateAnswer(inp) {
+  const qid = parseInt(inp.dataset.qid, 10);
+  if (inp.type === 'radio') {
+    _answers[qid] = inp.value;
+    inp.closest('.ln-q').querySelectorAll('.ln-opt').forEach(l => {
+      l.classList.toggle('checked', l.querySelector('input').checked);
+    });
+  } else if (inp.type === 'checkbox') {
+    const cur = Array.isArray(_answers[qid]) ? _answers[qid] : [];
+    if (inp.checked && !cur.includes(inp.value)) cur.push(inp.value);
+    if (!inp.checked) {
+      const i = cur.indexOf(inp.value);
+      if (i >= 0) cur.splice(i, 1);
+    }
+    _answers[qid] = cur;
+    inp.closest('.ln-opt').classList.toggle('checked', inp.checked);
+  }
+}
+
+async function markComplete() {
+  try {
+    const r = await fetch('/api/lessons/' + LESSON_ID + '/complete', { method: 'POST' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    showToast('Marked complete', 'success');
+    loadLesson();
+  } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+}
+window.markComplete = markComplete;
+
+async function submitQuiz() {
+  const btn = document.getElementById('ln-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  try {
+    const r = await fetch('/api/lessons/' + LESSON_ID + '/submit-quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers: _answers }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+
+    _resultMap = {};
+    (d.results || []).forEach(res => { _resultMap[res.question_id] = res; });
+    renderResults(d);
+  } catch (e) {
+    showToast('Submit failed: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Submit answers';
+  }
+}
+window.submitQuiz = submitQuiz;
+
+function renderResults(d) {
+  // Banner
+  const banner = d.passed
+    ? `<div class="ln-banner ln-banner-pass">✓ <strong>Passed</strong> — ${d.score_pct}% (need ${d.threshold}%). ${d.earned_points}/${d.total_points} points.</div>`
+    : `<div class="ln-banner ln-banner-fail">✗ <strong>Below threshold</strong> — ${d.score_pct}% (need ${d.threshold}%). Review the explanations and re-attempt.</div>`;
+  document.getElementById('ln-banner-slot').innerHTML = banner;
+
+  // Per-question feedback
+  (d.results || []).forEach(res => {
+    const slot = document.getElementById('ln-q-result-' + res.question_id);
+    if (!slot) return;
+    const cls = res.is_correct ? 'ln-result-correct' : 'ln-result-wrong';
+    const label = res.is_correct ? `✓ Correct — ${res.points_earned}/${res.points_max} pts` :
+      `✗ Incorrect — ${res.points_earned}/${res.points_max} pts. Correct answer: ${escHtml(JSON.stringify(res.correct_answer))}`;
+    let html = `<div class="${cls}">${label}</div>`;
+    if (res.explanation_md) {
+      html += `<div class="ln-result-explain">${md(res.explanation_md)}</div>`;
+    }
+    slot.innerHTML = html;
+  });
+
+  // Replace submit button with retry / next
+  document.querySelector('.ln-actions').innerHTML = `
+    <button class="ln-btn-secondary" onclick="loadLesson()">Re-attempt</button>
+    <a class="ln-btn-primary" href="javascript:history.back()">Back to course →</a>
+  `;
+}
+
+document.addEventListener('DOMContentLoaded', loadLesson);
+</script>
+{% endblock %}

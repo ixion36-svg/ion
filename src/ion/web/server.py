@@ -59,6 +59,7 @@ from ion.web.smtp_api import router as smtp_router
 from ion.web.enrichment_api import router as enrichment_router
 from ion.web.alert_prompt_api import router as alert_prompt_router
 from ion.web.story_api import router as story_router
+from ion.web.course_api import router as course_router
 from ion.web.tuning_proposal_api import router as tuning_proposal_router
 from ion.web.ticker_api import router as ticker_router
 from ion.web.investigation_memory_api import router as investigation_memory_router
@@ -317,6 +318,8 @@ app.include_router(alert_prompt_router, prefix="")
 # v0.11.0 — JSON-DAG playbook automation (Stories). The router declares
 # its own /api/ + page paths internally, so prefix="" here.
 app.include_router(story_router, prefix="")
+# v0.11.2 — L1/L2/L3 SOC training course subsystem
+app.include_router(course_router, prefix="")
 app.include_router(tuning_proposal_router, prefix="")
 app.include_router(ticker_router, prefix="")
 app.include_router(investigation_memory_router)

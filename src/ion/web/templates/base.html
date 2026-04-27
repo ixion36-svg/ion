@@ -136,6 +136,7 @@
                 <a href="/guide/sim" class="tw-drop-item {% if p.startswith('/guide/sim') %}is-active{% endif %}">Training Sim</a>
                 <a href="/guide/range" class="tw-drop-item {% if p.startswith('/guide/range') %}is-active{% endif %}">Cyber Range</a>
                 <a href="/training" class="tw-drop-item {% if p.startswith('/training') %}is-active{% endif %}">Skills &amp; Training</a>
+                <a href="/courses" class="tw-drop-item {% if p.startswith('/courses') or p.startswith('/lessons') or p.startswith('/my-courses') %}is-active{% endif %}">Courses (L1/L2/L3)</a>
                 <a href="/notes" class="tw-drop-item {% if p.startswith('/notes') %}is-active{% endif %}">Notes</a>
                 <a href="/templates" class="tw-drop-item {% if p.startswith('/templates') %}is-active{% endif %}">Templates</a>
                 <a href="/documents" class="tw-drop-item {% if p.startswith('/documents') %}is-active{% endif %}">Documents</a>
@@ -473,6 +474,17 @@
     <!-- Markdown parser + sanitizer -->
     <script src="/static/js/marked.min.js"></script>
     <script src="/static/js/purify.min.js"></script>
+    <!-- v0.11.2: Mermaid diagrams for course lessons (and any markdown
+         content that wants attack-chain / flowchart visuals). Optional —
+         consumer guards on `typeof mermaid !== 'undefined'` so a missing
+         file gracefully degrades. Drop mermaid.min.js into static/js for
+         air-gap deployments. -->
+    <script src="/static/js/mermaid.min.js" onerror="window.__mermaidMissing=true"></script>
+    <script>
+      if (typeof mermaid !== 'undefined' && mermaid.initialize) {
+        mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
+      }
+    </script>
     <script src="/static/js/app.js?v=0.9.28"></script>
     <script src="/static/js/ai-chat.js?v=0.9.28"></script>
     <script src="/static/js/quill.js"></script>

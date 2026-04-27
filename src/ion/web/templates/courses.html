@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Courses · ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="h-1.5 w-1.5 rounded-full bg-ion-iris pulse-cyan"></span>
+        <span class="label-tiny text-ion-iris">SOC training</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Courses</h1>
+      <p class="mt-3 max-w-2xl text-[15px] text-slate-400">
+        Tiered curriculum for L1 / L2 / L3 / L4 SOC analysts. Each course bundles
+        modules → lessons → quizzes; complete every lesson and pass the quizzes
+        to earn the badge for that tier.
+      </p>
+    </div>
+    <a href="/my-courses" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[13px] font-semibold transition">
+      My courses →
+    </a>
+  </section>
+
+  <!-- Level filter strip -->
+  <div class="flex flex-wrap gap-2 mb-6">
+    <button onclick="filterLevel('')"      class="cl-filter cl-filter-active" data-level="">All levels</button>
+    <button onclick="filterLevel('L1')"    class="cl-filter" data-level="L1">L1 — Tier-1 SOC</button>
+    <button onclick="filterLevel('L2')"    class="cl-filter" data-level="L2">L2 — Senior analyst</button>
+    <button onclick="filterLevel('L3')"    class="cl-filter" data-level="L3">L3 — IR / hunting</button>
+    <button onclick="filterLevel('L4')"    class="cl-filter" data-level="L4">L4 — Lead / engineering</button>
+  </div>
+
+  <div id="courses-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div class="text-slate-500 text-[13px] py-8 col-span-full text-center">Loading…</div>
+  </div>
+</div>
+</div>
+
+<style>
+.cl-filter{padding:0.5rem 0.95rem;border-radius:0.4rem;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03);color:var(--text-secondary);font-size:0.78rem;font-weight:600;cursor:pointer;transition:background .12s,border-color .12s}
+.cl-filter:hover{background:rgba(255,255,255,0.07)}
+.cl-filter-active{background:var(--primary-dim);border-color:var(--primary);color:var(--text-primary)}
+.cl-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.5rem;padding:1.25rem;transition:transform .12s,border-color .12s;display:flex;flex-direction:column;gap:0.55rem;text-decoration:none;color:inherit}
+.cl-card:hover{transform:translateY(-2px);border-color:var(--primary)}
+.cl-level-pill{display:inline-block;padding:0.18rem 0.55rem;font-size:0.6rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-radius:9999px;margin-bottom:0.4rem}
+.cl-level-L1{background:rgba(34,197,94,0.14);color:#86efac}
+.cl-level-L2{background:rgba(109,228,255,0.14);color:#6de4ff}
+.cl-level-L3{background:rgba(245,158,11,0.14);color:#fbbf24}
+.cl-level-L4{background:rgba(239,68,68,0.14);color:#fca5a5}
+.cl-title{font-size:1.05rem;font-weight:700;color:var(--text-primary);line-height:1.3}
+.cl-meta{display:flex;flex-wrap:wrap;gap:0.6rem;font-size:0.7rem;color:var(--text-muted);margin-top:auto;padding-top:0.5rem;border-top:1px solid var(--border)}
+.cl-desc{font-size:0.82rem;color:var(--text-secondary);line-height:1.45}
+</style>
+
+<script>
+let _courses = [];
+let _currentLevel = '';
+
+async function loadCourses() {
+  const grid = document.getElementById('courses-grid');
+  grid.innerHTML = '<div class="text-slate-500 text-[13px] py-8 col-span-full text-center">Loading…</div>';
+  try {
+    const r = await fetch('/api/courses');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    _courses = d.courses || [];
+    render();
+  } catch (e) {
+    grid.innerHTML = '<div class="text-ion-coral text-[13px] py-8 col-span-full text-center">Failed to load: ' + e.message + '</div>';
+  }
+}
+
+function filterLevel(lvl) {
+  _currentLevel = lvl;
+  document.querySelectorAll('.cl-filter').forEach(b => {
+    b.classList.toggle('cl-filter-active', (b.getAttribute('data-level') || '') === lvl);
+  });
+  render();
+}
+window.filterLevel = filterLevel;
+
+function escHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+
+function render() {
+  const grid = document.getElementById('courses-grid');
+  let rows = _courses;
+  if (_currentLevel) rows = rows.filter(c => c.level === _currentLevel);
+  if (!rows.length) {
+    grid.innerHTML = '<div class="text-slate-500 text-[13px] py-8 col-span-full text-center">No published courses' +
+      (_currentLevel ? ' for ' + _currentLevel : '') + ' yet.</div>';
+    return;
+  }
+  grid.innerHTML = rows.map(c => {
+    // Strip markdown for the description preview — full markdown renders on detail page
+    const desc = (c.description_md || '').replace(/[#*`_>]+/g, '').slice(0, 220);
+    return `<a class="cl-card" href="/courses/${escHtml(c.slug)}">
+      <span class="cl-level-pill cl-level-${escHtml(c.level)}">${escHtml(c.level)}</span>
+      <div class="cl-title">${escHtml(c.title)}</div>
+      <div class="cl-desc">${escHtml(desc)}${desc.length >= 220 ? '…' : ''}</div>
+      <div class="cl-meta">
+        <span>⏱ ~${c.estimated_hours}h</span>
+        <span>Pass ≥ ${c.pass_threshold}%</span>
+      </div>
+    </a>`;
+  }).join('');
+}
+
+document.addEventListener('DOMContentLoaded', loadCourses);
+</script>
+{% endblock %}

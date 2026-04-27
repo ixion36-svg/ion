@@ -1,5 +1,79 @@
 # Changelog
 
+## v0.11.2 (2026-04-27)
+
+### Course framework — L1/L2/L3 SOC analyst training (foundation ship)
+
+First of a six-ship sequence building a full BTL1-style training course system for L1/L2/L3 analysts. This ship is the **framework** that everything else hangs off — models, executor, UI, Mermaid support, and one substantial demo lesson per tier to set the quality bar.
+
+#### Models (7 new tables, all auto-create on first boot)
+
+- **`Course`** — id, title, slug (unique), level (`L1`/`L2`/`L3`/`L4`), description_md, estimated_hours, badge_image_path, prerequisite_course_id (self-FK), order_in_level, pass_threshold, published, skill_keys (JSON, links to existing `SkillAssessment`), author_id
+- **`CourseModule`** — child of Course, ordered, with own description + estimated minutes
+- **`Lesson`** — child of Module. `lesson_type` ∈ `{reading, quiz, lab}`. Markdown body. Lab variant carries an optional `lab_target_url` pointing into ION (e.g. `/cases/1`)
+- **`Question`** — child of Lesson. `kind` ∈ `{single, multi, truefalse, shortanswer}`. JSON-backed options + correct-answer + explanation
+- **`UserEnrolment`** — one per `(user_id, course_id)`, captures started/completed/badge/score_pct
+- **`UserLessonProgress`** — one per `(user_id, lesson_id)`, status, score, attempts
+- **`UserAnswer`** — one per quiz attempt, replays preserved (each submission stamps a fresh `attempt_id`)
+
+Distinct from the existing `TrainingPlan` (which tracks external certs like CompTIA/SANS) — Courses are interactive, in-app curriculum.
+
+#### Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/courses` | catalog (filterable by level, published-only by default) |
+| GET | `/api/courses/{slug}` | course detail with modules + lessons + per-lesson user progress |
+| POST | `/api/courses/{id}/enrol` | self-enrol (blocked if prerequisite course incomplete) |
+| GET | `/api/my-courses` | current user's enrolments dashboard payload |
+| GET | `/api/lessons/{id}` | lesson content + questions (correct answers stripped) |
+| POST | `/api/lessons/{id}/complete` | mark a reading/lab lesson complete |
+| POST | `/api/lessons/{id}/submit-quiz` | submit answers; server grades + records attempt + updates progress + recomputes course completion |
+
+Quiz grading: single/truefalse exact match, multi with partial credit (intersection-over-union × max points), shortanswer case-insensitive against an accepted-answer set.
+
+Course completion auto-detection: when *every* lesson is in `completed` status, the enrolment row's `completed_at` is set and `badge_earned` flips to true. If a quiz re-attempt regresses a lesson from `completed` to `failed`, the enrolment is reopened automatically.
+
+#### UI
+
+Three pages — all use the existing `marked.js` + `DOMPurify` markdown stack:
+
+- **`/courses`** — catalog grid by level with a filter strip. Cards show title, description preview, estimated hours, and pass threshold.
+- **`/courses/{slug}`** — course detail with a progress bar across all lessons, modules expanded with lesson list, status dots (not_started / in_progress / completed / failed), per-lesson type pill (reading / quiz / lab) and last score.
+- **`/lessons/{id}`** — lesson view. Markdown body rendered with full prose styling, then quiz questions inline if applicable. Submit returns per-question feedback with the correct answer + explanation. Pass/fail banner with pass threshold visible.
+
+Nav: new "Courses (L1/L2/L3)" link in the Knowledge dropdown alongside Skills & Training.
+
+#### Mermaid diagrams
+
+Added `<script src="/static/js/mermaid.min.js">` to `base.html` with a graceful-degradation guard. Lesson markdown can include ` ```mermaid ... ``` ` blocks for attack chains, kill chains, lifecycle diagrams. Air-gap deployments need to drop `mermaid.min.js` into `static/js` (not bundled by default — adds ~2 MB to the image).
+
+#### Demo content (one lesson per level)
+
+Substantial Markdown + quiz content seeded by `seed_courses.py`:
+
+- **L1 — Alert Triage Fundamentals** · 1 module, 3 lessons (1 reading + 2 quizzes, ~12 questions): the alert lifecycle as a Mermaid flowchart, the four-tier severity rubric with worked examples, true_positive / false_positive / benign_true_positive distinctions tied to ION's `CaseClosureReason` enum.
+- **L2 — Threat Hunting with KQL** · 1 module, 2 lessons (1 reading + 1 quiz, ~4 questions): the PEAK methodology, a worked LotL hypothesis (mshta/regsvr32 invoked from PowerShell), KQL refinement that reduces noise without hiding signal, converting hunts into TIDE rules.
+- **L3 — Adversary Emulation Basics** · 1 module, 2 lessons (1 reading + 1 quiz, ~4 questions): purple-team flow as a Mermaid graph, the four detection-fidelity tiers (alerted / logged-not-alerted / unparsed / not-logged), MITRE ATT&CK T1059.001 worked Atomic test, what to record on the scorecard.
+
+Prerequisite locks are wired: L2 requires L1, L3 requires L2.
+
+Each demo lesson is **substantive** — 800-1200 words, real worked examples, citations to ION's own enums and tables. Sets the quality bar for the full curriculum coming in v0.11.4 / v0.11.5 / v0.11.6.
+
+#### Upgrade
+
+Drop in `ion:0.11.2`. New tables (`courses`, `course_modules`, `lessons`, `course_questions`, `course_enrolments`, `course_lesson_progress`, `course_user_answers`) auto-create. Run `seed_courses.py` to populate the demo curriculum:
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
+#### What's next
+
+- **v0.11.3** — admin authoring UI (no more JSON seeders for course content)
+- **v0.11.4 / .5 / .6** — full L1 / L2 / L3 curriculum (each ~8 modules covering BTL1-equivalent depth)
+- **v0.11.7** — hands-on labs that link into real ION pages + PDF certificate generation on completion
+
 ## v0.11.1 (2026-04-27) — PATCH
 
 ### Network Mapper sync: TZ comparison crash

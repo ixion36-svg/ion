@@ -161,6 +161,13 @@ from ion.models.kb_document_embedding import KBDocumentEmbedding  # noqa: F401
 # v0.11.0: JSON-DAG playbook automation (Tines-inspired).
 from ion.models.story import Story, StoryRun  # noqa: F401
 
+# v0.11.2: L1/L2/L3/L4 SOC analyst training course subsystem.
+from ion.models.course import (  # noqa: F401
+    Course, CourseModule, Lesson, Question,
+    UserEnrolment, UserLessonProgress, UserAnswer,
+    CourseLevel, LessonType, QuestionKind, LessonProgressStatus,
+)
+
 __all__ = [
     "Base",
     "Template",
