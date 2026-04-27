@@ -2330,7 +2330,861 @@ A workstation generating 200+ unique DNS names in a short window with a high car
         points=2,
     )
 
-    print(f"  L1: {course.title} — 3 modules, 19 lessons (Module 3 Windows Event Logs @ proper depth)")
+    # ── Module 4 — Network Telemetry (v0.11.7) ───────────────────────────
+    # Authored at BTL1/SANS depth from research-agent dossier. Builds on
+    # Module 3 (endpoint logs) by covering what happens *between* hosts:
+    # PCAP/flow/Zeek/IDS, conn_state codes, ECS mapping, beaconing and DNS
+    # tunneling, scans/sweeps, exfiltration patterns, ATT&CK mapping for
+    # network-side observables.
+    mod4 = _add_module(
+        session, course, order=4,
+        title="Network Telemetry",
+        description_md=(
+            "What endpoint logs cannot tell you: who talked to whom, when, "
+            "how often, and how much. PCAP, flow records, Zeek metadata, "
+            "and IDS alerts; conn_state triage; beaconing and DNS tunneling "
+            "fingerprints; scans, sweeps, lateral movement, and bulk "
+            "exfiltration to cloud-storage destinations; mapping all of "
+            "the above to MITRE ATT&CK."
+        ),
+        estimated_minutes=200,
+    )
+
+    # Lesson 4.1 — data sources
+    m4l1 = _add_lesson(
+        session, mod4, order=1,
+        title="Network data sources — PCAP, flow, Zeek, IDS",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Compare PCAP, flow records (NetFlow/IPFIX/sFlow), protocol metadata (Zeek), and IDS alerts (Suricata/Snort) across cost, retention, fidelity, and privacy
+> 2. Explain why sampling rate is essential context for any flow-based count
+> 3. Identify the major Zeek log families and what each captures
+> 4. Position proxy and next-generation firewall logs in the telemetry stack
+> 5. Pick the right tier of telemetry for a given investigative question
+>
+> **Prerequisites.** Module 3 *Windows Event Logs* completed.
+
+## Why this module exists
+
+Module 3 covered endpoint logs — what happens *on* a host. This module covers what happens *between* hosts. Attackers don't always leave clean endpoint traces; a living-off-the-land tool can produce normal-looking process events while its *network* behaviour — a slow regular callback to an external IP every ten minutes — is the only place the compromise is visible.
+
+Network telemetry also scopes incidents. When an alert fires on one host, network logs tell you whether other hosts also talked to the bad destination, whether data left the perimeter, and over what time window. Scoping is an L1 job and you cannot scope without flow and DNS history.
+
+Finally, network logs are durable in a way endpoint logs are not. An attacker who clears Windows Security logs (4624 / 1102, covered in Module 3) cannot retroactively unsend the packets a network sensor captured.
+
+## The three tiers of network telemetry
+
+Network monitoring data trades fidelity for volume.
+
+**Full packet capture (PCAP)** is the byte-for-byte recording of traffic. Highest fidelity; you can replay, extract files, decode protocols you didn't know about at capture time. Also enormous: a single saturated 1 Gb/s link produces around 450 GB per hour. Most organisations retain full PCAP only at chokepoints for hours to days.
+
+**Flow records** are statistical summaries of conversations — typically a 5-tuple (source IP, source port, destination IP, destination port, protocol) plus byte and packet counts and timestamps. No payload. Tiny — ~50–100 bytes per record. Excellent for *"did host A ever talk to host B?"* over months. Poor for *"what did they say?"*.
+
+**Protocol metadata logs** — the Zeek family — sit between PCAP and flow. The sensor parses the protocol on the wire (DNS, HTTP, TLS, SMB) and emits structured records of what was seen: the DNS query name, the HTTP host header, the TLS server name, file hashes for transferred files. Vastly smaller than PCAP, vastly richer than flow. **This tier is the L1 analyst's bread and butter.**
+
+**IDS alerts** (Suricata, Snort) sit alongside Zeek, not in place of it. Zeek produces the fact-trail; the IDS produces a *"this fact-trail contains a known-bad pattern"* pointer.
+
+| Property | PCAP | Flow (NetFlow/IPFIX) | Zeek metadata | IDS alerts |
+| --- | --- | --- | --- | --- |
+| Captures payload | Yes | No | Partial (extracted fields, hashes) | Only matching context |
+| Storage cost | Very high | Very low | Low–moderate | Very low |
+| Typical retention | Hours–days | Months–years | Weeks–months | Months |
+| Good for retrospective hunt | If retained | Yes | Yes | Only if a rule fired |
+| Good for *"did X ever talk to Y?"* | Slow | Excellent | Excellent | Only if rule fired |
+| Privacy footprint | Highest | Lowest | Medium | Medium |
+
+```mermaid
+graph TD
+    A[Network traffic] --> B[Full PCAP]
+    A --> C[Flow records]
+    A --> D[Protocol metadata]
+    A --> E[IDS alerts]
+    C --> C1[NetFlow v5]
+    C --> C2[NetFlow v9 / IPFIX]
+    C --> C3[sFlow]
+    D --> D1[Zeek conn.log]
+    D --> D2[Zeek dns.log]
+    D --> D3[Zeek http.log]
+    D --> D4[Zeek ssl.log]
+    D --> D5[Zeek files.log]
+    E --> E1[Suricata]
+    E --> E2[Snort]
+```
+
+## NetFlow, IPFIX, and sFlow
+
+**NetFlow** was developed by Cisco. v5 is the legacy workhorse — fixed fields, IPv4-only. v9 added templates for extensibility and IPv6. NetFlow is unidirectional by default; a TCP connection produces two records, one per direction, and most collectors stitch them.
+
+**IPFIX (IP Flow Information Export)** is the IETF-standard successor to NetFlow v9, defined in RFC 7011. Template-based, vendor-neutral, supports application identification when the exporter inspects deep enough.
+
+**sFlow (sampled flow)** is fundamentally different. NetFlow/IPFIX try to record every flow by default. sFlow is *always sampled* — the exporter looks at, say, 1 in every 1024 packets, and exports those samples plus periodic interface counters. Cheap on switch ASICs, which is why high-density switches favour it. **You must remember the sampling rate when reasoning about volumes** — a single observed flow at 1:1024 implies roughly a thousand unseen real flows.
+
+Every flow architecture has the same three parts: an **exporter** (router, switch, firewall, dedicated probe), a **collector** (the central system that ingests and stores), and an **analyser** (the SIEM or hunt UI you actually query). Sampling can be enabled even on NetFlow exporters under load — *always know your sampling rate before you call something rare.*
+
+What flows do **not** capture: no payload. No DNS query name. No HTTP URL. No TLS server name. No file transferred. They tell you *"192.0.2.45 sent 14 MB to 198.51.100.12 over TCP/443 between 02:14 and 02:18"* — they do not tell you whether that 443 connection was Gmail, Slack, or a Cobalt Strike beacon.
+
+## Zeek (formerly Bro)
+
+Zeek is a network security monitor that parses traffic in real time and emits structured logs by protocol. It is not a signature-matching IDS; it is a programmable protocol decoder that produces a fact-trail. The Zeek log family an L1 should recognise:
+
+- **conn.log** — every connection attempt, successful or not. The backbone log.
+- **dns.log** — every DNS query and response.
+- **http.log** — every cleartext HTTP transaction (host, URI, method, status, user-agent, referrer).
+- **ssl.log** — every TLS handshake (SNI, certificate chain ID, JA3 fingerprint).
+- **files.log** — every file Zeek extracted from a protocol stream, with hash.
+- **x509.log** — every certificate seen, with subject, issuer, validity dates.
+- **smtp.log / ftp.log / ssh.log** — protocol-specific envelopes and version exchanges.
+- **weird.log** — protocol-violation events (often noise, sometimes real).
+- **notice.log** — Zeek's curated *"you should look at this"* output.
+
+Zeek differs from raw PCAP in that the parsing is already done. *"Did anyone resolve `evil-c2.example`?"* against PCAP needs you to decode every DNS packet in the timeframe; against Zeek it's a single field match on `dns.log`. Against NetFlow it's not answerable at all — flow records don't carry DNS query names.
+
+## Suricata and Snort
+
+Signature-based IDS. They watch traffic against a ruleset (Emerging Threats, Talos, custom) and emit alerts on match. For L1 work, IDS alerts are usually the *trigger* for an investigation, and Zeek/flow data is what you use to scope and confirm. A Suricata `ET MALWARE Cobalt Strike Beacon Activity` on host A is the starting gun; the conn.log shows how long the pattern has been going on, the dns.log shows what name resolved to that destination, the ssl.log carries the JA3.
+
+Treat IDS alerts with healthy scepticism — false-positive rates on community rules are non-trivial. The default L1 question is not *"is this real?"* but *"given this alert, what does Zeek/flow show, and does that corroborate?"*.
+
+## Proxy and firewall logs
+
+Most enterprise networks force outbound HTTP/HTTPS through a forward proxy or NGFW.
+
+- **Web proxies (Zscaler, Bluecoat, Squid)** log per-URL: timestamp, user, source IP, destination URL, host, method, content-category, action (allow/block), bytes, user-agent. Best place to answer *"did this user visit this site?"* with HTTP/HTTPS, especially with SSL inspection enabled.
+- **Next-generation firewalls (Palo Alto, Fortinet, Check Point)** produce traffic logs (5-tuple plus app-id and bytes), URL filtering logs, threat logs, decryption logs. Palo Alto's `App-ID` is *"regardless of port, this looks like SSH"* or *"this looks like Tor"*.
+- **Perimeter firewalls without app-awareness** (older Cisco ASA, basic iptables) produce 5-tuple connection logs equivalent to NetFlow.
+
+What an L1 sees: usually a SIEM-normalised view that flattens proxy and firewall logs into a common schema (often ECS — covered next lesson). The fields you care about are source identity, destination, action, category, bytes.
+
+## Trade-offs
+
+- **Cost vs fidelity.** PCAP is highest fidelity, highest cost. Flow is lowest cost, lowest fidelity. Zeek is the practical sweet spot.
+- **Retention vs volume.** Six months of flow data costs less than two days of PCAP at a busy site.
+- **Privacy.** PCAP captures everything including credentials and personal data inside cleartext protocols. Many organisations restrict PCAP queries. Zeek can be configured to drop sensitive fields. Flow has the smallest privacy footprint.
+- **Encryption.** Modern TLS 1.3 with Encrypted Client Hello (ECH) limits what unencrypted-decoder Zeek can see — SNI may be hidden. JA3 still works on the handshake. PCAP without keys is opaque past the handshake.
+
+```mermaid
+graph TD
+    P[PCAP - highest detail, highest volume]
+    Z[Zeek metadata - mid detail, mid volume]
+    F[Flow records - low detail, lowest volume]
+    P --> Z
+    Z --> F
+```
+
+## Glossary
+
+- **PCAP** — Packet Capture; lossless byte-for-byte recording. Highest fidelity, highest cost.
+- **NetFlow** — Cisco-originated flow-record protocol. v5 IPv4-only legacy; v9 templates + IPv6.
+- **IPFIX** — IETF standard flow protocol (RFC 7011), successor to NetFlow v9.
+- **sFlow** — Always-sampled flow protocol favoured by high-density switches.
+- **Sampling rate** — Ratio of inspected to total packets/flows; required context for flow counts.
+- **Exporter / collector / analyser** — Device emits records → central store → query tool.
+- **Zeek** — Open-source network monitor (formerly Bro); programmable, not signature-based.
+- **Suricata / Snort** — Signature-based IDS engines.
+- **App-ID** — Palo Alto's enriched protocol identifier independent of port.
+
+## Further reading
+
+- Zeek log reference: https://docs.zeek.org/en/master/script-reference/log-files.html
+- RFC 7011 — IPFIX Protocol Specification: https://www.rfc-editor.org/rfc/rfc7011
+- RFC 3954 — NetFlow v9: https://www.rfc-editor.org/rfc/rfc3954
+- RFC 3176 — sFlow: https://www.rfc-editor.org/rfc/rfc3176
+""",
+    )
+    m4l1q = _add_lesson(
+        session, mod4, order=2, title="Data sources — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=6,
+        content_md="Three questions on telemetry tier selection, sFlow behaviour, and Zeek's role.",
+    )
+    _add_q(session, m4l1q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Which network telemetry tier is best suited to answering *\"did any host in the estate ever connect to 198.51.100.42 in the last 90 days?\"*",
+        options=[
+            {"value": "pcap", "label": "Full PCAP"},
+            {"value": "flow", "label": "NetFlow / IPFIX records"},
+            {"value": "ids_only", "label": "Suricata alerts only"},
+            {"value": "edr", "label": "Endpoint EDR logs"},
+        ],
+        correct="flow",
+        explanation_md="Flow records are designed for long retention and per-conversation queries. PCAP is rarely retained 90 days; Suricata only fires on rule matches; EDR doesn't index full network history.",
+        points=2,
+    )
+    _add_q(session, m4l1q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are true about sFlow?",
+        options=[
+            {"value": "sampled", "label": "It is always sampled"},
+            {"value": "payload", "label": "It captures full packet payloads"},
+            {"value": "asic", "label": "Used by high-density switches because it's cheap on the ASIC"},
+            {"value": "rate_context", "label": "Sampling rate must be considered when reasoning about volume"},
+        ],
+        correct=["sampled", "asic", "rate_context"],
+        explanation_md="sFlow is statistically sampled, doesn't capture payloads, is favoured on busy switching gear, and the sampling rate is essential context when interpreting counts.",
+        points=2,
+    )
+    _add_q(session, m4l1q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="Zeek is fundamentally a signature-based IDS, like Snort.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** Zeek is a programmable network monitor that parses protocols and emits structured logs. Suricata and Snort are signature-based. Zeek scripts can produce notices but the core engine is a protocol decoder, not a rule matcher.",
+        points=1,
+    )
+
+    # Lesson 4.2 — Zeek + ECS mapping
+    m4l2 = _add_lesson(
+        session, mod4, order=3,
+        title="Reading Zeek logs and the ECS mapping",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Read a `conn.log` row and explain every field
+> 2. Interpret the seven `conn_state` codes that matter for triage
+> 3. Identify suspicious patterns in `dns.log` and `ssl.log`
+> 4. Pivot between Zeek logs using the shared `uid`
+> 5. Map every Zeek field to its Elastic Common Schema (ECS) equivalent
+> 6. Write a basic KQL query against Zeek-via-Filebeat data
+
+## conn.log fields
+
+A `conn.log` record represents one connection (or attempt). The fields you must know:
+
+- **ts** — connection-start timestamp.
+- **uid** — *connection unique ID*, e.g. `CzZRSm4VC4P0E5VqTk`. Every other Zeek log produced for this connection (dns, http, ssl, files) shares this uid. **It is the pivot key.**
+- **id.orig_h / id.orig_p** — originator IP and port (the side that initiated).
+- **id.resp_h / id.resp_p** — responder IP and port.
+- **proto** — transport protocol (`tcp`, `udp`, `icmp`).
+- **service** — application protocol Zeek identified (`dns`, `http`, `ssl`, `ssh`, `smb`). Empty if Zeek couldn't identify it.
+- **duration** — connection duration in seconds.
+- **orig_bytes / resp_bytes** — application-layer bytes sent by each side (excludes retransmissions/headers).
+- **conn_state** — the connection state code (next section).
+- **history** — compact packet-sequence string. Lowercase = originator, uppercase = responder. `S`=SYN, `H`=SYN+ACK, `A`=ACK, `D`=data, `F`=FIN, `R`=RST. A successful TLS connection looks like `ShADdaFf`.
+
+Example row (TSV, abbreviated):
+
+```
+ts=1714060800.123 uid=CzZRSm4VC4P0E5VqTk id.orig_h=10.20.30.40 id.orig_p=51234
+id.resp_h=192.0.2.55 id.resp_p=443 proto=tcp service=ssl duration=14.21
+orig_bytes=4502 resp_bytes=88210 conn_state=SF history=ShADadFf
+```
+
+Read it as: client `10.20.30.40` made an outbound TLS connection to `192.0.2.55:443`, lasted 14.2s, client sent 4.5 KB, received 88 KB, terminated cleanly.
+
+## conn_state codes that matter
+
+| Code | Meaning | Triage signal |
+| --- | --- | --- |
+| **S0** | SYN sent, no reply | Port-scan or dead destination |
+| **S1** | Established, not terminated at flush | In-progress; usually unremarkable |
+| **SF** | Normal establishment + termination | Healthy traffic — also healthy beacons |
+| **REJ** | Responder rejected with RST | Closed port, or filtered |
+| **RSTO** | Originator aborted with RST | Application-layer abort |
+| **RSTR** | Responder aborted with RST | Server actively cut client off — investigate |
+| **OTH** | No SYN seen, mid-connection only | Long-lived connection present at sensor start |
+
+**Triage shortcuts:** thousands of `S0` to many destinations in a short window = scanning. Many `REJ` to one destination = misconfigured client. `SF` outbound with 1 KB out + 50 KB in = normal HTTP. `SF` outbound with 50 MB out + 2 KB in = exfil candidate.
+
+## dns.log — patterns to flag
+
+Key fields: `uid`, `id.orig_h`, `id.resp_h`, `query`, `qtype_name` (A, AAAA, TXT, MX), `rcode_name` (NOERROR, NXDOMAIN, SERVFAIL, REFUSED), `answers`, `TTLs`.
+
+- **Long subdomain labels.** A query for `aGVsbG8tdGhpcy1pcy1leGZpbA.evil.example` with 50+ chars before the parent is a classic DNS-tunneling shape. CDN domains can have long labels too — context and parent reputation matter.
+- **NXDOMAIN bursts.** A host generating dozens of NXDOMAIN replies in a short window often means a Domain Generation Algorithm (DGA) is at work; the malware burns through algorithmic candidates until it finds the live controller.
+- **DGA-shaped queries.** High-entropy strings like `xkqzplmnvwert.com`, `qjxzbvwert42.net`. The labels look statistically random rather than English words.
+- **Rare TLDs.** Heavy traffic to `.tk`, `.top`, `.xyz`, `.cf`, `.gq` correlates with abuse — use as a weight, not a verdict.
+- **TXT-record volume.** TXT is normal for SPF/DKIM/domain-validation. *Thousands of TXT queries from one host to one parent domain over hours* is the hallmark of `dnscat2` / `iodine`-style tunneling.
+
+## http.log and ssl.log
+
+`http.log` covers cleartext HTTP — fields you'll use: `host`, `uri`, `method`, `status_code`, `user_agent`, `referrer`, `request_body_len`, `response_body_len`. With most traffic now TLS-encrypted, http.log is mostly relevant where SSL inspection decrypts on the wire, or for legitimate cleartext (internal HTTP, captive portals).
+
+`ssl.log` is far more useful in TLS-everywhere networks. Fields: `version`, `cipher`, `server_name` (the SNI), `subject`, `issuer`, `validation_status`, `ja3`, `ja3s`, `established`.
+
+**SNI (Server Name Indication)** is the unencrypted hostname in the TLS ClientHello. Until Encrypted Client Hello (ECH) deploys broadly, SNI is the analyst's window into *what site did this client claim to be visiting?* Note **claim** — domain fronting can lie; ECH will eliminate SNI visibility entirely on networks that adopt it.
+
+**JA3 / JA3S in non-jargon terms.** JA3 is a fingerprint of how a TLS client speaks during the handshake — its list of cipher suites, extensions, elliptic curves, and curve formats. Different software stacks (Chrome, Firefox, Python `requests`, Cobalt Strike, Sliver) produce subtly different lists. JA3 hashes the lists into a 32-character MD5. Two clients with identical JA3s are probably running the same TLS library version. JA3S is the same idea on the server side. Why this matters for L1: even though the rest of the connection is encrypted, **a host producing a JA3 that matches a known Cobalt Strike beacon's JA3 is strong evidence of what's running, without ever decrypting the payload.** JA3 collisions are real (legitimate Java clients overlap with malware that uses the same TLS library), so use it as a strong weight, not a verdict.
+
+## Pivoting via uid
+
+The most powerful pivot in the Zeek stack. Every connection produces one `conn.log` row and zero or more rows in protocol-specific logs, all sharing the same `uid`.
+
+1. Find the `conn.log` row of interest.
+2. Take the `uid`.
+3. Query every other Zeek log for that uid. You instantly get DNS resolution, TLS SNI/JA3, and any files transferred.
+
+If the original alert is a Suricata signature, Suricata in eve.json mode emits a `flow_id` that maps to Zeek's connection key in most properly-integrated stacks.
+
+```mermaid
+graph LR
+    C[conn.log uid=ABC123]
+    D[dns.log uid=XYZ789]
+    H[http.log uid=ABC123]
+    S[ssl.log uid=ABC123]
+    F[files.log uid=ABC123]
+    X[x509.log fingerprint=...]
+    C --- H
+    C --- S
+    C --- F
+    S --- X
+    D -. resolves to .-> C
+```
+
+The dashed arrow is the conceptual link from a DNS resolution (its own uid) to the resulting connection (different uid but matching destination IP).
+
+## ECS field mapping
+
+Modern ELK stacks ingest Zeek via Filebeat's Zeek module, which renames fields into the Elastic Common Schema (ECS). You'll see both names in practice — Zeek-native in some panels, ECS in others. The mapping you must memorise:
+
+| Zeek field | ECS field |
+| --- | --- |
+| `id.orig_h` | `source.ip` |
+| `id.orig_p` | `source.port` |
+| `id.resp_h` | `destination.ip` |
+| `id.resp_p` | `destination.port` |
+| `proto` | `network.transport` |
+| `service` | `network.protocol` |
+| `orig_bytes` | `source.bytes` |
+| `resp_bytes` | `destination.bytes` |
+| `orig_bytes + resp_bytes` | `network.bytes` |
+| `query` (dns.log) | `dns.question.name` |
+| `qtype_name` (dns.log) | `dns.question.type` |
+| `rcode_name` (dns.log) | `dns.response_code` |
+| `host` (http.log) | `url.domain` |
+| `uri` (http.log) | `url.path` |
+| `user_agent` (http.log) | `user_agent.original` |
+| `server_name` (ssl.log) | `tls.client.server_name` |
+| `ja3` (ssl.log) | `tls.client.ja3` |
+| `ja3s` (ssl.log) | `tls.server.ja3s` |
+
+ECS uses dotted lowercase paths and prefers `source` / `destination` over `client` / `server` for connection-level data.
+
+## Worked KQL examples
+
+**Example 1 — rare destination ports for one host.** A user's workstation feels sluggish; you want any unusual outbound TCP destinations in 24h.
+
+```kql
+event.dataset : "zeek.conn"
+and source.ip : "10.20.30.40"
+and not destination.port : (80 or 443 or 53 or 123)
+and network.transport : "tcp"
+```
+
+In Discover sort by `@timestamp` descending; in Lens aggregate by `destination.port` to spot any port that's unexpectedly common.
+
+**Example 2 — long-subdomain DNS candidates.** Surface DNS-tunneling candidates across the estate.
+
+```kql
+event.dataset : "zeek.dns"
+and dns.question.name : *
+and dns.question.type : ("TXT" or "A")
+```
+
+Then in Lens aggregate by `dns.question.name`, top values, and add a runtime field `dns_label_length` from the leftmost label's character count. Anything above 50 chars with significant query volume warrants a closer look.
+
+## Glossary
+
+- **conn.log / uid** — Zeek connection record + connection-unique pivot key.
+- **conn_state** — Two/three-character state code: S0, S1, SF, REJ, RSTO, RSTR, OTH.
+- **history** — Per-packet-direction shorthand string in conn.log.
+- **SNI** — Server Name Indication; unencrypted TLS hostname extension.
+- **JA3 / JA3S** — TLS handshake fingerprint hashes (client / server).
+- **DGA / NXDOMAIN** — Algorithmic-domain malware behaviour signal.
+- **ECS** — Elastic Common Schema; normalised field naming for the SIEM.
+
+## Further reading
+
+- ECS network fields: https://www.elastic.co/guide/en/ecs/current/ecs-network.html
+- ECS DNS fields: https://www.elastic.co/guide/en/ecs/current/ecs-dns.html
+- ECS TLS fields: https://www.elastic.co/guide/en/ecs/current/ecs-tls.html
+- JA3 (Salesforce original): https://github.com/salesforce/ja3
+""",
+    )
+    m4l2q = _add_lesson(
+        session, mod4, order=4, title="Zeek + ECS — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=6,
+        content_md="Three questions on conn_state interpretation, ECS mapping, and the uid pivot.",
+    )
+    _add_q(session, m4l2q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A host produced 4,000 conn.log records in 60 seconds, all with `conn_state=S0`, to many different destinations. What's the most likely explanation?",
+        options=[
+            {"value": "browse", "label": "Heavy legitimate web browsing"},
+            {"value": "syn_scan", "label": "A TCP SYN port scan from this host"},
+            {"value": "ssh", "label": "A long-lived SSH session"},
+            {"value": "inbound", "label": "The host received many inbound connections"},
+        ],
+        correct="syn_scan",
+        explanation_md="`S0` means SYN sent with no reply, and 4,000 such attempts to varied destinations in a minute is a textbook SYN-scan fingerprint.",
+        points=2,
+    )
+    _add_q(session, m4l2q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which Zeek-to-ECS field mappings are correct?",
+        options=[
+            {"value": "src_ip", "label": "id.orig_h → source.ip"},
+            {"value": "query", "label": "query (dns.log) → dns.question.name"},
+            {"value": "sni_url", "label": "server_name (ssl.log) → url.domain"},
+            {"value": "ja3", "label": "ja3 (ssl.log) → tls.client.ja3"},
+        ],
+        correct=["src_ip", "query", "ja3"],
+        explanation_md="The SNI maps to `tls.client.server_name`, not `url.domain` (which is the HTTP host). The other three are correct.",
+        points=3,
+    )
+    _add_q(session, m4l2q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="You have a suspicious conn.log row with `uid=CzZRSm4VC4P0E5VqTk`. What's the fastest way to retrieve every related Zeek event for this connection?",
+        options=[
+            {"value": "ip_time", "label": "Search every Zeek log for the source IP and timestamp"},
+            {"value": "uid", "label": "Query every Zeek log dataset filtering on that uid"},
+            {"value": "pcap", "label": "Replay the PCAP for that timeframe"},
+            {"value": "suricata", "label": "Open a Suricata rule against the destination"},
+        ],
+        correct="uid",
+        explanation_md="`uid` is the connection-level pivot key shared across all Zeek logs for that connection. Filtering on uid is exact and instant.",
+        points=2,
+    )
+
+    # Lesson 4.3 — beaconing & C2
+    m4l3 = _add_lesson(
+        session, mod4, order=5,
+        title="Beaconing, DNS tunneling, and C2 detection",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Define beaconing and identify its statistical signature in Zeek conn.log
+> 2. Walk a worked example end-to-end (144 connections, ~600 s jitter, low byte volume)
+> 3. Recognise DNS-tunneling shape and write the KQL aggregation that surfaces it
+> 4. Identify HTTP/HTTPS C2 indicators despite encryption
+> 5. Reason about CDN-hidden C2 (Cloudfront, Discord CDN) without false-positiving on legitimate cloud traffic
+> 6. State the L1 escalation criteria for a suspected C2
+
+## What beaconing is
+
+A beacon is a periodic check-in by an implanted agent to its command-and-control (C2) server. The agent says *"I'm alive — any orders?"*; the server says *"yes, run this"* or *"no, sleep"*. Cadence varies — 60 s, 5 min, 1 hour. Mature C2 frameworks (Cobalt Strike, Sliver, Mythic, Brute Ratel) randomise with **jitter** — a percentage variation around the base — so check-ins cluster around an average rather than landing on the second.
+
+Beaconing is hard to spot manually because each individual connection is unremarkable: a small TCP/443 from a workstation to an external IP, tens of kilobytes, completes cleanly. **The signal lives in the aggregate** — hundreds of nearly-identical connections, regularly spaced, over hours.
+
+## The statistical signature
+
+The shape an L1 should learn to recognise:
+
+- **High connection count** to a single destination over a long window. *"144 connections to 192.0.2.55 in the last 24 hours"* is suspicious if the destination isn't a known service.
+- **Low total byte volume per connection.** A beacon's check-in is small — a few hundred bytes to a few KB. If the C2 has work, the answer can be larger; otherwise both directions are tiny.
+- **Regular interval with jitter.** Plot timestamps; look for clustering around a base period. Common: 30 s, 60 s, 300 s, 600 s, 3600 s. Jitter typically 0–30 %.
+- **Long-lived destination.** Same destination contacted across hours or days, not a one-off burst.
+- **Single source-destination pair.** Beaconing is usually one infected host to one C2 IP, not many sources to one destination.
+
+**Mental rule.** A host that talks to one external IP **at least once every ten minutes for six hours straight**, with each connection under 10 KB total, is beaconing until proven otherwise. The proof is usually *"that destination is a legitimate service"* (Microsoft update endpoints, telemetry, mail polling).
+
+## Worked example — 144 connections in 24 hours
+
+A daily summary shows workstation `10.20.30.40` had exactly 144 successful TCP/443 connections to `192.0.2.55` over the last 24 hours, average 3.2 KB out / 2.8 KB in. 144 / 24 h = **once every ten minutes**, with low volume both ways.
+
+Sample conn.log shape (abbreviated):
+
+```
+ts=...T00:00:14Z src=10.20.30.40:55001 dst=192.0.2.55:443 proto=tcp service=ssl
+  duration=4.1 orig_bytes=3211 resp_bytes=2855 conn_state=SF
+ts=...T00:10:32Z src=10.20.30.40:55012 dst=192.0.2.55:443 proto=tcp service=ssl
+  duration=4.0 orig_bytes=3198 resp_bytes=2844 conn_state=SF
+ts=...T00:20:51Z src=10.20.30.40:55021 dst=192.0.2.55:443 proto=tcp service=ssl
+  duration=4.2 orig_bytes=3205 resp_bytes=2861 conn_state=SF
+ts=...T00:31:08Z src=10.20.30.40:55029 dst=192.0.2.55:443 proto=tcp service=ssl
+  duration=3.9 orig_bytes=3220 resp_bytes=2849 conn_state=SF
+[... 140 more ...]
+```
+
+Inter-arrival times: 618 s, 619 s, 617 s — base **600 s with ~3 % jitter**. Byte counts uniform. **All `conn_state=SF`** — clean handshake, clean close. Classic beacon.
+
+The ES|QL aggregation that surfaces this estate-wide:
+
+```esql
+FROM zeek-conn-*
+| WHERE event.dataset == "zeek.conn"
+   AND network.transport == "tcp"
+   AND destination.ip IS NOT NULL
+   AND NOT CIDR_MATCH(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+| STATS conn_count = COUNT(*),
+        avg_bytes = AVG(network.bytes),
+        unique_src = COUNT_DISTINCT(source.ip)
+   BY source.ip, destination.ip, destination.port
+| WHERE conn_count >= 50 AND avg_bytes < 20000 AND unique_src == 1
+| SORT conn_count DESC
+```
+
+Returns source-destination pairs with ≥50 connections, average size <20 KB, single source per destination — the candidate beacon list. Walk the list, check SNI and JA3 in `ssl.log` for those connections, and look up the destination IP against threat intel.
+
+```mermaid
+sequenceDiagram
+    participant A as Implant 10.20.30.40
+    participant C as C2 192.0.2.55
+    A->>C: TLS connect, 3.2KB out, 2.8KB in (T+0)
+    Note over A,C: ~600s sleep with jitter
+    A->>C: TLS connect, 3.1KB out, 2.9KB in (T+618s)
+    Note over A,C: ~600s sleep with jitter
+    A->>C: TLS connect, 3.2KB out, 2.8KB in (T+1235s)
+    Note over A,C: pattern continues 144x in 24h
+```
+
+## DNS tunneling
+
+DNS tunneling encodes data in DNS queries and responses. DNS is rarely blocked — even on networks that aggressively filter web traffic — so malware uses it as a covert channel for both C2 and exfiltration. Tools: `dnscat2`, `iodine`, DNS modes in Cobalt Strike.
+
+The shape:
+
+- High query volume from one source to one parent domain.
+- Long subdomain labels (often 50+ chars) carrying base32/base64-encoded payload chunks.
+- Frequent use of TXT records (the spec allows ~255 bytes of arbitrary text in a TXT response — useful for the C2 to send commands back).
+- Sometimes A or AAAA records for short payloads, with the answer IP encoding the response.
+
+**Worked example.** Internal host `10.20.30.40` is making DNS queries to `c2.example.test` (`.test` is reserved by RFC 6761 for examples). dns.log shows:
+
+```
+ts=... query=aGVsbG8tdGhpcy1pcy1jaHVuay0xLW9mLWV4ZmlsLWRhdGE.c2.example.test
+       qtype=TXT rcode=NOERROR
+ts=... query=Y2h1bmstMi1tb3JlLWRhdGEtaGVyZS1jb250aW51aW5n.c2.example.test
+       qtype=TXT rcode=NOERROR
+ts=... query=Y2h1bmstMy1ldmVuLW1vcmUtZGF0YS1iZWluZy1zZW50.c2.example.test
+       qtype=TXT rcode=NOERROR
+[... 800 more in a 5-minute window ...]
+```
+
+Each leftmost label ~45–50 chars of base32-shaped content. All TXT type. All to the same parent. Query rate ~3/s — far above any user behaviour.
+
+```kql
+event.dataset : "zeek.dns"
+and dns.question.type : "TXT"
+and source.ip : *
+```
+
+Aggregate in Lens by `source.ip` and `dns.question.registered_domain` (when ECS module is configured). Sort by query count; compute mean leftmost-label length — anything over 30 chars is unusual.
+
+```mermaid
+graph LR
+    H[Internal host 10.20.30.40]
+    R[Internal resolver]
+    A[Authoritative for c2.example.test]
+    H -- "TXT q: aGVsbG8...c2.example.test" --> R
+    R -- "recursive lookup" --> A
+    A -- "TXT response with command bytes" --> R
+    R -- "answer back" --> H
+```
+
+## HTTP/HTTPS C2
+
+Before TLS dominated, HTTP-based C2 was the norm; it's still common in commodity malware. Shape:
+
+- **Low-and-slow GET/POST.** Periodic requests to one URL, small bodies.
+- **Suspicious user agents.** `Mozilla/4.0 (compatible; MSIE 6.0)` in 2026, `Python-urllib/3.9` from a workstation that shouldn't run scripts, or unique strings. Some C2 mimics realistic UAs perfectly — UA alone is a weak signal.
+- **No Referer.** A browser navigation almost always carries a Referer; a script-driven beacon usually doesn't.
+- **Odd content-types.** A POST body marked `application/octet-stream` from a workstation to an unfamiliar domain is more suspicious than `application/json`.
+- **Repeating URI patterns.** Long random-looking paths, embedded base64, repeated requests to identical paths.
+
+For HTTPS, the same principles apply but you only see the encrypted shell — connection counts, byte volumes, SNI (when present), JA3, server certificate.
+
+## Domain fronting and CDN-hidden C2
+
+**Domain fronting** put one (innocuous) hostname in the SNI and another (malicious) hostname in the encrypted Host header, exploiting CDNs that routed by Host. Major CDNs (Google, AWS CloudFront, Azure Front Door) have largely closed it, but the descendant pattern persists: malware hosting C2 endpoints on legitimate cloud or CDN infrastructure so the traffic looks like normal cloud traffic.
+
+What you'll see at L1: SNIs of `cloudfront.net`, `azureedge.net`, `cloudflare.com`, `cdn.discordapp.com`, `s3.amazonaws.com`. None are *automatically* bad. But:
+
+- A host beaconing to the same Cloudflare IP every ten minutes for six hours is suspicious **regardless** of the SNI.
+- A workstation that has no business hitting Discord CDN suddenly making periodic requests there is suspicious.
+- Destination IP + JA3 + interval matters more than SNI alone.
+
+Don't dismiss a beacon pattern because the SNI looks legit. **The shape is the signal.**
+
+## JA3 against known-bad lists
+
+Public and commercial lists ship JA3 hashes associated with specific malware. Indexing them as a SIEM enrichment turns a haystack into a small candidate set. Caveat: **JA3 collisions are real** — older Cobalt Strike default JA3 overlapped with common Java client JA3s. Always corroborate JA3 hits with destination, interval, and conn count.
+
+## Escalation criteria
+
+Escalate to L2 when any of the following are met (**two or more** for a strong case):
+
+- **Beacon pattern confirmed** — high-count, low-byte, regular-interval connections from one internal host to one external destination, conn_state SF, over multiple hours.
+- **Bad JA3 match** with corroborating shape (same host, regular interval).
+- **DNS tunneling** — high TXT query rate, long subdomains, single source.
+- **Known-bad destination IP or domain** that the host actually connected to.
+- **Cleartext HTTP C2 indicators** — repeating requests, hardcoded suspicious UA, no Referer.
+
+Write up: source host, destination(s), time window, connection count, average bytes, JA3 (if SSL), supporting query.
+
+## Glossary
+
+- **Beacon / jitter** — Periodic C2 check-in with randomised interval offset.
+- **DGA** — Domain Generation Algorithm; algorithmically generated rendezvous candidates.
+- **DNS tunneling** — Covert channel encoding payload in DNS queries/responses.
+- **Domain fronting** — Mismatched SNI vs encrypted Host abusing CDN routing.
+- **JA3** — TLS client handshake fingerprint hash; identifies stack despite encryption.
+
+## Further reading
+
+- MITRE ATT&CK T1071 Application Layer Protocol: https://attack.mitre.org/techniques/T1071/
+- MITRE ATT&CK T1071.004 DNS: https://attack.mitre.org/techniques/T1071/004/
+- MITRE ATT&CK T1572 Protocol Tunneling: https://attack.mitre.org/techniques/T1572/
+""",
+    )
+    m4l3q = _add_lesson(
+        session, mod4, order=6, title="Beaconing & C2 — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on the beaconing signature, DNS tunneling, CDN-hidden C2, and conn_state for a successful beacon.",
+    )
+    _add_q(session, m4l3q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Which of these is the strongest *individual* signal of beaconing?",
+        options=[
+            {"value": "single", "label": "A single TCP/443 connection to an unfamiliar IP"},
+            {"value": "regular", "label": "Many TCP/443 connections, regularly spaced, low byte volume, from one source to one destination over hours"},
+            {"value": "burst", "label": "A burst of a thousand connections to a thousand different destinations in 60 seconds"},
+            {"value": "nxdomain", "label": "An NXDOMAIN reply for a long subdomain"},
+        ],
+        correct="regular",
+        explanation_md="Beaconing's signal is the *aggregate* shape of regular, low-byte, single-target connections sustained over time. A single connection isn't a beacon; a burst across many destinations is a scan; a single NXDOMAIN is a possible DGA hit, not a beacon.",
+        points=2,
+    )
+    _add_q(session, m4l3q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are reasonable patterns for DNS tunneling?",
+        options=[
+            {"value": "txt_volume", "label": "High volume of TXT queries from one source"},
+            {"value": "long_labels", "label": "Long leftmost labels of base32/base64-looking content"},
+            {"value": "one_parent", "label": "Many queries to one parent domain"},
+            {"value": "ms_a", "label": "A single A-record query for microsoft.com"},
+        ],
+        correct=["txt_volume", "long_labels", "one_parent"],
+        explanation_md="A single A-record for microsoft.com is normal DNS. The other three together describe a textbook DNS tunnel.",
+        points=3,
+    )
+    _add_q(session, m4l3q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="If a connection's SNI is `cloudfront.net`, the connection cannot be malicious because Cloudfront is a legitimate CDN.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** Malware routinely hosts C2 on legitimate CDNs. SNI alone proves nothing — interval, count, byte volume, and JA3 are what you should weight.",
+        points=1,
+    )
+    _add_q(session, m4l3q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="An L1 analyst suspects beaconing. The connections in question are completing cleanly — handshake, data exchange, graceful close. What `conn_state` value should they expect to see in conn.log for these beacon connections?",
+        options=None,
+        correct=["SF", "sf"],
+        explanation_md="**SF** — normal establishment and termination. A successful beacon's TLS connection completes the handshake, exchanges its check-in payload, and closes cleanly, which Zeek records as `SF`. (`S0` would imply the C2 never replied; `RSTO` / `RSTR` would imply an abort, which is not the typical beacon pattern.)",
+        points=2,
+    )
+
+    # Lesson 4.4 — recon & exfil
+    m4l4 = _add_lesson(
+        session, mod4, order=7,
+        title="Reconnaissance, exfiltration, and ATT&CK mapping",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Distinguish a port scan from a sweep and identify each in conn.log
+> 2. Recognise post-scan service-enumeration patterns (SMB, RDP, WinRM, WMI, LDAP)
+> 3. Identify bulk data exfiltration to common cloud-storage destinations using flow and proxy telemetry
+> 4. Compare DNS exfil vs HTTP/HTTPS exfil and pick the right detection
+> 5. Recognise lateral-movement protocols (445, 5985/6, 3389, RPC, LDAP, Kerberos) on the wire
+> 6. Map every wire-side observation in this module to MITRE ATT&CK techniques
+
+## Port scans
+
+A scan is one host probing many ports on one (or a small set of) targets. The conn.log shape depends on style:
+
+- **TCP SYN scan ("half-open").** SYN sent, waits for response, never completes the handshake. `conn_state` typically **S0** (no reply / filtered), **REJ** (RST reply / closed), or **OTH** for unusual cases. `history` shows `S` only or `Sh` followed by reset. Noisy on the wire but doesn't produce server-side application logs.
+- **Full-connect scan.** Completes the three-way handshake, then closes. `conn_state=SF` with `history=ShAfF`-ish, very short duration, no payload bytes. Hits the target's application logs (a complete handshake then immediate close looks like a TCP probe), so it's cheaper to write but more visible.
+- **UDP scan.** UDP has no handshake. The scanner sends a UDP packet to a target port; an open port may stay silent, a closed port elicits ICMP "port unreachable". Zeek emits a conn.log for UDP traffic too; `conn_state` is usually **S0** or **SHR** patterns.
+
+**Triage shortcut.** Filter conn.log for one source, time window of minutes, group by destination port. Many destination ports against few destination IPs with mostly `S0`/`REJ` = scan. Many destination IPs on one or two ports = sweep.
+
+## Sweep vs scan
+
+The intent differs.
+
+- **Scan**: one source probing **many ports on one target** — *enumerate what's running here.*
+- **Sweep**: one source probing **one port across many targets** — *find every host running this service.*
+
+Common sweep targets: TCP/445 (SMB), TCP/3389 (RDP), TCP/22 (SSH), TCP/3306 (MySQL), TCP/5985/5986 (WinRM). **A sudden internal sweep for 445 from a workstation is one of the strongest indicators of lateral-movement reconnaissance**, especially after a phishing-induced compromise.
+
+```mermaid
+graph LR
+    subgraph Scan
+      S1[Source 10.20.30.40] --> T1[Target 192.0.2.10:21]
+      S1 --> T2[Target 192.0.2.10:22]
+      S1 --> T3[Target 192.0.2.10:23]
+      S1 --> T4[Target 192.0.2.10:80]
+      S1 --> T5[Target 192.0.2.10:443]
+      S1 --> T6[Target 192.0.2.10:3389]
+    end
+    subgraph Sweep
+      S2[Source 10.20.30.40] --> U1[10.20.30.51:445]
+      S2 --> U2[10.20.30.52:445]
+      S2 --> U3[10.20.30.53:445]
+      S2 --> U4[10.20.30.54:445]
+      S2 --> U5[10.20.30.55:445]
+    end
+```
+
+## Service enumeration after a successful scan
+
+After an open port is found, the attacker probes the service:
+
+- **SMB (TCP/445).** Negotiates dialect and lists shares. Zeek's `smb_files.log` and `smb_mapping.log` (when enabled) record share access. A workstation that suddenly enumerates shares on dozens of file servers is anomalous.
+- **RDP (TCP/3389).** A burst of short RDP attempts across many hosts is brute-force or credential spray — the most common ransomware-precursor signal.
+- **WinRM (TCP/5985 cleartext, TCP/5986 TLS).** Less commonly enabled internally but heavily abused by Evil-WinRM. WinRM-over-HTTP from one workstation to many servers is suspicious.
+- **SSH (TCP/22).** Inside Linux estates, brute-force shows as many `S0` / `SF`-immediate-RSTO rows.
+- **WMI (DCOM, TCP/135 + ephemeral RPC).** Legitimate but heavily abused. Hard part: WMI uses dynamically allocated ephemeral RPC ports; you'll see TCP/135 establish then a high-port follow within seconds.
+
+## Data exfiltration
+
+Bulk exfil shapes:
+
+- **Large outbound transfers.** Single internal host pushing tens of MB to hundreds of GB outbound in one or a few sessions. **Asymmetry matters** — `orig_bytes` (out) substantially exceeds `resp_bytes` (in) on what was meant to be a request/response service.
+- **Off-hours patterns.** Heavy outbound from a workstation at 03:14 local, when the user is asleep. Some attackers schedule exfil for low-activity windows to avoid bandwidth alerts.
+- **Unusual destinations.** Outbound to destinations the host has never talked to before, or destinations not used by other peers. New cloud-storage destinations are particularly interesting.
+- **Compressed-and-encrypted blobs.** You can't see this directly without decryption or PCAP, but you can infer from byte ratios — uniformly random-looking patterns over TCP/443 to a fresh destination are consistent with encrypted archive uploads.
+
+### Cloud-storage exfil destinations — L1 watchlist
+
+- **mega.nz** — popular for ransomware exfil; large encrypted uploads.
+- **anonfiles** (and successors when one shuts down) — anonymous file hosts with permissive limits.
+- **Discord CDN (cdn.discordapp.com)** — frequently abused as a payload-and-exfil host.
+- **GitHub gists / raw.githubusercontent** — small-volume staging for second-stage payloads and small-blob exfil.
+- **transfer.sh, file.io, wetransfer.com** — generic file-share services.
+- **Pastebin and clones** — text-only, but useful for credential dumps.
+
+**Worked KQL example — outbound bytes by destination.**
+
+```esql
+FROM zeek-conn-*
+| WHERE event.dataset == "zeek.conn"
+   AND CIDR_MATCH(source.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+   AND NOT CIDR_MATCH(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+| STATS total_out = SUM(source.bytes),
+        total_in = SUM(destination.bytes),
+        sessions = COUNT(*)
+   BY source.ip, destination.ip, destination.port
+| WHERE total_out > 50000000
+| SORT total_out DESC
+```
+
+Finds internal-source / external-destination pairs where cumulative outbound is over 50 MB. Cross-reference destination IPs against reverse-DNS or `tls.client.server_name`. **A workstation pushing 4 GB out to a single Mega.nz IP overnight, when the user has no Mega usage in their history, is a confirmed exfil candidate.**
+
+## DNS exfil vs HTTP/HTTPS exfil
+
+Both move data out, but they differ in volume and visibility.
+
+- **DNS exfil**: low bandwidth (queries are tiny), but DNS is rarely blocked. Suited to small sensitive payloads — credentials, keys, command output. Detection: long subdomain labels, high TXT query rate, single source-to-domain.
+- **HTTP/HTTPS exfil**: high bandwidth, but more often subject to outbound filtering, decryption, and DLP. Suited to bulk archives, databases, design files. Detection: large outbound bytes on TCP/443 to unfamiliar or cloud-storage destinations.
+
+**Heuristic: DNS for stealth, HTTPS for volume.** Some campaigns use both — DNS for the C2 channel, HTTPS for the bulk pull.
+
+```mermaid
+sequenceDiagram
+    participant H as Compromised host
+    participant L as Local DNS resolver
+    participant A as Authoritative for evil.example
+    participant C as Operator
+    H->>H: Read sensitive file
+    H->>H: Chunk and base32 encode
+    loop for each chunk
+        H->>L: TXT q: chunk1.evil.example
+        L->>A: recursive TXT lookup
+        A->>C: log query (decode chunk1)
+        A->>L: TXT response with ack/command
+        L->>H: TXT response
+    end
+    C->>C: Reassemble decoded chunks
+```
+
+## Lateral movement on the wire
+
+Once inside, attackers move host-to-host using protocols already in the environment:
+
+- **SMB / TCP 445** — file-share access, named pipes, remote service creation. **Single most-abused port for Windows lateral movement.** PsExec, Impacket's `psexec.py` / `wmiexec.py`, DCSync, most ransomware spread.
+- **WinRM / TCP 5985 (HTTP) / 5986 (HTTPS)** — PowerShell remoting; modern preferred lateral channel because it integrates with Windows policy and is less noisy than SMB on EDR.
+- **RDP / TCP 3389** — interactive remote desktop. Brute-force entry plus hands-on movement. **Workstation-to-workstation RDP is anomalous** in most environments.
+- **RPC ephemeral / TCP 49152–65535** — DCE/RPC over dynamic ports allocated via the Endpoint Mapper (TCP/135). Hard to alert on by port; alert on the workflow (TCP/135 established then a high-port connection between the same pair within seconds).
+- **LDAP / TCP 389, LDAPS / 636, Global Catalog 3268/3269** — directory enumeration. SharpHound / BloodHound talk LDAP heavily; a workstation issuing thousands of LDAP queries to a DC is anomalous.
+- **Kerberos / TCP & UDP 88** — ticket-granting traffic. Kerberoasting requests many service tickets — surprisingly visible if you watch ticket request volume.
+
+**For L1: a workstation that suddenly initiates SMB or WinRM connections to many *other workstations* (not servers) is one of the loudest lateral-movement signals.** Workstation-to-workstation administrative protocol traffic is rare in normal operations.
+
+## Mapping wire observations to MITRE ATT&CK
+
+Memorise these — leading an L2 escalation with the technique ID is more compact than prose:
+
+- **T1046 — Network Service Discovery.** Port scans and sweeps. SMB / RDP / WinRM enumeration after initial access.
+- **T1041 — Exfiltration Over C2 Channel.** Data exfil through the same channel as C2 (HTTPS beacon carrying outbound data, DNS tunnel doing both).
+- **T1048 — Exfiltration Over Alternative Protocol.** Data exfil via a different protocol than C2 — typical with ransomware operators staging on a workstation then pushing to mega.nz.
+- **T1071 — Application Layer Protocol.** C2 via standard application-layer protocols (HTTP/S, DNS, SMTP). Sub-techniques: `.001` Web Protocols, `.004` DNS, etc.
+- **T1572 — Protocol Tunneling.** DNS tunneling, HTTP-tunneled SSH, SOCKS-over-HTTPS.
+
+A network-side incident write-up *"T1046 (port sweep on 445) followed by T1071.001 (HTTPS beacon to fresh CDN destination)"* tells L2 more in two phrases than a paragraph of prose.
+
+## Glossary
+
+- **Port scan / sweep** — One-source-many-ports vs one-source-many-IPs-one-port.
+- **Service enumeration** — Probing identified open services to characterise version and capabilities.
+- **Lateral movement** — Post-compromise host-to-host traversal inside a network.
+- **Exfiltration** — Unauthorised data transfer out of the target environment.
+- **T1041 / T1048 / T1071 / T1572** — Network-side ATT&CK techniques L1 should know on sight.
+
+## Further reading
+
+- MITRE ATT&CK T1046: https://attack.mitre.org/techniques/T1046/
+- MITRE ATT&CK T1041: https://attack.mitre.org/techniques/T1041/
+- MITRE ATT&CK T1048: https://attack.mitre.org/techniques/T1048/
+- BTL1 — Network Analysis chapter
+- SANS SEC503 Network Monitoring and Threat Detection In-Depth
+""",
+    )
+    m4l4q = _add_lesson(
+        session, mod4, order=8, title="Recon & exfil — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on scan vs sweep, lateral-movement protocols, ATT&CK technique selection, and cloud exfil destinations.",
+    )
+    _add_q(session, m4l4q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A single internal host produces 250 conn.log records to 250 different internal IPs, all on TCP/445, in 90 seconds, almost all `conn_state=S0` or `REJ`. What is this?",
+        options=[
+            {"value": "smb", "label": "A normal SMB file-share workload"},
+            {"value": "scan", "label": "A port scan (one source, many ports, one target)"},
+            {"value": "sweep", "label": "A network sweep for SMB"},
+            {"value": "beacon", "label": "Beaconing"},
+        ],
+        correct="sweep",
+        explanation_md="Many destination IPs on a single port from one source is a sweep, not a scan. The 445/SMB target and the absence of successful connections are consistent with reconnaissance ahead of lateral movement.",
+        points=2,
+    )
+    _add_q(session, m4l4q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are commonly observed lateral-movement protocols?",
+        options=[
+            {"value": "smb", "label": "SMB (TCP/445)"},
+            {"value": "winrm", "label": "WinRM (TCP/5985 or 5986)"},
+            {"value": "rdp", "label": "RDP (TCP/3389)"},
+            {"value": "ntp", "label": "NTP (UDP/123)"},
+        ],
+        correct=["smb", "winrm", "rdp"],
+        explanation_md="NTP is time synchronisation and is not used for lateral movement.",
+        points=3,
+    )
+    _add_q(session, m4l4q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="Which MITRE ATT&CK technique best describes data being exfiltrated via the same HTTPS C2 channel the implant uses for command-and-control?",
+        options=[
+            {"value": "t1046", "label": "T1046 Network Service Discovery"},
+            {"value": "t1041", "label": "T1041 Exfiltration Over C2 Channel"},
+            {"value": "t1048", "label": "T1048 Exfiltration Over Alternative Protocol"},
+            {"value": "t1572", "label": "T1572 Protocol Tunneling"},
+        ],
+        correct="t1041",
+        explanation_md="**T1041** is exactly *exfil over the C2 channel*. T1048 applies if the exfil uses a different channel than C2 (e.g. C2 over HTTPS, exfil to mega.nz over a separate session).",
+        points=2,
+    )
+    _add_q(session, m4l4q, order=4, kind=QuestionKind.MULTI,
+        stem_md="Which of the following destinations should an L1 weight as common cloud-exfiltration targets when reviewing high-outbound-byte sessions?",
+        options=[
+            {"value": "mega", "label": "mega.nz"},
+            {"value": "discord", "label": "cdn.discordapp.com"},
+            {"value": "fileserver", "label": "An internal file server"},
+            {"value": "transfersh", "label": "transfer.sh"},
+        ],
+        correct=["mega", "discord", "transfersh"],
+        explanation_md="Internal file servers are normal destinations for internal hosts. The other three are well-known cloud-storage abuse destinations.",
+        points=3,
+    )
+
+    print(f"  L1: {course.title} — 4 modules, 27 lessons (Module 4 Network Telemetry @ proper depth)")
     return course
 
 

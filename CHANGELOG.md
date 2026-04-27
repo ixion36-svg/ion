@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.11.7 (2026-04-27)
+
+### L1 Module 4 — Network Telemetry
+
+Third curriculum ship at the v0.11.3 depth bar. **L1 Module 4 — Network Telemetry** authored from a research-agent dossier. ~10,000 words, 8 lessons (4 reading + 4 quiz), 14 quiz questions. Lives on the existing `demo-l1-alert-triage-fundamentals` course as Module 4.
+
+#### Lesson breakdown
+
+| # | Title | Type | Quiz qs |
+|---|---|---|---|
+| 4.1 | Network data sources — PCAP, flow, Zeek, IDS | reading | — |
+| 4.2 | Data sources — quiz | quiz | 3 |
+| 4.3 | Reading Zeek logs and the ECS mapping | reading | — |
+| 4.4 | Zeek + ECS — quiz | quiz | 3 |
+| 4.5 | Beaconing, DNS tunneling, and C2 detection | reading | — |
+| 4.6 | Beaconing & C2 — quiz | quiz | 4 |
+| 4.7 | Reconnaissance, exfiltration, and ATT&CK mapping | reading | — |
+| 4.8 | Recon & exfil — quiz | quiz | 4 |
+
+#### Topics covered
+
+- **Data sources** — PCAP vs NetFlow/IPFIX/sFlow vs Zeek metadata vs Suricata/Snort IDS; sampling-rate context; proxy and NGFW logs
+- **Zeek + ECS** — full conn.log field set, the seven `conn_state` codes that matter (S0/S1/SF/REJ/RSTO/RSTR/OTH), suspicious dns.log shapes (long subdomains, NXDOMAIN bursts, DGAs, TXT volume), ssl.log + SNI + JA3/JA3S, uid pivot, complete Zeek-to-ECS field mapping table
+- **Beaconing & C2** — statistical signature, worked 144-conn / 600 s-jitter example with full conn.log shape and ES|QL aggregation, DNS tunneling shape with `dnscat2` / `iodine` worked example, HTTP/HTTPS C2 indicators, CDN-hidden C2 nuance, JA3 enrichment caveats, escalation criteria
+- **Recon & exfil** — port scan vs sweep distinction with conn_state shapes, post-scan service enumeration (SMB/RDP/WinRM/SSH/WMI), exfil patterns to mega.nz / Discord CDN / transfer.sh with ES|QL outbound-bytes query, DNS exfil vs HTTPS exfil trade-off, lateral-movement port catalogue (445/5985/6/3389/RPC/LDAP/Kerberos), MITRE ATT&CK technique mapping (T1046, T1041, T1048, T1071, T1572)
+
+10 Mermaid diagrams across the module: data-source taxonomy, detail-vs-volume pyramid, Zeek log family + uid pivot, Zeek-to-ECS mapping, beacon timeline, DNS-tunneling shape, scan vs sweep visualisation, DNS exfil workflow.
+
+L1 course now sits at **4 modules / 27 lessons / 68 questions**.
+
+#### Upgrade
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
+Idempotent — wipes `demo-*` courses and re-seeds.
+
+---
+
 ## v0.11.6 (2026-04-27)
 
 ### L1 Module 3 — Windows Event Logs

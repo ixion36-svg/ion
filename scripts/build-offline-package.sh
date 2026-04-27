@@ -23,7 +23,7 @@
 
 set -e
 
-VERSION="${1:-0.11.6}"
+VERSION="${1:-0.11.7}"
 CHAT_MODEL="${2:-llama3.1:8b}"
 PG_VERSION="${3:-pg16}"
 EMBED_MODEL="nomic-embed-text"
