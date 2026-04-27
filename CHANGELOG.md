@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.11.8 (2026-04-27)
+
+### L1 Module 5 — IOC Handling
+
+Fourth curriculum ship at the v0.11.3 depth bar. **L1 Module 5 — IOC Handling** authored from a research-agent dossier. ~10,000 words, 8 lessons (4 reading + 4 quiz), 14 quiz questions. Connects Modules 3 (host telemetry) and 4 (network telemetry) to the threat-intel side.
+
+#### Lesson breakdown
+
+| # | Title | Type | Quiz qs |
+|---|---|---|---|
+| 5.1 | IOC types and the Pyramid of Pain | reading | — |
+| 5.2 | IOC types — quiz | quiz | 3 |
+| 5.3 | IOC formats, sharing, and threat intel platforms | reading | — |
+| 5.4 | STIX/MISP/TLP/PAP — quiz | quiz | 3 |
+| 5.5 | Reputation services, enrichment, and OPSEC | reading | — |
+| 5.6 | Reputation & OPSEC — quiz | quiz | 4 |
+| 5.7 | IOC lifecycle, matching in ION, and decay | reading | — |
+| 5.8 | Lifecycle & matching — quiz | quiz | 4 |
+
+#### Topics covered
+
+- **IOC types & Pyramid of Pain** — observable vs indicator vs IOC, Mandiant atomic/computed/behavioural taxonomy, full IOC catalogue (hashes, network atomics, host artefacts, TLS, pattern-based, adversary-level), Bianco's tier model with cost-to-adversary breakdown, precision-vs-durability-vs-FP-rate trade-offs
+- **Formats, sharing, platforms** — STIX 2.1 SDO/SRO/SCO with worked indicator JSON, MISP events/attributes/objects/tags/galaxies with worked attribute JSON, OpenIOC legacy, CSV / Suricata / YARA / Sigma drops, **TLP 2.0** (CLEAR/GREEN/AMBER/AMBER+STRICT/RED) sharing rules, **PAP** (WHITE/GREEN/AMBER/RED) action rules — emphasising TLP and PAP are independent, OpenCTI as upstream truth source, defanging/refanging conventions
+- **Reputation & OPSEC** — VirusTotal interpretation (the 0/72 trap, Behaviour tab, Relations graph), AbuseIPDB confidence semantics, abuse.ch (URLhaus, ThreatFox, MalwareBazaar), AlienVault OTX pulse caveats, Shodan/Censys passive scan databases, Passive DNS for resolution-at-alert-time reconstruction, **the OPSEC trap** of submitting fresh hashes/samples/URLs to public services against live adversaries, active-vs-passive enrichment decision tree, end-to-end fresh-C2-domain triage walkthrough
+- **Lifecycle & matching in ION** — 8-stage lifecycle (production → ingestion → enrichment → distribution → matching → triage → feedback → decay), type-appropriate decay (hashes never auto-expire, IPs 30 d, domains 90 d, URLs 14 d), MISP decaying-indicators model + OpenCTI valid_until, Elastic Indicator Match rules with full ECS field-path table (`file.hash.sha256` ↔ `threat.indicator.file.hash.sha256`, `source.ip` ↔ `threat.indicator.ip`, etc.), KQL hunting examples for hash/IP/domain/URL, sightings semantics + feed efficacy measurement, FP-marking discipline, **end-to-end Emotet-dropper IOC-hit triage** (Module 3/4 callbacks, classification, sighting-write, escalation)
+
+10 Mermaid diagrams across the module: Pyramid of Pain, observable taxonomy, STIX object relationships, intel ingestion flow, active-vs-passive sources, OPSEC enrichment decision tree, IOC lifecycle, IOC match-then-investigate workflow.
+
+L1 course now sits at **5 modules / 35 lessons / 82 questions**.
+
+#### Upgrade
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
+Idempotent — wipes `demo-*` courses and re-seeds.
+
+---
+
 ## v0.11.7 (2026-04-27)
 
 ### L1 Module 4 — Network Telemetry

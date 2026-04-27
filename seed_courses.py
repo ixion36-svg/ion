@@ -3184,7 +3184,922 @@ A network-side incident write-up *"T1046 (port sweep on 445) followed by T1071.0
         points=3,
     )
 
-    print(f"  L1: {course.title} — 4 modules, 27 lessons (Module 4 Network Telemetry @ proper depth)")
+    # ── Module 5 — IOC Handling (v0.11.8) ─────────────────────────────────
+    # Authored at BTL1/SANS depth from research-agent dossier. Connects
+    # Modules 3 (host telemetry) and 4 (network telemetry) to the threat
+    # intel side: IOC types, Pyramid of Pain, STIX/MISP/TLP/PAP, OPSEC
+    # for enrichment, the indicator lifecycle from production to decay,
+    # and end-to-end IOC-hit triage in ION.
+    mod5 = _add_module(
+        session, course, order=5,
+        title="IOC Handling",
+        description_md=(
+            "The connective tissue between threat intelligence and the "
+            "telemetry covered in Modules 3 and 4. IOC types and the "
+            "Pyramid of Pain; STIX 2.1, MISP, TLP/PAP markings; "
+            "VirusTotal / abuse.ch / passive DNS / Shodan and the OPSEC "
+            "trap of public lookups; the indicator lifecycle from "
+            "production through matching, sightings, and decay; and a "
+            "worked end-to-end IOC-hit triage."
+        ),
+        estimated_minutes=200,
+    )
+
+    # Lesson 5.1 — IOC types & Pyramid of Pain
+    m5l1 = _add_lesson(
+        session, mod5, order=1,
+        title="IOC types and the Pyramid of Pain",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Distinguish observable, indicator, and IOC and use each term correctly
+> 2. Classify any indicator as atomic, computed, or behavioural (Mandiant taxonomy)
+> 3. Catalogue the major IOC types L1 sees daily — hashes, network atomics, host artefacts, TLS artefacts, pattern-based, adversary-level
+> 4. Place every IOC type on David Bianco's Pyramid of Pain and explain the cost-to-the-adversary of each tier
+> 5. Reason about precision vs durability vs FP rate trade-offs across tiers
+>
+> **Prerequisites.** Modules 3 (Windows Event Logs) and 4 (Network Telemetry) completed.
+
+## The vocabulary problem
+
+Three terms get used interchangeably but mean different things in formal CTI work:
+
+- **Observable** — a measurable property of an entity. A file's SHA-256, an IP, a process name. *Not malicious by itself; it is just data.*
+- **Indicator** — an observable plus the *context that says it is suspicious*. The same SHA-256 becomes an indicator when labelled *"Emotet payload, observed 2025-09-12, TLP:GREEN."*
+- **IOC** — informal industry shorthand for *indicator*. Some authors restrict IOC to "intrusion already happened" and use **IOA** (Indicator of Attack) for behavioural-in-progress signals; we use IOC broadly here.
+
+Mandiant's three-way split of indicators is still the cleanest mental model:
+
+- **Atomic indicator** — cannot be broken down without losing meaning. Example: `203.0.113.45`. The octets alone don't help.
+- **Computed indicator** — produced by running an algorithm over data. SHA-256, SSDEEP, IMPHASH, JA3, a YARA match.
+- **Behavioural indicator** — a chain of atomic and computed indicators bound by a description: *"Office process spawns powershell.exe with a base64 command line that resolves a freshly registered .top domain."* The territory of MITRE ATT&CK techniques.
+
+## Catalogue of IOC types
+
+In rough order of frequency:
+
+**File hashes.** Cryptographic digests of file content.
+- *MD5* (128-bit) — fast, broken for collisions, still ubiquitous in legacy feeds. **Don't trust MD5 alone.**
+- *SHA-1* (160-bit) — collision-broken (SHAttered, 2017), still common.
+- *SHA-256* (256-bit) — current default; use this where you can.
+- *SSDEEP* — fuzzy hash producing similar values for similar files. *"This dropper is 78 % similar to a known sample."*
+- *IMPHASH* — MD5 of a Windows PE's import-table function names in order. Two unrelated builds of the same family often share an IMPHASH because they import the same DLLs in the same order. Excellent for clustering.
+
+**Network atomic indicators.**
+- *IPv4 / IPv6 addresses* — cheap for an attacker to change (a click in a cloud console).
+- *Domain names* — slightly more expensive (registration time, money, KYC).
+- *URLs* — full path; very specific, very brittle.
+- *Email addresses, email subjects* — phishing campaigns. Brittle.
+
+**Host artefacts.**
+- *Mutex names* — malware often creates a named mutex to avoid double-execution. `Global\\__M_E_Z__`-style strings can be strong indicators if hardcoded.
+- *Registry keys* — persistence locations like `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\` plus a value name.
+- *Named pipes* — Cobalt Strike beacons historically used `\\\\.\\pipe\\msagent_*`.
+- *Service names, scheduled task names, parent-child process pairs.*
+
+**TLS / certificate artefacts.**
+- *Certificate SHA-1 / SHA-256 thumbprints.*
+- *JA3 / JA3S* — fingerprints of TLS Client Hello / Server Hello (covered in Module 4 lesson 2). JA4 is the modern successor; principle is the same.
+
+**Pattern-based indicators.**
+- *YARA rules* — pattern-matching for files (now also memory and process attributes).
+- *Sigma rules* — generic detection language; compiles to KQL/SPL/EQL.
+- *Suricata / Snort signatures* — network rules.
+
+**Adversary-level indicators.**
+- *MITRE ATT&CK techniques and sub-techniques* (T1566.001 Spearphishing Attachment).
+- *Tactics* (TA0001 Initial Access).
+- *Tools / family names* — Emotet, Cobalt Strike, AsyncRAT.
+- *Threat actor / intrusion-set names* — used cautiously; attribution is hard.
+
+## The Pyramid of Pain
+
+David Bianco published the Pyramid of Pain in 2013. It ranks indicator types by **how much it costs the adversary to change them after detection.** The higher you push them, the more your detections actually disrupt operations.
+
+```mermaid
+flowchart TB
+    A["TTPs (Tough)"]
+    B["Tools (Challenging)"]
+    C["Network and Host Artefacts (Annoying)"]
+    D["Domain Names (Simple)"]
+    E["IP Addresses (Easy)"]
+    F["Hash Values (Trivial)"]
+    A --> B --> C --> D --> E --> F
+```
+
+**Hash values — Trivial.** Recompile, repack, flip a byte and the hash changes. SHA-256 IOCs are usually stale within hours of a fresh campaign. L1 still uses them — exact-match hits on a known-bad hash are usually high-confidence TPs — but should not assume hash detection covers the family.
+
+**IP addresses — Easy.** A new VPS costs cents. Cloud-hosted attacker infrastructure rotates daily. L1 still pivots on IPs but treats IP-based IOCs as short-shelf-life.
+
+**Domain names — Simple.** A new domain costs ~$10 and ~10 minutes. Slightly more friction than an IP because registration leaves traces and reputation can build over weeks. L1 enriches domains with passive DNS to learn historical IPs.
+
+**Network and host artefacts — Annoying.** Mutex names, named pipes, registry keys, User-Agent strings, JA3, specific HTTP header orders. Changing these requires modifying tooling source. L1 escalates artefact hits faster — they tend to indicate a tool-family match.
+
+**Tools — Challenging.** *"Cobalt Strike beacon detected"* or *"Mimikatz signature matched"* forces the adversary to find or build a different tool. Real engineering time. L1 treats tool-level matches as genuinely high-severity.
+
+**TTPs — Tough.** Behavioural patterns — *"PowerShell child of WINWORD with encoded command, network beacon to a freshly registered domain over 443 every 60 s with jitter."* Detecting at TTP level forces the adversary to redesign their operation. L1s rarely write TTP-level detections, but they consume them: every Sigma rule and Elastic rule joining `process.parent.name` with a `process.command_line` regex is a TTP-level detector.
+
+## Trade-offs: precision, durability, FP rate
+
+Move up the pyramid and you gain **durability** but lose **precision**. FP rates roughly invert with the pyramid:
+
+- **Hash IOCs** — near-zero FP rate. A `file.hash.sha256` match is almost always real.
+- **IP / domain IOCs** — moderate FP rate. Shared hosting, CDNs, parked domains, ad networks.
+- **Artefact IOCs** — noticeable FP rate. A legitimate admin tool may use the same registry key.
+- **Tool IOCs** — variable FP rate. Penetration testers run Cobalt Strike too.
+- **TTP IOCs** — highest FP rate. PowerShell-from-Office is also how some line-of-business apps work.
+
+This is why a mature SIEM uses a **layered** approach — hashes catch the known things cheaply, TTP rules catch the unknown things expensively.
+
+```mermaid
+flowchart LR
+    Obs["Observable"]
+    Obs --> Atomic["Atomic"]
+    Obs --> Computed["Computed"]
+    Obs --> Behavioural["Behavioural"]
+    Atomic --> A1["IP / domain / URL / email"]
+    Computed --> C1["MD5 / SHA-256"]
+    Computed --> C2["SSDEEP / IMPHASH"]
+    Computed --> C3["JA3 / JA3S"]
+    Computed --> C4["YARA match"]
+    Behavioural --> B1["MITRE technique chain"]
+    Behavioural --> B2["Sigma rule"]
+```
+
+## Glossary
+
+- **Observable / indicator / IOC** — data / data-plus-context / industry shorthand.
+- **Atomic / computed / behavioural** — Mandiant indicator taxonomy.
+- **Pyramid of Pain** — Bianco's tier model of detection cost-to-adversary.
+- **IMPHASH / SSDEEP / JA3** — clustering-grade computed indicators.
+- **TTP** — Tactic / Technique / Procedure; the top of the pyramid.
+
+## Further reading
+
+- Bianco — "The Pyramid of Pain": https://detect-respond.blogspot.com/2013/03/the-pyramid-of-pain.html
+- MITRE ATT&CK Enterprise Matrix: https://attack.mitre.org/matrices/enterprise/
+""",
+    )
+    m5l1q = _add_lesson(
+        session, mod5, order=2, title="IOC types — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=6,
+        content_md="Three questions on Pyramid of Pain interpretation, computed-vs-atomic classification, and TTP-tier economics.",
+    )
+    _add_q(session, m5l1q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An adversary's command-and-control IP address is published as an IOC by a CTI feed at 09:00. By 11:00 the same campaign uses a new IP. Which Pyramid of Pain tier best explains why the feed degraded so quickly?",
+        options=[
+            {"value": "tools", "label": "Tools"},
+            {"value": "artefacts", "label": "Network artefacts"},
+            {"value": "ip", "label": "IP addresses"},
+            {"value": "ttps", "label": "TTPs"},
+        ],
+        correct="ip",
+        explanation_md="IPs are the second-from-bottom tier — trivially cheap for an adversary to swap out, which is exactly why IP-based IOCs have short useful lives.",
+        points=2,
+    )
+    _add_q(session, m5l1q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *computed* indicators rather than atomic ones?",
+        options=[
+            {"value": "sha256", "label": "SHA-256 hash of a file"},
+            {"value": "ip", "label": "Source IP 198.51.100.7"},
+            {"value": "ja3", "label": "JA3 fingerprint"},
+            {"value": "ssdeep", "label": "SSDEEP fuzzy hash"},
+            {"value": "subject", "label": "Email subject 'URGENT: Invoice overdue'"},
+        ],
+        correct=["sha256", "ja3", "ssdeep"],
+        explanation_md="Hashes and TLS fingerprints are produced by running an algorithm over data — computed. An IP and an email subject are atomic — read directly, not derived.",
+        points=3,
+    )
+    _add_q(session, m5l1q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="Detecting at the TTP layer of the Pyramid of Pain is the cheapest detection an SOC can deploy because behavioural patterns are easy to express in KQL.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** TTP-level detection is the most *expensive* to build and maintain — deep environment knowledge required, more FP-prone. Its value is the cost it inflicts on the adversary, not its ease of authorship.",
+        points=1,
+    )
+
+    # Lesson 5.2 — STIX, MISP, TLP, PAP
+    m5l2 = _add_lesson(
+        session, mod5, order=3,
+        title="IOC formats, sharing, and threat intel platforms",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Read a STIX 2.1 indicator object and identify SDO, SRO, and SCO categories
+> 2. Interpret a MISP event's attributes, objects, and tags
+> 3. Apply Traffic Light Protocol (TLP) and Permissible Actions Protocol (PAP) correctly
+> 4. Defang and refang IOCs and explain why each matters
+> 5. Position OpenCTI as the upstream truth source ION pulls from
+
+## STIX 2.1
+
+**STIX** (Structured Threat Information eXpression) is the OASIS standard for representing threat intelligence as a graph of typed JSON objects.
+
+- **SDO — STIX Domain Objects.** The "things" — `indicator`, `malware`, `threat-actor`, `attack-pattern`, `identity`, `campaign`, `intrusion-set`, `vulnerability`, `course-of-action`, `tool`, `report`.
+- **SRO — STIX Relationship Objects.** The edges — `relationship` (typed link, e.g. *(indicator) indicates (malware)*), `sighting`.
+- **SCO — STIX Cyber Observables.** The raw observable types — `file`, `ipv4-addr`, `domain-name`, `url`, `email-addr`, `process`, `network-traffic`. SCOs are referenced from indicator patterns and from sightings.
+- **Bundle.** Wrapper carrying a collection together. STIX is shared as bundles over **TAXII** (Trusted Automated eXchange of Intelligence Information).
+
+A minimal STIX 2.1 indicator:
+
+```json
+{
+  "type": "indicator",
+  "spec_version": "2.1",
+  "id": "indicator--6f3c7b2e-4a1d-4e8a-9f2c-7b1c2a8e9d44",
+  "created": "2026-03-14T08:12:00.000Z",
+  "modified": "2026-03-14T08:12:00.000Z",
+  "name": "Emotet dropper hash, March 2026 wave",
+  "indicator_types": ["malicious-activity"],
+  "pattern_type": "stix",
+  "pattern": "[file:hashes.'SHA-256' = 'a3f1c9b8e2d4a7f6b5c8e1d2a3f4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2']",
+  "valid_from": "2026-03-14T08:00:00.000Z",
+  "valid_until": "2026-06-14T08:00:00.000Z",
+  "labels": ["malicious-activity"]
+}
+```
+
+L1 reads off this object:
+- `pattern` — STIX pattern expression. Brackets and dotted accessors mean *any object of type `file` whose `hashes.'SHA-256'` equals this value.* Patterns can combine multiple observables with `AND`, `OR`, `FOLLOWEDBY`, time qualifiers.
+- `valid_from` / `valid_until` — the validity window (decay covered in lesson 5.4).
+- `indicator_types` / `labels` — taxonomy from open vocabularies.
+- `id` — stable UUID-suffixed identifier you can quote in case notes.
+
+## MISP
+
+**MISP** (Malware Information Sharing Platform) is OSS originally built by CIRCL Luxembourg. Predates STIX 2.x maturity; has its own data model that maps onto, but isn't identical to, STIX.
+
+- **Event** — top-level container, like an *incident report.* Date, threat level, analysis maturity, info field, attributes/objects/tags.
+- **Attribute** — single observable plus category and type (`ip-dst`, `domain`, `sha256`, `email-src`). Each has a `to_ids` flag — *push to detection* vs *contextual only.*
+- **Object** — structured grouping of attributes from a published template library (e.g. a `file` object bundling filename, size, MD5, SHA-1, SHA-256, SSDEEP).
+- **Tag** — free-form labels; most SOCs follow vocabularies like `tlp:green`, `PAP:AMBER`, `mitre-attack-pattern:T1566.001`.
+- **Galaxy** — curated knowledge-base entries (threat actors, malware families) attached as semantic tags.
+
+A minimal MISP attribute:
+
+```json
+{
+  "type": "domain",
+  "category": "Network activity",
+  "to_ids": true,
+  "value": "cdn-update[.]example",
+  "comment": "C2 domain for March 2026 dropper wave",
+  "Tag": [
+    {"name": "tlp:green"},
+    {"name": "PAP:AMBER"},
+    {"name": "misp-galaxy:malpedia=\\"Emotet\\""}
+  ]
+}
+```
+
+When ingested into ION, the value gets refanged (`cdn-update.example`), `to_ids: true` makes it eligible for the indicator-match index, the TLP tag governs sharing, and the PAP tag governs active enrichment.
+
+## OpenIOC (legacy)
+
+Mandiant's **OpenIOC** is an XML schema from ~2011, predating STIX. Still occasionally encountered in older Mandiant/FireEye reports. Convert to STIX/MISP via tooling rather than reading it by hand.
+
+## CSV and IDS-rule drops
+
+Not all sharing happens through structured platforms:
+
+- **CSV files** — one IOC per row, minimal columns.
+- **Suricata / Snort signatures** — network rules (Emerging Threats Open).
+- **YARA rules** — file/memory pattern rules.
+- **Sigma rules** — YAML detection language compiling to your SIEM.
+- **EDR-specific signatures** — vendor-proprietary.
+
+ION consumes CSVs through a simple ingestion job; treats Suricata/YARA rules as detection content, not indicator-match IOCs.
+
+## Traffic Light Protocol (TLP) 2.0
+
+**TLP** governs *who you may share an indicator with.* FIRST published TLP 2.0 in 2022, superseding TLP 1.0's `WHITE` with `CLEAR` and adding `AMBER+STRICT`.
+
+| Marking | Sharing rule |
+| --- | --- |
+| **TLP:CLEAR** | Share without restriction. Public. |
+| **TLP:GREEN** | Community of peers and partners; not publicly. |
+| **TLP:AMBER** | Within your organisation and clients/customers, need-to-know. |
+| **TLP:AMBER+STRICT** | Within your organisation only. Not to clients/external partners. |
+| **TLP:RED** | Original recipient list only. No internal redistribution. |
+
+**Practical L1 rule:** the highest TLP marking among contributing sources sets the ceiling for what you may quote in tickets, chat, and handovers.
+
+## Permissible Actions Protocol (PAP)
+
+**PAP** governs *what you may do with the indicator* — particularly, actions an adversary could observe.
+
+| Marking | Action rule |
+| --- | --- |
+| **PAP:WHITE** | Any action permitted. |
+| **PAP:GREEN** | Actions visible to peers permitted; no public exposure. |
+| **PAP:AMBER** | Passive only. No active probes, no public-sandbox submissions, no observable VirusTotal lookups. |
+| **PAP:RED** | Passive only, within recipient organisation. No queries that touch attacker infrastructure or any third-party service the adversary might monitor. |
+
+**The cardinal rule.** PAP:RED means **you do not curl, ping, traceroute, dig, nslookup, VirusTotal-search, urlscan-submit, or sandbox-detonate the indicator.** All are visible to an adversary watching their own infrastructure or hunting on VirusTotal Intelligence.
+
+**TLP and PAP are independent.** An indicator can be `TLP:GREEN, PAP:RED` — share with peers, do not actively probe. **Always read both tags.**
+
+## OpenCTI
+
+**OpenCTI** is OSS built on STIX 2.1; ION integrates with it for enriched intel storage. From L1's perspective, OpenCTI exposes:
+- An **indicators feed** browsable by type, label, confidence.
+- An **observable lookup** — paste an IP/hash and see what STIX context exists.
+- A **sightings view** — every match anywhere.
+- **Reports** — narrative documents linked to the SDOs they cite.
+
+ION pulls from OpenCTI on a schedule and pushes sightings back. L1 usually interacts via ION's UI; knowing OpenCTI is the upstream truth source helps when context looks thin.
+
+## Defanging and refanging
+
+When IOCs are pasted into emails, Slack, or PDFs, raw values like `http://evil.example/login.php` get auto-linkified. Someone clicks. Defanging breaks parsers but is trivially reversible:
+
+| Original | Defanged |
+| --- | --- |
+| `http://` | `hxxp://` |
+| `https://` | `hxxps://` |
+| `evil.example` | `evil[.]example` |
+| `192.0.2.1` | `192[.]0[.]2[.]1` |
+| `attacker@example.test` | `attacker[@]example[.]test` |
+
+**Refanging** is the inverse — restoring real values before query/ingest. ION refangs on import; L1 should defang manually whenever pasting an IOC into a place a human might click. **Reasonable habit:** any IOC into a case note, ticket, email, or chat → defanged. Any IOC into a query → refanged.
+
+```mermaid
+flowchart LR
+    TA["threat-actor"]
+    IS["intrusion-set"]
+    C["campaign"]
+    AP["attack-pattern (ATT&CK)"]
+    M["malware"]
+    I["indicator (pattern)"]
+    O["observable / SCO"]
+    S["sighting"]
+    TA -->|attributed-to| IS
+    IS -->|uses| AP
+    IS -->|uses| M
+    C -->|attributed-to| IS
+    M -->|indicated-by| I
+    I -->|based-on| O
+    S -->|sighting-of| I
+```
+
+```mermaid
+flowchart LR
+    F1["MISP feed"]
+    F2["OpenCTI"]
+    F3["CSV drop"]
+    F4["Vendor TAXII"]
+    Norm["Normaliser (STIX 2.1 internal)"]
+    Refang["Refang and validate"]
+    Idx["ION indicator index"]
+    Match["Elastic Indicator Match rules"]
+    Alert["Alert"]
+    F1 --> Norm
+    F2 --> Norm
+    F3 --> Norm
+    F4 --> Norm
+    Norm --> Refang --> Idx --> Match --> Alert
+```
+
+## Glossary
+
+- **STIX 2.1 / TAXII** — OASIS standard format / companion transport.
+- **SDO / SRO / SCO** — STIX domain objects / relationships / cyber observables.
+- **MISP** — OSS threat intel platform; events, attributes, objects, tags, galaxies.
+- **OpenCTI** — STIX-2.1-native OSS TIP; ION's upstream.
+- **TLP / PAP** — Traffic Light Protocol (sharing) / Permissible Actions Protocol (actions).
+- **Defanging / refanging** — Breaking / restoring IOCs for human-shareable text.
+
+## Further reading
+
+- OASIS STIX 2.1 spec: https://docs.oasis-open.org/cti/stix/v2.1/stix-v2.1.html
+- MISP documentation: https://www.misp-project.org/documentation/
+- OpenCTI documentation: https://docs.opencti.io/
+- FIRST TLP 2.0: https://www.first.org/tlp/
+""",
+    )
+    m5l2q = _add_lesson(
+        session, mod5, order=4, title="STIX/MISP/TLP/PAP — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=6,
+        content_md="Three questions on PAP enforcement, STIX SDO classification, and refanging.",
+    )
+    _add_q(session, m5l2q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A peer SOC sends you an email tagged *TLP:AMBER, PAP:RED* listing five domains tied to a current intrusion. Which of the following is permitted?",
+        options=[
+            {"value": "urlscan", "label": "Submitting one of the domains to urlscan.io"},
+            {"value": "internal", "label": "Searching internal DNS logs for any of the domains"},
+            {"value": "forward", "label": "Forwarding the email to a public security mailing list"},
+            {"value": "curl", "label": "curl-ing one of the domains from a SOC analyst workstation"},
+        ],
+        correct="internal",
+        explanation_md="PAP:RED forbids any action that touches attacker infrastructure or third-party services the adversary might watch. Internal log searches are passive and stay inside your perimeter. The other three options either expose the indicator publicly or actively probe it.",
+        points=2,
+    )
+    _add_q(session, m5l2q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of these are STIX Domain Objects (SDOs)?",
+        options=[
+            {"value": "indicator", "label": "indicator"},
+            {"value": "relationship", "label": "relationship"},
+            {"value": "malware", "label": "malware"},
+            {"value": "attack_pattern", "label": "attack-pattern"},
+            {"value": "sighting", "label": "sighting"},
+        ],
+        correct=["indicator", "malware", "attack_pattern"],
+        explanation_md="SDOs are the *things* in the STIX graph (indicator, malware, attack-pattern, threat-actor, etc.). `relationship` and `sighting` are SROs — the edges that connect SDOs.",
+        points=3,
+    )
+    _add_q(session, m5l2q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="Defanging an IOC like `evil[.]example` changes its meaning, so a SIEM rule that ingests the defanged value will fail to match real traffic.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** A SIEM matches the literal string. Defanged values must be refanged on ingestion before being placed into the indicator index, otherwise no real DNS query for `evil.example` will hit the rule.",
+        points=2,
+    )
+
+    # Lesson 5.3 — reputation & OPSEC
+    m5l3 = _add_lesson(
+        session, mod5, order=5,
+        title="Reputation services, enrichment, and OPSEC",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Read a VirusTotal result without overweighting the detection ratio
+> 2. Choose between active and passive enrichment based on PAP rating and OPSEC risk
+> 3. Use abuse.ch (URLhaus, ThreatFox, MalwareBazaar), AbuseIPDB, OTX, Shodan/Censys, and passive DNS appropriately
+> 4. Identify the OPSEC mistake of submitting a fresh hash/sample/URL to a public service against a live adversary
+> 5. Walk a fresh-C2-domain triage end-to-end without tipping the adversary
+
+## What enrichment is for
+
+The detection rule tells you **that** an observable matched. Enrichment tells you **what** the observable is — who else has seen it, when it appeared, what malware family it's associated with, what the IP's hosting reality looks like, what the domain's resolution history is.
+
+The catch: **the act of looking can be observed.** Nearly every popular reputation service is monitored — by abuse researchers, by competing CTI teams, and (the OPSEC trap) sometimes by the adversary themselves.
+
+## VirusTotal
+
+**VirusTotal** (Google/Chronicle) aggregates ~70 antivirus and threat-intel engines plus structured metadata.
+
+What to read on a VT result:
+
+- **Detection ratio** (e.g. *"32/72"*) — useful at a glance, **deeply unreliable for fresh samples.** First hours of a campaign typically show 0/72 because vendors haven't analysed.
+- **Vendor verdicts** — individual engines as data points, not ground truth. Cross-reference, never blind-trust.
+- **First / Last Submission, Submission Names** — *first-submission timestamp is genuinely informative.* If a hash was first submitted to VT 3 minutes before your alert fired, you're watching a fresh campaign. Submission filenames hint at the lure language.
+- **Behaviour tab** — sandbox detonation: dropped files, network connections, registry changes, command lines, mutexes. Gold for understanding what a sample does.
+- **Relations / Graph** — pivots: other files, URLs, domains, IPs associated with this hash.
+- **Comments** — community annotations. Variable quality; researchers tag with malware family / campaign IDs.
+- **Files containing this hash, with this signer, similar files (vhash, ssdeep)** — pivot points.
+
+**Free vs paid.** Public web UI gives verdict + basic metadata. **VT Intelligence** (paid) gives advanced search, Retrohunt (YARA against VT's full corpus historically), Livehunt (notify on future matches), and API quotas for automation.
+
+## AbuseIPDB
+
+Community-driven IP reputation. The IP page shows **Confidence of Abuse** (0–100), reports timeline, ISP / ASN data. *"Confidence"* reflects what other community members reported, **not** a deep analysis. **A high score is a strong signal; a low score means nothing has been reported, not that the IP is clean.** Fresh attacker infrastructure has low scores until burned.
+
+## abuse.ch services
+
+Swiss non-profit running several free, open feeds:
+
+- **URLhaus** — feed of malicious URLs distributing malware. Each entry: URL, status (online/offline), threat (e.g. `malware_download`), tags.
+- **ThreatFox** — IOCs tied to live malware families with the family name attached. Excellent for hash/IP/domain enrichment with attribution.
+- **MalwareBazaar** — sample-sharing platform. Researchers upload samples; download with caveats.
+- **Feodo Tracker / SSL Blacklist** — narrower feeds (banking-trojan C2 IPs, malicious certs).
+
+These feeds are typically TLP:CLEAR — querying them is generally TLP-safe. Nonetheless, *could the adversary be watching these feeds for their own infrastructure?* still applies.
+
+## AlienVault OTX
+
+**OTX** (Open Threat Exchange, now LevelBlue) is community-curated — **pulses** are themed IOC collections. Quality varies enormously: some pulses are excellent published research; others are auto-generated from honeypots. Treat as one data source; check the pulse author.
+
+## Shodan and Censys
+
+Passive scan databases. They continuously scan the public IPv4 (and parts of IPv6) space, recording open ports, banners, TLS certificates, HTTP responses, inferred software.
+
+For L1:
+- Confirming what services an attacker IP exposes — generic VPS? Known proxy? **Cobalt Strike Team Server with the default 50050 banner exposed?**
+- Pivoting on TLS certificates — find every IP presenting a particular self-signed cert.
+- Finding clusters — Shodan/Censys queries like `ssl.cert.subject.cn:"example.test" port:443` reveal sibling infrastructure.
+
+Shodan/Censys data is **passive from your perspective** — you read their database; the scan happened earlier from the platform's infrastructure. Right tool when you need infrastructure intel without touching the adversary.
+
+## Passive DNS
+
+**Passive DNS (PDNS)** services collect DNS responses observed in the wild — never queries from your network specifically, but DNS responses seen by sensors at recursive resolvers worldwide. L1 uses PDNS to answer:
+
+- *What IPs has `cdn-update.example` resolved to in the last 90 days?*
+- *What domains have ever resolved to `192.0.2.45`?*
+- *When did this domain first appear in DNS?*
+
+This matters operationally: at the moment your alert fired, the malicious domain may have been resolving to one IP; by the time you investigate, it points elsewhere. **PDNS reconstructs resolution at alert time.**
+
+Major sources: RiskIQ / Microsoft Defender Threat Intelligence (formerly PassiveTotal), Farsight DNSDB (DomainTools), SecurityTrails, CIRCL's free PDNS. **All are passive — adversary cannot see you query.**
+
+## The OPSEC trap
+
+The cardinal mistake every L1 must learn:
+
+> *You see a fresh, never-before-seen domain in an alert. You paste it into VirusTotal to "see what VT knows." VT records the submission. The adversary, who has VT Intelligence and a Livehunt rule on their own infrastructure, gets a notification: "your domain just got searched." They burn the domain, rotate, and your investigation is dead.*
+
+This is real. Adversaries with operational maturity monitor public reputation platforms for first-submission events on their infrastructure. Submitting a sample, hash, URL, or domain to VT, urlscan, AnyRun, Hybrid Analysis, or any public sandbox is an **active** action — even though no traffic touches the attacker's servers, the platform itself becomes a side-channel.
+
+This is what PAP:RED is designed to forbid. Why a careful L1 prefers passive enrichment when stealth matters:
+
+- Passive DNS instead of `dig` or `nslookup`.
+- Shodan/Censys cached banners instead of `nmap`.
+- Internal DNS logs, proxy logs, NetFlow, conn.log instead of any external query.
+- VT search by hash *only when the hash is already known to VT and your search adds no new information* — i.e. the hash is in a public report. **If unsure, don't.**
+
+**Every external lookup is an action you cannot undo. Treat it as one.**
+
+## Worked example — fresh C2 domain
+
+**Scenario.** At 10:14 an Elastic alert fires for an internal workstation making a DNS request to `cdn-update[.]example`. The domain isn't in any feed. What now?
+
+**Step 1 — Internal data first.** Always. Free and invisible.
+- DNS logs: how many hosts queried this domain, when did queries start, what types?
+- Proxy / web gateway: did anything fetch HTTP(S)? URI paths, response sizes?
+- Zeek `conn.log` (Module 4): outbound connections to whatever IP it resolved to — duration, bytes, frequency. C2 beaconing has telltale low-byte, high-regularity patterns.
+- EDR / Sysmon Event 22 (Module 3): which process initiated the resolution?
+
+**Step 2 — Passive external.**
+- Passive DNS: when did this domain first appear? What IPs has it resolved to? Are those IPs already on watchlists?
+- Whois (effectively passive — registry servers don't tip the adversary): registration date, registrar, registrant if not privacy-protected.
+- Shodan/Censys for PDNS-returned IPs: what services run there? Known-abused VPS provider?
+
+**Step 3 — Decide on active enrichment.**
+- Read PAP. PAP:RED → stop, escalate to L2 with what you have.
+- PAP:AMBER → internal-only continues. No external active queries.
+- PAP:GREEN / unmarked + SOC policy allows → may submit *only the domain string* to VT. Even this is observable.
+- PAP:WHITE → all options open.
+
+**Step 4 — Document.** In the ION case: every query (internal and external), every external service touched (with timestamps), the PAP rating applied and why, your verdict and confidence.
+
+This audit trail matters when L2/L3 takes over, when retrospectives ask whether you tipped the adversary, and when CTI writes the after-action report.
+
+```mermaid
+flowchart LR
+    subgraph Passive["Passive (no adversary signal)"]
+        P1["Internal DNS / proxy / EDR logs"]
+        P2["Passive DNS"]
+        P3["Shodan / Censys cached scans"]
+        P4["Existing CTI feeds"]
+    end
+    subgraph Active["Active (potentially observable)"]
+        A1["VirusTotal / urlscan / AnyRun submissions"]
+        A2["Direct DNS lookup against attacker domain"]
+        A3["nmap / curl / ping of attacker IP"]
+        A4["Sandbox detonation"]
+    end
+    Passive -->|prefer first| Decision["Triage decision"]
+    Active -->|only if PAP allows| Decision
+```
+
+```mermaid
+flowchart TD
+    Start["IOC needs enrichment"]
+    Q1{"PAP rating?"}
+    Q2{"Already in public feeds?"}
+    Q3{"Internal data sufficient?"}
+    Pas["Passive enrichment only"]
+    Act["Active enrichment permitted"]
+    Stop["Escalate to L2 — do not query"]
+    Start --> Q1
+    Q1 -->|RED| Stop
+    Q1 -->|AMBER| Pas
+    Q1 -->|GREEN or WHITE| Q2
+    Q2 -->|Yes, public| Act
+    Q2 -->|No, fresh| Q3
+    Q3 -->|Yes| Pas
+    Q3 -->|No| Act
+```
+
+## Glossary
+
+- **VirusTotal / VT Intelligence** — aggregate AV/CTI verdicts; paid tier adds Retrohunt/Livehunt.
+- **abuse.ch** — URLhaus, ThreatFox, MalwareBazaar, Feodo Tracker, SSL Blacklist.
+- **AbuseIPDB** — community IP reputation; *Confidence of Abuse* score.
+- **OTX (LevelBlue)** — community pulses; quality varies — read the author.
+- **Shodan / Censys** — passive scan databases for IP/cert intel.
+- **Passive DNS (PDNS)** — historical DNS resolution database, queryable invisibly.
+- **Active vs passive enrichment** — adversary-observable vs not.
+
+## Further reading
+
+- abuse.ch: https://abuse.ch/
+- VirusTotal API docs: https://docs.virustotal.com/
+- AbuseIPDB: https://www.abuseipdb.com/
+- AlienVault OTX (LevelBlue): https://otx.alienvault.com/
+- Shodan: https://www.shodan.io/
+- Censys: https://search.censys.io/
+- CIRCL Passive DNS: https://www.circl.lu/services/passive-dns/
+""",
+    )
+    m5l3q = _add_lesson(
+        session, mod5, order=6, title="Reputation & OPSEC — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on TLP-vs-PAP semantics, passive-source identification, VT detection-ratio interpretation, and the OPSEC risk of sample submission.",
+    )
+    _add_q(session, m5l3q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A SHA-256 hash for an unknown payload was published in a reputable public CTI report this morning, with TLP:GREEN and PAP:GREEN markings. Submitting that hash to VirusTotal is:",
+        options=[
+            {"value": "forbidden_tip", "label": "Forbidden — any submission tips the adversary"},
+            {"value": "permitted_public", "label": "Permitted — the hash is already public via the report; a VT search adds no new operational signal"},
+            {"value": "forbidden_tlp", "label": "Forbidden — TLP:GREEN means no external systems"},
+            {"value": "upload", "label": "Permitted only if you upload the file as well"},
+        ],
+        correct="permitted_public",
+        explanation_md="TLP governs sharing, PAP governs actions. PAP:GREEN allows queries that don't produce *new* operational exposure, and a hash already in a public report no longer reveals anything. Confusing TLP and PAP is a common mistake — TLP:GREEN does not block external queries.",
+        points=2,
+    )
+    _add_q(session, m5l3q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *passive* enrichment sources from the analyst's perspective?",
+        options=[
+            {"value": "pdns", "label": "Querying Farsight DNSDB for historical resolutions"},
+            {"value": "urlscan", "label": "Submitting a fresh domain to urlscan.io"},
+            {"value": "shodan", "label": "Searching Shodan for cached scan data on an IP"},
+            {"value": "dig", "label": "Running dig +short against the attacker domain from your laptop"},
+            {"value": "zeek", "label": "Searching internal Zeek dns.log for the domain"},
+        ],
+        correct=["pdns", "shodan", "zeek"],
+        explanation_md="PDNS, Shodan cached data, and internal log searches do not generate any signal an adversary could observe. urlscan submissions and direct dig queries against the attacker domain are active.",
+        points=3,
+    )
+    _add_q(session, m5l3q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="A *0/72* detection ratio on VirusTotal for a fresh sample reliably means the file is benign.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** A 0/72 verdict is common for the first hours of a fresh campaign because vendor signature engines haven't analysed the sample. Detection ratio is a lagging indicator and must never be used as sole evidence of benignity.",
+        points=2,
+    )
+    _add_q(session, m5l3q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="In one or two sentences, name a specific OPSEC risk of submitting a suspicious binary as a *file* (not just its hash) to VirusTotal during triage of a suspected targeted intrusion.",
+        options=None,
+        correct=["adversary VT Intelligence livehunt notification", "adversary subscribes to first-submissions and gets notified", "VT Intelligence Livehunt rule notifies adversary their malware was submitted", "first-submission alert tips the adversary", "exposes the file to other Intelligence subscribers including the adversary", "adversary watches VT for first-submissions of their samples"],
+        explanation_md="An adversary with VirusTotal Intelligence can subscribe to first-submissions matching their own samples (by YARA, IMPHASH, or similarity) and be alerted that their malware was just submitted by an unknown party — signalling the intrusion has been detected. The submission also makes the file available to other Intelligence subscribers, including the adversary if they pay. PAP:RED and PAP:AMBER explicitly forbid this for live targeted intrusions.",
+        points=3,
+    )
+
+    # Lesson 5.4 — lifecycle & matching in ION
+    m5l4 = _add_lesson(
+        session, mod5, order=7,
+        title="IOC lifecycle, matching in ION, and decay",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Walk an indicator through its lifecycle: production → ingestion → enrichment → distribution → matching → triage → feedback → decay
+> 2. Apply type-appropriate decay policies — hashes never expire automatically, IPs decay fastest, domains intermediate, URLs short
+> 3. Read an Elastic Indicator Match alert and identify the joined fields under `threat.indicator.*`
+> 4. Build KQL queries that match hashes, IPs, domains, and URLs against ECS-mapped fields
+> 5. Walk an IOC-hit triage end to end — confirm match, pivot to host (Module 3) and network (Module 4), classify, write a sighting, escalate
+
+## The lifecycle, end to end
+
+An indicator does not appear from nowhere and live forever. It moves through stages, and an L1 sees it at every one:
+
+1. **Production.** A CTI team observes activity, extracts observables, adds context (family, kill-chain phase, ATT&CK techniques, validity window), publishes as STIX bundle / MISP event / feed.
+2. **Ingestion.** ION (or any TIP/SIEM) pulls the bundle on a schedule, normalises to internal representation, refangs, validates types, writes to the indicator index.
+3. **Enrichment.** The indicator is decorated with cross-references — links to malware SDO, threat-actor SDO, ATT&CK techniques, prior sightings, related observables.
+4. **Distribution.** Pushed to detection engines: Elastic Indicator Match rules, EDR watchlists, firewall blocklists, web-proxy filters.
+5. **Matching.** A piece of telemetry — a hash in a process event, an IP in a conn.log row, a domain in a DNS request — joins to the indicator and produces an alert.
+6. **Triage.** L1 classifies as **TP** (true positive), **FP** (false positive), or **BTP** (benign true positive — *yes, indicator matched, but the activity was authorised, e.g. red team test*).
+7. **Feedback.** L1 records a sighting, an FP marker, and analyst notes. Flows back to the TIP and contributes to the indicator's score.
+8. **Decay / expiry.** Based on age, sightings, and explicit `valid_until`, the indicator's confidence drops over time.
+
+```mermaid
+flowchart LR
+    P["Production"]
+    I["Ingestion"]
+    E["Enrichment"]
+    D["Distribution"]
+    M["Matching"]
+    T["Triage"]
+    F["Feedback"]
+    X["Decay / expiry"]
+    P --> I --> E --> D --> M --> T --> F --> X
+    F -.->|score back to feed| P
+```
+
+## Indicator decay and expiry
+
+Different IOC types have very different lifespans:
+
+- **Hashes.** A SHA-256 of a malware sample is functionally permanent — that exact byte sequence will always be malicious. **Not auto-expired** by most TIPs. A hash from 2017 still matches the same file in 2027.
+- **IPs.** Cloud IPs rotate fast. Common policy: **30 days** of active matching after last sighting; afterward decays out of indicator-match index but stays queryable for retrospective analysis. Sightings reset the timer.
+- **Domains.** More variable. A dedicated malicious domain (typosquat, DGA seed) may stay malicious for the lifetime of the registration; common **90 days to 1 year**. A *compromised legitimate* domain (hacked WordPress for two weeks) needs a **shorter** expiry, not longer — once cleaned up, continuing to alert is harmful.
+- **URLs.** Often very short-lived — phishing kits move within hours/days. Policies of **7–30 days** common.
+- **TTPs and YARA rules.** No expiry; reviewed periodically as families evolve.
+
+**MISP's "decaying indicators" model** assigns each indicator a base score (e.g. 80) and a decay function (linear, exponential, sigmoid) parameterised by half-life. Time without sightings drops the score; each sighting boosts it. Below a threshold (commonly 25), the indicator stops being pushed to detection engines but remains in the database for historical lookup.
+
+**OpenCTI's `valid_until`** is simpler — explicit end-of-life timestamp, after which the indicator is no longer "live." STIX 2.1's `valid_from` / `valid_until` map directly.
+
+ION combines both: STIX-derived `valid_until` honoured if present, otherwise type-based defaults apply (hashes never decay, IPs 30 days from last sighting, domains 90 days, URLs 14 days). **Sightings reset the timer.**
+
+## Matching IOCs in ION/Elastic
+
+Indicators are written into a dedicated index pattern, often `logs-ti_*`. Detection runs through **Indicator Match** rules: a rule joins source events against the indicator index at search time and fires when a field of the source event equals a field of the indicator.
+
+Mental model:
+
+> *For every event in `logs-endpoint-*` or `logs-network-*` in the last N minutes, check whether `event.field` equals `indicator.field` for any indicator in `logs-ti_*` whose `valid_from` ≤ now ≤ `valid_until`. If yes, raise an alert with both records joined.*
+
+ECS field paths the L1 will recognise from Modules 3/4:
+
+| Source side | Indicator side | What's matched |
+| --- | --- | --- |
+| `file.hash.sha256` | `threat.indicator.file.hash.sha256` | A file's SHA-256 |
+| `process.hash.sha256` | `threat.indicator.file.hash.sha256` | The hash of the running executable |
+| `source.ip` / `destination.ip` | `threat.indicator.ip` | An IP either side of a connection |
+| `dns.question.name` | `threat.indicator.url.domain` | DNS query name |
+| `url.full` | `threat.indicator.url.full` | Full URL |
+| `tls.client.ja3` | `threat.indicator.tls.client.ja3` | JA3 fingerprint |
+
+Sample KQL for ad-hoc hunting (not the rules themselves):
+
+```kql
+file.hash.sha256 : "a3f1c9b8e2d4a7f6b5c8e1d2a3f4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2"
+```
+
+```kql
+destination.ip : "203.0.113.45" and event.category : "network"
+```
+
+```kql
+dns.question.name : "cdn-update.example" or dns.question.name : "*.cdn-update.example"
+```
+
+```kql
+url.full : "http://198.51.100.10/login.php" or url.domain : "cdn-update.example"
+```
+
+When a rule fires, the alert document carries both the source event and the matched indicator under `threat.indicator.*`. L1 reads the alert and sees *which* indicator matched, *which* feed it came from, and *what* context (family, ATT&CK technique) is attached.
+
+For deep field-path detail on network telemetry — `source.ip`, `destination.port`, `network.bytes`, `dns.question.*`, `tls.*` — refer back to **Module 4**. For host-side fields — `process.executable`, `process.parent.name`, `file.path`, `registry.key` — refer back to **Module 3**.
+
+## Sightings
+
+A **sighting** in STIX 2.1 is an SRO that says *"this indicator was matched in my environment at this time, this many times, by these systems."* When L1 confirms a TP, ION writes a sighting back to OpenCTI/MISP with:
+- `sighting_of_ref` — the indicator referenced.
+- Count of matches.
+- `first_seen` / `last_seen` timestamps.
+- `observed_data_refs` linking to the SCOs that matched (without exposing internal hostnames or user identities upstream).
+- Optionally `confidence`.
+
+**Why sightings matter:**
+- For **your own SOC**, sightings let the team measure feed efficacy. *"Feed X has produced 247 sightings in 90 days, 82 % TP"* is manageable; *"Feed Y has produced 4 sightings, all FP"* is a retirement candidate.
+- For the **producing CTI team**, sightings validate that their work catches things in real environments — shapes what the community prioritises.
+- For **decay**, sightings reset/boost the score, keeping useful indicators alive.
+
+L1 typically doesn't write sightings by hand; ION generates them on classification. The L1's job is to classify accurately.
+
+## False-positive markers
+
+Marking an alert FP in ION:
+1. Closes the case with reason FP.
+2. Decrements the indicator's confidence score in the local TIP cache.
+3. Optionally pushes an FP marker upstream to MISP/OpenCTI as a negative sighting.
+
+**Why aggressive FP marking matters.** An indicator generating daily FP alerts costs the SOC analyst hours every week. Worse, it teaches analysts to mute or ignore alerts from that source — *which is how real intrusions get missed.* If you find yourself acknowledging the same FP for the third time, escalate the **indicator** (not just the alert) to CTI or the senior analyst. Either: the indicator is wrong (a benign IP), the matching context is too broad (CDN-shared IP without scoping), or the rule is wrong (matching a non-load-bearing field).
+
+**FP fatigue erodes a feed's credibility within days.** Aggressive, specific FP marking — with notes explaining why — is how a feed stays trustworthy.
+
+## Worked example — IOC hit triage end to end
+
+**Scenario.** At 09:14 your ingestion job pulls a fresh CTI feed update. Among the indicators is a SHA-256:
+
+```
+b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2
+```
+
+— labelled *"Initial-stage dropper for the March 2026 wave; TLP:GREEN, PAP:AMBER, valid_until 2026-06-14, indicates malware:Emotet, attack-pattern:T1566.001."*
+
+At 11:02 the same morning, an Elastic Indicator Match rule fires on `WKS-04127`:
+
+```json
+{
+  "@timestamp": "2026-04-29T11:02:14.318Z",
+  "host.name": "WKS-04127",
+  "user.name": "j.doe",
+  "process.executable": "C:\\\\Users\\\\j.doe\\\\Downloads\\\\invoice_apr29.exe",
+  "process.hash.sha256": "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2",
+  "process.parent.name": "explorer.exe",
+  "threat.indicator.file.hash.sha256": "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2",
+  "threat.indicator.name": "Initial-stage dropper for the March 2026 wave",
+  "threat.feed.name": "internal-cti-feed-1",
+  "event.kind": "alert"
+}
+```
+
+**(a) Confirm the hit.** Both `process.hash.sha256` and `threat.indicator.file.hash.sha256` match — rule joined correctly. Sanity-check: real user, managed asset, plausible path (`C:\\Users\\j.doe\\Downloads\\invoice_apr29.exe` looks like a downloaded payload from an email lure).
+
+**(b) Sysmon context — Module 3 callback.** Pivot to Sysmon for `WKS-04127` around 11:02 ± 5 min:
+- Sysmon ID 1 (Process Create) for that hash — confirm parent (`explorer.exe` from the alert; consistent with user-double-click, *not* a parent Office app).
+- Sysmon ID 11 (FileCreate) for the executable — when did it land on disk?
+- Sysmon ID 15 (FileCreateStreamHash) — was a `Zone.Identifier` ADS attached? (Indicates downloaded from internet.)
+- Sysmon ID 22 (DnsQuery) shortly after process start — any suspicious resolutions?
+
+**(c) Network context — Module 4 callback.** Pivot to Zeek for `WKS-04127` from process-start onward:
+- `dns.log` — new domains queried within seconds of `invoice_apr29.exe` starting?
+- `conn.log` — outbound connections, especially repeated short-byte connections to a single destination (beaconing).
+- `http.log` / `ssl.log` — JA3? SNI matching a known C2 family?
+
+A clean dropper-to-C2-beacon chain (process executes → DNS query for fresh domain → outbound TLS to that resolved IP every ~60 s with jitter) is a high-confidence TP.
+
+**(d) Classify.** TP. Hash matched, parent process consistent with user execution, network behaviour consistent with the family the indicator labels (Emotet).
+
+**(e) Sighting.** ION writes a sighting back to OpenCTI: `sighting_of_ref: indicator--<id>`, count 1, first_seen / last_seen `2026-04-29T11:02:14Z`. Local indicator score is boosted; upstream feed gets sighting count incremented.
+
+**(f) Escalate.** Initial-access malware on a user workstation with confirmed C2 beaconing — escalate to L2 with: case ID, hash and indicator UUID, asset and user, C2 domain and IP from conn.log, the chain of Sysmon events, MITRE techniques observed (T1566.001 spearphishing attachment if email-sourced; T1204.002 user execution; T1071.001 web protocols for C2), recommended containment (EDR isolate, reset creds).
+
+Total triage time, with practice and the data already in ION: **10–20 minutes.** *The IOC match was the entry point, not the answer. Modules 3 and 4 fed the answer.*
+
+```mermaid
+flowchart TD
+    Hit["Indicator match alert"]
+    Conf["Confirm match"]
+    Host["Host context (Module 3)"]
+    Net["Network context (Module 4)"]
+    V{"Verdict"}
+    TP["True positive"]
+    FP["False positive"]
+    BTP["Benign true positive"]
+    Sight["Write sighting"]
+    FPmark["Mark FP, comment why"]
+    Esc["Escalate to L2"]
+    Close["Close with note"]
+    Hit --> Conf --> Host
+    Conf --> Net
+    Host --> V
+    Net --> V
+    V -->|TP| Sight --> Esc
+    V -->|FP| FPmark --> Close
+    V -->|BTP| Sight --> Close
+```
+
+## Glossary
+
+- **Indicator lifecycle** — Production → ingestion → enrichment → distribution → matching → triage → feedback → decay.
+- **TP / FP / BTP** — True positive / false positive / benign true positive.
+- **Indicator Match rule** — Elastic detection that joins source events against the indicator index.
+- **Sighting** — STIX 2.1 SRO recording an indicator was matched in your environment.
+- **Decay / valid_until** — Confidence drop / explicit expiry timestamp.
+
+## Further reading
+
+- ECS Threat fields: https://www.elastic.co/guide/en/ecs/current/ecs-threat.html
+- MISP Decaying Indicators model: https://www.misp-project.org/2019/05/14/Decaying-Indicators-Of-Compromise.html/
+- OpenCTI documentation: https://docs.opencti.io/
+""",
+    )
+    m5l4q = _add_lesson(
+        session, mod5, order=8, title="Lifecycle & matching — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on decay state, ECS hash field paths, hash-vs-IP decay policy, and FP-marking discipline.",
+    )
+    _add_q(session, m5l4q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An IP-address indicator was last sighted in your environment 45 days ago, and your ION expiry policy is *30 days since last sighting.* What is the indicator's current state?",
+        options=[
+            {"value": "deleted", "label": "Deleted from the system"},
+            {"value": "active", "label": "Still being actively pushed to detection engines"},
+            {"value": "decayed", "label": "Decayed out of the active match index but retained for historical lookup"},
+            {"value": "tombstoned", "label": "Permanently tombstoned and never queryable"},
+        ],
+        correct="decayed",
+        explanation_md="The standard decay model retires an indicator from active matching once the policy threshold is exceeded, but keeps it queryable for retrospective hunting. It is not deleted, and it is not still actively matching.",
+        points=2,
+    )
+    _add_q(session, m5l4q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which Elastic ECS field paths would correctly match a hash-type IOC against host telemetry?",
+        options=[
+            {"value": "file_hash", "label": "file.hash.sha256"},
+            {"value": "process_hash", "label": "process.hash.sha256"},
+            {"value": "dst_ip", "label": "destination.ip"},
+            {"value": "dns_q", "label": "dns.question.name"},
+            {"value": "parent_hash", "label": "process.parent.hash.sha256"},
+        ],
+        correct=["file_hash", "process_hash", "parent_hash"],
+        explanation_md="Hash-bearing fields under ECS live on `file`, `process`, and `process.parent`. `destination.ip` is for IP indicators; `dns.question.name` is for domain indicators.",
+        points=3,
+    )
+    _add_q(session, m5l4q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="A SHA-256 indicator was published 3 years ago tied to a long-dormant malware family. What is the most appropriate decay treatment?",
+        options=[
+            {"value": "auto90", "label": "Auto-delete after 90 days regardless of type"},
+            {"value": "indef", "label": "Retain indefinitely; cryptographic hashes do not naturally decay"},
+            {"value": "ip30", "label": "Apply the same 30-day decay used for IP indicators"},
+            {"value": "fp_remove", "label": "Remove it once a single FP is recorded"},
+        ],
+        correct="indef",
+        explanation_md="A SHA-256 of a known malicious sample never becomes benign — the byte sequence either is or is not the malware. Decay policies apply mostly to IPs, domains, and URLs, not hashes.",
+        points=2,
+    )
+    _add_q(session, m5l4q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="Aggressively marking false positives on a feed is harmful because it makes the feed appear less reliable than it really is.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False — the opposite is true.** Aggressive, specific FP marking surfaces broken indicators and broken matching contexts so the CTI team can fix them. Failing to mark FPs is what breaks a feed — alert fatigue erodes trust and trains analysts to miss real intrusions.",
+        points=2,
+    )
+
+    print(f"  L1: {course.title} — 5 modules, 35 lessons (Module 5 IOC Handling @ proper depth)")
     return course
 
 
