@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.11.1 (2026-04-27) — PATCH
+
+### Network Mapper sync: TZ comparison crash
+
+`network_mapper_service._upsert_one` raised `TypeError: can't compare offset-naive and offset-aware datetimes` when comparing the parsed ES `@timestamp` against `NetworkAsset.last_seen` (and the IP/MAC variants). ES timestamps came back TZ-aware via `datetime.fromisoformat("...Z".replace("Z","+00:00"))`, but the DB columns are plain `DateTime` (no `timezone=True`) so SQLAlchemy returned naive values — the `now > asset.last_seen` comparison on lines 234/265/284 then crashed and stopped the sync mid-batch.
+
+Single-line fix in `_parse_host_buckets`: drop tzinfo on `ts` after parsing so it's a naive UTC datetime, matching the DB column shape. Comparisons downstream stay consistent and the sync runs to completion.
+
 ## v0.11.0 (2026-04-27)
 
 ### Stories — JSON-DAG automation playbooks (Tines-inspired)

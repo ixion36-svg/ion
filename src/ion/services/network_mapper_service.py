@@ -171,6 +171,13 @@ async def _fetch_host_page(
             ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00")) if ts_raw else datetime.now(timezone.utc)
         except Exception:
             ts = datetime.now(timezone.utc)
+        # Normalise to naive UTC so downstream comparisons against the
+        # NetworkAsset.last_seen columns (plain DateTime, no timezone=True)
+        # don't raise "can't compare offset-naive and offset-aware datetimes"
+        # in _upsert_one. ES @timestamp is canonical UTC; dropping tzinfo
+        # is the right move when the destination column is naive.
+        if ts.tzinfo is not None:
+            ts = ts.astimezone(timezone.utc).replace(tzinfo=None)
 
         parsed.append({
             "hostname": hostname.strip().lower(),
