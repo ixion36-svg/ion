@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.10.16 (2026-04-27) — HOTFIX
+
+### Assessment endpoints 404'd in v0.10.15
+
+The 8 new assessment routes added in v0.10.15 declared their paths as `/api/cyab/assessment/...` etc. inside `cyab_api.py`. But that router is included in `server.py` with `prefix="/api/cyab"`, so paths are relative — every existing route uses `@router.get("/systems")`, `@router.get("/dashboard")`, etc. The new routes ended up registered at `/api/cyab/api/cyab/assessment/...` (doubled prefix), so the wizard's `GET /api/cyab/assessment/questions` returned a 404 and the UI showed "failed to load questions".
+
+Fixed by stripping `/api/cyab` from the eight new route decorators. No behavioural change otherwise — the wizard, scoring, persistence, and per-system endpoints all work as designed in v0.10.15.
+
+Drop-in upgrade from v0.10.15. No schema or `.env` changes.
+
 ## v0.10.15 (2026-04-27)
 
 ### CyAB use-case discovery questionnaire — Stream B foundation

@@ -2289,7 +2289,7 @@ def _serialise_assessment(row, include_results: bool = True) -> dict:
     return out
 
 
-@router.get("/api/cyab/assessment/questions")
+@router.get("/assessment/questions")
 def get_assessment_questions(
     current_user: User = Depends(get_current_user),
 ):
@@ -2334,7 +2334,7 @@ def _resolve_playbooks() -> List[dict]:
         return []
 
 
-@router.post("/api/cyab/assessment")
+@router.post("/assessment")
 def submit_org_assessment(
     body: AssessmentSubmit,
     current_user: User = Depends(get_current_user),
@@ -2368,7 +2368,7 @@ def submit_org_assessment(
     return _serialise_assessment(row)
 
 
-@router.get("/api/cyab/assessment")
+@router.get("/assessment")
 def list_org_assessments(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
@@ -2388,7 +2388,7 @@ def list_org_assessments(
     }
 
 
-@router.get("/api/cyab/assessment/latest")
+@router.get("/assessment/latest")
 def get_latest_org_assessment(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
@@ -2401,7 +2401,7 @@ def get_latest_org_assessment(
     return {"assessment": _serialise_assessment(row)}
 
 
-@router.get("/api/cyab/assessment/{assessment_id}")
+@router.get("/assessment/{assessment_id}")
 def get_org_assessment(
     assessment_id: int,
     current_user: User = Depends(get_current_user),
@@ -2413,7 +2413,7 @@ def get_org_assessment(
     return _serialise_assessment(row)
 
 
-@router.post("/api/cyab/systems/{system_id}/assessment")
+@router.post("/systems/{system_id}/assessment")
 def submit_system_assessment(
     system_id: int,
     body: AssessmentSubmit,
@@ -2457,7 +2457,7 @@ def submit_system_assessment(
     return _serialise_assessment(row)
 
 
-@router.get("/api/cyab/systems/{system_id}/assessment")
+@router.get("/systems/{system_id}/assessment")
 def list_system_assessments(
     system_id: int,
     current_user: User = Depends(get_current_user),
@@ -2479,7 +2479,7 @@ def list_system_assessments(
     }
 
 
-@router.get("/api/cyab/systems/{system_id}/assessment/latest")
+@router.get("/systems/{system_id}/assessment/latest")
 def get_latest_system_assessment(
     system_id: int,
     current_user: User = Depends(get_current_user),
