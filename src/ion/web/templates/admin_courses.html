@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Course authoring · ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1400px] w-full px-4 sm:px-6 py-10 md:py-14">
+
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="h-1.5 w-1.5 rounded-full bg-ion-iris pulse-cyan"></span>
+        <span class="label-tiny text-ion-iris">Course authoring</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[28px] md:text-[34px] leading-tight text-white tracking-[-0.02em]">Courses (admin)</h1>
+      <p class="mt-2 max-w-2xl text-[13px] text-slate-400">
+        Author L1 / L2 / L3 / L4 training courses. Click any course to edit its modules, lessons, and questions.
+        Unpublished drafts only show here — published catalogue is visible to analysts at <a href="/courses" class="underline text-ion-cyan">/courses</a>.
+      </p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button onclick="openImportDialog()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">Import JSON</button>
+      <button onclick="openCreateDialog()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition">+ New course</button>
+    </div>
+  </section>
+
+  <div class="rounded-md border border-white/5 bg-ink-900/40 overflow-hidden">
+    <table class="w-full text-[13px]">
+      <thead class="bg-ink-900/70 text-slate-500">
+        <tr>
+          <th class="text-left px-4 py-3 font-semibold">Title</th>
+          <th class="text-left px-4 py-3 font-semibold">Slug</th>
+          <th class="text-center px-4 py-3 font-semibold">Level</th>
+          <th class="text-right px-4 py-3 font-semibold">Hours</th>
+          <th class="text-right px-4 py-3 font-semibold">Pass</th>
+          <th class="text-center px-4 py-3 font-semibold">Status</th>
+          <th class="text-right px-4 py-3 font-semibold"></th>
+        </tr>
+      </thead>
+      <tbody id="ac-tbody" class="divide-y divide-white/5">
+        <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- Create dialog -->
+<div id="ac-create" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);" onclick="if(event.target===this)closeCreateDialog()">
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:520px;background:#0f172a;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:24px;">
+    <h2 class="text-[16px] font-semibold text-white mb-4">New course</h2>
+    <div class="space-y-3">
+      <div><label class="label-tiny text-slate-500 block mb-1">Title <span class="text-ion-coral">*</span></label>
+        <input id="cr-title" class="w-full h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[13px] text-white" placeholder="Alert Triage Fundamentals"></div>
+      <div><label class="label-tiny text-slate-500 block mb-1">Level <span class="text-ion-coral">*</span></label>
+        <select id="cr-level" class="w-full h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[13px] text-white">
+          <option value="L1">L1 — Tier-1 SOC</option>
+          <option value="L2">L2 — Senior analyst</option>
+          <option value="L3">L3 — IR / hunting</option>
+          <option value="L4">L4 — Lead / engineering</option>
+        </select></div>
+      <div><label class="label-tiny text-slate-500 block mb-1">Slug (auto-generated from title if blank)</label>
+        <input id="cr-slug" class="w-full h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[13px] text-white font-mono"></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="label-tiny text-slate-500 block mb-1">Estimated hours</label>
+          <input id="cr-hours" type="number" value="2" class="w-full h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[13px] text-white"></div>
+        <div><label class="label-tiny text-slate-500 block mb-1">Pass threshold (%)</label>
+          <input id="cr-pass" type="number" value="70" class="w-full h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[13px] text-white"></div>
+      </div>
+      <div><label class="inline-flex items-center gap-2 text-[12px] text-slate-300">
+        <input id="cr-published" type="checkbox"> Publish immediately (visible to analysts)
+      </label></div>
+    </div>
+    <div class="flex justify-end gap-2 mt-5">
+      <button onclick="closeCreateDialog()" class="h-9 px-4 rounded-md bg-white/5 text-slate-300 border border-white/10 text-[12px] font-semibold">Cancel</button>
+      <button onclick="submitCreate()" class="h-9 px-4 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import dialog -->
+<div id="ac-import" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);" onclick="if(event.target===this)closeImportDialog()">
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:760px;max-height:80vh;display:flex;flex-direction:column;background:#0f172a;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:24px;">
+    <h2 class="text-[16px] font-semibold text-white mb-2">Import course JSON</h2>
+    <p class="text-[12px] text-slate-400 mb-3">Paste a course payload exported from another ION instance (or hand-crafted following the same shape). Whole import is one transaction — slug must not collide with an existing course.</p>
+    <textarea id="im-json" rows="20" class="w-full rounded-md bg-ink-950 border border-white/10 px-3 py-2 text-[12px] text-slate-200 font-mono leading-relaxed flex-1" spellcheck="false" placeholder='{ "course": { "title": "...", "level": "L1", "modules": [...] } }'></textarea>
+    <div id="im-error" class="hidden text-[11px] text-ion-coral mt-2"></div>
+    <div class="flex justify-end gap-2 mt-4">
+      <button onclick="closeImportDialog()" class="h-9 px-4 rounded-md bg-white/5 text-slate-300 border border-white/10 text-[12px] font-semibold">Cancel</button>
+      <button onclick="submitImport()" class="h-9 px-4 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold">Import</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.ac-pill{display:inline-block;padding:0.18rem 0.55rem;font-size:0.6rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-radius:9999px}
+.ac-L1{background:rgba(34,197,94,0.14);color:#86efac}
+.ac-L2{background:rgba(109,228,255,0.14);color:#6de4ff}
+.ac-L3{background:rgba(245,158,11,0.14);color:#fbbf24}
+.ac-L4{background:rgba(239,68,68,0.14);color:#fca5a5}
+.ac-status-pub{background:rgba(34,197,94,0.14);color:#86efac}
+.ac-status-draft{background:rgba(148,163,184,0.14);color:#94a3b8}
+</style>
+
+<script>
+function escHtml(s){if(s==null)return'';return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);}
+
+async function loadCourses(){
+  try{
+    const r=await fetch('/api/courses?include_unpublished=true');
+    const d=await r.json();
+    const tbody=document.getElementById('ac-tbody');
+    if(!d.courses.length){tbody.innerHTML='<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">No courses yet. Click <strong>+ New course</strong> to start.</td></tr>';return;}
+    tbody.innerHTML=d.courses.map(c=>`
+      <tr class="hover:bg-white/5 cursor-pointer" onclick="openEdit(${c.id})">
+        <td class="px-4 py-3 text-slate-200 font-semibold">${escHtml(c.title)}</td>
+        <td class="px-4 py-3 text-slate-500 font-mono text-[11px]">${escHtml(c.slug)}</td>
+        <td class="px-4 py-3 text-center"><span class="ac-pill ac-${escHtml(c.level)}">${escHtml(c.level)}</span></td>
+        <td class="px-4 py-3 text-right text-slate-400 font-mono">${c.estimated_hours}h</td>
+        <td class="px-4 py-3 text-right text-slate-400 font-mono">${c.pass_threshold}%</td>
+        <td class="px-4 py-3 text-center"><span class="ac-pill ${c.published?'ac-status-pub':'ac-status-draft'}">${c.published?'Published':'Draft'}</span></td>
+        <td class="px-4 py-3 text-right">
+          <a href="/api/courses/${escHtml(c.slug)}/export" target="_blank" onclick="event.stopPropagation()" class="text-ion-cyan hover:text-ion-cyan/80 text-[11px] mr-3">Export</a>
+          <button onclick="event.stopPropagation();openEdit(${c.id})" class="text-ion-cyan hover:text-ion-cyan/80 text-[11px]">Edit</button>
+        </td>
+      </tr>`).join('');
+  }catch(e){
+    document.getElementById('ac-tbody').innerHTML='<tr><td colspan="7" class="px-4 py-8 text-center text-ion-coral">Failed to load: '+escHtml(e.message)+'</td></tr>';
+  }
+}
+
+function openEdit(id){window.location.href='/admin/courses/'+id+'/edit';}
+window.openEdit=openEdit;
+
+function openCreateDialog(){document.getElementById('ac-create').style.display='block';}
+function closeCreateDialog(){document.getElementById('ac-create').style.display='none';}
+window.openCreateDialog=openCreateDialog;window.closeCreateDialog=closeCreateDialog;
+
+async function submitCreate(){
+  const body={
+    title:document.getElementById('cr-title').value.trim(),
+    level:document.getElementById('cr-level').value,
+    slug:document.getElementById('cr-slug').value.trim()||null,
+    estimated_hours:parseInt(document.getElementById('cr-hours').value,10)||1,
+    pass_threshold:parseInt(document.getElementById('cr-pass').value,10)||70,
+    published:document.getElementById('cr-published').checked,
+  };
+  if(!body.title){showToast('Title required','error');return;}
+  try{
+    const r=await fetch('/api/courses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(!r.ok){showToast(d.detail||'Create failed','error');return;}
+    closeCreateDialog();
+    showToast('Created — opening editor','success');
+    setTimeout(()=>{window.location.href='/admin/courses/'+d.id+'/edit';},400);
+  }catch(e){showToast('Create failed: '+e.message,'error');}
+}
+window.submitCreate=submitCreate;
+
+function openImportDialog(){document.getElementById('ac-import').style.display='block';document.getElementById('im-error').className='hidden text-[11px] text-ion-coral mt-2';}
+function closeImportDialog(){document.getElementById('ac-import').style.display='none';}
+window.openImportDialog=openImportDialog;window.closeImportDialog=closeImportDialog;
+
+async function submitImport(){
+  const errEl=document.getElementById('im-error');
+  let payload;
+  try{payload=JSON.parse(document.getElementById('im-json').value);}
+  catch(e){errEl.className='block text-[11px] text-ion-coral mt-2';errEl.textContent='Invalid JSON: '+e.message;return;}
+  // Accept either {course:{...}} or just {...}
+  const body=payload.course?payload:{course:payload};
+  try{
+    const r=await fetch('/api/courses/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(!r.ok){errEl.className='block text-[11px] text-ion-coral mt-2';errEl.textContent=d.detail||'Import failed';return;}
+    closeImportDialog();
+    showToast('Imported — opening editor','success');
+    setTimeout(()=>{window.location.href='/admin/courses/'+d.id+'/edit';},400);
+  }catch(e){errEl.className='block text-[11px] text-ion-coral mt-2';errEl.textContent='Import failed: '+e.message;}
+}
+window.submitImport=submitImport;
+
+document.addEventListener('DOMContentLoaded',loadCourses);
+</script>
+{% endblock %}

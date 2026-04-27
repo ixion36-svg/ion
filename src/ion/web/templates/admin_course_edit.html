@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}Edit course · ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1600px] w-full px-4 sm:px-6 py-8 md:py-10">
+
+  <a href="/admin/courses" class="inline-flex items-center gap-1 text-[12px] text-slate-400 hover:text-white mb-3">← All courses</a>
+
+  <div id="ce-root">
+    <div class="text-slate-500 text-[13px] py-8 text-center">Loading…</div>
+  </div>
+</div>
+</div>
+
+<style>
+.ce-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.45rem;padding:1rem 1.2rem;margin-bottom:0.85rem}
+.ce-card-header{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem}
+.ce-row{display:flex;align-items:center;gap:0.55rem;flex-wrap:wrap}
+.ce-label{font-size:0.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em}
+.ce-input,.ce-textarea,.ce-select{background:var(--bg-deep);border:1px solid var(--border);border-radius:0.3rem;padding:0.4rem 0.6rem;font-size:0.82rem;color:var(--text-primary);font-family:inherit}
+.ce-input:focus,.ce-textarea:focus,.ce-select:focus{outline:none;border-color:var(--primary)}
+.ce-textarea{min-height:6rem;resize:vertical;font-family:'JetBrains Mono','Fira Code',monospace;line-height:1.5}
+.ce-textarea-md{min-height:14rem;font-family:inherit}
+.ce-btn{background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:0.3rem;padding:0.4rem 0.85rem;font-size:0.75rem;font-weight:600;cursor:pointer;transition:background .12s}
+.ce-btn:hover{background:var(--bg-secondary)}
+.ce-btn-primary{background:var(--primary);color:var(--bg-deep);border:none}
+.ce-btn-primary:hover{filter:brightness(1.1)}
+.ce-btn-danger{color:var(--danger);border-color:var(--danger)}
+.ce-btn-danger:hover{background:rgba(239,68,68,0.08)}
+.ce-mod{padding:0.85rem 1rem;background:var(--bg-deep);border:1px solid var(--border);border-radius:0.4rem;margin-top:0.6rem}
+.ce-lesson{padding:0.7rem 0.85rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.35rem;margin-top:0.5rem}
+.ce-lesson-summary{display:flex;align-items:center;gap:0.5rem;cursor:pointer}
+.ce-lesson-summary:hover{background:var(--primary-dim)}
+.ce-question{padding:0.65rem 0.8rem;background:var(--bg-deep);border:1px solid var(--border);border-radius:0.3rem;margin-top:0.4rem;font-size:0.78rem}
+.ce-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.6rem}
+.ce-status-pill{display:inline-block;padding:0.18rem 0.55rem;font-size:0.6rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-radius:9999px}
+.ce-pill-reading{background:rgba(148,163,184,0.16);color:#cbd5e1}
+.ce-pill-quiz{background:rgba(109,228,255,0.14);color:#6de4ff}
+.ce-pill-lab{background:rgba(245,158,11,0.14);color:#fbbf24}
+.ce-mdpreview{background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.3rem;padding:0.75rem 1rem;min-height:6rem;font-size:0.85rem;line-height:1.55}
+.ce-mdpreview h2,.ce-mdpreview h3,.ce-mdpreview h4{font-weight:700;margin-top:0.6rem;margin-bottom:0.35rem;color:var(--text-primary)}
+.ce-mdpreview h2{font-size:1.15rem}.ce-mdpreview h3{font-size:1rem}
+.ce-mdpreview code{background:var(--bg-deep);padding:0.1rem 0.4rem;border-radius:0.25rem;font-size:0.78rem;color:#a78bfa}
+.ce-mdpreview pre{background:var(--bg-deep);padding:0.75rem;border-radius:0.3rem;overflow-x:auto;margin:0.5rem 0;font-size:0.75rem}
+.ce-mdpreview pre code{background:none;padding:0}
+.ce-mdpreview .mermaid{background:var(--bg-deep);padding:0.6rem;border-radius:0.3rem;border:1px solid var(--border);margin:0.5rem 0}
+</style>
+
+<script>
+const COURSE_ID = {{ course_id | tojson }};
+let _course = null;
+let _editing = {};  // { lesson_id: 'preview' | 'edit' }
+
+function escHtml(s){if(s==null)return'';return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);}
+function md(s){if(typeof marked==='undefined'||typeof DOMPurify==='undefined')return escHtml(s);return DOMPurify.sanitize(marked.parse(s||''));}
+
+async function loadCourse(){
+  try{
+    // Course detail endpoint requires slug. We get the basic course summary
+    // first, then load the full export to populate the editor.
+    const list=await(await fetch('/api/courses?include_unpublished=true')).json();
+    const meta=(list.courses||[]).find(c=>c.id===COURSE_ID);
+    if(!meta)throw new Error('Course not found');
+    _course=await(await fetch('/api/courses/'+encodeURIComponent(meta.slug)+'/export')).json();
+    _course.id=COURSE_ID;
+    render();
+  }catch(e){
+    document.getElementById('ce-root').innerHTML='<div class="text-ion-coral py-8 text-center text-[13px]">Failed to load course: '+escHtml(e.message)+'</div>';
+  }
+}
+
+function render(){
+  const c=_course;
+  const lvlOpts=['L1','L2','L3','L4'].map(l=>`<option value="${l}"${l===c.level?' selected':''}>${l}</option>`).join('');
+  const html=`
+    <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
+      <h1 class="text-[24px] font-semibold text-white">${escHtml(c.title||'(untitled course)')}</h1>
+      <div class="flex gap-2">
+        <a href="/courses/${escHtml(c.slug)}" target="_blank" class="ce-btn">Preview as analyst →</a>
+        <button class="ce-btn-danger ce-btn" onclick="deleteCourse()">Delete course</button>
+      </div>
+    </div>
+
+    <!-- Course metadata card -->
+    <div class="ce-card">
+      <div class="ce-grid">
+        <div><div class="ce-label">Title</div><input class="ce-input w-full" id="ce-title" value="${escHtml(c.title)}"></div>
+        <div><div class="ce-label">Slug</div><input class="ce-input w-full font-mono" id="ce-slug" value="${escHtml(c.slug)}"></div>
+        <div><div class="ce-label">Level</div><select class="ce-select w-full" id="ce-level">${lvlOpts}</select></div>
+        <div><div class="ce-label">Estimated hours</div><input type="number" class="ce-input w-full" id="ce-hours" value="${c.estimated_hours}"></div>
+        <div><div class="ce-label">Pass threshold (%)</div><input type="number" class="ce-input w-full" id="ce-pass" value="${c.pass_threshold}"></div>
+        <div><div class="ce-label">Order in level</div><input type="number" class="ce-input w-full" id="ce-order" value="${c.order_in_level}"></div>
+        <div><div class="ce-label">Published</div>
+          <label class="inline-flex items-center gap-2 mt-1.5 text-[12px] text-slate-300">
+            <input type="checkbox" id="ce-pub" ${c.published?'checked':''}> Visible to analysts
+          </label>
+        </div>
+      </div>
+      <div class="mt-3"><div class="ce-label">Description (markdown)</div>
+        <textarea class="ce-textarea w-full" id="ce-desc">${escHtml(c.description_md||'')}</textarea>
+      </div>
+      <div class="mt-3 flex justify-end"><button class="ce-btn-primary ce-btn" onclick="saveCourse()">Save course metadata</button></div>
+    </div>
+
+    <!-- Modules -->
+    <div class="ce-card">
+      <div class="ce-card-header">
+        <h2 class="text-[16px] font-semibold text-white">Modules (${(c.modules||[]).length})</h2>
+        <button class="ce-btn-primary ce-btn" onclick="addModule()">+ Module</button>
+      </div>
+      ${(c.modules||[]).map((m,mi)=>renderModule(m,mi)).join('')}
+      ${(c.modules||[]).length===0?'<p class="text-slate-500 text-[12px]">No modules yet. Click + Module to add one.</p>':''}
+    </div>
+
+    <!-- Image upload -->
+    <div class="ce-card">
+      <div class="ce-card-header"><h2 class="text-[16px] font-semibold text-white">Images</h2></div>
+      <p class="text-[12px] text-slate-400 mb-3">Upload PNG/JPG/SVG/WebP/GIF (5 MB max). After upload, paste the markdown snippet into any lesson body.</p>
+      <input type="file" id="ce-img" class="text-[12px]" accept="image/*">
+      <button class="ce-btn ml-2" onclick="uploadImage()">Upload</button>
+      <div id="ce-img-out" class="mt-3 text-[12px]"></div>
+    </div>
+  `;
+  document.getElementById('ce-root').innerHTML=html;
+  // Re-render mermaid in any preview blocks
+  if(typeof mermaid!=='undefined'){try{mermaid.run({querySelector:'.mermaid'});}catch(e){}}
+}
+
+function renderModule(m,mi){
+  const id=m.id||('new-'+mi);
+  const lessons=(m.lessons||[]).map((l,li)=>renderLesson(l,m,mi,li)).join('');
+  return `
+    <div class="ce-mod" data-mid="${id}">
+      <div class="ce-row" style="margin-bottom:0.5rem;">
+        <div style="flex:1;min-width:240px;">
+          <input class="ce-input w-full" data-field="title" value="${escHtml(m.title)}" oninput="markModuleDirty(${m.id||-1},this)">
+        </div>
+        <input type="number" class="ce-input" style="width:5rem;" data-field="estimated_minutes" value="${m.estimated_minutes}" oninput="markModuleDirty(${m.id||-1},this)" title="Minutes">
+        <button class="ce-btn-primary ce-btn" onclick="saveModule(${m.id||-1},${mi})">Save</button>
+        <button class="ce-btn" onclick="addLesson(${m.id||-1},${mi})">+ Lesson</button>
+        ${m.id?`<button class="ce-btn-danger ce-btn" onclick="deleteModule(${m.id})">Delete module</button>`:''}
+      </div>
+      <textarea class="ce-textarea w-full" data-field="description_md" placeholder="Module description (markdown)" oninput="markModuleDirty(${m.id||-1},this)">${escHtml(m.description_md||'')}</textarea>
+      ${lessons||'<p class="text-slate-500 text-[12px] mt-2">No lessons yet.</p>'}
+    </div>
+  `;
+}
+
+function renderLesson(l,m,mi,li){
+  const id=l.id||('newL-'+mi+'-'+li);
+  const typeOpts=['reading','quiz','lab'].map(t=>`<option value="${t}"${t===l.lesson_type?' selected':''}>${t}</option>`).join('');
+  const isExpanded=_editing[id]==='edit';
+  const qcount=(l.questions||[]).length;
+  return `
+    <div class="ce-lesson" data-lid="${id}">
+      <div class="ce-lesson-summary" onclick="toggleLesson('${id}')">
+        <span class="ce-status-pill ce-pill-${l.lesson_type}">${l.lesson_type}</span>
+        <strong>${escHtml(l.title||'(untitled lesson)')}</strong>
+        <span class="text-slate-500 text-[11px] ml-auto">~${l.duration_min}m · ${qcount} q</span>
+      </div>
+      <div style="display:${isExpanded?'block':'none'};margin-top:0.6rem;" class="ce-lesson-body">
+        <div class="ce-grid" style="margin-bottom:0.6rem;">
+          <div><div class="ce-label">Title</div><input class="ce-input w-full" data-field="title" value="${escHtml(l.title)}"></div>
+          <div><div class="ce-label">Type</div><select class="ce-select w-full" data-field="lesson_type">${typeOpts}</select></div>
+          <div><div class="ce-label">Duration (min)</div><input type="number" class="ce-input w-full" data-field="duration_min" value="${l.duration_min}"></div>
+          <div><div class="ce-label">Lab target URL</div><input class="ce-input w-full" data-field="lab_target_url" value="${escHtml(l.lab_target_url||'')}" placeholder="/cases/1"></div>
+        </div>
+        <div class="ce-label">Content (markdown — supports \`\`\`mermaid blocks)</div>
+        <textarea class="ce-textarea ce-textarea-md w-full" data-field="content_md" placeholder="Lesson body in markdown…" oninput="updateMdPreview('${id}',this.value)">${escHtml(l.content_md||'')}</textarea>
+        <div class="ce-label" style="margin-top:0.5rem;">Live preview</div>
+        <div class="ce-mdpreview" id="ce-md-${id}">${md(l.content_md||'')}</div>
+
+        <div class="ce-card-header" style="margin:0.85rem 0 0.5rem;">
+          <h3 class="text-[13px] font-semibold text-white">Questions (${qcount})</h3>
+          <button class="ce-btn" onclick="addQuestion(${l.id||-1},${mi},${li})">+ Question</button>
+        </div>
+        ${(l.questions||[]).map((q,qi)=>renderQuestion(q,l,mi,li,qi)).join('')}
+
+        <div class="ce-row" style="margin-top:0.7rem;">
+          <button class="ce-btn-primary ce-btn" onclick="saveLesson(${l.id||-1},${mi},${li})">Save lesson</button>
+          ${l.id?`<button class="ce-btn-danger ce-btn" style="margin-left:auto;" onclick="deleteLesson(${l.id})">Delete lesson</button>`:''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderQuestion(q,l,mi,li,qi){
+  const id=q.id||('newQ-'+mi+'-'+li+'-'+qi);
+  const kindOpts=['single','multi','truefalse','shortanswer'].map(k=>`<option value="${k}"${k===q.kind?' selected':''}>${k}</option>`).join('');
+  const optsJson=q.options?JSON.stringify(q.options,null,2):'[\n  {"value":"a","label":"Option A"},\n  {"value":"b","label":"Option B"}\n]';
+  const corrJson=JSON.stringify(q.correct_answer);
+  return `
+    <div class="ce-question" data-qid="${id}">
+      <div class="ce-row" style="margin-bottom:0.4rem;">
+        <select class="ce-select" data-field="kind">${kindOpts}</select>
+        <input type="number" class="ce-input" style="width:4rem;" data-field="points" value="${q.points}" title="Points">
+        <span class="text-slate-500 text-[10px] ml-auto">#${qi+1}</span>
+      </div>
+      <div class="ce-label">Stem (markdown)</div>
+      <textarea class="ce-textarea w-full" data-field="stem_md">${escHtml(q.stem_md||'')}</textarea>
+      <div class="ce-grid" style="margin-top:0.5rem;">
+        <div><div class="ce-label">Options (JSON array of {value, label})</div>
+          <textarea class="ce-textarea w-full" data-field="options" style="font-size:0.7rem;">${escHtml(optsJson)}</textarea></div>
+        <div><div class="ce-label">Correct answer (JSON: string for single/truefalse, list for multi/shortanswer)</div>
+          <textarea class="ce-textarea w-full" data-field="correct_answer" style="font-size:0.7rem;">${escHtml(corrJson)}</textarea></div>
+      </div>
+      <div class="ce-label" style="margin-top:0.4rem;">Explanation (markdown, shown after submit)</div>
+      <textarea class="ce-textarea w-full" data-field="explanation_md">${escHtml(q.explanation_md||'')}</textarea>
+      <div class="ce-row" style="margin-top:0.4rem;">
+        <button class="ce-btn-primary ce-btn" onclick="saveQuestion(${q.id||-1},${l.id||-1},${mi},${li},${qi})">Save question</button>
+        ${q.id?`<button class="ce-btn-danger ce-btn" style="margin-left:auto;" onclick="deleteQuestion(${q.id})">Delete</button>`:''}
+      </div>
+    </div>
+  `;
+}
+
+function toggleLesson(id){
+  _editing[id]=_editing[id]==='edit'?null:'edit';
+  // Just toggle visibility without re-render to preserve unsaved typing
+  const wrap=document.querySelector(`.ce-lesson[data-lid="${id}"] .ce-lesson-body`);
+  if(wrap)wrap.style.display=_editing[id]==='edit'?'block':'none';
+}
+window.toggleLesson=toggleLesson;
+
+function updateMdPreview(id,text){
+  const el=document.getElementById('ce-md-'+id);
+  if(!el)return;
+  el.innerHTML=md(text);
+  if(typeof mermaid!=='undefined'){try{mermaid.run({nodes:el.querySelectorAll('.mermaid')});}catch(e){}}
+}
+window.updateMdPreview=updateMdPreview;
+
+function readField(scope,name){return scope.querySelector(`[data-field="${name}"]`)?.value;}
+
+async function saveCourse(){
+  const body={
+    title:document.getElementById('ce-title').value.trim(),
+    slug:document.getElementById('ce-slug').value.trim(),
+    level:document.getElementById('ce-level').value,
+    estimated_hours:parseInt(document.getElementById('ce-hours').value,10)||1,
+    pass_threshold:parseInt(document.getElementById('ce-pass').value,10)||70,
+    order_in_level:parseInt(document.getElementById('ce-order').value,10)||0,
+    published:document.getElementById('ce-pub').checked,
+    description_md:document.getElementById('ce-desc').value,
+  };
+  try{
+    const r=await fetch('/api/courses/'+COURSE_ID,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(!r.ok){showToast(d.detail||'Save failed','error');return;}
+    showToast('Saved','success');
+    // Reload to get the new slug if it changed
+    loadCourse();
+  }catch(e){showToast('Save failed: '+e.message,'error');}
+}
+window.saveCourse=saveCourse;
+
+async function addModule(){
+  try{
+    const r=await fetch('/api/courses/'+COURSE_ID+'/modules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'New module'})});
+    if(!r.ok){const d=await r.json();showToast(d.detail||'Add failed','error');return;}
+    showToast('Module added','success');
+    loadCourse();
+  }catch(e){showToast('Add failed: '+e.message,'error');}
+}
+window.addModule=addModule;
+
+async function saveModule(mid,mi){
+  if(mid<0){showToast('Save the course first','error');return;}
+  const scope=document.querySelector(`.ce-mod[data-mid="${mid}"]`);
+  const body={
+    title:readField(scope,'title'),
+    description_md:readField(scope,'description_md'),
+    estimated_minutes:parseInt(readField(scope,'estimated_minutes'),10)||30,
+  };
+  try{
+    const r=await fetch('/api/modules/'+mid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){const d=await r.json();showToast(d.detail||'Save failed','error');return;}
+    showToast('Module saved','success');
+    _course.modules[mi].title=body.title;_course.modules[mi].description_md=body.description_md;_course.modules[mi].estimated_minutes=body.estimated_minutes;
+  }catch(e){showToast('Save failed: '+e.message,'error');}
+}
+window.saveModule=saveModule;
+
+function markModuleDirty(){/* no-op visual cue could go here */}
+window.markModuleDirty=markModuleDirty;
+
+async function deleteModule(mid){
+  if(!confirm('Delete this module and all its lessons + questions?'))return;
+  try{await fetch('/api/modules/'+mid,{method:'DELETE'});showToast('Deleted','success');loadCourse();}
+  catch(e){showToast('Delete failed: '+e.message,'error');}
+}
+window.deleteModule=deleteModule;
+
+async function addLesson(mid,mi){
+  if(mid<0){showToast('Save the module first','error');return;}
+  try{
+    const r=await fetch('/api/modules/'+mid+'/lessons',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'New lesson',lesson_type:'reading',content_md:'## Heading\n\nLesson content goes here.'})});
+    if(!r.ok){const d=await r.json();showToast(d.detail||'Add failed','error');return;}
+    showToast('Lesson added','success');
+    loadCourse();
+  }catch(e){showToast('Add failed: '+e.message,'error');}
+}
+window.addLesson=addLesson;
+
+async function saveLesson(lid,mi,li){
+  if(lid<0){showToast('Save the lesson first','error');return;}
+  const scope=document.querySelector(`.ce-lesson[data-lid="${lid}"] .ce-lesson-body`);
+  const body={
+    title:readField(scope,'title'),
+    lesson_type:readField(scope,'lesson_type'),
+    duration_min:parseInt(readField(scope,'duration_min'),10)||10,
+    lab_target_url:readField(scope,'lab_target_url')||null,
+    content_md:readField(scope,'content_md'),
+  };
+  try{
+    const r=await fetch('/api/lessons/'+lid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){const d=await r.json();showToast(d.detail||'Save failed','error');return;}
+    showToast('Lesson saved','success');
+    Object.assign(_course.modules[mi].lessons[li],body);
+  }catch(e){showToast('Save failed: '+e.message,'error');}
+}
+window.saveLesson=saveLesson;
+
+async function deleteLesson(lid){
+  if(!confirm('Delete this lesson and all its questions?'))return;
+  try{await fetch('/api/lessons/'+lid,{method:'DELETE'});showToast('Deleted','success');loadCourse();}
+  catch(e){showToast('Delete failed: '+e.message,'error');}
+}
+window.deleteLesson=deleteLesson;
+
+async function addQuestion(lid,mi,li){
+  if(lid<0){showToast('Save the lesson first','error');return;}
+  try{
+    const r=await fetch('/api/lessons/'+lid+'/questions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'single',stem_md:'New question',options:[{value:'a',label:'Option A'},{value:'b',label:'Option B'}],correct_answer:'a',points:1})});
+    if(!r.ok){const d=await r.json();showToast(d.detail||'Add failed','error');return;}
+    showToast('Question added','success');
+    loadCourse();
+  }catch(e){showToast('Add failed: '+e.message,'error');}
+}
+window.addQuestion=addQuestion;
+
+async function saveQuestion(qid,lid,mi,li,qi){
+  if(qid<0){showToast('Save the question first','error');return;}
+  const scope=document.querySelector(`.ce-question[data-qid="${qid}"]`);
+  let opts=null,corr=null;
+  try{opts=JSON.parse(readField(scope,'options')||'null');}
+  catch(e){showToast('Options is invalid JSON: '+e.message,'error');return;}
+  try{corr=JSON.parse(readField(scope,'correct_answer')||'null');}
+  catch(e){showToast('Correct answer is invalid JSON: '+e.message,'error');return;}
+  const body={
+    kind:readField(scope,'kind'),
+    stem_md:readField(scope,'stem_md'),
+    options:opts,
+    correct_answer:corr,
+    explanation_md:readField(scope,'explanation_md'),
+    points:parseInt(readField(scope,'points'),10)||1,
+  };
+  try{
+    const r=await fetch('/api/questions/'+qid,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){const d=await r.json();showToast(d.detail||'Save failed','error');return;}
+    showToast('Question saved','success');
+  }catch(e){showToast('Save failed: '+e.message,'error');}
+}
+window.saveQuestion=saveQuestion;
+
+async function deleteQuestion(qid){
+  if(!confirm('Delete this question?'))return;
+  try{await fetch('/api/questions/'+qid,{method:'DELETE'});showToast('Deleted','success');loadCourse();}
+  catch(e){showToast('Delete failed: '+e.message,'error');}
+}
+window.deleteQuestion=deleteQuestion;
+
+async function deleteCourse(){
+  if(!confirm('Delete this entire course? Cannot be undone.'))return;
+  try{await fetch('/api/courses/'+COURSE_ID,{method:'DELETE'});showToast('Deleted','success');setTimeout(()=>{window.location.href='/admin/courses';},400);}
+  catch(e){showToast('Delete failed: '+e.message,'error');}
+}
+window.deleteCourse=deleteCourse;
+
+async function uploadImage(){
+  const f=document.getElementById('ce-img').files[0];
+  if(!f){showToast('Pick a file first','error');return;}
+  const fd=new FormData();
+  fd.append('file',f);
+  try{
+    const r=await fetch('/api/courses/'+_course.slug+'/images',{method:'POST',body:fd});
+    const d=await r.json();
+    if(!r.ok){showToast(d.detail||'Upload failed','error');return;}
+    document.getElementById('ce-img-out').innerHTML=`<div class="text-slate-300">Uploaded <a href="${d.url}" target="_blank" class="underline text-ion-cyan">${d.url}</a> · ${d.bytes} bytes</div>
+      <div class="mt-2"><strong>Markdown:</strong> <code class="bg-ink-deep px-2 py-1 rounded">${escHtml(d.markdown)}</code></div>`;
+    showToast('Uploaded','success');
+  }catch(e){showToast('Upload failed: '+e.message,'error');}
+}
+window.uploadImage=uploadImage;
+
+document.addEventListener('DOMContentLoaded',loadCourse);
+</script>
+{% endblock %}

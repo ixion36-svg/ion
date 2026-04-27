@@ -1,5 +1,64 @@
 # Changelog
 
+## v0.11.4 (2026-04-27)
+
+### Course admin authoring UI
+
+Curriculum work no longer requires running the seeder. Admins (anyone with the existing `playbook:create`/`update`/`delete` permissions) can author courses end-to-end through the UI.
+
+#### CRUD endpoints (10 new)
+
+| Method | Path | Action |
+|---|---|---|
+| `POST` | `/api/courses` | Create a course shell |
+| `PUT` | `/api/courses/{id}` | Update course metadata |
+| `DELETE` | `/api/courses/{id}` | Delete (cascades to modules → lessons → questions) |
+| `POST` | `/api/courses/{id}/modules` | Add a module |
+| `PUT` | `/api/modules/{id}` | Update module |
+| `DELETE` | `/api/modules/{id}` | Delete module |
+| `POST` | `/api/modules/{id}/lessons` | Add a lesson |
+| `PUT` | `/api/lessons/{id}` | Update lesson metadata + content_md |
+| `DELETE` | `/api/lessons/{id}` | Delete lesson |
+| `POST` | `/api/lessons/{id}/questions` | Add a question |
+| `PUT` | `/api/questions/{id}` | Update question (kind, stem, options, correct, explanation, points) |
+| `DELETE` | `/api/questions/{id}` | Delete question |
+
+All mutating endpoints validate kind/lesson_type enums + slug uniqueness.
+
+#### JSON import/export
+
+- `GET /api/courses/{slug}/export` — full course tree as JSON, including correct answers + explanations (admins only)
+- `POST /api/courses/import` — accepts the same shape, validates, creates the whole tree atomically. 409 if slug collides
+
+The export → import round-trip is byte-stable so courses can be moved between ION instances or version-controlled in git.
+
+#### Admin pages
+
+- **`/admin/courses`** — list of all courses (published + drafts). Each row shows level pill, status pill, hours, pass threshold, and quick actions for Edit / Export. Two dialogs:
+  - **+ New course** — minimal form (title, level, slug-optional, hours, pass-threshold, publish-flag). On create, auto-redirects to the editor.
+  - **Import JSON** — paste-and-validate. Accepts either `{"course": {...}}` or `{...}` shape; both work.
+- **`/admin/courses/{id}/edit`** — full editor:
+  - Course metadata card (title, slug, level, hours, pass-threshold, order, publish-flag, description markdown) with a single Save button
+  - Modules section — each module is a card with inline title/duration/description editing, Save / + Lesson / Delete buttons
+  - Lesson cards — collapsible by default. When expanded: metadata grid (title, type, duration, lab URL), content_md textarea with **live markdown preview pane** (Mermaid diagrams render as you type), then a question editor for each question
+  - Question editor — kind dropdown, stem textarea, options as JSON array, correct_answer as JSON, explanation textarea, points input. Two save buttons per question. Validation surfaces inline if JSON is malformed.
+  - Image upload card — pick a file → upload → returns the public URL + a markdown snippet ready to paste into any lesson body
+  - Top-right action bar — "Preview as analyst →" button opens the published-side `/courses/{slug}` page in a new tab; "Delete course" with confirmation
+
+The editor saves at module / lesson / question granularity (not all-at-once) so an author can save progress on one section without re-validating the rest. Every save shows a toast.
+
+#### Nav
+
+New "Course authoring" entry in the user dropdown's Admin section, alongside Stories / AI Scorecard.
+
+#### Why no full canvas editor?
+
+Markdown + live preview is the right power-curve for v0.11.4. A full WYSIWYG canvas (drag-drop modules, etc.) is plausible but adds 1500+ LOC of frontend work and locks authoring into ION's UX choices — markdown stays portable and git-diffable. v0.11.5+ can layer on richer affordances (drag-reorder, structured question builder for non-technical authors) once the bar of usage is established.
+
+#### Upgrade
+
+Drop in `ion:0.11.4`. No schema changes from v0.11.3. CRUD endpoints register automatically; admin pages live at `/admin/courses` and `/admin/courses/{id}/edit`.
+
 ## v0.11.3 (2026-04-27)
 
 ### Course depth bar set + image upload + Mermaid vendored

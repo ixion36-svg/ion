@@ -521,6 +521,495 @@ def submit_quiz(
     }
 
 
+# ── Authoring CRUD (v0.11.4) ─────────────────────────────────────────────
+#
+# Permission model: read uses `playbook:read`, mutating ops use
+# `playbook:create`/`playbook:update`/`playbook:delete` (mirroring the
+# Stories subsystem). Course authors typically hold engineering or admin
+# roles which already carry these.
+
+
+def _slugify(s: str) -> str:
+    """Course slug from title — lowercase, hyphenated, ASCII-only."""
+    s = (s or "").strip().lower()
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    return s.strip("-") or "course"
+
+
+class CourseCreate(BaseModel):
+    title: str
+    slug: Optional[str] = None
+    level: str  # "L1" | "L2" | "L3" | "L4"
+    description_md: Optional[str] = ""
+    estimated_hours: int = 1
+    pass_threshold: int = 70
+    order_in_level: int = 0
+    published: bool = False
+    skill_keys: Optional[List[str]] = None
+    prerequisite_course_id: Optional[int] = None
+    badge_image_path: Optional[str] = None
+
+
+class CoursePatch(BaseModel):
+    title: Optional[str] = None
+    slug: Optional[str] = None
+    level: Optional[str] = None
+    description_md: Optional[str] = None
+    estimated_hours: Optional[int] = None
+    pass_threshold: Optional[int] = None
+    order_in_level: Optional[int] = None
+    published: Optional[bool] = None
+    skill_keys: Optional[List[str]] = None
+    prerequisite_course_id: Optional[int] = None
+    badge_image_path: Optional[str] = None
+
+
+class ModuleCreate(BaseModel):
+    title: str
+    description_md: Optional[str] = ""
+    estimated_minutes: int = 30
+    order: Optional[int] = None
+
+
+class ModulePatch(BaseModel):
+    title: Optional[str] = None
+    description_md: Optional[str] = None
+    estimated_minutes: Optional[int] = None
+    order: Optional[int] = None
+
+
+class LessonCreate(BaseModel):
+    title: str
+    lesson_type: str = "reading"  # "reading" | "quiz" | "lab"
+    content_md: str = ""
+    duration_min: int = 10
+    order: Optional[int] = None
+    lab_target_url: Optional[str] = None
+
+
+class LessonPatch(BaseModel):
+    title: Optional[str] = None
+    lesson_type: Optional[str] = None
+    content_md: Optional[str] = None
+    duration_min: Optional[int] = None
+    order: Optional[int] = None
+    lab_target_url: Optional[str] = None
+
+
+class QuestionCreate(BaseModel):
+    kind: str  # "single" | "multi" | "truefalse" | "shortanswer"
+    stem_md: str
+    options: Optional[List[Dict[str, str]]] = None
+    correct_answer: Any  # str | list[str] depending on kind
+    explanation_md: Optional[str] = None
+    points: int = 1
+    order: Optional[int] = None
+
+
+class QuestionPatch(BaseModel):
+    kind: Optional[str] = None
+    stem_md: Optional[str] = None
+    options: Optional[List[Dict[str, str]]] = None
+    correct_answer: Any = None
+    explanation_md: Optional[str] = None
+    points: Optional[int] = None
+    order: Optional[int] = None
+
+
+def _next_order(items: List[Any]) -> int:
+    if not items:
+        return 0
+    return max(getattr(it, "order", 0) for it in items) + 1
+
+
+@router.post("/api/courses", status_code=201)
+def create_course(
+    body: CourseCreate,
+    current_user: User = Depends(require_permission("playbook:create")),
+    session: Session = Depends(get_db_session),
+):
+    """Create a new course shell. Modules/lessons/questions added separately."""
+    slug = body.slug or _slugify(body.title)
+    if session.query(Course).filter(Course.slug == slug).first():
+        raise HTTPException(status_code=409, detail=f"Course slug '{slug}' already exists")
+    course = Course(
+        title=body.title, slug=slug, level=body.level,
+        description_md=body.description_md or "",
+        estimated_hours=body.estimated_hours,
+        pass_threshold=body.pass_threshold,
+        order_in_level=body.order_in_level,
+        published=body.published,
+        skill_keys=json.dumps(body.skill_keys) if body.skill_keys else None,
+        prerequisite_course_id=body.prerequisite_course_id,
+        badge_image_path=body.badge_image_path,
+        author_id=current_user.id if current_user else None,
+    )
+    session.add(course)
+    session.commit()
+    session.refresh(course)
+    return _course_summary(course)
+
+
+@router.put("/api/courses/{course_id}")
+def update_course(
+    course_id: int, body: CoursePatch,
+    current_user: User = Depends(require_permission("playbook:update")),
+    session: Session = Depends(get_db_session),
+):
+    course = session.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    data = body.model_dump(exclude_unset=True)
+    if "skill_keys" in data:
+        data["skill_keys"] = json.dumps(data["skill_keys"]) if data["skill_keys"] else None
+    if "slug" in data and data["slug"] and data["slug"] != course.slug:
+        existing = session.query(Course).filter(Course.slug == data["slug"]).first()
+        if existing and existing.id != course_id:
+            raise HTTPException(status_code=409, detail=f"Slug '{data['slug']}' already in use")
+    for k, v in data.items():
+        setattr(course, k, v)
+    session.commit()
+    session.refresh(course)
+    return _course_summary(course)
+
+
+@router.delete("/api/courses/{course_id}", status_code=204)
+def delete_course(
+    course_id: int,
+    current_user: User = Depends(require_permission("playbook:delete")),
+    session: Session = Depends(get_db_session),
+):
+    course = session.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    session.delete(course)
+    session.commit()
+    return None
+
+
+@router.post("/api/courses/{course_id}/modules", status_code=201)
+def create_module(
+    course_id: int, body: ModuleCreate,
+    current_user: User = Depends(require_permission("playbook:create")),
+    session: Session = Depends(get_db_session),
+):
+    course = session.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    order = body.order if body.order is not None else _next_order(course.modules or [])
+    m = CourseModule(
+        course_id=course_id, order=order,
+        title=body.title, description_md=body.description_md or "",
+        estimated_minutes=body.estimated_minutes,
+    )
+    session.add(m)
+    session.commit()
+    session.refresh(m)
+    return {"id": m.id, "course_id": course_id, "order": m.order, "title": m.title}
+
+
+@router.put("/api/modules/{module_id}")
+def update_module(
+    module_id: int, body: ModulePatch,
+    current_user: User = Depends(require_permission("playbook:update")),
+    session: Session = Depends(get_db_session),
+):
+    m = session.get(CourseModule, module_id)
+    if not m:
+        raise HTTPException(status_code=404, detail="Module not found")
+    for k, v in body.model_dump(exclude_unset=True).items():
+        setattr(m, k, v)
+    session.commit()
+    session.refresh(m)
+    return {"id": m.id, "course_id": m.course_id, "order": m.order, "title": m.title}
+
+
+@router.delete("/api/modules/{module_id}", status_code=204)
+def delete_module(
+    module_id: int,
+    current_user: User = Depends(require_permission("playbook:delete")),
+    session: Session = Depends(get_db_session),
+):
+    m = session.get(CourseModule, module_id)
+    if not m:
+        raise HTTPException(status_code=404, detail="Module not found")
+    session.delete(m)
+    session.commit()
+    return None
+
+
+@router.post("/api/modules/{module_id}/lessons", status_code=201)
+def create_lesson(
+    module_id: int, body: LessonCreate,
+    current_user: User = Depends(require_permission("playbook:create")),
+    session: Session = Depends(get_db_session),
+):
+    module = session.get(CourseModule, module_id)
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+    if body.lesson_type not in {"reading", "quiz", "lab"}:
+        raise HTTPException(status_code=400, detail="lesson_type must be reading|quiz|lab")
+    order = body.order if body.order is not None else _next_order(module.lessons or [])
+    l = Lesson(
+        module_id=module_id, order=order, title=body.title,
+        lesson_type=body.lesson_type, content_md=body.content_md,
+        duration_min=body.duration_min, lab_target_url=body.lab_target_url,
+    )
+    session.add(l)
+    session.commit()
+    session.refresh(l)
+    return {"id": l.id, "module_id": module_id, "order": l.order, "title": l.title, "lesson_type": l.lesson_type}
+
+
+@router.put("/api/lessons/{lesson_id}")
+def update_lesson_metadata(
+    lesson_id: int, body: LessonPatch,
+    current_user: User = Depends(require_permission("playbook:update")),
+    session: Session = Depends(get_db_session),
+):
+    l = session.get(Lesson, lesson_id)
+    if not l:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    data = body.model_dump(exclude_unset=True)
+    if "lesson_type" in data and data["lesson_type"] not in {"reading", "quiz", "lab"}:
+        raise HTTPException(status_code=400, detail="lesson_type must be reading|quiz|lab")
+    for k, v in data.items():
+        setattr(l, k, v)
+    session.commit()
+    session.refresh(l)
+    return {"id": l.id, "module_id": l.module_id, "order": l.order, "title": l.title, "lesson_type": l.lesson_type}
+
+
+@router.delete("/api/lessons/{lesson_id}", status_code=204)
+def delete_lesson(
+    lesson_id: int,
+    current_user: User = Depends(require_permission("playbook:delete")),
+    session: Session = Depends(get_db_session),
+):
+    l = session.get(Lesson, lesson_id)
+    if not l:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    session.delete(l)
+    session.commit()
+    return None
+
+
+@router.post("/api/lessons/{lesson_id}/questions", status_code=201)
+def create_question(
+    lesson_id: int, body: QuestionCreate,
+    current_user: User = Depends(require_permission("playbook:create")),
+    session: Session = Depends(get_db_session),
+):
+    lesson = session.get(Lesson, lesson_id)
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+    if body.kind not in {"single", "multi", "truefalse", "shortanswer"}:
+        raise HTTPException(status_code=400, detail="kind must be single|multi|truefalse|shortanswer")
+    order = body.order if body.order is not None else _next_order(lesson.questions or [])
+    q = Question(
+        lesson_id=lesson_id, order=order, kind=body.kind, stem_md=body.stem_md,
+        options_json=json.dumps(body.options) if body.options else None,
+        correct_answer_json=json.dumps(body.correct_answer),
+        explanation_md=body.explanation_md, points=body.points,
+    )
+    session.add(q)
+    session.commit()
+    session.refresh(q)
+    return {"id": q.id, "lesson_id": lesson_id, "order": q.order, "kind": q.kind}
+
+
+@router.put("/api/questions/{question_id}")
+def update_question(
+    question_id: int, body: QuestionPatch,
+    current_user: User = Depends(require_permission("playbook:update")),
+    session: Session = Depends(get_db_session),
+):
+    q = session.get(Question, question_id)
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
+    data = body.model_dump(exclude_unset=True)
+    # Only persist correct_answer if explicitly set (None has special meaning here)
+    if "correct_answer" in data and data["correct_answer"] is not None:
+        q.correct_answer_json = json.dumps(data.pop("correct_answer"))
+    elif "correct_answer" in data:
+        data.pop("correct_answer")
+    if "options" in data:
+        opts = data.pop("options")
+        q.options_json = json.dumps(opts) if opts is not None else None
+    if "kind" in data and data["kind"] not in {"single", "multi", "truefalse", "shortanswer"}:
+        raise HTTPException(status_code=400, detail="kind invalid")
+    for k, v in data.items():
+        setattr(q, k, v)
+    session.commit()
+    session.refresh(q)
+    return {"id": q.id, "lesson_id": q.lesson_id, "order": q.order, "kind": q.kind}
+
+
+@router.delete("/api/questions/{question_id}", status_code=204)
+def delete_question(
+    question_id: int,
+    current_user: User = Depends(require_permission("playbook:delete")),
+    session: Session = Depends(get_db_session),
+):
+    q = session.get(Question, question_id)
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
+    session.delete(q)
+    session.commit()
+    return None
+
+
+# ── JSON import / export (v0.11.4) ───────────────────────────────────────
+
+
+def _course_to_full_dict(course: Course) -> dict:
+    """Full export payload: course + modules + lessons + questions (with answers)."""
+    out = {
+        "title": course.title,
+        "slug": course.slug,
+        "level": course.level,
+        "description_md": course.description_md or "",
+        "estimated_hours": course.estimated_hours,
+        "pass_threshold": course.pass_threshold,
+        "order_in_level": course.order_in_level,
+        "published": course.published,
+        "badge_image_path": course.badge_image_path,
+        "skill_keys": json.loads(course.skill_keys) if course.skill_keys else None,
+        "modules": [],
+    }
+    for m in course.modules or []:
+        m_dict = {
+            "title": m.title,
+            "description_md": m.description_md or "",
+            "estimated_minutes": m.estimated_minutes,
+            "order": m.order,
+            "lessons": [],
+        }
+        for l in m.lessons or []:
+            l_dict = {
+                "title": l.title,
+                "lesson_type": l.lesson_type,
+                "content_md": l.content_md,
+                "duration_min": l.duration_min,
+                "lab_target_url": l.lab_target_url,
+                "order": l.order,
+                "questions": [],
+            }
+            for q in l.questions or []:
+                q_dict = {
+                    "kind": q.kind,
+                    "stem_md": q.stem_md,
+                    "options": json.loads(q.options_json) if q.options_json else None,
+                    "correct_answer": json.loads(q.correct_answer_json) if q.correct_answer_json else None,
+                    "explanation_md": q.explanation_md,
+                    "points": q.points,
+                    "order": q.order,
+                }
+                l_dict["questions"].append(q_dict)
+            m_dict["lessons"].append(l_dict)
+        out["modules"].append(m_dict)
+    return out
+
+
+@router.get("/api/courses/{slug}/export")
+def export_course(
+    slug: str,
+    current_user: User = Depends(require_permission("playbook:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Export a course as a JSON payload that can be re-imported elsewhere."""
+    course = session.query(Course).filter(Course.slug == slug).one_or_none()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return _course_to_full_dict(course)
+
+
+class CourseImport(BaseModel):
+    course: dict
+
+
+@router.post("/api/courses/import", status_code=201)
+def import_course(
+    body: CourseImport,
+    current_user: User = Depends(require_permission("playbook:create")),
+    session: Session = Depends(get_db_session),
+):
+    """Import a full course JSON.
+
+    Accepts the shape produced by ``GET /api/courses/{slug}/export``. If a
+    course with the same slug already exists, returns 409 — caller must
+    delete or rename first. Whole import is one transaction.
+    """
+    src = body.course or {}
+    title = src.get("title")
+    level = src.get("level")
+    if not title or not level:
+        raise HTTPException(status_code=400, detail="title + level are required")
+    slug = src.get("slug") or _slugify(title)
+    if session.query(Course).filter(Course.slug == slug).first():
+        raise HTTPException(status_code=409, detail=f"Course slug '{slug}' already exists — delete or rename first")
+    if level not in {"L1", "L2", "L3", "L4"}:
+        raise HTTPException(status_code=400, detail="level must be L1|L2|L3|L4")
+
+    course = Course(
+        title=title, slug=slug, level=level,
+        description_md=src.get("description_md", "") or "",
+        estimated_hours=int(src.get("estimated_hours", 1)),
+        pass_threshold=int(src.get("pass_threshold", 70)),
+        order_in_level=int(src.get("order_in_level", 0)),
+        published=bool(src.get("published", False)),
+        badge_image_path=src.get("badge_image_path"),
+        skill_keys=json.dumps(src.get("skill_keys")) if src.get("skill_keys") else None,
+        author_id=current_user.id if current_user else None,
+    )
+    session.add(course)
+    session.flush()
+
+    for m_idx, m_src in enumerate(src.get("modules") or []):
+        m = CourseModule(
+            course_id=course.id,
+            order=int(m_src.get("order", m_idx)),
+            title=m_src.get("title", f"Module {m_idx + 1}"),
+            description_md=m_src.get("description_md", "") or "",
+            estimated_minutes=int(m_src.get("estimated_minutes", 30)),
+        )
+        session.add(m)
+        session.flush()
+        for l_idx, l_src in enumerate(m_src.get("lessons") or []):
+            ltype = l_src.get("lesson_type", "reading")
+            if ltype not in {"reading", "quiz", "lab"}:
+                ltype = "reading"
+            l = Lesson(
+                module_id=m.id,
+                order=int(l_src.get("order", l_idx)),
+                title=l_src.get("title", f"Lesson {l_idx + 1}"),
+                lesson_type=ltype,
+                content_md=l_src.get("content_md", "") or "",
+                duration_min=int(l_src.get("duration_min", 10)),
+                lab_target_url=l_src.get("lab_target_url"),
+            )
+            session.add(l)
+            session.flush()
+            for q_idx, q_src in enumerate(l_src.get("questions") or []):
+                kind = q_src.get("kind", "single")
+                if kind not in {"single", "multi", "truefalse", "shortanswer"}:
+                    kind = "single"
+                q = Question(
+                    lesson_id=l.id,
+                    order=int(q_src.get("order", q_idx)),
+                    kind=kind,
+                    stem_md=q_src.get("stem_md", ""),
+                    options_json=json.dumps(q_src.get("options")) if q_src.get("options") else None,
+                    correct_answer_json=json.dumps(q_src.get("correct_answer")),
+                    explanation_md=q_src.get("explanation_md"),
+                    points=int(q_src.get("points", 1)),
+                )
+                session.add(q)
+    session.commit()
+    session.refresh(course)
+    return {"id": course.id, "slug": course.slug, "imported": True}
+
+
 # ── Image upload (v0.11.3) ───────────────────────────────────────────────
 
 
@@ -644,4 +1133,20 @@ def lesson_page(
 ):
     return _templates.TemplateResponse(
         request=request, name="lesson.html", context={"lesson_id": lesson_id},
+    )
+
+
+# v0.11.4 — admin authoring pages
+@router.get("/admin/courses", response_class=HTMLResponse)
+def admin_courses_page(request: Request, _user: User = Depends(require_page_auth)):
+    return _templates.TemplateResponse(request=request, name="admin_courses.html")
+
+
+@router.get("/admin/courses/{course_id}/edit", response_class=HTMLResponse)
+def admin_course_edit_page(
+    course_id: int, request: Request, _user: User = Depends(require_page_auth),
+):
+    return _templates.TemplateResponse(
+        request=request, name="admin_course_edit.html",
+        context={"course_id": course_id},
     )
