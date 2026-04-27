@@ -909,6 +909,22 @@ class TideService:
         if applied is None:
             return None
 
+        # v0.10.14: also pull the literal rule_ids applied to this system so
+        # we can decorate each playbook-step's detection with applied=True/False.
+        # The baseline view shows TIDE's recommended rules per step; flagging
+        # which are actually live here is what makes "why is this covered"
+        # meaningful — and what makes blind steps actionable ("apply rule X").
+        applied_rules = self._query(f"""
+            SELECT DISTINCT ad.detection_id
+            FROM applied_detections ad
+            WHERE ad.system_id = '{safe_id}'
+        """)
+        applied_rule_ids: set[str] = set()
+        for row in ((applied_rules or {}).get("rows") or []):
+            rid = (row.get("detection_id") or "").strip()
+            if rid:
+                applied_rule_ids.add(rid)
+
         # Build a set of covered technique IDs and a set of "parent" IDs so a
         # use case step listing T1003 is covered by an applied rule tagged
         # with T1003.001 (and vice-versa).
@@ -960,6 +976,22 @@ class TideService:
                         state = "covered"
                     else:
                         state = "partial"
+                # v0.10.14: surface the TIDE-recommended detections per step
+                # plus the analyst note (the "why") and a flag for whether
+                # the rule is actually applied to this system. The frontend
+                # baseline view renders these instead of just the technique
+                # heat-grid — analysts get rule-level traceability.
+                step_detections = []
+                for d in (s.get("detections") or []):
+                    if not isinstance(d, dict):
+                        continue
+                    rid = (d.get("rule_ref") or "").strip()
+                    step_detections.append({
+                        "rule_ref": rid,
+                        "note": d.get("note") or "",
+                        "source": d.get("source") or "",
+                        "applied": rid in applied_rule_ids if rid else False,
+                    })
                 uc_steps_out.append({
                     "order": s.get("order"),
                     "name": s.get("name"),
@@ -968,6 +1000,7 @@ class TideService:
                     "state": state,
                     "covered_techniques": [t for t in techs if _is_covered(t)],
                     "gap_techniques": [t for t in techs if not _is_covered(t)],
+                    "detections": step_detections,
                 })
                 if state == "covered":
                     uc_covered += 1

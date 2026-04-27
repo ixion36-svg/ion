@@ -593,10 +593,26 @@
                     <!-- Severity breakdown bar -->
                     <div id="tide-severity-bar" style="margin-bottom:1rem;"></div>
 
-                    <!-- MITRE Coverage Summary -->
+                    <!-- v0.10.14: Baseline coverage view — TIDE use cases with per-step
+                         rule mapping + analyst "why covered" comments. Replaces the
+                         MITRE tactic grid as the primary coverage view. -->
+                    <div id="tide-baseline-panel" style="display:none;margin-bottom:1rem;">
+                        <label style="font-weight:600;font-size:0.85rem;display:block;margin-bottom:0.5rem;">Assurance Baselines (Use Case Coverage)</label>
+                        <div id="tide-baseline-list" class="tide-baseline-list"></div>
+                    </div>
+
+                    <!-- MITRE Coverage Summary — demoted to a collapsible toggle.
+                         Still useful for ATT&CK-aligned reporting but the per-use-case
+                         baseline view above is the primary coverage signal. -->
                     <div id="tide-mitre-panel" style="display:none;margin-bottom:1rem;">
-                        <label style="font-weight:600;font-size:0.85rem;display:block;margin-bottom:0.5rem;">MITRE ATT&CK Coverage by Tactic</label>
-                        <div id="tide-mitre-grid" class="tide-mitre-grid"></div>
+                        <button type="button" id="tide-mitre-toggle" onclick="toggleMitreGrid()"
+                                style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.75rem;padding:0.25rem 0;display:flex;align-items:center;gap:0.4rem;">
+                            <span id="tide-mitre-chevron">▸</span>
+                            <span>Show MITRE ATT&CK heatmap</span>
+                        </button>
+                        <div id="tide-mitre-grid-wrap" style="display:none;margin-top:0.5rem;">
+                            <div id="tide-mitre-grid" class="tide-mitre-grid"></div>
+                        </div>
                     </div>
 
                     <!-- Detection rules table -->
@@ -913,6 +929,36 @@
 .tide-mitre-bar{flex:1;height:4px;background:var(--bg-deep);border-radius:var(--radius);overflow:hidden}
 .tide-mitre-bar-fill{height:100%;border-radius:var(--radius);transition:width .3s}
 @media(max-width:768px){.tide-mitre-grid{grid-template-columns:repeat(2,1fr)}}
+/* TIDE Baseline Coverage (v0.10.14) */
+.tide-baseline-list{display:flex;flex-direction:column;gap:0.5rem}
+.tide-baseline-summary{display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.6rem}
+.tide-baseline-summary-pill{font-size:0.65rem;padding:0.2rem 0.55rem;border-radius:9999px;font-weight:600}
+.tide-baseline-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.tide-baseline-card-header{width:100%;display:grid;grid-template-columns:1.2rem 1fr auto auto;gap:0.6rem;align-items:center;padding:0.6rem 0.85rem;background:none;border:none;color:var(--text-primary);cursor:pointer;text-align:left;font-size:0.8rem;transition:background .1s}
+.tide-baseline-card-header:hover{background:var(--primary-dim)}
+.tide-baseline-chevron{color:var(--text-muted);font-size:0.7rem;width:0.9rem;text-align:center}
+.tide-baseline-card-name{font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tide-baseline-card-state{font-size:0.6rem;font-weight:700;padding:0.18rem 0.55rem;border-radius:9999px;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap}
+.tide-baseline-card-counts{font-size:0.65rem;color:var(--text-muted);white-space:nowrap}
+.tide-baseline-card-body{padding:0.5rem 1rem 0.85rem;border-top:1px solid var(--border);background:var(--bg-deep)}
+.tide-baseline-card-desc{font-size:0.72rem;color:var(--text-muted);margin-bottom:0.7rem;font-style:italic}
+.tide-baseline-step{padding:0.55rem 0;border-bottom:1px dashed var(--border)}
+.tide-baseline-step:last-child{border-bottom:none}
+.tide-baseline-step-header{display:flex;align-items:center;gap:0.45rem;font-size:0.78rem;color:var(--text-primary)}
+.tide-baseline-step-state-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.tide-baseline-step-order{font-family:'JetBrains Mono','Fira Code',monospace;font-size:0.65rem;color:var(--text-muted)}
+.tide-baseline-step-name{font-weight:500;flex:1;color:var(--text-primary)}
+.tide-baseline-step-tactic{font-size:0.6rem;padding:0.12rem 0.4rem;border-radius:var(--radius);background:rgba(139,92,246,0.12);color:#a78bfa;text-transform:uppercase;letter-spacing:0.03em;white-space:nowrap}
+.tide-baseline-techs{margin:0.4rem 0 0.3rem 1.4rem;display:flex;flex-wrap:wrap;gap:0.25rem}
+.tide-baseline-tech{font-size:0.6rem;padding:0.1rem 0.4rem;border-radius:var(--radius);border:1px solid;font-family:'JetBrains Mono','Fira Code',monospace}
+.tide-baseline-detections{list-style:none;margin:0.35rem 0 0 1.4rem;padding:0;display:flex;flex-direction:column;gap:0.45rem}
+.tide-baseline-detections li{padding:0.4rem 0.55rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem}
+.tide-baseline-applied{font-size:0.55rem;font-weight:700;padding:0.15rem 0.45rem;border-radius:9999px;text-transform:uppercase;letter-spacing:0.04em;flex-shrink:0}
+.tide-baseline-applied.applied{background:rgba(16,185,129,0.15);color:var(--success);border:1px solid rgba(16,185,129,0.3)}
+.tide-baseline-applied.not-applied{background:rgba(239,68,68,0.1);color:var(--danger);border:1px solid rgba(239,68,68,0.2)}
+.tide-baseline-rule-ref{font-size:0.7rem;font-family:'JetBrains Mono','Fira Code',monospace;color:var(--text-secondary);background:var(--bg-deep);padding:0.15rem 0.35rem;border-radius:var(--radius)}
+.tide-baseline-note{flex-basis:100%;font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem;padding-left:0.4rem;border-left:2px solid var(--primary);font-style:italic;line-height:1.4}
+.tide-baseline-no-detections{margin:0.3rem 0 0 1.4rem;font-size:0.7rem;color:var(--text-muted);font-style:italic}
 /* Sign-off */
 .cyab-sign-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
 .cyab-sign-box{padding:1.25rem}
@@ -2356,12 +2402,160 @@ function renderTideCoverage(detail) {
     }
     document.getElementById('tide-severity-bar').innerHTML = barHtml;
 
-    // MITRE tactic grid
+    // v0.10.14: Baseline coverage (use cases + per-step rules + analyst notes)
+    // is now the primary view. MITRE tactic grid is collapsed by default —
+    // analysts wanted "why is this covered" answers, not heatmap percentages.
+    renderBaselineCoverage(detail);
     renderMitreTacticGrid(detail);
 
     // Rules table
     renderTideRulesTable(detections);
 }
+
+function _esc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, function(c) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+}
+
+function renderBaselineCoverage(detail) {
+    var panel = document.getElementById('tide-baseline-panel');
+    var list = document.getElementById('tide-baseline-list');
+    var useCases = detail && detail._useCases;
+    if (!useCases || !useCases.use_cases || useCases.use_cases.length === 0) {
+        panel.style.display = 'none';
+        list.innerHTML = '';
+        return;
+    }
+    panel.style.display = '';
+
+    // Summary line above the per-baseline cards.
+    var s = useCases.summary || {};
+    var headerHtml = '<div class="tide-baseline-summary">' +
+        '<span class="tide-baseline-summary-pill" style="background:rgba(0,255,150,0.12);color:var(--success)">' +
+            (s.fully_covered || 0) + ' covered</span>' +
+        '<span class="tide-baseline-summary-pill" style="background:rgba(255,200,0,0.12);color:var(--neon-yellow)">' +
+            (s.partial || 0) + ' partial</span>' +
+        '<span class="tide-baseline-summary-pill" style="background:rgba(255,80,80,0.12);color:var(--danger)">' +
+            (s.blind || 0) + ' blind</span>' +
+        '<span class="tide-baseline-summary-pill" style="background:var(--bg-secondary);color:var(--text-secondary)">' +
+            (s.covered_steps || 0) + '/' + (s.total_steps || 0) + ' steps</span>' +
+        '<span class="tide-baseline-summary-pill" style="background:var(--bg-secondary);color:var(--text-secondary)">' +
+            (s.overall_score || 0) + '% overall</span>' +
+        '</div>';
+
+    // Per-use-case cards. Each is collapsible — the rendered HTML can run
+    // long, so default collapsed except for blind/partial cases (which are
+    // the actionable ones).
+    var cards = (useCases.use_cases || []).map(function(uc, idx) {
+        var stateColor = uc.state === 'covered' ? 'var(--success)'
+                       : uc.state === 'partial' ? 'var(--neon-yellow)'
+                       : 'var(--danger)';
+        var stateLabel = uc.state.toUpperCase();
+        var defaultOpen = uc.state !== 'covered';
+        var headerRow =
+            '<button type="button" class="tide-baseline-card-header" ' +
+                'onclick="toggleBaselineCard(' + idx + ')">' +
+                '<span class="tide-baseline-chevron" id="tide-bl-chev-' + idx + '">' +
+                    (defaultOpen ? '▾' : '▸') + '</span>' +
+                '<span class="tide-baseline-card-name">' + _esc(uc.name) + '</span>' +
+                '<span class="tide-baseline-card-state" style="background:' + stateColor + '20;color:' + stateColor + '">' +
+                    stateLabel + ' · ' + (uc.score || 0) + '%</span>' +
+                '<span class="tide-baseline-card-counts">' +
+                    (uc.covered_steps || 0) + '/' + (uc.step_count || 0) + ' steps</span>' +
+            '</button>';
+
+        var stepsHtml = (uc.steps || []).map(function(step) {
+            var sColor = step.state === 'covered' ? 'var(--success)'
+                       : step.state === 'partial' ? 'var(--neon-yellow)'
+                       : step.state === 'blind' ? 'var(--danger)'
+                       : 'var(--text-secondary)';
+            var techsHtml = (step.techniques || []).map(function(t) {
+                var coveredOnStep = (step.covered_techniques || []).indexOf(t) !== -1;
+                var tColor = coveredOnStep ? 'var(--success)' : 'var(--danger)';
+                return '<span class="tide-baseline-tech" style="border-color:' + tColor + '40;color:' + tColor + '">' +
+                       _esc(t) + '</span>';
+            }).join('');
+
+            // Detections — TIDE's recommended rules per step. Each carries
+            // applied=true/false (is it live on this system?) and the
+            // analyst-authored note explaining WHY this rule covers this
+            // step. Notes are the headline addition in v0.10.14.
+            var detsHtml = '';
+            if (step.detections && step.detections.length > 0) {
+                detsHtml = '<ul class="tide-baseline-detections">' +
+                    step.detections.map(function(d) {
+                        var pill = d.applied
+                            ? '<span class="tide-baseline-applied applied">APPLIED</span>'
+                            : '<span class="tide-baseline-applied not-applied">NOT APPLIED</span>';
+                        var noteLine = d.note
+                            ? '<div class="tide-baseline-note">' + _esc(d.note) + '</div>'
+                            : '';
+                        return '<li>' +
+                            pill +
+                            '<code class="tide-baseline-rule-ref">' + _esc(d.rule_ref || '') + '</code>' +
+                            noteLine +
+                        '</li>';
+                    }).join('') +
+                    '</ul>';
+            } else {
+                detsHtml = '<div class="tide-baseline-no-detections">' +
+                    'No TIDE-recommended detections defined for this step.</div>';
+            }
+
+            return '<div class="tide-baseline-step">' +
+                '<div class="tide-baseline-step-header">' +
+                    '<span class="tide-baseline-step-state-dot" style="background:' + sColor + '"></span>' +
+                    '<span class="tide-baseline-step-order">#' + (step.order || '?') + '</span>' +
+                    '<span class="tide-baseline-step-name">' + _esc(step.name || '(unnamed)') + '</span>' +
+                    (step.tactic ? '<span class="tide-baseline-step-tactic">' + _esc(step.tactic) + '</span>' : '') +
+                '</div>' +
+                (techsHtml ? '<div class="tide-baseline-techs">' + techsHtml + '</div>' : '') +
+                detsHtml +
+            '</div>';
+        }).join('');
+
+        var body =
+            '<div class="tide-baseline-card-body" id="tide-bl-body-' + idx + '" ' +
+                'style="display:' + (defaultOpen ? 'block' : 'none') + ';">' +
+                (uc.description ? '<div class="tide-baseline-card-desc">' + _esc(uc.description) + '</div>' : '') +
+                stepsHtml +
+            '</div>';
+
+        return '<div class="tide-baseline-card">' + headerRow + body + '</div>';
+    }).join('');
+
+    list.innerHTML = headerHtml + cards;
+}
+
+function toggleBaselineCard(idx) {
+    var body = document.getElementById('tide-bl-body-' + idx);
+    var chev = document.getElementById('tide-bl-chev-' + idx);
+    if (!body) return;
+    if (body.style.display === 'none') {
+        body.style.display = 'block';
+        if (chev) chev.textContent = '▾';
+    } else {
+        body.style.display = 'none';
+        if (chev) chev.textContent = '▸';
+    }
+}
+window.toggleBaselineCard = toggleBaselineCard;
+
+function toggleMitreGrid() {
+    var wrap = document.getElementById('tide-mitre-grid-wrap');
+    var chev = document.getElementById('tide-mitre-chevron');
+    if (!wrap) return;
+    if (wrap.style.display === 'none') {
+        wrap.style.display = 'block';
+        if (chev) chev.textContent = '▾';
+    } else {
+        wrap.style.display = 'none';
+        if (chev) chev.textContent = '▸';
+    }
+}
+window.toggleMitreGrid = toggleMitreGrid;
 
 function renderMitreTacticGrid(detail) {
     var mitre = detail._mitre;

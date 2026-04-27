@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.10.14 (2026-04-27)
+
+### CyAB system detail — baseline coverage view (replaces MITRE heatmap)
+
+The system detail page's coverage panel previously rendered a MITRE ATT&CK tactic heat-grid (4-column tactic boxes with %). Useful for ATT&CK-aligned reporting but useless for the actual analyst question — *"why is this step covered, and which rule covered it?"*
+
+Replaced with a **baseline coverage view** that surfaces TIDE's full assurance-baseline model: each TIDE playbook (use case) is a collapsible card; inside, each step shows its state (covered / partial / blind), its MITRE techniques (with covered vs gap colour-coding), and crucially the **TIDE-recommended detection rules per step + the analyst's "why covered" note** straight from the `step_detections.note` column.
+
+Each detection rule under a step is tagged **APPLIED** or **NOT APPLIED** — so a "blind" step makes the gap actionable: "rule X is recommended here but not live on this system, apply it to close the gap."
+
+Cards default to expanded for `partial`/`blind` use cases (the actionable ones) and collapsed for `covered` (read-only confirmation).
+
+The MITRE heatmap is **kept** but demoted to a "Show MITRE ATT&CK heatmap" toggle below the baseline view — still there for ATT&CK-style reporting, just not the primary signal.
+
+### Backend
+
+`get_system_use_case_coverage` already pulled `step_detections.note` via `get_playbooks_with_kill_chains` but discarded it from the per-step output. Now:
+
+- Pulls the system's literal applied `detection_id` set in addition to the technique set
+- Returns `detections: [{rule_ref, note, source, applied}]` per step, with `applied` cross-referenced against the system's actual rule application
+- No SQL added (data was already coming through `get_playbooks_with_kill_chains`); only the per-step output shape changed
+- Payload size grows ~2-5× per call (option A from the design discussion); acceptable given the per-step rule list is what makes the view useful
+
+### No schema or compose changes
+Drop in `ion:0.10.14` alongside existing volumes — no migration, no `.env` updates required.
+
 ## v0.10.13 (2026-04-23)
 
 ### Arkime — PCAP timeout + alert-anchored IP search (hours-old alert fix)
