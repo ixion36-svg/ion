@@ -16,13 +16,13 @@
         <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Data source ingestion SLAs across all departments.</p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
-        <button onclick="openAssessment()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[13px] font-semibold transition">
+        <button onclick="openOnboarding()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
           <svg class="w-3.5 h-3.5"><use href="#i-shield"/></svg>
-          Assessment
+          Onboard a System
         </button>
-        <button onclick="openNewSystem()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+        <button onclick="openNewSystem()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[13px] font-semibold transition" title="Quick stub create — fill in the rest later from the system detail">
           <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
-          New System
+          Quick stub
         </button>
       </div>
     </section>
@@ -107,16 +107,16 @@
     </div>
 </div>
 
-<!-- ======================== ASSESSMENT VIEW (v0.10.15) ======================== -->
+<!-- ======================== ONBOARDING VIEW (v0.10.17) ======================== -->
 <div id="cyab-assessment" style="display:none;">
     <section class="flex flex-wrap items-end justify-between gap-6 mb-6 rise d-1">
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-3 mb-3">
           <svg class="w-4 h-4 text-ion-iris"><use href="#i-shield"/></svg>
-          <span class="label-tiny text-ion-iris">Use-case discovery</span>
+          <span class="label-tiny text-ion-iris">System onboarding</span>
         </div>
-        <h1 class="font-sans font-semibold text-[28px] md:text-[34px] leading-tight text-white tracking-[-0.02em]">CyAB Assessment</h1>
-        <p class="mt-2 max-w-2xl text-[13px] text-slate-400">Quick questionnaire that ranks the SOC use cases worth prioritising based on your sector, stack, controls, and concerns. Takes 5–10 minutes. Each submission is kept verbatim — re-answer to track posture over time.</p>
+        <h1 class="font-sans font-semibold text-[28px] md:text-[34px] leading-tight text-white tracking-[-0.02em]">Onboard a System</h1>
+        <p class="mt-2 max-w-2xl text-[13px] text-slate-400">Six-step wizard that creates a fully-defined CyAB system with contacts, data sources, and a ranked list of use cases to focus on. Each step is saved as a single transaction at the end.</p>
       </div>
       <button onclick="closeAssessment()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
         ← Back to dashboard
@@ -126,24 +126,12 @@
     <!-- Progress strip -->
     <div id="asmt-progress" class="cyab-asmt-progress" style="display:none;">
         <div class="cyab-asmt-progress-track"><div id="asmt-progress-fill" class="cyab-asmt-progress-fill"></div></div>
-        <div id="asmt-progress-label" class="cyab-asmt-progress-label">Step 1 of 4</div>
-    </div>
-
-    <!-- Loading / latest summary panel -->
-    <div id="asmt-latest-panel" class="cyab-asmt-latest" style="display:none;">
-        <div class="cyab-asmt-latest-row">
-            <div>
-                <div class="label-tiny text-slate-500">Last submitted</div>
-                <div id="asmt-latest-when" class="text-[13px] text-slate-200">—</div>
-            </div>
-            <button onclick="startAssessment()" class="cyab-asmt-btn-primary">Start a new assessment</button>
-            <button onclick="viewLatestResults()" class="cyab-asmt-btn-secondary">View latest results</button>
-        </div>
+        <div id="asmt-progress-label" class="cyab-asmt-progress-label">Step 1 of 6</div>
     </div>
 
     <div id="asmt-empty-panel" class="cyab-asmt-empty" style="display:none;">
-        <p class="text-[13px] text-slate-400">No assessment yet. The questionnaire ranks SOC use cases against your org profile + threat landscape.</p>
-        <button onclick="startAssessment()" class="cyab-asmt-btn-primary" style="margin-top:0.75rem;">Start assessment</button>
+        <p class="text-[13px] text-slate-400">Walk through six short steps to onboard a new system: identity, contacts, system assessment, data sources, governance, and sign-off.</p>
+        <button onclick="startOnboarding()" class="cyab-asmt-btn-primary" style="margin-top:0.75rem;">Start onboarding</button>
     </div>
 
     <!-- Wizard panel -->
@@ -155,7 +143,7 @@
         </div>
     </form>
 
-    <!-- Results panel -->
+    <!-- Results panel — shown after successful submit -->
     <div id="asmt-results" class="cyab-asmt-results" style="display:none;"></div>
 </div>
 
@@ -1032,6 +1020,30 @@
 .cyab-sys-asmt-card{padding:1rem 1.15rem;margin-top:1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius)}
 .cyab-sys-asmt-header{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;margin-bottom:0.6rem;flex-wrap:wrap}
 .cyab-sys-asmt-header h3{font-size:0.88rem;font-weight:700;color:var(--text-primary);margin:0}
+/* Onboarding wizard (v0.10.17) */
+.cyab-onb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.8rem 1.1rem}
+.cyab-onb-field{display:flex;flex-direction:column;gap:0.3rem}
+.cyab-onb-field label{font-size:0.72rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.04em}
+.cyab-onb-field input,.cyab-onb-field select,.cyab-onb-field textarea{background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius);padding:0.45rem 0.6rem;font-size:0.82rem;color:var(--text-primary);font-family:inherit}
+.cyab-onb-field input:focus,.cyab-onb-field select:focus,.cyab-onb-field textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(109,228,255,0.12)}
+.cyab-onb-field textarea{resize:vertical;min-height:2.4rem}
+.cyab-onb-hint{font-size:0.65rem;color:var(--text-muted);font-style:italic}
+.cyab-onb-subhead{margin:1.2rem 0 0.5rem 0;font-size:0.85rem;font-weight:700;color:var(--text-primary)}
+/* Template picker grid */
+.cyab-onb-template-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.55rem;margin-top:0.5rem}
+.cyab-onb-tpl-card{display:flex;align-items:flex-start;gap:0.55rem;padding:0.7rem 0.85rem;background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:border-color .12s,background .12s}
+.cyab-onb-tpl-card:hover{background:var(--primary-dim)}
+.cyab-onb-tpl-card.selected{border-color:var(--primary);background:var(--primary-dim)}
+.cyab-onb-tpl-card input{accent-color:var(--primary);flex-shrink:0;margin-top:0.18rem}
+.cyab-onb-tpl-card > div{flex:1;min-width:0}
+.cyab-onb-tpl-name{font-size:0.78rem;font-weight:600;color:var(--text-primary);margin-bottom:0.15rem}
+.cyab-onb-tpl-meta{font-size:0.65rem;color:var(--text-muted)}
+/* Review step summary */
+.cyab-onb-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.7rem 1.1rem;padding:0.85rem 1rem;background:var(--bg-deep);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1rem}
+.cyab-onb-summary > div{display:flex;flex-direction:column;gap:0.2rem;font-size:0.78rem}
+.cyab-onb-summary span{font-size:0.62rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);font-weight:600}
+.cyab-onb-summary strong{color:var(--text-primary);font-weight:600}
+.cyab-onb-summary small{color:var(--text-muted);font-weight:400;font-size:0.7rem}
 /* TIDE Baseline Coverage (v0.10.14) */
 .tide-baseline-list{display:flex;flex-direction:column;gap:0.5rem}
 .tide-baseline-summary{display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.6rem}
@@ -1315,160 +1327,346 @@ function showDetail() {
     updateScore();
 }
 
-// ======================== ASSESSMENT WIZARD (v0.10.15) ========================
-// State carried across wizard steps. Reset on every fresh start.
+// ======================== ONBOARDING WIZARD (v0.10.17) ========================
+// Six-step wizard that creates a CyAB system + data sources + per-system
+// assessment in one transactional submit. State persists across steps so
+// the user can navigate forwards/backwards without losing answers.
 var asmtState = {
-    schema: null,           // { schema_version, org_questions[], system_questions[] }
-    step: 0,                // 0..N-1 (sections)
-    sections: [],           // ['Organisation profile', 'Tech stack', ...] in order
-    sectionQuestions: {},   // { sectionName: [questions] }
-    responses: {},          // { question_key: value }
+    schema: null,        // { schema_version, system_questions[] }
+    templates: null,     // [{id,name,...}] from /api/cyab/templates
+    step: 0,
+    steps: [
+        { kind: 'identity',    label: 'System identity' },
+        { kind: 'contacts',    label: 'Points of contact' },
+        { kind: 'assessment',  label: 'System assessment' },
+        { kind: 'datasources', label: 'Data sources' },
+        { kind: 'governance',  label: 'Governance & SLA' },
+        { kind: 'review',      label: 'Review & sign-off' },
+    ],
+    // Form state — every step writes to its own slice.
+    identity: {
+        name: '', department: '', business_unit: '', reference: '',
+        version: '1.0', status: 'DRAFT', icon: 'monitor', tags: '',
+        data_classification: '',
+    },
+    contacts: {
+        department_lead: '', dept_lead_email: '', dept_lead_phone: '',
+        dept_deputy_name: '', dept_deputy_email: '',
+        soc_team: 'Security Operations Center', soc_lead: '',
+        soc_lead_email: '', soc_analyst_owner: '',
+        stakeholder_distribution: '', ir_runbook_url: '',
+    },
+    assessmentResponses: {},  // per-system question answers
+    dataSources: [],          // [{template_id, name_override?, tide_system_id?, data_namespace?}]
+    governance: {
+        sal_tier: 'SAL-2', review_cadence_days: 90, next_review_date: '',
+    },
+    signoff: {
+        sign_dept_name: '', sign_dept_date: '',
+        sign_soc_name: '', sign_soc_date: '',
+    },
 };
 
-function openAssessment() {
+function openOnboarding() {
     document.getElementById('cyab-dashboard').style.display = 'none';
     document.getElementById('cyab-detail').style.display = 'none';
     document.getElementById('cyab-assessment').style.display = '';
     document.getElementById('asmt-wizard').style.display = 'none';
     document.getElementById('asmt-results').style.display = 'none';
     document.getElementById('asmt-progress').style.display = 'none';
-    asmtLoadLatest();
+    document.getElementById('asmt-empty-panel').style.display = '';
 }
-window.openAssessment = openAssessment;
+window.openOnboarding = openOnboarding;
 
 function closeAssessment() {
     showDashboard();
 }
 window.closeAssessment = closeAssessment;
 
-async function asmtLoadLatest() {
-    var latestPanel = document.getElementById('asmt-latest-panel');
-    var emptyPanel = document.getElementById('asmt-empty-panel');
-    latestPanel.style.display = 'none';
-    emptyPanel.style.display = 'none';
-    try {
-        var res = await api.get('/api/cyab/assessment/latest');
-        var a = res.assessment;
-        if (a && a.submitted_at) {
-            var when = new Date(a.submitted_at);
-            document.getElementById('asmt-latest-when').textContent =
-                when.toLocaleString() + (a.submitted_by ? ' · user #' + a.submitted_by : '');
-            latestPanel.style.display = '';
-            asmtState._latest = a;
-        } else {
-            emptyPanel.style.display = '';
-        }
-    } catch (e) {
-        emptyPanel.style.display = '';
-    }
-}
-
-async function startAssessment() {
-    document.getElementById('asmt-latest-panel').style.display = 'none';
+async function startOnboarding() {
     document.getElementById('asmt-empty-panel').style.display = 'none';
     document.getElementById('asmt-results').style.display = 'none';
     try {
-        var schema = await api.get('/api/cyab/assessment/questions');
+        // Load both schemas + templates in parallel — startup happens once
+        // per wizard run and we want every step ready by the time the user
+        // navigates to it.
+        var [schema, templates] = await Promise.all([
+            api.get('/api/cyab/assessment/questions'),
+            api.get('/api/cyab/templates'),
+        ]);
         asmtState.schema = schema;
-        // Group org questions by section, preserving first-seen order.
-        var sections = [];
-        var byS = {};
-        (schema.org_questions || []).forEach(function(q) {
-            var sec = q.section || 'General';
-            if (!(sec in byS)) { byS[sec] = []; sections.push(sec); }
-            byS[sec].push(q);
-        });
-        asmtState.sections = sections;
-        asmtState.sectionQuestions = byS;
+        asmtState.templates = templates.templates || [];
         asmtState.step = 0;
-        asmtState.responses = {};
         asmtRenderStep();
         document.getElementById('asmt-wizard').style.display = '';
         document.getElementById('asmt-progress').style.display = '';
     } catch (e) {
-        showToast('Failed to load questions: ' + (e.message || e), 'error');
+        showToast('Failed to load wizard data: ' + (e.message || e), 'error');
     }
 }
-window.startAssessment = startAssessment;
+window.startOnboarding = startOnboarding;
 
 function asmtRenderStep() {
-    var sec = asmtState.sections[asmtState.step];
-    var qs = asmtState.sectionQuestions[sec] || [];
+    var stepDef = asmtState.steps[asmtState.step];
     var body = document.getElementById('asmt-step-body');
-    var html = '<h2 class="cyab-asmt-section-title">' + asmtEsc(sec) + '</h2>' +
+    var html = '<h2 class="cyab-asmt-section-title">' + asmtEsc(stepDef.label) + '</h2>' +
                '<p class="cyab-asmt-section-hint">Step ' + (asmtState.step + 1) +
-               ' of ' + asmtState.sections.length + '</p>';
-    qs.forEach(function(q) { html += asmtRenderQuestion(q); });
+               ' of ' + asmtState.steps.length + '</p>';
+    switch (stepDef.kind) {
+        case 'identity':    html += asmtRenderIdentityStep(); break;
+        case 'contacts':    html += asmtRenderContactsStep(); break;
+        case 'assessment':  html += asmtRenderAssessmentStep(); break;
+        case 'datasources': html += asmtRenderDataSourcesStep(); break;
+        case 'governance':  html += asmtRenderGovernanceStep(); break;
+        case 'review':      html += asmtRenderReviewStep(); break;
+    }
     body.innerHTML = html;
-    // Wire change handlers
-    qs.forEach(function(q) { asmtAttachQuestionHandlers(q); });
+    // Wire change handlers per-step
+    asmtAttachStepHandlers(stepDef.kind);
     // Progress bar
-    var pct = Math.round(((asmtState.step) / Math.max(1, asmtState.sections.length)) * 100);
+    var pct = Math.round(((asmtState.step) / Math.max(1, asmtState.steps.length)) * 100);
     document.getElementById('asmt-progress-fill').style.width = pct + '%';
     document.getElementById('asmt-progress-label').textContent =
-        'Step ' + (asmtState.step + 1) + ' of ' + asmtState.sections.length;
-    // Buttons
+        'Step ' + (asmtState.step + 1) + ' of ' + asmtState.steps.length;
     document.getElementById('asmt-prev-btn').style.visibility = asmtState.step === 0 ? 'hidden' : '';
     document.getElementById('asmt-next-btn').textContent =
-        asmtState.step === asmtState.sections.length - 1 ? 'Submit ✓' : 'Next →';
+        asmtState.step === asmtState.steps.length - 1 ? 'Onboard system ✓' : 'Next →';
 }
 
-function asmtRenderQuestion(q) {
-    var name = q.key;
-    var current = asmtState.responses[name];
-    var optsHtml = (q.options || []).map(function(opt) {
-        var isMulti = q.answer_type === 'multi';
-        var inputType = isMulti ? 'checkbox' : 'radio';
-        var checked = false;
-        if (isMulti) {
-            checked = Array.isArray(current) && current.indexOf(opt.value) !== -1;
-        } else {
-            checked = current === opt.value;
-        }
-        return '<label class="' + (checked ? 'checked' : '') + '">' +
-            '<input type="' + inputType + '" name="' + asmtEsc(name) +
-                '" value="' + asmtEsc(opt.value) + '"' + (checked ? ' checked' : '') + '> ' +
-            '<span>' + asmtEsc(opt.label) + '</span>' +
-        '</label>';
-    }).join('');
-    var multiHint = '';
-    if (q.answer_type === 'multi' && q.multi_max) {
-        multiHint = '<div class="cyab-asmt-q-multi-hint">Select up to ' + q.multi_max + '</div>';
-    } else if (q.answer_type === 'multi') {
-        multiHint = '<div class="cyab-asmt-q-multi-hint">Select all that apply</div>';
-    }
-    return '<div class="cyab-asmt-q" data-key="' + asmtEsc(name) + '">' +
-        '<p class="cyab-asmt-q-text">' + asmtEsc(q.text) + '</p>' +
-        '<div class="cyab-asmt-q-options">' + optsHtml + '</div>' +
-        multiHint +
+// ── Step renderers ────────────────────────────────────────────────────────
+function _onbInput(label, key, slice, opts) {
+    opts = opts || {};
+    var val = asmtState[slice][key] || '';
+    var type = opts.type || 'text';
+    var hint = opts.hint ? '<div class="cyab-onb-hint">' + asmtEsc(opts.hint) + '</div>' : '';
+    var required = opts.required ? ' required' : '';
+    var placeholder = opts.placeholder || '';
+    return '<div class="cyab-onb-field">' +
+        '<label>' + asmtEsc(label) + (opts.required ? ' <span style="color:var(--danger)">*</span>' : '') + '</label>' +
+        '<input type="' + type + '" data-slice="' + slice + '" data-key="' + asmtEsc(key) +
+            '" value="' + asmtEsc(val) + '" placeholder="' + asmtEsc(placeholder) + '"' + required + '>' +
+        hint +
     '</div>';
 }
 
-function asmtAttachQuestionHandlers(q) {
-    var wrap = document.querySelector('[data-key="' + q.key + '"]');
-    if (!wrap) return;
-    wrap.querySelectorAll('input').forEach(function(input) {
-        input.addEventListener('change', function() {
-            if (q.answer_type === 'multi') {
-                var checked = Array.from(wrap.querySelectorAll('input:checked'))
-                    .map(function(i) { return i.value; });
-                if (q.multi_max && checked.length > q.multi_max) {
-                    // Reject the last selection — find the just-checked item
-                    // and uncheck it.
-                    input.checked = false;
-                    showToast('Pick at most ' + q.multi_max + ' for this question.', 'info');
-                    return;
-                }
-                asmtState.responses[q.key] = checked;
-            } else {
-                asmtState.responses[q.key] = input.value;
+function _onbSelect(label, key, slice, options, opts) {
+    opts = opts || {};
+    var current = asmtState[slice][key] || '';
+    var optsHtml = (options || []).map(function(o) {
+        var v = (typeof o === 'string') ? o : o.value;
+        var l = (typeof o === 'string') ? o : o.label;
+        return '<option value="' + asmtEsc(v) + '"' +
+            (current === v ? ' selected' : '') + '>' + asmtEsc(l) + '</option>';
+    }).join('');
+    var hint = opts.hint ? '<div class="cyab-onb-hint">' + asmtEsc(opts.hint) + '</div>' : '';
+    return '<div class="cyab-onb-field">' +
+        '<label>' + asmtEsc(label) + '</label>' +
+        '<select data-slice="' + slice + '" data-key="' + asmtEsc(key) + '">' + optsHtml + '</select>' +
+        hint +
+    '</div>';
+}
+
+function asmtRenderIdentityStep() {
+    var statusOpts = [
+        { value: 'DRAFT',         label: 'Draft (not yet authorised)' },
+        { value: 'ACTIVE',        label: 'Active' },
+        { value: 'DECOMMISSIONED', label: 'Decommissioned' },
+    ];
+    var classOpts = [
+        '', 'Public', 'Internal', 'Confidential', 'Restricted', 'Secret',
+    ].map(function(v) { return { value: v, label: v || '— Select —' }; });
+    return '<div class="cyab-onb-grid">' +
+        _onbInput('System name', 'name', 'identity', { required: true, placeholder: 'e.g. SOC EDR Telemetry' }) +
+        _onbInput('Department', 'department', 'identity', { required: true, placeholder: 'e.g. IT Security' }) +
+        _onbInput('Business unit', 'business_unit', 'identity', { placeholder: 'e.g. Group Technology' }) +
+        _onbInput('Reference', 'reference', 'identity', { placeholder: 'Auto-generated if blank (SOC-SLA-yyyy-NNN)' }) +
+        _onbInput('Version', 'version', 'identity') +
+        _onbSelect('Status', 'status', 'identity', statusOpts) +
+        _onbSelect('Data classification', 'data_classification', 'identity', classOpts) +
+        _onbInput('Tags (comma-separated)', 'tags', 'identity', { placeholder: 'e.g. critical, prod, gdpr' }) +
+    '</div>';
+}
+
+function asmtRenderContactsStep() {
+    return '<div class="cyab-onb-grid">' +
+        _onbInput('Department lead', 'department_lead', 'contacts', { placeholder: 'Primary owner — name' }) +
+        _onbInput('Dept lead email', 'dept_lead_email', 'contacts', { type: 'email' }) +
+        _onbInput('Dept lead phone', 'dept_lead_phone', 'contacts', { type: 'tel' }) +
+        _onbInput('Dept deputy name', 'dept_deputy_name', 'contacts', { hint: 'Backup contact when the lead is unavailable' }) +
+        _onbInput('Dept deputy email', 'dept_deputy_email', 'contacts', { type: 'email' }) +
+        _onbInput('SOC team', 'soc_team', 'contacts') +
+        _onbInput('SOC lead', 'soc_lead', 'contacts') +
+        _onbInput('SOC lead email', 'soc_lead_email', 'contacts', { type: 'email' }) +
+        _onbInput('SOC analyst owner', 'soc_analyst_owner', 'contacts', { hint: 'Day-to-day analyst on this system' }) +
+    '</div>' +
+    '<div class="cyab-onb-field" style="margin-top:0.6rem;">' +
+        '<label>Stakeholder distribution list</label>' +
+        '<textarea data-slice="contacts" data-key="stakeholder_distribution" rows="2" placeholder="Comma- or semicolon-separated emails for incident notifications">' +
+            asmtEsc(asmtState.contacts.stakeholder_distribution) + '</textarea>' +
+    '</div>' +
+    '<div class="cyab-onb-field">' +
+        '<label>IR runbook URL</label>' +
+        '<input type="url" data-slice="contacts" data-key="ir_runbook_url" value="' +
+            asmtEsc(asmtState.contacts.ir_runbook_url) + '" placeholder="https://...">' +
+        '<div class="cyab-onb-hint">Direct link to the system-specific runbook in your IR documentation</div>' +
+    '</div>';
+}
+
+function asmtRenderAssessmentStep() {
+    var qs = (asmtState.schema && asmtState.schema.system_questions) || [];
+    if (qs.length === 0) {
+        return '<p style="color:var(--text-muted);font-size:0.8rem;">' +
+            'No assessment questions configured. Skip this step.</p>';
+    }
+    var html = '<p class="cyab-asmt-section-hint" style="margin-bottom:0.85rem;">' +
+        'Eight quick questions about this specific system. Answers refine the use-case ranking.</p>';
+    qs.forEach(function(q) {
+        var current = asmtState.assessmentResponses[q.key];
+        var optsHtml = (q.options || []).map(function(opt) {
+            var checked = current === opt.value;
+            return '<label class="' + (checked ? 'checked' : '') + '">' +
+                '<input type="radio" name="' + asmtEsc(q.key) + '" data-asmt-key="' +
+                asmtEsc(q.key) + '" value="' + asmtEsc(opt.value) + '"' +
+                (checked ? ' checked' : '') + '> ' +
+                '<span>' + asmtEsc(opt.label) + '</span>' +
+            '</label>';
+        }).join('');
+        html += '<div class="cyab-asmt-q">' +
+            '<p class="cyab-asmt-q-text">' + asmtEsc(q.text) + '</p>' +
+            '<div class="cyab-asmt-q-options">' + optsHtml + '</div>' +
+        '</div>';
+    });
+    return html;
+}
+
+function asmtRenderDataSourcesStep() {
+    var tpls = asmtState.templates || [];
+    var selected = new Set(asmtState.dataSources.map(function(d) { return d.template_id; }));
+    var html = '<p class="cyab-asmt-section-hint" style="margin-bottom:0.85rem;">' +
+        'Pick the data sources this system will provide. You can configure namespace + TIDE link per-source ' +
+        'after onboarding from the system detail page. Skipping is fine — add sources later.</p>';
+    if (tpls.length === 0) {
+        html += '<p style="color:var(--text-muted);font-size:0.8rem;">No templates available.</p>';
+        return html;
+    }
+    html += '<div class="cyab-onb-template-grid">';
+    tpls.forEach(function(t) {
+        var on = selected.has(t.id);
+        html += '<label class="cyab-onb-tpl-card' + (on ? ' selected' : '') + '">' +
+            '<input type="checkbox" data-tpl-id="' + asmtEsc(t.id) + '"' + (on ? ' checked' : '') + '>' +
+            '<div>' +
+                '<div class="cyab-onb-tpl-name">' + asmtEsc(t.name) + '</div>' +
+                '<div class="cyab-onb-tpl-meta">' +
+                    asmtEsc(t.data_source_type || '—') +
+                    ' · readiness ' + (t.readiness_score || 0) + '%' +
+                '</div>' +
+            '</div>' +
+        '</label>';
+    });
+    html += '</div>';
+    html += '<p style="font-size:0.7rem;color:var(--text-muted);margin-top:0.5rem;">' +
+        'Selected: <strong id="onb-tpl-count">' + asmtState.dataSources.length + '</strong></p>';
+    return html;
+}
+
+function asmtRenderGovernanceStep() {
+    var salOpts = [
+        { value: 'SAL-1', label: 'SAL-1 — Tier 1 (highest assurance)' },
+        { value: 'SAL-2', label: 'SAL-2 — Tier 2 (default)' },
+        { value: 'SAL-3', label: 'SAL-3 — Tier 3' },
+        { value: 'SAL-4', label: 'SAL-4 — Tier 4' },
+    ];
+    return '<div class="cyab-onb-grid">' +
+        _onbSelect('SAL tier (default)', 'sal_tier', 'governance', salOpts, {
+            hint: 'Per-source overrides can be set on each data source after onboarding'
+        }) +
+        _onbInput('Review cadence (days)', 'review_cadence_days', 'governance', {
+            type: 'number', hint: 'How often this baseline is re-reviewed. 90 days is typical.'
+        }) +
+        _onbInput('Next review date', 'next_review_date', 'governance', {
+            type: 'date', hint: 'Auto-set to today + cadence if blank'
+        }) +
+    '</div>';
+}
+
+function asmtRenderReviewStep() {
+    var i = asmtState.identity, c = asmtState.contacts, g = asmtState.governance;
+    var so = asmtState.signoff;
+    var dsCount = asmtState.dataSources.length;
+    var asmtCount = Object.keys(asmtState.assessmentResponses).length;
+    var summary =
+        '<div class="cyab-onb-summary">' +
+            '<div><span>Name</span><strong>' + asmtEsc(i.name || '—') + '</strong></div>' +
+            '<div><span>Department</span><strong>' + asmtEsc(i.department || '—') + '</strong></div>' +
+            '<div><span>Status</span><strong>' + asmtEsc(i.status) + '</strong></div>' +
+            '<div><span>Lead</span><strong>' + asmtEsc(c.department_lead || '—') +
+                (c.dept_lead_email ? ' <small>&lt;' + asmtEsc(c.dept_lead_email) + '&gt;</small>' : '') +
+            '</strong></div>' +
+            '<div><span>SOC owner</span><strong>' + asmtEsc(c.soc_analyst_owner || c.soc_lead || '—') + '</strong></div>' +
+            '<div><span>Data sources</span><strong>' + dsCount + ' selected</strong></div>' +
+            '<div><span>Assessment questions answered</span><strong>' + asmtCount + ' / ' +
+                ((asmtState.schema && asmtState.schema.system_questions || []).length) + '</strong></div>' +
+            '<div><span>Review cadence</span><strong>' + g.review_cadence_days + ' days</strong></div>' +
+        '</div>';
+    return summary +
+        '<h3 class="cyab-onb-subhead">Sign-off (optional)</h3>' +
+        '<p class="cyab-asmt-section-hint">Sign-off can be deferred — leaving this blank keeps the system in DRAFT status.</p>' +
+        '<div class="cyab-onb-grid">' +
+            _onbInput('Dept signed by (name)', 'sign_dept_name', 'signoff') +
+            _onbInput('Dept sign date', 'sign_dept_date', 'signoff', { type: 'date' }) +
+            _onbInput('SOC signed by (name)', 'sign_soc_name', 'signoff') +
+            _onbInput('SOC sign date', 'sign_soc_date', 'signoff', { type: 'date' }) +
+        '</div>';
+}
+
+// ── Step handler wiring ───────────────────────────────────────────────────
+function asmtAttachStepHandlers(kind) {
+    var body = document.getElementById('asmt-step-body');
+    // Generic slice-bound inputs (identity/contacts/governance/signoff)
+    body.querySelectorAll('[data-slice][data-key]').forEach(function(el) {
+        el.addEventListener('input', function() {
+            var slice = el.getAttribute('data-slice');
+            var key = el.getAttribute('data-key');
+            var v = el.value;
+            if (el.type === 'number') {
+                v = v === '' ? '' : Number(v);
             }
-            // Update visual checked state on labels
-            wrap.querySelectorAll('label').forEach(function(l) {
-                var i = l.querySelector('input');
-                if (i && i.checked) l.classList.add('checked');
-                else l.classList.remove('checked');
+            asmtState[slice][key] = v;
+        });
+    });
+    // Assessment radios
+    body.querySelectorAll('input[data-asmt-key]').forEach(function(el) {
+        el.addEventListener('change', function() {
+            var key = el.getAttribute('data-asmt-key');
+            asmtState.assessmentResponses[key] = el.value;
+            // Visual checked state on labels
+            body.querySelectorAll('input[data-asmt-key="' + key + '"]').forEach(function(i) {
+                var lbl = i.closest('label');
+                if (lbl) {
+                    if (i.checked) lbl.classList.add('checked');
+                    else lbl.classList.remove('checked');
+                }
             });
+        });
+    });
+    // Template card toggles
+    body.querySelectorAll('input[data-tpl-id]').forEach(function(el) {
+        el.addEventListener('change', function() {
+            var id = el.getAttribute('data-tpl-id');
+            var card = el.closest('.cyab-onb-tpl-card');
+            if (el.checked) {
+                if (!asmtState.dataSources.some(function(d) { return d.template_id === id; })) {
+                    asmtState.dataSources.push({ template_id: id });
+                }
+                if (card) card.classList.add('selected');
+            } else {
+                asmtState.dataSources = asmtState.dataSources.filter(function(d) {
+                    return d.template_id !== id;
+                });
+                if (card) card.classList.remove('selected');
+            }
+            var counter = document.getElementById('onb-tpl-count');
+            if (counter) counter.textContent = asmtState.dataSources.length;
         });
     });
 }
@@ -1482,56 +1680,99 @@ function asmtPrev() {
 window.asmtPrev = asmtPrev;
 
 async function asmtNext() {
-    if (asmtState.step < asmtState.sections.length - 1) {
+    var stepDef = asmtState.steps[asmtState.step];
+
+    // Step-specific validation. Identity is the only step with hard
+    // requirements — the system can't be created without name + dept.
+    if (stepDef.kind === 'identity') {
+        if (!asmtState.identity.name || !asmtState.identity.department) {
+            showToast('Name and department are required.', 'error');
+            return;
+        }
+    }
+
+    // Forward navigation
+    if (asmtState.step < asmtState.steps.length - 1) {
         asmtState.step++;
         asmtRenderStep();
         return;
     }
-    // Last step — submit
+
+    // Last step — POST to /onboarding (transactional create)
     var btn = document.getElementById('asmt-next-btn');
     btn.disabled = true;
-    btn.textContent = 'Submitting…';
+    btn.textContent = 'Onboarding…';
     try {
-        var res = await api.post('/api/cyab/assessment', { responses: asmtState.responses });
+        var i = asmtState.identity;
+        var c = asmtState.contacts;
+        var g = asmtState.governance;
+        var so = asmtState.signoff;
+        var payload = {
+            // identity
+            name: i.name, department: i.department,
+            business_unit: i.business_unit || null,
+            reference: i.reference || null,
+            version: i.version || '1.0',
+            status: i.status || 'DRAFT',
+            icon: i.icon || 'monitor',
+            tags: i.tags
+                ? i.tags.split(',').map(function(t) { return t.trim(); }).filter(Boolean)
+                : null,
+            data_classification: i.data_classification || null,
+            // contacts
+            department_lead: c.department_lead || null,
+            dept_lead_email: c.dept_lead_email || null,
+            dept_lead_phone: c.dept_lead_phone || null,
+            dept_deputy_name: c.dept_deputy_name || null,
+            dept_deputy_email: c.dept_deputy_email || null,
+            soc_team: c.soc_team || null,
+            soc_lead: c.soc_lead || null,
+            soc_lead_email: c.soc_lead_email || null,
+            soc_analyst_owner: c.soc_analyst_owner || null,
+            stakeholder_distribution: c.stakeholder_distribution || null,
+            ir_runbook_url: c.ir_runbook_url || null,
+            // assessment
+            assessment_responses: asmtState.assessmentResponses,
+            // data sources
+            data_sources: asmtState.dataSources,
+            // governance
+            sal_tier: g.sal_tier || 'SAL-2',
+            review_cadence_days: Number(g.review_cadence_days) || 90,
+            next_review_date: g.next_review_date || null,
+            // sign-off
+            sign_dept_name: so.sign_dept_name || null,
+            sign_dept_date: so.sign_dept_date || null,
+            sign_soc_name: so.sign_soc_name || null,
+            sign_soc_date: so.sign_soc_date || null,
+        };
+        var res = await api.post('/api/cyab/onboarding', payload);
         document.getElementById('asmt-wizard').style.display = 'none';
         document.getElementById('asmt-progress').style.display = 'none';
-        asmtRenderResults(res);
+        asmtRenderOnboardingResults(res);
+        showToast('System onboarded — created ' + res.data_sources_created +
+            ' data source(s) and computed ' + (res.ranked_use_cases || []).length +
+            ' ranked use cases.', 'success');
     } catch (e) {
-        showToast('Submit failed: ' + (e.message || e), 'error');
+        showToast('Onboarding failed: ' + (e.message || e), 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Submit ✓';
+        btn.textContent = 'Onboard system ✓';
     }
 }
 window.asmtNext = asmtNext;
 
-async function viewLatestResults() {
-    if (!asmtState._latest) return;
-    try {
-        // Re-fetch with results (the /latest endpoint already includes them
-        // but be defensive in case it was a cached metadata-only payload).
-        var res = await api.get('/api/cyab/assessment/' + asmtState._latest.id);
-        document.getElementById('asmt-latest-panel').style.display = 'none';
-        asmtRenderResults(res);
-    } catch (e) {
-        showToast('Failed to load results: ' + (e.message || e), 'error');
-    }
-}
-window.viewLatestResults = viewLatestResults;
-
-function asmtRenderResults(asmt) {
-    var ucs = asmt.ranked_use_cases || [];
-    var actors = asmt.ranked_actors || [];
-    var profile = asmt.computed_profile || {};
+function asmtRenderOnboardingResults(res) {
+    var ucs = res.ranked_use_cases || [];
+    var actors = res.ranked_actors || [];
 
     var ucHtml = ucs.length > 0
-        ? ucs.map(function(uc, i) {
+        ? ucs.map(function(uc, idx) {
             var reasons = (uc.reasons || []).map(function(r) {
                 return '<li>' + asmtEsc(r) + '</li>';
             }).join('');
             return '<div class="cyab-asmt-uc-card">' +
                 '<div class="cyab-asmt-uc-header">' +
-                    '<span class="cyab-asmt-uc-rank">#' + (i + 1) + '</span>' +
+                    '<span class="cyab-asmt-uc-rank">#' + (idx + 1) + '</span>' +
                     '<span class="cyab-asmt-uc-name">' + asmtEsc(uc.name || '') + '</span>' +
                     '<span class="cyab-asmt-uc-score">' + (uc.score || 0) + ' / 100</span>' +
                 '</div>' +
@@ -1543,42 +1784,28 @@ function asmtRenderResults(asmt) {
         }).join('')
         : '<p style="color:var(--text-muted);font-size:0.8rem;">No TIDE playbooks available — check TIDE connectivity in Integrations.</p>';
 
-    var actorsHtml = actors.length > 0
-        ? actors.map(function(a) {
-            return '<div class="cyab-asmt-actor-card">' +
-                '<div class="cyab-asmt-actor-name">' + asmtEsc(a.name || '') + '</div>' +
-                '<div class="cyab-asmt-actor-why">' + asmtEsc(a.why || '') + '</div>' +
-            '</div>';
-        }).join('')
-        : '';
-
-    var when = asmt.submitted_at ? new Date(asmt.submitted_at).toLocaleString() : '—';
-    var weakHtml = '';
-    if (profile.weak_controls && profile.weak_controls.length > 0) {
-        weakHtml = '<p style="font-size:0.78rem;color:var(--text-secondary);margin:0.5rem 0;">' +
-            'Weak/missing controls: ' + profile.weak_controls.map(function(w) {
-                return '<code>' + asmtEsc(w.replace('_weak','')) + '</code>';
-            }).join(', ') + '</p>';
-    }
+    var actorsHtml = actors.map(function(a) {
+        return '<div class="cyab-asmt-actor-card">' +
+            '<div class="cyab-asmt-actor-name">' + asmtEsc(a.name || '') + '</div>' +
+            '<div class="cyab-asmt-actor-why">' + asmtEsc(a.why || '') + '</div>' +
+        '</div>';
+    }).join('');
 
     var html =
         '<div class="cyab-asmt-results-section">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;flex-wrap:wrap;gap:0.5rem;">' +
                 '<div>' +
-                    '<h2>Profile snapshot</h2>' +
-                    '<p style="font-size:0.7rem;color:var(--text-muted);margin:0;">Submitted ' + asmtEsc(when) + '</p>' +
+                    '<h2>System onboarded ✓</h2>' +
+                    '<p style="font-size:0.7rem;color:var(--text-muted);margin:0;">' +
+                        asmtEsc(res.system_reference || '') +
+                        ' · ' + (res.data_sources_created || 0) + ' data source(s) created' +
+                    '</p>' +
                 '</div>' +
                 '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;">' +
-                    '<button onclick="startAssessment()" class="cyab-asmt-btn-secondary">Re-take</button>' +
-                    '<button onclick="closeAssessment()" class="cyab-asmt-btn-primary">Done</button>' +
+                    '<button onclick="openSystem(' + Number(res.system_id) + ')" class="cyab-asmt-btn-primary">Open system</button>' +
+                    '<button onclick="closeAssessment()" class="cyab-asmt-btn-secondary">Back to dashboard</button>' +
                 '</div>' +
             '</div>' +
-            '<p style="font-size:0.78rem;color:var(--text-secondary);margin:0;">' +
-                'Sector: <strong>' + asmtEsc(profile.sector || '—') + '</strong> · ' +
-                'Public profile: <strong>' + asmtEsc(profile.public_profile || '—') + '</strong> · ' +
-                'Stack platforms: <code>' + asmtEsc((profile.stack_platforms || []).join(', ') || '—') + '</code>' +
-            '</p>' +
-            weakHtml +
         '</div>' +
         '<div class="cyab-asmt-results-section">' +
             '<h2>Top use cases to focus on</h2>' +
@@ -1586,7 +1813,7 @@ function asmtRenderResults(asmt) {
         '</div>';
     if (actorsHtml) {
         html += '<div class="cyab-asmt-results-section">' +
-            '<h2>Threat actors most likely to target you</h2>' +
+            '<h2>Threat actors most likely to target this system</h2>' +
             actorsHtml +
         '</div>';
     }

@@ -1,5 +1,46 @@
 # Changelog
 
+## v0.10.17 (2026-04-27)
+
+### CyAB onboarding wizard — full system creation in one transaction
+
+The CyAB landing page now leads with **"Onboard a System"** (replaces v0.10.15's standalone "Assessment" button). It opens a six-step wizard that captures everything needed to bring a SOC system online — identity, contacts, system assessment, data sources, governance, and sign-off — and persists it all in a single transaction.
+
+The original simple **"New System"** modal stays as a **"Quick stub"** button for the power-user "just create the row, fill it in later" path.
+
+### Wizard steps
+
+| # | Step | Captures |
+|---|---|---|
+| 1 | **System identity** | Name, department, business unit, reference (auto-generated if blank), version, status (Draft/Active/Decommissioned), data classification, tags |
+| 2 | **Points of contact** | Department lead + email + phone, deputy + email, SOC team, SOC lead + email, SOC analyst owner, stakeholder distribution list, IR runbook URL |
+| 3 | **System assessment** | The 8 per-system questions (criticality, data sensitivity, internet-facing, user access, BYOD, MFA, segmentation, monitoring) |
+| 4 | **Data sources** | Multi-pick from the 13 pre-built templates (sysmon, Windows Security, firewall, EDR, etc.). Optional — submit zero is fine |
+| 5 | **Governance & SLA** | SAL tier default, review cadence days, next review date |
+| 6 | **Review & sign-off** | Summary preview + optional dept/SOC sign-off names + dates. Sign-off can be deferred — system created in DRAFT if blank |
+
+### Backend
+
+New endpoint `POST /api/cyab/onboarding` accepts a single JSON body and creates:
+- One `CyabSystem` row with all identity + contact + governance fields
+- N `CyabDataSource` rows from the chosen templates
+- One `CyabSystemAssessment` row scored against the latest org-wide assessment + this system's overlay
+- One initial `CyabSnapshot` so the trend chart has day-one data
+
+All four writes happen in one DB transaction. Failure rolls everything back. Returns the new `system_id`, ranked top-10 use cases, and ranked threat actors so the UI can land directly on the system detail page with results visible.
+
+### Schema additions to `CyabSystem` (10 nullable columns)
+
+Adds `business_unit`, `data_classification`, `dept_lead_email`, `dept_lead_phone`, `dept_deputy_name`, `dept_deputy_email`, `soc_lead_email`, `soc_analyst_owner`, `stakeholder_distribution` (Text), `ir_runbook_url`.
+
+Idempotent `ALTER TABLE ADD COLUMN` migration in `database.py` (matches existing pattern). All columns nullable so pre-v0.10.17 rows stay valid. `Base.metadata.create_all` handles fresh deployments.
+
+### Verification done locally
+Migration tested end-to-end on a populated database: dropped a column, restarted, confirmed the migration log fired (`Migrated: cyab_systems.business_unit`) and the column re-added without affecting existing rows.
+
+### Upgrade
+Drop in `ion:0.10.17`. No `.env` or compose changes required. New columns auto-add on first boot.
+
 ## v0.10.16 (2026-04-27) — HOTFIX
 
 ### Assessment endpoints 404'd in v0.10.15

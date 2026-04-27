@@ -697,6 +697,31 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: post_incident_reviews.linked_controls")
 
+    # v0.10.17: CyAB system gains onboarding metadata (contacts + business
+    # context). All nullable; pre-v0.10.17 rows stay valid. Idempotent —
+    # checks for column existence before each ALTER.
+    if insp.has_table("cyab_systems"):
+        existing = {col["name"] for col in insp.get_columns("cyab_systems")}
+        new_cols = {
+            "business_unit": "VARCHAR(255)",
+            "data_classification": "VARCHAR(64)",
+            "dept_lead_email": "VARCHAR(255)",
+            "dept_lead_phone": "VARCHAR(64)",
+            "dept_deputy_name": "VARCHAR(255)",
+            "dept_deputy_email": "VARCHAR(255)",
+            "soc_lead_email": "VARCHAR(255)",
+            "soc_analyst_owner": "VARCHAR(255)",
+            "stakeholder_distribution": "TEXT",
+            "ir_runbook_url": "VARCHAR(2048)",
+        }
+        for col_name, col_type in new_cols.items():
+            if col_name not in existing:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(f"ALTER TABLE cyab_systems ADD COLUMN {col_name} {col_type}")
+                    )
+                    logger.info("Migrated: cyab_systems.%s", col_name)
+
     # v0.10.11: Investigation gains prompt snapshot + raw response + key
     # observations so AIFeedback rows are debuggable (see what Bob saw, not
     # just whether he was right). Idempotent — checks for column existence

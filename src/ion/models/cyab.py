@@ -56,6 +56,20 @@ class CyabSystem(Base):
     version: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, default="1.0")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="DRAFT")
 
+    # v0.10.17: onboarding metadata. All nullable so existing rows stay
+    # valid; the wizard captures these on system creation but the legacy
+    # quick-create modal still works without setting them.
+    business_unit: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    data_classification: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    dept_lead_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    dept_lead_phone: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    dept_deputy_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    dept_deputy_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    soc_lead_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    soc_analyst_owner: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    stakeholder_distribution: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ir_runbook_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
+
     # Visual
     icon: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, default="monitor")
     tags: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array

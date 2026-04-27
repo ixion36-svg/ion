@@ -2494,3 +2494,223 @@ def get_latest_system_assessment(
     if not row:
         return {"assessment": None}
     return {"assessment": _serialise_assessment(row)}
+
+
+# ===========================================================================
+# v0.10.17 — Onboarding wizard: full system creation in one transaction
+#
+# POST /api/cyab/onboarding accepts a single JSON body that fully describes
+# a new CyAB system: identity, contacts, governance, an inline per-system
+# assessment, and a list of data sources to create from templates.
+#
+# Everything happens in one transaction — if any step fails the whole
+# onboarding rolls back. On success, the returned payload links to the
+# new system + its computed ranked use cases so the UI lands on the
+# detail page with the assessment already wired up.
+# ===========================================================================
+
+
+class OnboardingDataSource(BaseModel):
+    """One data-source request inside the onboarding payload.
+
+    `template_id` is the id from the cyab_templates catalogue (sysmon,
+    windows-security, firewall, etc). Optional `name_override`,
+    `tide_system_id`, and `data_namespace` let the wizard customise
+    per-source settings during creation.
+    """
+    template_id: str
+    name_override: Optional[str] = None
+    tide_system_id: Optional[str] = None
+    data_namespace: Optional[str] = None
+
+
+class OnboardingRequest(BaseModel):
+    # Step 1 — identity
+    name: str
+    department: str
+    reference: Optional[str] = None
+    version: Optional[str] = "1.0"
+    status: Optional[str] = "DRAFT"
+    icon: Optional[str] = "monitor"
+    tags: Optional[List[str]] = None
+    business_unit: Optional[str] = None
+    data_classification: Optional[str] = None
+
+    # Step 2 — contacts
+    department_lead: Optional[str] = None
+    dept_lead_email: Optional[str] = None
+    dept_lead_phone: Optional[str] = None
+    dept_deputy_name: Optional[str] = None
+    dept_deputy_email: Optional[str] = None
+    soc_team: Optional[str] = "Security Operations Center"
+    soc_lead: Optional[str] = None
+    soc_lead_email: Optional[str] = None
+    soc_analyst_owner: Optional[str] = None
+    stakeholder_distribution: Optional[str] = None
+    ir_runbook_url: Optional[str] = None
+
+    # Step 3 — system assessment (8 questions)
+    assessment_responses: Optional[dict] = None
+
+    # Step 4 — data sources
+    data_sources: List[OnboardingDataSource] = []
+
+    # Step 5 — governance / SLA defaults (applied when individual
+    # data-source overrides aren't set)
+    sal_tier: Optional[str] = "SAL-2"
+    review_cadence_days: Optional[int] = 90
+    next_review_date: Optional[str] = None
+
+    # Step 6 — sign-off (optional; system stays DRAFT if not signed)
+    sign_dept_name: Optional[str] = None
+    sign_dept_date: Optional[str] = None
+    sign_soc_name: Optional[str] = None
+    sign_soc_date: Optional[str] = None
+
+
+@router.post("/onboarding")
+def onboarding_create(
+    body: OnboardingRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Create a CyAB system + data sources + per-system assessment in one
+    transaction. Returns the new system's id and computed ranked use cases.
+
+    Roll-back semantics: any failure (including TIDE unreachable) does NOT
+    block the system create — it just yields an empty ranked-use-cases
+    list. Caller can re-run the assessment later from the system detail.
+    """
+    from ion.services.cyab_templates import get_template
+
+    # ── 1. CyabSystem ──────────────────────────────────────────────────────
+    # Auto-reference if not supplied — same SOC-SLA-{year}-{count} pattern as
+    # the simple New System path (kept for parity).
+    ref = body.reference
+    if not ref:
+        last = (
+            session.query(CyabSystem)
+            .order_by(CyabSystem.id.desc())
+            .first()
+        )
+        next_num = (last.id + 1) if last else 1
+        ref = f"SOC-SLA-{datetime.utcnow().year}-{next_num:03d}"
+
+    next_review = None
+    if body.next_review_date:
+        next_review = _parse_date(body.next_review_date)
+    elif body.review_cadence_days:
+        next_review = (datetime.utcnow().date() + timedelta(days=body.review_cadence_days))
+
+    sys = CyabSystem(
+        name=body.name,
+        department=body.department,
+        department_lead=body.department_lead,
+        soc_team=body.soc_team,
+        soc_lead=body.soc_lead,
+        reference=ref,
+        version=body.version or "1.0",
+        status=body.status or "DRAFT",
+        icon=body.icon or "monitor",
+        tags=json.dumps(body.tags) if body.tags else None,
+        business_unit=body.business_unit,
+        data_classification=body.data_classification,
+        dept_lead_email=body.dept_lead_email,
+        dept_lead_phone=body.dept_lead_phone,
+        dept_deputy_name=body.dept_deputy_name,
+        dept_deputy_email=body.dept_deputy_email,
+        soc_lead_email=body.soc_lead_email,
+        soc_analyst_owner=body.soc_analyst_owner,
+        stakeholder_distribution=body.stakeholder_distribution,
+        ir_runbook_url=body.ir_runbook_url,
+        sal_tier=body.sal_tier or "SAL-2",
+        review_cadence_days=body.review_cadence_days or 90,
+        next_review_date=next_review,
+        sign_dept_name=body.sign_dept_name,
+        sign_dept_date=_parse_date(body.sign_dept_date) if body.sign_dept_date else None,
+        sign_soc_name=body.sign_soc_name,
+        sign_soc_date=_parse_date(body.sign_soc_date) if body.sign_soc_date else None,
+        created_by=current_user.id if current_user else None,
+    )
+    session.add(sys)
+    session.flush()  # get sys.id for FK references
+
+    # ── 2. CyabDataSource[] from templates ─────────────────────────────────
+    created_ds_count = 0
+    for ds_req in (body.data_sources or []):
+        tpl = get_template(ds_req.template_id)
+        if not tpl:
+            # Skip unknown templates rather than fail the whole onboarding —
+            # a missing template id (typo, removed) shouldn't blow away
+            # the rest of a wizard submission.
+            continue
+        ds = CyabDataSource(
+            system_id=sys.id,
+            name=ds_req.name_override or tpl["name"],
+            data_source_type=tpl["data_source_type"],
+            icon=tpl["icon"],
+            sal_tier=tpl.get("sal_tier") or sys.sal_tier,
+            uptime_target=tpl.get("uptime_target"),
+            max_latency=tpl.get("max_latency"),
+            retention=tpl.get("retention"),
+            p1_sla=tpl.get("p1_sla"),
+            field_mapping=json.dumps(tpl["field_mapping"]),
+            field_mapping_score=tpl["field_mapping_score"],
+            mandatory_score=tpl["mandatory_score"],
+            readiness_score=tpl["readiness_score"],
+            field_notes=tpl.get("field_notes"),
+            tide_system_id=ds_req.tide_system_id,
+            data_namespace=ds_req.data_namespace,
+        )
+        session.add(ds)
+        created_ds_count += 1
+    session.flush()
+    session.refresh(sys)
+    # Recompute aggregate scores from the freshly-added sources.
+    _recalc_system_aggregates(sys)
+
+    # ── 3. CyabSystemAssessment + scoring ──────────────────────────────────
+    # Latest org-wide assessment is the baseline; this system's responses
+    # overlay on top of it.
+    org_row = _latest_org_assessment(session)
+    org_responses = (
+        cyab_assessment_service.parse_json_field(org_row.responses_json) or {}
+        if org_row else {}
+    )
+    sys_responses = body.assessment_responses or {}
+
+    playbooks = _resolve_playbooks()
+    scoring_result = cyab_assessment_service.rank_for_assessment(
+        responses=org_responses,
+        playbooks=playbooks,
+        sys_responses=sys_responses,
+    )
+
+    asmt_row = CyabSystemAssessment(
+        system_id=sys.id,
+        org_assessment_id=org_row.id if org_row else None,
+        schema_version=ASSESSMENT_SCHEMA_VERSION,
+        submitted_by=current_user.id if current_user else None,
+        responses_json=json.dumps(sys_responses, default=str),
+        computed_profile_json=json.dumps(scoring_result["computed_profile"], default=str),
+        ranked_use_cases_json=json.dumps(scoring_result["ranked_use_cases"], default=str),
+        ranked_actors_json=json.dumps(scoring_result["ranked_actors"], default=str),
+        notes=f"Captured during onboarding wizard for system #{sys.id}",
+    )
+    session.add(asmt_row)
+
+    # Initial snapshot — gives the trend chart something to show on day one.
+    _create_snapshot(session, sys, notes="Initial onboarding snapshot")
+
+    session.commit()
+    session.refresh(sys)
+    session.refresh(asmt_row)
+
+    return {
+        "system_id": sys.id,
+        "system_reference": sys.reference,
+        "data_sources_created": created_ds_count,
+        "assessment_id": asmt_row.id,
+        "ranked_use_cases": scoring_result["ranked_use_cases"],
+        "ranked_actors": scoring_result["ranked_actors"],
+    }
