@@ -1,5 +1,49 @@
 # Changelog
 
+## v0.11.6 (2026-04-27)
+
+### L1 Module 3 — Windows Event Logs
+
+Second curriculum ship at the v0.11.3 depth bar. **L1 Module 3 — Windows Event Logs** authored from a research-agent dossier covering channels, providers, the high-value Security event IDs, Sysmon, and canonical attacker patterns. ~10,000 words of curriculum content, 8 lessons (4 reading + 4 quiz), 23 quiz questions. Now lives on the existing `demo-l1-alert-triage-fundamentals` course as Module 3.
+
+#### Lesson breakdown
+
+| # | Title | Type | Words | Quiz qs |
+|---|---|---|---|---|
+| 3.1 | The Windows logging architecture and how it reaches ION | reading | ~2,200 | — |
+| 3.2 | Architecture quiz | quiz | — | 5 |
+| 3.3 | High-value Security channel event IDs | reading | ~2,800 | — |
+| 3.4 | Security event IDs — quiz | quiz | — | 6 |
+| 3.5 | Sysmon — the L1 superpower | reading | ~2,500 | — |
+| 3.6 | Sysmon recognition — quiz | quiz | — | 6 |
+| 3.7 | Triaging common attack patterns from raw events | reading | ~2,700 | — |
+| 3.8 | Attack patterns — quiz | quiz | — | 6 |
+
+Each reading lesson hits the v0.11.3 quality bar: explicit learning objectives + prerequisites, multiple Mermaid diagrams (10 across the module — flowcharts, sequence diagrams, decision trees), worked scenarios with full ECS field traces and ATT&CK technique mappings, KQL with line-by-line commentary, glossary, and references.
+
+#### Topics covered
+
+- **Architecture** — channels (Security, System, Application, Setup, Forwarded Events) vs providers, EVTX format, winlogbeat ECS normalisation, channel-to-index mapping, Windows Event Forwarding (WEF) source-initiated subscriptions
+- **Security event IDs** — the 4624/4625/4634/4647/4648/4672 logon cluster with all 11 LogonTypes, 4625 SubStatus codes (`0xC000006A` bad password, etc.), the 4720/4722/4724/4732/4738/4756 account/group cluster, Kerberos 4768/4769 with `TicketEncryptionType` Kerberoasting tells, NTLM 4776, audit log clearing 1102, service install 7045, command-line process creation 4688
+- **Sysmon** — provider/channel naming, SwiftOnSecurity vs Olaf Hartong baselines, the high-value event IDs (1, 3, 7, 8, 10, 11, 13, 22) with full ECS field mapping, `OriginalFileName` for renamed-binary detection, Mimikatz LSASS signature on Event 10
+- **Attack patterns** — Pass-the-Hash signatures (`AuthenticationPackageName: NTLM` for admin accounts), golden/silver ticket conceptual signals (4624 without 4768/4769 on DC), service install persistence with `ImagePath` heuristics, account-creation-then-group-add cluster, parent-child anomaly table (Office spawning shells, IIS spawning shells = webshell, lsass.exe spawning anything), DNS exfiltration via Sysmon 22
+
+22 ATT&CK technique mappings cited (T1078, T1110, T1021, T1550.002, T1558.001/002/003, T1003.001, T1059, T1218, T1036, T1071, T1041, T1574, T1055, T1486, T1547.001, T1543.003, T1505.003, T1070.001, T1566.001, T1059.005, T1110.003).
+
+#### Upgrade
+
+Drop in `ion:0.11.6`. Re-run the seeder to refresh course content (idempotent — wipes `demo-*` courses and re-seeds):
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
+After re-seed, browse `http://localhost:8000/courses/demo-l1-alert-triage-fundamentals` — Module 3 (Windows Event Logs) appears below Modules 1 and 2.
+
+#### What's next
+
+L1 Module 4 (Network Telemetry) → 5 (IOC Handling) → 6 (Phishing Triage) → 7 (Escalation Workflow) → 8 (Common ATT&CK), all using the same research-agent → dossier → curriculum pattern. Then L2 and L3 curricula. Then the Elastic Agent Skills integration we scoped earlier.
+
 ## v0.11.5 (2026-04-27)
 
 ### L1 Module 2 — SIEM Fundamentals (curriculum kick-off)

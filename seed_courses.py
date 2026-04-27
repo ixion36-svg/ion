@@ -1422,7 +1422,915 @@ This comment carries forward the timeline, the verbatim pivots, the IOCs, and th
         points=2,
     )
 
-    print(f"  L1: {course.title} — 2 modules, 11 lessons (Module 2 SIEM Fundamentals @ proper depth)")
+    # ── Module 3 — Windows Event Logs (v0.11.6) ──────────────────────────
+    # Authored at BTL1/SANS depth from research-agent dossier. ECS-first
+    # throughout; pairs every event ID discussion with the ATT&CK
+    # technique(s) it maps to.
+    mod3 = _add_module(
+        session, course, order=3,
+        title="Windows Event Logs",
+        description_md=(
+            "The single richest endpoint telemetry source on a tier-1 shift. "
+            "Channels and providers, the high-value Security event IDs, "
+            "Sysmon's enriched telemetry, and the canonical attacker patterns "
+            "you triage daily — pass-the-hash, persistence, suspicious service "
+            "installs, Office spawning shells, DNS exfiltration."
+        ),
+        estimated_minutes=200,
+    )
+
+    # Lesson 3.1 — architecture
+    m3l1 = _add_lesson(
+        session, mod3, order=1,
+        title="The Windows logging architecture and how it reaches ION",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Identify the standard Windows event channels (Security, System, Application, Setup, Forwarded Events) and the role each plays
+> 2. Explain the provider/channel relationship and how the same event can be authored by different providers
+> 3. Describe how `winlogbeat` reads EVTX channels and ships them to Elastic with ECS-compliant field names
+> 4. Define Windows Event Forwarding (WEF), distinguish it from agent-based shipping, and recognise forwarded events in ION
+> 5. Map a `winlog.channel` value to the ION/Elastic index pattern an analyst should query
+>
+> **Prerequisites.** Module 2 *SIEM Fundamentals* completed.
+
+## Channels, providers, and the EVTX format
+
+Modern Windows (Vista and later) uses the **Windows Event Log** service to host log data in **channels**. A channel is a named stream of events — `Security`, `System`, `Application`, `Setup`, and `Forwarded Events` are the five default *Windows Logs* channels every workstation and server has. Beyond those, hundreds of *Applications and Services Logs* channels exist under the `Microsoft-Windows-*` namespace: `Microsoft-Windows-Sysmon/Operational`, `Microsoft-Windows-PowerShell/Operational`, `Microsoft-Windows-TaskScheduler/Operational`, and so on. Each channel is backed by an EVTX file (`.evtx`) on disk under `%SystemRoot%\\System32\\Winevt\\Logs\\`.
+
+Every event has a **provider** — the component that authored the event — and a **channel** — the stream the event was written to. The provider for a 4624 logon event is `Microsoft-Windows-Security-Auditing`; the channel is `Security`. The provider for a Sysmon process-create is `Microsoft-Windows-Sysmon`; the channel is `Microsoft-Windows-Sysmon/Operational`. The same provider can write to multiple channels (operational, analytic, debug); the same channel can host events from multiple providers. In ION you'll see both surfaced as `winlog.provider_name` and `winlog.channel` in ECS.
+
+The EVTX format itself is binary, structured, and self-describing. Events have a fixed `System` block (TimeCreated, EventRecordID, EventID, Computer, SecurityID) and a variable `EventData` block whose schema depends on the EventID. This is why field names like `winlog.event_data.TargetUserName` and `winlog.event_data.LogonType` exist — the `event_data` map is the per-EventID payload, and the keys are the names defined in the provider's manifest.
+
+```mermaid
+flowchart LR
+    subgraph Endpoint[Windows Endpoint]
+        Provider1[Provider: Security-Auditing]
+        Provider2[Provider: Sysmon]
+        Provider3[Provider: PowerShell]
+        Channel1[Channel: Security]
+        Channel2[Channel: Sysmon/Operational]
+        Channel3[Channel: PowerShell/Operational]
+        EVTX[(EVTX files on disk)]
+        Provider1 --> Channel1
+        Provider2 --> Channel2
+        Provider3 --> Channel3
+        Channel1 --> EVTX
+        Channel2 --> EVTX
+        Channel3 --> EVTX
+    end
+    EVTX --> Winlogbeat
+    Winlogbeat -->|ECS-normalised JSON| Elastic[(Elasticsearch winlogbeat-*)]
+    Elastic --> ION[ION Triage UI]
+```
+
+**Worked example.** A successful interactive logon at the console of `WS-FINANCE-04` produces an event written by provider `Microsoft-Windows-Security-Auditing` to the `Security` channel with EventID `4624`. After winlogbeat ships it to Elastic, the document will have `winlog.provider_name: "Microsoft-Windows-Security-Auditing"`, `winlog.channel: "Security"`, `event.code: "4624"`, `winlog.event_data.LogonType: "2"`, `winlog.event_data.TargetUserName: "alice"`, and ECS-mirrored fields `user.name: "alice"` and `host.name: "ws-finance-04"`.
+
+## Winlogbeat, ECS, and channel-to-index mapping
+
+`winlogbeat` is the Elastic-published agent that subscribes to Windows event channels via the EvtSubscribe API and forwards records to Elasticsearch. In ION's deployment, the default `winlogbeat.yml` subscribes to at minimum: `Application`, `Security`, `System`, `Microsoft-Windows-Sysmon/Operational`, `Microsoft-Windows-PowerShell/Operational`, `Windows PowerShell`, `ForwardedEvents`. Each subscribed channel becomes a stream of documents indexed under the `winlogbeat-*` data view.
+
+Winlogbeat ships a fixed module set that performs **ECS normalisation** — it remaps native Windows field names to the Elastic Common Schema. So `EventData.SubjectUserName` becomes both `winlog.event_data.SubjectUserName` (preserved raw) and `user.name` (ECS-mapped). `Computer` becomes `host.name`. The TimeCreated SystemTime becomes `@timestamp`. `IpAddress` from a 4624 becomes `source.ip` when the LogonType implies a network logon. **Always prefer ECS field names in queries** because they are stable across data sources, but fall back to `winlog.event_data.*` when an attribute hasn't been ECS-promoted.
+
+In ION, channels do **not** get separate indices — every winlogbeat document lands in the same daily index (e.g. `winlogbeat-8.11.0-2026.04.23`) and is distinguished by `winlog.channel`. So a query for *"all Sysmon events on this host"* is `host.name : "ws-finance-04" and winlog.channel : "Microsoft-Windows-Sysmon/Operational"`, not a different index.
+
+### ECS field translation table
+
+| Native Windows field | winlogbeat raw field | ECS-mapped field |
+| --- | --- | --- |
+| `EventData.SubjectUserName` | `winlog.event_data.SubjectUserName` | `user.name` |
+| `EventData.IpAddress` (on 4624) | `winlog.event_data.IpAddress` | `source.ip` |
+| `EventData.TargetUserName` | `winlog.event_data.TargetUserName` | `user.target.name` |
+| `EventData.NewProcessName` (4688) | `winlog.event_data.NewProcessName` | `process.executable` |
+| `EventData.CommandLine` (4688/Sysmon 1) | `winlog.event_data.CommandLine` | `process.command_line` |
+| `Computer` | `winlog.computer_name` | `host.name` |
+| `EventID` | `winlog.event_id` | `event.code` |
+
+## Windows Event Forwarding (WEF)
+
+Native Windows event logs are local — they live on the host that generated them. Two strategies exist for centralising them:
+
+1. **Agent-based shipping** (winlogbeat, Splunk UF, NXLog) — each endpoint runs a process that reads its own EVTX and pushes records out
+2. **Windows Event Forwarding (WEF)** — a Microsoft-native mechanism where a *collector* server subscribes to events on remote *source* machines via WinRM, and the source pushes matching events to the collector's `ForwardedEvents` channel
+
+WEF subscriptions are configured via Group Policy or `wecutil` and identified by **subscription names** (e.g. `Security_Logs_Subscription`). Source-initiated subscriptions are the common production pattern — endpoints push to the collector after picking up GPO config — and are ideal for high-security zones where you can't run a third-party agent on every workstation. The downside: you need WinRM/HTTPS plumbing, certificate trust, and tuning of the XPath subscription queries to avoid forwarding everything.
+
+```mermaid
+flowchart LR
+    subgraph Sources[Source Endpoints]
+        S1[WS-001]
+        S2[WS-002]
+        S3[WS-003]
+    end
+    subgraph Collector[WEF Collector]
+        FwdChannel[Channel: ForwardedEvents]
+        WLB[winlogbeat]
+    end
+    S1 -->|WinRM HTTPS push| FwdChannel
+    S2 -->|WinRM HTTPS push| FwdChannel
+    S3 -->|WinRM HTTPS push| FwdChannel
+    FwdChannel --> WLB
+    WLB -->|host.name preserved| Elastic[(winlogbeat-*)]
+```
+
+In ION, forwarded events arrive in the collector's `ForwardedEvents` channel. Winlogbeat then ships them, and the document has `winlog.channel: "ForwardedEvents"` plus a preserved `winlog.computer_name` pointing at the *original source host* (not the collector). When triaging, **an L1 must read `winlog.computer_name` or `host.name` carefully** — the host that *generated* the event is what matters for the investigation, not the collector that relayed it.
+
+## KQL snippets
+
+```kql
+winlog.channel : "Security" and event.code : "4624"
+```
+- `winlog.channel` filters to the Security channel — discards Sysmon, PowerShell, System
+- `event.code` is the ECS-mapped EventID; using `event.code` (string) is preferred over `winlog.event_id` (integer) for stable cross-version queries
+
+```kql
+winlog.channel : "ForwardedEvents" and host.name : "dc01.corp.local"
+```
+- Filters to events that came through WEF specifically
+- `host.name` here is the *source* host (the endpoint that generated the event), preserved by winlogbeat — not the collector
+
+```kql
+event.code : "4624" and winlog.event_data.LogonType : "10" and not user.name : "alice"
+```
+- `LogonType 10` is RemoteInteractive (RDP)
+- The exclusion of `alice` shows pivoting by removing a known-good user during triage
+
+## Glossary
+
+- **Channel** — a named log stream Windows uses to organise events (Security, System, Sysmon/Operational, etc.)
+- **Provider** — the component that authors events (e.g. `Microsoft-Windows-Security-Auditing`)
+- **EVTX** — the binary file format used by Windows to store event logs on disk under `%SystemRoot%\\System32\\Winevt\\Logs\\`
+- **winlogbeat** — Elastic's official agent for shipping Windows event channels with ECS normalisation
+- **WEF** — Windows Event Forwarding; native Microsoft mechanism to centralise events to a collector via WinRM
+- **Collector** — the Windows server that receives forwarded events from sources and writes them to its `ForwardedEvents` channel
+- **Subscription** — a WEF configuration object defining which events from which sources to collect, expressed as an XPath query
+- **EventData** — the per-EventID payload block in an EVTX record, surfaced as `winlog.event_data.*`
+- **System block** — the fixed-schema header on every EVTX record (TimeCreated, EventID, Computer, etc.)
+- **WinRM** — Windows Remote Management; the WS-Management transport WEF uses
+- **Source-initiated subscription** — WEF mode where endpoints push to the collector based on GPO; standard production pattern
+
+## Further reading
+
+- Microsoft Learn — Windows Event Log overview: https://learn.microsoft.com/en-us/windows/win32/wes/windows-event-log
+- Microsoft Learn — Windows Event Forwarding for intrusion detection: https://learn.microsoft.com/en-us/windows/security/threat-protection/use-windows-event-forwarding-to-assist-in-intrusion-detection
+- Elastic — Winlogbeat reference: https://www.elastic.co/guide/en/beats/winlogbeat/current/index.html
+- Elastic Common Schema — Field reference: https://www.elastic.co/guide/en/ecs/current/ecs-field-reference.html
+- BTL1 — Windows Event Logs domain
+""",
+    )
+    m3l1q = _add_lesson(
+        session, mod3, order=2, title="Architecture quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Five questions on channels/providers, winlogbeat, ECS mapping, and WEF.",
+    )
+    _add_q(session, m3l1q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Which Windows component is the **provider** for a Sysmon process-create event?",
+        options=[
+            {"value": "security_auditing", "label": "Microsoft-Windows-Security-Auditing"},
+            {"value": "sysmon", "label": "Microsoft-Windows-Sysmon"},
+            {"value": "eventlog", "label": "Microsoft-Windows-Eventlog"},
+            {"value": "winlogbeat", "label": "winlogbeat"},
+        ],
+        correct="sysmon",
+        explanation_md="The provider is the component that authored the event. Sysmon authors its own events under the `Microsoft-Windows-Sysmon` provider into the `Microsoft-Windows-Sysmon/Operational` channel.",
+        points=2,
+    )
+    _add_q(session, m3l1q, order=2, kind=QuestionKind.SINGLE,
+        stem_md="A document in ION has `winlog.channel: \"ForwardedEvents\"` and `host.name: \"ws-hr-12\"`. Which host generated the original event?",
+        options=[
+            {"value": "collector", "label": "The WEF collector"},
+            {"value": "source", "label": "ws-hr-12"},
+            {"value": "ingest", "label": "The Elasticsearch ingest node"},
+            {"value": "winlogbeat_host", "label": "The winlogbeat host"},
+        ],
+        correct="source",
+        explanation_md="Winlogbeat preserves the source host's name in `host.name` (and `winlog.computer_name`) when shipping forwarded events. The `ForwardedEvents` channel is just the collection point on the collector; the originating host is `ws-hr-12`.",
+        points=2,
+    )
+    _add_q(session, m3l1q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="Each Windows event channel maps to a separate Elasticsearch index in a default ION winlogbeat deployment.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** All winlogbeat-shipped channels land in the same `winlogbeat-*` daily index. They are distinguished by the `winlog.channel` field, not by index name.",
+        points=1,
+    )
+    _add_q(session, m3l1q, order=4, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are true about ECS field mapping in winlogbeat?",
+        options=[
+            {"value": "target_user", "label": "winlog.event_data.TargetUserName becomes user.target.name"},
+            {"value": "ecs_stable", "label": "ECS field names are stable across data sources whereas winlog.event_data.* is per-EventID"},
+            {"value": "computer_event", "label": "The native Computer field maps to event.host"},
+            {"value": "ip_source", "label": "EventData.IpAddress on a 4624 maps to source.ip when the logon type implies a network source"},
+        ],
+        correct=["target_user", "ecs_stable", "ip_source"],
+        explanation_md="The ECS host field is `host.name`, not `event.host` — so the Computer-to-event.host claim is wrong. The other three are correct.",
+        points=3,
+    )
+    _add_q(session, m3l1q, order=5, kind=QuestionKind.SHORTANSWER,
+        stem_md="An analyst writes the query `winlog.event_id : 4624`. Why might this fail to return results, and what's the safer field to use?",
+        options=None,
+        correct=["event.code", "use event.code", "event.code is keyword", "event.code instead", "switch to event.code"],
+        explanation_md="`winlog.event_id` is sometimes indexed as keyword, sometimes as number, depending on winlogbeat version and pipeline; comparing a number to a keyword field can silently return zero hits. The ECS-mapped `event.code` is consistently a keyword string and should be the default.",
+        points=2,
+    )
+
+    # Lesson 3.2 — Security event IDs
+    m3l2 = _add_lesson(
+        session, mod3, order=3,
+        title="High-value Security channel event IDs",
+        lesson_type=LessonType.READING, duration_min=26,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Identify the 15-20 Security channel event IDs L1 must recognise on sight, and recall what each means
+> 2. Decode the LogonType field on 4624/4625 events and reason about logon context
+> 3. Distinguish Kerberos events (4768/4769) from NTLM events (4776) and identify the failure-code fields
+> 4. Recognise account- and group-management events (4720/4722/4724/4732/4738/4756) as a triage cluster
+> 5. Map every event ID covered to one or more MITRE ATT&CK techniques
+
+## Authentication events: the 4624 / 4625 / 4634 / 4647 / 4648 / 4672 cluster
+
+These six events are the bread and butter of identity-driven triage.
+
+A successful logon writes **4624 — An account was successfully logged on**. The most important field on a 4624 is `LogonType` (`winlog.event_data.LogonType`):
+
+| LogonType | Name | Meaning |
+| --- | --- | --- |
+| 2 | Interactive | At-keyboard / console logon |
+| 3 | Network | SMB, IPC$, network share — the **pass-the-hash favourite** |
+| 4 | Batch | Scheduled task |
+| 5 | Service | Service account starting a service |
+| 7 | Unlock | Workstation unlock |
+| 8 | NetworkCleartext | Network logon with cleartext password (basic auth, IIS) |
+| 9 | NewCredentials | runas /netonly |
+| 10 | RemoteInteractive | RDP |
+| 11 | CachedInteractive | Cached domain credentials (laptop offline) |
+
+A failed logon writes **4625 — An account failed to log on** with the same `LogonType` field plus a `Status` and `SubStatus`:
+
+- `0xC0000064` — user does not exist
+- `0xC000006A` — bad password
+- `0xC0000234` — account locked
+- `0xC0000072` — account disabled
+- `0xC0000193` — account expired
+
+A burst of 4625s with `SubStatus 0xC000006A` from one source IP against many usernames is **password spraying**. A burst against one username from many IPs is targeted brute force.
+
+**4634 — An account was logged off** and **4647 — User initiated logoff** complement 4624: 4647 is specifically a user clicking sign-out, while 4634 fires for service/network session teardowns. **4648 — A logon was attempted using explicit credentials** is the `runas` event — a process tried to authenticate as someone other than its current security context. 4648 with a high-privilege target user is a strong signal of credential-laundering or admin escalation.
+
+**4672 — Special privileges assigned to new logon** fires whenever a logon receives sensitive privileges (`SeDebugPrivilege`, `SeTcbPrivilege`, `SeBackupPrivilege`, etc.). Practically, every administrator logon produces a 4672 immediately after the corresponding 4624. A 4672 for a user account that *should not* be admin is a fast-pivot signal.
+
+**ATT&CK mapping.** 4624/4625 → **T1078** (Valid Accounts), **T1110** (Brute Force), **T1021** (Remote Services). 4648 → **T1078**, **T1550** (Use Alternate Authentication Material). 4672 → **T1078.003** (Local Accounts) when on a local privileged account.
+
+```mermaid
+flowchart TD
+    Logon[User attempts logon] --> Success{Auth result}
+    Success -->|Pass| E4624[4624 logged on]
+    Success -->|Fail| E4625[4625 failed]
+    E4624 --> Privs{Has admin privs?}
+    Privs -->|Yes| E4672[4672 special privs assigned]
+    Privs -->|No| Done[Standard session]
+    E4624 --> ExplicitCreds{runas / explicit creds?}
+    ExplicitCreds -->|Yes| E4648[4648 explicit cred logon]
+    Done --> Logoff{Session ends}
+    Logoff -->|User-initiated| E4647[4647 user logoff]
+    Logoff -->|System teardown| E4634[4634 logoff]
+```
+
+## Account, group, and Kerberos/NTLM events
+
+When an attacker establishes persistence, they often **create a user and add it to a privileged group**. The events to memorise as a cluster:
+
+- **4720** — A user account was created
+- **4722** — A user account was enabled
+- **4724** — An attempt was made to reset an account's password (admin reset, not user-driven)
+- **4738** — A user account was changed
+- **4732** — A member was added to a security-enabled local group
+- **4756** — A member was added to a security-enabled universal group (and **4728** for global groups)
+
+A 4720 followed within minutes by a 4732 against the local Administrators group (`TargetSid` ending in `-544`) is the canonical local-admin-persistence signature. Look for the `SubjectUserName` (who did it) and `TargetUserName` (the account being acted on).
+
+### Kerberos and NTLM authentication on the DC
+
+Three domain-controller-only events:
+
+- **4768 — A Kerberos authentication ticket (TGT) was requested** (the AS-REQ). Fields: `TargetUserName`, `IpAddress`, `TicketEncryptionType` (`0x12` = AES256, `0x17` = RC4 — RC4 is the **Kerberoasting tell**), `Status` (`0x6` = client unknown, `0x12` = client locked, `0x18` = bad password)
+- **4769 — A Kerberos service ticket was requested** (the TGS-REQ). Fields: `TargetUserName` (the *service account* the ticket targets, e.g. `MSSQLSVC/sql01`), `ServiceName`, `TicketEncryptionType` (RC4 here is **Kerberoasting**; AES is normal), `Status`
+- **4776 — The computer attempted to validate the credentials for an account** — NTLM authentication. Fields: `TargetUserName`, `Workstation` (source NetBIOS name), `Status` (same family as 4625)
+
+**4769 with `TicketEncryptionType: "0x17"` (RC4) for a service account** is the textbook Kerberoasting indicator (**T1558.003**) — attackers force RC4 because it's offline-crackable.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant DC as Domain Controller
+    participant FileSrv as File Server
+    Client->>DC: AS-REQ (request TGT)
+    DC->>DC: Log 4768 (TGT requested)
+    DC-->>Client: TGT
+    Client->>DC: TGS-REQ for cifs/fileserver
+    DC->>DC: Log 4769 (Service ticket requested)
+    DC-->>Client: TGS
+    Client->>FileSrv: SMB session with TGS
+    FileSrv->>FileSrv: Log 4624 LogonType 3
+    FileSrv->>FileSrv: Log 5140 share accessed
+```
+
+### Other high-value Security events
+
+- **5140 — A network share object was accessed** — fires when a user accesses an SMB share. Fields: `ShareName`, `ShareLocalPath`, `IpAddress`
+- **5145 — A network share object was checked** — much noisier, fires per-file. Filter aggressively
+- **1102 — The audit log was cleared** — single highest-priority event in the entire Security channel. Fires when someone runs `wevtutil cl Security` or otherwise clears the log. **T1070.001**. *Always* escalate
+- **7045 — A service was installed in the system** (System channel, technically). Fields: `ServiceName`, `ImagePath`, `ServiceType`, `StartType`. Suspicious `ImagePath` patterns: temp directories, double extensions, base64-laden powershell
+- **4688 — A new process has been created** — the native equivalent of Sysmon Event 1, but only includes `CommandLine` if the *Include command line in process creation events* GPO is enabled. Without the GPO, 4688 is much less useful than Sysmon 1
+
+## A worked triage walkthrough
+
+**Scenario.** An ION alert fires: *"10+ failed logons from one source IP in 60 seconds."* The KQL backing it:
+
+```kql
+event.code : "4625" and source.ip : "10.42.18.91"
+```
+
+The 12 hits all show:
+
+- `winlog.event_data.LogonType: "3"` — network logon
+- `winlog.event_data.SubStatus: "0xC000006A"` — bad password
+- `winlog.event_data.TargetUserName: "alice", "bob", "carol", ...` — twelve different usernames
+- `source.ip: "10.42.18.91"` — all from the same host
+
+**Interpretation.** One source IP, one bad-password substatus, twelve different usernames, all over network logon (SMB or similar). This is **password spraying** (T1110.003). The attacker is iterating usernames against (probably) one weak password.
+
+**Pivot 1 — did any spray succeed?**
+
+```kql
+event.code : "4624" and source.ip : "10.42.18.91" and winlog.event_data.LogonType : "3"
+```
+
+If you see a 4624 from the same `source.ip` within the same window, that's the **compromised account**.
+
+**Pivot 2 — what is `10.42.18.91`?** Cross-reference asset inventory and DHCP logs. If it's a domain-joined endpoint, the attacker has a foothold and is pivoting. If it's an unknown IP on the corporate VLAN, that's a rogue device.
+
+**Pivot 3 — if a 4624 succeeded, follow up with:**
+
+```kql
+host.name : "ws-finance-04" and event.code : ("4624" or "4672" or "4688") and @timestamp >= "2026-04-23T14:00:00Z"
+```
+
+…to see what the attacker did after the successful logon.
+
+**This pattern is the heart of L1.** Recognise the burst, classify the type (spray vs brute force), check for success, pivot to the source.
+
+## KQL snippets with line-by-line commentary
+
+```kql
+event.code : "4625" and winlog.event_data.LogonType : "3" and winlog.event_data.SubStatus : "0xC000006A"
+```
+- Network logon (`LogonType 3`) failures specifically for bad password
+- Excluding `0xC0000064` (user does not exist) reduces noise from username enumeration; this clause focuses on actual credential testing
+
+```kql
+event.code : "4769" and winlog.event_data.TicketEncryptionType : "0x17" and not winlog.event_data.TargetUserName : *$
+```
+- `0x17` is RC4-HMAC, which Kerberoasting tools force
+- Excluding usernames ending in `$` filters out machine accounts (which legitimately use weaker encryption in some cases)
+
+```kql
+event.code : "1102"
+```
+- The simplest and most important query in this lesson. `1102` is *audit log cleared.* Anyone clearing the security audit log on a production system gets investigated — full stop
+
+## Glossary
+
+- **LogonType** — integer field on 4624/4625 indicating logon method (2=interactive, 3=network, 10=RDP, etc.)
+- **SubStatus** — failure-detail code on 4625 (e.g. `0xC000006A` = bad password, `0xC0000064` = user not found)
+- **TGT** — Kerberos Ticket-Granting Ticket; obtained via AS-REQ (logged 4768)
+- **TGS** — Kerberos Ticket-Granting Service ticket; obtained via TGS-REQ (logged 4769)
+- **Kerberoasting** — credential-access technique (T1558.003) requesting RC4 service tickets to crack offline
+- **NTLM** — legacy challenge/response authentication; validation logged as 4776 on the validating DC
+- **TicketEncryptionType** — Kerberos ticket cipher (`0x12`=AES256, `0x17`=RC4); RC4 on 4769 is the Kerberoasting tell
+- **Special privileges** — sensitive Windows privileges (SeDebugPrivilege, SeBackupPrivilege, etc.) whose assignment fires 4672
+- **Explicit credentials** — credentials supplied at runtime via runas or RunAs API; logged as 4648
+- **Audit log clearing** — manual clearing of the Security log; produces 1102, near-universal red flag
+- **Service install** — registration of a new Windows service, logged as 7045 on System channel
+- **Network share access** — SMB share open, logged as 5140; per-object access is 5145 (noisy)
+
+## Further reading
+
+- Microsoft Learn — Audit Logon (4624/4625): https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/event-4624
+- Microsoft Learn — Audit Kerberos Authentication Service: https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/audit-kerberos-authentication-service
+- Microsoft Learn — Event 1102 audit log cleared: https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/event-1102
+- MITRE ATT&CK — T1110 Brute Force, T1558 Kerberos Tickets, T1070.001 Clear Windows Event Logs
+- SANS — Windows Logging Cheat Sheet (Malware Archaeology)
+""",
+    )
+    m3l2q = _add_lesson(
+        session, mod3, order=4, title="Security event IDs — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=10,
+        content_md="Six questions on LogonTypes, account/group cluster, Kerberos, and triage pivots.",
+    )
+    _add_q(session, m3l2q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A 4624 event has `LogonType: \"3\"` and `source.ip: \"10.4.5.99\"`. The source IP is a workstation, not a server. What is the most likely activity?",
+        options=[
+            {"value": "console", "label": "A user logged in at the console"},
+            {"value": "rdp", "label": "A user RDP'd in"},
+            {"value": "network_smb", "label": "A network logon from the workstation, e.g. SMB share access or pass-the-hash"},
+            {"value": "task", "label": "A scheduled task started"},
+        ],
+        correct="network_smb",
+        explanation_md="LogonType 3 is network logon. SMB share access, IPC$ enumeration, and pass-the-hash all produce LogonType 3 events. Console = LogonType 2; RDP = LogonType 10; scheduled task = LogonType 4.",
+        points=2,
+    )
+    _add_q(session, m3l2q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which events are typical signals of attacker persistence via account creation?",
+        options=[
+            {"value": "4720", "label": "4720 (account created)"},
+            {"value": "4732", "label": "4732 (member added to local group)"},
+            {"value": "4634", "label": "4634 (account logged off)"},
+            {"value": "4756", "label": "4756 (member added to universal group)"},
+            {"value": "4624", "label": "4624 (account logged on)"},
+        ],
+        correct=["4720", "4732", "4756"],
+        explanation_md="4720 then 4732/4756 is the canonical create-and-elevate pattern. 4634 is just logoff; 4624 is a logon and not specifically persistence by itself.",
+        points=3,
+    )
+    _add_q(session, m3l2q, order=3, kind=QuestionKind.SHORTANSWER,
+        stem_md="You see a 4769 with `TicketEncryptionType: \"0x17\"` and `TargetUserName: \"MSSQLSVC\"`. What's likely happening, and which ATT&CK technique applies?",
+        options=None,
+        correct=["Kerberoasting T1558.003", "Kerberoasting", "T1558.003 Kerberoasting", "T1558.003"],
+        explanation_md="RC4-HMAC service tickets for a service account is the textbook signature of Kerberoasting (**T1558.003**). The attacker has requested a service ticket they can crack offline because RC4 keys are derived directly from the service account's NT hash.",
+        points=2,
+    )
+    _add_q(session, m3l2q, order=4, kind=QuestionKind.SINGLE,
+        stem_md="Which event is the *highest-priority* by itself, with essentially no false-positive case?",
+        options=[
+            {"value": "4624", "label": "4624"},
+            {"value": "4625", "label": "4625"},
+            {"value": "1102", "label": "1102"},
+            {"value": "7045", "label": "7045"},
+        ],
+        correct="1102",
+        explanation_md="**1102** is *audit log cleared.* There is no legitimate operational reason for someone to manually clear a production Security log; it's almost always evidence-destruction (T1070.001). 7045 is high-value but has many legitimate cases (driver installs).",
+        points=2,
+    )
+    _add_q(session, m3l2q, order=5, kind=QuestionKind.SHORTANSWER,
+        stem_md="You're triaging a 4625 burst from `10.42.18.91` against 12 usernames with `SubStatus: \"0xC000006A\"`. State your next two pivots.",
+        options=None,
+        correct=["check 4624 from same source", "query 4624 same source.ip", "see if any logon succeeded, check asset inventory", "look for successful 4624, check who owns the IP"],
+        explanation_md="(1) Query `event.code : \"4624\" and source.ip : \"10.42.18.91\"` over the same window to see if any logon *succeeded*. (2) Cross-reference `10.42.18.91` against asset inventory / DHCP to identify the source host.",
+        points=2,
+    )
+    _add_q(session, m3l2q, order=6, kind=QuestionKind.TRUEFALSE,
+        stem_md="Event 4688 always includes the full process command line.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** 4688 only includes the `CommandLine` field if the GPO setting *Include command line in process creation events* is enabled. Many enterprises don't enable it (risk of credentials in command lines being logged). This is exactly why **Sysmon Event 1** — which always includes CommandLine and adds parent process and hash — is the L1's preferred process-create source.",
+        points=1,
+    )
+
+    # Lesson 3.3 — Sysmon
+    m3l3 = _add_lesson(
+        session, mod3, order=5,
+        title="Sysmon — the L1 superpower",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Explain what Sysmon is, how it differs from native Windows auditing, and why it's effectively mandatory in mature SOCs
+> 2. List the high-value Sysmon event IDs (1, 3, 7, 8, 10, 11, 13, 22) and describe what each captures
+> 3. Map common Sysmon fields (`Image`, `ParentImage`, `CommandLine`, `Hashes`, `OriginalFileName`) to ECS
+> 4. Recognise the SwiftOnSecurity and Olaf Hartong baseline configurations as the de-facto starting points
+> 5. Identify a typical Sysmon-driven detection (Office spawns shell, suspicious DNS query, code injection) from raw events
+
+## What Sysmon is and why it matters
+
+**Sysmon** (System Monitor) is a free Microsoft Sysinternals driver-and-service that augments Windows native auditing with vastly richer endpoint telemetry. Where native Windows logs tell you *"process X started"*, Sysmon tells you:
+
+> *"process X (hash `abc123`, parent `winword.exe`, original filename `powershell.exe`, signature `Microsoft Corporation`) started with command line `-enc JABjAD0AbgBlA…`, run by user `alice`, with an integrity level of `High`"*
+
+The richness gap is enormous, and most production detection logic in modern SOCs assumes Sysmon is present.
+
+Sysmon is configured by an XML configuration file. The two community-standard baselines are:
+
+- **SwiftOnSecurity / sysmon-config** — the original community baseline. Conservative, well-documented, focuses on attacker-relevant noise reduction
+- **Olaf Hartong / sysmon-modular** — modular baseline organised per ATT&CK technique. Richer, more granular, requires more tuning
+
+As an L1 you don't author Sysmon config — but you must understand that **the Sysmon channel is `Microsoft-Windows-Sysmon/Operational`** and that every Sysmon event arrives in ION at `winlog.channel: "Microsoft-Windows-Sysmon/Operational"` with `event.provider: "Microsoft-Windows-Sysmon"`.
+
+A Sysmon document also has its own internal event IDs, ranging from 1 to 28+. **The ones an L1 must memorise: 1, 3, 7, 8, 10, 11, 13, 22.**
+
+```mermaid
+flowchart TD
+    SysmonDriver[Sysmon driver] --> Channel[Microsoft-Windows-Sysmon/Operational]
+    Channel --> Winlogbeat
+    Winlogbeat --> ECS[ECS-mapped winlogbeat-*]
+    subgraph EventsCaptured[Events captured]
+        E1[ID 1 ProcessCreate]
+        E3[ID 3 NetworkConnect]
+        E7[ID 7 ImageLoaded]
+        E8[ID 8 CreateRemoteThread]
+        E10[ID 10 ProcessAccess]
+        E11[ID 11 FileCreate]
+        E13[ID 13 RegistryEvent]
+        E22[ID 22 DnsQuery]
+    end
+    SysmonDriver --> EventsCaptured
+```
+
+## The high-value Sysmon event IDs
+
+### Event ID 1 — Process Create
+
+The single most-queried event in any mature SOC. Fields:
+
+- `winlog.event_data.Image` → ECS `process.executable` (the new process)
+- `winlog.event_data.CommandLine` → ECS `process.command_line`
+- `winlog.event_data.ParentImage` → ECS `process.parent.executable`
+- `winlog.event_data.ParentCommandLine` → ECS `process.parent.command_line`
+- `winlog.event_data.Hashes` → contains MD5/SHA256/IMPHASH; ECS `process.hash.sha256` etc.
+- `winlog.event_data.OriginalFileName` → the PE's original filename from its version resource (catches **renamed binaries**)
+- `winlog.event_data.User` → ECS `user.name`
+- `winlog.event_data.IntegrityLevel` → process integrity (Low / Medium / High / System)
+
+**ATT&CK:** T1059 Command and Scripting Interpreter, T1218 Signed Binary Proxy Execution, T1036 Masquerading.
+
+### Event ID 3 — Network Connection
+
+A process initiated a network connection. Fields: `Image`, `SourceIp`, `SourcePort`, `DestinationIp`, `DestinationPort`, `DestinationHostname`, `Protocol`. **ATT&CK:** T1071, T1041.
+
+### Event ID 7 — Image Loaded
+
+A DLL was loaded by a process. Fields: `Image` (loader), `ImageLoaded` (the DLL), `Signed`, `Signature`, `SignatureStatus`. Heavily filtered by config because Windows loads thousands of DLLs constantly. **ATT&CK:** T1574, T1055.
+
+### Event ID 8 — CreateRemoteThread
+
+A process created a thread in another process — the textbook code-injection primitive. Fields: `SourceImage`, `TargetImage`, `StartAddress`. **ATT&CK:** T1055.003.
+
+### Event ID 10 — ProcessAccess
+
+A process opened a handle to another process. **The classic Mimikatz signature** is `SourceImage` of any process opening `lsass.exe` with `GrantedAccess` of `0x1410` or `0x1010` (PROCESS_VM_READ + PROCESS_QUERY_INFORMATION). **ATT&CK:** T1003.001 (LSASS Memory).
+
+### Event ID 11 — FileCreate
+
+A file was created or overwritten. Fields: `Image`, `TargetFilename`, `CreationUtcTime`. The classic ransomware tell is mass `TargetFilename` writes ending in unusual extensions. **ATT&CK:** T1486.
+
+### Event ID 13 — RegistryEvent (Value Set)
+
+A registry value was written. Fields: `EventType`, `TargetObject` (the registry path), `Details`. **Persistence-detection gold** — Run keys, Image File Execution Options, services, scheduled tasks. **ATT&CK:** T1547.001.
+
+### Event ID 22 — DnsQuery
+
+A process performed a DNS query. Fields: `Image`, `QueryName`, `QueryStatus`, `QueryResults`. The textbook DNS-exfiltration signature is long, high-entropy `QueryName` values at high frequency. **ATT&CK:** T1071.004, T1048.003.
+
+## A worked Sysmon triage
+
+**Scenario.** ION fires the alert *"Office product spawned a shell"* against `WS-FINANCE-04`:
+
+```kql
+winlog.channel : "Microsoft-Windows-Sysmon/Operational"
+and event.code : "1"
+and process.parent.executable : ("*\\\\winword.exe" or "*\\\\excel.exe" or "*\\\\outlook.exe")
+and process.executable : ("*\\\\powershell.exe" or "*\\\\cmd.exe" or "*\\\\wscript.exe")
+```
+
+The hit shows:
+
+- `process.parent.executable: "C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE"`
+- `process.executable: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"`
+- `process.command_line: "powershell.exe -nop -w hidden -enc JABjAD0AbgBlAHcALQBvAGIAagBlAGMAdAA…"`
+- `winlog.event_data.OriginalFileName: "PowerShell.EXE"`
+- `user.name: "alice"`
+- `winlog.event_data.IntegrityLevel: "Medium"`
+
+**Interpretation.** Word is the parent. PowerShell is the child. `-nop -w hidden -enc` is the standard *"hide and run base64"* pattern attackers use. The base64 blob is the encoded command. This is almost certainly a malicious macro execution (T1059.001 + T1566.001).
+
+```mermaid
+flowchart LR
+    Email[Phishing email] --> Word[winword.exe]
+    Word -->|Macro fires| PS[powershell.exe -enc ...]
+    PS -->|Sysmon 1| Detect1[Office spawns shell]
+    PS -->|Sysmon 22| Detect2[DNS query to C2]
+    PS -->|Sysmon 3| Detect3[Network connect to C2]
+    PS -->|Sysmon 11| Detect4[Drops payload to disk]
+    PS -->|Sysmon 13| Detect5[Persistence in Run key]
+```
+
+**Pivot 1 — what did PowerShell do?** Find subsequent Sysmon Events 3, 11, or 1 from PowerShell.
+
+**Pivot 2 — DNS queries.** Look at Sysmon 22 from the PowerShell process.
+
+**Pivot 3 — was the macro a delivered email?** Pivot to Outlook attachment write events and from there to email logs.
+
+**Disposition.** Almost always escalate. Containment runbook: isolate host, kill PowerShell, capture memory if possible, hand to L2/IR.
+
+## KQL snippets
+
+```kql
+event.code : "10"
+and process.target.executable : "*\\\\lsass.exe"
+and not process.executable : ("*\\\\MsMpEng.exe" or "*\\\\System32\\\\svchost.exe")
+```
+- Sysmon 10 (ProcessAccess) targeting LSASS — the credential-dumping signature
+- Excludes Defender (`MsMpEng.exe`) and svchost which legitimately query LSASS
+
+```kql
+event.code : "13"
+and winlog.event_data.TargetObject : ("*\\\\CurrentVersion\\\\Run\\\\*" or "*\\\\CurrentVersion\\\\RunOnce\\\\*")
+```
+- Sysmon 13 RegistryEvent on the classic Run keys — a primary persistence detection
+
+## Glossary
+
+- **Sysmon** — Sysinternals system-monitor driver/service emitting enriched endpoint telemetry beyond native Windows auditing
+- **Sysmon channel** — `Microsoft-Windows-Sysmon/Operational`
+- **Image** — Sysmon's term for the executable path of a process; ECS `process.executable`
+- **OriginalFileName** — PE version-resource original filename, used to detect renamed binaries
+- **Hashes** — Sysmon-computed MD5/SHA256/IMPHASH on process create and image load
+- **IntegrityLevel** — Windows process integrity (Low / Medium / High / System)
+- **CreateRemoteThread** — Sysmon Event 8; cross-process thread creation, code-injection primitive
+- **ProcessAccess** — Sysmon Event 10; opening a handle to another process, used by credential dumpers
+- **GrantedAccess** — bitmask on Sysmon 10 indicating what access rights were requested
+- **SwiftOnSecurity baseline** — community-standard Sysmon config, the conservative starting point
+- **sysmon-modular** — Olaf Hartong's modular Sysmon config set, organised by ATT&CK technique
+- **DnsQuery** — Sysmon Event 22; per-process DNS resolution capture, key for DNS-exfil detection
+
+## Further reading
+
+- Microsoft Sysinternals — Sysmon: https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon
+- SwiftOnSecurity / sysmon-config: https://github.com/SwiftOnSecurity/sysmon-config
+- Olaf Hartong / sysmon-modular: https://github.com/olafhartong/sysmon-modular
+- MITRE ATT&CK — T1003.001 OS Credential Dumping: LSASS Memory
+- MITRE ATT&CK — T1071.004 Application Layer Protocol: DNS
+""",
+    )
+    m3l3q = _add_lesson(
+        session, mod3, order=6, title="Sysmon recognition — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Six questions on Sysmon event IDs, fields, channel, and triage interpretation.",
+    )
+    _add_q(session, m3l3q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Which Sysmon event captures a process opening a handle to another process — the foundational Mimikatz-against-LSASS signature?",
+        options=[
+            {"value": "id1", "label": "Event ID 1"},
+            {"value": "id7", "label": "Event ID 7"},
+            {"value": "id10", "label": "Event ID 10"},
+            {"value": "id13", "label": "Event ID 13"},
+        ],
+        correct="id10",
+        explanation_md="**Event ID 10** is ProcessAccess, capturing handle-opens between processes. The Mimikatz signature is `SourceImage` opening `TargetImage: lsass.exe` with high `GrantedAccess` (often `0x1410` or `0x1010`).",
+        points=2,
+    )
+    _add_q(session, m3l3q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which Sysmon fields would you use to detect a *renamed* `powershell.exe`?",
+        options=[
+            {"value": "orig", "label": "winlog.event_data.OriginalFileName"},
+            {"value": "image", "label": "winlog.event_data.Image"},
+            {"value": "hashes", "label": "winlog.event_data.Hashes"},
+            {"value": "cmdline", "label": "winlog.event_data.CommandLine"},
+        ],
+        correct=["orig", "hashes"],
+        explanation_md="`OriginalFileName` is the PE version-resource original filename — `powershell.exe` even if the file on disk is `update.exe`. `Hashes` lets you match against known PowerShell SHA256s. `Image` is just the path to the renamed file (useless on its own); `CommandLine` is contextual but not definitive.",
+        points=3,
+    )
+    _add_q(session, m3l3q, order=3, kind=QuestionKind.SHORTANSWER,
+        stem_md="A Sysmon Event 1 fires with `ParentImage` of `outlook.exe`, `Image` of `wscript.exe`, and `CommandLine` of `wscript.exe C:\\Users\\bob\\AppData\\Local\\Temp\\invoice.vbs`. What is the most likely scenario and which ATT&CK technique applies?",
+        options=None,
+        correct=["T1566.001 spearphishing T1059.005 visual basic", "spearphishing attachment + visual basic", "T1566.001 + T1059.005", "phishing attachment running vbs"],
+        explanation_md="The user opened a `.vbs` attachment from Outlook. Outlook spawned wscript to execute the script. This is **T1566.001 Spearphishing Attachment + T1059.005 Visual Basic**.",
+        points=2,
+    )
+    _add_q(session, m3l3q, order=4, kind=QuestionKind.SINGLE,
+        stem_md="What is the `winlog.channel` value for Sysmon events?",
+        options=[
+            {"value": "sysmon_only", "label": "Sysmon"},
+            {"value": "provider_only", "label": "Microsoft-Windows-Sysmon"},
+            {"value": "channel_full", "label": "Microsoft-Windows-Sysmon/Operational"},
+            {"value": "security", "label": "Security"},
+        ],
+        correct="channel_full",
+        explanation_md="The full channel name is `Microsoft-Windows-Sysmon/Operational`. The provider is `Microsoft-Windows-Sysmon` but the channel includes the `/Operational` suffix.",
+        points=2,
+    )
+    _add_q(session, m3l3q, order=5, kind=QuestionKind.TRUEFALSE,
+        stem_md="Sysmon Event ID 1 always includes the parent process command line.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** Sysmon Event ID 1 includes both `CommandLine` and `ParentCommandLine`. This is one of the largest advantages over native 4688, which often lacks `CommandLine` entirely (and never has `ParentCommandLine`).",
+        points=1,
+    )
+    _add_q(session, m3l3q, order=6, kind=QuestionKind.SHORTANSWER,
+        stem_md="You see a Sysmon Event 22 with `QueryName: \"5a3b2c1d.exfil.attacker.com\"` from `powershell.exe` on a finance workstation. State your next two queries.",
+        options=None,
+        correct=["aggregate by query name and count, find parent of powershell", "stats count by dns name, sysmon 1 to find parent", "aggregate volume, then find parent process"],
+        explanation_md="(1) Aggregate Sysmon 22 by `dns.question.name` for the same host and process to estimate the DNS-tunnel volume. (2) Pivot to Sysmon Event 1 for the same host to identify the parent of `powershell.exe` and reconstruct how PowerShell was launched.",
+        points=2,
+    )
+
+    # Lesson 3.4 — Attack patterns
+    m3l4 = _add_lesson(
+        session, mod3, order=7,
+        title="Triaging common attack patterns from raw events",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Distinguish interactive, network, and remote-interactive logons by LogonType and reason about expected vs anomalous patterns
+> 2. Recognise pass-the-hash signatures from a 4624/4625 LogonType 3 + NTLM authentication package
+> 3. Identify the rough indicators of golden ticket and silver ticket abuse in 4624 / 4769 events
+> 4. Triage suspicious service installs (7045) using `ImagePath` heuristics
+> 5. Spot account-creation-then-group-add patterns and Office-spawns-shell parent-child anomalies
+> 6. Recognise DNS exfiltration via Sysmon Event 22
+
+## Logon-context triage and pass-the-hash
+
+The single most common L1 question is: *is this logon legitimate?* The answer almost always begins with the LogonType. A legitimate user at their workstation produces LogonType 2 (interactive) or 7 (unlock). A user RDP-ing in produces LogonType 10. A scheduled task produces 4. A service starting produces 5. **Anything else needs explanation.**
+
+**LogonType 3 (network) is where attackers live.** SMB, file shares, IPC$, WMI, PsExec, WinRM — all produce 4624 with LogonType 3. Most LogonType 3 events are completely legitimate (Group Policy refresh, browse to a share). The triage signal is *which user, from where, to where*. A workstation-to-workstation LogonType 3 with admin credentials is suspicious — workstations don't usually authenticate to each other. A service-account LogonType 3 from a client subnet to a server is normal.
+
+### Pass-the-Hash (T1550.002)
+
+PtH is the attack where an attacker has captured an NTLM hash and uses it to authenticate without knowing the cleartext password. The signatures:
+
+- 4624 with `LogonType: "3"` and `AuthenticationPackageName: "NTLM"` (rather than Kerberos)
+- `LogonProcessName: "NtLmSsp"`
+- Often paired with `KeyLength: "0"` (no Kerberos session key)
+- `TargetUserName` is a privileged account; `IpAddress` is a workstation, not a server
+
+In modern domains where Kerberos is the default, **NTLM logons to servers from workstation IPs are inherently suspicious** — especially for admin accounts.
+
+```kql
+event.code : "4624"
+and winlog.event_data.LogonType : "3"
+and winlog.event_data.AuthenticationPackageName : "NTLM"
+and winlog.event_data.TargetUserName : ("Administrator" or "*-adm" or "svc-*")
+```
+
+A clean enterprise can drop NTLM almost entirely with Kerberos-only policies, which makes any remaining NTLM logon stand out.
+
+```mermaid
+flowchart TD
+    Logon[4624 received] --> LType{LogonType}
+    LType -->|2 Interactive| Console[Expected at console]
+    LType -->|3 Network| Net{NTLM or Kerberos?}
+    LType -->|10 RDP| RDP[Check source IP and user]
+    Net -->|NTLM| NTLM{Privileged user?}
+    Net -->|Kerberos| Krb[Normal SMB / share access]
+    NTLM -->|Yes admin| PtH[Pass-the-Hash candidate]
+    NTLM -->|No| Investigate[Investigate source]
+    PtH --> Escalate[Escalate to L2]
+```
+
+**Worked example.** ION shows a 4624 on `FILESRV-01`. Fields: `LogonType: 3`, `AuthenticationPackageName: NTLM`, `TargetUserName: Administrator`, `IpAddress: 10.50.4.119`, `WorkstationName: ATTACKER-WIN`. The source IP belongs to a VLAN with helpdesk laptops; the `WorkstationName` is not a known asset name. **This is a textbook PtH attempt** — workstation-named source authenticating to a file server as Administrator over NTLM. Escalate, contain the file server, hunt the source workstation, and check 4768/4769 absence (PtH bypasses Kerberos by definition).
+
+## Golden tickets, silver tickets, and service-install persistence
+
+**Golden ticket (T1558.001)** is forging a TGT using the krbtgt account's hash. A real TGT comes from a 4768 on a DC. A golden ticket *did not* — it was forged offline. The signature: a 4624 on a member server using a Kerberos-signed token whose corresponding 4768 on the DC does not exist.
+
+**Silver ticket (T1558.002)** is forging a service ticket (TGS) using a service account's hash. Even more subtle — a silver ticket means the *DC is never contacted at all*. The 4624 on the targeted service host appears, but no 4769 fires on the DC.
+
+**L1 generally cannot conclusively detect golden or silver tickets** — these are L2 hunting territory. But L1 should **flag for escalation any high-privilege Kerberos logon that lacks corresponding 4768/4769 on the DC**, because that's the conceptual signal.
+
+### Service install persistence (T1543.003)
+
+When attackers establish persistence as SYSTEM, installing a service is one of the cleanest mechanisms. Event ID 7045 on the System channel fires. The triage heuristics on `ImagePath`:
+
+- Path in `%TEMP%`, `%APPDATA%`, `\\Users\\Public\\` → **suspicious**
+- Path that's a base64-encoded PowerShell command (`powershell -enc …`) → almost certainly malicious
+- `ImagePath` pointing to `cmd.exe /c …` → masqueraded service
+- Random-string service names (`Hyguafkj`, `WindowsHelper42`) → tooling tell (Cobalt Strike, Metasploit `psexec_psh`)
+
+```kql
+event.code : "7045"
+and (winlog.event_data.ImagePath : ("*\\\\Temp\\\\*" or "*\\\\AppData\\\\*" or "*powershell*-enc*" or "*\\\\Users\\\\Public\\\\*"))
+```
+
+### Account creation followed by group add
+
+The 4720 → 4732/4756 cluster discussed in Lesson 2 is the persistence pattern that L1 sees most often:
+
+```mermaid
+flowchart LR
+    A[4720 account created] --> B{Group add within 10m?}
+    B -->|4732 BUILTIN Admins| Persist1[Local admin persistence]
+    B -->|4756 Universal group| Persist2[Domain group persistence]
+    B -->|4728 Global group e.g. Domain Admins| Persist3[CRITICAL escalate now]
+    B -->|None| Watch[Continue monitoring]
+    Persist1 --> Esc[Escalate]
+    Persist2 --> Esc
+    Persist3 --> Esc
+```
+
+Any 4720 with the same `TargetUserName` followed within minutes by a 4732 against `BUILTIN\\Administrators` (SID `S-1-5-32-544`) or 4756/4728 against `Domain Admins` (`-512`) is an **immediate-escalate**.
+
+## Parent-child anomalies and DNS exfil
+
+**Parent-child anomalies** are the cleanest Sysmon-driven signal. A baseline of *what should never spawn what* gives high-fidelity detection:
+
+| Parent | Suspicious child |
+| --- | --- |
+| `winword.exe`, `excel.exe`, `outlook.exe`, `powerpnt.exe` | `cmd.exe`, `powershell.exe`, `wscript.exe`, `mshta.exe`, `regsvr32.exe` |
+| `mshta.exe`, `regsvr32.exe`, `wmic.exe` | `cmd.exe`, `powershell.exe` |
+| `services.exe` | anything in user-writable paths |
+| `svchost.exe` | `cmd.exe` or `powershell.exe` (rare; investigate) |
+| `lsass.exe` | any child (lsass should never spawn anything) |
+| `w3wp.exe` (IIS), `httpd.exe` | `cmd.exe`, `powershell.exe` (**webshell tell**) |
+
+The Office-spawns-shell example covered in Lesson 3 is the canonical. The IIS-spawns-shell row is the canonical webshell signature (T1505.003).
+
+### DNS exfiltration via Sysmon 22
+
+When attackers can't C2 over HTTP/HTTPS (egress-filtered networks), DNS is the fallback because almost all networks resolve outbound DNS. Tools like `dnscat2` and `iodine` encode payloads as long subdomains under an attacker-controlled domain. Signatures:
+
+- `dns.question.name` length consistently >50 chars
+- Subdomains base64- or hex-shaped (high entropy, mixed case)
+- Hundreds of queries per minute from a single process
+- Always to the same parent domain, varying subdomain
+- Process is unexpected for DNS (e.g. `powershell.exe` rather than `chrome.exe`)
+
+A workstation generating 200+ unique DNS names in a short window with a high cardinality from a single process is the smoke. Confirm by inspecting query lengths and entropy.
+
+## Glossary
+
+- **Pass-the-Hash (PtH)** — T1550.002, authenticating with an NTLM hash without the cleartext password
+- **Golden ticket** — T1558.001, forged TGT signed with the krbtgt hash
+- **Silver ticket** — T1558.002, forged TGS signed with the service account hash
+- **AuthenticationPackageName** — 4624 field indicating Kerberos / NTLM / Negotiate; NTLM for admin accounts is the PtH tell
+- **WorkstationName** — 4624 field carrying the NetBIOS name claimed by the source; attacker-controlled and often anomalous
+- **ImagePath** — 7045 field giving the binary path of an installed service; primary triage heuristic for malicious service installs
+- **Webshell** — server-side script enabling remote command execution via web requests; surfaces as `w3wp.exe` spawning shells in Sysmon 1
+- **DNS exfiltration** — encoding payload data in DNS queries; surfaces as long, high-entropy subdomains in Sysmon Event 22
+- **Parent-child anomaly** — process lineage that violates expected baselines (e.g. winword spawning powershell)
+- **LAPS** — Local Administrator Password Solution; rotates local admin passwords per host to break PtH lateral movement
+- **krbtgt** — special domain account whose hash signs TGTs; whoever steals it can forge golden tickets indefinitely
+- **Privileged group escalation** — adding an attacker-controlled account to BUILTIN\\Administrators (SID -544) or Domain Admins (-512); 4732/4756/4728
+
+## Further reading
+
+- MITRE ATT&CK — T1550.002 Pass the Hash: https://attack.mitre.org/techniques/T1550/002/
+- MITRE ATT&CK — T1558.001 Golden Ticket: https://attack.mitre.org/techniques/T1558/001/
+- MITRE ATT&CK — T1558.002 Silver Ticket: https://attack.mitre.org/techniques/T1558/002/
+- MITRE ATT&CK — T1543.003 Windows Service: https://attack.mitre.org/techniques/T1543/003/
+- MITRE ATT&CK — T1505.003 Web Shell: https://attack.mitre.org/techniques/T1505/003/
+- Microsoft Learn — Audit Process Creation (4688)
+""",
+    )
+    m3l4q = _add_lesson(
+        session, mod3, order=8, title="Attack patterns — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=10,
+        content_md="Six questions on PtH, persistence, parent-child anomalies, and DNS exfil.",
+    )
+    _add_q(session, m3l4q, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="A 4624 fires on `FILESRV-02` with `LogonType: \"3\"`, `AuthenticationPackageName: \"NTLM\"`, `TargetUserName: \"Administrator\"`, `IpAddress: \"10.50.4.119\"` (a workstation subnet), `WorkstationName: \"WS-CONTRACTOR-07\"`. What attack are you looking at?",
+        options=None,
+        correct=["pass-the-hash T1550.002", "pass the hash", "PtH T1550.002", "T1550.002", "Pass-the-Hash"],
+        explanation_md="**Pass-the-Hash (T1550.002).** NTLM authentication for the local Administrator account from a workstation source to a file server, in a domain that should default to Kerberos, is the textbook signature. Containment: isolate `FILESRV-02` and `WS-CONTRACTOR-07`, escalate to L2/IR.",
+        points=2,
+    )
+    _add_q(session, m3l4q, order=2, kind=QuestionKind.SINGLE,
+        stem_md="Which event ID directly indicates audit log tampering and should always be escalated?",
+        options=[
+            {"value": "4624", "label": "4624"},
+            {"value": "4688", "label": "4688"},
+            {"value": "1102", "label": "1102"},
+            {"value": "7045", "label": "7045"},
+        ],
+        correct="1102",
+        explanation_md="**1102** fires when the Security audit log is cleared. There is no legitimate operational reason for this on a production system; it's near-universally evidence destruction (T1070.001).",
+        points=2,
+    )
+    _add_q(session, m3l4q, order=3, kind=QuestionKind.MULTI,
+        stem_md="Which heuristics on a 7045 ImagePath are suspicious?",
+        options=[
+            {"value": "temp", "label": "Path under %TEMP%"},
+            {"value": "progfiles", "label": "Path under C:\\Program Files\\"},
+            {"value": "ps_enc", "label": "ImagePath containing powershell -enc"},
+            {"value": "cmd_c", "label": "ImagePath containing cmd.exe /c"},
+            {"value": "drivers_sys", "label": "Path ending in .sys under C:\\Windows\\System32\\drivers\\"},
+        ],
+        correct=["temp", "ps_enc", "cmd_c"],
+        explanation_md="Temp paths, encoded PowerShell, and cmd-as-service are all attacker-tooling tells. Program Files and System32 driver paths are normal install locations for legitimate vendor software.",
+        points=3,
+    )
+    _add_q(session, m3l4q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="You see a Sysmon Event 22 burst from `WS-FINANCE-04`: 480 DNS queries in 2 minutes from `powershell.exe`, all to `*.exfil.attacker.com`, with average subdomain length of 60 characters. What is happening?",
+        options=None,
+        correct=["DNS exfiltration T1071.004", "DNS C2 / exfil", "DNS tunnelling T1071.004", "DNS exfiltration"],
+        explanation_md="**DNS exfiltration via PowerShell to a C2 domain (T1071.004 + T1048.003).** The long subdomains are encoded payload chunks; the constant parent domain is the C2; the high query rate is the data-transfer pattern. Isolate the host immediately.",
+        points=2,
+    )
+    _add_q(session, m3l4q, order=5, kind=QuestionKind.TRUEFALSE,
+        stem_md="A legitimate Kerberos logon to a member server should always have a corresponding 4768/4769 on a domain controller around the same time.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True (mostly).** A legitimate Kerberos AS-REQ produces 4768 on the DC; a TGS-REQ produces 4769. A 4624 with Kerberos auth whose ticket lacks corresponding DC-side events is the conceptual signal of golden/silver ticket forgery. Caveat: ticket caching can produce a 4624 without a fresh 4768/4769 within a tight window, so absence over a short window is suspicious-not-conclusive.",
+        points=2,
+    )
+    _add_q(session, m3l4q, order=6, kind=QuestionKind.SHORTANSWER,
+        stem_md="You see a 4720 on `DC01` for new user `mssql_helper`, followed 4 minutes later by a 4732 adding the same user to `BUILTIN\\Administrators`. State your next two actions.",
+        options=None,
+        correct=["identify subjectusername actor, disable account, scope actor logons", "identify the actor, disable mssql_helper, escalate", "find SubjectUserName, pull actor 4624 logons, disable new account"],
+        explanation_md="(1) Identify the `SubjectUserName` (the account that performed the create+add) — that's the actor. (2) Disable the new `mssql_helper` account immediately, remove it from Administrators, and pull all 4624 logons by the actor account in the prior 24h to scope how the attacker got admin in the first place.",
+        points=2,
+    )
+
+    print(f"  L1: {course.title} — 3 modules, 19 lessons (Module 3 Windows Event Logs @ proper depth)")
     return course
 
 
