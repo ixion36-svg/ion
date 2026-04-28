@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.11.9 (2026-04-28)
+
+### L1 Module 6 — Phishing Triage
+
+Fifth curriculum ship at the v0.11.3 depth bar. **L1 Module 6 — Phishing Triage** authored from a research-agent dossier. ~10,000 words, 8 lessons (4 reading + 4 quiz), 15 quiz questions. Lives on the existing `demo-l1-alert-triage-fundamentals` course as Module 6.
+
+#### Lesson breakdown
+
+| # | Title | Type | Quiz qs |
+|---|---|---|---|
+| 6.1 | Phishing taxonomy and email authentication | reading | — |
+| 6.2 | Taxonomy & email auth — quiz | quiz | 4 |
+| 6.3 | Lure analysis, lookalike domains, and attachment + link triage | reading | — |
+| 6.4 | Lure & link triage — quiz | quiz | 3 |
+| 6.5 | Detection telemetry: email side, endpoint side, identity side | reading | — |
+| 6.6 | Telemetry & AiTM — quiz | quiz | 4 |
+| 6.7 | Reporting pipeline, decision framework, ATT&CK, and worked scenarios | reading | — |
+| 6.8 | Decision framework, ATT&CK & scenarios — quiz | quiz | 4 |
+
+#### Topics covered
+
+- **Taxonomy & email auth** — credential phishing, malware delivery, BEC (CEO fraud / vendor invoice redirect / payroll diversion), spear/whaling, smishing/vishing, **quishing** (QR-phishing), **consent phishing** (OAuth abuse), browser-in-the-browser, **AiTM** kits (Evilginx, EvilProxy, Tycoon 2FA), MFA fatigue / push bombing; RFC 5321 envelope vs RFC 5322 header From; reading the Received chain bottom-up; Authentication-Results / `compauth` interpretation; SPF (RFC 7208), DKIM (RFC 6376) including DKIM replay, DMARC (RFC 7489) alignment + policy, ARC (RFC 8617) for forwarders; the four spoofs none of SPF/DKIM/DMARC stops alone (display-name, lookalike, compromised legitimate sender, Reply-To swap)
+- **Lures & link triage** — pretext catalogue (HR / IT / voicemail / DocuSign / courier / invoice / Teams / calendar / captcha / QR), urgency–authority–scarcity psychology, brand-impersonation tells (display-name vs domain, hover-vs-display URL, favicon, footer), lookalike domain families (typosquat / combosquat / IDN homoglyph / TLD swap / sub-domain abuse) with worked Cyrillic-`о` example, risky file types (HTML smuggling, ISO/IMG/VHD MOTW bypass, .lnk, .one, weaponised PDF, .docm/.xlsm/.xll macros, .svg with script, password-protected zip, ClickOnce, .url SMB-cred-theft), URL reputation tooling (VT, urlscan.io, Hybrid Analysis, abuse.ch, OPSWAT), the **OPSEC submission rule** with per-victim-token handling, sandbox decision criteria
+- **Email + endpoint + identity telemetry** — Microsoft 365 Defender for Office 365 (Threat Explorer, Email Entity Page, Quarantine, ZAP, Submissions API), Exchange Message Trace fields + `Get-MessageTrace` PowerShell, Google Workspace Investigation Tool, EDR process trees rooted at `outlook.exe` / `<browser>.exe` / Office, Sysmon event-ID fingerprints (1/3/7/11/15/22/25), full ECS field-path map for phishing follow-on (`process.parent.name`, `url.original`, `email.from.address`, `dns.question.name`, `file.hash.sha256`), worked KQL + Lucene queries, **AiTM signal in Entra ID sign-in logs** (riskEventTypes_v2, sessionId reuse, `previouslySatisfied` MFA), Unified Audit Log events (`New-InboxRule`, `Set-Mailbox -ForwardingSmtpAddress`, `Add-MailboxPermission`, `Consent to application`), illicit OAuth grants and the risky scopes that demand escalation, the textbook post-takeover BEC inbox-rule pivot
+- **Pipeline, decisions, ATT&CK, scenarios** — user-reported phishing pipeline (PhishER, Cofense, Microsoft Report Message), confirmed-phish workflow (scope → pull → contain → IOC-pivot → 7-day hunt → submit), L1-vs-L2 authority boundaries, escalate/contain/close decision tree, ATT&CK mapping across **T1566.001/.002/.003/.004**, T1583.001 lookalike domains, **T1656** impersonation, T1027.006 HTML smuggling, **T1539** Steal Web Session Cookie, **T1098.005** Device Registration, T1556 Modify Authentication Process, **T1114.003** Email Forwarding Rule, T1621 MFA Request Generation, T1071.001/.004 C2; three full worked scenarios — **AiTM credential phish with token theft**, **HTML smuggling → ISO → LNK → loader**, **BEC vendor invoice redirect (no malware)**
+
+10 Mermaid diagrams across the module: SPF/DKIM/DMARC validation flow, AiTM kit topology, click-path process tree, post-confirmation containment checklist, triage decision tree.
+
+L1 course now sits at **6 modules / 43 lessons / 97 questions**.
+
+#### Upgrade
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
+Idempotent — wipes `demo-*` courses and re-seeds.
+
+---
+
 ## v0.11.8 (2026-04-27)
 
 ### L1 Module 5 — IOC Handling

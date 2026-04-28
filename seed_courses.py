@@ -4099,7 +4099,1099 @@ flowchart TD
         points=2,
     )
 
-    print(f"  L1: {course.title} — 5 modules, 35 lessons (Module 5 IOC Handling @ proper depth)")
+    # ── Module 6 — Phishing Triage ───────────────────────────────────────
+    # End-to-end phishing alert triage: taxonomy, email auth (SPF/DKIM/DMARC/
+    # ARC), lure analysis, attachment+link triage, gateway+EDR telemetry,
+    # AiTM/OAuth/MFA-fatigue specifics, user-reported pipeline, decision
+    # framework, ATT&CK mapping, three worked scenarios.
+    mod6 = _add_module(
+        session, course, order=6,
+        title="Phishing Triage",
+        description_md=(
+            "Working a phishing alert end-to-end as an L1: phishing "
+            "taxonomy (credential / malware / BEC / consent / AiTM / "
+            "quishing), the two `From` addresses and reading "
+            "Authentication-Results, lure analysis and lookalike "
+            "domains, attachment + link triage with OPSEC limits, "
+            "Microsoft 365 / Defender / EDR pivot patterns, the AiTM "
+            "session-cookie theft pattern, illicit OAuth consent and "
+            "post-takeover BEC, the user-reported phishing pipeline, "
+            "and a defensible escalate / contain / close decision."
+        ),
+        estimated_minutes=210,
+    )
+
+    # Lesson 6.1 — Phishing taxonomy & email anatomy
+    m6l1 = _add_lesson(
+        session, mod6, order=1,
+        title="Phishing taxonomy and email authentication",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Distinguish credential phishing, malware delivery, BEC, consent phishing, AiTM, smishing/vishing, and quishing — and explain why each produces a different triage workflow
+> 2. Read the difference between RFC 5321 envelope From and RFC 5322 header From, and describe what each lets an attacker spoof
+> 3. Walk a `Received:` chain bottom-up to find the first untrusted relay
+> 4. Interpret an `Authentication-Results:` header — SPF, DKIM, DMARC, compauth — and reason about what each does and does *not* prove
+> 5. Identify the four kinds of spoofing none of SPF/DKIM/DMARC stops on its own
+>
+> **Prerequisites.** Modules 1–5 (Alert Lifecycle, SIEM Fundamentals, Windows Event Logs, Network Telemetry, IOC Handling).
+
+## Why "phishing" is not one alert type
+
+The catch-all term *phishing* hides at least eight family-level patterns. For the L1, **the family matters because each produces a different set of artefacts and therefore a different triage workflow.** Misclassifying a Business Email Compromise (BEC) attempt as a generic credential phish leads the analyst to spend the first 15 minutes hunting URL reputation when there is no URL — and miss the wire-transfer fraud entirely.
+
+### Credential phishing (the classic)
+A lure email drives the user to a landing page that mimics a real login portal. Credentials POST to attacker infrastructure. Distinguishing signal: the link goes to a domain that is not the brand's real login origin (`login-microsoftonline.evilkit[.]xyz`, or a compromised WordPress under `/wp-content/plugins/<name>/login.html`). M365-themed kits dominate 2023–2025 volume — EvilProxy, NakedPages, Caffeine, Tycoon 2FA.
+
+### Malware delivery
+The lure carries a payload — attachment or download link — and the goal is execution on the endpoint. Distinguishing signal: a *file* artefact instead of, or alongside, a credential page. Common 2023–2025 delivery primitives: HTML smuggling that decodes a blob inside the browser, ISO/IMG/VHD containers that historically bypassed Mark-of-the-Web (MOTW), OneNote (`.one`) embedded scripts after Office macros were blocked by default, `.lnk` shortcuts inside containers, SVGs with embedded JavaScript.
+
+### Business Email Compromise (BEC)
+Pure social engineering. *No malware. No link.* A trusted-party impersonation that asks for a financial action. Three sub-patterns:
+
+- **CEO fraud / wire request** — *"Hi, are you at your desk? I need you to action a wire urgently. Confidential, only deal with me."* Lookalike domain or compromised CEO mailbox.
+- **Vendor invoice redirect** — vendor mailbox is compromised or spoofed; new banking details. *"Please update our remit-to."*
+- **Payroll diversion** — HR/Payroll is asked to change an employee's direct-deposit account before pay run.
+
+Distinguishing signal: no URL, no attachment (or a benign PDF), an unusual `Reply-To`, financial verbs in the body (*"wire", "ACH", "remit", "direct deposit", "swift"*).
+
+### Spear phishing vs whaling
+Spear phishing is targeted, low-volume, with personal/organisational details (manager's name, real project, real vendor). Whaling targets executives specifically. Distinguishing signal: one or two recipients, mid-week, mid-day, looks routine.
+
+### Smishing and vishing
+Phishing over SMS and voice. ATT&CK now tracks voice as **T1566.004 Spearphishing Voice**. The L1 rarely triages a vishing call directly but will see downstream effects (someone called IT pretending to be a user, password got reset, suspicious sign-in followed).
+
+### Quishing — QR phishing
+A QR code in an email (often inside a PDF or PNG attachment) encodes the malicious URL. This evades URL-rewriting and link-reputation engines that scan text but not images. The user scans with a *phone*, leaving the corporate-managed endpoint and entering an unmanaged channel. Distinguishing signal: the body is essentially *"scan the QR to view the document."*
+
+### Consent phishing (OAuth abuse)
+Instead of stealing a password, the attacker registers a malicious application and tricks the user into clicking **Accept** on an OAuth consent prompt. The app receives a long-lived refresh token with scopes like `Mail.Read`, `Mail.Send`, `offline_access`, `Files.ReadWrite.All`. *No password ever changes hands; MFA is bypassed because the user authorised the app.* This is why password resets alone *do not* remediate consent-phish — the analyst must revoke the OAuth grant.
+
+### Browser-in-the-Browser (BitB)
+The phishing landing page renders a *fake browser chrome* (address bar, lock icon, padlock favicon) inside the actual browser viewport. A user inspecting "the URL" sees a perfectly spelled `login.microsoftonline.com` — but it is HTML elements, not the real address bar.
+
+### AiTM / MFA-bypass kits
+Adversary-in-the-Middle reverse-proxy kits (Evilginx, EvilProxy, Modlishka, Tycoon 2FA, Mamba 2FA, Greatness) sit between the victim and the real login. The user authenticates *for real* against Microsoft, completes MFA *for real*, and the kit captures the resulting session cookie. The attacker then replays the cookie and skips MFA entirely on subsequent sessions. This is the dominant phishing pattern of 2024–2025 against MFA-protected tenants. Distinguishing signal: a real, successful MFA login from an unusual IP/UA shortly after the user clicked, often followed by an inbox rule and a new MFA method registration.
+
+### MFA fatigue / push bombing
+After credential capture, the attacker authenticates repeatedly so the user's authenticator app spams pushes until the user taps Approve to make it stop. Often combined with a vishing call from "IT" telling the user the prompts are legitimate.
+
+## Email anatomy: there are TWO `From` addresses
+
+The single most cited mistake in junior phishing triage is reading "From" off the rendered email and not looking at headers.
+
+### RFC 5321 envelope vs RFC 5322 header
+- **RFC 5321 envelope sender** (`5321.MailFrom`, *return path*) — used during the SMTP `MAIL FROM:` command. Tells receiving servers where to send a bounce.
+- **RFC 5322 header From** (`5322.From`) — what the user's client renders.
+
+These do not have to match. Mailchimp, SendGrid, and other legitimate platforms routinely have a `5321.MailFrom` of `bounces@mailchimp.com` and a `5322.From` of the customer's domain. Attackers exploit the same gap: spoof the visible header From while using a throwaway envelope sender that passes SPF for the throwaway domain.
+
+DMARC's job is to require *alignment* between these so an attacker cannot freely spoof the visible From — but DMARC only protects domains that publish it.
+
+### The Received chain
+Every relay along the path *prepends* a `Received:` header. The chain reads bottom-up (oldest at the bottom, freshest at the top). Walk from the bottom up until you reach a relay you don't recognise.
+
+```text
+Received: from BN8PR12MB3651.namprd12.prod.outlook.com (...) by ...
+ with HTTPS; Tue, 22 Apr 2026 09:14:11 +0000
+Received: from mail.attacker-relay.example (mail.attacker-relay.example
+ [203.0.113.42]) by mx0a-00069f02.pphosted.com (8.17.1.19/8.17.1.19)
+ with ESMTP id 4Y8m3...; Tue, 22 Apr 2026 09:13:58 +0000
+```
+
+The bottom relay injected the mail into your perimeter. `203.0.113.42` is the first thing the analyst should pivot on.
+
+### The Authentication-Results header (the gateway's verdict)
+Written by the first trusted hop. Reading it correctly is half the job. A clean pass:
+
+```text
+Authentication-Results: spf=pass (sender IP is 203.0.113.42)
+ smtp.mailfrom=bounces.acme-marketing.com;
+ dkim=pass (signature was verified) header.d=acme.com;
+ dmarc=pass action=none header.from=acme.com;
+ compauth=pass reason=100
+```
+
+A spoof:
+
+```text
+Authentication-Results: spf=fail (sender IP is 203.0.113.42)
+ smtp.mailfrom=acmе.com;          ← cyrillic 'е'
+ dkim=none (message not signed);
+ dmarc=fail action=quarantine header.from=acme.com;
+ compauth=fail reason=001
+```
+
+`compauth` is Microsoft's *composite authentication* result. `reason=100` is full pass; `reason=001` is explicit DMARC fail; `reason=000` means DMARC failed and policy was none/quarantine; `reason=130` is "passed implicit auth."
+
+## SPF, DKIM, DMARC, ARC — what each one actually proves
+
+### SPF (RFC 7208) — envelope-IP authorisation
+A DNS TXT record on the sending domain listing IPs authorised to send mail "from" that domain *at the envelope level*.
+
+`v=spf1 include:_spf.google.com include:spf.protection.outlook.com ip4:198.51.100.0/24 -all`
+
+| Result | Meaning |
+| --- | --- |
+| `pass` | IP explicitly authorised |
+| `fail` (`-all`) | Hard fail — should be rejected |
+| `softfail` (`~all`) | Probably not authorised; accept and mark |
+| `neutral` (`?all`) | Domain owner makes no assertion |
+| `none` | No SPF record published |
+| `permerror` / `temperror` | Lookup or syntax problem |
+
+**What SPF does not catch.** It checks the *envelope* (5321), not the visible From (5322), so an attacker can pass SPF for `attacker.com` while putting `header.from=ceo@yourcorp.com` in the message. SPF is also broken by forwarding (forwarder's IP isn't in your SPF) — which is why ARC exists.
+
+### DKIM (RFC 6376) — cryptographic signing
+The sending server signs selected headers + the body with a private key; a public key sits in DNS at `<selector>._domainkey.<domain>`. The receiver re-computes the signature.
+
+```text
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=acme.com; s=selector1; t=1714390451;
+ bh=YzNkN2YxYmE...; h=From:To:Subject:Date:Message-ID;
+ b=Hk2T9...sig...==
+```
+
+Fields the triager cares about:
+
+- `d=` — *signing* domain. DMARC alignment compares this to the header From.
+- `s=` — selector, lets a domain rotate keys (`selector1`, `mar2026`, etc.).
+- `bh=` — body hash. If anything along the path mutates the body, the hash breaks and DKIM fails.
+- `h=` — list of signed headers. Headers *not* in this list can be added or modified downstream without breaking the signature.
+
+**DKIM replay** — the 2023+ trick: an attacker captures a legitimately DKIM-signed message and re-injects it from their own infrastructure to new recipients. Body and headers unchanged, DKIM still passes. Defenders increasingly pin oversigning and short key TTLs.
+
+### DMARC (RFC 7489) — alignment + policy
+DMARC ties SPF and DKIM together by requiring that *at least one* passes *and aligns* with the header From.
+
+`_dmarc.acme.com TXT "v=DMARC1; p=reject; rua=mailto:dmarc@acme.com; pct=100; adkim=s; aspf=s"`
+
+- `p=` — policy: `none` (monitor) / `quarantine` / `reject`.
+- `adkim=` / `aspf=` — alignment: `s` strict (exact match) or `r` relaxed (organisational domain).
+- `pct=` — percentage of mail policy applies to (used during rollout).
+- `rua=` — aggregate reports.
+- `ruf=` — forensic per-message reports (most senders ignore due to privacy).
+
+**What DMARC does:** stops naive header-From spoofing of a DMARC-protected domain. **What it does not:** stop lookalike domains, display-name spoofing, compromised legitimate accounts, or messages from domains that don't publish DMARC. A cousin-domain attack like `acme-billing.com` will pass DMARC for *its own* domain perfectly happily.
+
+### ARC (RFC 8617) — preserving auth across forwarders
+When mail is forwarded (mailing list, alias), the forwarding server can rewrite the message and break SPF/DKIM. ARC lets the forwarder seal the original auth result so the next hop can still trust it. Headers: `ARC-Authentication-Results`, `ARC-Message-Signature`, `ARC-Seal`. If the gateway trusts the forwarder, an ARC-pass can override a downstream SPF fail.
+
+## SPF / DKIM / DMARC validation flow
+
+```mermaid
+flowchart TD
+    A[Inbound message] --> B{SPF check<br/>5321.MailFrom IP authorised?}
+    A --> C{DKIM check<br/>signature valid?}
+    B -->|pass| D[SPF aligned with<br/>header.from?]
+    C -->|pass| E[DKIM d= aligned with<br/>header.from?]
+    D -->|yes| F[DMARC pass]
+    E -->|yes| F
+    D -->|no| G{Either aligned?}
+    E -->|no| G
+    B -->|fail| G
+    C -->|fail| G
+    G -->|no| H[DMARC fail<br/>apply p= policy]
+    F --> I[Deliver]
+    H --> J{p= ?}
+    J -->|reject| K[Reject]
+    J -->|quarantine| L[Junk]
+    J -->|none| M[Deliver + report]
+```
+
+## What an attacker can spoof past auth
+
+- **Display-name only** — *"Mike Boss <attacker@gmail.com>"*. Nothing in SPF/DKIM/DMARC stops this; DMARC only protects the domain part.
+- **Lookalike domains** — `rnicrosoft.com`, `acme.co` not `.com`, `acmе.com` (IDN). These pass auth for *their own* domain.
+- **Compromised legitimate sender** — vendor mailbox takeover. SPF/DKIM/DMARC all pass; only behaviour gives it away.
+- **Reply-To swap** — `From: boss@yourcorp.com`, `Reply-To: boss.private@gmail.com`. Auth on the From passes; conversation gets diverted on reply.
+
+## Glossary
+
+- **5321.MailFrom / 5322.From** — envelope vs header sender; an attacker controls the latter more freely than the former unless DMARC enforces alignment.
+- **SPF / DKIM / DMARC / ARC** — IP authorisation / signature / alignment-and-policy / forwarder-preserved auth chain.
+- **compauth** — Microsoft's composite authentication verdict in the Authentication-Results header.
+- **AiTM / consent / quishing / BEC** — phishing families with materially different triage workflows.
+
+## Further reading
+
+- RFCs 5321, 5322, 7208, 6376, 7489, 8617 — read the headers reference if you take only one thing.
+- Microsoft Learn — *Anti-spam message headers in Microsoft 365* (compauth reasons reference).
+""",
+    )
+    m6l1q = _add_lesson(
+        session, mod6, order=2, title="Taxonomy & email auth — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on phishing family identification, envelope-vs-header From, what DMARC does and doesn't stop, and reading a Received chain.",
+    )
+    _add_q(session, m6l1q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Finance flags an email apparently from a known vendor asking AP to update banking details before next week's payment run. The message has no URL and no attachment, the SPF/DKIM/DMARC line shows `dmarc=fail action=quarantine header.from=acme.com` but the message was delivered, and the `Reply-To` differs from the visible `From`. Which phishing family does this best fit?",
+        options=[
+            {"value": "cred", "label": "Credential phishing"},
+            {"value": "malware", "label": "Malware delivery"},
+            {"value": "bec", "label": "BEC vendor invoice redirect"},
+            {"value": "consent", "label": "OAuth consent phishing"},
+        ],
+        correct="bec",
+        explanation_md="No URL + no attachment + financial verb + lookalike sender domain + Reply-To swap is the BEC vendor-invoice-redirect signature. The other families would each leave a different artefact (a credential page, a payload, an OAuth grant).",
+        points=2,
+    )
+    _add_q(session, m6l1q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *not* stopped by SPF/DKIM/DMARC alone, even when all three pass?",
+        options=[
+            {"value": "displayname", "label": "Display-name spoof using a free Gmail address"},
+            {"value": "lookalike", "label": "A lookalike domain like `rnicrosoft.com` that publishes its own SPF and DKIM"},
+            {"value": "compromised", "label": "Mail sent from a compromised legitimate vendor mailbox"},
+            {"value": "headerfrom", "label": "Naive header-From spoof of a DMARC-protected domain"},
+            {"value": "replyto", "label": "Reply-To swap on an otherwise-aligned message"},
+        ],
+        correct=["displayname", "lookalike", "compromised", "replyto"],
+        explanation_md="DMARC stops only naive header-From spoofing of *its own* domain. Display-name spoofs, lookalike domains (which auth for themselves), takeovers of legitimate senders, and Reply-To swaps all pass auth checks happily.",
+        points=3,
+    )
+    _add_q(session, m6l1q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="Resetting the user's password fully remediates a successful OAuth consent phishing attack because the attacker's app cannot continue to access the mailbox once the password changes.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** Consent phishing issues the malicious app a *refresh token* tied to the granted OAuth permissions. The token is independent of the user's password — the app keeps reading mail until the *grant itself* is revoked.",
+        points=2,
+    )
+    _add_q(session, m6l1q, order=4, kind=QuestionKind.SINGLE,
+        stem_md="You're walking the `Received:` chain on a suspicious email and want to identify the IP that *injected* the message into your perimeter. Which entry should you focus on?",
+        options=[
+            {"value": "top", "label": "The top-most `Received:` header (most recent)"},
+            {"value": "bottom", "label": "The bottom-most `Received:` header (oldest, the first untrusted relay)"},
+            {"value": "rp", "label": "The Return-Path header"},
+            {"value": "auth", "label": "The Authentication-Results header"},
+        ],
+        correct="bottom",
+        explanation_md="Each relay *prepends* a Received header, so the chain is read bottom-up. The bottom-most entry is the oldest hop and is what actually injected the mail into your perimeter — that IP is the first pivot.",
+        points=2,
+    )
+
+    # Lesson 6.2 — Lure and link/attachment triage
+    m6l2 = _add_lesson(
+        session, mod6, order=3,
+        title="Lure analysis, lookalike domains, and attachment + link triage",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Recognise the common pretext families and the psychological levers (urgency, authority, scarcity) lures press
+> 2. Spot brand-impersonation tells: display-name vs domain mismatch, hover URL vs displayed URL, lookalike domains via typosquat / combosquat / IDN homoglyph
+> 3. Catalogue risky file types delivered in phishing — HTML smuggling, ISO/IMG/VHD, .lnk, .one, weaponised PDFs, .svg with script — and what to look for in each
+> 4. Use URL reputation tooling — VirusTotal, urlscan.io, Hybrid Analysis, abuse.ch — and apply the **OPSEC submission rule** so you don't tip off a targeted attacker
+> 5. Decide when to detonate in a sandbox versus rely on static analysis
+
+## Common pretexts
+
+The lure landscape rotates seasonally but the categories are stable:
+
+- **HR / payroll** — *"your direct deposit has been updated", "review the new handbook", "tax form correction"*.
+- **IT / M365** — *"your password expires in 24 hours", "storage quota exceeded", "MFA re-registration required", "new sign-in detected"*.
+- **Voicemail / fax / scan** — *"you have a new voicemail from +44 ..."*, attached PDF/HTML.
+- **DocuSign / Adobe Sign / OneDrive / SharePoint** — *"Mike shared a document with you"*.
+- **Courier** — *"DHL/FedEx/USPS — package held, click to schedule redelivery"*.
+- **Invoice / quote / PO** — finance-flavoured attachments.
+- **Teams / Slack chat** — out-of-band IM linking to a phishing page (rising fast as tenants enable external Teams chat).
+- **Calendar invite** — Google Calendar / Outlook ICS from an unknown sender, body contains the lure.
+- **Captcha / "verify you're human"** — first hop to defeat URL crawlers; the captcha proves a human is on the page, then redirects.
+- **QR code attachment** — message is essentially a single PNG/PDF telling the user to scan.
+
+## Urgency, authority, scarcity
+
+Lures press the same psychological levers social engineering has always pressed:
+
+- **Urgency** — *"today", "in the next 30 minutes"*.
+- **Authority** — *"from the CEO", "from IT"*.
+- **Fear** — *"your account will be locked", "legal action"*.
+- **Scarcity** — *"only 5 spots", "expires"*.
+
+Triage heuristic: *if the email asks the user to do something quickly and outside the normal channel, treat it as suspicious until proven otherwise.*
+
+## Brand impersonation tells
+
+- **Display name vs From domain** — *"Microsoft 365 Security <noreply@account-security-portal.xyz>"*.
+- **Hover URL ≠ displayed URL** — visible text says `https://login.microsoftonline.com`, hover reveals `https://o365-secure-login.azurewebsites.net/...`. Cloud hosts (Azure Web Apps, Cloudflare Workers, Vercel, GitHub Pages) inherit a trusted parent domain and are commonly abused.
+- **Favicon mismatch** — landing page favicon missing or pixelated. Modern kits fix this, so *its absence is not exonerating.*
+- **Logo as inline base64** — many kits embed the logo to avoid hot-link signatures.
+- **Footer details** — copy-pasted boilerplate, wrong copyright year, wrong support phone, wrong physical address.
+
+## Lookalike domains
+
+- **Typosquats** — `mircosoft.com`, `goggle.com`, `paypa1.com` (digit 1 for letter `l`).
+- **Combosquats** — `microsoft-login.com`, `acme-billing-portal.com`, `office365-secure.net`. Brand is present with extra tokens.
+- **Homoglyph / IDN / punycode** — Unicode characters that *render* like ASCII: Cyrillic `а` (U+0430) for Latin `a`, Greek `ο` for Latin `o`. The ACE encoding (`xn--...`) gives it away in headers. Tooling: `dnstwist`, `urlcrazy`, Defender's "Look-alike Domain" detection.
+- **TLD swap** — `acme.co`, `acme.io`, `acme.app` when the real one is `acme.com`.
+- **Sub-domain abuse** — `acme.com.evilkit.xyz` looks legitimate at a glance because users read left-to-right.
+
+Worked example: `https://login.microsoftоnline-verify.com/auth?...` — the `о` in `microsoft` is U+043E. The header rendering shows the real domain as `xn--micrsft-...`. That is enough on its own to confirm the message is malicious.
+
+## Risky file types
+
+| Extension | Why it's dangerous | What to look for |
+| --------- | ------------------ | ---------------- |
+| `.html` / `.htm` | HTML smuggling — JS in the page assembles a payload from a base64 blob and offers it as a download. | Long base64 strings, `Blob`, `msSaveOrOpenBlob`, `URL.createObjectURL`. |
+| `.iso` / `.img` / `.vhd` / `.vhdx` | Container types that historically did not propagate Mark-of-the-Web (MOTW) to extracted files. Win11 22H2+ propagates from .iso, but estate coverage is mixed. | LNK or EXE inside, icon-spoof. |
+| `.lnk` | Shortcut whose `Target` runs `cmd`/`powershell`/`mshta`/`rundll32` with attacker args. | `lnkparser` / `LECmd`; inspect `Arguments` and `IconLocation`. |
+| `.one` (OneNote) | Can embed any OLE attachment (HTA, JS, BAT, CMD, VBS). Exploded Q1 2023 after Office macros blocked by default. | `pyOneNote`; `EmbeddedFiles`. |
+| `.pdf` | Embedded JavaScript, embedded files, or just a phishing link — most modern PDF "phish" is the latter. | `pdfid.py`, `peepdf`. Look for `/JS`, `/JavaScript`, `/OpenAction`, `/EmbeddedFile`, `/URI`. |
+| Office `.docm`/`.xlsm` macros | Blocked by default for Internet-zone files since 2022, still relevant where MOTW is missing. | `oletools` (`olevba`, `oleid`). |
+| `.xll` | Excel add-in DLL. Loaded with no macro warning. Now blocked by default in newer Office. | Hash + sandbox. |
+| `.svg` | XML with `<script>` or `<foreignObject>`; renders inline in the browser and runs JS. | Grep for `<script`, `eval`, `data:` URIs. |
+| Password-protected `.zip` / `.7z` | Defeats most gateway sandboxes that can't unpack without the password (which is in the email body). | Note the password from the email; submit privately. |
+| ClickOnce `.application` / `.appref-ms` | Launches a signed-looking installer from a URL. | Inspect the `<deployment>` URL in the manifest. |
+| `.url` / `.website` | Internet shortcut; Windows resolves the icon path immediately, used for SMB credential theft. | Inspect `URL=`, `IconFile=`, `WorkingDirectory=`. |
+
+## URL reputation tooling
+
+- **VirusTotal** — multi-engine reputation, passive DNS, downloaded files history. Watch the *Relations* tab. **Public submissions are visible.**
+- **urlscan.io** — fetches the URL in a sandboxed browser, screenshots the result, dumps DOM and network. Default visibility is *public*; use *unlisted* or *private* when triaging targeted lures.
+- **Hybrid Analysis (Falcon Sandbox)** — file and URL detonation; static + dynamic.
+- **abuse.ch URLhaus / ThreatFox / MalwareBazaar** — community blocklist + IOC sharing.
+- **OPSWAT MetaDefender** — multi-engine static for files.
+- **Cisco Talos / Spamhaus / SURBL** — IP/domain reputation.
+- **PhishTank / OpenPhish** — community phish URL lists.
+
+## OPSEC trap (revisited from Module 5: IOC Handling)
+
+*If you submit an attacker-supplied URL or attachment to a public scanner, you tell the attacker that someone in your org received the lure and is investigating it.* Many kits encode the recipient (or a per-victim token) into the URL path or query. Submitting `https://kit.example/?id=abc123` to urlscan.io's public queue will appear in the kit's analytics, alerting them to burn the infrastructure or rotate the lure.
+
+**Rule of thumb:**
+
+- **Bulk / commodity phish** (template, generic, no per-victim token) → public submission OK.
+- **Targeted / spear / BEC / AiTM with per-victim token** → use *unlisted* / *private* mode; or detonate in your private sandbox; or strip identifying tokens before public submission.
+
+Module 5 covers the full OPSEC taxonomy; the rule is the same here.
+
+## When to detonate vs static
+
+Static analysis first if you can identify the file confidently and the lure is high-volume. Detonate when:
+
+- The artefact is novel (no VT reputation).
+- The triage decision turns on *behaviour* — does it call out? to where? does it write a registry key?
+- You suspect multi-stage delivery (HTML → ISO → LNK → loader) and need the whole chain.
+- You need IOCs (C2 hostnames/IPs, dropped file hashes, named pipes, mutexes) to pivot in EDR.
+
+Sandbox options:
+
+- **Any.run** — interactive (analyst can click through prompts). Community public; commercial private.
+- **Joe Sandbox** — heavier static + dynamic; good behaviour graphs.
+- **CAPE** — open-source Cuckoo successor; common self-hosted choice.
+- **Hatching Triage / Recorded Future Triage** — fast, good Yara coverage.
+- **Microsoft Defender for Office 365 Detonation** (Safe Attachments / Safe Links) — gateway already detonates and surfaces verdicts in Threat Explorer.
+
+## Glossary
+
+- **Pretext** — the social-engineering cover story (HR, IT, payroll, courier, M365, DocuSign, etc.).
+- **Typosquat / combosquat / homoglyph** — three lookalike-domain families.
+- **HTML smuggling** — JS in a benign-looking HTML page reconstructs a payload client-side, evading email-gateway scanners.
+- **MOTW** — Mark-of-the-Web Zone.Identifier ADS; ISO/IMG containers historically bypassed it.
+- **OPSEC submission rule** — *don't* feed targeted-lure URLs/files to public scanners with the per-victim token intact.
+
+## Further reading
+
+- urlscan.io — *Visibility levels* documentation (public / unlisted / private).
+- Microsoft Learn — *Safe Attachments* and *Safe Links* in Defender for Office 365.
+- abuse.ch — URLhaus and ThreatFox API docs.
+""",
+    )
+    m6l2q = _add_lesson(
+        session, mod6, order=4, title="Lure & link triage — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=7,
+        content_md="Three questions on lookalike-domain classification, OPSEC submission decisions, and risky-file recognition.",
+    )
+    _add_q(session, m6l2q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An analyst sees the URL `https://login.microsoftоnline.com/auth/...` and notices the rendering of the domain in the email source as `xn--micrsft-q9a.com`. Which lookalike-domain category does this fit?",
+        options=[
+            {"value": "typo", "label": "Typosquat"},
+            {"value": "combo", "label": "Combosquat"},
+            {"value": "tld", "label": "TLD swap"},
+            {"value": "idn", "label": "IDN homoglyph (punycode)"},
+        ],
+        correct="idn",
+        explanation_md="The Cyrillic `о` (U+043E) renders identically to Latin `o` but encodes differently — this is an IDN homoglyph attack, identified by the `xn--` ACE-encoded domain in the actual headers.",
+        points=2,
+    )
+    _add_q(session, m6l2q, order=2, kind=QuestionKind.MULTI,
+        stem_md="A user reports an email with the URL `https://acme-billing-portal.com/inv?id=PRIYA-93FA`. Mail-trace shows it was sent to four people, each with a different per-recipient token in the URL. Which of the following are *OPSEC-appropriate* analyst actions?",
+        options=[
+            {"value": "vt_full", "label": "Submit the full URL with the token to VirusTotal's public queue immediately"},
+            {"value": "urlscan_private", "label": "Run the URL through urlscan.io in *private* mode"},
+            {"value": "private_sandbox", "label": "Detonate the URL in your in-house private sandbox"},
+            {"value": "strip_token", "label": "Strip the per-victim token, then submit the de-identified base URL to a public scanner if reputation is needed"},
+            {"value": "publicpost", "label": "Post the URL to a public Slack channel asking other analysts to take a look"},
+        ],
+        correct=["urlscan_private", "private_sandbox", "strip_token"],
+        explanation_md="Per-victim tokens identify the campaign back to the attacker if submitted to public services. Private/unlisted submission, in-house detonation, or stripping the token before public submission are all acceptable. Public VT submission and a public Slack post both leak the per-victim token.",
+        points=3,
+    )
+    _add_q(session, m6l2q, order=3, kind=QuestionKind.SHORTANSWER,
+        stem_md="An analyst inspects an HTML attachment that is 412 KB in size and contains a long base64 string plus calls to `Blob` and `msSaveOrOpenBlob`. Which delivery technique does this match? (Two or three words.)",
+        options=None,
+        correct=["html smuggling", "html-smuggling", "HTML smuggling", "smuggling"],
+        explanation_md="HTML smuggling: JavaScript in the page reconstructs a binary payload from an embedded base64 blob and saves it via `Blob` + `msSaveOrOpenBlob`, evading the email gateway because no executable ever crosses the wire.",
+        points=2,
+    )
+
+    # Lesson 6.3 — Detection telemetry across email + endpoint + identity
+    m6l3 = _add_lesson(
+        session, mod6, order=5,
+        title="Detection telemetry: email side, endpoint side, identity side",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Pivot from a SIEM phishing alert to the email source-of-truth (Microsoft 365 Threat Explorer or Exchange Message Trace) and answer the *delivered? where? still there? clicked?* questions
+> 2. Read an EDR process tree to identify a suspicious phishing-driven click-path (browser/Outlook → script-host)
+> 3. Cite the Sysmon event IDs that fingerprint each step of the click-path
+> 4. Use ECS field paths (`process.parent.name`, `url.original`, `email.from.address`, `dns.question.name`, `file.hash.sha256`) to write Kibana queries against phishing telemetry
+> 5. Recognise the textbook AiTM signal in Microsoft Entra ID sign-in logs — token theft, session-cookie reuse, anomalous IP / UA, post-takeover inbox-rule creation
+> 6. Identify illicit OAuth consent grants and call out the risky scopes that demand immediate escalation
+
+## When the SIEM alert says "phishing", what does the L1 do first?
+
+The L1 must pivot to the email source-of-truth and answer six questions:
+
+1. *Did the message arrive?* — Threat Explorer / Message Trace.
+2. *Where did it land?* — Inbox / Junk / Quarantine.
+3. *Is it still there?* — or has ZAP / TRAP already pulled it.
+4. *Did anyone click?* — UrlClickEvents / proxy logs.
+5. *Did anyone authenticate?* — Entra ID sign-in logs for the lure landing.
+6. *Who else got it?* — mail-trace, scope.
+
+Until those questions are answered, the L1 cannot make a defensible decision.
+
+## Email-side telemetry — Microsoft 365 / Defender for Office 365
+
+**Threat Explorer / Real-time detections** is the central pane. Filters on *Sender, Recipients, Subject, URL, File, Detection technology, Delivery action.* Use it to confirm scope (how many recipients), check Delivery location (Inbox / Junk / Quarantine), and see the Safe Links URL click verdict.
+
+**Email Entity Page** opens for a single message: headers, body preview, attachments, URLs, detection details, and an action menu (*Soft delete / Hard delete / Move to junk / Submit to Microsoft*). Delivery action is one of `Delivered`, `Junked`, `Blocked`, `Replaced`. Latest delivery location is one of `Inbox`, `Junk`, `Quarantine`, `External`, `Failed`, `Dropped`, `Forwarded`, `On-prem`, `Deleted items`, `Unknown`.
+
+**Quarantine** holds messages blocked at the gateway. The L1 reviews user-released messages and can release/deny pending admin approval depending on policy.
+
+**ZAP (Zero-hour Auto Purge)** retroactively removes a message from inboxes when the verdict updates after delivery. The trace shows `ZAP` in delivery action and `LatestStatus` of `FilteredAsSpam`/`FilteredAsMalware`/`FilteredAsPhish`.
+
+**Submissions** (admin) is how the analyst reports a confirmed phish back to Microsoft for tenant-wide block + global signal improvement.
+
+## Email-side telemetry — Exchange Message Trace
+
+The mail-flow log. Useful when Threat Explorer doesn't have the message (licensing tier without DfO P2). Fields:
+
+- `Received`, `SenderAddress` (5321 envelope), `RecipientAddress`, `Subject`, `Status` (`Delivered`, `FilteredAsSpam`, `Quarantined`, `Failed`, `Pending`, `Resolved`, `Expanded`).
+- `MessageTraceId` (GUID) — pivot key for detailed trace.
+- `MessageId` — RFC 5322 Message-ID.
+- `FromIP`, `ToIP`, `Connector` (useful for partner-domain spoof checks), `OrganizationId`.
+
+```powershell
+Get-MessageTrace -SenderAddress "*@suspicious-domain.example" `
+                 -StartDate (Get-Date).AddDays(-7) `
+                 -EndDate (Get-Date) |
+  Select-Object Received,SenderAddress,RecipientAddress,Subject,Status |
+  Sort-Object Received |
+  Format-Table -AutoSize
+```
+
+For per-message detail use `Get-MessageTraceDetail -MessageTraceId <guid>`. (Exact data-window for `Get-MessageTrace` — verify the current Microsoft Learn doc; Microsoft has changed it before.)
+
+## Email-side telemetry — Google Workspace
+
+- **Investigation tool** (Security Center) — search Gmail logs by sender, recipient, subject, URL, attachment hash; bulk actions (delete, restore, mark as phishing, send to quarantine).
+- **Email log search** — lighter log viewer in Admin console.
+- **Show original** in Gmail — full RFC 5322 source plus auth summary.
+- Google-specific headers: `X-Gm-Message-State`, `X-Google-Smtp-Source`, `Received-SPF`, `ARC-*`.
+
+## Endpoint-side: EDR process trees
+
+If a user *clicked* and something detonated, the smoking gun is a process chain rooted at a mail or browser process spawning something it has no business spawning:
+
+- `outlook.exe → cmd.exe / powershell.exe / wscript.exe / cscript.exe / mshta.exe / rundll32.exe / regsvr32.exe`
+- `msedge.exe / chrome.exe / firefox.exe → cmd.exe / powershell.exe`
+- `winword.exe / excel.exe / powerpnt.exe → powershell.exe / wscript.exe / cmd.exe`
+- `explorer.exe → <something in Downloads>` immediately after a download event
+- `mshta.exe https://...` — HTA download-and-run
+- `regsvr32.exe /s /n /u /i:http://... scrobj.dll` — Squiblydoo / SCT abuse
+- `rundll32.exe javascript:...` — JS via rundll32
+
+```mermaid
+flowchart TD
+    OUT[outlook.exe] --> EDGE[msedge.exe]
+    EDGE --> EXP[explorer.exe<br/>mounts ISO]
+    EXP --> LNK[Invoice_Q1.lnk]
+    LNK --> CMD[cmd.exe /c]
+    CMD --> PS[powershell.exe<br/>-enc base64]
+    PS --> RDLL[rundll32.exe<br/>xy.dll, Start]
+    RDLL --> NET((C2: cdn-acme-billing.com))
+    classDef red fill:#fdd,stroke:#a00,color:#000
+    class CMD,PS,RDLL,NET red
+```
+
+Modern EDRs (Defender XDR, CrowdStrike, SentinelOne, Carbon Black, Cortex XDR) all expose process-lineage queries. **AMSI** captures inline-script content (PowerShell, JScript, VBScript, Office macros) before execution, giving the analyst the actual script text to read.
+
+## Sysmon event-ID fingerprints for click-path follow-on
+
+| Event ID | What it captures | Why it matters here |
+| -------- | ---------------- | ------------------- |
+| **1** Process Create | Parent/child chain, command line, hashes | The smoking-gun process tree |
+| **3** Network Connect | Outbound socket from a process | Browser/loader → C2 |
+| **7** Image Load | DLL loaded by a process | Side-loading by a downloader |
+| **11** File Create | New file on disk | Payload dropped |
+| **15** File Create Stream Hash | MOTW Zone.Identifier ADS | Confirms file came from Internet zone |
+| **22** DNS Query | Process resolves a domain | Browser/loader resolves C2 |
+| **25** Process Tampering | Hollowing / unmapping | Loader anti-analysis |
+
+## ECS field paths the phishing triager queries against
+
+ION's SIEM and most modern stacks normalise to Elastic Common Schema. Pin these:
+
+- `process.parent.name`, `process.name`, `process.command_line`, `process.executable`
+- `process.parent.command_line`
+- `user.name`, `host.name`, `host.os.family`
+- `url.original`, `url.domain`, `url.path`, `url.full`
+- `dns.question.name`, `dns.question.type`, `dns.resolved_ip`
+- `file.hash.sha256`, `file.path`, `file.name`, `file.extension`
+- `email.subject`, `email.from.address`, `email.to.address`, `email.message_id`, `email.delivery_timestamp`
+- `event.action`, `event.category`, `event.outcome`
+- `network.protocol`, `destination.ip`, `destination.domain`, `tls.server.ja3s`
+
+(`email.*` was added to ECS in 8.6; if your SIEM is on an older schema, fields differ.)
+
+## Worked SIEM queries
+
+KQL — Defender XDR Advanced Hunting, browser/Outlook spawning a script host:
+
+```kql
+DeviceProcessEvents
+| where Timestamp > ago(24h)
+| where InitiatingProcessFileName in~ ("outlook.exe","msedge.exe","chrome.exe","firefox.exe")
+| where FileName in~ ("powershell.exe","cmd.exe","wscript.exe","cscript.exe","mshta.exe","rundll32.exe","regsvr32.exe")
+| project Timestamp, DeviceName, AccountName,
+          InitiatingProcessFileName, FileName, ProcessCommandLine, ReportId
+```
+
+KQL — pivot from a confirmed-phish URL to clicks across the tenant:
+
+```kql
+let badUrl = "https://o365-secure-login.azurewebsites.net/auth";
+UrlClickEvents
+| where Url has badUrl
+| project Timestamp, AccountUpn, ActionType, NetworkMessageId, Url, ThreatTypes
+| join kind=inner (
+    EmailEvents
+    | project NetworkMessageId, Subject, SenderFromAddress, RecipientEmailAddress, DeliveryAction
+) on NetworkMessageId
+```
+
+Lucene (ION-style) — same idea against an Elastic SIEM:
+
+```text
+event.category:process AND
+process.parent.name:(outlook.exe OR msedge.exe OR chrome.exe) AND
+process.name:(powershell.exe OR cmd.exe OR mshta.exe OR rundll32.exe OR regsvr32.exe)
+```
+
+## Identity side — AiTM in Entra ID sign-in logs
+
+Microsoft Entra ID logs every sign-in. The fields that betray AiTM:
+
+- `userPrincipalName`, `userId`
+- `appDisplayName`, `appId` (e.g. `Office 365 Exchange Online`)
+- `ipAddress`, `location.countryOrRegion`, `location.city`
+- `deviceDetail.browser`, `deviceDetail.operatingSystem`, `deviceDetail.deviceId`
+- `clientAppUsed` (`Browser`, `Mobile Apps and Desktop clients`, `IMAP4`, `POP3`)
+- `authenticationDetails[].authenticationMethod` (`Password`, `Mobile app notification`, `FIDO2 security key`)
+- `authenticationRequirement` (`singleFactorAuthentication` / `multiFactorAuthentication`)
+- `riskState`, `riskLevelAggregated`, `riskLevelDuringSignIn`
+- `riskEventTypes_v2` — `unfamiliarFeatures`, `anonymizedIPAddress`, `maliciousIPAddress`, `unlikelyTravel`, `tokenIssuerAnomaly`, `anomalousToken`, `tokenIssuedFromAnonymousIP`, `mcasFinSuspiciousInboxManipulationRules`
+- `correlationId`, `sessionId` — *the latter is gold:* same session ID re-used from a new IP/UA = cookie replay.
+
+The textbook AiTM pattern in the log:
+
+1. Real successful interactive sign-in from the user's normal IP, MFA satisfied.
+2. Within minutes, a non-interactive sign-in for the *same `sessionId`* from a different IP / country / UA, MFA `previouslySatisfied`.
+3. Inbox rule creation event in the Unified Audit Log.
+4. New device or auth-method registration (T1098.005).
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant K as AiTM kit (reverse proxy)
+    participant M as login.microsoftonline.com
+    U->>K: GET /auth (clicked phishing link)
+    K->>M: GET /auth (proxied)
+    M-->>K: login form
+    K-->>U: login form (rendered as if from M)
+    U->>K: username + password
+    K->>M: username + password
+    M-->>K: MFA challenge
+    K-->>U: MFA challenge
+    U->>M: MFA approve (push)
+    M-->>K: session cookie + tokens
+    K->>K: STORE cookie + tokens
+    K-->>U: redirect to real M365
+    Note over K: Attacker replays cookie<br/>from their own host;<br/>MFA already satisfied.
+```
+
+## Identity side — Unified Audit Log events to know
+
+- `New-InboxRule` / `Set-InboxRule` — auto-forward, move-to-RSS-Feeds, delete-on-receipt.
+- `Add-MailboxPermission` — granting Full Access / Send-As to another mailbox.
+- `Set-Mailbox -ForwardingSmtpAddress` — forwarding at mailbox level.
+- `Add-MailboxFolderPermission` — exfil via shared folder.
+- `Update application` / `Add service principal` / `Consent to application` — OAuth changes.
+- `Add member to role` — privilege escalation post-takeover.
+
+## Illicit OAuth consent grants
+
+When a user clicks Accept on a malicious OAuth app:
+
+1. The app appears in **Enterprise applications** in Entra ID.
+2. A delegated permission grant is recorded.
+3. A refresh token is issued to the app.
+
+Risky scopes that demand immediate escalation:
+
+- `Mail.Read`, `Mail.ReadWrite`, `Mail.Send`
+- `MailboxSettings.ReadWrite` — lets the app create inbox rules without UI
+- `offline_access` — refresh-token persistence
+- `Files.ReadWrite.All`, `Sites.ReadWrite.All`
+- `User.Read.All`, `Directory.Read.All`, `Contacts.ReadWrite`
+
+Containment requires **revoking the app grant**, not just resetting the user's password:
+
+```powershell
+Connect-MgGraph -Scopes "Directory.Read.All","DelegatedPermissionGrant.ReadWrite.All"
+$badAppId = "00000000-1111-2222-3333-444444444444"
+Get-MgOauth2PermissionGrant -All |
+  Where-Object ClientId -eq $badAppId |
+  ForEach-Object { Remove-MgOauth2PermissionGrant -OAuth2PermissionGrantId $_.Id }
+Revoke-MgUserSignInSession -UserId user@acme.com
+```
+
+## The classic post-takeover BEC pivot
+
+The single most diagnostic post-AiTM action is creation of an **inbox rule** that:
+
+- moves messages containing finance keywords (`invoice`, `wire`, `swift`, `ach`, `payment`, `bank`, `remit`) to *RSS Feeds* / *Conversation History* / *Archive*,
+- *and* marks them read or deletes them,
+- *and* optionally auto-forwards to an external address.
+
+Hunt query (UAL):
+
+```text
+Operations:"New-InboxRule" OR "Set-InboxRule"
+| where Parameters has_any ("MoveToFolder","DeleteMessage","ForwardTo","RedirectTo","MarkAsRead")
+| where Parameters has_any ("invoice","wire","swift","ach","payment","bank","remit")
+```
+
+## Glossary
+
+- **Threat Explorer / Email Entity Page / ZAP / Submissions** — the four M365 Defender screens an L1 phishing triager opens.
+- **AMSI** — Antimalware Scan Interface; captures script content before execution.
+- **AiTM** — adversary-in-the-middle reverse-proxy phishing kit; steals session cookies, defeats password+push MFA.
+- **`sessionId`** — the gold field; same session re-used from a new IP/UA is cookie replay.
+- **Risky OAuth scopes** — `Mail.*`, `MailboxSettings.ReadWrite`, `offline_access`, `Files.ReadWrite.All`, `Directory.Read.All`.
+
+## Further reading
+
+- Microsoft Learn — *Threat Explorer and real-time detections in Defender for Office 365*.
+- Microsoft Learn — *Sign-in logs in Microsoft Entra ID* (riskEventType, riskState, conditional access result).
+- Microsoft Learn — *Detect and Remediate Illicit Consent Grants*.
+- Sysmon — *System Monitor* event reference.
+""",
+    )
+    m6l3q = _add_lesson(
+        session, mod6, order=6, title="Telemetry & AiTM — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on Sysmon event IDs, ECS phishing field paths, AiTM Entra ID signal reading, and OAuth consent containment.",
+    )
+    _add_q(session, m6l3q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Which Sysmon event ID is most useful for confirming that a downloaded file inherited the Mark-of-the-Web Zone.Identifier alternate data stream — i.e. that Windows recognised it as Internet-zone?",
+        options=[
+            {"value": "ev1", "label": "Event ID 1 — Process Create"},
+            {"value": "ev11", "label": "Event ID 11 — File Create"},
+            {"value": "ev15", "label": "Event ID 15 — File Create Stream Hash"},
+            {"value": "ev22", "label": "Event ID 22 — DNS Query"},
+        ],
+        correct="ev15",
+        explanation_md="Event ID 15 fires when an alternate data stream is created on a file — that's specifically what records the Zone.Identifier ADS for MOTW. Event 11 is the underlying file-create; 15 is the ADS-level event that confirms the MOTW tag.",
+        points=2,
+    )
+    _add_q(session, m6l3q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following indicators in Microsoft Entra ID sign-in logs together fingerprint an AiTM session-cookie replay?",
+        options=[
+            {"value": "samesession", "label": "The same `sessionId` value used from two different `ipAddress` values within minutes"},
+            {"value": "spfpass", "label": "An SPF=pass result on the original phishing email"},
+            {"value": "previously", "label": "MFA recorded as `previouslySatisfied` for the second sign-in"},
+            {"value": "anonymized", "label": "`riskEventTypes_v2` containing `anonymizedIPAddress` or `tokenIssuedFromAnonymousIP`"},
+            {"value": "rule", "label": "A `New-InboxRule` event in the Unified Audit Log shortly after the second sign-in"},
+        ],
+        correct=["samesession", "previously", "anonymized", "rule"],
+        explanation_md="Same sessionId re-used from another IP, MFA previouslySatisfied, anonymised-IP risk events, and a finance-keyword inbox rule are the textbook AiTM-to-BEC fingerprint. SPF pass on the email tells you nothing about cookie theft.",
+        points=3,
+    )
+    _add_q(session, m6l3q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="A user has accepted an OAuth consent prompt for an unfamiliar third-party app that requested `Mail.ReadWrite`, `Mail.Send`, and `offline_access`. The L1's manager confirms this is malicious. Which of the following is *required* to fully contain the incident?",
+        options=[
+            {"value": "pwdreset", "label": "Reset the user's password and force MFA re-registration"},
+            {"value": "blockip", "label": "Block the source IP at the perimeter firewall"},
+            {"value": "revoke_grant", "label": "Revoke the OAuth permission grant for the malicious app and revoke the user's active sign-in sessions"},
+            {"value": "softdelete", "label": "Soft-delete the original phishing email tenant-wide"},
+        ],
+        correct="revoke_grant",
+        explanation_md="Consent phishing issues a refresh token tied to the OAuth grant — independent of the user's password. Resetting the password leaves the malicious app fully functional. The grant itself must be removed, and active sessions revoked.",
+        points=2,
+    )
+    _add_q(session, m6l3q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="In Elastic Common Schema, hash-bearing fields for phishing follow-on can live on `file.hash.sha256`, `process.hash.sha256`, *and* `process.parent.hash.sha256` simultaneously, depending on whether the indicator describes a file at rest, a running process, or the parent of a process.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** ECS exposes hash fields on every entity that can carry one — `file`, `process`, and `process.parent` are all valid match targets. A complete IOC join on a file hash typically queries all three.",
+        points=2,
+    )
+
+    # Lesson 6.4 — Reporting pipeline, decision framework, ATT&CK + worked scenarios
+    m6l4 = _add_lesson(
+        session, mod6, order=7,
+        title="Reporting pipeline, decision framework, ATT&CK, and worked scenarios",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Walk a user-reported phishing report through the standard L1 pipeline — confirm, scope mail-trace, pull from inboxes, IOC-block, hunt 7-day window
+> 2. Apply a defensible *escalate / contain / close* decision using the ION L1 decision framework
+> 3. Draw the line between L1 containment authority and L2 territory
+> 4. Map a phishing-driven incident to the relevant MITRE ATT&CK techniques (T1566 family, T1539, T1098.005, T1114.003, T1656)
+> 5. Walk three end-to-end worked scenarios — AiTM credential phish with token theft, HTML-smuggling → ISO → LNK → loader, and BEC vendor-invoice-redirect
+
+## The user-reported phishing pipeline
+
+Reporting tools the L1 will encounter:
+
+- **Microsoft Report Message / Report Phishing** — built-in Outlook button.
+- **PhishER (KnowBe4)** — orchestration; auto-tags, runs YARA, integrates with VT/Hybrid Analysis.
+- **Cofense Reporter / Triage / Vision** — equivalent stack.
+- **Custom button + shared mailbox** — `phishing@yourcorp.com`. Cheaper, more FPs, no automation.
+
+### Queue triage SLA (illustrative — replace with your runbook's numbers)
+
+- High-volume burst (same subject ≥ 5 reports in 10 min) — investigate within 15 minutes.
+- Single user report from a privileged account or VIP — within 30 minutes.
+- Standard single user report — within 4 business hours.
+- Bulk advertising / non-malicious — close at end-of-shift batch.
+
+### False-positive categories (most user-reports are these)
+
+- Newsletters and marketing the user opted into.
+- Internal mail with unfamiliar branding (a new HR system, a new SaaS rollout).
+- Cold sales outreach.
+- Calendar invites from external partners.
+- Mail through a forwarder that broke SPF/DKIM (auth-fail tells, real content).
+- Genuine M365 / Google service notifications.
+
+### Confirmed-phish workflow
+
+1. **Scope the spread.** Mail-trace the sender / subject / URL / attachment hash across the tenant. Note all recipients and delivery locations.
+2. **Pull from inboxes.** Soft-delete first, hard-delete if approved.
+
+   ```powershell
+   New-ComplianceSearch -Name "Phish-2026-04-28" `
+     -ExchangeLocation All `
+     -ContentMatchQuery 'subject:"Action required: M365 password expires today" AND from:notify@*.azurewebsites.net'
+   Start-ComplianceSearch -Identity "Phish-2026-04-28"
+   New-ComplianceSearchAction -SearchName "Phish-2026-04-28" -Purge -PurgeType SoftDelete
+   ```
+
+3. **Affected user containment** (only if confirmed click / cred entry / token issue):
+   - Revoke active sessions: `Revoke-MgUserSignInSession`.
+   - Force password reset.
+   - Force MFA re-registration.
+   - Check inbox rules, forwarding rules, recent mailbox permission changes.
+   - Check OAuth grants; revoke any unfamiliar.
+   - Check `MFA methods` for newly added authenticators.
+4. **IOC pivot.** Domain → block at email gateway, web proxy, DNS, EDR custom IOC. Sender → tenant-allow-block list. URL → block at proxy / CASB / Safe Links; submit to Microsoft. File hash → block in EDR. Sender IP — cautiously (shared infra).
+5. **Threat-hunt sweep** for any other recipients who clicked / authenticated, in the 7-day window before and after delivery.
+6. **Submit to vendors** for global signal: Microsoft Submissions, Google's Report phishing, urlscan/abuse.ch (within OPSEC limits — see Lesson 6.2).
+7. **Close-out artefacts captured:** original `.eml`, headers, attachment hashes, screenshots of landing page, summary of containment actions, notification to affected user.
+
+```mermaid
+flowchart TD
+    C[Confirmed phish] --> S[Scope mail-trace<br/>tenant-wide]
+    S --> P[Pull from inboxes<br/>soft-delete]
+    P --> CB[Block IOCs:<br/>domain / URL / hash / sender]
+    CB --> U{User clicked?}
+    U -->|No| R[Report-back to user,<br/>close]
+    U -->|Yes| RV[Revoke sessions,<br/>force pwd + MFA reset]
+    RV --> O[Check OAuth grants,<br/>inbox rules,<br/>forwarding,<br/>MFA methods]
+    O --> H[Hunt 7-day window<br/>for related activity]
+    H --> SUB[Submit to Microsoft / Google,<br/>abuse.ch / VT (OPSEC-aware)]
+    SUB --> CLOSE[Close ticket with<br/>artefacts attached]
+```
+
+## The triage decision framework
+
+A junior analyst's job is to make a *defensible* decision quickly. Three outcomes:
+
+- **Close — benign.** Marketing, newsletter, internal mail flagged, false positive.
+- **Confirm phish — contained at gateway, no click.** Quarantine + block + close + report-back.
+- **Escalate to L2.** Real click, real auth, real cred entry, real malware execution, BEC suspected, or scope > 1 user.
+
+Decision inputs the L1 must collect:
+
+- *Was it delivered?* (Threat Explorer / Message Trace)
+- *Where did it land?* (Inbox / Junk / Quarantine)
+- *Is it still there?* (or has ZAP / TRAP already pulled it)
+- *Did anyone click?* (UrlClickEvents / proxy logs)
+- *Did anyone authenticate?* (Entra ID sign-in logs)
+- *Did anything execute?* (EDR process tree)
+- *Who else got it?* (mail-trace, scope)
+- *Is the recipient privileged or VIP?*
+- *What is the lure asking for?* (cred / payment / file / OAuth)
+
+```mermaid
+flowchart TD
+    A[New phishing alert / report] --> B{Delivered to a mailbox?}
+    B -->|No: blocked at gateway| C[Verify, log, close]
+    B -->|Yes| D{Anyone clicked?}
+    D -->|No| E[Soft-delete, IOC block, report-back, close]
+    D -->|Yes| F{Did they authenticate?}
+    F -->|No| G[Containment: revoke sessions,<br/>monitor, soft-delete]
+    F -->|Yes| H{Successful sign-in<br/>from anomalous IP?}
+    H -->|No| I[Force pwd reset,<br/>monitor 24h]
+    H -->|Yes| J[Escalate to L2:<br/>AiTM suspected]
+    A --> K{Lure category}
+    K -->|BEC / financial| L{Wire requested?}
+    L -->|Yes| M[Escalate to fraud + L2]
+    L -->|No| N[Block sender, monitor]
+    K -->|Consent / OAuth| O{Grant accepted?}
+    O -->|Yes| P[Escalate L2 — revoke grant]
+    O -->|No| Q[User-train, block app]
+```
+
+### Escalation criteria — escalate to L2 if any of:
+
+- Successful sign-in attributable to the lure (AiTM token theft).
+- OAuth consent granted to an unfamiliar app.
+- EDR alert fires from a process descended from `outlook.exe` or a browser.
+- Inbox / forwarding rule created in the same window as a suspicious sign-in.
+- Multiple recipients (≥ 3 in the default policy) clicked.
+- VIP / executive / privileged-account recipient interacted.
+- BEC pattern detected (financial verb + lookalike domain + reply-to swap + outgoing thread).
+- Anything novel (no IOC matches, no template matches in past 30 days).
+
+### L1 containment authority (typical, configurable)
+
+- Soft-delete confirmed phish across inboxes via Compliance Search / TRAP / PhishRIP.
+- Add IOC to email gateway and proxy block lists.
+- Force password reset / MFA re-registration / sign-out for *one* affected user.
+- Disable a user account temporarily.
+- Submit to Microsoft / Google.
+
+### L2 territory — do not action without escalation
+
+- Mailbox forensics (recovery of pre-purge content, contents of inbox rules, journaling).
+- OAuth grant revocation (privilege required + tenant-wide impact).
+- Threat-hunt sweep across 30+ days / multiple data sources / multiple users.
+- Coordinated takedown requests (registrar / hosting provider).
+- Fraud-team handoff for confirmed BEC with attempted wire transfer.
+- Legal hold / preservation if litigation likely.
+
+## MITRE ATT&CK mapping
+
+ATT&CK Enterprise techniques the analyst should be able to cite:
+
+### Initial Access (TA0001)
+- **T1566 Phishing** — parent.
+  - **T1566.001 Spearphishing Attachment**
+  - **T1566.002 Spearphishing Link**
+  - **T1566.003 Spearphishing via Service** — LinkedIn DM, Twitter DM, Discord, Teams external chat.
+  - **T1566.004 Spearphishing Voice** — vishing.
+
+### Resource Development (TA0042)
+- **T1583 Acquire Infrastructure** — `.001` Domains (typosquats), `.006` Web Services (Azure Web Apps, Cloudflare Workers, GitHub Pages, Vercel).
+- **T1585 Establish Accounts** — `.002` Email Accounts.
+
+### Defense Evasion (TA0005)
+- **T1656 Impersonation** — display-name, brand impersonation.
+- **T1036 Masquerading** — extensions, icons, signed binaries.
+- **T1027.006 HTML Smuggling**.
+
+### Credential Access (TA0006)
+- **T1056 Input Capture** — landing-page credential theft.
+- **T1539 Steal Web Session Cookie** — AiTM.
+- **T1621 MFA Request Generation** — push bombing.
+
+### Persistence (TA0003)
+- **T1098.005 Device Registration** — adversary registers their own device for MFA / Conditional Access bypass.
+- **T1556 Modify Authentication Process**.
+- **T1136 Create Account** — guest in Entra ID.
+
+### Collection (TA0009)
+- **T1114 Email Collection** — `.001` Local, `.002` Remote, **`.003` Email Forwarding Rule** — the BEC textbook persistence/exfil.
+
+### Command and Control (TA0011) — when click leads to follow-on malware
+- **T1071 Application Layer Protocol** — `.001` Web, `.004` DNS.
+- **T1102 Web Service**, **T1573 Encrypted Channel**.
+
+The analyst should be able to read an alert title like *"Suspicious inbox rule creation following anomalous sign-in"* and immediately map it to **T1539 → T1098.005 → T1114.003** — the AiTM-to-BEC pivot.
+
+## Worked scenario A — O365 credential phish via AiTM kit
+
+**Initial alert.** Defender XDR fires *"Anomalous sign-in followed by inbox rule creation"* for `alex.bennett@acme.com`. Risk: High.
+
+**Step 1 — pull the sign-in.** Two events for Alex:
+
+- 09:14 UTC, IP `198.51.100.10` (London — Alex's normal), Edge / Win11, MFA satisfied via Authenticator push, `riskLevelDuringSignIn=low`.
+- 09:21 UTC, IP `185.220.101.7` (Tor exit, `anonymizedIPAddress`), Chrome / Linux, MFA `previouslySatisfied`, **same `sessionId` as the 09:14 event**, `riskEventTypes_v2=[anonymizedIPAddress, anomalousToken]`, `riskLevelDuringSignIn=high`.
+
+**Step 2 — trace the email.** Threat Explorer for previous 24h, recipient `alex.bennett`. One delivered message: subject *"Action Required: your Microsoft 365 password expires in 24 hours"*, sender `notify@m365-secure-tenant.azurewebsites.net`, delivered Inbox at 09:11. Safe Links rewrote the URL to `https://safelinks.protection.outlook.com/?url=https%3A%2F%2Fm365-secure-tenant.azurewebsites.net%2Fauth%3Frid%3DBENN-A1B2`. The `rid=BENN-A1B2` is a per-victim token — *do not submit to public scanners.*
+
+**Step 3 — confirm the click.** UrlClickEvents shows `ClickAllowed` at 09:13, NetworkMessageId matches.
+
+**Step 4 — confirm the AiTM.** The 09:14 successful sign-in *immediately* followed the 09:13 click. Authentication-Method shows `Password` then `Mobile app notification` — user typed creds into the kit, kit relayed to Microsoft, Microsoft pushed real MFA, user approved, kit captured the cookie. **Confirmed.**
+
+**Step 5 — confirm post-takeover action.** UAL filtered for `alex.bennett`:
+
+- 09:21 — `New-InboxRule`, `Name="."`, `MoveToFolder="RSS Feeds"`, `BodyContainsWords="invoice,wire,swift,payment,remit"`, `MarkAsRead=true`.
+- 09:22 — `Update user` adding a new authenticator method on a different deviceId.
+
+**Step 6 — escalate to L2.** Confirmed AiTM with token theft + persistence + collection rule. Out of L1 authority for full remediation.
+
+L1 containment actions before handover: revoke sessions; block sender domain at gateway; submit to Microsoft; soft-delete the lure tenant-wide; search mail-trace for the `rid=*-*` token format. L2 picks up: forensic mailbox dump, OAuth grant review, expanded user-cohort hunt, fraud check on Alex's recent outbound, takedown to Microsoft Azure abuse.
+
+ATT&CK chain: **T1566.002 → T1539 → T1098.005 → T1114.003**.
+
+## Worked scenario B — HTML smuggling → ISO → LNK → loader
+
+**Initial alert.** EDR fires *"PowerShell launched from LNK in mounted ISO"* on `WS-FIN-014` (Priya Patel).
+
+**Step 1 — process tree.**
+
+```
+explorer.exe (PID 5120)
+  └─ msedge.exe (PID 7204)            [chrome download initiated]
+      └─ explorer.exe (mount ISO, PID 8801)
+           └─ Invoice_Q1_2026.lnk → cmd.exe (PID 9120)
+               └─ powershell.exe -nop -w hidden -enc <base64>
+                    └─ rundll32.exe %TEMP%\\xy.dll,Start
+```
+
+The base64-decoded PowerShell does an `Invoke-WebRequest` to `https://cdn-acme-billing[.]com/upd.dll`, drops `%TEMP%\\xy.dll`, `rundll32`s it.
+
+**Step 2 — back to the browser.** msedge.exe download history shows `Invoice_Q1_2026.html` from `https://acme-billing-portal.com/inv?id=PRIYA-93FA`. The HTML is 412 KB (large for an invoice page); `<script>` block contains a base64 blob and `Blob` + `msSaveOrOpenBlob` calls — classic HTML smuggling.
+
+**Step 3 — back to the email.** Mail-trace for Priya: 11:42 UTC, sender `accounts@acme-billing-portal.com`, subject *"Q1 2026 invoice — overdue"*, delivered Inbox. Click telemetry shows `ClickAllowed` on the URL at 11:44.
+
+**Step 4 — auth check.** SPF for `acme-billing-portal.com` — passes for `203.0.113.42` (attacker owns the domain; SPF on attacker domain is unhelpful as a signal). DKIM `d=acme-billing-portal.com` — passes. DMARC alignment — passes. *But:* `acme-billing-portal.com` is a 4-day-old domain (passive DNS). The real vendor is `acme.com`. **Combosquat.**
+
+**Step 5 — IOCs and pivot.** Domain `acme-billing-portal.com`, `cdn-acme-billing.com`. URL `https://acme-billing-portal.com/inv?id=*` — strip the per-victim token before public submission. SHA-256 of the HTML, ISO, and `xy.dll`. Network connection to `cdn-acme-billing.com` from `WS-FIN-014`.
+
+**Step 6 — scope and escalate.** Mail-trace shows three other Finance users got variants. EDR query for `process.parent.name:explorer.exe AND process.command_line:*Invoice_Q1*lnk` returns one match (Priya's host) — only Priya executed. Containment: isolate `WS-FIN-014` via EDR, soft-delete the four emails, block both domains at proxy/DNS/EDR, submit hashes to TI.
+
+ATT&CK chain: **T1566.002 → T1027.006 (HTML smuggling) → T1204.002 (User Execution: Malicious File) → T1059.001 (PowerShell) → T1218.011 (Rundll32)**.
+
+## Worked scenario C — BEC vendor invoice redirect (no malware)
+
+**Initial alert.** Finance flags an email to AP from `mike.harris@acme.com`, subject *"Updated banking details for our 2026 contract"*. AP is suspicious — Mike normally emails the buyer side, not AP.
+
+**Step 1 — open the headers.**
+
+```text
+From: "Mike Harris" <mike.harris@acme.com>
+Reply-To: "Mike Harris" <mike.harris.acme@gmail.com>
+Return-Path: <bounces@acme-corp-finance.com>
+Received: from acme-corp-finance.com (mail.acme-corp-finance.com [203.0.113.99])
+ by mx.acme-supplier.example with ESMTPS; Mon, 27 Apr 2026 14:02:15 +0000
+Authentication-Results: spf=pass smtp.mailfrom=acme-corp-finance.com;
+ dkim=pass header.d=acme-corp-finance.com;
+ dmarc=fail action=quarantine header.from=acme.com;
+ compauth=fail reason=001
+```
+
+Three findings:
+
+1. SPF and DKIM **pass for `acme-corp-finance.com`**, *not* for `acme.com`. Attacker owns this domain.
+2. DMARC for `acme.com` — `fail action=quarantine` because `header.from=acme.com` does not align with any passing auth identity. Microsoft applied `quarantine`, but a tenant Allow rule let it through (common: AP allow-listed `*acme*` years ago).
+3. **Reply-To swap** — visible From is `mike.harris@acme.com` but Reply-To is `mike.harris.acme@gmail.com`. Replies go to Gmail.
+
+**Step 2 — confirm lookalike.** `acme.com` is the legitimate vendor. `acme-corp-finance.com` is 11 days old per WHOIS. No prior mail-flow history.
+
+**Step 3 — body content.**
+
+> Hi team — please update our remit-to information on file before the next payment run. New details are attached. We've changed banks; please process Tuesday's invoice (PO-44910) to the new account. Confidential, do not discuss with the buyer side, this is being handled at director level.
+
+The combination — new banking details + urgency + secrecy + reply-to swap + 11-day-old lookalike — is BEC vendor-invoice-redirect with very high confidence.
+
+**Step 4 — check whether any payment has gone out.** Mail-trace and AP system: no wire issued yet (next run Tuesday).
+
+**Step 5 — verify out of band.** Phone Mike on the number AP has on file (not the number in the email signature). Mike confirms he sent no such email. The address is forged.
+
+**Step 6 — escalate to L2 / fraud.** L1 actions: tenant-block `acme-corp-finance.com`, soft-delete from AP inboxes (and any cc'd), submit to Microsoft, search mail-trace for the same sender pattern across the org. Notify the real `acme.com` security contact (their domain is being abused).
+
+ATT&CK chain: **T1583.001 (lookalike domain) → T1656 (impersonation) → T1566.002 → attempted T1657 (financial theft)**.
+
+## Glossary
+
+- **PhishRIP / TRAP / ZAP** — vendor names for the same primitive: post-delivery pull from inboxes after verdict change.
+- **Compliance Search + Purge** — Microsoft 365 mechanism for soft- or hard-deleting a message tenant-wide.
+- **L1 authority vs L2 territory** — soft-delete and single-user containment vs forensic, OAuth-grant, threat-hunt-sweep work.
+- **`rid=` per-victim token** — the OPSEC tell that says *strip before public submission* in URL reputation work.
+
+## Further reading
+
+- MITRE ATT&CK Enterprise Matrix — Initial Access, Defense Evasion, Credential Access, Persistence, Collection.
+- Microsoft Learn — *Submit messages to Microsoft for analysis* (Submissions API).
+- Microsoft Learn — *Search-Mailbox / New-ComplianceSearch reference* — note: `Search-Mailbox` is being phased out in favour of compliance-portal workflows; verify against the current Microsoft Learn doc.
+""",
+    )
+    m6l4q = _add_lesson(
+        session, mod6, order=8, title="Decision framework, ATT&CK & scenarios — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on L1-vs-L2 authority, ATT&CK chain mapping, BEC red-flag combinations, and the confirmed-phish workflow order.",
+    )
+    _add_q(session, m6l4q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L1 investigates a phishing alert and finds: the user clicked the link, authenticated successfully, the sign-in was from an anonymised IP, and an inbox rule moving messages with `wire` / `invoice` / `swift` to RSS Feeds was created two minutes later. Which is the correct *next* action?",
+        options=[
+            {"value": "close", "label": "Close as benign — the user authenticated successfully so the sign-in is legitimate"},
+            {"value": "pwd_only", "label": "Force a password reset and close the ticket"},
+            {"value": "escalate", "label": "Escalate to L2 — confirmed AiTM with cookie theft and post-takeover BEC persistence rule"},
+            {"value": "ban_ip", "label": "Block the user's home IP at the firewall and monitor"},
+        ],
+        correct="escalate",
+        explanation_md="Click + auth + anomalous IP + finance-keyword inbox rule is the textbook AiTM-to-BEC fingerprint. Mailbox forensics, OAuth grant review, and tenant-wide hunt are L2 territory. L1 contains (revoke sessions, soft-delete the lure, IOC-block) and hands over.",
+        points=2,
+    )
+    _add_q(session, m6l4q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *L1 containment authority* in a typical SOC, vs L2 territory?",
+        options=[
+            {"value": "softdel", "label": "Soft-delete the confirmed-phish email tenant-wide via Compliance Search"},
+            {"value": "ioc_block", "label": "Add the sender domain to the email gateway and proxy block lists"},
+            {"value": "revoke_sessions", "label": "Force password reset and revoke active sign-in sessions for one affected user"},
+            {"value": "oauth_revoke", "label": "Revoke the OAuth permission grant of a malicious enterprise application across the tenant"},
+            {"value": "forensic", "label": "Recover pre-purge mailbox content for a 30-day retroactive forensic dump"},
+        ],
+        correct=["softdel", "ioc_block", "revoke_sessions"],
+        explanation_md="Tenant-wide soft-delete, IOC blocking, and single-user session/credential containment are typical L1 authority. Tenant-wide OAuth grant revocation (high blast radius) and pre-purge mailbox forensics (legal/privacy weight) are L2 territory.",
+        points=3,
+    )
+    _add_q(session, m6l4q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="Map the AiTM-to-BEC pivot — *(a) cookie theft on the landing page → (b) attacker registers their own device for MFA → (c) attacker creates an inbox rule auto-forwarding finance threads* — to the right ATT&CK techniques in order.",
+        options=[
+            {"value": "wrong1", "label": "T1566.001 → T1098.001 → T1114.001"},
+            {"value": "right", "label": "T1539 → T1098.005 → T1114.003"},
+            {"value": "wrong2", "label": "T1056 → T1556 → T1102"},
+            {"value": "wrong3", "label": "T1621 → T1136 → T1567"},
+        ],
+        correct="right",
+        explanation_md="Cookie theft is **T1539** (Steal Web Session Cookie). Adversary device registration for MFA bypass is **T1098.005**. Auto-forwarding inbox rule for BEC is **T1114.003** (Email Forwarding Rule).",
+        points=2,
+    )
+    _add_q(session, m6l4q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="In a BEC investigation an analyst sees: `From: mike.harris@acme.com`, `Reply-To: mike.harris.acme@gmail.com`, `Return-Path: bounces@acme-corp-finance.com`, DMARC fails for `acme.com` but a tenant Allow rule let the message through, and the body asks for a banking-details change. Beyond the auth signal, what is the single most diagnostic header-level red flag a junior analyst should learn to spot? (Two or three words.)",
+        options=None,
+        correct=["reply-to swap", "reply to swap", "reply-to mismatch", "reply to mismatch"],
+        explanation_md="The `Reply-To` swap diverts replies to an attacker-controlled address while the visible `From` looks legitimate. It survives auth alignment because DMARC does not check Reply-To, and it is what turns a phishing email into an active BEC conversation.",
+        points=2,
+    )
+
+    print(f"  L1: {course.title} — 6 modules, 43 lessons (Module 6 Phishing Triage @ proper depth)")
     return course
 
 
