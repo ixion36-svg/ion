@@ -1,5 +1,62 @@
 # Changelog
 
+## v0.11.16 (2026-04-28) — `seed_courses.py` baked into the image
+
+### Operator fix — courses now seed automatically on deploy
+
+`seed_courses.py` is now baked into the ION image and registered in `seed_all.py`'s `SEEDS` list. Pre-v0.11.16, course content lived only in the local-dev `seed_courses.py` file at the repo root — it was never copied into the image and never invoked by `seed_all.py`. Operators who pulled a new image on a deployed environment got the application code update but no course refresh, and had to manually `curl` the seed script from GitHub raw and pipe it into `docker exec -i ion python -`.
+
+#### What changed
+
+- **`Dockerfile`** — `seed_courses.py` added to the `COPY` block alongside the other production seed scripts. The file lands at `/app/seed_courses.py` inside the image.
+- **`seed_all.py`** — `("Courses (L1/L2/L3)", "seed_courses.py")` appended to the `SEEDS` list (last entry, after Core Templates / KB / Playbooks / SOC Templates). The subprocess runner invokes it the same way as every other seeder; `seed_courses.py` uses direct DB access via SQLAlchemy (`ion.storage.database`) rather than the HTTP API like the others, but the runner doesn't care which path the script takes.
+
+#### Operator workflow on deployed environments
+
+After this ship, the standard upgrade flow is:
+
+```bash
+# On the deployed host:
+sed -i 's/^ION_VERSION=.*/ION_VERSION=0.11.16/' .env
+docker compose pull ion seeder
+docker compose up -d
+```
+
+The `seeder` service runs after `ion` becomes healthy, executes `seed_all.py` end to end (including courses), writes the `.seeded` marker, and exits. On subsequent restarts, the marker prevents redundant seeding; pass `--force` to `seed_all.py` to re-seed.
+
+To force a re-seed of an already-seeded volume (for instance after a course-content update on a *new* image tag with the same data volume):
+
+```bash
+# Option A — via seed_all.py --force (recommended)
+docker exec ion python /app/seed_all.py --force
+
+# Option B — via seed_courses.py only (when only courses changed)
+docker exec ion python /app/seed_courses.py
+```
+
+`seed_courses.py` is itself idempotent — it removes `demo-*` courses first and re-seeds — so calling it directly is also a safe operation.
+
+#### Why this is a structural fix
+
+Pre-v0.11.16, every minor release that ships course content (v0.11.5 through v0.11.15) required operators to remember to `curl ... | docker exec -i ion python -` after pulling. That instruction was in the upgrade section of every CHANGELOG entry but easy to miss, and produced exactly the failure mode reported during v0.11.15 testing — pulled the new image, the new courses didn't appear, no obvious error.
+
+After v0.11.16, the seed pipeline is uniform: every release that touches `seed_courses.py` ships its updates the same way every release that touches KB articles or playbooks ships its updates — via the `seeder` container, gated by the `.seeded` marker, with a documented `--force` path for re-seeding.
+
+#### Note for offline-bundle users
+
+The offline build script (`scripts/build-offline-package.sh`) bundles `seed_courses.py` indirectly via the image — no changes needed there. Air-gapped operators get the same automatic behaviour after `load.sh` + `docker compose up -d`.
+
+#### Upgrade
+
+```bash
+docker compose pull ion seeder
+docker compose up -d seeder    # forces seeder to run on the new image
+```
+
+Or simply `docker compose up -d` to start every service (including `seeder`) on the new tag.
+
+---
+
 ## v0.11.15 (2026-04-28)
 
 ### L2 Module 4 — Identity & sign-in: Credential Access + Lateral Movement

@@ -25,7 +25,10 @@ SEED_URL = os.environ.get("ION_SEED_URL", "http://127.0.0.1:8000")
 DATA_DIR = os.environ.get("ION_DATA_DIR", "/data")
 MARKER = Path(DATA_DIR) / ".ion" / ".seeded"
 
-# Ordered list of seed scripts (HTTP API only)
+# Ordered list of seed scripts.
+# Most scripts use the HTTP API; `seed_courses.py` uses direct DB access
+# (SQLAlchemy via `ion.storage.database`). The subprocess runner below
+# doesn't care which path the script takes — it just invokes the file.
 SEEDS = [
     ("Core Templates", "seed_ion_data.py"),
     ("Knowledge Base (core)", "seed_knowledge_base.py"),
@@ -34,6 +37,7 @@ SEEDS = [
     ("Knowledge Base (security fundamentals)", "seed_knowledge_base_security_fundamentals.py"),
     ("Playbooks", "seed_playbooks.py"),
     ("SOC Templates", "seed_soc_templates.py"),
+    ("Courses (L1/L2/L3)", "seed_courses.py"),
 ]
 
 HEALTH_URL = f"{SEED_URL}/api/health"

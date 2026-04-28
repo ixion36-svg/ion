@@ -70,7 +70,7 @@ COPY src/ src/
 COPY seed_all.py seed_ion_data.py seed_knowledge_base.py \
      seed_knowledge_base_blueteam.py seed_knowledge_base_foundations.py \
      seed_knowledge_base_security_fundamentals.py \
-     seed_playbooks.py seed_soc_templates.py /app/
+     seed_playbooks.py seed_soc_templates.py seed_courses.py /app/
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
