@@ -12154,7 +12154,1080 @@ Both bodies submit to TIDE with severity *high*, threat metadata `T1071.001` + `
         points=2,
     )
 
-    print(f"  L2: {course.title} — 5 modules, 40 lessons (Module 5 Network Telemetry @ proper depth)")
+    # ── Module 6 — Email & collaboration: Initial Access ────────────────
+    mod6 = _add_module(
+        session, course, order=6,
+        title="Email & collaboration — Initial Access",
+        description_md=(
+            "Hunting on the email + collaboration plane. The Office 365 "
+            "Unified Audit Log surface (`logs-microsoft_o365.audit-*`); "
+            "**T1566 Phishing** sub-techniques (.001 attachment, .002 "
+            "link, .003 via service, .004 voice) and the email-side "
+            "fingerprints; **email authentication** (SPF / DKIM / DMARC "
+            "/ ARC / SRS / compauth) and the Reply-To swap signal; "
+            "post-click + AiTM downstream — T1098 OAuth backdoor, "
+            "T1556.006 federation tampering, T1114 email collection, "
+            "T1213 SharePoint / Teams / Atlassian mass-pull, T1534 "
+            "internal spear phishing, T1027.006 HTML smuggling on the "
+            "email side; statistical hunts (rare-sender / attachment-"
+            "hash / subject-burst / DMARC fail-rate / mailbox-rule "
+            "create-rate / MailItemsAccessed cluster); worked PEAK "
+            "capstone — *AiTM phishing → cookie theft → mass mailbox "
+            "forwarding rule + SharePoint exfil* — ending in a Kibana "
+            "Security EQL detection-rule body."
+        ),
+        estimated_minutes=240,
+    )
+
+    # Lesson 6.1 — Email + collaboration data plane + ECS reference
+    m6l1 = _add_lesson(
+        session, mod6, order=1,
+        title="The email + collaboration data plane in Elastic and the ECS email field reference",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Recognise the **Office 365 Unified Audit Log** surface in `logs-microsoft_o365.audit-*` and the workloads it covers (Exchange / SharePoint / OneDrive / Teams / Entra)
+> 2. Map the **operation names** an L2 hunts daily — `Send`, `MailItemsAccessed`, `New-InboxRule`, `Set-Mailbox`, `FileDownloaded`, `SearchQueryPerformed`, `Add-MailboxPermission`
+> 3. Read the **ECS `email.*` field reference** (added in 8.6) — `email.subject`, `email.from.address`, `email.to.address`, `email.message_id`, `email.attachments.file.*`
+> 4. Pivot between O365 audit, Entra sign-in, and Entra audit indices for a single user-takeover hunt
+> 5. Apply broad-to-narrow KQL → EQL → ES|QL on a single email-plane hunt
+>
+> **Prerequisites.** L2 Modules 1–5 (with M4 in particular for the Entra `session_id` AiTM pattern recapped here).
+
+## The Office 365 Unified Audit Log surface
+
+`logs-microsoft_o365.audit-*` is the single index pattern that carries every audit event across the Microsoft 365 estate: Exchange (mailbox + transport), SharePoint, OneDrive, Microsoft Teams, Entra ID admin actions, Power BI, and a handful of smaller workloads. The L2 filter discriminator is `o365.audit.Workload`:
+
+| Workload | Covers |
+|---|---|
+| `Exchange` | `Send`, `MailItemsAccessed`, `New-InboxRule`, `Set-Mailbox`, `Add-MailboxPermission`, mail-flow rules |
+| `SharePoint` | `FileDownloaded`, `FileAccessed`, `FileUploaded`, `SharingSet`, `PageViewed` |
+| `OneDrive` | Same shape as SharePoint, but for the personal OneDrive surface |
+| `MicrosoftTeams` | `MessageSent`, `MessageRead`, `MeetingDetail`, `MemberAdded`, `ChannelAdded` |
+| `AzureActiveDirectory` | Mirror of `logs-azure.auditlogs-*` for consent / role / app changes |
+| `SecurityComplianceCenter` | `SearchQueryPerformed` (eDiscovery / Compliance Search) |
+
+The L2's reflex for any user-takeover hunt: filter to `event.dataset: \"o365.audit\"` and pivot on `o365.audit.Operation` for the action verb.
+
+## Operation names an L2 hunts daily
+
+| Operation | What it captures | Hunt value |
+|---|---|---|
+| **`Send`** | Outbound mail send (Exchange) | Spear-phishing internal-from-internal (T1534) |
+| **`MailItemsAccessed`** | Mailbox content accessed via API or sync | T1114.002 remote email collection — *page-IR* if clustered post-AiTM |
+| **`New-InboxRule`** / **`Set-InboxRule`** | Inbox-rule create / modify | T1114.003 — finance-keyword rules are the BEC fingerprint |
+| **`Set-Mailbox -ForwardingSmtpAddress`** | Mailbox-level forwarding to attacker | T1114.003 / forwarding-rule persistence |
+| **`Add-MailboxPermission`** | Granting Full Access / Send-As | T1098 / mailbox-permission backdoor |
+| **`Add-MailboxFolderPermission`** | Folder-level share | Exfil via shared folder |
+| **`Add service principal credentials`** | OAuth client secret / cert added to a service principal | **T1098.001** — *page-IR* if non-admin actor |
+| **`Consent to application`** | User accepted an OAuth consent prompt | T1528 / OAuth-grant abuse |
+| **`Add member to role`** | Role assignment (`Global Administrator`, `Privileged Role Administrator`) | T1098.003 — *page-IR* signal |
+| **`FileDownloaded`** | SharePoint / OneDrive file download | T1213 mass-pull cluster |
+| **`SharingSet`** | External SharePoint share created | Data exfil via external link |
+| **`MessageSent`** | Teams chat message | T1534 / external-Teams-DM phishing |
+| **`SearchQueryPerformed`** | Compliance Search / eDiscovery | Adversary searching the tenant for sensitive content |
+| **`MessageTrace`** | Mail-flow trace lookup | Recon-by-attacker (rare in normal ops) |
+| **`Set domain authentication`** / **`Set federation settings on domain`** | Domain federation change | **T1556.006 — *page-IR* signal** |
+
+KQL for a *fast* O365-audit pivot:
+
+```kql
+event.dataset: "o365.audit"
+  and o365.audit.Workload: "Exchange"
+  and o365.audit.Operation: ("New-InboxRule" or "Set-InboxRule")
+```
+
+## ECS email field reference
+
+ECS added the `email.*` namespace in 8.6. The L2's working set:
+
+| Field | Carries |
+|---|---|
+| `email.subject` | Message subject |
+| `email.from.address` | RFC 5322 header From |
+| `email.to.address` / `email.cc.address` / `email.bcc.address` | Recipients |
+| `email.reply_to.address` | Reply-To header — the swap signal |
+| `email.sender.address` | RFC 5321 envelope sender |
+| `email.message_id` | RFC 5322 Message-ID |
+| `email.delivery_timestamp` | Hand-off to recipient mailbox |
+| `email.direction` | `inbound` / `outbound` |
+| `email.local_id` | The exchange-side ID for the message |
+| `email.attachments.file.name` | Attachment filename |
+| `email.attachments.file.hash.sha256` | Attachment hash — primary IOC |
+| `email.attachments.file.size` | Bytes |
+| `email.attachments.file.mime_type` | MIME type |
+
+For deployments still on pre-8.6 schema, equivalent fields surface under `winlogbeat-msexchange-*` or vendor-specific paths (Mimecast / Proofpoint integration field names). Confirm the schema version on the target estate before pinning a hunt to specific paths.
+
+## Third-party gateway integrations — recognise but don't pin
+
+| Gateway | Elastic integration | Notes |
+|---|---|---|
+| **Mimecast** | `logs-mimecast.*` | TTP / URL Protect / Attachment Protect logs |
+| **Proofpoint** | `logs-proofpoint_tap.*` | TAP / TRAP — auto-pull events |
+| **Cisco IronPort / SEG** | `logs-cisco_ironport.*` | Mail-flow + decisions |
+| **Barracuda / Trend / Sophos** | varies | Estate-specific |
+| **Abnormal Security** | `logs-abnormal_security.*` | ML-based gateway |
+| **Cofense / KnowBe4** | varies | User-reported phish workflow |
+
+The L2 should hunt against whichever gateway integration is wired in the estate; the *patterns* (phishing fingerprint, header analysis, URL reputation) are the same — only the field paths shift.
+
+## Cross-source pivot — the user-takeover hunt
+
+A single user takeover crosses three indices:
+
+```mermaid
+flowchart LR
+    SI[logs-azure.signinlogs-*<br/>risk + session_id reuse] --> AD[logs-azure.auditlogs-*<br/>OAuth consent / role grant]
+    AD --> O3[logs-microsoft_o365.audit-*<br/>inbox rule + MailItemsAccessed<br/>+ FileDownloaded]
+```
+
+ES|QL multi-index pivot keyed on `user.target.name` or the M4 UPN field:
+
+```esql
+FROM logs-azure.signinlogs-*, logs-azure.auditlogs-*, logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 24h
+  AND (user.name == "alex@corp.example"
+       OR user.target.name == "alex@corp.example"
+       OR azure.signinlogs.properties.user_principal_name == "alex@corp.example")
+| KEEP @timestamp, event.dataset, event.action,
+       azure.signinlogs.properties.risk_level_during_sign_in,
+       azure.auditlogs.operation_name,
+       o365.audit.Operation,
+       o365.audit.Workload
+| SORT @timestamp ASC
+```
+
+This produces a chronological per-user timeline across the three planes — the L2's daily reach for *what happened to this user in the last 24 hours?*
+
+## Worked broad-to-narrow on a single hunt
+
+**Hypothesis.** *In the past 7 days, an adversary has created an inbox rule with finance keywords on a victim mailbox after a high-risk Entra sign-in, observable in `logs-microsoft_o365.audit-*` `New-InboxRule` events with body keywords matching `wire / invoice / swift / payment / remit`.*
+
+**KQL** (Discover):
+
+```kql
+event.dataset: "o365.audit"
+  and o365.audit.Operation: ("New-InboxRule" or "Set-InboxRule")
+  and o365.audit.Parameters: (*invoice* or *wire* or *swift* or *payment* or *remit* or *bank* or *ach*)
+```
+
+**ES|QL** aggregation by user (user-fan-out + frequency):
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 7d
+  AND event.dataset == "o365.audit"
+  AND o365.audit.Operation IN ("New-InboxRule", "Set-InboxRule")
+  AND KQL("o365.audit.Parameters: (*invoice* OR *wire* OR *swift* OR *payment* OR *remit*)")
+| STATS rule_count = COUNT(),
+        rules = VALUES(o365.audit.Parameters)
+  BY user.target.name, BUCKET(@timestamp, 1h)
+| SORT rule_count DESC
+| LIMIT 100
+```
+
+**EQL** for the AiTM-then-rule chain joining sign-in to mailbox-rule:
+
+```eql
+sequence by user.target.name with maxspan=4h
+  [ any where event.dataset == "azure.signinlogs"
+          and azure.signinlogs.properties.risk_level_during_sign_in == "high" ]
+  [ any where event.dataset == "o365.audit"
+          and o365.audit.Operation : ("New-InboxRule", "Set-InboxRule") ]
+```
+
+A high-risk sign-in followed within 4 hours by an inbox-rule create from the same UPN is the textbook AiTM-to-BEC pattern.
+
+## Glossary
+
+- **`o365.audit.Workload`** — the discriminator field across Exchange / SharePoint / OneDrive / Teams / Entra audit events.
+- **`o365.audit.Operation`** — the action verb (`Send`, `MailItemsAccessed`, `New-InboxRule`, etc.).
+- **MailItemsAccessed** — Microsoft 365 audit event for mailbox content access; gated to E5 / A5 / G5 licences.
+- **ECS `email.*`** — added in 8.6; older deployments use Winlogbeat / vendor-specific schemas.
+- **Cross-source pivot** — `signinlogs` ↔ `auditlogs` ↔ `o365.audit` keyed on UPN.
+
+## Further reading
+
+- Microsoft Learn — *Office 365 Management Activity API audit schema*.
+- Elastic docs — *Microsoft 365 integration* (Filebeat / Elastic Agent).
+- ECS field reference — `email.*` namespace.
+""",
+    )
+    m6l1q = _add_lesson(
+        session, mod6, order=2, title="Email data plane — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on the o365.audit Workload+Operation discriminators, MailItemsAccessed licensing, the cross-source UPN pivot, and ECS email.* schema versioning.",
+    )
+    _add_q(session, m6l1q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 wants to filter the Office 365 Unified Audit Log to *only* mailbox-rule create / modify events. Which combination of fields is canonical?",
+        options=[
+            {"value": "kibana", "label": "`event.dataset: \"kibana.alert\"`"},
+            {"value": "audit", "label": "`event.dataset: \"o365.audit\" AND o365.audit.Workload: \"Exchange\" AND o365.audit.Operation: (\"New-InboxRule\" OR \"Set-InboxRule\")`"},
+            {"value": "azure", "label": "`event.dataset: \"azure.signinlogs\"`"},
+            {"value": "winlog", "label": "`event.dataset: \"winlogbeat\"`"},
+        ],
+        correct="audit",
+        explanation_md="The Unified Audit Log lives in `event.dataset: o365.audit`. The Workload (Exchange / SharePoint / Teams / etc.) discriminates between data planes; the Operation is the action verb. `New-InboxRule` and `Set-InboxRule` are the two operations the L2 hunts for the BEC inbox-rule fingerprint.",
+        points=2,
+    )
+    _add_q(session, m6l1q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following ECS `email.*` fields are core to email-plane hunting (added in ECS 8.6)?",
+        options=[
+            {"value": "subject", "label": "`email.subject`"},
+            {"value": "from", "label": "`email.from.address` (RFC 5322 header From)"},
+            {"value": "reply", "label": "`email.reply_to.address` (the Reply-To swap signal)"},
+            {"value": "att_hash", "label": "`email.attachments.file.hash.sha256`"},
+            {"value": "process_pid", "label": "`process.pid`"},
+        ],
+        correct=["subject", "from", "reply", "att_hash"],
+        explanation_md="The `email.*` namespace covers subject, from, reply-to, attachment hash, message-id, recipients. `process.pid` is from the process-event namespace (M3) — completely unrelated to the email plane.",
+        points=3,
+    )
+    _add_q(session, m6l1q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="The Microsoft 365 `MailItemsAccessed` audit event — used to detect T1114.002 Remote Email Collection — is **gated to E5 / A5 / G5 licences only**, so its presence (or absence) on a given tenant depends on the licensing tier and the L2 should confirm coverage before authoring hunts that depend on it.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** `MailItemsAccessed` is part of Microsoft Purview Audit (Premium), which requires E5 / A5 / G5 (or the standalone Audit Premium add-on). Lower-SKU tenants don't emit this event at all — the L2 must use alternative signals (mailbox-rule create-rate spikes, OAuth grant additions, sign-in risk + Mailbox forwarding) for the same hunt class on lower SKUs.",
+        points=2,
+    )
+    _add_q(session, m6l1q, order=4, kind=QuestionKind.SINGLE,
+        stem_md="An L2 wants to build a *user-timeline* hunt across Entra sign-in, Entra audit, and the Office 365 Unified Audit Log for one suspect UPN. Which ES|QL pattern is correct?",
+        options=[
+            {"value": "single_index", "label": "Query only `logs-microsoft_o365.audit-*`"},
+            {"value": "multi", "label": "`FROM logs-azure.signinlogs-*, logs-azure.auditlogs-*, logs-microsoft_o365.audit-*` with a UPN filter that matches across all three (`user.name`, `user.target.name`, `azure.signinlogs.properties.user_principal_name`)"},
+            {"value": "kql_only", "label": "Run three separate KQL searches and manually correlate"},
+            {"value": "join", "label": "`FROM logs-azure.signinlogs-* | LOOKUP JOIN logs-microsoft_o365.audit-*`"},
+        ],
+        correct="multi",
+        explanation_md="ES|QL multi-index `FROM` is first-class. The three indices use slightly different UPN field paths (`user.name` in O365 audit, `user.target.name` in Entra audit, `azure.signinlogs.properties.user_principal_name` in sign-in logs), so a robust filter ORs all three. The result is a chronological per-user timeline across the three planes.",
+        points=2,
+    )
+
+    # Lesson 6.2 — T1566 Phishing sub-techniques + email-side hunts
+    m6l2 = _add_lesson(
+        session, mod6, order=3,
+        title="T1566 Phishing — sub-techniques and email-side hunts",
+        lesson_type=LessonType.READING, duration_min=26,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Distinguish **T1566.001** Spearphishing Attachment (file delivery), **.002** Spearphishing Link (URL delivery), **.003** Spearphishing via Service (LinkedIn / Teams / Discord), **.004** Spearphishing Voice (vishing)
+> 2. Recognise **T1027.006 HTML Smuggling** as it surfaces in email-side telemetry
+> 3. Read **email-authentication results** (SPF / DKIM / DMARC / ARC / SRS / compauth) and the *Reply-To swap* signal
+> 4. Hunt **lookalike domain** patterns and **AiTM kit per-recipient tokens** in URL paths
+> 5. Catch **legacy authentication** post-AiTM and **OAuth-consent-prompt URL** patterns
+
+## T1566.001 Spearphishing Attachment
+
+File-delivery phishing — payloads ride as email attachments. The L2's first cut is the *risky-extension* filter against `email.attachments.file.extension` or `email.attachments.file.mime_type`:
+
+```kql
+event.dataset: "o365.audit"
+  and o365.audit.Operation: "Send"
+  and email.direction: "inbound"
+  and email.attachments.file.extension: ("html" or "htm" or "iso" or "img" or "vhd" or "vhdx"
+                                          or "lnk" or "one" or "svg" or "xll" or "appref-ms"
+                                          or "url" or "website" or "appx" or "msix")
+```
+
+Each extension maps to a documented evasion technique covered in L1 Module 6 — HTML smuggling on `.html`, MOTW-bypass containers on `.iso`/`.img`/`.vhd`, OneNote embedding on `.one`, LNK-with-cmdline on `.lnk`, SVG-with-script on `.svg`. The L2 hunts the cluster, not any single extension.
+
+### T1027.006 HTML Smuggling specifically
+
+JavaScript inside an email-attached HTML file reconstructs a binary payload from a base64 blob, evading email-gateway scanners that scan body text but not embedded blobs. The email-side fingerprint:
+
+```esql
+FROM logs-microsoft_o365.audit-*, logs-mimecast-*, logs-proofpoint_tap-*
+| WHERE @timestamp > NOW() - 7d
+  AND email.attachments.file.mime_type IN ("text/html", "application/octet-stream")
+  AND email.attachments.file.size > 100000
+| KEEP @timestamp, email.from.address, email.to.address,
+       email.subject, email.attachments.file.name,
+       email.attachments.file.size, email.attachments.file.hash.sha256
+| LIMIT 200
+```
+
+A 100 KB+ HTML attachment is unusual for legitimate mail; pair with hash-novelty to catch the smuggling pattern.
+
+## T1566.002 Spearphishing Link
+
+URL-delivery phishing. The L2's hunt classes:
+
+- **Lookalike-domain links** — `mlcrosoft-update.com` / `office365-secure.net` / IDN homoglyphs (`acmе.com`).
+- **OAuth-consent-prompt URLs** — `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?...&client_id=<unfamiliar-app>&scope=Mail.ReadWrite ...`. Catch via URL-pattern + OAuth-scope analysis.
+- **AiTM kit URLs** — kits like Tycoon / EvilProxy / Mamba 2FA / NakedPages / Caffeine encode a *per-recipient token* in the URL path or query string (`?id=USER-A1B2`, `/auth/<token>`). The token *survives mail-gateway URL rewriting* on most gateways.
+
+KQL for AiTM kit per-recipient-token URL patterns:
+
+```kql
+event.dataset: "o365.audit"
+  and o365.audit.Workload: "Exchange"
+  and email.direction: "inbound"
+  and url.full: (*?rid=*-* or *?id=*-* or *?vid=* or */auth/*)
+  and url.domain: (*.azurewebsites.net or *.workers.dev or *.r2.dev or *.web.app)
+```
+
+The combination of *cloud-hosted domain* + *per-recipient-looking token* in the URL is the AiTM-kit signature. Detection from the email-side beats waiting for the post-click sign-in.
+
+## T1566.003 Spearphishing via Service
+
+LinkedIn DM, Teams external chat, Discord, freemail. The Microsoft 365 telemetry:
+
+```kql
+event.dataset: "o365.audit"
+  and o365.audit.Workload: "MicrosoftTeams"
+  and o365.audit.Operation: "MessageSent"
+  and o365.audit.UserId: *external*
+```
+
+Tenant-allowed external Teams chat is a growing attack surface. Hunt for Teams messages from external users containing URL patterns matching the T1566.002 lookalike list above.
+
+## T1566.004 Spearphishing Voice
+
+Voice phishing (vishing) — the L2 rarely triages this directly from email telemetry; the downstream effect surfaces as user-reported password resets / MFA registrations / suspicious sign-ins (Module 4 surface).
+
+## Email authentication — SPF / DKIM / DMARC / ARC / SRS / compauth
+
+Most mail integrations normalise authentication results into a header-derived field. In Microsoft 365 the L2 reads `o365.audit.Headers` (or the gateway-specific equivalent) for:
+
+- **SPF** result — `pass` / `fail` / `softfail` / `neutral` / `none`. Fail isn't deterministic (forwarding breaks SPF) but a fail cluster from one sender is signal.
+- **DKIM** signature verification — `pass` / `fail` / `none`. Pair with the `d=` signing domain.
+- **DMARC** verdict — `pass` / `fail` with the policy applied (`reject` / `quarantine` / `none`). DMARC fails that landed in the inbox indicate either tenant Allow-list abuse or ARC-trusted forwarding.
+- **ARC chain** — relevant for forwarded mail; the receiving server seals the original auth result so downstream hops can still trust it.
+- **SRS** — Sender Rewriting Scheme; mailing-list / forwarder envelope rewriting. Rare but handy to recognise.
+- **compauth** — Microsoft's *composite authentication* result combining SPF / DKIM / DMARC. The single field that tells the L2 *did this message authenticate end to end*.
+
+Hunt for DMARC fails that *landed in the inbox* (i.e. tenant Allow-list let through):
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 24h
+  AND email.direction == "inbound"
+  AND KQL("(authentication_results: *dmarc=fail* OR compauth: *fail*) AND NOT delivery_action: \"Quarantine\"")
+| STATS count = COUNT() BY email.from.address, email.subject
+| SORT count DESC
+| LIMIT 100
+```
+
+## The Reply-To swap signal
+
+A header where the visible `From` address differs from the `Reply-To` address. Auth on the `From` passes (SPF/DKIM/DMARC for the legitimate-looking domain), and the conversation gets diverted to the attacker-controlled Reply-To on the user's reply.
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 7d
+  AND email.direction == "inbound"
+  AND email.from.address IS NOT NULL
+  AND email.reply_to.address IS NOT NULL
+  AND email.from.address != email.reply_to.address
+| EVAL from_domain = SPLIT(email.from.address, "@")[1]
+| EVAL reply_domain = SPLIT(email.reply_to.address, "@")[1]
+| WHERE from_domain != reply_domain
+| KEEP @timestamp, email.from.address, email.reply_to.address, email.subject
+| LIMIT 200
+```
+
+`From: ceo@yourcorp.com` + `Reply-To: ceo.private@gmail.com` is the textbook BEC fingerprint — and *passes auth* on the `From` because the attacker controls the apparent-CEO domain spoof at the visible-From layer separately.
+
+## Lookalike-domain detection
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 7d
+  AND email.direction == "inbound"
+  AND email.from.address IS NOT NULL
+| EVAL from_domain = SPLIT(email.from.address, "@")[1]
+| WHERE from_domain LIKE "%microsoft%"
+   OR from_domain LIKE "%office365%"
+   OR from_domain LIKE "%adobe%"
+   OR from_domain LIKE "%docusign%"
+   OR from_domain LIKE "%sharepoint%"
+| WHERE NOT from_domain IN ("microsoft.com", "outlook.com", "office.com",
+                              "office365.com", "sharepoint.com", "onmicrosoft.com",
+                              "adobe.com", "docusign.com", "docusign.net")
+| STATS count = COUNT() BY from_domain
+| SORT count DESC
+| LIMIT 100
+```
+
+The pattern: domain *contains* a brand string (`microsoft` / `adobe` / `docusign`) but isn't on the legitimate-domain whitelist. Catches typosquats (`mlcrosoft-update.com`) and combosquats (`microsoft-login-portal.io`).
+
+## Display-name vs domain mismatch
+
+`From: "Microsoft 365 Security Team" <noreply@account-security-portal.xyz>`. The display name claims a brand; the domain is unrelated. Detection:
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 7d
+  AND email.direction == "inbound"
+  AND email.from.name IS NOT NULL
+  AND email.from.address IS NOT NULL
+| EVAL from_domain = SPLIT(email.from.address, "@")[1]
+| WHERE (email.from.name LIKE "%Microsoft%" AND NOT from_domain LIKE "%microsoft%")
+   OR (email.from.name LIKE "%Adobe%" AND NOT from_domain LIKE "%adobe%")
+   OR (email.from.name LIKE "%DocuSign%" AND NOT from_domain LIKE "%docusign%")
+| KEEP @timestamp, email.from.name, email.from.address, email.subject
+| LIMIT 200
+```
+
+## Legacy authentication post-AiTM
+
+(M4 callback.) Once AiTM has captured a session cookie, the attacker may pivot to legacy-auth protocols (IMAP4 / POP3 / Authenticated SMTP / *Other clients*) which bypass MFA at the protocol level. Hunt for *successful* legacy-auth sign-ins for users who normally use modern auth:
+
+```kql
+event.dataset: "azure.signinlogs"
+  and azure.signinlogs.properties.client_app_used: ("IMAP4" or "POP3" or "Authenticated SMTP" or "Other clients")
+  and azure.signinlogs.properties.status.error_code: 0
+```
+
+## Glossary
+
+- **T1566 sub-techniques** — .001 attachment / .002 link / .003 service / .004 voice.
+- **AiTM kit per-recipient token** — `?id=USER-XXXX` / `?rid=*-*` URL patterns; survives gateway URL rewriting.
+- **compauth** — Microsoft's composite auth result combining SPF / DKIM / DMARC.
+- **Reply-To swap** — visible From and Reply-To diverge; BEC fingerprint that passes auth on From.
+
+## Further reading
+
+- Microsoft Learn — *Anti-spam message headers* (compauth reasons).
+- Elastic docs — *Microsoft 365 integration* event reference.
+- ATT&CK technique pages T1566 + sub-techniques + T1027.006.
+""",
+    )
+    m6l2q = _add_lesson(
+        session, mod6, order=4, title="T1566 phishing — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on the AiTM-kit per-recipient-token URL fingerprint, the Reply-To swap signal, DMARC fail bypassing tenant Allow-list, and the legacy-auth post-AiTM signal.",
+    )
+    _add_q(session, m6l2q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 hunts for **AiTM-kit phishing URLs** in inbound mail. Which URL-pattern combination is the strongest fingerprint?",
+        options=[
+            {"value": "any_https", "label": "Any HTTPS URL"},
+            {"value": "kit_token", "label": "URL with a *per-recipient token* in the path or query (`?id=USER-A1B2`, `?rid=*-*`, `/auth/<token>`) hosted on a cloud-fronted domain (`*.azurewebsites.net`, `*.workers.dev`, `*.r2.dev`, `*.web.app`)"},
+            {"value": "att_only", "label": "Any URL with an attachment"},
+            {"value": "external", "label": "Any external sender"},
+        ],
+        correct="kit_token",
+        explanation_md="AiTM kits encode a per-recipient token in the URL because the kit needs to know which victim's session it's relaying. The token survives gateway URL rewriting on most gateways, and the cloud-fronted domain provides cheap, ephemeral hosting. The *combination* — token + cloud-front — is the kit fingerprint. Catching this on the email-side beats waiting for the post-click sign-in.",
+        points=2,
+    )
+    _add_q(session, m6l2q, order=2, kind=QuestionKind.SHORTANSWER,
+        stem_md="A header pattern where `email.from.address` is `ceo@corp.example` (visible From, passes SPF / DKIM / DMARC) and `email.reply_to.address` is `ceo.private@gmail.com` (different domain entirely) is the textbook fingerprint of which BEC technique? (Two or three words.)",
+        options=None,
+        correct=["reply-to swap", "reply to swap", "reply-to mismatch", "reply to mismatch"],
+        explanation_md="**Reply-To swap.** The visible From passes auth (attacker controls a separate spoof or the email source legitimately authenticates), but the conversation gets diverted to the attacker-controlled Reply-To on the user's *reply*. Catches a class of BEC that *passes all three of SPF/DKIM/DMARC* on the From and is therefore not blockable by auth-only filtering.",
+        points=2,
+    )
+    _add_q(session, m6l2q, order=3, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *valid* email-authentication-result patterns the L2 should hunt as suspicious in inbound mail?",
+        options=[
+            {"value": "dmarc_fail", "label": "DMARC `fail` that *landed in the inbox* (not Quarantine) — indicates tenant Allow-list bypass or ARC-trusted forwarding"},
+            {"value": "compauth_fail", "label": "Microsoft `compauth: fail` (composite auth fail combining SPF / DKIM / DMARC)"},
+            {"value": "spf_softfail_cluster", "label": "SPF `softfail` cluster from one sending IP across many recipients"},
+            {"value": "dkim_pass", "label": "DKIM `pass` with the signing-domain `d=` matching the visible From"},
+            {"value": "dmarc_pass", "label": "DMARC `pass`"},
+        ],
+        correct=["dmarc_fail", "compauth_fail", "spf_softfail_cluster"],
+        explanation_md="DMARC fail, compauth fail, and SPF softfail clusters are anomaly signals. DKIM pass with `d=` matching From and DMARC pass are *normal* — exactly what legitimate authenticated mail produces. Hunting for those would be inverted; the L2 hunts *failures* that landed despite policy.",
+        points=3,
+    )
+    _add_q(session, m6l2q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="Even on a tenant where MFA is enforced for all users, a successful sign-in with `azure.signinlogs.properties.client_app_used == \"IMAP4\"` (or `POP3`, `Authenticated SMTP`, `Other clients`) is *especially* suspicious because legacy auth protocols bypass MFA at the protocol level — and this is a frequent post-AiTM persistence pattern on tenants that haven't fully disabled legacy auth.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** Legacy auth (IMAP4 / POP3 / Authenticated SMTP / Other clients) bypasses MFA at the protocol level. Microsoft has deprecated basic auth for most of these but estate coverage remains mixed. On an MFA-enforced tenant, a *successful* legacy-auth sign-in is either a configuration gap an attacker is exploiting, or post-AiTM persistence. Either way, page IR-grade signal.",
+        points=2,
+    )
+
+    # Lesson 6.3 — Post-click + AiTM downstream + collaboration hunts
+    m6l3 = _add_lesson(
+        session, mod6, order=5,
+        title="Post-click and AiTM downstream + collaboration-platform hunts",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Recap the **AiTM `session_id` reuse** pattern from Module 4 and join it to **post-takeover** O365 audit signals
+> 2. Hunt **T1098** account-manipulation tradecraft — .001 OAuth credential addition, .003 cloud-role grant, .005 device registration
+> 3. Recognise **T1556.006** Domain Federation Settings tampering as a *page-IR* Golden-SAML-prep signal
+> 4. Hunt **T1114** Email Collection — .003 forwarding rules with finance keywords, .002 MailItemsAccessed clusters
+> 5. Detect **T1213** SharePoint / Teams / OneDrive mass-pull and **T1534** Internal Spear Phishing
+
+## Recap — the AiTM downstream chain (M4 → M6)
+
+The Module 4 capstone established the AiTM session-cookie reuse signal. M6 extends that hunt with the *post-takeover* tradecraft an L2 sees on the O365 plane:
+
+```mermaid
+flowchart LR
+    A[Phishing click<br/>T1566.002] --> B[AiTM cookie theft<br/>T1539]
+    B --> C[Cloud sign-in<br/>session_id reuse<br/>T1078.004]
+    C --> D[Device registration<br/>T1098.005]
+    D --> E[OAuth secret added<br/>T1098.001]
+    E --> F[Cloud role added<br/>T1098.003]
+    F --> G[Inbox rule + forwarding<br/>T1114.003]
+    G --> H[SharePoint mass pull<br/>T1213]
+    H --> I[Exfil to cloud storage<br/>T1567.002]
+```
+
+Each stage produces a discrete audit event. The L2's daily reach is the *kill-chain* — recognising stages 1–4 lets the analyst escalate before stages 7–9 happen.
+
+## T1098 — Account Manipulation post-takeover
+
+### .001 Additional Cloud Credentials — OAuth backdoor
+
+Adversary adds an OAuth client secret or certificate to a service principal, establishing tenant-wide persistence independent of any user account.
+
+```esql
+FROM logs-azure.auditlogs-*
+| WHERE @timestamp > NOW() - 7d
+  AND azure.auditlogs.operation_name IN ("Update application – Certificates and secrets management",
+                                          "Add service principal credentials",
+                                          "Add owner to service principal")
+| STATS event_count = COUNT(),
+        actors = VALUES(azure.auditlogs.properties.initiated_by.user.user_principal_name),
+        targets = VALUES(azure.auditlogs.properties.target_resources)
+  BY azure.auditlogs.properties.target_resources, BUCKET(@timestamp, 1h)
+| SORT event_count DESC
+| LIMIT 100
+```
+
+A *non-admin actor* adding credentials to a high-privilege app like `Microsoft Graph PowerShell` is *page-IR*.
+
+### .003 Additional Cloud Roles
+
+Granting Global Administrator / Privileged Role Administrator / Application Administrator. Always page-IR-grade outside documented change windows.
+
+```kql
+event.dataset: "azure.auditlogs"
+  and azure.auditlogs.operation_name: ("Add member to role"
+                                        or "Add eligible member to role"
+                                        or "Add role assignment to role definition")
+  and azure.auditlogs.properties.target_resources: ("Global Administrator"
+                                                      or "Privileged Role Administrator"
+                                                      or "Application Administrator"
+                                                      or "Cloud Application Administrator")
+```
+
+### .005 Device Registration — compliant-device CA bypass
+
+After AiTM cookie theft, the attacker registers their own device in Entra ID, satisfying compliant-device Conditional Access policies. Recognise as the *AiTM finisher*.
+
+```kql
+event.dataset: "azure.auditlogs"
+  and azure.auditlogs.operation_name: ("Add device" or "Add registered users to device")
+```
+
+Pair with M4's `session_id` reuse signal — a registration event from the same UPN that just had AiTM-fingerprint sign-in is the high-confidence pattern.
+
+## T1556.006 Domain Federation Settings — Golden SAML preparation
+
+Adding a rogue federated domain or trust enables tenant-wide *Golden SAML* persistence — sign tokens with a stolen ADFS / token-signing key. **Always page-IR.**
+
+```kql
+event.dataset: "azure.auditlogs"
+  and azure.auditlogs.operation_name: ("Set domain authentication"
+                                        or "Set federation settings on domain"
+                                        or "Update domain")
+```
+
+The hunt is *trivial* but the disposition is severe — federation-settings changes are extremely rare in normal ops (usually once a year, with a documented change ticket). Unattributed = page IR.
+
+## T1114 Email Collection
+
+### .003 Email Forwarding Rule — the BEC fingerprint
+
+Inbox rule with finance keywords and `MoveToFolder` / `MarkAsRead` / `Forward` / `Redirect` actions. Captured in M4 Lesson 4.7's capstone; restated here for the email-side angle:
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 24h
+  AND o365.audit.Operation IN ("New-InboxRule", "Set-InboxRule")
+  AND KQL("o365.audit.Parameters: (*invoice* OR *wire* OR *swift* OR *payment* OR *remit* OR *ach* OR *bank*)")
+  AND KQL("o365.audit.Parameters: (*MoveToFolder* OR *DeleteMessage* OR *MarkAsRead* OR *ForwardTo* OR *RedirectTo*)")
+| KEEP @timestamp, user.target.name, o365.audit.Parameters
+| SORT @timestamp DESC
+| LIMIT 100
+```
+
+### .002 Remote Email Collection — `MailItemsAccessed` clusters
+
+Microsoft Purview Audit (Premium) emits `MailItemsAccessed` for mailbox content read via API or sync — Graph mass-pull, EWS, IMAP, OWA bulk view. A cluster of `MailItemsAccessed` events for one user immediately after a high-risk Entra sign-in is the textbook T1114.002 fingerprint.
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 24h
+  AND o365.audit.Operation == "MailItemsAccessed"
+| STATS access_count = COUNT() BY user.target.name, BUCKET(@timestamp, 5m)
+| WHERE access_count > 50
+| SORT access_count DESC
+| LIMIT 100
+```
+
+Note the licensing gate (E5 / A5 / G5) — for lower-SKU tenants the L2 falls back to mailbox-rule + forwarding signals instead.
+
+## T1213 — Data from Information Repositories
+
+### SharePoint / OneDrive mass-pull
+
+`FileDownloaded` is the workhorse audit operation. A cluster of downloads from one user touching many distinct SharePoint sites in a short window indicates collection:
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 24h
+  AND o365.audit.Workload IN ("SharePoint", "OneDrive")
+  AND o365.audit.Operation == "FileDownloaded"
+| STATS download_count = COUNT(),
+        unique_sites = COUNT_DISTINCT(o365.audit.SiteUrl),
+        unique_files = COUNT_DISTINCT(o365.audit.SourceFileName)
+  BY user.target.name, BUCKET(@timestamp, 1h)
+| WHERE download_count > 100 OR unique_sites > 5
+| SORT download_count DESC
+| LIMIT 100
+```
+
+### `SharingSet` external-share signal
+
+Adversary creates external-shareable links to the data they've collected, bypassing the need for inline exfil:
+
+```kql
+event.dataset: "o365.audit"
+  and o365.audit.Workload: ("SharePoint" or "OneDrive")
+  and o365.audit.Operation: ("SharingSet" or "AnonymousLinkCreated" or "AddedToGroup")
+```
+
+### Teams chat exfil
+
+Teams `MessageSent` clusters from a compromised user to an external Teams chat (tenant-allowed external chat is increasing surface):
+
+```kql
+event.dataset: "o365.audit"
+  and o365.audit.Workload: "MicrosoftTeams"
+  and o365.audit.Operation: "MessageSent"
+  and o365.audit.MessageURLs: *
+```
+
+### `SearchQueryPerformed` recon
+
+Adversary inside the tenant uses Compliance Search / eDiscovery to find sensitive content. Rare in legitimate operations outside the security and legal teams.
+
+```kql
+event.dataset: "o365.audit"
+  and o365.audit.Workload: "SecurityComplianceCenter"
+  and o365.audit.Operation: "SearchQueryPerformed"
+  and not user.target.name: ("ediscovery_*" or "compliance_*" or "soc_*")
+```
+
+## T1534 — Internal Spear Phishing
+
+Once an account is compromised, the attacker uses *legitimate* Exchange to send phishing internally — auth passes, DKIM passes, no DMARC fail because mail is from a real internal user. Detection requires *behavioural* analysis on the post-takeover send pattern:
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 24h
+  AND o365.audit.Operation == "Send"
+  AND email.direction == "outbound"
+| STATS sent_count = COUNT(),
+        recipients = COUNT_DISTINCT(email.to.address),
+        subjects = COUNT_DISTINCT(email.subject)
+  BY user.target.name, BUCKET(@timestamp, 1h)
+| WHERE sent_count > 50 AND subjects <= 3
+| SORT sent_count DESC
+| LIMIT 100
+```
+
+The pattern: one user sends > 50 messages with ≤ 3 distinct subjects to many distinct recipients in 1 hour — a bulk-from-internal pattern that's atypical for legitimate user activity. Pair with M4 sign-in risk to attribute to AiTM.
+
+## T1027.006 HTML Smuggling — email-side fingerprint
+
+Recap: HTML attachment with > 100 KB body containing base64 + `Blob` / `msSaveOrOpenBlob` / `URL.createObjectURL`. From the email-side, the fingerprint is the *attachment hash never seen before* + *high-byte HTML attachment* combination — production hunts join attachment-hash novelty with size:
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 7d
+  AND email.direction == "inbound"
+  AND email.attachments.file.mime_type IN ("text/html", "application/octet-stream")
+| STATS first_seen = MIN(@timestamp),
+        recipient_count = COUNT_DISTINCT(email.to.address),
+        max_size = MAX(email.attachments.file.size)
+  BY email.attachments.file.hash.sha256
+| WHERE max_size > 100000 AND recipient_count >= 1
+| SORT first_seen DESC
+| LIMIT 200
+```
+
+## Glossary
+
+- **AiTM-to-BEC kill chain** — phishing click → cookie theft → cloud sign-in → device reg → OAuth secret → cloud role → inbox rule → SharePoint pull → cloud-storage exfil.
+- **`MailItemsAccessed`** — T1114.002 fingerprint; E5/A5/G5 licence-gated.
+- **`SharingSet` / `AnonymousLinkCreated`** — external-share exfil signals on SharePoint / OneDrive.
+- **T1534 Internal Spear Phishing** — auth-passing post-compromise mass-send pattern.
+
+## Further reading
+
+- Microsoft Learn — *Audit log activities* (full operation reference).
+- ATT&CK technique pages T1098 / T1556 / T1114 / T1213 / T1534.
+- Elastic Security prebuilt rules — Email & Cloud Identity rule library.
+""",
+    )
+    m6l3q = _add_lesson(
+        session, mod6, order=6, title="Post-click & collaboration — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on T1556.006 federation tampering severity, T1098.001 OAuth backdoor, MailItemsAccessed cluster reading, and the T1534 internal phishing shape.",
+    )
+    _add_q(session, m6l3q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 sees an Entra audit-log event `Set federation settings on domain` for the tenant's primary domain. The change-management ticket database shows no documented federation change. What is the L2's correct disposition?",
+        options=[
+            {"value": "info", "label": "Tag as informational; federation changes happen periodically"},
+            {"value": "queue", "label": "Open a low-severity case for review next shift"},
+            {"value": "page", "label": "**Page IR immediately** — `Set federation settings on domain` is a T1556.006 fingerprint that paves the path to *Golden SAML* T1606.002 tenant-wide persistence; Tier-0-equivalent risk in the cloud control plane"},
+            {"value": "tune", "label": "Submit a tuning ticket — the rule is FP-rich"},
+        ],
+        correct="page",
+        explanation_md="Federation-settings changes are extremely rare in normal ops (usually once a year, with documented change). Unattributed = page IR. The operator is establishing tenant-wide persistence via a rogue federated domain — Golden SAML preparation that bypasses every conditional-access control. Freeze the affected domain, revoke any in-progress federation change, and engage IR + Legal.",
+        points=2,
+    )
+    _add_q(session, m6l3q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following Entra audit-log events are *high-priority* T1098 Account Manipulation signals an L2 should escalate immediately when fired by a non-admin actor?",
+        options=[
+            {"value": "add_sp_creds", "label": "`Add service principal credentials` — T1098.001 OAuth backdoor"},
+            {"value": "role_grant", "label": "`Add member to role` for `Global Administrator` / `Privileged Role Administrator` / `Application Administrator` — T1098.003"},
+            {"value": "add_device", "label": "`Add device` for an unfamiliar Entra device — T1098.005 (compliant-device CA bypass)"},
+            {"value": "set_fed", "label": "`Set federation settings on domain` — T1556.006 (Golden SAML preparation)"},
+            {"value": "user_login", "label": "Successful interactive sign-in from a domestic IP"},
+        ],
+        correct=["add_sp_creds", "role_grant", "add_device", "set_fed"],
+        explanation_md="The first four are all canonical post-AiTM persistence signals — service-principal credential addition, privileged-role grant, device registration, federation-settings change. Each is *page-IR* on its own; the cluster of two or more is unmistakable. Domestic-IP interactive sign-in is normal user behaviour.",
+        points=3,
+    )
+    _add_q(session, m6l3q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="An L2 hunts for **T1114.002 Remote Email Collection** by counting `MailItemsAccessed` events per user per 5-minute bucket and flagging clusters > 50. The hunt produces zero results across the entire fleet over 30 days. What's the most likely explanation before assuming the technique is absent?",
+        options=[
+            {"value": "no_attack", "label": "The technique is genuinely not active in the environment"},
+            {"value": "license", "label": "`MailItemsAccessed` is gated to E5 / A5 / G5 licences (Microsoft Purview Audit Premium); on lower-SKU tenants the event simply isn't emitted, regardless of activity. The L2 should confirm tenant licensing tier before drawing conclusions, and use alternative signals (mailbox-rule + forwarding-rule clusters) on lower-SKU tenants"},
+            {"value": "bug", "label": "Bug in the Filebeat module"},
+            {"value": "field", "label": "The field is named differently"},
+        ],
+        correct="license",
+        explanation_md="`MailItemsAccessed` is a Purview Audit Premium feature requiring E5 / A5 / G5 (or the standalone Audit Premium add-on). Lower-SKU tenants don't emit the event — meaning a zero-result hunt is *uninformative* rather than reassuring. The L2's reflex on a new estate: confirm licensing tier first, then pick the signal set that matches the tier. Lower-SKU equivalent hunts use mailbox-rule create-rate, forwarding-rule clusters, and OAuth grant additions.",
+        points=2,
+    )
+    _add_q(session, m6l3q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="A user sending > 50 messages with ≤ 3 distinct subjects to many distinct recipients within a 1-hour window from inside the tenant — where SPF / DKIM / DMARC all pass because the mail is genuinely from a real authenticated internal user — is a high-confidence T1534 Internal Spear Phishing pattern that legitimate user activity rarely produces.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** Legitimate user activity touches many subjects across many threads in a normal day; it doesn't produce 50+ near-identical sends. The auth-passing nature of post-compromise internal phishing is exactly what makes it dangerous (auth-only filtering can't catch it) and what makes the *behavioural* pattern — high-volume + low-subject-diversity + many-recipients — the L2's primary detection surface. Pair with M4 sign-in risk to confirm AiTM-driven compromise.",
+        points=2,
+    )
+
+    # Lesson 6.4 — Statistical hunts + capstone
+    m6l4 = _add_lesson(
+        session, mod6, order=7,
+        title="Statistical-anomaly hunts on email + collaboration and a worked end-to-end capstone",
+        lesson_type=LessonType.READING, duration_min=26,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Apply the **five canonical email-plane statistical-anomaly patterns** — rare-sender, attachment-hash novelty, subject-burst, DMARC fail-rate spike, mailbox-rule create-rate
+> 2. Author **MailItemsAccessed cluster** anomaly hunts with M4 sign-in-risk pairing
+> 3. Walk the **PEAK capstone** — *AiTM phishing → cookie theft → mass mailbox forwarding rule + SharePoint exfil* — end to end
+> 4. Produce a **Kibana Security EQL detection-rule body** for the BEC-takeover-with-data-exfil chain
+
+## Five canonical email-plane statistical patterns
+
+### 1. Rare-sender across the fleet
+
+Sender domains seen on ≤ N recipients fleet-wide:
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 30d
+  AND email.direction == "inbound"
+  AND email.from.address IS NOT NULL
+| EVAL from_domain = SPLIT(email.from.address, "@")[1]
+| STATS recipient_count = COUNT_DISTINCT(email.to.address),
+        message_count = COUNT(),
+        first_seen = MIN(@timestamp)
+  BY from_domain
+| WHERE recipient_count <= 3 AND message_count <= 10
+| SORT first_seen DESC
+| LIMIT 200
+```
+
+Rare *new* sender domains delivered to a small number of recipients are worth investigation — most legitimate senders have organisation-wide footprints once they've been received before.
+
+### 2. Attachment-hash novelty
+
+Attachment SHA-256 hashes never seen before, delivered to multiple users in a short window:
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 7d
+  AND email.direction == "inbound"
+  AND email.attachments.file.hash.sha256 IS NOT NULL
+| STATS first_seen = MIN(@timestamp),
+        recipient_count = COUNT_DISTINCT(email.to.address),
+        senders = VALUES(email.from.address)
+  BY email.attachments.file.hash.sha256, email.attachments.file.name
+| WHERE recipient_count >= 5
+| SORT first_seen DESC
+| LIMIT 200
+```
+
+5+ recipients receiving the same novel-hash attachment in a short window is bulk-phish or campaign distribution.
+
+### 3. Subject-burst
+
+One subject delivered to > 50 mailboxes within 30 minutes from one external sender:
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 24h
+  AND email.direction == "inbound"
+  AND email.from.address IS NOT NULL
+| STATS recipient_count = COUNT_DISTINCT(email.to.address),
+        message_count = COUNT()
+  BY email.subject, email.from.address, BUCKET(@timestamp, 30m)
+| WHERE recipient_count > 50
+| SORT recipient_count DESC
+| LIMIT 100
+```
+
+### 4. DMARC fail-rate spike per sender
+
+Senders whose DMARC-fail rate jumps over baseline:
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 24h
+  AND email.direction == "inbound"
+| EVAL is_dmarc_fail = CASE(KQL("authentication_results: *dmarc=fail*"), 1, 0)
+| STATS total = COUNT(),
+        fails = SUM(is_dmarc_fail)
+  BY email.from.address, BUCKET(@timestamp, 1h)
+| EVAL fail_ratio = TO_DOUBLE(fails) / TO_DOUBLE(total)
+| WHERE total > 10 AND fail_ratio > 0.5
+| SORT fail_ratio DESC
+```
+
+A sender suddenly failing DMARC half the time indicates either the sender's auth posture broke or someone is spoofing them.
+
+### 5. Mailbox-rule create-rate per user
+
+A user creating > 1 inbox rule per 5-minute window — most users create rules once a year:
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 24h
+  AND o365.audit.Operation IN ("New-InboxRule", "Set-InboxRule")
+| STATS rule_count = COUNT() BY user.target.name, BUCKET(@timestamp, 5m)
+| WHERE rule_count > 1
+| SORT rule_count DESC
+```
+
+Pair with finance-keyword filter for the BEC fingerprint.
+
+## MailItemsAccessed cluster + sign-in-risk pair
+
+The high-confidence T1114.002 pattern — pair MailItemsAccessed clustering with M4's high-risk sign-in:
+
+```esql
+FROM logs-microsoft_o365.audit-*, logs-azure.signinlogs-*
+| WHERE @timestamp > NOW() - 24h
+  AND ((event.dataset == "o365.audit" AND o365.audit.Operation == "MailItemsAccessed")
+       OR (event.dataset == "azure.signinlogs"
+           AND azure.signinlogs.properties.risk_level_during_sign_in IN ("high", "medium")))
+| STATS access_count = COUNTIF(o365.audit.Operation == "MailItemsAccessed"),
+        risky_signin_count = COUNTIF(event.dataset == "azure.signinlogs")
+  BY user.target.name, BUCKET(@timestamp, 30m)
+| WHERE access_count > 50 AND risky_signin_count >= 1
+| SORT access_count DESC
+| LIMIT 100
+```
+
+A 30-minute window with both a high-risk sign-in and 50+ MailItemsAccessed events for the same user is *page-IR*.
+
+## The PEAK capstone — AiTM phishing → cookie theft → mass mailbox-forwarding + SharePoint exfil
+
+A complete L2-grade hunt walked end to end.
+
+### Prepare
+
+**Hypothesis (four-element).** *In the past 7 days, an adversary has executed the AiTM-to-BEC chain on at least one user — phishing-click on a cloud-fronted URL, AiTM session-cookie reuse via Entra `session_id`, an inbox-rule create with finance keywords, and SharePoint mass-download — observable across `logs-microsoft_o365.audit-*` and `logs-azure.signinlogs-*` joined on `user.target.name`.*
+
+- **ATT&CK chain:** T1566.002 → T1539 → T1078.004 → T1098.005 → T1114.003 → T1213.
+- **Data sources:** `logs-microsoft_o365.audit-*`, `logs-azure.signinlogs-*`, `logs-azure.auditlogs-*`.
+- **Window:** explicit UTC bounds, last 7 days.
+
+### Execute
+
+**Q1 — Broad ES|QL** (anomalous Entra sign-ins per user):
+
+```esql
+FROM logs-azure.signinlogs-*
+| WHERE @timestamp > NOW() - 7d
+  AND azure.signinlogs.properties.risk_level_during_sign_in IN ("high", "medium")
+| STATS risk_event_count = COUNT(),
+        risk_types = VALUES(azure.signinlogs.properties.risk_event_types_v2),
+        ips = VALUES(azure.signinlogs.properties.ip_address)
+  BY azure.signinlogs.properties.user_principal_name, BUCKET(@timestamp, 1h)
+| SORT risk_event_count DESC
+| LIMIT 100
+```
+
+**Q2 — Narrow with `session_id` reuse** (M4-style AiTM signal):
+
+```esql
+FROM logs-azure.signinlogs-*
+| WHERE @timestamp > NOW() - 7d
+| STATS device_count = COUNT_DISTINCT(azure.signinlogs.properties.device_detail.device_id),
+        ip_count = COUNT_DISTINCT(azure.signinlogs.properties.ip_address),
+        ua_count = COUNT_DISTINCT(azure.signinlogs.properties.device_detail.browser),
+        events = COUNT()
+  BY azure.signinlogs.properties.user_principal_name,
+     azure.signinlogs.properties.session_id,
+     BUCKET(@timestamp, 30m)
+| WHERE (device_count > 1 OR ua_count > 1) AND events >= 2
+| SORT events DESC
+| LIMIT 100
+```
+
+**Q3 — Enrichment** (BEC inbox-rule + SharePoint mass-pull on the same UPN):
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE @timestamp > NOW() - 7d
+  AND user.target.name == "<survivor UPN>"
+| KEEP @timestamp, o365.audit.Workload, o365.audit.Operation, o365.audit.Parameters,
+       o365.audit.SourceFileName, o365.audit.SiteUrl
+| SORT @timestamp ASC
+```
+
+**Q4 — Disposition with EQL `sequence`** covering the four-step chain:
+
+```eql
+sequence by user.target.name with maxspan=2h
+  [ any where event.dataset == "azure.signinlogs"
+          and azure.signinlogs.properties.risk_level_during_sign_in == "high" ]
+  [ any where event.dataset == "azure.auditlogs"
+          and azure.auditlogs.operation_name : "Add device" ]
+  [ any where event.dataset == "o365.audit"
+          and o365.audit.Operation : ("New-InboxRule", "Set-InboxRule") ]
+  [ any where event.dataset == "o365.audit"
+          and o365.audit.Workload : ("SharePoint", "OneDrive")
+          and o365.audit.Operation == "FileDownloaded" ]
+```
+
+A user with all four steps in a 2-hour window is the textbook AiTM-to-BEC-to-data-exfil chain.
+
+### Act
+
+A high-confidence TP — page IR with the hunt report attached. Suggested L1 / L2 containment: revoke active sessions (`Revoke-MgUserSignInSession`), revoke any OAuth grants added by the user in the window, force password reset, force MFA re-registration, soft-delete the inbox rule (preserve for evidence — disable not delete), notify the user out-of-band.
+
+### Know
+
+Update Navigator coverage red → orange. Propose the EQL `sequence` from Q4 as the Kibana Security detection-rule body with severity *critical*, threat metadata (`TA0001 / TA0006 / TA0009 / TA0010` + the relevant T-numbers), runbook reference `RUNBOOK-AITM-BEC-EXFIL`, owner team `IR-team`. After 90 days FP-rate measurement and whitelist refinement, transition orange → yellow → green.
+
+### The detection-rule body
+
+The Q4 EQL `sequence` *is* the rule body — no rewriting:
+
+```eql
+sequence by user.target.name with maxspan=2h
+  [ any where event.dataset == "azure.signinlogs"
+          and azure.signinlogs.properties.risk_level_during_sign_in == "high" ]
+  [ any where event.dataset == "azure.auditlogs"
+          and azure.auditlogs.operation_name : "Add device" ]
+  [ any where event.dataset == "o365.audit"
+          and o365.audit.Operation : ("New-InboxRule", "Set-InboxRule") ]
+  [ any where event.dataset == "o365.audit"
+          and o365.audit.Workload : ("SharePoint", "OneDrive")
+          and o365.audit.Operation == "FileDownloaded" ]
+```
+
+Metadata YAML:
+
+```yaml
+rule_type: eql
+severity: critical
+threat:
+  - tactic_id: TA0001
+    technique_id: T1566.002
+  - tactic_id: TA0006
+    technique_id: T1539
+  - tactic_id: TA0003
+    technique_id: T1098.005
+  - tactic_id: TA0009
+    technique_id: T1114.003
+  - tactic_id: TA0009
+    technique_id: T1213
+runbook: RUNBOOK-AITM-BEC-EXFIL
+owner: IR-team
+```
+
+## Glossary
+
+- **Five canonical email-plane statistical patterns** — rare-sender / attachment-hash novelty / subject-burst / DMARC fail-rate spike / mailbox-rule create-rate.
+- **MailItemsAccessed + sign-in-risk pair** — the high-confidence T1114.002 fingerprint.
+- **Four-step AiTM-to-BEC-exfil chain** — risky sign-in → device add → inbox rule → SharePoint mass-pull, all keyed on one UPN within 2 hours.
+
+## Further reading
+
+- ATT&CK technique pages — full chain reference.
+- Microsoft Learn — `MailItemsAccessed` documentation.
+- Elastic docs — *Microsoft 365* and *Azure Active Directory* integration references.
+""",
+    )
+    m6l4q = _add_lesson(
+        session, mod6, order=8, title="Email statistical hunts & capstone — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on the rare-sender pattern, mailbox-rule create-rate baseline, the four-step AiTM chain ordering, and the detection-rule body format.",
+    )
+    _add_q(session, m6l4q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 wants to hunt for users creating *anomalous* numbers of inbox rules — the BEC fingerprint where post-AiTM the attacker creates one or more finance-keyword rules. What baseline assumption is the hunt's threshold built on?",
+        options=[
+            {"value": "monthly", "label": "Most users create > 10 inbox rules per month"},
+            {"value": "rare", "label": "Most users create *zero or one* inbox rules per year — so > 1 inbox-rule-create event per user per 5-minute window is anomalous"},
+            {"value": "daily", "label": "Most users create one rule per day"},
+            {"value": "never", "label": "No legitimate user ever creates inbox rules"},
+        ],
+        correct="rare",
+        explanation_md="Inbox-rule creation is genuinely rare in normal user behaviour — most users create zero rules per year, and even power users create perhaps one or two. So a single user creating > 1 inbox rule in a 5-minute window is unusual; pair with finance-keyword body filter and that becomes the textbook BEC fingerprint with very low FP rate.",
+        points=2,
+    )
+    _add_q(session, m6l4q, order=2, kind=QuestionKind.SHORTANSWER,
+        stem_md="Map the canonical four-step **AiTM-to-BEC-to-data-exfil chain** to the ATT&CK technique IDs in order: *high-risk Entra sign-in → device registration → inbox rule create → SharePoint mass file-download*. Use sub-tech IDs where relevant. Format: `T####.### → T####.### → T####.### → T####`.",
+        options=None,
+        correct=[
+            "T1078.004 → T1098.005 → T1114.003 → T1213",
+            "T1078.004 -> T1098.005 -> T1114.003 -> T1213",
+            "1078.004 → 1098.005 → 1114.003 → 1213",
+            "T1078.004, T1098.005, T1114.003, T1213",
+            "T1078.004 T1098.005 T1114.003 T1213",
+        ],
+        explanation_md="**T1078.004 (Cloud Accounts) → T1098.005 (Device Registration) → T1114.003 (Email Forwarding Rule) → T1213 (Data from Information Repositories)**. The four steps form the textbook cloud-takeover chain — the L2 hunts the chain as an EQL `sequence by user.target.name with maxspan=2h`, which becomes a Kibana Security EQL detection-rule body with severity *critical*.",
+        points=2,
+    )
+    _add_q(session, m6l4q, order=3, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *valid* email-plane statistical-anomaly hunt patterns the L2 should run regularly?",
+        options=[
+            {"value": "rare_sender", "label": "**Rare-sender** — sender domains seen on ≤ 3 recipients fleet-wide with ≤ 10 messages"},
+            {"value": "att_hash", "label": "**Attachment-hash novelty** — never-before-seen SHA-256 hashes delivered to ≥ 5 recipients in a short window"},
+            {"value": "subj_burst", "label": "**Subject-burst** — one subject to > 50 mailboxes within 30 min from one external sender"},
+            {"value": "dmarc_spike", "label": "**DMARC fail-rate spike** — sender whose DMARC-fail rate jumps over baseline (e.g. > 50% fails per hour)"},
+            {"value": "rule_rate", "label": "**Mailbox-rule create-rate** — user creating > 1 inbox rule per 5-minute window"},
+            {"value": "any_email", "label": "Any inbound email containing the word `urgent`"},
+        ],
+        correct=["rare_sender", "att_hash", "subj_burst", "dmarc_spike", "rule_rate"],
+        explanation_md="The five canonical statistical patterns are exactly those listed in the first five options. Filtering for any inbound email containing `urgent` is too coarse — produces enormous noise without specificity.",
+        points=3,
+    )
+    _add_q(session, m6l4q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="The Q4 EQL `sequence by user.target.name with maxspan=2h` covering the four-step AiTM-to-BEC chain (risky sign-in → device add → inbox rule → SharePoint download) becomes a **Kibana Security EQL detection-rule body** with no rewriting — the same query that found the hunt finding fires the rule, with severity / threat-metadata / runbook / owner added at conversion time.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** Kibana Security's EQL rule type accepts `sequence` bodies directly. The L2's hunt query *is* the candidate rule body. The five-gate hand-off (M1 Lesson 4) adds FP-rate measurement, whitelist filters, severity / runbook / owner metadata, the TIDE submission, and the lifecycle plan — but the *query body* itself doesn't change. This 1:1 hunt-to-detection mapping is the architectural reason EQL is the preferred chain-rule language in Kibana Security.",
+        points=2,
+    )
+
+    print(f"  L2: {course.title} — 6 modules, 48 lessons (Module 6 Email & Collaboration @ proper depth)")
     return course
 
 

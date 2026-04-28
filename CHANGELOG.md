@@ -1,5 +1,46 @@
 # Changelog
 
+## v0.11.18 (2026-04-28)
+
+### L2 Module 6 — Email & collaboration: Initial Access
+
+Sixth L2 ship. **L2 Module 6 — Email & collaboration — Initial Access** authored at BTL1+/SANS depth. ~9,000 words, 8 lessons (4 reading + 4 quiz), 16 quiz questions. Covers the Microsoft 365 Unified Audit Log surface end to end, with the AiTM-to-BEC-to-data-exfil four-step capstone.
+
+#### Lesson breakdown
+
+| # | Title | Type | Quiz qs |
+|---|---|---|---|
+| 6.1 | Email + collaboration data plane + ECS email field reference | reading | — |
+| 6.2 | Email data plane — quiz | quiz | 4 |
+| 6.3 | T1566 Phishing — sub-techniques and email-side hunts | reading | — |
+| 6.4 | T1566 phishing — quiz | quiz | 4 |
+| 6.5 | Post-click and AiTM downstream + collaboration-platform hunts | reading | — |
+| 6.6 | Post-click & collaboration — quiz | quiz | 4 |
+| 6.7 | Statistical-anomaly hunts on email + collaboration and worked end-to-end capstone | reading | — |
+| 6.8 | Email statistical hunts & capstone — quiz | quiz | 4 |
+
+#### Topics covered
+
+- **Email + collaboration data plane** — Microsoft 365 Unified Audit Log workloads (Exchange / SharePoint / OneDrive / Teams / Entra) via `o365.audit.Workload`; the operation-name reference (`Send`, `MailItemsAccessed`, `New-InboxRule` / `Set-InboxRule`, `Set-Mailbox`, `Add-MailboxPermission`, `FileDownloaded`, `SharingSet`, `MessageSent`, `SearchQueryPerformed`, `Set domain authentication`, `Add member to role`, `Add service principal credentials`); ECS `email.*` field reference (8.6+); third-party gateway integrations cite-only (Mimecast / Proofpoint TAP / IronPort / Barracuda / Abnormal); cross-source pivot `signinlogs ↔ auditlogs ↔ o365.audit` keyed on UPN
+- **T1566 phishing** — sub-techniques .001 attachment / .002 link / .003 service / .004 voice; T1027.006 **HTML smuggling** email-side fingerprint with novel-hash + 100KB+ HTML body filter; **AiTM-kit per-recipient-token URLs** (`?id=USER-XXXX`, `?rid=*-*`) on cloud-fronted domains as the AiTM email-side fingerprint; **email authentication** (SPF / DKIM / DMARC / ARC / SRS / Microsoft compauth) — DMARC fail that landed-in-inbox detection, **Reply-To swap** as the BEC fingerprint that passes auth on `From`; **lookalike-domain detection** via brand-string-but-not-on-whitelist filter; **display-name vs domain mismatch**; **legacy-auth post-AiTM** detection
+- **Post-click + AiTM downstream** — recap of M4 `session_id` reuse joined to O365 audit; **T1098 account manipulation** (.001 `Add service principal credentials` OAuth backdoor, .003 `Add member to role` for Global/Privileged/Application Administrator, .005 `Add device` compliant-CA bypass); **T1556.006 `Set federation settings on domain`** Golden-SAML preparation as page-IR signal; **T1114 email collection** — .003 inbox forwarding rules with finance keywords (`MoveToFolder` / `MarkAsRead` / `Forward` paired with `*invoice*` / `*wire*` / `*remit*`), **.002 `MailItemsAccessed` clusters** (E5/A5/G5-gated with explicit licensing call-out); **T1213 SharePoint / OneDrive** mass-pull via `FileDownloaded` aggregation, `SharingSet` external-share signal, Teams `MessageSent` external-chat exfil, `SearchQueryPerformed` recon; **T1534 Internal Spear Phishing** auth-passing post-compromise mass-send pattern (>50 sends with ≤3 distinct subjects per hour)
+- **Statistical hunts + capstone** — five canonical email-plane patterns (rare-sender / attachment-hash novelty / subject-burst / DMARC fail-rate spike / mailbox-rule create-rate); MailItemsAccessed cluster paired with M4 sign-in-risk for high-confidence T1114.002; **the worked PEAK capstone** — full *AiTM-to-BEC-to-data-exfil* chain via EQL `sequence by user.target.name with maxspan=2h` covering risky sign-in → device add → inbox rule → SharePoint download. Output: a Kibana Security EQL detection-rule body with severity *critical* + threat-metadata for TA0001 / TA0006 / TA0009 / TA0010 + the relevant T-numbers + runbook ref + owner team
+
+6 Mermaid diagrams: data-plane taxonomy, T1566 sub-technique tree, AiTM-to-BEC kill chain, T1114/T1213 collection-platform fan-out, statistical-hunt decision tree, capstone hunt-to-detection pipeline.
+
+L2 course now sits at **6 modules / 48 lessons / 96 questions**.
+
+#### Upgrade
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+The seeder picks up the new course content automatically (v0.11.16+ in-image seed pipeline).
+
+---
+
 ## v0.11.17 (2026-04-28)
 
 ### L2 Module 5 — Network telemetry: Command and Control + Exfiltration
