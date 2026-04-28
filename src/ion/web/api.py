@@ -4382,10 +4382,14 @@ async def create_case(
 
     await _sync_case_to_es(new_case, session)
 
-    # Resolve Kibana assignee UID for case creation
+    # Resolve Kibana assignee UID for case creation.
+    # Read the assignee from `new_case.assigned_to_id` (already persisted) rather than
+    # `data.assigned_to_id`. Line 4319 falls back to `current_user.id` when the request
+    # body has no assignee, so reading `data.*` here misses the auto-assigned creator
+    # and produced the symptom: ION case had an assignee but the Kibana case did not.
     create_assignee_uid = None
-    if data.assigned_to_id:
-        assignee_user = session.query(User).filter_by(id=data.assigned_to_id).first()
+    if new_case.assigned_to_id:
+        assignee_user = session.query(User).filter_by(id=new_case.assigned_to_id).first()
         if assignee_user:
             if assignee_user.elastic_uid:
                 create_assignee_uid = assignee_user.elastic_uid

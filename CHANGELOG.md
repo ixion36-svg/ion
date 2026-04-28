@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.11.19 (2026-04-28) — bug fix
+
+### Kibana case assignee now propagates from the auto-assigned creator
+
+**Bug.** When a user created a case in ION without explicitly setting an assignee, the case was auto-assigned to the *creator* (`current_user.id`) on the ION side — but the corresponding Kibana case was created with **no assignee**. Subsequent assignee changes via the case-update endpoint synced correctly; only the *initial create* path missed the auto-assigned value.
+
+**Root cause.** `src/ion/web/api.py` line 4319 sets `new_case.assigned_to_id = data.assigned_to_id if data.assigned_to_id else current_user.id` — so the persisted ION case carries an assignee even when the request body doesn't supply one. The downstream Kibana-sync block then resolved the assignee UID by reading **`data.assigned_to_id`** (the request body), not **`new_case.assigned_to_id`** (the persisted value). When the request body's `assigned_to_id` was empty, `create_assignee_uid` stayed `None` and the Kibana payload omitted the `assignees` array entirely.
+
+**Fix.** Read the assignee from `new_case.assigned_to_id` (the persisted value) instead of `data.assigned_to_id`. The Kibana case is now created with the same assignee the ION case shows — including the auto-assigned creator on cases that didn't specify one.
+
+```diff
+-    if data.assigned_to_id:
+-        assignee_user = session.query(User).filter_by(id=data.assigned_to_id).first()
++    if new_case.assigned_to_id:
++        assignee_user = session.query(User).filter_by(id=new_case.assigned_to_id).first()
+```
+
+The case-update path already reads from the request body correctly (line 5269) and passes the assignee through to `_background_kibana_case_sync` — that path was unaffected.
+
+The auto-promote path (`case_grouper_service.py:441`) creates cases without an ION-side assignee, so its omission of `assignees=` from the Kibana create payload remains correct (no assignee to push) and was not part of this fix.
+
+#### Verifying the fix
+
+After upgrade, create a fresh case in the ION UI without specifying an assignee. The ION case should auto-assign to you (the creator), and the corresponding Kibana case should now show you as the assignee in Kibana's case UI. Assignee changes via the ION update path were already syncing correctly and continue to do so.
+
+#### Upgrade
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+No course content changes in this ship.
+
+---
+
 ## v0.11.18 (2026-04-28)
 
 ### L2 Module 6 — Email & collaboration: Initial Access
