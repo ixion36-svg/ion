@@ -480,10 +480,13 @@ function renderLogHealth(prefix, data) {
     return;
   }
 
-  // Determine overall RAG status for the section header light
+  // Determine overall RAG status for the section header light.
+  // `overallLight` is already in scope from line 440 — re-declaring here is a
+  // SyntaxError that abort the script parse and breaks every other handler in
+  // the file (including runChecks → uncaught ReferenceError on the Run-checks
+  // button onclick).
   const hasCritical = hosts.some(h => h.status === 'critical');
   const hasWarning = hosts.some(h => h.status === 'warning');
-  const overallLight = document.getElementById(prefix + '-overall-light');
   if (overallLight) {
     overallLight.className = 'ds-rag-light ' + (hasCritical ? 'ds-rag-red' : hasWarning ? 'ds-rag-amber' : 'ds-rag-green');
   }

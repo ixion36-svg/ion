@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.11.20 (2026-04-28) — bug fix
+
+### Daily Standup — duplicate `const overallLight` SyntaxError + downstream `runChecks` ReferenceError
+
+**Bug.** Two console errors on the `/standup` page:
+
+1. `Uncaught SyntaxError: Identifier 'overallLight' has already been declared` (rendered line 1076).
+2. `Uncaught ReferenceError: runChecks is not defined` at `HTMLButtonElement.onclick` (rendered line 554).
+
+**Root cause.** `src/ion/web/templates/daily_standup.html` declared `const overallLight = document.getElementById(prefix + '-overall-light')` *twice* inside `renderLogHealth(prefix, data)` — once at line 440 (covering the early error / not-configured / empty-hosts branches) and again at line 486 (the happy-path RAG-status branch). Re-declaring the same `const` in the same function-level scope is a SyntaxError in strict-mode ES6+, which aborts the script-block parse. Every function defined later in the same `<script>` — including `runChecks()` (defined at line 691) — is therefore never assigned to the global scope, so the *Run Checks* button's inline `onclick="runChecks()"` handler at the top of the page throws `ReferenceError`. Two errors, one root cause.
+
+**Fix.** Drop the redundant `const` redeclaration at line 486; the earlier line-440 binding is already in scope across the whole function. The two later branches at lines 487–491 simply assign through the existing reference.
+
+```diff
+   // Determine overall RAG status for the section header light
+   const hasCritical = hosts.some(h => h.status === 'critical');
+   const hasWarning = hosts.some(h => h.status === 'warning');
+-  const overallLight = document.getElementById(prefix + '-overall-light');
+   if (overallLight) {
+     overallLight.className = 'ds-rag-light ' + (hasCritical ? 'ds-rag-red' : hasWarning ? 'ds-rag-amber' : 'ds-rag-green');
+   }
+```
+
+Once the SyntaxError clears, `runChecks()` becomes defined as the script parses to completion, and the button's `onclick` works.
+
+#### Verifying the fix
+
+After upgrade, open `/standup` in the browser. Console should be clean — no `overallLight` SyntaxError, no `runChecks` ReferenceError. Click *Run Checks* and the standup widgets should refresh.
+
+#### Upgrade
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+No course content or data-model changes in this ship.
+
+---
+
 ## v0.11.19 (2026-04-28) — bug fix
 
 ### Kibana case assignee now propagates from the auto-assigned creator
