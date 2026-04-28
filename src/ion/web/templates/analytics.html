@@ -140,8 +140,9 @@
             <span id="sys-summary-text" style="font-size:0.75rem;color:var(--text-muted);margin-left:auto;"></span>
         </div>
         <!-- System stats bar -->
-        <div id="sys-stats-bar" style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.75rem;margin-bottom:1.5rem;">
+        <div id="sys-stats-bar" style="display:grid;grid-template-columns:repeat(6,1fr);gap:0.75rem;margin-bottom:1.5rem;">
             <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-total">-</div><div class="sys-stat-label">Total Alerts</div></div>
+            <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-logs">-</div><div class="sys-stat-label">Logs Ingested</div></div>
             <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-systems">-</div><div class="sys-stat-label">Systems</div></div>
             <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-mapped">-</div><div class="sys-stat-label">TIDE Mapped</div></div>
             <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-coverage">-</div><div class="sys-stat-label">Avg Coverage</div></div>
@@ -1365,6 +1366,7 @@ function renderSystemAnalytics(data) {
     // Stats bar
     const sev = data.total_severity || {};
     setText('sys-s-total', (data.total_alerts || 0).toLocaleString());
+    setText('sys-s-logs', (data.total_logs_ingested || 0).toLocaleString());
     setText('sys-s-systems', data.total_systems || 0);
     setText('sys-s-mapped', data.mapped_systems || 0);
     const covEl = document.getElementById('sys-s-coverage');
@@ -1517,8 +1519,9 @@ function buildSysCard(sys) {
             <div class="sys-sev-row">${sevHtml}</div>
             <div class="sys-sparkline">${sparkHtml}</div>
             <div class="sys-meta">
-                <span title="Unique hosts">&#x1F4BB; ${sys.unique_hosts || 0} hosts</span>
-                <span title="Unique users">&#x1F464; ${sys.unique_users || 0} users</span>
+                <span title="Logs ingested in window from this namespace's data streams">&#x1F4DC; ${(sys.logs_ingested || 0).toLocaleString()} logs</span>
+                <span title="Unique hosts">&#x1F4BB; ${sys.unique_hosts || sys.logs_unique_hosts || 0} hosts</span>
+                <span title="Unique users">&#x1F464; ${sys.unique_users || sys.logs_unique_users || 0} users</span>
                 <span title="Alert status">${formatSysStatus(sys.status)}</span>
             </div>
             ${cyabHtml}

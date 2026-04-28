@@ -2920,24 +2920,66 @@ class ElasticsearchService:
         # Total timeline
         total_timeline = [{"timestamp": tb["key_as_string"], "count": tb["doc_count"]} for tb in aggs.get("total_over_time", {}).get("buckets", [])]
 
-        # If we only got one namespace (or "default"), also try to discover
-        # systems from the log index names (logs-*-systemname pattern).
-        # This covers setups where alerts all land in the default namespace
-        # but the original data streams use per-system naming.
-        if len(systems) <= 1:
-            try:
-                log_systems = await self._discover_systems_from_logs(hours, interval)
-                if log_systems:
-                    # Merge: log systems take priority if they have more entries
-                    if len(log_systems) > len(systems):
-                        systems = log_systems
-            except Exception:
-                pass  # Non-fatal — stick with what we have
+        # Always fetch log-side per-namespace volumes so each system entry
+        # carries both `alert_count` (from .alerts-*) and `logs_ingested`
+        # (from logs-*). Two failure modes covered:
+        #   1. Alerts use the default namespace but log data-streams are
+        #      per-system named — the log query is the only way to discover
+        #      systems at all (the original fallback case).
+        #   2. Alerts produce multi-namespace data, but the operator wants
+        #      the L1/L2 view to show *log volume* per system alongside
+        #      alert volume — what System Analytics now does always.
+        log_systems_map = {}
+        log_total = 0
+        try:
+            log_systems = await self._discover_systems_from_logs(hours, interval)
+            for ls in log_systems:
+                ns = ls.get("system")
+                if ns is None:
+                    continue
+                log_systems_map[ns] = {
+                    "logs_ingested": ls.get("event_count", 0),
+                    "logs_timeline": ls.get("timeline", []),
+                    "logs_datasets": ls.get("datasets", []),
+                    "logs_categories": ls.get("categories", []),
+                    "logs_unique_hosts": ls.get("unique_hosts", 0),
+                    "logs_unique_users": ls.get("unique_users", 0),
+                }
+                log_total += ls.get("event_count", 0)
+        except Exception:
+            pass  # Non-fatal — log enrichment is additive; alert data still ships
+
+        # Merge log volumes into every alert-side system entry; if a
+        # namespace exists in logs but had no alerts, surface it as a
+        # zero-alert entry so it still appears in the UI.
+        if log_systems_map:
+            existing_ns = {s.get("system") for s in systems}
+            for s in systems:
+                ns = s.get("system")
+                if ns in log_systems_map:
+                    s.update(log_systems_map[ns])
+            for ns, log_data in log_systems_map.items():
+                if ns not in existing_ns and ns and ns != "_unknown_":
+                    systems.append({
+                        "system": ns,
+                        "alert_count": 0,
+                        "severity": {},
+                        "status": {},
+                        "top_rules": [],
+                        "timeline": [],
+                        "datasets": log_data.get("logs_datasets", []),
+                        "unique_hosts": log_data.get("logs_unique_hosts", 0),
+                        "unique_users": log_data.get("logs_unique_users", 0),
+                        **log_data,
+                    })
+            # Re-sort: prefer alert volume, fall back to log volume
+            systems.sort(key=lambda s: (s.get("alert_count", 0), s.get("logs_ingested", 0)), reverse=True)
 
         return {
             "systems": systems,
             "indices": indices,
             "total": total,
+            "total_logs_ingested": log_total,
             "total_severity": total_severity,
             "total_timeline": total_timeline,
             "hours": hours,

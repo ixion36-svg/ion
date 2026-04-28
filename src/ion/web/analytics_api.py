@@ -328,6 +328,7 @@ async def get_system_overview(
     return {
         "systems": enriched,
         "total_alerts": es_data.get("total", 0),
+        "total_logs_ingested": es_data.get("total_logs_ingested", 0),
         "total_severity": es_data.get("total_severity", {}),
         "total_timeline": es_data.get("total_timeline", []),
         "total_systems": len(enriched),

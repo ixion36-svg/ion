@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.11.21 (2026-04-28) — feature
+
+### System Analytics — logs ingested per system, alongside alerts and TIDE coverage
+
+The System Analytics tab on `/analytics` now shows **logs ingested per system** in addition to the existing per-system alert volume and TIDE rule-coverage. Operators wanted visibility into the *raw log volume* feeding each system's data streams — previously the page only counted what fired into `.alerts-security.alerts-*`, missing entirely the upstream picture.
+
+#### What changed
+
+- **`elasticsearch_service.py`** — `get_system_analytics()` now *always* fetches per-namespace log volumes from the `logs-*` index pattern via the existing `_discover_systems_from_logs()` helper (previously this fired only as a one-namespace fallback). Each system entry is enriched with `logs_ingested`, `logs_timeline`, `logs_datasets`, `logs_categories`, `logs_unique_hosts`, `logs_unique_users`. Namespaces that exist in `logs-*` but produced no alerts in the window now also surface as zero-alert system entries.
+- **`analytics_api.py`** — `/api/analytics/system-overview` exposes a top-level `total_logs_ingested` (sum across systems) so the UI can render a fleet-wide stat.
+- **`analytics.html`** — the System Analytics top stats bar now has 6 cards (was 5): adds **Logs Ingested** between Total Alerts and Systems. Each per-system card surfaces a "📜 *N* logs" entry alongside hosts and users.
+
+#### Data sources
+
+The log query targets the Elastic Agent default index pattern `logs-*` and aggregates by `data_stream.namespace`. The same index pattern the existing one-namespace-fallback used since v0.11.x — no new env var required for typical Elastic Agent deployments. For non-default deployments (Beats / Logstash with custom index naming), the pattern lives in `_discover_systems_from_logs` and can be tuned in a follow-up if needed.
+
+#### Verifying the feature
+
+After upgrade, open `/analytics` → *System Analytics* tab. The top stats bar should show six cards including **Logs Ingested**; each per-system card should show the log-volume count alongside the existing alert count.
+
+#### Upgrade
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+No data-model or course content changes in this ship.
+
+---
+
 ## v0.11.20 (2026-04-28) — bug fix
 
 ### Daily Standup — duplicate `const overallLight` SyntaxError + downstream `runChecks` ReferenceError
