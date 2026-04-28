@@ -11030,7 +11030,1131 @@ owner: IR-team
         points=2,
     )
 
-    print(f"  L2: {course.title} — 4 modules, 32 lessons (Module 4 Identity & Sign-in @ proper depth)")
+    # ── Module 5 — Network telemetry: Command and Control + Exfiltration ──
+    mod5 = _add_module(
+        session, course, order=5,
+        title="Network telemetry — Command and Control + Exfiltration",
+        description_md=(
+            "Hunting on the network plane. Four data sources (Elastic "
+            "Agent endpoint, Packetbeat, Zeek, Suricata) and the ECS "
+            "network / DNS / TLS / URL field reference; **Command "
+            "and Control (TA0011)** — T1071 application-layer protocol, "
+            "T1573 encrypted channel, T1090 proxy, T1568 DGA, T1102 "
+            "SaaS dead-drops, T1572 protocol tunneling, T1219 RMM "
+            "abuse; **beacon shape** (periodicity / size symmetry / "
+            "working-hours-agnostic / sparse hostname diversity); DNS "
+            "and TLS hunts (long subdomains / NXDOMAIN bursts / DoH; "
+            "JA3 / JA3S / self-signed / short-validity / CN-vs-SNI "
+            "mismatch); **Exfiltration (TA0010)** — T1041 over C2 "
+            "channel, T1567 cloud-storage drop-offs, T1048 alternative "
+            "protocols, T1029 scheduled transfer; statistical-anomaly "
+            "hunts in ES|QL; worked PEAK capstone for a beaconing "
+            "anomaly with a Kibana Security ES|QL or EQL rule body."
+        ),
+        estimated_minutes=240,
+    )
+
+    # Lesson 5.1 — Network data plane + ECS reference
+    m5l1 = _add_lesson(
+        session, mod5, order=1,
+        title="The network-event data plane in Elastic and the ECS network/DNS/TLS field reference",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Distinguish the **four network data sources** in Elastic — Elastic Agent endpoint network events, Packetbeat, Zeek, Suricata — and their strengths
+> 2. Read the ECS `network.*`, `source.*`, `destination.*`, `dns.*`, `tls.*`, `url.*`, `http.*` field families
+> 3. Use **`network.community_id`** as the cross-source join key
+> 4. Recognise the Zeek `conn_state` codes carried over from L1 Module 4 (S0 / S1 / SF / REJ / RSTO / RSTR / OTH)
+> 5. Apply broad-to-narrow KQL → EQL → ES|QL on a beacon hunt
+>
+> **Prerequisites.** L2 Modules 1–4.
+
+## Four data sources, four strengths
+
+Network telemetry on the Elastic stack arrives via four parallel pipelines. The L2 must know which is best populated for the hunt at hand.
+
+### Elastic Agent endpoint network events — `logs-endpoint.events.network-*`
+
+Host-side network connections from the Elastic Defend agent. Events carry `process.entity_id` so a network connection can be joined back to the originating process — *the* enrichment for "what process made this beacon?" Coverage is endpoint-only (no router/firewall traffic), but the process-attribution is the crucial differentiator.
+
+### Packetbeat — `logs-network_traffic.*` / `packetbeat-*`
+
+Wire-level passive capture deployed on hosts or span ports. Produces L7 events for `http`, `dns`, `tls`, plus `flow` summaries. Strong on protocol decoding; weaker on retention because byte-volume is high.
+
+### Zeek (Bro) — `logs-zeek.connection-*`, `logs-zeek.dns-*`, `logs-zeek.ssl-*`, `logs-zeek.http-*`, `logs-zeek.notice-*`
+
+The classical NSM pivot — passive analyser producing structured event-per-protocol logs. The `connection-*` index is the workhorse with the `conn_state` field driving most network triage; sibling indices (`dns-*`, `ssl-*`, `http-*`, `notice-*`) carry protocol-specific decoding. Zeek's `community_id` field enables cross-source correlation.
+
+### Suricata — `logs-suricata.eve-*`
+
+IDS / IPS alerts plus protocol decoding via EVE JSON. Single index pattern with `event.kind: alert` (rule fires) or `event.kind: event` (passive protocol decoding for `dns` / `tls` / `http` / `flow`). Best when you want IDS rule context paired with raw network metadata.
+
+| Source | Best for | Limitation |
+|---|---|---|
+| **Elastic Agent** | Process-attribution of network connections | Endpoint-only; no wire-level protocol decoding |
+| **Packetbeat** | L7 protocol decoding (`dns`, `tls`, `http`) | High volume; deployment friction |
+| **Zeek** | Connection states + per-protocol indices | Requires Zeek deployment + Filebeat module |
+| **Suricata** | IDS rule context + EVE protocol decoding | Mostly aligned with rule-author bias |
+
+## ECS network field reference
+
+| Family | Fields |
+|---|---|
+| `network.*` | `network.protocol`, `network.transport`, `network.bytes`, `network.packets`, `network.community_id`, `network.direction` |
+| `source.*` | `source.ip`, `source.port`, `source.bytes`, `source.packets`, `source.geo.country_iso_code`, `source.as.organization.name` |
+| `destination.*` | `destination.ip`, `destination.port`, `destination.bytes`, `destination.packets`, `destination.domain`, `destination.geo.country_iso_code` |
+| `dns.*` | `dns.question.name`, `dns.question.type`, `dns.question.subdomain`, `dns.answers.data`, `dns.answers.type`, `dns.resolved_ip`, `dns.response_code` |
+| `tls.*` | `tls.version`, `tls.cipher`, `tls.client.ja3`, `tls.server.ja3s`, `tls.server.x509.subject.common_name`, `tls.server.x509.issuer.common_name`, `tls.server.x509.not_before`, `tls.server.x509.not_after`, `tls.server.x509.signature_algorithm` |
+| `url.*` | `url.full`, `url.domain`, `url.path`, `url.query`, `url.scheme` |
+| `http.*` | `http.request.method`, `http.request.headers.user-agent`, `http.response.status_code`, `http.request.body.bytes`, `http.response.body.bytes` |
+
+## `network.community_id` — the cross-source join key
+
+`community_id` is an Elastic-introduced, deterministic flow hash. Two events from the *same* TCP/UDP flow on different sensors compute to the same `community_id` regardless of capture point. This is **the** join key for cross-source correlation:
+
+```esql
+FROM logs-zeek.connection-*, logs-suricata.eve-*, logs-endpoint.events.network-*
+| WHERE @timestamp > NOW() - 1h
+  AND network.community_id == "1:r7sP9...=="
+| KEEP @timestamp, event.dataset, source.ip, destination.ip, destination.port,
+       network.protocol, network.bytes, process.entity_id
+| SORT @timestamp ASC
+```
+
+Use `community_id` to pivot from a Suricata alert to the Zeek connection log to the Elastic Agent endpoint event that names the process — three sources, one hash, one row per event in the unified output.
+
+## Zeek `conn_state` codes (L1 M4 callback)
+
+`conn_state` is the workhorse field for triage on `logs-zeek.connection-*`. The seven states an L2 must know:
+
+| Code | Meaning |
+|---|---|
+| **S0** | Connection attempt, no reply |
+| **S1** | Connection established, not terminated |
+| **SF** | Normal establishment + termination |
+| **REJ** | Connection rejected (RST received) |
+| **RSTO** | Originator sent RST mid-connection |
+| **RSTR** | Responder sent RST mid-connection |
+| **OTH** | No SYN seen — partial flow capture |
+
+Most hunts filter to **`SF`** for established connections, and `S0` / `REJ` clusters are scan / port-discovery signals.
+
+## Worked broad-to-narrow on a beacon hunt
+
+A single hunt expressed across the three languages.
+
+**Hypothesis (four-element).** *In the past 7 days, an adversary has used T1071.001 web-protocol C2 with low-jitter periodicity to a single destination IP from at least one host, observable in `logs-zeek.connection-*` where the same `(host, destination.ip)` produces > 50 connections in ≥ 12 hourly buckets within 24 hours, with `network.bytes_outbound` clustered around a small range.*
+
+**KQL** to filter Zeek connection events to outbound TLS / HTTP that survives initial handshake:
+
+```kql
+event.dataset: "zeek.connection"
+  and network.transport: "tcp"
+  and destination.port: ("443" or "80" or "8080" or "8443")
+  and zeek.connection.state: "SF"
+  and not destination.ip: ("10.0.0.0/8" or "172.16.0.0/12" or "192.168.0.0/16")
+```
+
+**ES|QL** aggregation per (host × destination.ip × hour-bucket):
+
+```esql
+FROM logs-zeek.connection-*
+| WHERE @timestamp > NOW() - 7d
+  AND network.transport == "tcp"
+  AND destination.port IN (443, 80, 8080, 8443)
+  AND zeek.connection.state == "SF"
+  AND NOT CIDR_MATCH(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+| STATS connection_count = COUNT(),
+        avg_bytes_out = AVG(source.bytes),
+        unique_dest_ports = COUNT_DISTINCT(destination.port)
+  BY host.name, destination.ip, BUCKET(@timestamp, 1h)
+| WHERE connection_count > 50
+| SORT connection_count DESC
+| LIMIT 200
+```
+
+**EQL** for the process-attribution chain joining the network event to the spawning process:
+
+```eql
+sequence by host.name with maxspan=2m
+  [ process where event.action : ("start", "process_started")
+              and not process.code_signature.trusted == true ]
+  [ network where destination.port in (443, 80, 8080, 8443)
+              and not cidrMatch(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16") ]
+```
+
+Each language plays its part: KQL surfaces the artefact, ES|QL aggregates per-host beacon shape, EQL adds the process-attribution chain.
+
+## Glossary
+
+- **`network.community_id`** — deterministic flow hash; cross-source join key.
+- **Zeek `conn_state`** — `SF` (normal), `S0` (no reply), `REJ` (rejected), `RSTO/RSTR` (mid-connection RST).
+- **`process.entity_id` join from Elastic Agent network events** — the host-side network connection's link to the originating process.
+- **Beacon shape** — periodicity + size symmetry + working-hours-agnostic + sparse hostname diversity (next lesson).
+
+## Further reading
+
+- Zeek docs — `connection`, `dns`, `ssl`, `http`, `notice` log references.
+- Suricata EVE JSON schema — `event.kind` discrimination.
+- ECS field reference — `network.*`, `dns.*`, `tls.*`.
+""",
+    )
+    m5l1q = _add_lesson(
+        session, mod5, order=2, title="Network data plane — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on data-source selection, the community_id join key, Zeek conn_state codes, and process.entity_id attribution.",
+    )
+    _add_q(session, m5l1q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 wants to attribute a suspicious outbound TCP connection to the *originating process* on the host. Which Elastic data source is the right reach?",
+        options=[
+            {"value": "zeek", "label": "Zeek (`logs-zeek.connection-*`) — has the connection-state field"},
+            {"value": "agent", "label": "Elastic Agent endpoint network events (`logs-endpoint.events.network-*`) — carries `process.entity_id` linking the network event to the originating process"},
+            {"value": "suricata", "label": "Suricata (`logs-suricata.eve-*`) — has IDS-rule context"},
+            {"value": "packetbeat", "label": "Packetbeat (`logs-network_traffic.*`) — has L7 decoding"},
+        ],
+        correct="agent",
+        explanation_md="Process-attribution of a network connection is unique to the *host-side* Elastic Agent endpoint network events — they carry `process.entity_id`, which joins the network event back to `logs-endpoint.events.process-*` for the spawning process. Zeek, Suricata, and Packetbeat are wire-side and have no host process context. The L2's reflex when 'what process made this beacon?' is the question: pivot to `logs-endpoint.events.network-*` keyed on `host.name + destination.ip + @timestamp`.",
+        points=2,
+    )
+    _add_q(session, m5l1q, order=2, kind=QuestionKind.SINGLE,
+        stem_md="An L2 wants to correlate a single network flow across **three sources** — a Suricata IDS alert, the matching Zeek connection log, and the Elastic Agent endpoint network event from the host. Which ECS field provides the deterministic cross-source join key?",
+        options=[
+            {"value": "src_ip", "label": "`source.ip` and `destination.ip` together"},
+            {"value": "community_id", "label": "`network.community_id` — Elastic-introduced deterministic flow hash that computes the same value for the same flow on every sensor"},
+            {"value": "timestamp", "label": "`@timestamp` to the millisecond"},
+            {"value": "flow_id", "label": "`network.flow.id`"},
+        ],
+        correct="community_id",
+        explanation_md="`network.community_id` is the deterministic flow-hash standard that Elastic adopted across its network integrations (Zeek, Suricata, Elastic Agent, Packetbeat). The same flow seen by different sensors hashes to the same value, making it the canonical cross-source join key. IP+timestamp is approximate; `flow.id` is single-source.",
+        points=2,
+    )
+    _add_q(session, m5l1q, order=3, kind=QuestionKind.MULTI,
+        stem_md="Which Zeek `conn_state` code values indicate **fully-established connections** that survived the TCP handshake (relevant for beacon hunts that want established traffic only)?",
+        options=[
+            {"value": "sf", "label": "`SF` — Normal establishment + termination"},
+            {"value": "s1", "label": "`S1` — Connection established, not terminated"},
+            {"value": "s0", "label": "`S0` — Connection attempt, no reply"},
+            {"value": "rej", "label": "`REJ` — Connection rejected"},
+            {"value": "rsto", "label": "`RSTO` — Originator sent RST mid-connection"},
+        ],
+        correct=["sf", "s1", "rsto"],
+        explanation_md="`SF` and `S1` are unambiguously established. `RSTO` is also established (the connection completed handshake, then the originator sent a RST mid-connection — sometimes seen in C2 patterns where the implant terminates abruptly). `S0` (no reply) and `REJ` (rejected) are scan / failed-connection signals that didn't establish — different hunt class.",
+        points=3,
+    )
+    _add_q(session, m5l1q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="Querying `FROM logs-zeek.connection-*, logs-suricata.eve-*, logs-endpoint.events.network-*` in a single ES|QL pipeline keyed on `network.community_id` is a valid pattern for cross-source correlation of a single network flow.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** Multi-index `FROM` is first-class in ES|QL, and `community_id` is the cross-source join key. The L2 sometimes joins the Suricata IDS alert to the Zeek connection record to the Elastic Agent host-side event in one pipeline — surfacing the IDS context, the connection state, and the spawning process in a single result row.",
+        points=2,
+    )
+
+    # Lesson 5.2 — Command and Control TA0011
+    m5l2 = _add_lesson(
+        session, mod5, order=3,
+        title="Command and Control (TA0011) — top techniques and EQL+ES|QL fingerprints",
+        lesson_type=LessonType.READING, duration_min=26,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Hunt **T1071** application-layer C2 across .001 web / .002 file transfer / .003 mail / .004 DNS
+> 2. Recognise **T1573.002 Encrypted Channel** (TLS) as the near-universal modern C2 envelope
+> 3. Detect **T1090 Proxy** (.001/.002/.003 Tor / multi-hop / .004 domain fronting) and **T1568.002 DGA**
+> 4. Catch **T1102 Web Service** SaaS dead-drops (`*.workers.dev`, Discord webhooks, GitHub raw, Telegram, Pastebin)
+> 5. Hunt **T1572 Protocol Tunneling** (DNS / ICMP / SSH) and **T1219 Remote Access Software** (AnyDesk / ScreenConnect / TeamViewer / Atera)
+> 6. Articulate **beacon shape** along four axes — periodicity, size symmetry, working-hours-agnostic, sparse hostname diversity
+
+## T1071 Application Layer Protocol
+
+### .001 Web Protocols (HTTP / HTTPS)
+
+The dominant C2 envelope. Detection is hard because legitimate web traffic dwarfs C2 in volume; the L2's task is to find the *shape* of beaconing inside that haystack.
+
+```esql
+FROM logs-zeek.connection-*
+| WHERE @timestamp > NOW() - 7d
+  AND network.transport == "tcp"
+  AND destination.port IN (443, 80)
+  AND NOT CIDR_MATCH(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+| STATS conn_count = COUNT(),
+        unique_dest_ips = COUNT_DISTINCT(destination.ip),
+        avg_dur = AVG(zeek.connection.duration),
+        bytes_out = SUM(source.bytes)
+  BY host.name, destination.ip, BUCKET(@timestamp, 1h)
+| WHERE conn_count > 30
+| SORT conn_count DESC
+```
+
+### .004 DNS
+
+C2 over DNS — heartbeat queries with payload encoded in subdomains, responses encoded in TXT records or A-record IP-tuples. Distinct from T1572 DNS *tunneling* in scale (DNS C2 carries small commands; DNS tunneling carries bulk data). Hunt: high-volume queries from one host to one specific authoritative server, with TXT-record responses.
+
+```esql
+FROM logs-zeek.dns-*
+| WHERE @timestamp > NOW() - 24h
+  AND dns.question.type == "TXT"
+| STATS query_count = COUNT(),
+        unique_subdomains = COUNT_DISTINCT(dns.question.name)
+  BY host.name, destination.ip, dns.question.registered_domain
+| WHERE query_count > 50 AND unique_subdomains > 20
+| SORT query_count DESC
+```
+
+### .002 File Transfer / .003 Mail
+
+Less common but worth recognising. .002 is FTP/SFTP/SMB-over-WAN; .003 is SMTP-as-C2 (the mail-server-as-channel pattern). Both surface in the relevant Zeek protocol logs.
+
+## T1573.002 Encrypted Channel — TLS
+
+Almost every modern C2 rides TLS. Detection comes from the *flow shape* and TLS metadata, not the encrypted payload. L2's reach: JA3/JA3S TLS fingerprinting (Lesson 5.3) and beacon-shape statistical hunts (below).
+
+## T1090 Proxy
+
+- **.001 Internal Proxy** — pivot through an internal host.
+- **.002 External Proxy** — outbound through an attacker-owned proxy.
+- **.003 Multi-hop** — Tor, I2P, mixnets. Detection via Tor exit-node IP lists.
+- **.004 Domain Fronting** — sending a TLS SNI for one CDN-hosted domain while the HTTP Host header targets a different one. Less viable post-2018 (CDN providers cracked down) but still occasionally seen on specific platforms.
+
+```kql
+event.dataset: "zeek.connection"
+  and destination.ip: "tor_exits"  // requires an enrich-policy lookup
+```
+
+For fronting detection: SNI / Host mismatch on the same connection requires correlated capture across both fields.
+
+## T1568.002 Dynamic Resolution: DGA
+
+Algorithmically-generated gibberish domains rotate frequently to evade blocklists. Detection via entropy / n-gram analysis on `dns.question.name` — DGA domains are statistically less likely to follow English-bigram distributions.
+
+A simple ES|QL entropy-proxy approach (special-character density isn't enough — for DGA, look at uniqueness of consecutive consonants and vowel ratios; this is approximated below):
+
+```esql
+FROM logs-zeek.dns-*
+| WHERE @timestamp > NOW() - 24h
+  AND dns.question.type == "A"
+| EVAL name_len = LENGTH(dns.question.name)
+| EVAL consonants = LENGTH(dns.question.name) - LENGTH(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(dns.question.name, "a", ""), "e", ""), "i", ""), "o", ""), "u", ""))
+| EVAL consonant_ratio = TO_DOUBLE(consonants) / TO_DOUBLE(name_len)
+| WHERE name_len > 14 AND consonant_ratio > 0.7
+| STATS count = COUNT() BY dns.question.name, host.name
+| SORT count DESC
+| LIMIT 100
+```
+
+Real DGA detection uses ML (random-forest classifiers on n-gram features) but a high consonant-ratio + long-name proxy catches a useful fraction.
+
+## T1102 Web Service — SaaS dead-drops
+
+Adversaries use legitimate, allow-listed SaaS as C2 channels: GitHub Pages, Discord webhooks, Cloudflare Workers (`*.workers.dev`), Telegram Bot API, Pastebin, Slack incoming webhooks, Notion, Tor2Web, custom webhook services. Detection is genuinely hard — destinations are *legitimately reachable* for everyone.
+
+```kql
+event.dataset: ("zeek.dns" or "zeek.connection" or "logs-endpoint.events.network")
+  and destination.domain: ("*.workers.dev" or "discord.com" or "discordapp.com"
+                           or "*.pastebin.com" or "pastebin.com" or "raw.githubusercontent.com"
+                           or "api.telegram.org" or "hooks.slack.com" or "*.notion.so")
+  and not user.name: ("dev_*" or "build_*")  // exclude developer accounts
+```
+
+The hunt becomes signal when paired with *unusual user* (non-developer accessing GitHub raw), *unusual host* (server-class system reaching out to Discord), or *off-hours* timing.
+
+## T1572 Protocol Tunneling
+
+### DNS tunneling
+
+Bulk-data exfil or C2 over DNS. Fingerprints:
+- Long subdomains (>50 chars per label, >100 chars total).
+- High volume of TXT-record queries to one zone.
+- NXDOMAIN bursts (encoded data → invalid lookup) followed by an A-record success.
+- Low-TTL responses pointing at attacker-controlled IPs.
+
+```esql
+FROM logs-zeek.dns-*
+| WHERE @timestamp > NOW() - 24h
+| EVAL question_len = LENGTH(dns.question.name)
+| WHERE question_len > 80 OR dns.question.type == "TXT"
+| STATS query_count = COUNT(),
+        avg_len = AVG(question_len),
+        max_len = MAX(question_len)
+  BY host.name, dns.question.registered_domain, BUCKET(@timestamp, 1h)
+| WHERE query_count > 100 OR max_len > 150
+| SORT query_count DESC
+```
+
+### ICMP tunneling
+
+Outbound ICMP echo-request with payload. Rare but high-confidence — most enterprise networks have minimal legitimate ICMP-with-payload.
+
+### SSH tunneling
+
+`ssh -L` / `ssh -R` port forwarding. Detection: SSH connections from unexpected sources to high-port destinations, or persistent SSH sessions with anomalous duration.
+
+## T1219 Remote Access Software
+
+Adversaries install RMM tools because they're allow-listed in many estates. Detection requires *both* the process-side (M3) and the network-side (this module):
+
+```esql
+FROM logs-endpoint.events.network-*
+| WHERE @timestamp > NOW() - 24h
+  AND process.name IN ("AnyDesk.exe", "ScreenConnect.ClientService.exe",
+                        "TeamViewer.exe", "AteraAgent.exe", "Splashtop.exe",
+                        "client32.exe",  // NetSupport
+                        "Action1.exe", "TacticalRMM.exe", "LogMeIn.exe")
+  AND NOT CIDR_MATCH(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+| STATS conn_count = COUNT(),
+        sessions = VALUES(destination.ip)
+  BY host.name, process.name
+| SORT conn_count DESC
+```
+
+The hunt becomes high-signal when paired with *no IT-managed deployment* — the RMM tool isn't on the corporate software inventory but it's making outbound connections.
+
+## Beacon shape — the four axes
+
+The L2's working definition of "beacon" comes from four parallel axes:
+
+```mermaid
+flowchart LR
+    P[Periodicity<br/>tight interval ± jitter] --> S[Beacon]
+    Z[Size symmetry<br/>small heartbeat out<br/>occasional larger in] --> S
+    W[Working-hours-agnostic<br/>fires at 03:00 UTC<br/>same as 14:00 UTC] --> S
+    H[Sparse hostname diversity<br/>one host → one rare domain<br/>hundreds of times/day] --> S
+```
+
+- **Periodicity** — packets to one destination at near-constant intervals (e.g. every 60 s ± 10 s jitter). User-driven traffic is bursty; beacons are metronomic.
+- **Size symmetry** — outbound POST sizes clustered around a small range (the heartbeat), inbound mostly small with occasional larger responses (tasking).
+- **Working-hours-agnostic** — beacons don't take weekends off; user-driven traffic does. A connection-count time series with `BUCKET(1h)` showing flat overnight + weekend activity is suspicious.
+- **Sparse hostname diversity** — one host visiting one rare domain hundreds of times per day with no other domains touched. Legitimate user traffic touches many domains.
+
+ES|QL hunt that scores all four axes:
+
+```esql
+FROM logs-zeek.connection-*
+| WHERE @timestamp > NOW() - 7d
+  AND zeek.connection.state == "SF"
+  AND NOT CIDR_MATCH(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+| STATS conn_count = COUNT(),
+        unique_dest_count = COUNT_DISTINCT(destination.ip),
+        active_hours = COUNT_DISTINCT(BUCKET(@timestamp, 1h))
+  BY host.name, destination.ip
+| WHERE conn_count > 100 AND unique_dest_count == 1 AND active_hours > 12
+| SORT conn_count DESC
+| LIMIT 100
+```
+
+This finds (host, IP) pairs with > 100 connections, only-one-destination from this host, active across > 12 distinct hours — a strong beacon signal.
+
+## C2 domain-class tells
+
+| Class | Tell |
+|---|---|
+| **NRD** (Newly Registered Domain) | Domain age < 7 days |
+| **DGA** | Algorithmic gibberish — high consonant-ratio, long names |
+| **Typosquat** | `mlcrosoft-update.com`, `adobeadmin-portal.io` |
+| **SaaS dead-drop** | `*.workers.dev`, Discord webhook, raw.githubusercontent.com, api.telegram.org |
+| **Bulletproof TLD** | `.top`, `.xyz`, `.icu`, `.click`, `.cn`, `.ru` carry disproportionately high abuse |
+
+## JA3 / JA3S TLS fingerprinting
+
+JA3 hashes the TLS Client Hello fields; JA3S hashes the Server Hello. Two flows from the same client implementation produce the same JA3; same for JA3S on the server side. Detection: rare JA3s and JA3Ss on a fleet — most modern OSes / browsers produce a small set of JA3s; an outlier value often indicates malware or an out-of-policy tool.
+
+```esql
+FROM logs-zeek.ssl-*
+| WHERE @timestamp > NOW() - 7d
+| STATS host_count = COUNT_DISTINCT(host.name),
+        conn_count = COUNT()
+  BY tls.client.ja3
+| WHERE host_count <= 3 AND conn_count >= 5
+| SORT conn_count DESC
+| LIMIT 50
+```
+
+(Lesson 5.3 covers JA3 / JA3S in more depth, plus the JA4 succession.)
+
+## Glossary
+
+- **T1071 / T1573.002 / T1090 / T1568.002 / T1102 / T1572 / T1219** — the C2 technique families an L2 hunts daily.
+- **Beacon shape (4 axes)** — periodicity, size symmetry, working-hours-agnostic, sparse hostname diversity.
+- **NRD / DGA / typosquat / SaaS dead-drop / bulletproof TLD** — the five C2 domain-class tells.
+- **JA3 / JA3S** — TLS Client / Server Hello fingerprints. Rare values per fleet are hunt anchors.
+
+## Further reading
+
+- ATT&CK technique pages T1071, T1573, T1090, T1568, T1102, T1572, T1219.
+- Salesforce JA3 / JA3S whitepaper.
+- Zeek / Filebeat module reference for `connection-*`, `dns-*`, `ssl-*`.
+""",
+    )
+    m5l2q = _add_lesson(
+        session, mod5, order=4, title="Command and Control — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on beacon shape axes, T1102 SaaS dead-drops, the C2 domain-class tells, and JA3 fingerprinting.",
+    )
+    _add_q(session, m5l2q, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *correct* axes of **beacon shape** that the L2 looks for in a C2 hunt?",
+        options=[
+            {"value": "periodicity", "label": "Periodicity — tight inter-arrival interval with low jitter (e.g. every 60s ± 10s)"},
+            {"value": "size_sym", "label": "Size symmetry — small clustered outbound bytes (heartbeat) + small inbound with occasional larger (tasking)"},
+            {"value": "off_hours", "label": "Working-hours-agnostic — beacons fire at 03:00 UTC same as 14:00 UTC; user traffic doesn't"},
+            {"value": "sparse_hosts", "label": "Sparse hostname diversity — one host hits one rare domain hundreds of times/day with no other domains touched"},
+            {"value": "browser_ua", "label": "Beacons always use the legitimate corporate browser User-Agent"},
+        ],
+        correct=["periodicity", "size_sym", "off_hours", "sparse_hosts"],
+        explanation_md="The four axes are periodicity, size symmetry, working-hours-agnostic, and sparse hostname diversity. The fifth option is wrong — beacons frequently use *unusual* User-Agents (`python-requests/2.x`, `curl/7.81`, missing UA) that the L2 hunts for separately (Lesson 5.3 HTTP hunts).",
+        points=3,
+    )
+    _add_q(session, m5l2q, order=2, kind=QuestionKind.SINGLE,
+        stem_md="An L2 sees outbound HTTPS from a server-class host to `https://example-org.workers.dev/`, `https://discord.com/api/webhooks/...`, and `https://raw.githubusercontent.com/.../...` at near-regular intervals. None of these are blocklisted. Which ATT&CK technique best fits?",
+        options=[
+            {"value": "t1071_004", "label": "T1071.004 DNS"},
+            {"value": "t1102", "label": "T1102 Web Service — adversary using legitimate, allow-listed SaaS (Cloudflare Workers, Discord webhooks, GitHub raw) as C2 dead-drops"},
+            {"value": "t1568_002", "label": "T1568.002 Dynamic Resolution: DGA"},
+            {"value": "t1090_004", "label": "T1090.004 Domain Fronting"},
+        ],
+        correct="t1102",
+        explanation_md="T1102 *Web Service* covers SaaS dead-drops — adversaries use legitimate cloud services (Cloudflare Workers, Discord webhook URLs, GitHub raw, Telegram Bot API, Pastebin, Slack hooks, Notion) as C2 endpoints because they're allow-listed for everyone. Detection is genuinely hard; the hunt becomes signal when paired with *unusual user* (non-developer hitting raw GitHub) or *unusual host* (server-class system reaching out to Discord).",
+        points=2,
+    )
+    _add_q(session, m5l2q, order=3, kind=QuestionKind.SHORTANSWER,
+        stem_md="Name the **TLS fingerprint** standard (commonly used for hunting rare TLS implementations across a fleet) that hashes the **TLS Client Hello** fields and produces a deterministic short value the L2 can pivot on. (Three or four characters.)",
+        options=None,
+        correct=["JA3", "ja3", "tls.client.ja3"],
+        explanation_md="**JA3** — Salesforce-published TLS Client Hello hash; **JA3S** is the Server Hello equivalent. The L2 hunts for *rare* JA3 / JA3S values on the fleet (`COUNT_DISTINCT(host.name) ≤ 3` per JA3) — outliers often indicate malware-class TLS implementations or out-of-policy tools. **JA4** is the modern successor (more robust to TLS-extension reordering); the L2 should know it exists but JA3 is the workhorse in mid-2026 deployments.",
+        points=2,
+    )
+    _add_q(session, m5l2q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="DGA-detected domains tend to have a **higher consonant-to-letter ratio and longer label length** than human-pronounceable English-bigram-distributed domains, which is why a simple `LENGTH > 14 AND consonant_ratio > 0.7` ES|QL filter catches a useful fraction of DGA traffic without ML.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** Most DGA implementations use random byte sequences mapped to base32-ish character sets, producing strings statistically far from natural language — high consonant ratio, low vowel cadence, frequent triple-consonant runs. A simple length+consonant-ratio filter is a useful first-pass; production-grade detection adds n-gram language models (random-forest classifiers on bigram / trigram features) for higher precision.",
+        points=2,
+    )
+
+    # Lesson 5.3 — DNS + TLS hunts
+    m5l3 = _add_lesson(
+        session, mod5, order=5,
+        title="DNS hunts and TLS hunts",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Hunt **DNS tunneling** — long subdomains, TXT-record volume, NXDOMAIN bursts, DoH detection, rare TLDs
+> 2. Recognise **DNS exfiltration** shape (T1048.003 + T1572) vs DNS C2 vs benign DNS-as-service
+> 3. Hunt **TLS anomalies** — rare JA3 / JA3S, self-signed, untrusted-root issuers, short-validity, CN-vs-SNI mismatch, TLS 1.0/1.1 downgrade
+> 4. Hunt **HTTP** — User-Agent anomalies, unusual methods (PROPFIND, MKCOL), suspicious-path discovery (`/.git/config`, `/.env`)
+> 5. Apply queries against `logs-zeek.dns-*`, `logs-zeek.ssl-*`, `logs-zeek.http-*`, `logs-suricata.eve-*`
+
+## DNS hunts
+
+### Long-subdomain detection
+
+DNS-tunnel traffic encodes payload bytes as subdomain labels. A label can be up to 63 characters; total domain length up to 253. Legitimate DNS rarely exceeds 50 characters total.
+
+```esql
+FROM logs-zeek.dns-*
+| WHERE @timestamp > NOW() - 24h
+| EVAL question_len = LENGTH(dns.question.name)
+| WHERE question_len > 80
+| STATS query_count = COUNT(),
+        avg_len = AVG(question_len),
+        max_len = MAX(question_len)
+  BY host.name, dns.question.registered_domain, BUCKET(@timestamp, 1h)
+| WHERE query_count > 50
+| SORT query_count DESC
+| LIMIT 100
+```
+
+`question_len > 80` is the catch-all; production deployments tune by environment.
+
+### TXT-record query volume
+
+DNS tunneling tools often use TXT records as the response carrier (more bytes per response than A or AAAA).
+
+```esql
+FROM logs-zeek.dns-*
+| WHERE @timestamp > NOW() - 1h
+  AND dns.question.type == "TXT"
+| STATS txt_count = COUNT(),
+        unique_zones = COUNT_DISTINCT(dns.question.registered_domain)
+  BY host.name, BUCKET(@timestamp, 5m)
+| WHERE txt_count > 20
+| SORT txt_count DESC
+```
+
+Most hosts produce 0–1 TXT queries per hour from `_dmarc` / `_acme-challenge` / SPF lookups. > 20 TXT queries in 5 minutes from one host is a strong tunnel signal.
+
+### NXDOMAIN bursts
+
+Encoded-payload DNS queries often produce NXDOMAIN responses (the encoded subdomain doesn't exist). A cluster of NXDOMAINs to one parent zone followed by a successful A-record lookup is the textbook tunnel handshake.
+
+```kql
+event.dataset: "zeek.dns"
+  and dns.response_code: "NXDOMAIN"
+```
+
+```esql
+FROM logs-zeek.dns-*
+| WHERE @timestamp > NOW() - 1h
+  AND dns.response_code == "NXDOMAIN"
+| STATS nx_count = COUNT()
+  BY host.name, dns.question.registered_domain, BUCKET(@timestamp, 5m)
+| WHERE nx_count > 30
+| SORT nx_count DESC
+```
+
+### DNS over HTTPS (DoH) detection
+
+DoH bypasses the corporate DNS resolver, allowing a host to do DNS resolution against an external HTTPS endpoint (Cloudflare 1.1.1.1 / Quad9 / Google 8.8.8.8 over HTTPS, or attacker-controlled DoH). Detection: outbound TCP/443 to known DoH endpoints from a host that should resolve via internal DNS.
+
+```kql
+event.dataset: ("zeek.connection" or "logs-endpoint.events.network")
+  and destination.port: 443
+  and (destination.ip: "1.1.1.1" or destination.ip: "1.0.0.1"
+       or destination.ip: "8.8.8.8" or destination.ip: "8.8.4.4"
+       or destination.ip: "9.9.9.9"
+       or destination.domain: ("dns.google" or "cloudflare-dns.com" or "dns.quad9.net"))
+  and not user.name: ("admin_*" or "svc_dns_*")
+```
+
+### Rare TLD detection
+
+Bulletproof / abuse-prone TLDs (`.top` / `.xyz` / `.icu` / `.click` / `.cn` / `.ru` / `.tk`) carry disproportionately high abuse rates. Filtering DNS for queries to these TLDs from non-development hosts is a useful filter:
+
+```esql
+FROM logs-zeek.dns-*
+| WHERE @timestamp > NOW() - 24h
+  AND dns.question.top_level_domain IN ("top", "xyz", "icu", "click", "tk", "cn", "ru")
+| STATS query_count = COUNT()
+  BY host.name, dns.question.registered_domain
+| SORT query_count DESC
+| LIMIT 100
+```
+
+## TLS hunts
+
+### Rare JA3 / JA3S
+
+Most fleets produce a small set of JA3 values — Chrome, Edge, Firefox, the OS-native HTTPS client, a few SDK clients. An outlier JA3 visible on ≤ 3 hosts is hunt-worthy.
+
+```esql
+FROM logs-zeek.ssl-*
+| WHERE @timestamp > NOW() - 7d
+| STATS host_count = COUNT_DISTINCT(host.name),
+        conn_count = COUNT(),
+        sni_examples = VALUES(tls.client.server_name)
+  BY tls.client.ja3
+| WHERE host_count <= 3 AND conn_count >= 5
+| SORT conn_count DESC
+| LIMIT 50
+```
+
+JA4 is the successor — more robust to TLS-extension reordering — and increasingly available in Zeek / Suricata. The L2 should know JA4 exists; JA3 remains the workhorse in 2026.
+
+### Self-signed certificate detection
+
+Self-signed certs presented on outbound TLS to unknown CAs are a strong C2 signal. Legitimate CAs are rare on the public Internet.
+
+```kql
+event.dataset: "zeek.ssl"
+  and tls.server.x509.subject.common_name: *
+  and tls.server.x509.issuer.common_name: tls.server.x509.subject.common_name
+```
+
+(KQL doesn't compare two fields directly — this is conceptual; ES|QL has the comparison via `EVAL`.)
+
+```esql
+FROM logs-zeek.ssl-*
+| WHERE @timestamp > NOW() - 24h
+  AND tls.server.x509.subject.common_name == tls.server.x509.issuer.common_name
+| KEEP @timestamp, host.name, destination.ip,
+       tls.server.x509.subject.common_name, tls.server.x509.issuer.common_name
+| LIMIT 200
+```
+
+### Untrusted-root issuers
+
+Certificates from non-public CAs (no Let's Encrypt / DigiCert / GlobalSign / Sectigo / Microsoft) on outbound HTTPS:
+
+```kql
+event.dataset: "zeek.ssl"
+  and not tls.server.x509.issuer.common_name: ("Let's Encrypt*"
+                                                or "DigiCert*"
+                                                or "GlobalSign*"
+                                                or "Sectigo*"
+                                                or "Microsoft*"
+                                                or "Amazon*"
+                                                or "Google*"
+                                                or "Cloudflare*")
+```
+
+### Short-validity certificates
+
+Let's Encrypt issues 90-day certs; many ephemeral C2 setups use very-short-validity certs (≤ 30 days). Detection:
+
+```esql
+FROM logs-zeek.ssl-*
+| WHERE @timestamp > NOW() - 7d
+  AND tls.server.x509.not_before IS NOT NULL
+  AND tls.server.x509.not_after IS NOT NULL
+| EVAL validity_days = DATE_DIFF("day", tls.server.x509.not_before, tls.server.x509.not_after)
+| WHERE validity_days < 30
+| STATS conn_count = COUNT() BY destination.ip, validity_days
+| SORT conn_count DESC
+```
+
+### CN-vs-SNI mismatch
+
+A cert whose subject CN doesn't match the SNI the client sent is a domain-fronting tell or a misconfigured server. Hunt:
+
+```esql
+FROM logs-zeek.ssl-*
+| WHERE @timestamp > NOW() - 24h
+  AND tls.client.server_name IS NOT NULL
+  AND tls.server.x509.subject.common_name IS NOT NULL
+  AND NOT tls.server.x509.subject.common_name == tls.client.server_name
+  AND NOT tls.server.x509.subject.common_name LIKE CONCAT("*.", tls.client.server_name)
+| KEEP @timestamp, host.name, destination.ip,
+       tls.client.server_name, tls.server.x509.subject.common_name
+| LIMIT 100
+```
+
+### TLS 1.0 / 1.1 downgrade
+
+Modern clients negotiate TLS 1.2 / 1.3. TLS 1.0 / 1.1 on outbound 2026 traffic indicates either a legacy device or malicious tooling that pinned an old protocol.
+
+```kql
+event.dataset: "zeek.ssl"
+  and tls.version: ("TLS 1.0" or "TLS 1.1" or "TLSv1.0" or "TLSv1.1")
+```
+
+## HTTP hunts
+
+### User-Agent anomalies
+
+Default UAs from common scripting frameworks are strong tunnel signals:
+
+```kql
+event.dataset: ("zeek.http" or "logs-suricata.eve")
+  and (http.request.headers.user-agent: *python-requests*
+       or http.request.headers.user-agent: *curl/*
+       or http.request.headers.user-agent: *Wget/*
+       or http.request.headers.user-agent: *PowerShell*
+       or http.request.headers.user-agent: *Go-http-client*
+       or not http.request.headers.user-agent: *)
+```
+
+The `not ua: *` clause catches missing-UA requests (some malware emits no UA at all).
+
+### Unusual HTTP methods
+
+`PROPFIND`, `MKCOL`, `LOCK`, `UNLOCK`, `COPY`, `MOVE` are WebDAV. They have legitimate uses (SharePoint, file servers) but appearing in outbound traffic from a workstation is a tunnel signal:
+
+```kql
+event.dataset: "zeek.http"
+  and http.request.method: ("PROPFIND" or "MKCOL" or "LOCK" or "COPY" or "MOVE")
+```
+
+### Suspicious-path discovery
+
+Recon hunts for the `.git/config` / `.env` / `phpinfo.php` / `wp-admin` cluster from one source:
+
+```esql
+FROM logs-zeek.http-*
+| WHERE @timestamp > NOW() - 1h
+  AND url.path LIKE "%.git/config%"
+   OR url.path LIKE "%.env%"
+   OR url.path LIKE "%phpinfo.php%"
+   OR url.path LIKE "%/wp-admin/%"
+   OR url.path LIKE "%/admin/login%"
+| STATS path_count = COUNT_DISTINCT(url.path),
+        request_count = COUNT()
+  BY source.ip, BUCKET(@timestamp, 10m)
+| WHERE path_count >= 4
+| SORT request_count DESC
+```
+
+A source IP hitting four or more reconnaissance paths in 10 minutes is a discovery / scanning signal.
+
+## Glossary
+
+- **DNS tunneling fingerprints** — long subdomain labels (>50 char), TXT-record volume burst, NXDOMAIN clusters preceding A-record success, low-TTL responses.
+- **JA3 / JA3S / JA4** — TLS Client / Server Hello fingerprints; JA4 succeeds JA3 with extension-order robustness.
+- **CN-vs-SNI mismatch** — cert subject doesn't match client-supplied SNI; domain-fronting or misconfig signal.
+- **WebDAV methods** (`PROPFIND` / `MKCOL` etc.) — protocol verbs that frequently surface in tunneling tools.
+
+## Further reading
+
+- Zeek `dns-*` and `ssl-*` log references.
+- Suricata EVE `dns` and `tls` event-type docs.
+- JA3 / JA4 Salesforce + FoxIO references.
+""",
+    )
+    m5l3q = _add_lesson(
+        session, mod5, order=6, title="DNS & TLS hunts — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on DNS-tunneling fingerprints, JA3 fleet-rarity, self-signed-cert detection, and WebDAV HTTP-method anomalies.",
+    )
+    _add_q(session, m5l3q, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *strong* DNS-tunneling fingerprints an L2 should hunt for in `logs-zeek.dns-*`?",
+        options=[
+            {"value": "long_sub", "label": "Question name length > 80 characters total"},
+            {"value": "txt_burst", "label": "High TXT-record query volume from one host (> 20 TXT queries in 5 minutes)"},
+            {"value": "nx_burst", "label": "NXDOMAIN burst followed by an A-record success on the same parent zone"},
+            {"value": "doh", "label": "Outbound TCP/443 to a known DoH endpoint (1.1.1.1, dns.google, cloudflare-dns.com) from a non-admin host"},
+            {"value": "single_q", "label": "A single A-record query for `google.com`"},
+        ],
+        correct=["long_sub", "txt_burst", "nx_burst", "doh"],
+        explanation_md="Long subdomains, TXT-record bursts, NXDOMAIN clusters, and DoH-bypass are all canonical tunnel/exfil signals. A single A-record for `google.com` is normal traffic — the trap is the fifth option.",
+        points=3,
+    )
+    _add_q(session, m5l3q, order=2, kind=QuestionKind.SINGLE,
+        stem_md="An L2 wants to surface **rare TLS Client Hello fingerprints** across the fleet — outlier JA3 values that appear on ≤ 3 hosts, suggesting non-standard TLS implementations like malware or out-of-policy tools. Which ES|QL pattern is correct?",
+        options=[
+            {"value": "wrong_field", "label": "`STATS conn_count = COUNT() BY tls.cipher`"},
+            {"value": "right", "label": "`STATS host_count = COUNT_DISTINCT(host.name), conn_count = COUNT() BY tls.client.ja3 | WHERE host_count <= 3 AND conn_count >= 5`"},
+            {"value": "all_hosts", "label": "`STATS COUNT() BY host.name`"},
+            {"value": "by_ip", "label": "`STATS COUNT() BY destination.ip`"},
+        ],
+        correct="right",
+        explanation_md="Aggregate by `tls.client.ja3` and count distinct hosts that produced each fingerprint. Filter to JA3 values seen on ≤ 3 hosts with ≥ 5 connections — the rare-implementation outlier set. JA3S is the server-side equivalent (`tls.server.ja3s`); JA4 is the modern successor with extension-order robustness.",
+        points=2,
+    )
+    _add_q(session, m5l3q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="An L2 sees outbound TLS where the certificate's `tls.server.x509.subject.common_name` is *equal to* `tls.server.x509.issuer.common_name`. What does this fingerprint?",
+        options=[
+            {"value": "expired", "label": "Expired certificate"},
+            {"value": "self_signed", "label": "**Self-signed** certificate — subject and issuer are the same entity. On outbound HTTPS this is a strong C2 signal because legitimate public-CA-issued certs have a different issuer (Let's Encrypt / DigiCert / etc.)"},
+            {"value": "wildcard", "label": "Wildcard certificate covering all subdomains"},
+            {"value": "ev", "label": "Extended-Validation certificate"},
+        ],
+        correct="self_signed",
+        explanation_md="Subject == Issuer is the textbook self-signed signature. Legitimate public-CA certs have a third-party issuer (`Let's Encrypt Authority X3`, `DigiCert Global G2`, etc.). Self-signed certs on outbound HTTPS are rare in legitimate traffic and a strong C2 signal — paired with rare JA3, short-validity, or CN-vs-SNI-mismatch they form a high-confidence detection.",
+        points=2,
+    )
+    _add_q(session, m5l3q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="HTTP requests using `PROPFIND`, `MKCOL`, `LOCK`, `COPY`, `MOVE` methods originating from workstations to outbound destinations are a strong **WebDAV / tunneling** signal that the L2 should investigate, despite these methods having legitimate uses with SharePoint and file servers internally.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** WebDAV verbs are legitimately used internally (SharePoint, network shares) but their appearance in *outbound* traffic from a workstation to an external destination is a strong tunneling-tool signal — common in tools that establish file-share-style channels for exfil. The internal-vs-outbound distinction is the L2's filter; raw method-name filtering produces high noise without it.",
+        points=2,
+    )
+
+    # Lesson 5.4 — Exfiltration + statistical hunts + capstone
+    m5l4 = _add_lesson(
+        session, mod5, order=7,
+        title="Exfiltration (TA0010), statistical-anomaly hunts, and a worked end-to-end capstone",
+        lesson_type=LessonType.READING, duration_min=26,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Hunt **T1041 Exfiltration Over C2** via byte-volume asymmetry and **T1567 Exfiltration Over Web Service** with the cloud-storage drop-off list
+> 2. Catch **T1048 Exfiltration Over Alternative Protocol** (DNS, ICMP, raw FTP / SMB) and **T1029 Scheduled Transfer**
+> 3. Apply the four canonical **statistical-anomaly hunts** in ES|QL — beacon-shape, rare-destination, byte-volume outlier, UA / JA3 rarity
+> 4. Walk the **worked PEAK capstone** for a beaconing-anomaly hunt end to end with both an **ES|QL** and an **EQL** Kibana Security detection-rule body
+
+## T1041 Exfiltration Over C2 Channel
+
+Exfil rides the same pathway as inbound C2 commands. Detection via **byte-volume asymmetry**: outbound bytes >> inbound for a sustained window:
+
+```esql
+FROM logs-zeek.connection-*
+| WHERE @timestamp > NOW() - 24h
+  AND zeek.connection.state == "SF"
+  AND NOT CIDR_MATCH(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+| STATS bytes_out = SUM(source.bytes),
+        bytes_in = SUM(destination.bytes),
+        conn_count = COUNT()
+  BY host.name, destination.ip, BUCKET(@timestamp, 1h)
+| EVAL ratio = TO_DOUBLE(bytes_out) / TO_DOUBLE(bytes_in + 1)
+| WHERE bytes_out > 10000000  // >10 MB outbound
+  AND ratio > 5.0              // outbound / inbound > 5x
+| SORT bytes_out DESC
+| LIMIT 100
+```
+
+10 MB outbound with a 5:1 ratio in a 1-hour bucket is suspicious; tune per environment.
+
+## T1567 Exfiltration Over Web Service
+
+### .002 Cloud Storage drop-offs
+
+Adversaries use legitimate file-share services as exfil endpoints. The L2's hunt list:
+
+```kql
+event.dataset: ("zeek.dns" or "zeek.connection" or "logs-endpoint.events.network")
+  and destination.domain: ("*.mega.nz" or "*.dropbox.com" or "*.onedrive.live.com"
+                           or "*.googledrive.com" or "*.drive.google.com"
+                           or "*.discordapp.com" or "*.discord.com"
+                           or "*.transfer.sh" or "*.anonfiles.com"
+                           or "*.file.io" or "*.gofile.io"
+                           or "*.bashupload.com" or "*.0x0.st"
+                           or "*.catbox.moe" or "*.pixeldrain.com")
+  and not user.name: ("dev_*")
+```
+
+### .003 Code Repository
+
+GitHub / GitLab as exfil — adversary creates a private repo and pushes stolen data via git operations:
+
+```kql
+event.dataset: "zeek.connection"
+  and destination.domain: ("github.com" or "gitlab.com" or "bitbucket.org")
+  and destination.port: 22  // SSH-keyed git push
+```
+
+## T1048 Exfiltration Over Alternative Protocol
+
+- **.003 Unencrypted Non-C2** — raw FTP, SMB-over-WAN. Rare in modern environments because most enterprise blocks both at the edge.
+- **.001 Symmetric Encrypted Non-C2** — DNS tunneling (Lesson 5.3), ICMP tunneling.
+
+DNS exfil hunt — large total bytes carried as subdomains:
+
+```esql
+FROM logs-zeek.dns-*
+| WHERE @timestamp > NOW() - 1h
+| EVAL question_len = LENGTH(dns.question.name)
+| STATS total_bytes = SUM(question_len),
+        query_count = COUNT()
+  BY host.name, dns.question.registered_domain, BUCKET(@timestamp, 5m)
+| WHERE total_bytes > 51200  // >50 KB cumulative subdomain bytes per 5min
+| SORT total_bytes DESC
+```
+
+50 KB/hour of subdomain-encoded data is far above any legitimate DNS pattern.
+
+## T1029 Scheduled Transfer
+
+Low-and-slow exfil during off-hours. Detection: outbound traffic clusters in the 02:00–05:00 local-time window from hosts that are otherwise quiet overnight.
+
+```esql
+FROM logs-zeek.connection-*
+| WHERE @timestamp > NOW() - 7d
+| EVAL hour = DATE_EXTRACT("HOUR_OF_DAY", @timestamp)
+| WHERE hour >= 2 AND hour < 5
+| STATS bytes_out = SUM(source.bytes),
+        conn_count = COUNT()
+  BY host.name, destination.ip
+| WHERE bytes_out > 100000000  // >100 MB outbound during 02:00-05:00 window
+| SORT bytes_out DESC
+```
+
+## The four statistical-anomaly hunt patterns in ES|QL
+
+### 1. Beacon-shape
+
+Multi-axis beacon detection (combining periodicity proxy, single-destination, hours-active):
+
+```esql
+FROM logs-zeek.connection-*
+| WHERE @timestamp > NOW() - 7d
+  AND zeek.connection.state == "SF"
+  AND NOT CIDR_MATCH(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+| STATS conn_count = COUNT(),
+        unique_dest = COUNT_DISTINCT(destination.ip),
+        active_hours = COUNT_DISTINCT(BUCKET(@timestamp, 1h)),
+        avg_bytes_out = AVG(source.bytes)
+  BY host.name, destination.ip
+| WHERE conn_count > 100
+  AND unique_dest == 1
+  AND active_hours > 12
+| SORT conn_count DESC
+| LIMIT 100
+```
+
+### 2. Rare-destination by host
+
+Hosts that visit an unusual destination relative to their own baseline. Requires a baseline subquery — for simplicity, here using fleet-rarity:
+
+```esql
+FROM logs-zeek.connection-*
+| WHERE @timestamp > NOW() - 30d
+  AND NOT CIDR_MATCH(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+| STATS host_count = COUNT_DISTINCT(host.name),
+        conn_count = COUNT()
+  BY destination.ip
+| WHERE host_count <= 2 AND conn_count >= 30
+| SORT conn_count DESC
+| LIMIT 200
+```
+
+### 3. Byte-volume outlier
+
+Hosts whose outbound byte volume spikes anomalously:
+
+```esql
+FROM logs-zeek.connection-*
+| WHERE @timestamp > NOW() - 7d
+| STATS bytes_out = SUM(source.bytes)
+  BY host.name, BUCKET(@timestamp, 1d)
+| WHERE bytes_out > 1000000000  // >1 GB outbound in a day
+| SORT bytes_out DESC
+```
+
+### 4. UA / JA3 rarity
+
+Covered in Lesson 5.3.
+
+## The PEAK capstone — beaconing-anomaly hunt
+
+A complete L2-grade hunt walked end-to-end.
+
+### Prepare
+
+**Hypothesis (four-element).** *In the past 7 days, an adversary has used T1071.001 + T1573.002 web/TLS C2 with low-jitter periodicity to a single destination IP from at least one host, observable in `logs-zeek.connection-*` joined with `logs-endpoint.events.network-*` and `logs-endpoint.events.process-*` to attribute the beacon to a specific process.*
+
+- **ATT&CK:** T1071.001 + T1573.002 + (likely) T1568.002 if NRD/DGA-shaped + (possibly) T1102 if SaaS dead-drop.
+- **Data sources:** `logs-zeek.connection-*` (network-side), `logs-endpoint.events.network-*` (host-side with `process.entity_id`), `logs-endpoint.events.process-*` (process attribution).
+- **Window:** explicit UTC bounds.
+
+### Execute
+
+**Q1 — Broad ES|QL** (per-host per-destination per-hour aggregation):
+
+```esql
+FROM logs-zeek.connection-*
+| WHERE @timestamp > NOW() - 7d
+  AND zeek.connection.state == "SF"
+  AND network.transport == "tcp"
+  AND destination.port IN (443, 80, 8080, 8443)
+  AND NOT CIDR_MATCH(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+| STATS conn_count = COUNT(),
+        unique_dest = COUNT_DISTINCT(destination.ip),
+        active_hours = COUNT_DISTINCT(BUCKET(@timestamp, 1h)),
+        avg_bytes_out = AVG(source.bytes)
+  BY host.name, destination.ip
+```
+
+**Q2 — Narrow** (apply beacon-shape filter):
+
+```esql
+| WHERE conn_count > 100
+  AND unique_dest == 1
+  AND active_hours > 12
+| SORT conn_count DESC
+| LIMIT 100
+```
+
+**Q3 — Enrichment** (DNS resolution + JA3S):
+
+```esql
+FROM logs-zeek.connection-*, logs-zeek.dns-*, logs-zeek.ssl-*
+| WHERE @timestamp > NOW() - 7d
+  AND host.name == "<survivor host>"
+  AND destination.ip == "<survivor ip>"
+| STATS dns_names = VALUES(dns.question.name),
+        ja3s = VALUES(tls.server.ja3s),
+        conn_count = COUNT()
+  BY host.name, destination.ip
+```
+
+**Q4 — Process attribution** (EQL `sequence` on the host side):
+
+```eql
+sequence by host.name, process.entity_id with maxspan=5m
+  [ process where event.action : ("start", "process_started")
+              and not process.code_signature.trusted == true ]
+  [ network where destination.ip == "<survivor ip>"
+              and destination.port in (443, 80) ]
+```
+
+### Act
+
+Disposition the survivor list. A high-confidence TP — process attribution to an unsigned binary spawning regular-interval HTTPS to a single rare destination with sparse hostname diversity — is *page-IR*. Hand off to IR with the hunt report attached.
+
+### Know
+
+Update Navigator coverage red → orange (hunting coverage) and propose two detection-rule bodies:
+
+**ES|QL detection-rule body** (threshold-based aggregation):
+
+```esql
+FROM logs-zeek.connection-*
+| WHERE @timestamp > NOW() - 1h
+  AND zeek.connection.state == "SF"
+  AND network.transport == "tcp"
+  AND destination.port IN (443, 80, 8080, 8443)
+  AND NOT CIDR_MATCH(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+| STATS conn_count = COUNT(),
+        unique_dest = COUNT_DISTINCT(destination.ip)
+  BY host.name, destination.ip
+| WHERE conn_count > 50 AND unique_dest == 1
+```
+
+**EQL detection-rule body** (process-spawn → network-connect chain):
+
+```eql
+sequence by host.name with maxspan=2m
+  [ process where event.action : ("start", "process_started")
+              and not process.code_signature.trusted == true
+              and not process.executable : ("?:\\\\Program Files\\\\*",
+                                             "?:\\\\Windows\\\\System32\\\\*") ]
+  [ network where destination.port in (443, 80, 8080, 8443)
+              and not cidrMatch(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16") ]
+```
+
+Both bodies submit to TIDE with severity *high*, threat metadata `T1071.001` + `T1573.002`, and the hunt report attached. After 90 days of FP-rate measurement, Navigator transitions yellow → green.
+
+## Glossary
+
+- **Byte-volume asymmetry** — outbound bytes >> inbound for sustained window; T1041 fingerprint.
+- **Cloud-storage drop-off list** — `mega.nz`, `dropbox.com`, `transfer.sh`, `anonfiles.com`, `file.io`, `gofile.io`, `bashupload.com`, `0x0.st`, `catbox.moe`, `pixeldrain.com`, plus Discord CDN.
+- **Scheduled transfer (T1029)** — exfil clusters in the 02:00–05:00 local-time window.
+- **Four statistical-anomaly hunt patterns** — beacon-shape / rare-destination / byte-volume outlier / UA-JA3 rarity.
+
+## Further reading
+
+- ATT&CK technique pages T1041, T1567, T1048, T1029.
+- Elastic Security prebuilt rules — Exfiltration EQL/ES|QL rules.
+- Zeek / Suricata Filebeat module references for production deployments.
+""",
+    )
+    m5l4q = _add_lesson(
+        session, mod5, order=8, title="Exfil & capstone — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on byte-volume asymmetry, T1567.002 SaaS exfil hunting, scheduled-transfer hour filtering, and the capstone EQL process-attribution chain.",
+    )
+    _add_q(session, m5l4q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 wants to detect **T1041 Exfiltration Over C2 Channel** by spotting hosts whose outbound byte-volume vastly exceeds inbound for sustained periods. Which ES|QL pattern is correct?",
+        options=[
+            {"value": "any_bytes", "label": "`STATS COUNT() BY host.name`"},
+            {"value": "ratio", "label": "`STATS bytes_out = SUM(source.bytes), bytes_in = SUM(destination.bytes) BY host.name, destination.ip, BUCKET(@timestamp, 1h) | EVAL ratio = TO_DOUBLE(bytes_out) / TO_DOUBLE(bytes_in + 1) | WHERE bytes_out > 10000000 AND ratio > 5.0`"},
+            {"value": "name_only", "label": "Filter by destination.domain matching cloud-storage names"},
+            {"value": "asymm", "label": "Filter by outbound bytes only with no comparison to inbound"},
+        ],
+        correct="ratio",
+        explanation_md="Byte-volume asymmetry is computed per (host × destination × time-bucket) by summing source.bytes and destination.bytes, computing the outbound/inbound ratio in `EVAL`, and filtering. The `+1` prevents division by zero. 10 MB outbound + 5:1 ratio in a 1-hour bucket is the textbook T1041 signal; tune per environment baseline.",
+        points=2,
+    )
+    _add_q(session, m5l4q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following destination domains should an L2's **T1567.002 cloud-storage exfiltration** hunt include in its filter?",
+        options=[
+            {"value": "mega", "label": "`*.mega.nz`"},
+            {"value": "anonfiles", "label": "`*.anonfiles.com`"},
+            {"value": "transfer", "label": "`*.transfer.sh`"},
+            {"value": "discord", "label": "`*.discordapp.com` / `*.discord.com` (Discord CDN)"},
+            {"value": "msft", "label": "`*.microsoft.com`"},
+        ],
+        correct=["mega", "anonfiles", "transfer", "discord"],
+        explanation_md="Mega, AnonFiles, transfer.sh, and Discord CDN are all canonical T1567.002 drop-off destinations. The full L2 hunt list also includes file.io, gofile.io, bashupload, 0x0.st, catbox.moe, pixeldrain — and the major personal-cloud surfaces (Dropbox, Google Drive, OneDrive). `*.microsoft.com` is far too broad — it would catch every Office 365 connection in the estate. Hunts target *small / specific* SaaS services, not entire vendor namespaces.",
+        points=3,
+    )
+    _add_q(session, m5l4q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="An L2 hunts for **T1029 Scheduled Transfer** — adversaries that exfil during off-hours to avoid detection. Which ES|QL clause filters to the canonical 02:00–05:00 local-time window?",
+        options=[
+            {"value": "where_two", "label": "`WHERE hour == 2`"},
+            {"value": "extract", "label": "`EVAL hour = DATE_EXTRACT(\"HOUR_OF_DAY\", @timestamp) | WHERE hour >= 2 AND hour < 5`"},
+            {"value": "between", "label": "`WHERE @timestamp BETWEEN 02:00 AND 05:00`"},
+            {"value": "string", "label": "`WHERE @timestamp LIKE \"%T02:%\"`"},
+        ],
+        correct="extract",
+        explanation_md="`DATE_EXTRACT(\"HOUR_OF_DAY\", @timestamp)` produces the hour-of-day integer (0–23) in `EVAL`; the subsequent `WHERE hour >= 2 AND hour < 5` filters to the 02:00–05:00 window. Note the time-zone semantics depend on cluster configuration — for multi-timezone fleets the L2 should baseline per-host-or-per-region rather than fleet-wide.",
+        points=2,
+    )
+    _add_q(session, m5l4q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="The capstone hunt's *Q4 process-attribution* step uses an **EQL `sequence by host.name, process.entity_id with maxspan=5m`** that pairs an unsigned-binary process-start event with an outbound network-connection event from the same process — joining the network-side hunt to the host-side process tree to give triage-grade context.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** The L2's signature capstone shape: ES|QL aggregates per-host beacon shape on the network side, EQL `sequence` joins the network event to the spawning process via `process.entity_id`. This produces *triage-grade* output — the L2 hands off the hunt with both the destination beacon evidence and the process that initiated it, ready for L1 triage or IR escalation.",
+        points=2,
+    )
+
+    print(f"  L2: {course.title} — 5 modules, 40 lessons (Module 5 Network Telemetry @ proper depth)")
     return course
 
 

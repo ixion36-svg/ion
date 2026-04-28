@@ -1,5 +1,46 @@
 # Changelog
 
+## v0.11.17 (2026-04-28)
+
+### L2 Module 5 — Network telemetry: Command and Control + Exfiltration
+
+Fifth L2 ship. **L2 Module 5 — Network telemetry — Command and Control + Exfiltration** authored from a research-agent dossier at BTL1+/SANS GCIH+/SANS FOR572-equivalent depth. ~9,000 words, 8 lessons (4 reading + 4 quiz), 16 quiz questions. Covers the Elastic network-data plane (Elastic Agent endpoint network events / Packetbeat / Zeek / Suricata) end to end, with the cross-source `network.community_id` join and the process-attribution capstone.
+
+#### Lesson breakdown
+
+| # | Title | Type | Quiz qs |
+|---|---|---|---|
+| 5.1 | The network-event data plane in Elastic and the ECS network/DNS/TLS field reference | reading | — |
+| 5.2 | Network data plane — quiz | quiz | 4 |
+| 5.3 | Command and Control (TA0011) — top techniques and EQL+ES&#x7C;QL fingerprints | reading | — |
+| 5.4 | Command and Control — quiz | quiz | 4 |
+| 5.5 | DNS hunts and TLS hunts | reading | — |
+| 5.6 | DNS & TLS hunts — quiz | quiz | 4 |
+| 5.7 | Exfiltration (TA0010), statistical-anomaly hunts, and a worked end-to-end capstone | reading | — |
+| 5.8 | Exfil & capstone — quiz | quiz | 4 |
+
+#### Topics covered
+
+- **Network data plane** — the four sources (Elastic Agent endpoint `logs-endpoint.events.network-*` with `process.entity_id` for process-attribution; Packetbeat / `logs-network_traffic.*` for L7 protocol decoding; Zeek `logs-zeek.connection-*` / `dns-*` / `ssl-*` / `http-*` / `notice-*` for connection states + per-protocol indices; Suricata `logs-suricata.eve-*` for IDS rules + EVE protocol events) with strengths/weaknesses; ECS `network.*` / `source.*` / `destination.*` / `dns.*` / `tls.*` / `url.*` / `http.*` field reference; **`network.community_id` as the cross-source join key**; Zeek `conn_state` codes (S0 / S1 / SF / REJ / RSTO / RSTR / OTH from L1 M4) for established-vs-failed-vs-rejected discrimination; multi-index `FROM logs-zeek.connection-*, logs-suricata.eve-*, logs-endpoint.events.network-*` cross-source pivots; worked broad-to-narrow KQL → EQL → ES&#x7C;QL on a beacon hunt
+- **C2 TA0011** — T1071 application-layer protocol with sub-techniques .001 web (the dominant envelope) / .002 file transfer / .003 mail / .004 DNS C2 (TXT-record carrier vs benign DNS); **T1573.002 Encrypted Channel — TLS** as the near-universal C2 envelope; T1090 proxy with .001 internal / .002 external / .003 multi-hop (Tor / I2P) / .004 domain fronting; **T1568.002 DGA** with consonant-ratio + length entropy proxy in ES&#x7C;QL; **T1102 Web Service** SaaS dead-drops (`*.workers.dev` / Discord webhook / GitHub raw / Telegram Bot API / Pastebin / Slack hooks / Notion); T1572 protocol tunneling (DNS / ICMP / SSH); **T1219 Remote Access Software** (AnyDesk / ScreenConnect / TeamViewer / Atera / Splashtop / NetSupport / Action1 / TacticalRMM) with process+network co-occurrence; **beacon shape along four axes** (periodicity ± jitter, size symmetry small-out + larger-in, working-hours-agnostic, sparse hostname diversity) with full ES&#x7C;QL multi-axis hunt; **C2 domain-class tells** (NRD / DGA / typosquat / SaaS dead-drop / bulletproof TLDs `.top` / `.xyz` / `.icu` / `.click` / `.cn` / `.ru`); **JA3 / JA3S TLS-fingerprinting** basics with rare-fingerprint fleet hunt
+- **DNS + TLS hunts** — DNS tunneling fingerprints (long subdomains > 80 chars, TXT-record query-volume bursts > 20/5min, NXDOMAIN bursts followed by A-record success, **DoH detection** of outbound TCP/443 to known DoH endpoints `1.1.1.1` / `8.8.8.8` / `dns.google` / `cloudflare-dns.com` / `dns.quad9.net` from non-admin hosts, rare-TLD detection); DNS exfil shape (T1048.003 + T1572) with `LENGTH(dns.question.name)` cumulative-bytes hunt; TLS hunts — rare JA3 / JA3S (`COUNT_DISTINCT(host.name) ≤ 3 AND COUNT() ≥ 5`), **self-signed cert detection** via subject-equals-issuer comparison, untrusted-root issuers exclusion list (`Let's Encrypt` / `DigiCert` / `GlobalSign` / `Sectigo` / `Microsoft` / `Amazon` / `Google` / `Cloudflare`), short-validity certs (`DATE_DIFF` between `not_before` and `not_after` < 30 days), **CN-vs-SNI mismatch** detection, TLS 1.0/1.1 downgrade detection (legacy + likely malicious in 2026); HTTP hunts — UA anomalies (`python-requests/2.x` / `curl/7.81` / `Go-http-client` / missing UA), unusual methods (`PROPFIND` / `MKCOL` / `LOCK` / `COPY` / `MOVE` WebDAV verbs from outbound traffic), suspicious-path discovery (`/.git/config` / `/.env` / `/phpinfo.php` / `/wp-admin/` cluster from one source). JA4 successor to JA3 noted (extension-order robustness)
+- **Exfiltration TA0010 + statistical hunts + capstone** — T1041 exfil over C2 channel via byte-volume asymmetry (`SUM(source.bytes) / SUM(destination.bytes) > 5.0` per host-IP-hour); T1567 web-service exfil with the canonical drop-off domain list (`*.mega.nz` / `*.dropbox.com` / `*.transfer.sh` / `*.anonfiles.com` / `*.file.io` / `*.gofile.io` / `*.bashupload.com` / `*.0x0.st` / `*.catbox.moe` / `*.pixeldrain.com` / Discord CDN / OneDrive / Google Drive); T1567.003 code-repo exfil (GitHub / GitLab over SSH); T1048 alternative-protocol exfil with DNS-bytes hunt; T1029 scheduled transfer with `DATE_EXTRACT(\"HOUR_OF_DAY\")` 02:00–05:00 off-hours filter; **the four canonical statistical-anomaly hunt patterns** (beacon-shape, rare-destination by host, byte-volume outlier, UA / JA3 rarity); **the worked PEAK capstone — beaconing-anomaly hunt** end to end: Q1 broad ES&#x7C;QL aggregation per (host × destination × hour), Q2 narrow with `conn_count > 100 AND unique_dest == 1 AND active_hours > 12`, Q3 enrichment via `logs-zeek.dns-*` + `logs-zeek.ssl-*` for DNS resolution and JA3S, **Q4 process attribution via EQL `sequence by host.name, process.entity_id with maxspan=5m`** joining the network-side beacon to the host-side spawning process. Two **Kibana Security detection-rule bodies** as the deliverable — an ES&#x7C;QL threshold rule and an EQL `sequence` rule — both ready for TIDE submission with severity / runbook / threat-metadata
+
+7 Mermaid diagrams across the module: data-plane taxonomy, TA0011 family tree, beacon-shape four-axis scorecard, DNS-tunnel fingerprint flow, TLS-cert lifecycle, exfil-channel decision tree, capstone hunt-to-detection pipeline.
+
+L2 course now sits at **5 modules / 40 lessons / 80 questions**.
+
+#### Upgrade
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+The seeder container (baked-in from v0.11.16) now picks up `seed_courses.py` automatically — no manual `curl ... | docker exec -i` required. To force a re-seed: `docker exec ion python /app/seed_all.py --force`.
+
+---
+
 ## v0.11.16 (2026-04-28) — `seed_courses.py` baked into the image
 
 ### Operator fix — courses now seed automatically on deploy
