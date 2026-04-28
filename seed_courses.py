@@ -8048,7 +8048,970 @@ A by-product of disciplined Know-phase work is the team's *data-gap log* — a r
     )
 
 
-    print(f"  L2: {course.title} — 1 module, 8 lessons (Module 1 PEAK Methodology @ proper depth)")
+    # ── Module 2 — KQL + EQL + ES|QL: the Elastic-stack query languages ──
+    mod2 = _add_module(
+        session, course, order=2,
+        title="KQL, EQL, and ES|QL — the Elastic-stack query languages",
+        description_md=(
+            "The Elastic query-language landscape for hunters. Lucene "
+            "(legacy), **KQL** (Kibana search-bar), **EQL** (sequence + "
+            "behavioural-chain queries), **ES|QL** (piped DSL for stats / "
+            "joins / time-series / cross-index). The decision framework "
+            "for which language to reach for; KQL fluency in Discover; "
+            "EQL `sequence by host with maxspan` for adversary chains; "
+            "ES|QL pipelines `FROM | WHERE | EVAL | STATS BY | SORT | "
+            "LIMIT` with `ENRICH` and `LOOKUP JOIN`; cross-language "
+            "pivots; the ECS field reference for L2 hunters; five worked "
+            "queries across all four languages against Beats / Elastic "
+            "Agent indices."
+        ),
+        estimated_minutes=210,
+    )
+
+    # Lesson 2.1 — The query-language landscape
+    m2l1 = _add_lesson(
+        session, mod2, order=1,
+        title="The Elastic query-language landscape: Lucene, KQL, EQL, ES|QL",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Distinguish **Lucene query syntax**, **KQL (Kibana Query Language)**, **EQL (Event Query Language)**, and **ES|QL (Elasticsearch Query Language)** by syntax shape and use case
+> 2. Pick the right query language for a given hunt question using the decision framework
+> 3. Recognise where each language *runs* in Kibana (Discover bar, Lucene toggle, Timelines, ES|QL mode, detection-rule body)
+> 4. Articulate the version timeline (Lucene since v0; KQL since 6.3 in 2018; EQL GA in 7.9 mid-2020; ES|QL GA in 8.13 March 2024) and the implications for tooling
+> 5. Place **Painless** in the picture without confusing it with a query language proper
+>
+> **Prerequisites.** Module 1 of this course (PEAK methodology). Comfort recognising ATT&CK technique IDs; familiarity with ECS field paths.
+
+## Why four languages?
+
+Elasticsearch is fifteen years old, and that age shows in the *plurality* of query languages it supports. A modern Kibana operator stares at a search bar that can be re-toggled between two languages, switches over to the Security app where a third is preferred, and opens Discover's new toggle to find a fourth. Each language exists for a real reason — and for an L2 hunter, **picking the right one is half the hunt.**
+
+Knowing only KQL is the L1's surface. The L2 difference is fluency across all four — and, more importantly, knowing *which one to reach for given the shape of the question.*
+
+## Lucene query syntax — the original
+
+Elasticsearch is built on Apache Lucene, and its first query language was Lucene's query string syntax. Lucene strings are deeply expressive — full Boolean expressions with `AND`/`OR`/`NOT` (uppercase), regex with anchors and character classes, fuzzy match by edit distance, proximity match by token gap, term boosting, range queries on numerics and dates. They are also famously fiddly: special characters need escaping, the rules for what constitutes a "term" depend on whether the field is analyzed, and a malformed expression can fail-open by silently turning into a free-text search.
+
+The Lucene syntax pieces an L2 should recognise:
+
+- **Field equality:** `process.name:powershell.exe`
+- **Boolean (uppercase):** `process.name:powershell.exe AND NOT user.name:SYSTEM`
+- **Range, inclusive:** `process.pid:[100 TO 999]`
+- **Range, exclusive:** `process.pid:{100 TO 999}`
+- **Regex:** `process.name:/power.*\\.exe/`
+- **Fuzzy (edit distance):** `process.name:powershel~2`
+- **Proximity (token gap on a phrase):** `"powershell encoded"~5`
+- **Boost:** `process.name:powershell^2`
+- **Exists / missing (legacy):** `_exists_:process.command_line`, `_missing_:process.command_line`
+
+Lucene was the default before KQL (Kibana 6.3, mid-2018), and it still ships in Discover as a per-search override toggle. Senior analysts who learned Elastic before 2018 reach for Lucene reflexively when they need regex anchors, fuzzy matching, or proximity — predicates that KQL still does not expose cleanly.
+
+## KQL — Kibana Query Language
+
+KQL is Kibana's *simpler-than-Lucene* search-bar syntax, introduced in 6.3 (2018) and made the default in 7.x. It powers the Discover filter bar, Lens, Maps, the Security app, the Observability app, the saved-search format, and the *KQL query* input on every detection rule. Designed for analysts who never want to learn Lucene's quirks: lowercase Boolean operators, intuitive wildcards, friendly nested-field handling, opt-in case sensitivity.
+
+KQL is *only* a filter language. **It has no aggregation, no joins, no scripting, no `if-then-else`.** It produces a set of matching documents and stops. Everything else — counts, group-bys, time bucketing, lookups — is the job of a different tool (visualisations, ES|QL, the aggregations API).
+
+In modern Kibana (8.13+), KQL gained one new superpower: it is callable from inside ES|QL via the `KQL("...")` function, letting the analyst write the *filter* half of a hunt in KQL and the *aggregation* half in ES|QL. (See Lesson 4.)
+
+## EQL — Event Query Language
+
+EQL went GA in Elastic Stack 7.9 (mid-2020). It is purpose-built for **security event correlation** — for the question shapes that look like *"process A then process B then file write, same host, all within five minutes."* Sequence semantics are a first-class primitive: `sequence by host.name with maxspan=5m` is short, clear, and *impossible to express cleanly in any other Elastic query language.* EQL also normalises around the ECS `event.category` field, so queries like `process where ...` and `network where ...` read naturally to anyone who knows ECS.
+
+Hundreds of the rules that ship in Elastic Security's prebuilt rule library are EQL rules. The MITRE ATT&CK rule library Elastic maintains uses EQL almost exclusively for the technique-level detection rules whose logic is fundamentally a behavioural chain.
+
+## ES|QL — Elasticsearch Query Language
+
+ES|QL went GA in 8.13 (March 2024). It is the new piped-DSL — strongly resembling Microsoft Kusto KQL (yes, *same name, different language*), Splunk SPL, and PromQL in shape. It ships as the default new-rule language for many Elastic Security templates from 8.14 onward, and it is the recommended default for ad-hoc analytics, threat hunting, and any cross-index or cross-cluster query.
+
+The pipeline shape: `FROM <index> | WHERE <predicate> | EVAL <columns> | STATS <agg> BY <grouping> | SORT | LIMIT | KEEP | DROP`. Every `|` passes a *tabular result-set* forward, exactly like Kusto or Splunk. ES|QL also supports `DISSECT` and `GROK` for runtime parsing of unstructured fields, `ENRICH` for joins to a small reference index via an enrich policy, and **`LOOKUP JOIN`** (8.16+) for left-outer joins to a lookup index.
+
+ES|QL absorbs much of the territory that previously required Painless scripted fields, the legacy SQL endpoint, and the aggregations API. It does *not* yet absorb EQL's `sequence` primitive — for behavioural chains across events, EQL remains the right tool.
+
+## The "fourth language" — Painless
+
+Painless is Elastic's scripted-fields language. *Not* a query language proper — the runtime expression language that fills in gaps when KQL/EQL/ES|QL need a computation that the schema doesn't expose directly. Recognise it (and recognise that ES|QL's `EVAL` largely replaces it for query-time computations) but don't dwell on it. Hunt queries that rely on Painless are usually a code smell — the right answer is normally to add an ECS field, an ingest-pipeline enrichment, or an ES|QL `EVAL`.
+
+## Decision framework — which language for which hunt
+
+| Question shape | Best language | Why |
+|---|---|---|
+| Filter rows: *show me events where X* | **KQL** | Search bar, simplest to type, Kibana-native |
+| Boolean / regex / fuzzy / proximity on single index | **Lucene** | KQL still doesn't expose anchors / fuzzy / proximity |
+| Adversary behaviour chain: *A then B then C, same host, within 5m* | **EQL** | Only language with first-class `sequence` |
+| Statistics / aggregation / pivoting / joins | **ES\\|QL** | Pipelines + `STATS BY` + `ENRICH` + `LOOKUP JOIN` |
+| Cross-index / cross-cluster | **ES\\|QL** | First-class; KQL/EQL can't really do this |
+| Detection-rule body for tier-2 / tier-3 alerts | **EQL** or **ES\\|QL** | Both run as Kibana Security rule bodies |
+| Time-series anomaly | **ES\\|QL** | Native `BUCKET()` time-bucketing in `STATS` |
+| Quick exploration with field auto-complete | **KQL** | Discover's bar offers field auto-complete |
+| Saved-search filter / dashboard filter | **KQL** | Saved-search format is KQL |
+| Embedded predicate inside an aggregation pipeline | **KQL inside ES\\|QL** | `WHERE KQL("...")` — best of both |
+
+```mermaid
+flowchart TD
+    Start[Hunt question] --> Q1{Filter rows<br/>or aggregate?}
+    Q1 -- Filter only --> Q2{Need regex / fuzzy /<br/>proximity?}
+    Q2 -- No --> KQL[KQL]
+    Q2 -- Yes --> Lucene[Lucene]
+    Q1 -- Aggregate --> Q3{Behavioural chain<br/>across events?}
+    Q3 -- Yes --> EQL[EQL]
+    Q3 -- No --> Q4{Stats / joins /<br/>cross-index?}
+    Q4 -- Yes --> ESQL[ES&#x7C;QL]
+    Q4 -- No --> ESQL
+```
+
+## Where each language runs in Kibana
+
+- **KQL** — search bar in Discover, Dashboard, Lens, Maps; the Security app's filter bar; the *KQL query* input on every detection rule; saved-search format.
+- **Lucene** — toggle in Discover next to the search bar; the Dev Console's `_search` API as `query_string`.
+- **EQL** — Kibana Security → Timelines → *Add EQL query*; the EQL search API in Dev Console; an EQL rule body in detection-rule creation.
+- **ES|QL** — Discover's *ES|QL mode* toggle (8.11+); the Dev Console `_query` API; an ES|QL rule body in detection-rule creation (8.13+).
+
+## Version timeline
+
+| Release | Year | Language event |
+|---|---|---|
+| Elasticsearch 0.x | 2010 | Lucene query strings — the original |
+| Kibana 6.3 | 2018 | KQL introduced |
+| Elastic Stack 7.9 | mid-2020 | EQL GA |
+| Elastic Stack 8.11 | late 2023 | ES|QL beta — Discover ES|QL mode |
+| Elastic Stack 8.13 | March 2024 | ES|QL GA |
+| Elastic Stack 8.14+ | 2024+ | ES|QL becomes default for new rule templates |
+| Elastic Stack 8.16 | late 2024 | `LOOKUP JOIN` in ES|QL |
+
+The L2 should know which version the *target environment* runs at — feature availability shifts by point release, especially for ES|QL functions that landed mid-8.x.
+
+## Documentation references
+
+- **Lucene query string** — `elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html`
+- **KQL** — `elastic.co/guide/en/kibana/current/kuery-query.html`
+- **EQL syntax** — `elastic.co/guide/en/elasticsearch/reference/current/eql-syntax.html`
+- **ES|QL** — `elastic.co/guide/en/elasticsearch/reference/current/esql.html`
+- **ECS field reference** — `elastic.co/guide/en/ecs/current/ecs-field-reference.html`
+
+## Glossary
+
+- **Lucene query syntax** — original Elasticsearch query language; full Boolean / regex / fuzzy / proximity. Toggle in Discover.
+- **KQL** — Kibana Query Language; search-bar syntax; filter-only.
+- **EQL** — Event Query Language; security event correlation with `sequence` semantics. GA 2020.
+- **ES|QL** — Elasticsearch Query Language; piped DSL; stats / joins / cross-index. GA 2024.
+- **Painless** — scripted-fields language; not a query language. Largely superseded by ES|QL `EVAL`.
+
+## Further reading
+
+- Elastic blog — *Introducing ES|QL* (8.13 GA announcement, March 2024).
+- Elastic Stack release notes — to track ES|QL function additions per point release.
+- Elastic Security Labs — EQL rule library (the prebuilt MITRE-mapped rule corpus).
+""",
+    )
+    m2l1q = _add_lesson(
+        session, mod2, order=2, title="Language landscape — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on language selection by question shape, EQL's distinguishing feature, ES|QL's GA timeline, and KQL's filter-only nature.",
+    )
+    _add_q(session, m2l1q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 hunter wants to detect *'process `outlook.exe` spawning `msedge.exe` followed within 60 seconds by `msedge.exe` spawning `powershell.exe` on the same host'*. Which Elastic query language is the right tool?",
+        options=[
+            {"value": "kql", "label": "KQL — the search bar in Discover"},
+            {"value": "lucene", "label": "Lucene — for the regex on process names"},
+            {"value": "eql", "label": "EQL — its `sequence by host.name with maxspan` is the only language that expresses behavioural chains natively"},
+            {"value": "esql", "label": "ES|QL — pipe through `STATS BY host.name`"},
+        ],
+        correct="eql",
+        explanation_md="EQL is the only Elastic query language with first-class `sequence` semantics. KQL is filter-only, Lucene is filter+regex, ES|QL has stats/joins but no `sequence` primitive yet. The shape `[event] then [event] within Xm by host.name` is *the* EQL question shape.",
+        points=2,
+    )
+    _add_q(session, m2l1q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *correct* statements about the Elastic query-language landscape?",
+        options=[
+            {"value": "kql_filter", "label": "KQL is filter-only — no aggregation, no joins, no `if-then-else`"},
+            {"value": "esql_pipe", "label": "ES|QL uses pipeline syntax (`FROM | WHERE | STATS | SORT | LIMIT`) similar in shape to Splunk SPL or Kusto"},
+            {"value": "eql_security", "label": "EQL was designed for security event correlation and is widely used in Elastic Security's prebuilt rule library"},
+            {"value": "kql_kusto", "label": "KQL in Elastic and KQL in Microsoft Defender are the same language with the same syntax"},
+            {"value": "lucene_legacy", "label": "Lucene query syntax remains available in Discover via a per-search toggle"},
+        ],
+        correct=["kql_filter", "esql_pipe", "eql_security", "lucene_legacy"],
+        explanation_md="The trap is the fourth option. Microsoft's KQL is **Kusto Query Language** (a piped DSL closer to Elastic's ES|QL); Elastic's KQL is **Kibana Query Language** (a search-bar filter language). Same acronym, completely different languages — confusing them is a recurring junior-hunter mistake.",
+        points=3,
+    )
+    _add_q(session, m2l1q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="The L2 needs to embed a precise filter inside an aggregation pipeline — *'count process events per host per hour where the command-line matches a complex KQL pattern.'* Which approach is idiomatic in modern Elastic (8.13+)?",
+        options=[
+            {"value": "all_kql", "label": "Write everything in KQL"},
+            {"value": "all_eql", "label": "Write everything in EQL"},
+            {"value": "kql_inside_esql", "label": "Write the aggregation in ES|QL and embed the filter via `WHERE KQL(\"...\")` — best of both"},
+            {"value": "painless", "label": "Author a Painless scripted field for the predicate"},
+        ],
+        correct="kql_inside_esql",
+        explanation_md="ES|QL exposes a `KQL(\"...\")` function that lets the L2 embed a KQL filter inside an ES|QL pipeline. The aggregation half of the hunt runs in ES|QL's `STATS BY BUCKET()`; the precise filter half stays in KQL where intellisense and field auto-complete help. Painless scripted fields are a code smell — superseded by ES|QL `EVAL` for query-time computations.",
+        points=2,
+    )
+    _add_q(session, m2l1q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="ES|QL absorbs much of the territory previously requiring Painless scripted fields, the legacy SQL endpoint, and the aggregations API — *but* it does **not** yet absorb EQL's `sequence` primitive, so EQL remains the right tool for behavioural chains across events.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** ES|QL is the right tool for stats, aggregations, joins, time-series, and cross-index — but `sequence by host.name with maxspan=5m` has no ES|QL equivalent yet (as of 8.16). EQL stays the language of behavioural-chain hunts; ES|QL is the language of pipelines. The two are complementary, not competing.",
+        points=2,
+    )
+
+    # Lesson 2.3 — KQL + Lucene fundamentals
+    m2l2 = _add_lesson(
+        session, mod2, order=3,
+        title="KQL fundamentals — and Lucene as the legacy fallback",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Write KQL filters using field-equality, ranges, Boolean operators, wildcards, and exists checks
+> 2. Recognise the **case-sensitivity** trap — `keyword` mappings vs `text` mappings on ECS fields
+> 3. Apply explicit `nested:{...}` scope to avoid silent over-counts on `nested`-mapped fields
+> 4. Decide when to drop into **Lucene** for regex, fuzzy, or proximity predicates KQL doesn't expose
+> 5. Avoid the leading-wildcard performance trap on text fields
+
+## KQL field equality
+
+KQL's primary form is `field: value`. Strings can be unquoted if they have no spaces or special characters; quoted strings handle anything else.
+
+```kql
+event.action: "process_started"
+host.name: "WIN-FIN-014"
+process.name: powershell.exe
+user.name: "Bob.Hadley"
+```
+
+**Case sensitivity follows the index mapping.** ECS `keyword` fields (`process.name`, `host.name`, `user.name`, `event.action`) are typically *exact match, case-sensitive*. ECS `text` fields (`process.command_line.text`, `message`) run through an analyzer — they're tokenised and case-insensitive. The same predicate `process.command_line: "powershell"` does very different things on a `keyword` versus `text` mapping.
+
+This trips up newcomers — the L2's reflex must be to **check the index mapping** (Discover → Inspect → Field type) before iterating. ECS commonly exposes both: `process.command_line` is a `keyword` *and* `process.command_line.text` is a `text` field; choose deliberately.
+
+## Range queries
+
+```kql
+process.pid: [100 TO 999]            // inclusive both ends
+process.pid: { 100 TO 999 }          // exclusive both ends (8.x)
+@timestamp >= "2026-04-01"           // half-open via comparator
+@timestamp >= "now-7d"               // relative time
+event.severity > 70 and event.severity <= 90
+```
+
+Comparator syntax (`>=`, `>`, `<=`, `<`) was added to KQL well after the initial release; older muscle memory might prefer the bracket syntax. Both are valid; comparators read more naturally for time and numeric ranges.
+
+## Boolean operators and grouping
+
+KQL takes Boolean operators in lowercase or uppercase (the docs use lowercase; many analysts prefer uppercase for readability). Grouping is via `()`.
+
+```kql
+event.category: process
+  and process.name: ("powershell.exe" or "pwsh.exe")
+  and not user.name: ("SYSTEM" or "NT AUTHORITY*")
+  and (process.command_line: *EncodedCommand* or process.command_line: *FromBase64String*)
+```
+
+Three KQL conveniences:
+
+- **`field: (a or b or c)`** — list match, equivalent to `field: a or field: b or field: c` but shorter.
+- **`field: a*`** — wildcard.
+- **`not field: value`** — negation.
+
+## Wildcards
+
+KQL wildcards are `*` (zero-or-more characters) and `?` (single character). They work on `keyword` fields and most `text` fields:
+
+```kql
+process.name: power*
+host.name: *-PROD-*
+process.command_line: *FromBase64String*
+file.path: "C:\\\\Users\\\\*\\\\AppData\\\\Local\\\\Temp\\\\*.exe"
+```
+
+**Avoid leading wildcards on text fields** — `process.command_line: *cmd.exe*` on a text field forces a full-table scan and may take minutes on a multi-terabyte index. On `keyword` fields leading wildcards are *much* less expensive but still slower than prefix-only patterns. The L2 reflex: **anchor your wildcards to the front whenever possible.**
+
+## Exists / missing
+
+KQL has no `_exists_:` keyword like Lucene; instead it uses the wildcard match-all on a field:
+
+```kql
+process.command_line: *           // matches docs that have the field set
+not process.command_line: *       // matches docs missing the field
+```
+
+The ES|QL equivalent is `WHERE process.command_line IS NOT NULL`. The Lucene legacy form `_exists_:process.command_line` still works in Lucene mode but is deprecated.
+
+## Nested fields — the same-element trap
+
+ECS uses two patterns for nested data: dotted **object** fields (the common case) and explicit **`nested`** mappings (used when arrays of objects must preserve same-element semantics). KQL handles them differently:
+
+- For dotted-object fields (most ECS), use dot notation: `user.name: "alice"`, `process.parent.command_line: "*powershell*"`.
+- For `nested`-mapped fields (like `email.attachments`), you **may need explicit `nested:{...}` scope** to enforce *same-element* matching across multiple predicates.
+
+Without `nested:{...}` scope, KQL applies each predicate to *any* element of the array. So this query:
+
+```kql
+email.attachments.name: "*.docx" and email.attachments.size > 1000000
+```
+
+returns emails where *some* attachment is a `.docx` and *some* attachment is over 1MB — **not necessarily the same one.** Same-element semantics:
+
+```kql
+email.attachments:{ name: "*.docx" and size > 1000000 }
+```
+
+This is one of the most common silent over-counts an L2 will produce. **The hunter's reflex: if my query touches a `nested` field with multiple predicates, enforce same-element scope explicitly.**
+
+## Free-text fallback
+
+A KQL search with no field prefix (`"powershell"`) does a full-text search across the index's `default_field` configuration. Fast, imprecise, and **rarely used in real hunts** — the matched fields depend on the index template, the result set is unpredictable, and it's nearly impossible to reproduce or pivot from. Use it for first-pass exploration only; once you know what you're looking for, anchor to a field.
+
+## KQL limitations and when to switch
+
+KQL has **no aggregation, joins, scripting, conditionals, runtime computation, or sequence semantics.** The moment a hunt question goes beyond *"show me documents where X"*, the L2 should switch:
+
+- Need counts / stats / pivots? → **ES|QL** (Lesson 4).
+- Need behavioural chain semantics? → **EQL** (Lesson 3).
+- Need regex anchors, fuzzy matching, or proximity? → **Lucene** (this lesson, below).
+
+## Lucene cheat sheet — when KQL isn't enough
+
+Switch in Discover via the *KQL / Lucene* toggle next to the search bar. Predicates KQL doesn't (cleanly) expose:
+
+```text
+// Anchored regex
+process.name:/^power.*\\.exe$/
+
+// Character classes
+process.command_line:/[A-Za-z0-9+/]{200,}={0,2}/    // base64-shape
+
+// Fuzzy match (edit distance ≤ 2)
+process.name:powershel~2
+
+// Proximity (terms within 5 positions in a phrase)
+"powershell encoded"~5
+
+// Boost — rarely useful in hunting
+event.action:process_started^2
+
+// Legacy exists / missing
+_exists_:process.command_line
+_missing_:process.command_line
+```
+
+Lucene's null-quirk: `_exists_:` and `_missing_:` still work in Lucene mode but the KQL idiom (`field: *` / `not field: *`) is preferred outside Lucene queries.
+
+## Worked KQL — three iterations on the same hunt
+
+Hunt: *PowerShell with encoded command launched by an Office process.*
+
+**Q1 — broad:**
+
+```kql
+event.category: process
+  and process.name: ("powershell.exe" or "pwsh.exe")
+  and process.command_line: (*-enc* or *EncodedCommand* or *FromBase64String*)
+```
+
+**Q2 — narrowed (Office parent):**
+
+```kql
+event.category: process
+  and process.name: ("powershell.exe" or "pwsh.exe")
+  and process.command_line: (*-enc* or *EncodedCommand* or *FromBase64String*)
+  and process.parent.name: ("WINWORD.EXE" or "EXCEL.EXE" or "POWERPNT.EXE" or "OUTLOOK.EXE")
+```
+
+**Q3 — exclude known-good admin paths:**
+
+```kql
+event.category: process
+  and process.name: ("powershell.exe" or "pwsh.exe")
+  and process.command_line: (*-enc* or *EncodedCommand* or *FromBase64String*)
+  and process.parent.name: ("WINWORD.EXE" or "EXCEL.EXE" or "POWERPNT.EXE" or "OUTLOOK.EXE")
+  and not user.name: ("svc_*" or "admin_*")
+```
+
+Each iteration adds *structural* exclusions (parent process, account class), never *content* exclusions (string length, char-set). The four-element hypothesis is preserved end-to-end.
+
+## Glossary
+
+- **`keyword` vs `text` mapping** — ECS exposes both for many fields; pick the right one. `keyword` is exact-match case-sensitive; `text` is analyzer-tokenised case-insensitive.
+- **`nested:{...}` scope** — enforces same-element matching across predicates on `nested`-mapped fields.
+- **Leading-wildcard trap** — `*foo*` on a text field forces full-table scan.
+- **KQL is filter-only** — no aggregation, joins, conditionals, sequence.
+
+## Further reading
+
+- Elastic docs — *Kibana Query Language* (`elastic.co/guide/en/kibana/current/kuery-query.html`).
+- Elastic docs — *query-string query* (Lucene reference).
+- ECS field reference — `elastic.co/guide/en/ecs/current/ecs-field-reference.html`.
+""",
+    )
+    m2l2q = _add_lesson(
+        session, mod2, order=4, title="KQL & Lucene — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on the case-sensitivity trap, leading-wildcard performance, the nested-field same-element issue, and Lucene's regex/fuzzy reach.",
+    )
+    _add_q(session, m2l2q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 runs a KQL search `process.command_line: \"powershell\"` and gets *zero* hits, despite knowing PowerShell ran on the host. The mapping shows `process.command_line` is a `keyword` field with a `.text` multi-field. What's the most likely cause?",
+        options=[
+            {"value": "perm", "label": "The L2 lacks index permissions"},
+            {"value": "case", "label": "Keyword fields are exact-match case-sensitive — the actual command line was `powershell.exe -enc ...`, not just the literal string `powershell`. The hunt should target `process.command_line.text: \"powershell\"` (analyzer-tokenised) or `process.command_line: \"*powershell*\"` (wildcard)"},
+            {"value": "retention", "label": "The data has aged out of retention"},
+            {"value": "kql_off", "label": "KQL is disabled — Lucene is the only language"},
+        ],
+        correct="case",
+        explanation_md="`keyword` fields are exact-match case-sensitive — `process.command_line: \"powershell\"` looks for a command line that *equals* the literal string `powershell` exactly, not one that contains it. The fix is either to use the `.text` multi-field (analyzer-tokenised) or to add wildcards (`\"*powershell*\"`). Knowing whether to target `process.command_line` vs `process.command_line.text` is one of the most common KQL fluency-markers.",
+        points=2,
+    )
+    _add_q(session, m2l2q, order=2, kind=QuestionKind.SINGLE,
+        stem_md="An L2 writes the KQL filter `email.attachments.name: \"*.docx\" and email.attachments.size > 1000000` against an index where `email.attachments` is a `nested`-mapped field. The query returns more emails than expected. What's likely going wrong, and what's the fix?",
+        options=[
+            {"value": "wildcard", "label": "The leading wildcard scans every document — remove the wildcard"},
+            {"value": "same_element", "label": "Without explicit `nested:{...}` scope, KQL applies each predicate to *any* element of the array — so the query matches emails with *some* `.docx` attachment AND *some* attachment over 1MB, not necessarily the same one. Fix: `email.attachments:{ name: \"*.docx\" and size > 1000000 }`"},
+            {"value": "perm", "label": "The L2 lacks `view_index_metadata` permission"},
+            {"value": "lucene", "label": "Switch to Lucene — KQL doesn't support attachment fields"},
+        ],
+        correct="same_element",
+        explanation_md="The `nested`-mapping same-element trap. Multiple predicates on a `nested` array without explicit `nested:{...}` scope apply to *any* element each, producing silent over-counts. Same-element semantics requires the explicit scope syntax. This is the second-most common silent-over-count failure mode in junior KQL hunts.",
+        points=3,
+    )
+    _add_q(session, m2l2q, order=3, kind=QuestionKind.MULTI,
+        stem_md="Which Lucene-only predicates would prompt an L2 to switch from KQL into Lucene mode in Discover?",
+        options=[
+            {"value": "regex_anchors", "label": "Anchored regex: `process.name:/^power.*\\.exe$/`"},
+            {"value": "fuzzy", "label": "Fuzzy edit-distance match: `process.name:powershel~2`"},
+            {"value": "proximity", "label": "Phrase proximity: `\"powershell encoded\"~5`"},
+            {"value": "field_eq", "label": "Simple field equality: `process.name: \"powershell.exe\"`"},
+            {"value": "list_match", "label": "List match: `process.name: (\"powershell.exe\" or \"cmd.exe\")`"},
+        ],
+        correct=["regex_anchors", "fuzzy", "proximity"],
+        explanation_md="Anchored regex, fuzzy, and proximity are all Lucene-only — KQL doesn't (cleanly) expose them. Field equality and list match are first-class KQL — no need to switch. The L2 reflex: stay in KQL until a regex anchor, fuzzy, or proximity predicate appears, then toggle.",
+        points=3,
+    )
+    _add_q(session, m2l2q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="Leading-wildcard KQL queries on `text`-mapped fields (e.g. `process.command_line: *cmd.exe*`) are cheap because Elasticsearch indexes substrings.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** Leading wildcards on `text` fields force a full-table scan — Elasticsearch's inverted index is not designed for substring search of arbitrary positions. A trailing wildcard (`process.command_line: cmd.exe*`) uses the prefix index and is fast. Anchor your wildcards to the front whenever possible.",
+        points=2,
+    )
+
+    # Lesson 2.5 — EQL
+    m2l3 = _add_lesson(
+        session, mod2, order=5,
+        title="EQL — sequence queries and behavioural chains",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Read and write basic EQL queries — event-category predicates, `where` clauses, conditions
+> 2. Use EQL **`sequence`** to express adversary behavioural chains across multiple events with `by` and `with maxspan`
+> 3. Distinguish EQL's `==` (keyword exact, case-sensitive) from `:` (case-insensitive *like*-with-wildcards)
+> 4. Apply `until` to terminate a sequence early on a stop event
+> 5. Use EQL's pipe operators (`head`, `tail`, `unique`, `sort`) for post-processing
+> 6. Recognise the EQL function set — `endsWith`, `cidrMatch`, `wildcard`, `between`
+
+## EQL's design centre
+
+EQL was built for **security event correlation.** Its design centre is the question shape *"event A then event B then event C, on the same host, within five minutes."* It normalises around the ECS `event.category` field, so predicates read naturally: `process where ...`, `network where ...`, `file where ...`, `authentication where ...`.
+
+EQL is a *first-class* member of Kibana Security: the Timelines surface accepts EQL queries; the EQL search API is exposed in Dev Console; EQL rule bodies are first-class detection-rule citizens; the prebuilt rule library Elastic ships uses EQL for the technique-level rules whose logic is fundamentally a behavioural chain.
+
+## Basic shape
+
+A simple EQL query targets one event category with a `where` clause:
+
+```eql
+process where process.name == "powershell.exe"
+  and process.command_line : "*EncodedCommand*"
+```
+
+Two operators to recognise:
+
+- **`==`** — keyword-exact equality, **case-sensitive**.
+- **`:`** — case-insensitive *like* match with wildcards (`*`, `?`).
+
+The same predicate against `process.name` (`keyword` field):
+
+- `process.name == "powershell.exe"` — exact, case-sensitive.
+- `process.name : "powershell.exe"` — case-insensitive, can use wildcards.
+- `process.name : "power*"` — prefix-wildcard.
+
+**Mixing them up is the most common EQL fluency error.** Use `==` when you know the case; use `:` when you want forgiveness or wildcards.
+
+## Event categories
+
+EQL's first token is the `event.category` filter. ECS-normalised categories an L2 will use:
+
+| Category | Typical events |
+|---|---|
+| `process` | process started, terminated, exec'd |
+| `network` | flow, connection, DNS, HTTP, TLS |
+| `file` | created, modified, deleted, renamed |
+| `registry` | key set, deleted (Windows) |
+| `authentication` | logon success/failure, Kerberos, NTLM |
+| `library` | DLL load, image load |
+| `iam` | account creation, role grant, group change |
+| `intrusion_detection` | IDS / Suricata alerts |
+| `dns` | DNS query / response (sub-category of `network` in some indices) |
+| `email` | email events (ECS 8.6+) |
+
+The category is what makes EQL queries readable — a hunter can glance at `process where ...` versus `network where ...` and know what data plane they're scoped to.
+
+## `sequence` — the behavioural-chain primitive
+
+The defining EQL primitive. Syntax:
+
+```eql
+sequence [by field1, field2, ...] [with maxspan=duration]
+  [ event-category-1 where condition-1 ]
+  [ event-category-2 where condition-2 ]
+  ...
+```
+
+Worked example — *click on a phishing URL followed by a script-host child of a browser process within 10 minutes on the same host:*
+
+```eql
+sequence by host.name with maxspan=10m
+  [ network where event.action == "url_click_allowed"
+              and url.domain : "*.azurewebsites.net" ]
+  [ process where process.parent.name : ("msedge.exe", "chrome.exe", "firefox.exe")
+              and process.name : ("powershell.exe", "cmd.exe", "mshta.exe") ]
+```
+
+Read top-to-bottom: an event matching the first predicate, then an event matching the second predicate, on the same `host.name`, within `10m`. Each `[...]` is a step. The output is one row per *complete* sequence with the joined event fields.
+
+### Multi-key correlation
+
+`by` accepts multiple fields:
+
+```eql
+sequence by host.name, user.name with maxspan=5m
+  [ authentication where event.action == "logon-success" ]
+  [ process where process.name : "rundll32.exe" and process.command_line : "*javascript:*" ]
+```
+
+This finds login → suspicious rundll32 within 5 min keyed by host *and* user.
+
+### `until` — early termination
+
+`until` lets you stop the sequence when a "neutralising" event fires:
+
+```eql
+sequence by host.name with maxspan=30m
+  [ process where process.name : "powershell.exe" and process.command_line : "*-enc*" ]
+  [ network where destination.ip != "10.0.0.0/8" ]
+  until [ process where process.name : "MsMpEng.exe" ]
+```
+
+The sequence is killed if `MsMpEng.exe` (Defender) fires in the meantime — useful for excluding sequences that the EDR already neutralised.
+
+## `sample` — unordered correlation
+
+Like `sequence` but the steps can occur in any order within `maxspan`. Useful when temporal order doesn't matter:
+
+```eql
+sample by host.name
+  [ process where process.name : "vssadmin.exe" ]
+  [ process where process.name : "wbadmin.exe" ]
+  [ process where process.name : "bcdedit.exe" ]
+```
+
+Finds hosts where all three ransomware-staging tools fired in any order — the T1490 chain from L1 Module 8.
+
+## Pipe operators — post-processing
+
+EQL's pipe operators come *after* the main query and post-process the result-set. Unlike ES|QL pipes, EQL's are limited to post-aggregation operations:
+
+- **`head N`** — first N rows (deterministic if combined with sort).
+- **`tail N`** — last N rows.
+- **`unique field, ...`** — deduplicate by named fields.
+- **`sort field, ...`** — order results.
+- **`count by field, ...`** — simple group-and-count.
+- **`filter`** — additional predicate on the result-set.
+
+```eql
+process where process.name : "powershell.exe"
+  and process.command_line : "*-enc*"
+| unique host.name
+| sort host.name
+| head 100
+```
+
+For richer aggregation, switch to ES|QL.
+
+## Functions
+
+EQL exposes a function set for predicate authoring. Frequent uses:
+
+- **`endsWith(field, "value")`** — case-sensitive suffix match.
+- **`startsWith(field, "value")`** — case-sensitive prefix match.
+- **`wildcard(field, "pattern")`** — explicit wildcard match.
+- **`concat(a, b, ...)`** — string concatenation.
+- **`length(field)`** — string length.
+- **`between(field, start, end, lower_inclusive, upper_inclusive)`** — range.
+- **`cidrMatch(ip_field, "10.0.0.0/8", "192.168.0.0/16")`** — CIDR membership.
+- **`add`, `subtract`, `multiply`, `divide`** — arithmetic.
+
+Worked example — outbound to non-RFC1918 from a script host:
+
+```eql
+network where process.name : ("powershell.exe", "cmd.exe", "wscript.exe")
+  and not cidrMatch(destination.ip,
+                    "10.0.0.0/8",
+                    "172.16.0.0/12",
+                    "192.168.0.0/16",
+                    "127.0.0.0/8",
+                    "fe80::/10")
+```
+
+## Where EQL fits in the L2 toolbox
+
+```mermaid
+flowchart LR
+    Hunt[Hunt question] --> Q{Is this a behavioural chain?}
+    Q -- "process A then B then C, same host, within Xm" --> EQL[EQL sequence]
+    Q -- "stats / counts / pivots" --> ESQL[ES&#x7C;QL]
+    Q -- "single-event filter" --> KQL[KQL]
+    EQL -.detection rule.-> Rule[Kibana Security<br/>EQL rule body]
+```
+
+EQL queries become EQL rule bodies in Kibana Security with no rewriting. This is the cleanest hunt-to-detection path for behavioural-chain hunts (covered in L2 Module 8).
+
+## Glossary
+
+- **`event.category`** — ECS field that EQL uses as its first-class predicate target (`process where ...`, `network where ...`).
+- **`sequence`** — EQL's behavioural-chain primitive. `by` for keys, `with maxspan` for window.
+- **`==` vs `:`** — keyword-exact case-sensitive vs case-insensitive *like*-with-wildcards.
+- **`until`** — sequence-terminator; useful for excluding chains the EDR already neutralised.
+- **`sample`** — unordered correlation; like `sequence` without temporal ordering.
+
+## Further reading
+
+- Elastic docs — *EQL syntax* (`elastic.co/guide/en/elasticsearch/reference/current/eql-syntax.html`).
+- Elastic Security Labs — *Detection rules repository* — practical EQL rule corpus.
+- ECS event-category reference — `elastic.co/guide/en/ecs/current/ecs-category-field-values-reference.html`.
+""",
+    )
+    m2l3q = _add_lesson(
+        session, mod2, order=6, title="EQL — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on the `==` vs `:` distinction, sequence semantics, `until` use cases, and event-category predicates.",
+    )
+    _add_q(session, m2l3q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 wants to detect *'rundll32.exe spawned by msedge.exe with `javascript:` in the command line, within 2 minutes of an outbound HTTPS connection from msedge.exe to a `*.workers.dev` Cloudflare Worker subdomain, on the same host.'* Which EQL primitive expresses this most naturally?",
+        options=[
+            {"value": "where_join", "label": "A single `process where ... and network where ...` predicate"},
+            {"value": "sequence", "label": "A `sequence by host.name with maxspan=2m` containing two steps — one network and one process"},
+            {"value": "sample", "label": "A `sample by host.name` of two events"},
+            {"value": "kql", "label": "Switch to KQL — EQL doesn't handle multi-event correlation"},
+        ],
+        correct="sequence",
+        explanation_md="`sequence by host.name with maxspan=2m` is the canonical EQL form for two-step behavioural chains keyed by host with a time window. `sample` works without ordering but loses the temporal order signal. KQL has no correlation primitive. The `where ... and ...` form would only match a single event satisfying both predicates simultaneously, which is impossible across two event categories.",
+        points=2,
+    )
+    _add_q(session, m2l3q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *correct* about EQL operators and predicates?",
+        options=[
+            {"value": "eq_keyword", "label": "`==` is keyword-exact and case-sensitive"},
+            {"value": "colon_like", "label": "`:` is case-insensitive *like*-with-wildcards"},
+            {"value": "colon_regex", "label": "`:` is full regex including anchors and character classes"},
+            {"value": "until_terminate", "label": "`until [event]` terminates a sequence early when the named event fires"},
+            {"value": "category_first", "label": "EQL queries lead with the `event.category` (e.g. `process where ...`, `network where ...`)"},
+        ],
+        correct=["eq_keyword", "colon_like", "until_terminate", "category_first"],
+        explanation_md="`:` is *like*-with-wildcards (`*`, `?`), not full regex — for anchored regex you'd switch to Lucene or use `wildcard()`. `==` keyword-exact-case-sensitive, `:` case-insensitive-like, `until` terminator, and event-category-first predicate are all correct EQL semantics.",
+        points=3,
+    )
+    _add_q(session, m2l3q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="An L2 hunts for a sequence of `vssadmin → wbadmin → bcdedit` ransomware staging on a host. The order in which the three tools fire is variable — some affiliates run `bcdedit` first, others run it last. Which EQL primitive best fits?",
+        options=[
+            {"value": "sequence", "label": "`sequence by host.name with maxspan=10m` enforcing the listed order"},
+            {"value": "sample", "label": "`sample by host.name` — finds hosts where all three events occurred in any order within `maxspan`"},
+            {"value": "three_queries", "label": "Three separate KQL queries union'd together"},
+            {"value": "esql", "label": "Switch to ES|QL `STATS BY host.name`"},
+        ],
+        correct="sample",
+        explanation_md="`sample` is EQL's primitive for *unordered* multi-event correlation — the steps can occur in any order within the time window. `sequence` enforces order, which would miss affiliates that run `bcdedit` first. ES|QL `STATS BY` could count the events but loses the per-host correlation cleanly. `sample` is the textbook fit.",
+        points=2,
+    )
+    _add_q(session, m2l3q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="EQL's pipe operators (`head`, `tail`, `unique`, `sort`, `count`) post-process the result-set after the main query, but EQL does *not* support full ES|QL-style pipeline composition with `EVAL` and `STATS BY` — for richer aggregation, the L2 should switch to ES|QL.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** EQL pipes are post-aggregation only — `head`, `tail`, `unique`, `sort`, `count by`, `filter`. ES|QL has full pipeline composition with `EVAL`, `STATS BY BUCKET()`, joins, enrichments. For richer aggregation in EQL, the L2's reflex is to either save the EQL output and re-query in ES|QL, or migrate the hunt entirely to ES|QL.",
+        points=2,
+    )
+
+    # Lesson 2.7 — ES|QL
+    m2l4 = _add_lesson(
+        session, mod2, order=7,
+        title="ES|QL — the piped DSL for stats, joins, and time-series",
+        lesson_type=LessonType.READING, duration_min=26,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Write ES|QL pipelines using `FROM | WHERE | EVAL | STATS BY | SORT | LIMIT | KEEP | DROP`
+> 2. Use `BUCKET()` for time-bucketing and `STATS BY BUCKET(@timestamp, 1h)` as the workhorse time-series form
+> 3. Apply `DISSECT` and `GROK` for runtime parsing of unstructured fields
+> 4. Use `ENRICH` (via enrich policies) and `LOOKUP JOIN` (8.16+) for joins to small reference indices
+> 5. Embed KQL filters inside ES|QL with `WHERE KQL("...")`
+> 6. Recognise common ES|QL pitfalls — column-drop in `STATS`, default 10,000-row cap, `LIKE`-vs-`RLIKE` syntax
+
+## ES|QL pipeline shape
+
+```esql
+FROM <index>
+| WHERE <predicate>
+| EVAL <computed columns>
+| STATS <aggregations> BY <grouping>
+| SORT <field> [ASC|DESC]
+| LIMIT <n>
+| KEEP <columns>
+| DROP <columns>
+```
+
+Each `|` passes a *tabular result-set* forward. Strongly resembles Splunk SPL or Microsoft Kusto in shape; the L2 who has seen either will read ES|QL fluently within an hour.
+
+## `FROM` — the data plane
+
+```esql
+FROM logs-endpoint.events.process-*
+FROM logs-endpoint.events.process-*, winlogbeat-*       // multi-index
+FROM cluster1:logs-*, cluster2:logs-*                    // cross-cluster
+```
+
+Index patterns support glob; multi-index queries are first-class; cross-cluster requires the cluster prefix.
+
+## `WHERE` — predicates
+
+Operators: `==`, `!=`, `<`, `>`, `IN`, `NOT IN`, `IS NULL`, `IS NOT NULL`, `LIKE`, `RLIKE`.
+
+String functions: `STARTS_WITH()`, `ENDS_WITH()`, `LENGTH()`, `TO_LOWER()`, `TO_UPPER()`, `SUBSTRING()`, `REPLACE()`.
+
+```esql
+FROM logs-endpoint.events.process-*
+| WHERE @timestamp > NOW() - 24h
+  AND process.name == "powershell.exe"
+  AND process.parent.name IN ("WINWORD.EXE", "EXCEL.EXE", "OUTLOOK.EXE")
+  AND process.command_line LIKE "%EncodedCommand%"
+```
+
+Note: ES|QL's `LIKE` uses SQL-style `%` and `_` (not `*` and `?`); `RLIKE` accepts a real regex. Mixing this up with KQL/EQL wildcard syntax is the most common ES|QL fluency error.
+
+### Embedded KQL — best of both
+
+```esql
+FROM logs-endpoint.events.process-*
+| WHERE @timestamp > NOW() - 24h
+  AND KQL("process.name: powershell.exe AND process.command_line: *FromBase64String*")
+| STATS event_count = COUNT() BY host.name, BUCKET(@timestamp, 1h)
+| SORT event_count DESC
+```
+
+`KQL("...")` lets the analyst write the filter half in KQL (where intellisense and field auto-complete help) and the aggregation half in ES|QL. Idiomatic for hunts that need stats over a complex KQL filter.
+
+## `EVAL` — computed columns
+
+```esql
+FROM logs-endpoint.events.process-*
+| EVAL hour_of_day = DATE_EXTRACT("HOUR_OF_DAY", @timestamp)
+| EVAL cmd_lower = TO_LOWER(process.command_line)
+| EVAL is_after_hours = CASE(hour_of_day < 8 OR hour_of_day > 18, true, false)
+```
+
+Date functions: `DATE_TRUNC`, `DATE_DIFF`, `DATE_PARSE`, `DATE_FORMAT`, `DATE_EXTRACT`, `BUCKET()`.
+
+## `STATS` — group-and-aggregate
+
+The workhorse of ES|QL. Aggregation functions: `COUNT()`, `COUNT_DISTINCT()`, `SUM()`, `AVG()`, `MIN()`, `MAX()`, `MEDIAN()`, `PERCENTILE()`, `VALUES()` (collect into array), `TOP()`.
+
+```esql
+FROM logs-endpoint.events.process-*
+| WHERE @timestamp > NOW() - 7d
+  AND event.category == "process"
+| STATS event_count = COUNT(),
+        unique_users = COUNT_DISTINCT(user.name),
+        commands = VALUES(process.command_line)
+  BY host.name, BUCKET(@timestamp, 1h)
+| SORT event_count DESC
+| LIMIT 100
+```
+
+**The column-drop trap.** `STATS` drops every column not in the `BY` clause and not aggregated. Newcomers from Kusto-style "preserve all columns" languages are surprised. If you need columns through, add them explicitly to `BY` or aggregate them with `VALUES()` / `TOP()`.
+
+## `BUCKET()` — time-bucketing
+
+```esql
+| STATS count = COUNT() BY BUCKET(@timestamp, 1h)
+| STATS count = COUNT() BY BUCKET(@timestamp, 5m)
+| STATS count = COUNT() BY BUCKET(@timestamp, 1d), host.name
+```
+
+The default time-bucketing form. Combine with `STATS` for time-series, `SORT @timestamp` for chronological output.
+
+## `DISSECT` and `GROK` — runtime parsing
+
+When a field contains structured-but-unparsed strings (`message`, raw command lines), `DISSECT` and `GROK` extract substrings into named columns:
+
+```esql
+FROM logs-network.dns-*
+| WHERE @timestamp > NOW() - 24h
+| DISSECT message "Query: %{query_name} (%{query_type})"
+| STATS count = COUNT() BY query_name, query_type, BUCKET(@timestamp, 1h)
+```
+
+`DISSECT` is fast and pattern-based; `GROK` is regex-based and more flexible. Use `DISSECT` first; fall back to `GROK` only when the input is irregular.
+
+## `ENRICH` — joins to a reference index
+
+`ENRICH` joins the pipeline to a small reference index via a pre-defined enrich policy:
+
+```esql
+FROM logs-endpoint.events.process-*
+| WHERE @timestamp > NOW() - 24h AND host.os.family == "windows"
+| ENRICH asset_criticality_lookup ON host.name
+| WHERE asset.criticality == "tier-0"
+| STATS event_count = COUNT() BY host.name, process.name
+```
+
+The enrich policy `asset_criticality_lookup` must be created in advance against a reference index keyed by `host.name`; once registered, ES|QL pipelines can `ENRICH ... ON ...` against it.
+
+## `LOOKUP JOIN` — left-outer join to a small index (8.16+)
+
+```esql
+FROM logs-endpoint.events.process-*
+| WHERE @timestamp > NOW() - 24h
+| LOOKUP JOIN known_admins_lookup ON user.name
+| WHERE known_admins_lookup.is_admin IS NULL
+```
+
+`LOOKUP JOIN` is the explicit left-outer-join form for cases where `ENRICH` policies aren't a fit. The right side must be a small lookup index; large-large joins remain awkward in ES|QL.
+
+## `SORT` and `LIMIT`
+
+```esql
+| SORT event_count DESC, host.name ASC
+| LIMIT 1000
+```
+
+ES|QL has a default 10,000-row result cap. For large `STATS` results, set `LIMIT` explicitly. Note that `SORT` happens *before* `LIMIT`, so `SORT event_count DESC | LIMIT 100` is "top 100 by count" — the canonical "top-N" form.
+
+## `KEEP` and `DROP` — column projection
+
+```esql
+| KEEP @timestamp, host.name, process.command_line, event_count
+| DROP fields.we.dont.want, internal.bookkeeping
+```
+
+Use `KEEP` to whitelist final columns; use `DROP` to blacklist a few from a wide table. The L2 reflex: end every pipeline with `KEEP` to make the result-set's shape obvious.
+
+## Worked ES|QL — beaconing anomaly
+
+A 30-day beaconing-anomaly hunt that combines `BUCKET()`, `STATS`, and a structural filter:
+
+```esql
+FROM logs-network.flow-*
+| WHERE @timestamp > NOW() - 30d
+  AND network.transport == "tcp"
+  AND destination.port IN (443, 80)
+  AND NOT CIDR_MATCH(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+| STATS connection_count = COUNT(),
+        unique_destinations = COUNT_DISTINCT(destination.ip),
+        bytes_total = SUM(network.bytes)
+  BY host.name, destination.ip, BUCKET(@timestamp, 1h)
+| WHERE connection_count > 50 AND unique_destinations == 1
+| SORT connection_count DESC
+| LIMIT 100
+| KEEP @timestamp, host.name, destination.ip, connection_count, bytes_total
+```
+
+Reads top-to-bottom: scope to TCP/443/80 outbound to non-RFC1918, count connections per (host × IP × hour), keep buckets with >50 connections to a single destination IP, sort by count, take top 100.
+
+## Common ES|QL pitfalls
+
+- **`LIKE` vs `RLIKE` syntax.** `LIKE` uses `%` / `_`; `RLIKE` is regex. Mixing in KQL/EQL wildcard chars (`*`, `?`) silently fails to match.
+- **Default 10,000-row cap.** Set `LIMIT` explicitly for large `STATS` results.
+- **`STATS` column-drop.** Every non-`BY`, non-aggregated column is dropped. Surprising for Kusto users.
+- **`@timestamp` filtering.** Always filter `@timestamp` early — unbounded time-range queries hit the full retention window and time out.
+- **Embedded KQL gotchas.** `WHERE KQL("...")` runs the embedded KQL with all the KQL semantics (case sensitivity, nested-field traps); the wrapper doesn't fix them.
+- **`ENRICH` policy lifecycle.** Enrich policies are *administered* (created against a source index, registered, executed); a hunter authoring an ES|QL `ENRICH` clause requires the policy already in place.
+
+## Where ES|QL beats EQL / KQL — recap
+
+```mermaid
+flowchart LR
+    A[Stats / aggregation / pivoting] --> ESQL1[ES&#x7C;QL STATS BY]
+    B[Cross-index / cross-cluster] --> ESQL2[ES&#x7C;QL FROM a-*, b-*]
+    C[Joins / lookups] --> ESQL3[ES&#x7C;QL ENRICH / LOOKUP JOIN]
+    D[Time-bucketing] --> ESQL4[ES&#x7C;QL BUCKET]
+    E[Behavioural chains] --> EQL[EQL sequence]
+    F[Quick filter / search bar] --> KQL[KQL]
+    G[Detection rule body] --> ER[EQL rule] & ESR[ES&#x7C;QL rule]
+```
+
+## Glossary
+
+- **`FROM | WHERE | EVAL | STATS BY | SORT | LIMIT | KEEP | DROP`** — the ES|QL pipeline operators.
+- **`BUCKET(@timestamp, 1h)`** — time-bucketing. The workhorse of ES|QL time-series.
+- **`DISSECT` / `GROK`** — runtime parsing of unstructured strings.
+- **`ENRICH`** — join to a reference index via an enrich policy.
+- **`LOOKUP JOIN`** — left-outer join to a lookup index (8.16+).
+- **`KQL("...")`** — embed a KQL predicate inside ES|QL.
+
+## Further reading
+
+- Elastic docs — *ES|QL reference* (`elastic.co/guide/en/elasticsearch/reference/current/esql.html`).
+- Elastic docs — *ES|QL functions reference* (per-function pages).
+- Elastic blog — *ES|QL GA announcement* (8.13).
+""",
+    )
+    m2l4q = _add_lesson(
+        session, mod2, order=8, title="ES|QL — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on the pipeline operators, `STATS` column-drop trap, `LIKE` vs `RLIKE` syntax, and the embedded-KQL pattern.",
+    )
+    _add_q(session, m2l4q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 writes `... | STATS event_count = COUNT() BY host.name | SORT process.command_line` and the query errors with *'unknown column process.command_line'*. What is the most likely cause?",
+        options=[
+            {"value": "perm", "label": "Permission issue on `process.command_line`"},
+            {"value": "stats_drop", "label": "`STATS` drops every column not in the `BY` clause and not aggregated — `process.command_line` was lost when STATS ran. To keep it, either add it to `BY` or aggregate it (e.g. `VALUES(process.command_line)` or `TOP(process.command_line, 1)`)"},
+            {"value": "missing", "label": "The field doesn't exist in the index"},
+            {"value": "syntax", "label": "Sort syntax is wrong — should be `SORT BY process.command_line`"},
+        ],
+        correct="stats_drop",
+        explanation_md="The ES|QL `STATS` column-drop trap. After `STATS`, only the `BY` columns and the aggregated columns remain — every other column is dropped. The L2 reflex is to either add the column to `BY` (changes the grouping) or aggregate it explicitly (e.g. `VALUES(process.command_line)` to collect per-group, or `TOP(process.command_line, 1)` for the most common per group).",
+        points=2,
+    )
+    _add_q(session, m2l4q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following ES|QL pipeline operations are *correctly* described?",
+        options=[
+            {"value": "from_multi", "label": "`FROM logs-*, winlogbeat-*` queries multiple indices in one statement"},
+            {"value": "bucket", "label": "`BUCKET(@timestamp, 1h)` is the canonical ES|QL time-bucketing form, used inside `STATS ... BY`"},
+            {"value": "dissect", "label": "`DISSECT message \"%{key}=%{value}\"` extracts substrings into runtime columns at query time"},
+            {"value": "kql_embed", "label": "`WHERE KQL(\"process.name: powershell*\")` embeds a KQL filter inside an ES|QL pipeline"},
+            {"value": "esql_sequence", "label": "`SEQUENCE BY host.name WITH MAXSPAN=5m [event1] [event2]` is ES|QL's behavioural-chain primitive"},
+        ],
+        correct=["from_multi", "bucket", "dissect", "kql_embed"],
+        explanation_md="The trap is the last option. `sequence` is **EQL's** primitive, not ES|QL's. ES|QL has no behavioural-chain operator yet (as of 8.16) — for chains, switch to EQL. Multi-index FROM, BUCKET time-bucketing, DISSECT runtime parsing, and embedded KQL are all correct ES|QL features.",
+        points=3,
+    )
+    _add_q(session, m2l4q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="An L2 writes `WHERE process.command_line LIKE \"*EncodedCommand*\"` in ES|QL and gets zero hits despite knowing the artefact is present. What's the most likely fix?",
+        options=[
+            {"value": "kql", "label": "Switch to KQL — ES|QL doesn't support wildcard predicates"},
+            {"value": "syntax", "label": "ES|QL `LIKE` uses SQL-style `%` and `_` (not `*` and `?`); the predicate should be `LIKE \"%EncodedCommand%\"` — or use `RLIKE` for regex"},
+            {"value": "case", "label": "Add `TO_LOWER()` around the field"},
+            {"value": "missing", "label": "The field doesn't exist"},
+        ],
+        correct="syntax",
+        explanation_md="ES|QL's `LIKE` uses SQL-style wildcards (`%` and `_`), not KQL/EQL-style (`*` and `?`). The predicate `LIKE \"*EncodedCommand*\"` matches command lines that *literally* contain the asterisks — almost never. Fix: `LIKE \"%EncodedCommand%\"`. For full regex use `RLIKE`. Mixing wildcard syntax across languages is the most common ES|QL fluency error.",
+        points=2,
+    )
+    _add_q(session, m2l4q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="Name the ES|QL clause that lets the L2 *embed a KQL predicate inside an ES|QL pipeline*, used to write the filter half of a hunt in KQL and the aggregation half in ES|QL. (Function name only.)",
+        options=None,
+        correct=["KQL", "kql", "KQL()", "kql()", "WHERE KQL", "where kql"],
+        explanation_md="`KQL(\"...\")` — used as `WHERE KQL(\"process.name: powershell* AND process.parent.name: WINWORD.EXE\")`. The pattern is idiomatic in modern Elastic for hunts that need both KQL's intellisense-friendly filter ergonomics and ES|QL's `STATS BY BUCKET()` aggregation. The companion function `MATCH(field, \"value\")` does the same thing for full-text matches.",
+        points=2,
+    )
+
+    print(f"  L2: {course.title} — 2 modules, 16 lessons (Module 2 KQL+EQL+ES|QL @ proper depth)")
     return course
 
 

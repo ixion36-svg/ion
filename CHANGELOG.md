@@ -1,5 +1,49 @@
 # Changelog
 
+## v0.11.13 (2026-04-28)
+
+### L2 Module 2 — KQL, EQL, and ES|QL: the Elastic-stack query languages
+
+Second L2 ship. **L2 Module 2 — KQL, EQL, and ES|QL** authored from a research-agent dossier at BTL1+/SANS depth. ~10,000 words, 8 lessons (4 reading + 4 quiz), 16 quiz questions. Aligned to ION's actual stack — Elastic + Kibana — with all worked queries against Beats / Elastic-Agent indices using ECS field paths.
+
+#### Lesson breakdown
+
+| # | Title | Type | Quiz qs |
+|---|---|---|---|
+| 2.1 | The Elastic query-language landscape: Lucene, KQL, EQL, ES&#x7C;QL | reading | — |
+| 2.2 | Language landscape — quiz | quiz | 4 |
+| 2.3 | KQL fundamentals — and Lucene as the legacy fallback | reading | — |
+| 2.4 | KQL & Lucene — quiz | quiz | 4 |
+| 2.5 | EQL — sequence queries and behavioural chains | reading | — |
+| 2.6 | EQL — quiz | quiz | 4 |
+| 2.7 | ES&#x7C;QL — the piped DSL for stats, joins, and time-series | reading | — |
+| 2.8 | ES&#x7C;QL — quiz | quiz | 4 |
+
+#### Topics covered
+
+- **The query-language landscape** — Lucene query syntax (the original; regex / fuzzy / proximity), **KQL** (Kibana 6.3+; search-bar; filter-only), **EQL** (7.9 GA mid-2020; `sequence by host with maxspan`; security event correlation), **ES|QL** (8.13 GA March 2024; piped DSL; `STATS BY BUCKET()`; cross-index; ENRICH / LOOKUP JOIN). Painless as the *non*-query language. Decision framework for which to reach for given the question shape; per-language Kibana surface (Discover bar, Lucene toggle, Timelines, ES|QL mode, detection-rule body); version timeline (Lucene since v0; KQL 6.3 / 2018; EQL 7.9 / 2020; ES|QL 8.13 / 2024; LOOKUP JOIN 8.16 / late-2024). Crucial disambiguation: *Microsoft KQL* (Kusto) vs *Elastic KQL* (Kibana) — same acronym, completely different languages
+- **KQL + Lucene** — field equality, ranges (bracket and comparator), Boolean operators with grouping, wildcards (with the leading-wildcard performance trap), exists/missing via `field: *`, **the keyword vs text mapping case-sensitivity trap** (the same predicate behaves differently on `process.command_line` keyword vs `process.command_line.text` analyzer-tokenised), **the `nested:{...}` same-element trap** (multiple predicates on `nested`-mapped arrays without explicit scope produce silent over-counts), free-text fallback with caveats. KQL's filter-only nature with explicit *when to switch* — switch to ES|QL for stats/joins, EQL for chains, Lucene for regex/fuzzy/proximity. Lucene cheat sheet (anchored regex, fuzzy edit-distance, phrase proximity, term boost, legacy `_exists_` / `_missing_`). Worked three-iteration KQL hunt (PowerShell encoded command from Office parent, narrowed to known-good account exclusions)
+- **EQL** — design centre is security event correlation; ECS `event.category` as the first-class predicate target (`process where ...`, `network where ...`, `file where ...`, `authentication where ...`, etc.); `==` keyword-exact case-sensitive vs `:` case-insensitive *like*-with-wildcards (the most common EQL fluency error); `sequence by host.name with maxspan=5m` as the behavioural-chain primitive with multi-key `by` and `until` for early termination; `sample` for unordered correlation (T1490 ransomware staging across `vssadmin` / `wbadmin` / `bcdedit` in any order); EQL's pipe operators (`head` / `tail` / `unique` / `sort` / `count by` / `filter`) for *post*-processing — and recognition that EQL pipes are limited compared to ES|QL. Functions reference (`endsWith`, `startsWith`, `wildcard`, `cidrMatch`, `between`, `length`, arithmetic). Worked phishing-click → script-host chain via `sequence by host.name with maxspan=10m`; worked CIDR-membership predicate via `cidrMatch`
+- **ES|QL** — pipeline shape `FROM | WHERE | EVAL | STATS BY | SORT | LIMIT | KEEP | DROP` with each `|` passing a tabular result-set forward (Kusto-like / Splunk-like); `FROM` with multi-index (`logs-*, winlogbeat-*`) and cross-cluster (`cluster1:logs-*, cluster2:logs-*`); `WHERE` with `==`, `IN`, `IS NULL`, `LIKE` (SQL-style `%` / `_` — *not* `*` / `?` — the most common ES|QL fluency error), `RLIKE` for regex, embedded **`KQL("...")`** for "filter half in KQL, aggregation half in ES|QL"; `EVAL` for computed columns including `DATE_TRUNC` / `DATE_EXTRACT` / `CASE`; `STATS` aggregations (`COUNT` / `COUNT_DISTINCT` / `SUM` / `AVG` / `MEDIAN` / `PERCENTILE` / `VALUES` / `TOP`) with the **column-drop trap** (everything not in `BY` and not aggregated is dropped); **`BUCKET(@timestamp, 1h)`** as the workhorse time-series form; `DISSECT` and `GROK` for runtime parsing of unstructured strings (`message`, raw command lines); **`ENRICH`** for joins to a small reference index via an enrich policy; **`LOOKUP JOIN`** (8.16+) for explicit left-outer joins to a lookup index; default 10,000-row cap with explicit `LIMIT` for large `STATS` results. Worked beaconing-anomaly hunt with TCP / 443 + 80 outbound to non-RFC1918, COUNT/COUNT_DISTINCT/SUM per (host × IP × hour), filtered to single-destination-IP buckets with > 50 connections
+
+8 Mermaid diagrams across the module: query-language decision tree, where-each-language-runs map, EQL-vs-ES|QL-vs-KQL-vs-Lucene capabilities matrix, EQL sequence visualisation, ES|QL pipeline horizontal flow, cross-language pivot pipeline, ES|QL detection-rule hand-off, the *KQL embedded in ES|QL* pattern.
+
+L2 course now sits at **2 modules / 16 lessons / 32 questions**.
+
+#### Note on prior modules
+
+L1 Module 8 (Common ATT&CK Techniques) and L2 Module 1 (PEAK methodology) shipped with KQL examples that referenced *Microsoft Kusto* / Defender Advanced Hunting tables (`DeviceProcessEvents`, etc.) — pre-dating the explicit clarification that ION runs on Elastic + Kibana. From v0.11.13 onward, all L2 modules use Elastic query languages and ECS field paths consistently. The L1 examples remain as written (still pedagogically sound for technique recognition); future L2 modules (3–8) will be Elastic-native end to end.
+
+#### Upgrade
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
+Idempotent — wipes `demo-*` courses and re-seeds.
+
+---
+
 ## v0.11.12 (2026-04-28) — L2 begins
 
 ### L2 Module 1 — The Hunt Hypothesis (PEAK methodology) — first L2 ship at BTL1+/SANS depth
