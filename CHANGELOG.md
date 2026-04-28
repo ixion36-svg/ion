@@ -1,5 +1,63 @@
 # Changelog
 
+## v0.11.11 (2026-04-28) — L1 COMPLETE
+
+### L1 Module 8 — Common ATT&CK Techniques (the L1 finale)
+
+Seventh and final L1 curriculum ship at the v0.11.3 depth bar. **L1 Module 8 — Common ATT&CK Techniques** authored from a research-agent dossier. ~10,000 words, 8 lessons (4 reading + 4 quiz), 15 quiz questions. **L1 *Alert Triage Fundamentals* is now structurally complete.**
+
+#### Lesson breakdown
+
+| # | Title | Type | Quiz qs |
+|---|---|---|---|
+| 8.1 | The ATT&CK framework, reading a technique page, and mapping alerts on the fly | reading | — |
+| 8.2 | Framework & technique pages — quiz | quiz | 3 |
+| 8.3 | Top techniques: Initial Access, Execution, and Persistence | reading | — |
+| 8.4 | IA + Execution + Persistence — quiz | quiz | 4 |
+| 8.5 | Privilege Escalation, Defense Evasion, Credential Access, and Discovery | reading | — |
+| 8.6 | PrivEsc, Evasion, Cred, Discovery — quiz | quiz | 4 |
+| 8.7 | Lateral Movement, Collection / Exfil / Impact, C2, ransomware + cloud chains, worked scenarios, ION conventions | reading | — |
+| 8.8 | Lateral, Impact, C2 & ION — quiz | quiz | 4 |
+
+#### Topics covered
+
+- **Framework & technique-page reading** — the four-tier hierarchy (Tactic / Technique / Sub-technique / Procedure), 14 enterprise tactics with TA-numbers, Enterprise / Windows / macOS / Linux / Cloud / Network / Containers / ESXi matrices, ATT&CK Navigator (coverage / threat-actor / detection-coverage layers), versioning inflection points (v6 → v7 sub-tech overhaul → v9-10 cloud reshuffle → v15 ESXi → v16 cloud cleanup), the **30-second / 3-minute / 30-minute** reading cadences, the *zero-second-read* anti-pattern, mapping ATT&CK Data Components to Sysmon / Windows Event Log / Defender Advanced Hunting / ECS, the alert-title → technique-ID mapping table (12 worked translations)
+- **Initial Access + Execution + Persistence** — T1566 (Module 6 callback), **T1190** with KEV-cross-reference and Log4Shell / MOVEit / Citrix Bleed / Ivanti canonical examples, T1078 valid-account sub-techniques, T1133 external remote services, T1195 / T1199 / T1189 (recognise but rarely L1-triaged); **T1059** workhorse with the suspicious-PowerShell vocabulary memo (`-enc`, `-w hidden`, `IEX`, `DownloadString`, `FromBase64String`, AMSI bypass strings), T1204 user execution, **T1218** LOLBAS sub-techniques (Mshta, Regsvr32 Squiblydoo, Rundll32, CMSTP, Msiexec) plus the LOLBAS / GTFOBins references, T1053 scheduled tasks (EID 4698/4700/4702), T1569.002 PsExec (EID 7045), T1106 native-API, T1559 IPC; **T1547.001** registry Run keys (Sysmon EID 13), T1543.003 service persistence (EID 7045), T1136 account creation, T1098 account manipulation (`.005` device registration / `.003` cloud roles / `.001` cloud credentials), T1574 DLL hijack/sideload, T1505.003 web shell, T1546.003 WMI subscription
+- **PrivEsc + Defense Evasion + Cred Access + Discovery** — T1068 BYOVD, T1134 token manipulation, T1055 process injection (EID 8 + EID 10), T1548.002 UAC bypass; T1027 obfuscation (`.002` packing / `.006` HTML smuggling / `.010` command obfuscation), T1070 indicator removal (EID 1102), T1562 impair defenses (Set-MpPreference, sc stop Sense, Auditpol disable), T1036 masquerading; **T1003 OS credential dumping** (`.001` LSASS with the `0x1010` / `0x1F0FFF` granted-access fingerprint, `.002` SAM, `.003` NTDS, **`.006` DCSync** with the EID 4662 + replication-GUID signal), T1110 brute force / spray / stuffing, T1555.003 browser passwords, T1539 cookie theft, T1187 forced authentication, **T1558 Kerberos** (`.003` Kerberoasting with EID 4769 RC4 downgrade, `.004` AS-REP Roasting with EID 4768 preauth-not-required, `.001` Golden Ticket, `.002` Silver Ticket), T1621 MFA fatigue; the **discovery cluster** — *the cluster is the signal* — full T1087 / T1018 / T1083 / T1057 / T1016 / T1033 / T1069 / T1482 / T1518 mapping
+- **Lateral + Collection / Exfil / Impact + C2 + chains + scenarios** — T1021 remote services (`.001` RDP LT10, `.002` SMB LT3, `.006` WinRM with `WinRM` logon-process), T1570 lateral tool transfer (`bitsadmin`, `certutil -urlcache`), T1550 alternate-auth (PtH, PtT), T1210 EternalBlue / ProxyShell / ZeroLogon; T1005 / T1114 / T1213 / T1560.001; T1041 / T1567.002 cloud-storage exfil / T1048; **T1486 / T1490 / T1485 / T1489** ransomware Impact cluster — *T1490 is page-everyone*; T1071 / T1573.002 / T1090 / T1568.002 DGA / **T1102** SaaS dead-drops / T1572 tunnels / T1219 RMM abuse, plus the **beacon-shape** pattern from Module 4; the **modal ransomware-affiliate intrusion chain** in ATT&CK shorthand with **dwell-time compression to 5–10 day medians** (under 24h for fast-flux operators); the **modal cloud-takeover chain** (T1566.002 → T1539 → T1078.004 → T1098.005 → T1098.001/.003 → T1114.003 + T1213 → T1567.002); **ION-specific** — matcher tier 3 (technique) + tier 4 (tactic) drive Bob's prompt selection, case taxonomy carries technique IDs through escalation packets (Module 7), Bob's verdict cites technique IDs, pgvector case-similarity uses technique tags as a deterministic axis; **three end-to-end worked scenarios** — *(A) discovery-cluster fingerprint* on a workstation, *(B) LSASS read → DCSync chain* with isolation + IR page, *(C) ransomware staging* (T1490 → T1489 → T1486) with 2–10 minute time pressure; the **eight common L1 ATT&CK-mapping mistakes** to avoid (parent-instead-of-sub-tech, group-name-pinning from procedures, single-discovery-as-high, cluster-as-info, T1490 as monitor, T1055 as escalation, on-prem T1078 for cloud, Detection-section as must-match)
+
+10+ Mermaid diagrams across the module: ATT&CK matrix-style horizontal flow with most-common L1 techniques, ransomware-affiliate chain, cloud-takeover chain, alert-title → technique decision tree, discovery-cluster Gantt timeline, LSASS → DCSync flow, ransomware staging timeline.
+
+L1 course now sits at **8 modules / 59 lessons / 127 questions — STRUCTURALLY COMPLETE**.
+
+#### L1 milestone
+
+The full L1 *Alert Triage Fundamentals* curriculum (v0.11.3 onwards) covers the day-shift triage analyst from first principles to capstone:
+
+| M | Title | Lessons | Questions | Shipped |
+|---|---|---|---|---|
+| 1 | The alert lifecycle | 3 | 8 | v0.11.3 |
+| 2 | SIEM Fundamentals | 8 | 23 | v0.11.5 |
+| 3 | Windows Event Logs | 8 | 23 | v0.11.6 |
+| 4 | Network Telemetry | 8 | 14 | v0.11.7 |
+| 5 | IOC Handling | 8 | 14 | v0.11.8 |
+| 6 | Phishing Triage | 8 | 15 | v0.11.9 |
+| 7 | Escalation Workflow | 8 | 15 | v0.11.10 |
+| 8 | Common ATT&CK Techniques (finale) | 8 | 15 | **v0.11.11** |
+| **L1 total** | | **59** | **127** | |
+
+**Backlog from here:** L2 *Threat Hunting with KQL* full curriculum (8 modules, currently a 1-module / 2-lesson v0.11.2 stub) — kicks off in the next ship. After L2: L3 *Adversary Emulation Basics* (currently a stub). After all three: labs ship, PDF certificate generation, Elastic Agent Skills consumer integration as Bob's 6th matcher tier.
+
+#### Upgrade
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
+Idempotent — wipes `demo-*` courses and re-seeds.
+
+---
+
 ## v0.11.10 (2026-04-28)
 
 ### L1 Module 7 — Escalation Workflow
