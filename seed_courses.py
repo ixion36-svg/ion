@@ -5191,7 +5191,1068 @@ ATT&CK chain: **T1583.001 (lookalike domain) → T1656 (impersonation) → T1566
         points=2,
     )
 
-    print(f"  L1: {course.title} — 6 modules, 43 lessons (Module 6 Phishing Triage @ proper depth)")
+    # ── Module 7 — Escalation Workflow ───────────────────────────────────
+    # How an L1 hands work off cleanly: the escalate/contain/close decision,
+    # severity + priority frameworks, the multi-team escalation topology,
+    # the handover packet, chain of custody, communication discipline,
+    # external regulatory clocks, and three worked scenarios that cascade
+    # into 9+ escalation paths.
+    mod7 = _add_module(
+        session, course, order=7,
+        title="Escalation Workflow",
+        description_md=(
+            "Handing work off cleanly. The cost calculus of false vs missed "
+            "escalation, triage timeboxing and SLA tiers, severity + "
+            "priority + blast-radius classification, the L1 escalation "
+            "paths (L2 / IR / Identity / IT / Legal / HR / CISO / "
+            "MSSP / CERT / regulator / law enforcement), the handover "
+            "packet template (with good and bad examples), chain of "
+            "custody and RFC 3227 order of volatility, communication "
+            "discipline (the 3-line update + cadence by severity), "
+            "external reporting timelines (GDPR Art.33 / NIS2 / SEC "
+            "8-K / HIPAA), national CERT and ISAC relationships, ION "
+            "case-state conventions, and three worked scenarios."
+        ),
+        estimated_minutes=210,
+    )
+
+    # Lesson 7.1 — Discipline + the L1 decision + timeboxing
+    m7l1 = _add_lesson(
+        session, mod7, order=1,
+        title="The escalation decision: cost calculus, criteria, and timeboxing",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Articulate the *two opposing failure modes* of an L1 — false escalation and missed escalation — and reason about the cost of each
+> 2. Apply the *escalate / contain / close* decision to a concrete alert using the default escalation criteria
+> 3. Distinguish *contain-and-close* candidates from *escalate* candidates and avoid the "when in doubt, escalate everything" anti-pattern
+> 4. Use SLA tiers as escalation triggers, not just measurement targets
+> 5. Tell *stuck-because-of-authority* apart from *stuck-because-of-skill* and apply the right response to each
+>
+> **Prerequisites.** Modules 1–6 (Alert Lifecycle, SIEM Fundamentals, Windows Event Logs, Network Telemetry, IOC Handling, Phishing Triage).
+
+## Why escalation discipline matters
+
+Every alert that reaches an L1 is, at its core, a question: *does this need someone else's attention, and if so, whose?* That answer — multiplied across thousands of alerts per shift, hundreds of analysts, dozens of teams — is the engine that determines whether a SOC functions or melts down. Escalation is not a side activity. It *is* L1 work.
+
+A well-disciplined L1 understands two opposing failure modes:
+
+### The cost of a false escalation
+
+A false escalation is one where L1 hands work to L2, IR, or another team that L1 should have closed themselves. Each false escalation:
+
+- **Burns L2 cycles.** L2 analysts are the most expensive seat in the SOC and, in most teams, the bottleneck. Every minute spent on a false-positive escalation is a minute *not* spent on a real intrusion already in dwell.
+- **Erodes signal-to-noise on the L2 queue.** When L2 sees 70% noise from L1, they read the queue with skepticism. A real escalation buried in noise gets dismissed.
+- **Produces alert fatigue downstream.** *Boy who cried wolf* is not a metaphor in a SOC — it is observable. After enough false escalations, L2 anchors low on severity and *misses* a genuine high-severity event.
+- **Distorts KPIs.** Escalation rate is a managed metric. False escalations inflate it artificially, hiding real coverage gaps and making detection-engineering work look more successful than it is.
+- **Demoralises the analyst.** L1s who escalate everything stop learning to triage. They become a routing function, not analysts. Career growth stalls.
+
+### The cost of a missed escalation
+
+A missed escalation is when L1 closes a ticket that should have moved up. Each one:
+
+- **Delays containment.** If credential theft is misclassified as a benign sign-in, the attacker has another shift to move laterally. *Mean time to contain (MTTC)* is the metric most directly correlated with breach cost (Verizon DBIR; IBM *Cost of a Data Breach*).
+- **Lengthens dwell time.** First-evidence-to-detection. Mandiant *M-Trends* and Verizon DBIR publish annual medians. A missed L1 escalation moves a clock the rest of the org cannot un-move.
+- **Widens blast radius.** Another four hours of unimpeded access compromises more accounts, exfiltrates more data, places more persistence.
+- **Starts the regulatory clock late.** GDPR Article 33's 72-hour clock starts when the controller *becomes aware* of a personal-data breach. If L1 missed it, "awareness" is whenever the customer / partner / press informs you instead — and the regulator now sees both an incident *and* a notification failure.
+- **Becomes a board-level event.** Missed L1 escalations turning into public breaches are how SOCs lose trust internally, lose budget, and lose people.
+
+### The chokepoint principle
+
+L1 sits at the funnel's narrowest point. Bad escalation discipline degrades *everything* downstream — detection engineering, IR, threat intel, and even external relationships with regulators and CIRTs. Good discipline is a force multiplier: an L1 who escalates the right 5% and closes the rest with confidence is worth far more than one who escalates 30% indiscriminately.
+
+The honest framing: *"I am not the last line of defence, but I am the first line of judgement."* L1 isn't expected to know everything. L1 *is* expected to recognise when a situation has moved beyond what they can confidently dispose of, and to package the work cleanly for whoever takes it next.
+
+## The L1 decision: escalate / contain / close
+
+Three terminal dispositions for any alert:
+
+1. **Close** — false positive, benign true positive (BTP), known-good behaviour, duplicate, or out-of-scope.
+2. **Contain-and-close** — true positive, but L1 has authority and the action is bounded; L1 takes the action, documents it, closes.
+3. **Escalate** — beyond L1 authority, beyond L1 skill, or scope is too broad for L1 to bound.
+
+### Default escalation criteria
+
+If any of the following are present, escalate by default:
+
+- **Confirmed credential exposure.** AiTM phishing kit harvest, token theft, password-spray success, OAuth illicit consent (Module 6).
+- **EDR alert at *high* or above** — process injection, LSASS access, suspicious child-of-Office, ransomware behaviour, suspected lateral movement.
+- **Lateral movement signals.** SMB / WMI / WinRM / RDP / PsExec / Impacket from a non-admin source. WinRM (port 5985/5986) from a workstation (Module 3).
+- **Multiple users / multiple hosts affected.** Anything at scale exits the per-ticket frame and needs a coordinator.
+- **VIP user.** Executives, board members, anyone in the privileged-user list.
+- **Privileged-account activity outside change windows.** Domain admin sign-in from an unusual host, service account interactive logon (Logon Type 2 or 10), DCSync-like patterns.
+- **Novel TTP** — something L1 has not seen before *and* cannot explain in a paragraph.
+- **SLA risk** — L1 will not be able to dispose within tier SLA.
+- **Cross-team action required** — OAuth grant revoke beyond L1's authority, account lock that requires Identity, system reimage that requires IT.
+- **Suspected data exposure.** Personal data triggers GDPR; cardholder data triggers PCI; PHI triggers HIPAA.
+
+### Contain-and-close criteria
+
+Confidently close, with a documented disposition:
+
+- Single-recipient phish blocked at gateway, never delivered.
+- Phish delivered, *not* clicked (per URL telemetry), email purged, sender blocked.
+- Confirmed FP on a known-noisy rule (with feedback flagged to detection engineering).
+- Benign user behaviour matching a known pattern (developer running `psexec` in dev VLAN, sysadmin doing scripted maintenance during change window, security-team red-team exercise documented in calendar).
+- Known-good admin-tool execution with corroborating evidence (ticket ID, change record, paired identity).
+- Duplicate of an open higher-priority ticket (link, close as duplicate).
+
+### "When in doubt, escalate" — but
+
+The rule is a safety net, not a strategy. *If you would escalate every alert that produced uncertainty, your escalation rate becomes meaningless and your L2 stops trusting you.* The discipline is to *narrow* the doubt: pull one more log, check one more enrichment, ask one more question. **Then** decide.
+
+### Worked examples
+
+- *Alert: "Impossible travel — user signed in from London then Singapore in 8 minutes."* First check: corporate VPN egress map. If both IPs map to known VPN PoPs, this is benign. If one is a residential IP, this is escalate-grade (potential token theft).
+- *Alert: "PowerShell encoded command on developer workstation."* First check: command-line decode. If it's `Get-AzContext` or developer tooling, BTP. If it's `IEX (New-Object Net.WebClient).DownloadString(...)`, escalate immediately.
+- *Alert: "Outbound DNS to a newly-registered domain."* First check: enrichment age, popularity, related-IP reputation. CDN edge registered yesterday → BTP. Single host beaconing to an unranked domain every 60 s with low jitter → escalate (C2 candidate).
+
+## Triage timeboxing
+
+A SOC that does not timebox is a SOC that drifts. Timeboxing means *"I will spend at most N minutes on this disposition; if I can't decide by then, the inability to decide is itself the signal."*
+
+### SLA tiers and escalation triggers
+
+Typical L1 SLA bands (these vary; ION's defaults are sane):
+
+| Severity | Triage start | First-action SLA | Disposition target |
+|---|---|---|---|
+| **P1 / Critical** | ≤ 5 min | ≤ 15 min | ≤ 1 hour or escalate |
+| **P2 / High** | ≤ 15 min | ≤ 30 min | ≤ 4 hours or escalate |
+| **P3 / Medium** | ≤ 30 min | ≤ 1 hour | ≤ 8 hours or backlog |
+| **P4 / Low** | ≤ 4 hours | best-effort | next business day |
+
+A *slipping SLA is itself an escalation trigger.* Started a P1 forty minutes ago and still don't have a verdict? You don't keep working — you escalate. The SLA exists to enforce this discipline.
+
+### The 80/20 of L1 disposition
+
+Empirically, ~80% of L1 alerts dispose within 15 minutes (BTPs, dedupes, simple FPs). ~15% take 15–60 minutes (need enrichment / a check). ~5% are genuine escalations. If your distribution is more like 50/40/10, you are either being overrun by noisy detections (a Detection-Engineering signal) or escalating when you shouldn't be.
+
+### Stuck — escalate vs research
+
+Two different stuck states demand different responses:
+
+- **Stuck because of authority** (you don't have permission to revoke an OAuth grant) → escalate. The blocker is structural; more time won't change it.
+- **Stuck because of skill / context** (you don't know how to read a certain log) → 15 more minutes of research, then escalate if still stuck. The blocker is knowledge; modest time may solve it.
+- **Stuck because of scale** (more than one host or user; can't bound the scope) → escalate. L2/IR exists to coordinate scope.
+- **Stuck because of novelty** (a TTP you've never seen) → 10 minutes of OSINT (CTI, ATT&CK, vendor blogs), then escalate or close. Don't try to become a threat researcher mid-shift.
+
+### Heuristics
+
+- *"Could I justify this disposition to my shift lead in two sentences?"* If not, escalate.
+- *"If I close this and it turns out to be real, what will the post-incident review find?"* If "L1 had X evidence and missed Y signal," escalate.
+- *"Am I closing this because I'm confident, or because I want my queue clean?"* If the second, escalate.
+
+## The escalation decision tree
+
+```mermaid
+flowchart TD
+    A[Alert received] --> B{Confirmed FP?}
+    B -- yes --> Z1[Close as FP +<br/>tune ticket if recurring]
+    B -- no --> C{Confirmed BTP?}
+    C -- yes --> Z2[Close as BTP]
+    C -- no --> D{Within L1<br/>authority?}
+    D -- no --> E[Escalate]
+    D -- yes --> F{Scope bounded<br/>to 1 user / 1 host?}
+    F -- no --> E
+    F -- yes --> G{Regulated data /<br/>VIP / Tier-0?}
+    G -- yes --> E
+    G -- no --> H{Can dispose<br/>within SLA?}
+    H -- no --> E
+    H -- yes --> I[Contain + close]
+    E --> J[Build handover packet]
+```
+
+## Glossary
+
+- **FP / BTP / TP** — false positive / benign true positive / true positive.
+- **MTTC / dwell time** — mean time to contain / first-evidence to detection.
+- **SLA tier as trigger** — slipping past the SLA *is* an escalation signal, not a measurement-only artefact.
+- **Stuck-authority vs stuck-skill** — different stuck states demand different responses (escalate immediately vs research for a bounded window).
+
+## Further reading
+
+- Verizon DBIR — annual *Data Breach Investigations Report*.
+- Mandiant *M-Trends* — annual dwell-time medians by region.
+- IBM *Cost of a Data Breach Report*.
+- NIST SP 800-61 Rev. 2 — *Computer Security Incident Handling Guide.*
+""",
+    )
+    m7l1q = _add_lesson(
+        session, mod7, order=2, title="Decision & timeboxing — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=7,
+        content_md="Three questions on contain-vs-escalate criteria, SLA tiers as triggers, and the cost of false vs missed escalation.",
+    )
+    _add_q(session, m7l1q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An EDR alert fires for suspicious behaviour on a Tier-0 domain controller. The L1 has investigated for 25 minutes, the P2 disposition SLA is 4 hours, and they remain genuinely uncertain whether this is a malicious chain or a benign admin tool. What is the best next action?",
+        options=[
+            {"value": "research", "label": "Continue researching for up to 4 hours within the SLA"},
+            {"value": "fp", "label": "Close as suspected FP and submit a tuning request to detection engineering"},
+            {"value": "escalate", "label": "Escalate to L2 now with a partial handover packet"},
+            {"value": "reassign", "label": "Reassign to the overnight shift to give them a head start"},
+        ],
+        correct="escalate",
+        explanation_md="Tier-0 asset criticality plus genuine uncertainty after 25 minutes means the asset class itself drives the decision: escalate now. Continuing for another 3+ hours on a DC alert is not heroism; closing as FP is unsafe; reassigning passes the parcel.",
+        points=2,
+    )
+    _add_q(session, m7l1q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are valid *contain-and-close* dispositions at L1, vs ones that should escalate?",
+        options=[
+            {"value": "blocked", "label": "Single-recipient phishing email blocked at the gateway and never delivered"},
+            {"value": "fp_known", "label": "Confirmed FP on a known-noisy rule, with a tuning ticket opened"},
+            {"value": "wmi_lat", "label": "Lateral-movement WMI from a workstation to an unrelated server"},
+            {"value": "admin_change", "label": "Admin-tool execution paired with an open change record and approved ticket"},
+            {"value": "afterhours_da", "label": "Domain Admin sign-in from an unusual host outside any change window"},
+        ],
+        correct=["blocked", "fp_known", "admin_change"],
+        explanation_md="Blocked phish, confirmed FPs (with tuning), and admin tool runs that have a change record are all defensible L1 closures. Lateral-movement WMI from a workstation and out-of-window DA sign-ins are escalate-by-default — both are textbook lateral-movement / privilege-abuse signals.",
+        points=3,
+    )
+    _add_q(session, m7l1q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="A slipping SLA is an administrative reporting metric only — analysts should keep working through it as long as they are making progress on the investigation.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** The SLA is the discipline mechanism, not the report. Crossing it without a verdict *is* the signal to escalate; the inability to decide within the timebox is itself information that the next tier needs to see.",
+        points=2,
+    )
+
+    # Lesson 7.2 — Severity + priority + escalation paths
+    m7l2 = _add_lesson(
+        session, mod7, order=3,
+        title="Severity, priority, blast radius, and the escalation paths",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Speak the language of standard severity and incident-classification frameworks (FIRST, ENISA, NIST 800-61r2, MITRE D3FEND/RE&CT)
+> 2. Translate a severity into a *priority* using asset criticality, scope, time-of-day, and regulatory exposure
+> 3. Articulate a *blast radius* — hosts × users × data classifications × services × external entities
+> 4. Identify the right escalation path for an incident and know each path's *who / when / how / what / why*
+> 5. Distinguish escalation paths that *L1 owns* from paths *L1 only triggers* (Comms, Regulators, Law Enforcement)
+
+## Severity scales
+
+L1s rarely *set* organisational severity from scratch — most SOCs inherit it from rule severity / SIEM scoring — but L1s constantly *propose adjustments* in handovers. Knowing the frameworks lets you speak the language of the people you're escalating to.
+
+The most common SOC scale is five-tier:
+
+| Severity | Common meaning |
+|---|---|
+| **Critical** | Confirmed business-impacting incident; widespread compromise or imminent data loss |
+| **High** | Confirmed compromise of a single sensitive asset, or strong likelihood of widespread |
+| **Medium** | Suspected compromise; investigation underway |
+| **Low** | Possible compromise or low-impact policy violation |
+| **Informational** | Logged for awareness; no action required |
+
+### The frameworks worth knowing by name
+
+- **FIRST CSIRT Services Framework v2.1** — industry-standard taxonomy of CSIRT services and incident handling. Source for many SOC severity conventions.
+- **CVSS** (FIRST, v3.1 / v4.0) — vulnerability score, but its lens (Confidentiality × Integrity × Availability impact, weighted by attack vector and complexity) adapts well: incident severity ≈ *impact-on-CIA × asset-criticality × likelihood-of-realisation × scope*.
+- **ENISA Reference Incident Classification Taxonomy** — used heavily across EU CSIRTs. Categories: abusive content, malicious code, information gathering, intrusion attempts, intrusions, availability, information content security, fraud, vulnerable, other.
+- **NIST SP 800-61 Rev. 2** — *Computer Security Incident Handling Guide.* Categories: Denial of Service, Malicious Code, Unauthorized Access, Inappropriate Usage, Multiple Component, Other. Functional impact / information impact / recoverability are graded separately and combined.
+- **MITRE D3FEND** and **ATC RE&CT** — defensive techniques and response actions. They don't drive severity directly, but they're the vocabulary L2 / IR use to describe response. Recognise the names.
+
+## Priority = severity × business context
+
+**Severity** answers *"how bad is this kind of incident?"* **Priority** answers *"how bad is this incident, on this asset, to this business, right now?"*
+
+Inputs to priority:
+
+- **Asset criticality.** A CRM sales workstation versus the domain controller versus the CEO's laptop are not the same asset, even when the alert text is identical.
+- **Time of day / shift.** P2 at 09:00 Tuesday is a very different operational picture than P2 at 03:00 Sunday, when on-call must be paged.
+- **Scope.** One user vs 50 users vs all users.
+- **Regulatory exposure.** Regulated data class touched; jurisdiction; sectoral regime (PCI / HIPAA / NIS2 / DORA).
+- **Concurrent incident posture.** If three other P1s are open, a borderline P3 may need escalation purely for awareness.
+
+### Worked priority matrix
+
+| Severity ↓ \\ Asset → | Workstation | Server | DC / Tier-0 | VIP / Regulated |
+| ---- | ---- | ---- | ---- | ---- |
+| **Critical** | P1 | P1 | P1 | P1 |
+| **High** | P2 | P1 | P1 | P1 |
+| **Medium** | P3 | P2 | P1 | P1 |
+| **Low** | P4 | P3 | P2 | P2 |
+
+Use it as a *sanity check.* If your alert is on a Tier-0 host and you classified it Medium-P3, you're miscalibrated.
+
+## The blast-radius lens
+
+Beyond severity, articulate a blast radius:
+
+- **Hosts** affected (count + criticality)
+- **Users** affected (count + privilege level)
+- **Data classifications** touched (Public / Internal / Confidential / Restricted; PII / PHI / PCI / IP)
+- **Services** touched (customer-facing? internal-only?)
+- **External entities** touched (partner orgs, customers, vendors)
+
+Blast radius is what L2 / IR cares about most when reading an L1 escalation.
+
+## TLP marking on every handoff
+
+Revisit Module 5. Every escalation handoff carries a **TLP** marking — TLP:RED, TLP:AMBER+STRICT, TLP:AMBER, TLP:GREEN, TLP:CLEAR (FIRST TLP 2.0, 2022). Many escalations also carry **PAP** markings, which limit the recipient's permitted action with the indicator. Mismarking is itself an incident in some regulated contexts.
+
+## The escalation paths
+
+L1 sits at the centre of a routing topology. Each path has *who, when, how, what, why.* You'll use 2–3 daily but should know all of them.
+
+```mermaid
+flowchart TD
+    L1((L1<br/>analyst))
+    L1 --> L2[L2 SOC]
+    L1 --> IR[IR / DFIR]
+    L1 --> TI[Threat Intel]
+    L1 --> DE[Detection Eng / TIDE]
+    L1 --> IT[IT / Helpdesk]
+    L1 --> ID[Identity / IAM]
+    L1 --> LG[Legal / Privacy]
+    L1 --> HR[HR-Sec liaison]
+    L1 --> CM[Comms / PR]
+    L1 --> MG[Management / CISO]
+    L1 --> VN[MSSP / Vendors]
+    L1 --> CT[CIRT / CERT]
+    L1 --> RG[Regulators]
+    L1 --> LE[Law enforcement]
+```
+
+### L1 → L2 (the most common)
+
+- **Why:** investigation requires deeper toolset, longer time, or specialist skill.
+- **When:** any default-escalate criterion + L1 cannot bound scope or take terminal action.
+- **How:** in-platform case escalation (ION case status `open → escalated`). Slack / Teams ping if P1.
+- **What:** full handover packet (Lesson 7.5).
+- **SLA:** L2 acknowledges within 15 min for P1, 1 hr for P2, 4 hr for P3.
+
+### L1 → IR / DFIR (incident declared)
+
+- **Why:** escalation has crossed from *investigate alert* into *manage incident lifecycle.* Multiple workstreams now needed: containment, eradication, recovery, comms, evidence, lessons-learned.
+- **When:** confirmed compromise of a Tier-0 asset, mass user impact, regulator clock starts, business-impact threshold crossed (loss-of-service, data exposure).
+- **How:** formal *incident declaration* — paging, war-room creation, comms cadence start, exec-loop opened.
+- **What:** L2 packet plus a *declared incident scope* statement and an Incident Commander assignment.
+
+### L1 → Threat Intel
+
+- **Why:** novel campaign indicators that the org's CTI team should track / pivot on; or you need enrichment beyond standard tooling.
+- **When:** new TTP, new infrastructure cluster, new lure family.
+- **How:** CTI ticket / Slack channel / TIP submission. ION's CTI integrations (OpenCTI, MISP) accept structured submissions.
+- **What:** indicators with TLP/PAP, a one-paragraph narrative, links to source artefacts.
+
+### L1 → Detection Engineering / TIDE
+
+- **Why:** the rule that fired is broken (FP-rich), missing (you saw something the rule didn't catch), or needs tuning.
+- **When:** any FP-close from a rule with ≥ N FPs this week (often N=3); any time you manually find a pattern that should have alerted.
+- **How:** detection-tuning ticket / TIDE rule-feedback / ION's tuning-proposal mechanism. *Separate channel from L2 escalation.* Tuning is engineering work; investigation is L2 work; don't mix them.
+- **What:** rule ID, observed pattern, suggested logic change, sample events.
+
+### L1 → IT / Ops / Helpdesk
+
+- **Why:** non-security action required — reboot, reimage, rebuild, patch, hardware swap.
+- **When:** L1 has decided containment requires IT-only action. Coordinate with L2 first if escalation pending.
+- **How:** ITSM ticket (ServiceNow / Jira / Zendesk) with security-incident link.
+- **What:** action, asset, deadline, risk-acceptance / change-management implications.
+
+### L1 → Identity / IAM team
+
+- **Why:** OAuth-grant revocation, conditional-access change, MFA reset, privileged-access-review trigger, federation issue.
+- **When:** confirmed token theft (revoke active sessions + refresh tokens), confirmed illicit OAuth consent (revoke grant + audit app), suspected federation abuse.
+- **How:** IAM ticket / on-call IAM page (P1 in working hours; P1 + page after-hours).
+- **What:** affected user, affected app/grant ID, action requested, justification, approval thread.
+
+### L1 → Legal / Compliance / Privacy
+
+- **Why:** regulatory or contractual notification may be required; legal hold may need to be triggered; counsel may need to lead external communications.
+- **When:** confirmed exposure of personal / regulated / customer data; potential law-enforcement involvement; potential litigation hold.
+- **How:** privacy / legal escalation channel — typically Legal-IR liaison, with a high bar (don't spam Legal with maybes).
+- **What:** facts as known, data classes touched, jurisdictions involved, **time of awareness**, current containment status. *Especially time of awareness* — it drives the GDPR / NIS2 clock.
+
+### L1 → HR
+
+- **Why:** confirmed insider threat, policy violation, suspected employee compromise where personnel action is in scope.
+- **When:** insider data exfil suspected; shared-credentials-with-external; willful policy violation; suspected coercion / account-sale.
+- **How:** **HR-Security liaison** (most orgs have one). *Never* L1 directly to a line HR rep.
+- **What:** factual evidence only — *no speculation about employee motive.* Chain of custody matters here.
+
+### L1 → Comms / PR
+
+- **Why:** the incident is likely to surface publicly.
+- **When:** *typically not L1's call.* Comms is engaged by IR or management. L1's job is to flag the *possibility* up the chain so Comms can be pre-positioned.
+- **How:** via IR / management.
+- **What:** scope, scale, sensitivity — Comms cares about reach and narrative, not technical detail.
+
+### L1 → Management / CISO
+
+- **Why:** policy threshold crossed, exec-stakeholder notification due, decision authority required (ransom, takedown, regulator engagement).
+- **When:** P1 declared, regulator clock started, financial-impact threshold, board-level asset compromised.
+- **How:** typically through shift lead → SOC manager → CISO chain. Page paths differ by org.
+- **What:** the **3-line update** (Lesson 7.5) plus the full ticket link.
+
+### L1 → MSSP / vendor support
+
+- **Why:** vendor product is the source of truth (CrowdStrike, SentinelOne, Microsoft, Mandiant) and you need their telemetry, expertise, or escalation.
+- **When:** vendor-detected campaign, suspected vendor-tooling false-positive, need for vendor IR support, suspected zero-day in a vendor product.
+- **How:** vendor support portal + account team. Some products have integrated escalation (e.g., CrowdStrike Falcon Complete).
+- **What:** their case ID, your ticket ID, full triage so far. Vendors hate being asked to start from zero.
+
+### L1 → External CIRT / CERT, ISACs, regulators, law enforcement
+
+These four paths are *typically not L1-initiated.* L1 should know they exist and which jurisdictions / regimes they cover. Lesson 7.7 covers them in detail (timed clocks, reporting portals, ISAC list).
+
+## Glossary
+
+- **Severity vs priority** — kind-of-incident vs this-incident-on-this-asset-right-now.
+- **Blast radius** — hosts × users × data class × services × external entities.
+- **TLP / PAP** — sharing-rule + permitted-action markings carried on every escalation handoff.
+- **Path L1 owns vs path L1 triggers** — L2 / Identity / IT / DE are L1-driven; Comms / Regulators / Law Enforcement are L1-flagged but driven by IR / Legal / CISO.
+
+## Further reading
+
+- FIRST CSIRT Services Framework v2.1.
+- NIST SP 800-61r2 §3.2 incident category definitions.
+- ENISA Reference Incident Classification Taxonomy.
+- FIRST TLP 2.0.
+""",
+    )
+    m7l2q = _add_lesson(
+        session, mod7, order=4, title="Severity, priority, paths — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on framework recognition, severity-vs-priority distinction, blast-radius reasoning, and selecting the right escalation path.",
+    )
+    _add_q(session, m7l2q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Which of the following best describes the *difference* between **severity** and **priority** in SOC incident handling?",
+        options=[
+            {"value": "synonyms", "label": "They are synonyms; both rate how bad the incident is"},
+            {"value": "sev_pri", "label": "Severity describes how bad the kind of incident is in general; priority combines that with asset criticality, scope, time, and regulatory exposure to rank this specific incident"},
+            {"value": "vendor", "label": "Severity is the vendor's score; priority is the analyst's score"},
+            {"value": "rules", "label": "Severity is set by detection rules; priority is set by management"},
+        ],
+        correct="sev_pri",
+        explanation_md="Severity is generic — *how bad is this kind of incident*. Priority is contextual — *how bad is this incident, on this asset, to this business, right now*, accounting for asset criticality, scope, regulatory exposure, and concurrent incident posture.",
+        points=2,
+    )
+    _add_q(session, m7l2q, order=2, kind=QuestionKind.MULTI,
+        stem_md="A confirmed AiTM token-theft incident is detected on the CFO's laptop. The CFO has access to pre-announcement financial data and the company is a US-listed public registrant. Which of the following are *correct* escalation paths the L1 should engage at this stage?",
+        options=[
+            {"value": "l2", "label": "L2 SOC for forensics"},
+            {"value": "identity", "label": "Identity team for session and refresh-token revocation"},
+            {"value": "legal", "label": "Legal — recording time of awareness and assessing materiality / GDPR / SEC 8-K disclosure trigger"},
+            {"value": "comms_direct", "label": "Comms / PR — directly drafting a public statement"},
+            {"value": "le_direct", "label": "Law enforcement — calling FBI directly to seize the attacker IP"},
+        ],
+        correct=["l2", "identity", "legal"],
+        explanation_md="L2 + Identity + Legal are within L1's escalation flow at this stage. Comms is engaged by IR or management once the materiality / public-disclosure call is made — not L1's call. Law enforcement contact is a Legal/CISO-led decision, never an L1 unilateral action.",
+        points=3,
+    )
+    _add_q(session, m7l2q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="An L1 closes a phishing alert as a false positive. The same rule has now produced **four** FP-closes this week. Which escalation path is appropriate, in addition to closing the ticket?",
+        options=[
+            {"value": "l2", "label": "Escalate the closed FP to L2 for review"},
+            {"value": "ir", "label": "Open an IR incident — multiple FPs are a coordination problem"},
+            {"value": "de", "label": "Open a Detection Engineering / TIDE tuning ticket on the rule"},
+            {"value": "ti", "label": "Submit the indicator to the threat-intel team"},
+        ],
+        correct="de",
+        explanation_md="Recurring FPs are a *rule-tuning* signal, not an investigation signal. Detection Engineering / TIDE owns the fix. Sending it to L2 burns expensive capacity; sending it to IR is wildly out of scope; TI is for novel-indicator handoff, not rule noise.",
+        points=2,
+    )
+    _add_q(session, m7l2q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="When escalating an indicator marked TLP:AMBER+STRICT, an L1 may share it on the SOC's general Slack channel as long as no external parties are present.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** TLP:AMBER+STRICT confines sharing to the immediate org *and* to need-to-know — not the SOC's general channel. The whole-team Slack typically exceeds need-to-know; mismarking by widening sharing is itself a TLP violation.",
+        points=2,
+    )
+
+    # Lesson 7.3 — Handover packet, chain of custody, comms discipline
+    m7l3 = _add_lesson(
+        session, mod7, order=5,
+        title="The handover packet, chain of custody, and communication discipline",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Build a complete handover packet — title, header, affected entities, timeline, IOCs, containment actions, hypothesis, artefacts, open questions, recommended next steps, stakeholder log
+> 2. Distinguish a 5-line escalation from a 5-page escalation, and know which is appropriate for which kind of work
+> 3. Apply the irreducible-minimum *five fields* every handover must include
+> 4. Apply RFC 3227 *order of volatility* and the L1's chain-of-custody rules of thumb
+> 5. Use the **3-line update** for execs and a status-update cadence appropriate to severity
+
+## Anatomy of a good handover
+
+This is the most practical part of escalation work — the artefact you produce every time you escalate. A good handover saves L2 thirty minutes; a bad one costs L2 ninety.
+
+A complete handover packet:
+
+```
+TITLE
+  [12-word incident summary, severity-leading]
+  e.g. "P1 — Confirmed AiTM token theft, 1 user (HR-Director), session active"
+
+HEADER
+  Severity (current / proposed):     P1 / P1
+  Classification (NIST 800-61):      Unauthorized Access
+  TLP:                               TLP:AMBER
+  Time of awareness (UTC):           2026-04-28T09:14:02Z
+  Reporter:                          alice@soc (L1)
+  Detection source:                  Defender for Cloud Apps - "Suspicious inbox forwarding"
+
+AFFECTED ENTITIES
+  Users:     hr-director@corp.example   (object_id: 5d0c...)
+  Hosts:     LAPTOP-HRD01                (computer_name, EDR id)
+  Accounts:  AAD primary + 2 secondary OAuth grants
+  IPs:       198.51.100.42 (attacker, ASN-...), 203.0.113.7 (victim, corp egress)
+  Mailboxes: hr-director@corp.example
+  Apps:      Microsoft Graph "MailRead.All" grant by app id 71b5...
+
+TIMELINE (UTC, monotonic)
+  09:02:11  user.signin       hr-director from 198.51.100.42, MFA-satisfied (token replay suspected)
+  09:02:14  inbox.rule.create "Move to RSS Subs" — pattern: subject CONTAINS "invoice"
+  09:08:30  graph.token.use   MailRead.All from same IP
+  09:11:55  alert.fired       DCA-1234 "Suspicious inbox forwarding"
+  09:12:30  l1.assigned       alice
+  09:14:02  l1.aware          alice opens case (TIME OF AWARENESS)
+  09:18:40  l1.action         sign-ins audit pulled; 12 sessions in last 24h
+  09:23:05  l1.action         inbox rule disabled (with L2 OK)
+  09:24:00  l1.escalate       escalating to L2 + Identity
+
+IOCS
+  - 198.51.100.42 [ip-src] TLP:AMBER PAP:AMBER  (sighting: aad sign-in)
+  - <token JTI>   [token]  TLP:RED   PAP:RED    (revoke pending Identity)
+  - <app id>      [oauth]  TLP:AMBER PAP:AMBER  (grant: MailRead.All)
+  - rule="Move to RSS Subs" + "invoice" [mailbox-rule] TLP:GREEN
+
+CONTAINMENT ACTIONS TAKEN
+  - 09:23:05  Inbox rule disabled (revertible; not deleted, kept for evidence)
+  - 09:24:00  User notified by SOC duty manager (not by L1)
+  - NOT TAKEN: token revoke (pending Identity); password reset (pending IT)
+
+HYPOTHESIS
+  AiTM token theft via reverse-proxy phish kit; attacker replayed session, set
+  inbox rule for invoice fraud. Initial vector likely Tycoon/EvilProxy class
+  based on TTP. Confidence: medium-high.
+
+ARTEFACTS (hashed, attached)
+  - signin_export_2026-04-28_0914Z.csv  sha256:7a3f...
+  - inbox_rules_pre_disable.json        sha256:4e2c...
+  - graph_audit_24h.json                sha256:9b81...
+  - email_screenshot_phish_lure.png     sha256:c0f1...
+
+OPEN QUESTIONS
+  - Did the attacker exfiltrate from the mailbox? (need full Graph export — L2)
+  - Are other users in same campaign? (need TI pivot on attacker IP — TI)
+  - Is HR-Director's laptop compromised, or was the theft pure web? (need EDR — L2)
+
+RECOMMENDED NEXT STEPS
+  1. Identity: revoke all sessions + refresh tokens for hr-director; revoke OAuth grant
+  2. L2: full M365 ediscovery on mailbox last 24h; pivot on IP / token
+  3. IT: forced password reset post-revoke
+  4. Legal: this user has PII access — preserve and assess GDPR Art.33 trigger
+
+STAKEHOLDER LOG
+  09:24  SOC duty manager notified (Slack #soc-shift)
+  09:25  L2 paged (PagerDuty)
+  09:26  Identity on-call paged (PagerDuty)
+  Legal: NOT YET notified — proposing notification by 09:45 if data-touch confirmed
+```
+
+```mermaid
+flowchart LR
+    H[Handover packet] --> T[Title + severity]
+    H --> M[Metadata<br/>TLP / time-of-awareness]
+    H --> E[Affected entities]
+    H --> TL[Timeline UTC]
+    H --> I[IOCs + TLP/PAP]
+    H --> A[Containment actions]
+    H --> Hy[Hypothesis]
+    H --> Ar[Hashed artefacts]
+    H --> O[Open questions]
+    H --> R[Recommended next steps]
+    H --> S[Stakeholder log]
+```
+
+## Anatomy of a *bad* handover
+
+```
+TITLE
+  Phishing alert
+BODY
+  user got phished, sign-in from weird ip, escalating to L2
+```
+
+This is unfortunately common. Missing time of awareness, scope, IOCs, actions taken, hypothesis. L2 must redo all of L1's work.
+
+## 5-line vs 5-page
+
+A **5-line** escalation is appropriate for:
+
+- A clearly bounded P3 / P4 where the next step is mechanical (*"rule X false-positive #4 this week, please tune"*).
+- A handover to a team that already has full context (*"Identity, please revoke sessions for user X — full case in #incident-1234"*).
+
+A **5-page** escalation is appropriate for:
+
+- Any P1 / declared incident.
+- Anything Legal / regulator-adjacent.
+- Anything that crosses 2+ teams.
+
+## The irreducible minimum
+
+Even on a 5-line escalation, never leave out:
+
+1. **Severity / proposed priority**
+2. **Time of awareness (UTC)**
+3. **Affected entity / scope**
+4. **Action requested + why**
+5. **Link to full evidence (case ID)**
+
+## Chain of custody and evidence handling
+
+L1 is not a forensic examiner. L1's role is *not to taint the chain.* Forensic discipline matters because some incidents end up in court, in regulatory inquiry, or in insurance claims — and evidence mishandled at the start cannot be salvaged later.
+
+### Why it matters
+
+- **Legal admissibility** — broken chain may be inadmissible.
+- **Regulatory inquiry** — ICO, FTC, sectoral regulators may request evidence.
+- **Criminal-referral preservation** — law enforcement requires defensible chain.
+- **Insurance** — cyber insurers increasingly demand evidence preservation as a claims condition.
+
+### Hash at collection
+
+Every artefact pulled out of a system gets hashed *at collection time.* SHA-256 is the current default; SHA-1 / MD5 only as legacy corroboration, never alone. Hash + collection time + collector identity goes into the ticket adjacent to the artefact. This binds the artefact to its capture moment.
+
+### Source-of-truth principle
+
+Don't edit originals. Work on copies. If you must inspect a `.eml`, copy first; if you opened it in a viewer that may have triggered remote-content load (always for `.html` artefacts), record the fact in the timeline.
+
+### RFC 3227 — order of volatility
+
+Brezinski & Killalea, IETF, Feb 2002 — the canonical reference. Most volatile first:
+
+1. Registers, cache
+2. Routing table, ARP cache, process table, kernel statistics, **memory (RAM)**
+3. Temporary file systems
+4. Disk
+5. Remote logging / monitoring data relevant to the system
+6. Physical configuration, network topology
+7. Archival media
+
+The practical L1 translation: **don't shut down a host that L2 / IR may want to image live.** Powering off destroys RAM, where most modern malware actually lives (process injection, fileless, in-memory loaders).
+
+### Time discipline
+
+- All timestamps in **UTC. Always.** Local-time timestamps cause incident-reconstruction errors that take hours to untangle.
+- All log sources NTP-synced. Record any known clock skew (*e.g.* `host A's clock is +12s ahead of UTC truth`).
+- Monotonic timeline reconstruction: when two events share a timestamp, record collection order or sub-second precision.
+
+### Live-forensics vs containment trade-off
+
+- **Containment first** if the host is actively exfiltrating or moving laterally.
+- **Image first** if the host is contained at the network layer (EDR isolation) and IR wants memory/disk.
+- L1 is rarely the decision-maker here. L1's role is to *flag the trade-off* and *not unilaterally power-cycle* the box.
+
+### L1 chain-of-custody rules of thumb
+
+1. **Don't run unfamiliar tooling against a host without IR clearance.** Especially DFIR tools (Volatility, KAPE, Velociraptor agents) — if these aren't already deployed and you aren't certified, don't.
+2. **Don't shut down or reboot a machine that L2 may want live.** Network-isolate via EDR instead.
+3. **Hash everything you pull out.** SHA-256 + collector + UTC timestamp + ticket ID.
+4. **Keep originals; work on copies.**
+5. **Document time skews.** Don't assume clocks are right.
+6. **Don't share artefacts on channels with looser TLP than the marking requires.**
+
+```mermaid
+flowchart LR
+    C[Collection] --> H[Hash SHA-256]
+    H --> S[Seal in ticket]
+    S --> T[Transfer to L2/IR]
+    T --> A[Analyst working copy]
+    A --> R[Return + retention]
+    R --> X[Disposal per policy]
+```
+
+## Communication discipline
+
+### Channel hygiene
+
+| Severity / context | Appropriate channels |
+|---|---|
+| P3 / P4 routine | SOC ticket comments, team Slack / Teams |
+| P2 high | SOC ticket + dedicated incident channel |
+| P1 critical | Incident channel + paging + voice bridge / war room |
+| Sensitive (insider, legal) | Restricted channel + voice; never general Slack |
+| Press-adjacent | Voice / in-person; minimal written trail outside Legal |
+
+### The 3-line update
+
+For execs and other non-technical stakeholders. Memorise the shape:
+
+```
+WHAT HAPPENED:    one sentence, plain English, no acronyms.
+IMPACT:           one sentence on scope, users, services.
+WHAT'S BEING DONE: one sentence on action + next checkpoint.
+```
+
+Example:
+
+> **WHAT HAPPENED:** A senior staff member's email account was accessed by an attacker who stole a login session.
+>
+> **IMPACT:** One user; mailbox access only; no evidence of further spread; no customer data confirmed exposed yet.
+>
+> **WHAT'S BEING DONE:** Account locked, session revoked; forensics underway; next update at 10:30.
+
+### Status-update cadence
+
+| Severity | Cadence | Audience |
+|---|---|---|
+| P1 active | Every 15 min | Incident channel + execs (3-line) |
+| P1 stable / contained | Every 30 min, then hourly | Incident channel |
+| P2 active | Every 30–60 min | Incident channel |
+| P3 | At disposition | Ticket comments |
+
+Cadence is a *promise.* If you said "next update at 10:30," at 10:30 there must be an update — even if it's *"no change since 10:00."*
+
+### Plain language
+
+No SOC-internal acronyms in messages going beyond the SOC. *"AiTM token theft"* becomes *"stolen login session."* *"DCSync"* becomes *"attacker reading password material from our identity system."* Specific. Plain. No mystery.
+
+### TLP and information sharing
+
+What can be said where is determined by TLP. TLP:RED stays in the named room. TLP:AMBER+STRICT stays inside the immediate org. TLP:AMBER stays inside org + immediate clients. TLP:GREEN is community-shareable. TLP:CLEAR is public. Get this wrong and a "share" can become a TLP-violation incident in itself.
+
+### The "no surprises" rule
+
+Escalate facts before they appear in a Slack thread, a press article, or a customer ticket. *Anyone whose seat in the org will hear about this must hear it from the SOC first.*
+
+## Glossary
+
+- **Time of awareness** — load-bearing timestamp in every handover; starts regulator clocks.
+- **Irreducible minimum** — the five fields no handover may omit (severity, awareness time, scope, ask, link).
+- **RFC 3227 order of volatility** — RAM is *more* volatile than disk; don't power off a host L2 may want imaged live.
+- **3-line update** — what happened / impact / what's being done — in plain language, no acronyms.
+
+## Further reading
+
+- RFC 3227 — *Guidelines for Evidence Collection and Archiving.*
+- FIRST TLP 2.0.
+- ION case audit log — *automatic* chain of custody for in-platform actions.
+""",
+    )
+    m7l3q = _add_lesson(
+        session, mod7, order=6, title="Handover, custody, comms — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on RFC 3227 order of volatility, the irreducible minimum, the 3-line update shape, and inbox-rule preservation discipline.",
+    )
+    _add_q(session, m7l3q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Per RFC 3227's *order of volatility*, which of the following should be collected *first* during evidence acquisition?",
+        options=[
+            {"value": "disk", "label": "Disk image"},
+            {"value": "ram", "label": "Memory contents (RAM, including process table and kernel statistics)"},
+            {"value": "tape", "label": "Archived backup tapes"},
+            {"value": "topo", "label": "Network topology diagram"},
+        ],
+        correct="ram",
+        explanation_md="RFC 3227 ranks RAM and live-process state as more volatile than disk, temporary file systems, or archives. The practical L1 takeaway: do not power-cycle a host that L2/IR may want to image live — RAM is gone the moment power is lost.",
+        points=2,
+    )
+    _add_q(session, m7l3q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which fields are part of the *irreducible minimum* every L1 handover must include, even on a 5-line escalation?",
+        options=[
+            {"value": "sev", "label": "Severity / proposed priority"},
+            {"value": "awareness", "label": "Time of awareness (UTC)"},
+            {"value": "scope", "label": "Affected entity / scope"},
+            {"value": "motive", "label": "Speculation about adversary motive"},
+            {"value": "ask", "label": "Action requested + why"},
+            {"value": "link", "label": "Link to full evidence (case ID)"},
+        ],
+        correct=["sev", "awareness", "scope", "ask", "link"],
+        explanation_md="The five irreducible fields are severity, time of awareness, scope, action requested + why, and a link to evidence. Speculation about motive is something to keep *out* of handovers — facts only, especially in HR/Legal-adjacent cases.",
+        points=3,
+    )
+    _add_q(session, m7l3q, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="When containing an attacker-created inbox rule for finance keywords, the L1 should *delete* the rule immediately so the attacker cannot use it again.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** Disable rather than delete. The rule is evidence — for L2 forensics, for chain of custody, potentially for Legal / regulatory inquiry. Disabling neutralises the threat while preserving the artefact; deletion destroys it.",
+        points=2,
+    )
+    _add_q(session, m7l3q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="Name the three components of the **3-line update** the L1 should use for non-technical executive stakeholders. Three short phrases.",
+        options=None,
+        correct=["what happened, impact, what's being done", "what happened impact what's being done", "what happened / impact / what's being done", "what happened, impact, what is being done"],
+        explanation_md="The 3-line update is **What happened / Impact / What's being done** — one sentence each, plain English, no acronyms. It's the canonical way to brief executives during an active incident.",
+        points=2,
+    )
+
+    # Lesson 7.4 — External clocks, CERT/ISAC, ION conventions, scenarios
+    m7l4 = _add_lesson(
+        session, mod7, order=7,
+        title="External reporting, CERTs and ISACs, ION conventions, and worked scenarios",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Recognise the major external reporting clocks — GDPR Art.33 (72h), NIS2 (24h / 72h / 30d), DORA, SEC 8-K Item 1.05 (4 business days), HIPAA Breach Notification (60d for ≥500), CIRCIA, sectoral (PCI / TSA / NERC CIP)
+> 2. Identify the right national CERT for a jurisdiction and the right ISAC for a sector
+> 3. Apply ION-specific escalation conventions — case state machine, Bob's verdict, the ticker as an escalation trigger, the audit log as automatic chain of custody, CaseClosureReason as a feedback loop
+> 4. Walk three worked end-to-end scenarios — confirmed AiTM, suspected insider exfil, mass phishing with regulator-clock implications
+
+## External reporting timelines
+
+L1 is not a lawyer. L1 *is* the person whose *time of awareness* starts these clocks, so L1 must know the clocks exist and how tight they are.
+
+### GDPR Article 33 — Notification of a personal data breach
+
+- Source: Regulation (EU) 2016/679, Art. 33.
+- Trigger: controller becomes aware of a personal-data breach.
+- Window: **without undue delay and, where feasible, not later than 72 hours after having become aware.**
+- Exception: *unless the personal data breach is unlikely to result in a risk to the rights and freedoms of natural persons.*
+- Article 34: notify data subjects without undue delay where the breach is likely to result in a *high* risk.
+- Practical: L1 logs the time of awareness *exactly.* That timestamp may end up in a regulator filing.
+
+### NIS2 Directive (EU 2022/2555)
+
+In force from October 2024 (national transpositions varied). Applies to *essential* and *important* entities.
+
+- **Early warning** to the CSIRT or competent authority **within 24 hours** of becoming aware of a significant incident.
+- **Incident notification** with initial assessment, severity and impact, IOCs, **within 72 hours**.
+- **Final report within 1 month** (or progress report if not yet resolved).
+
+### DORA (EU 2022/2554) — financial sector
+
+Applicable from January 17, 2025. Major ICT-related incidents: initial / intermediate / final reports on prescribed timelines (see ESAs RTS / ITS for exact windows; verify against current primary sources before claiming specific numbers).
+
+### SEC Form 8-K Item 1.05 — US public companies
+
+- 17 CFR § 229.106 / Item 1.05 of Form 8-K, effective Dec 18, 2023.
+- Trigger: registrant determines a cybersecurity incident is **material**.
+- Window: **disclose within 4 business days** of the materiality determination (with limited DOJ-led national-security delay).
+
+### HIPAA Breach Notification Rule — US healthcare
+
+- 45 CFR §§ 164.400–414.
+- Breach affecting **≥ 500 individuals**: notify HHS *without unreasonable delay and in no case later than 60 calendar days* after discovery; notify affected individuals; notify prominent media.
+- Breach affecting **< 500**: maintain a log; submit annually to HHS within 60 days of end of calendar year.
+
+### Other regimes the L1 should *recognise*
+
+- **US state breach laws** — all 50 states + DC + several territories. CCPA / CPRA, NY SHIELD, Massachusetts 201 CMR 17, Texas, Illinois (BIPA for biometric). Windows vary; *that they exist and are time-pressured* is what matters at L1.
+- **UK GDPR + DPA 2018** — ICO supervisory authority, equivalent regime.
+- **UK NIS Regulations 2018** — OES / RDSPs.
+- **PCI-DSS** — incident notification to acquirer + card brands; PCI Forensic Investigator (PFI) engagement requirements.
+- **TSA security directives** (US pipelines / aviation / rail) — within **24 hours** of identifying a cybersecurity incident.
+- **FERC / NERC CIP-008** — bulk-electric system; reporting to E-ISAC and DOE within 1 hour of determination.
+- **CIRCIA (US)** — Cyber Incident Reporting for Critical Infrastructure Act 2022; final rule under CISA defines covered entities and (proposed) **72-hour** reporting + **24-hour** ransom-payment reporting. Phased in.
+
+```mermaid
+gantt
+    title External reporting clocks (illustrative; verify per-jurisdiction)
+    dateFormat HH
+    axisFormat +%Hh
+    section NIS2
+    24h early warning   :a1, 00, 24h
+    72h notification    :a2, 00, 72h
+    section GDPR Art.33
+    72h to SA           :b1, 00, 72h
+    section SEC 8-K
+    4 bd from materiality :c1, 00, 96h
+    section HIPAA >=500
+    60d notify          :d1, 00, 1440h
+```
+
+The takeaway: **the moment you become aware** is the moment a clock may have started. *Document it precisely.*
+
+## National CERTs and ISACs
+
+### National CERTs the L1 should recognise
+
+- **NCSC (UK)** — National Cyber Security Centre, part of GCHQ.
+- **CISA (US)** — Cybersecurity and Infrastructure Security Agency, part of DHS. Operates KEV catalogue, runs JCDC.
+- **BSI / CERT-Bund (DE)**, **ANSSI / CERT-FR (FR)**, **JPCERT/CC (JP)**, **AusCERT / ACSC (AU)**, **CCCS (CA)**, **CERT-EU**, **ENISA**.
+
+These cooperate via FIRST and (for a subset) the Five Eyes intelligence-sharing community.
+
+### ISACs by sector
+
+| ISAC | Sector |
+|---|---|
+| FS-ISAC | Financial services |
+| MS-ISAC | US state, local, tribal, territorial gov |
+| H-ISAC | Health |
+| E-ISAC | Electricity / NERC |
+| Auto-ISAC | Automotive |
+| Aviation-ISAC | Aviation |
+| Space-ISAC | Space |
+| WaterISAC | Water utilities |
+| ND-ISAC | National Defense |
+| REN-ISAC | Higher education / research |
+| Retail-ISAC | Retail |
+| MFG-ISAC | Manufacturing |
+
+ISAC sharing is TLP-controlled and member-only. L1 typically *consumes* ISAC bulletins via the org's CTI feed; production and submission is normally TI's job.
+
+### Reporting portals (cheat sheet)
+
+| Portal | URL | Purpose |
+|---|---|---|
+| CISA | cisa.gov/report | US incident reporting |
+| FBI IC3 | ic3.gov | US cybercrime |
+| NCSC UK | ncsc.gov.uk | UK incident reporting |
+| Action Fraud (UK) | actionfraud.police.uk | UK consumer / SME fraud |
+| ICO (UK) | ico.org.uk | UK data-protection breach |
+
+### What to share
+
+TLP-conformant indicators, pattern descriptions, impact summaries. **Never PII unless legally required.** Pseudonymise users (`hr-director@<redacted>` → `<user-A>`) when sharing externally.
+
+## ION-specific escalation conventions
+
+### Case state machine
+
+ION cases progress: **open → investigating → escalated → closed**. The transition `investigating → escalated` is the natural moment for the handover packet to be finalised. `closed` requires a `CaseClosureReason` — aligning case closure with the closure-vs-escalation taxonomy of this module.
+
+### Bob (the AI analyst)
+
+Bob produces a verdict + confidence on most alerts. When Bob's verdict is `escalate` with **high** confidence, it's a strong nudge but never an authority — the L1 still owns the disposition. When Bob's verdict is `close` with **high** confidence and the L1 disagrees, escalate *and flag the disagreement* — it's a tuning signal for Bob's prompt template / tier.
+
+### The ticker strip
+
+Critical alerts that have been open without a case for **N minutes** surface on the ticker. The ticker is *itself* an escalation trigger: an L1 who walks into the SOC and sees a 3-hour-old critical on the ticker has an immediate handover-or-explain duty.
+
+### Audit log = automatic chain of custody (in-platform)
+
+Every action in ION is audited — actor, timestamp, action, target. For in-platform actions chain of custody is automatic. For *out-of-platform* actions (an analyst running a CLI on a workstation), L1 records the action manually in the case timeline.
+
+### CaseClosureReason taxonomy
+
+Closure reasons feed the AIFeedback ledger and per-template scorecards (the Tier-1 training foundation for Bob). L1 should pick the closure reason carefully — it shapes how the org's detection content evolves.
+
+### AlertPromptTemplate matcher tiers
+
+When escalating, L1 should be able to name *which prompt-template tier* matched the alert (rule_id → regex → MITRE technique → tactic → groups). This information is gold for Detection Engineering.
+
+## Worked scenarios
+
+### Scenario A — Confirmed AiTM with token theft
+
+**Alert:** Defender for Cloud Apps *"Suspicious inbox forwarding"* on `hr-director@corp.example`.
+
+**Triage (08:14–08:30 UTC):**
+
+- L1 alice opens case at 08:14:02Z (records as time of awareness).
+- Sign-in audit: 08:02:11 sign-in from `198.51.100.42` (Bulgaria, residential ASN). MFA-satisfied. Token issued.
+- Inbox-rule audit: 08:02:14 new rule "Move to RSS Subs" matching subject CONTAINS "invoice".
+- Graph audit: 08:08:30 `MailRead.All` exercise from same IP.
+- Hypothesis: AiTM (Tycoon / EvilProxy class) → token replay → invoice-fraud staging.
+
+**Decisions:** Severity P1. Asset criticality: HR-Director (PII access). Escalation paths: **L2** (forensics), **Identity** (revoke), **IT** (forced password reset post-revoke), **Legal** (PII exposure assessment).
+
+**Actions L1 takes (within authority):**
+
+- Disables (does not delete) the inbox rule, with L2 acknowledgement, at 08:23:05Z.
+- Hashes signin-export, inbox-rules JSON, Graph audit JSON, screenshot of phish lure.
+- Notifies SOC duty manager at 08:24Z. Pages L2 + Identity at 08:25Z + 08:26Z.
+
+**Actions L1 does NOT take:** token revoke (Identity authority), password reset (IT, post-revoke), user notification (duty manager handles, with talking-points from L1), Legal contact (proposes 08:45Z trigger if data-touch confirmed).
+
+**Regulatory:** GDPR Art.33 clock potentially started at 08:14:02Z. Legal will determine whether risk-to-rights threshold is met; the clock the org will be held to *is L1's recorded awareness time.*
+
+### Scenario B — Suspected insider data exfil
+
+**Alert:** DLP — large outbound transfer to a personal cloud-storage domain by `engineer-sam@corp.example`. Engineer Sam is on a known-departing list.
+
+**Triage:** L1 confirms 4.7 GB to personal Dropbox in 14 minutes at 23:42 local on a Sunday. EDR confirms `Dropbox.exe` invoked, files from `\\Projects\\<repo>` (source code). Badge data: Sam is *not* on premises; remote VPN session.
+
+**Decisions:** Severity P1 (suspected insider IP exfil). Escalation paths: **L2** (forensics), **HR** (personnel action), **Legal** (litigation hold), possibly **Law Enforcement** (later, via Legal).
+
+**Critical L1 disciplines:**
+
+- **Don't tip off the suspect.** No user notification. No password reset that might alert. Account left active under monitoring (with L2 / IR / Legal call).
+- **Chain of custody is paramount.** Hash every artefact at collection. Don't run anything that modifies system state.
+- **Handover packet is fact-only.** No speculation about motive.
+- **HR-Security liaison only.** Not a line HR rep. Not a general Slack channel.
+
+**Stakeholder routing:** L2 + IR (incident commander) → HR-Security liaison (factual brief) → Legal (litigation hold; preservation order on email, laptop, badge, VPN logs) → IT (do *not* reimage; preserve in current state; image with write-blocker if Legal directs) → Comms / management (notified by IR/CISO; L1 does not engage). Law enforcement is a Legal-led decision; L1's role is preservation.
+
+### Scenario C — Mass phishing with ≥ 50 confirmed clicks
+
+**Alert:** SIEM correlation — *"Mass phishing campaign — 50+ users clicked URL pointing to `corp-login.auth-portal[.]xyz` in the last 30 minutes."*
+
+**Triage:** L1 carla opens case at 14:02Z. Domain registered yesterday, hosted on attacker IP cluster, mimics corp-login (visual clone). Sign-in audit: **17 of 50+** users completed MFA-satisfied sign-ins in the post-click window. Token theft confirmed for at least 17. Pattern: AiTM kit + automated post-auth follow-up; multiple inbox rules already created across affected mailboxes.
+
+**Decisions:** Severity P1 / declared incident. IR engaged immediately. Escalation paths: **IR** (incident commander), **L2** (forensics squad), **Identity** (mass revocation), **IT** (mass password reset), **Legal** (regulator clock), **Comms** (likely public-facing), **CTI** (campaign IoCs), **Detection Engineering** (rule fired late — tune), **MSSP / Microsoft** (vendor support).
+
+**Time-pressure interaction:**
+
+- 17+ users with PII access → **GDPR Art.33** likely triggered. 72-hour clock from 14:02Z = next-Wednesday 14:02Z. Legal informed at 14:15Z.
+- Org is an EU "essential entity" under **NIS2** → 24-hour early warning to CSIRT due by tomorrow 14:02Z.
+- Org is a US-listed public company → **SEC 8-K Item 1.05** materiality determination is the trigger (not awareness); counsel will assess. 4 business days from materiality determination.
+
+**Mass action:** Identity executes session/refresh-token revoke for the 17 confirmed + a precautionary list of all 50+ clickers. IT executes forced password reset. Comms drafts customer-facing statement (held; not sent without IR / CISO / Legal sign-off). CTI publishes internal IOC bulletin (TLP:AMBER+STRICT) and prepares ISAC submission (TLP:AMBER, pseudonymised). DE opens a tuning ticket (rule fired late; root cause: 30-min correlation window too long).
+
+This scenario shows how a single L1 ticket cascades into **9 escalation paths within the first hour.** L1's discipline is to package the initial handover so L2 / IR can run the cascade — *not* to try to run it themselves.
+
+## Glossary
+
+- **GDPR Art.33 / NIS2 24-72-30 / SEC 8-K 4-bd / HIPAA 60d** — the four reporting clocks every L1 should recognise on sight.
+- **Materiality determination** — SEC 8-K's trigger; differs from "awareness."
+- **CIRCIA** — phased-in US critical-infrastructure reporting (proposed 72h + 24h ransom).
+- **ION case state machine** — `open → investigating → escalated → closed`; `closed` requires a `CaseClosureReason`.
+- **Ticker as escalation trigger** — a critical alert open without a case past N minutes is *itself* a signal.
+
+## Further reading
+
+- GDPR Art.33 / Art.34 — Regulation (EU) 2016/679.
+- NIS2 Directive Art.23 — Directive (EU) 2022/2555.
+- DORA — Regulation (EU) 2022/2554.
+- SEC Form 8-K Item 1.05 / 17 CFR § 229.106 — SEC Final Rule 33-11216, 2023.
+- HIPAA Breach Notification Rule — 45 CFR §§ 164.400–414.
+- FIRST CSIRT Services Framework v2.1.
+""",
+    )
+    m7l4q = _add_lesson(
+        session, mod7, order=8, title="Clocks, CERTs, ION & scenarios — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on regulatory windows, CERT / ISAC selection, ION conventions, and the insider-exfil scenario disciplines.",
+    )
+    _add_q(session, m7l4q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A controller becomes aware of a personal-data breach involving EU citizens at 14:00 UTC on Monday. Per GDPR Article 33, by when must the supervisory authority be notified, assuming the risk-to-rights-and-freedoms threshold is met?",
+        options=[
+            {"value": "48h", "label": "14:00 UTC Wednesday — 48 hours"},
+            {"value": "72h", "label": "14:00 UTC Thursday — 72 hours"},
+            {"value": "month", "label": "End of the calendar month"},
+            {"value": "4bd", "label": "Within 4 business days"},
+        ],
+        correct="72h",
+        explanation_md="GDPR Art.33 requires notification *without undue delay and, where feasible, not later than 72 hours after having become aware.* The clock starts at awareness, not at the breach event. 4 business days is the SEC 8-K Item 1.05 window for material cybersecurity incidents — different regime.",
+        points=2,
+    )
+    _add_q(session, m7l4q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *true* about the NIS2 Directive's incident-reporting cascade for essential / important entities?",
+        options=[
+            {"value": "early24", "label": "An early warning is required within 24 hours of becoming aware of a significant incident"},
+            {"value": "notif72", "label": "An incident notification with initial assessment is required within 72 hours"},
+            {"value": "final30", "label": "A final report (or progress report if unresolved) is required within 1 month"},
+            {"value": "us_only", "label": "It only applies to US-headquartered companies"},
+            {"value": "voluntary", "label": "All notifications are voluntary"},
+        ],
+        correct=["early24", "notif72", "final30"],
+        explanation_md="NIS2 codifies a 24h / 72h / 30d cascade for essential and important entities (Annex I/II). It is an EU directive (Directive (EU) 2022/2555) and the notifications are mandatory for in-scope entities — not voluntary, not US-specific.",
+        points=3,
+    )
+    _add_q(session, m7l4q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="During a suspected insider data-exfil incident, the L1 confirms 4.7 GB went to a personal cloud-storage account from a departing engineer's laptop. Which of the following is the **wrong** action for the L1 to take next?",
+        options=[
+            {"value": "hash", "label": "Hash every artefact at collection time and record collector + UTC timestamp"},
+            {"value": "hr_liaison", "label": "Notify the HR-Security liaison via the established channel with facts only"},
+            {"value": "preserve", "label": "Leave the laptop in its current state; do not reimage; flag preservation to IT"},
+            {"value": "user_pwreset", "label": "Force a password reset and email the user telling them their account behaviour is being investigated"},
+        ],
+        correct="user_pwreset",
+        explanation_md="Tipping off the suspect destroys evidence and may sabotage HR / Legal / law-enforcement options. Account is left active under monitoring (with L2 / IR / Legal call); password resets and user notifications are decided by IR / Legal, not unilaterally by L1.",
+        points=2,
+    )
+    _add_q(session, m7l4q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="In ION, an alert that has been open without a case for past the ticker threshold (N minutes for criticals) is *itself* an escalation trigger that the next L1 walking into the SOC has a duty to handover-or-explain.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** The ticker exists precisely so a critical that drifts past N minutes without a case becomes visible. ION's design treats the ticker as an escalation surface, not just a status display — finding one open and accepting it without a handover/explanation is itself a missed-escalation signal.",
+        points=2,
+    )
+
+    print(f"  L1: {course.title} — 7 modules, 51 lessons (Module 7 Escalation Workflow @ proper depth)")
     return course
 
 

@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.11.10 (2026-04-28)
+
+### L1 Module 7 — Escalation Workflow
+
+Sixth curriculum ship at the v0.11.3 depth bar. **L1 Module 7 — Escalation Workflow** authored from a research-agent dossier. ~10,000 words, 8 lessons (4 reading + 4 quiz), 15 quiz questions. Lives on the existing `demo-l1-alert-triage-fundamentals` course as Module 7.
+
+#### Lesson breakdown
+
+| # | Title | Type | Quiz qs |
+|---|---|---|---|
+| 7.1 | The escalation decision: cost calculus, criteria, and timeboxing | reading | — |
+| 7.2 | Decision & timeboxing — quiz | quiz | 3 |
+| 7.3 | Severity, priority, blast radius, and the escalation paths | reading | — |
+| 7.4 | Severity, priority, paths — quiz | quiz | 4 |
+| 7.5 | The handover packet, chain of custody, and communication discipline | reading | — |
+| 7.6 | Handover, custody, comms — quiz | quiz | 4 |
+| 7.7 | External reporting, CERTs and ISACs, ION conventions, and worked scenarios | reading | — |
+| 7.8 | Clocks, CERTs, ION & scenarios — quiz | quiz | 4 |
+
+#### Topics covered
+
+- **The escalation decision** — cost calculus of *false escalation* (L2 burnout, alert-fatigue erosion, KPI distortion) vs *missed escalation* (delayed containment, dwell-time growth, regulator-clock-started-late, board-level event); the chokepoint principle; default escalation criteria (credential exposure, EDR-high, lateral movement, multi-host/multi-user, VIP, privileged-account out-of-window, novel TTP, SLA risk, cross-team action, suspected data exposure); contain-and-close criteria; "when in doubt escalate — *but*" anti-pattern; SLA bands as escalation triggers; 80/20 of L1 disposition; *stuck-authority* vs *stuck-skill* vs *stuck-scale* vs *stuck-novelty*
+- **Severity, priority, blast radius, paths** — five-tier severity scale; FIRST CSIRT services framework, CVSS adapted for incidents, ENISA Reference Incident Classification Taxonomy, NIST 800-61r2 categories, MITRE D3FEND / RE&CT vocabulary; severity × asset class priority matrix; blast-radius lens (hosts × users × data class × services × external entities); TLP / PAP marking on every handoff; the **15 escalation paths** — L2, IR / DFIR, Threat Intel, Detection Engineering / TIDE, IT / Ops, Identity / IAM, Legal / Compliance / Privacy, HR-Security liaison, Comms / PR, Management / CISO, MSSP / vendors, External CIRT / CERT, Sector ISACs, Regulators, Law enforcement — each with *who / when / how / what / why* and the L1-owns vs L1-triggers distinction
+- **Handover packet, custody, comms** — the full handover-packet template (title, header, affected entities, monotonic UTC timeline, IOCs with TLP/PAP, containment actions, hypothesis, hashed artefacts, open questions, recommended next steps, stakeholder log) with worked good and bad examples; 5-line vs 5-page question; the **irreducible minimum** five fields; chain-of-custody discipline (legal admissibility, regulatory inquiry, criminal-referral, insurance); SHA-256 hashing at collection; source-of-truth principle; **RFC 3227** order of volatility; UTC time discipline + clock-skew documentation; live-forensics vs containment trade-off; six L1 chain-of-custody rules of thumb; channel hygiene by severity; the **3-line update** (what happened / impact / what's being done) for execs; status-update cadence; plain-language discipline; TLP information-sharing rules; the *no-surprises* rule
+- **External clocks, CERTs, ION conventions, scenarios** — **GDPR Art.33** 72h clock from awareness; **NIS2** 24h / 72h / 30d cascade; **DORA** financial-sector regime; **SEC 8-K Item 1.05** 4-business-day disclosure from materiality determination; **HIPAA** 60-day breach notification; **CIRCIA** phased-in 72h / 24h ransom; sectoral (PCI-DSS, TSA, NERC CIP-008); national CERTs (NCSC UK, CISA US, BSI DE, ANSSI FR, JPCERT JP, AusCERT AU, CCCS CA, CERT-EU, ENISA); twelve sector ISACs (FS / MS / H / E / Auto / Aviation / Space / Water / ND / REN / Retail / MFG); reporting portals; ION-specific conventions (case state machine `open → investigating → escalated → closed`, Bob verdict + confidence as nudge-not-authority, ticker as escalation trigger, audit log as automatic in-platform chain of custody, `CaseClosureReason` taxonomy as Tier-1 training feedback, AlertPromptTemplate matcher tier as DE-feedback signal); three full worked scenarios — **AiTM token theft on HR-Director** (4-team handover), **suspected insider IP exfil** (preserve-not-tip-off discipline), **mass phishing with ≥50 confirmed clicks** (cascading into 9 escalation paths within the first hour, GDPR/NIS2/SEC clocks all engaged)
+
+7 Mermaid diagrams across the module: escalation decision tree, multi-team escalation routing topology, handover-packet anatomy, chain-of-custody flow, external-reporting clock Gantt.
+
+L1 course now sits at **7 modules / 51 lessons / 112 questions**.
+
+#### Upgrade
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
+Idempotent — wipes `demo-*` courses and re-seeds.
+
+---
+
 ## v0.11.9 (2026-04-28)
 
 ### L1 Module 6 — Phishing Triage
