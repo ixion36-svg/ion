@@ -9011,7 +9011,1030 @@ flowchart LR
         points=2,
     )
 
-    print(f"  L2: {course.title} — 2 modules, 16 lessons (Module 2 KQL+EQL+ES|QL @ proper depth)")
+    # ── Module 3 — Process & file events: Execution + Defense Evasion ────
+    mod3 = _add_module(
+        session, course, order=3,
+        title="Process & file events — Execution + Defense Evasion",
+        description_md=(
+            "First concrete-hunt module in L2. Apply the PEAK methodology "
+            "of Module 1 and the KQL/EQL/ES|QL fluency of Module 2 to "
+            "the **Execution (TA0002)** and **Defense Evasion (TA0005)** "
+            "ATT&CK tactic families. The process-event data plane in "
+            "Elastic (`logs-endpoint.events.process-*` vs `winlogbeat-*`); "
+            "ECS field reference for hunters; T1059 / T1204 / T1218 / "
+            "T1053 / T1569 execution patterns; T1027 / T1070 / T1562 / "
+            "T1036 / T1112 evasion tradecraft; rare-process / rare-pair / "
+            "command-line-entropy / signed-ratio / time-of-day statistical "
+            "hunts in ES|QL; cross-source pivots between Elastic Agent and "
+            "Sysmon; and a worked end-to-end PEAK hunt for *encoded "
+            "PowerShell from Office parent* converted into a Kibana "
+            "Security EQL detection rule body."
+        ),
+        estimated_minutes=240,
+    )
+
+    # Lesson 3.1 — Process-event data plane + ECS field reference
+    m3l1 = _add_lesson(
+        session, mod3, order=1,
+        title="The process-event data plane in Elastic and the ECS field reference for hunters",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Distinguish the three principal sources of process-event telemetry on the Elastic stack — **Elastic Agent endpoint integration**, **Winlogbeat + Sysmon**, **native Windows Security log** — and pivot between them
+> 2. Read the ECS field reference for process / file / library / registry hunts (`process.*`, `process.parent.*`, `process.code_signature.*`, `event.action`, `event.code`)
+> 3. Use `process.entity_id` as the host-stable process unique-id for chain reconstruction
+> 4. Recognise the schema differences between Elastic Agent and Winlogbeat that affect `union`-style multi-index hunts
+> 5. Apply the broad-to-narrow hunt pattern from Module 1 to a process-event hunt across KQL → EQL → ES|QL
+>
+> **Prerequisites.** L2 Modules 1 (PEAK) and 2 (KQL/EQL/ES|QL fundamentals).
+
+## The three data sources
+
+A modern Elastic SOC has up to three process-event sources running in parallel. The L2 must know which is best populated for the hunt at hand and how to pivot between them.
+
+### Elastic Agent endpoint integration — `logs-endpoint.events.process-*`
+
+The default for new Elastic Stack deployments. Native ECS, schema-stable, fields clean. Sibling indices: `logs-endpoint.events.file-*`, `logs-endpoint.events.library-*`, `logs-endpoint.events.registry-*`, `logs-endpoint.events.network-*`. Each event has a fully-populated `process.command_line`, `process.parent.command_line`, `process.code_signature.subject_name`, `process.hash.sha256`, `process.entity_id`. **First reach for endpoint hunts.**
+
+### Winlogbeat + Sysmon — `winlogbeat-*`
+
+Older but still common deployment. Sysmon's structured XML-based logging, ingested by Winlogbeat into Elastic. Coverage:
+
+| Sysmon EID | What it captures |
+|---|---|
+| **1** | Process create — full command line, parent, hashes |
+| **2** | File create-time changed (timestomping) |
+| **3** | Network connect |
+| **7** | Image load (DLL / module) |
+| **8** | CreateRemoteThread |
+| **10** | ProcessAccess (LSASS dump signal) |
+| **11** | File create |
+| **13** | Registry value set |
+| **22** | DNS query |
+| **25** | Process tampering / image hollowing |
+
+Mapped via `winlog.event_id` → `event.code`, `winlog.event_data.*` → various ECS paths. The L2 sees both the native Windows Security log events (4624, 4688, 7045, 4698, 1102) and Sysmon events on this same index pattern.
+
+### Native Windows Security log
+
+Surfaces inside `winlogbeat-*` if Sysmon isn't deployed, or alongside Sysmon if both are present. Key event codes:
+
+| Event Code | Meaning |
+|---|---|
+| **4688** | Process create (truncated command line unless Audit Process Creation policy is enabled with the *Include Command Line* setting) |
+| **4698** | Scheduled task created |
+| **4700** / **4702** | Task enabled / updated |
+| **4720** | User account created |
+| **7045** | Service installed |
+| **1102** | Security log cleared (T1070.001) |
+| **104** | System log cleared |
+
+**Practical gap.** EID 4688 silently lacks a usable command line unless the *Audit Process Creation* GPO with *Include command line in process creation events* is enabled. If the deployed estate hasn't enabled it, your only useful command-line surface is Sysmon EID 1 or Elastic Agent. The L2 reflex on a new estate: confirm command-line coverage before authoring command-line-pattern hunts.
+
+## ECS field reference for process hunts
+
+The fields the L2 will reach for daily:
+
+| Category | Fields |
+|---|---|
+| Process identity | `process.name`, `process.executable`, `process.pid`, `process.entity_id`, `process.start` |
+| Command line | `process.command_line`, `process.command_line.text` (analyzer-tokenised) |
+| Parent | `process.parent.name`, `process.parent.executable`, `process.parent.command_line`, `process.parent.pid`, `process.parent.entity_id` |
+| Hashes | `process.hash.sha256`, `process.hash.md5`, `process.hash.sha1` |
+| Code signing | `process.code_signature.subject_name`, `.status`, `.trusted`, `.exists`, `.subject` |
+| User | `process.user.name`, `process.user.domain`, `process.user.id` |
+| Host | `host.name`, `host.os.family`, `host.os.platform`, `host.os.version` |
+| Event meta | `event.action`, `event.category`, `event.type`, `event.outcome`, `event.code`, `event.kind` |
+| File events | `file.path`, `file.name`, `file.extension`, `file.hash.sha256`, `file.created`, `file.mtime` |
+| Registry | `registry.path`, `registry.value`, `registry.data.strings`, `registry.hive` |
+
+**`process.entity_id` is the host-stable process unique id.** It survives across multiple events (process start → file write → process stop) for the same OS-level process, and is the join key the L2 uses to reconstruct a single process's full activity timeline.
+
+## Schema differences between sources
+
+| Field | Elastic Agent | Winlogbeat (Sysmon) | Native Security Log |
+|---|---|---|---|
+| Process name | `process.name` (clean) | `process.name` (mapped from `Image`) | `process.name` (mapped from `NewProcessName`) |
+| Command line | `process.command_line` always populated | `process.command_line` populated for Sysmon EID 1 | `process.command_line` populated *only if* Audit Process Creation policy is enabled |
+| Code signature | `process.code_signature.*` reliably populated (Elastic Agent) | Sysmon EID 7 populates for image-load events; EID 1 in newer Sysmon | Not present |
+| Hash | `process.hash.sha256` always populated | Populated *if* Sysmon config has `<HashAlgorithms>SHA256</HashAlgorithms>` | Not present |
+| Event code | `event.action: ("start", "process_started")` | `event.code: "1"` (Sysmon) or `"4688"` (native) | `event.code: "4688"` |
+
+The L2's reflex when a hunt produces sparse results: check whether the *expected* fields are populated on the source you're querying. If `process.code_signature.trusted` is null on a Sysmon-only host, switch to `process.executable` path-based heuristics or pivot to Elastic Agent if available.
+
+## Cross-source `union` pattern in ES|QL
+
+When both sources are present in the estate, query both:
+
+```esql
+FROM logs-endpoint.events.process-*, winlogbeat-*
+| WHERE @timestamp > NOW() - 7d
+  AND (event.action IN ("start", "process_started") OR event.code == "1" OR event.code == "4688")
+  AND process.name == "powershell.exe"
+| STATS event_count = COUNT() BY host.name
+```
+
+The multi-index `FROM` is first-class in ES|QL. The `event.action`/`event.code` disjunction handles both schemas.
+
+## Worked broad-to-narrow — KQL → EQL → ES|QL
+
+A single hunt expressed in all three languages.
+
+**Hunt:** *PowerShell with `-EncodedCommand` from an Office parent in the last 7 days.*
+
+**KQL** in Discover (the analyst's first reach):
+
+```kql
+event.category: process
+  and event.action: ("start" or "process_started")
+  and process.name: ("powershell.exe" or "pwsh.exe")
+  and process.command_line: (*-EncodedCommand* or *-enc *)
+  and process.parent.name: ("WINWORD.EXE" or "EXCEL.EXE" or "POWERPNT.EXE" or "OUTLOOK.EXE")
+```
+
+**EQL** for the click-context (sequence-aware):
+
+```eql
+sequence by host.name with maxspan=5m
+  [ process where process.name : ("WINWORD.EXE", "EXCEL.EXE", "POWERPNT.EXE", "OUTLOOK.EXE") ]
+  [ process where process.name : ("powershell.exe", "pwsh.exe")
+              and process.command_line : ("*-EncodedCommand*", "*-enc *", "*FromBase64String*") ]
+```
+
+**ES|QL** for triage aggregation:
+
+```esql
+FROM logs-endpoint.events.process-*
+| WHERE @timestamp > NOW() - 7d
+  AND KQL("process.name: (powershell.exe or pwsh.exe)
+          AND process.command_line: (*EncodedCommand* or *FromBase64String* or *DownloadString*)
+          AND process.parent.name: (WINWORD.EXE or EXCEL.EXE or POWERPNT.EXE or OUTLOOK.EXE)")
+| STATS event_count = COUNT(),
+        users = VALUES(user.name),
+        parents = VALUES(process.parent.command_line)
+  BY host.name, BUCKET(@timestamp, 1h)
+| SORT event_count DESC
+| LIMIT 100
+```
+
+Each language plays its part: KQL surfaces the artefact in Discover, EQL adds the behavioural-chain shape, ES|QL produces the triage-grade aggregation.
+
+## Glossary
+
+- **Elastic Agent endpoint integration** — `logs-endpoint.events.*` indices; native ECS; the modern default.
+- **Winlogbeat + Sysmon** — older deployment; XML-based Sysmon logs ingested into `winlogbeat-*`.
+- **`process.entity_id`** — host-stable unique process id; the join key for reconstructing a process's full activity timeline.
+- **EID 4688 command-line gap** — native Windows process-create events lack command line unless the GPO is set; check before relying.
+
+## Further reading
+
+- Elastic docs — *Elastic Agent endpoint integration* schema reference.
+- ECS field reference — `elastic.co/guide/en/ecs/current/ecs-field-reference.html`.
+- SwiftOnSecurity Sysmon configuration — community standard for Sysmon coverage.
+""",
+    )
+    m3l1q = _add_lesson(
+        session, mod3, order=2, title="Data plane & ECS — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on the three data sources, the EID 4688 command-line gap, `process.entity_id` use, and cross-source pivots.",
+    )
+    _add_q(session, m3l1q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 hunts for `process.command_line` patterns against `winlogbeat-*` events that map from native Windows Event ID 4688. The hunt returns mostly events with empty / `-` command lines despite knowing PowerShell with arguments ran. What's the most likely cause?",
+        options=[
+            {"value": "perm", "label": "Index permission issue"},
+            {"value": "audit", "label": "The estate hasn't enabled the *Audit Process Creation* GPO with *Include command line in process creation events* — native EID 4688 silently lacks a usable command line without it. Switch to Sysmon EID 1 or Elastic Agent endpoint integration"},
+            {"value": "retention", "label": "Data has aged out"},
+            {"value": "wrong_field", "label": "The field is `process.cmd` not `process.command_line`"},
+        ],
+        correct="audit",
+        explanation_md="EID 4688's command line requires the GPO sub-policy *Audit Process Creation: Include command line in process creation events*. Without it, native Windows process-create events lack a usable command line. Sysmon EID 1 and Elastic Agent endpoint events both populate `process.command_line` reliably and are the L2's preferred sources when this gap is present.",
+        points=2,
+    )
+    _add_q(session, m3l1q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following statements about ECS process fields are *correct*?",
+        options=[
+            {"value": "entity_id", "label": "`process.entity_id` is host-stable for the lifetime of the OS-level process and is the canonical join key for reconstructing a process's full activity timeline"},
+            {"value": "code_sig", "label": "`process.code_signature.subject_name`, `.status`, and `.trusted` are populated reliably by Elastic Agent endpoint integration"},
+            {"value": "parent_cmd", "label": "`process.parent.command_line` is sometimes sparse on native EID 4688 (depending on policy) but reliably populated on Sysmon EID 1 and Elastic Agent"},
+            {"value": "name_only", "label": "Process name (`process.name`) is the only field needed to fully identify a process — path and hash are redundant"},
+            {"value": "kw_text", "label": "`process.command_line` is typically a `keyword` field with `process.command_line.text` as an analyzer-tokenised multi-field"},
+        ],
+        correct=["entity_id", "code_sig", "parent_cmd", "kw_text"],
+        explanation_md="The trap is the fourth option. `process.name` is *not* sufficient — adversaries rename and masquerade (T1036). `process.executable` (full path), `process.hash.sha256`, and `process.code_signature.*` together identify the binary; `process.entity_id` identifies the *running instance*. The other four statements are correct.",
+        points=3,
+    )
+    _add_q(session, m3l1q, order=3, kind=QuestionKind.SHORTANSWER,
+        stem_md="Which ECS field is the *host-stable unique identifier* for a running OS-level process — used as the join key to reconstruct a single process's full activity timeline across multiple events (start → file write → network connect → stop)? (Field path.)",
+        options=None,
+        correct=["process.entity_id", "entity_id", "process.entity.id"],
+        explanation_md="`process.entity_id` — host-stable for the process's lifetime. Survives across multiple event types (start / file create / network connect / stop) for the same OS-level process. The L2 uses it as the canonical join key for chain reconstruction in ES|QL `LOOKUP JOIN` and EQL `sequence` queries.",
+        points=2,
+    )
+    _add_q(session, m3l1q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="When both Elastic Agent endpoint integration (`logs-endpoint.events.process-*`) and Winlogbeat+Sysmon (`winlogbeat-*`) are present in the estate, an L2 can query both in a single ES|QL pipeline using a multi-index `FROM logs-endpoint.events.process-*, winlogbeat-*` clause.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** ES|QL's `FROM` accepts multiple comma-separated index patterns natively. The L2 must align the `event.action` / `event.code` disjunction across schemas (e.g. `event.action IN (\"start\", \"process_started\") OR event.code == \"1\" OR event.code == \"4688\"`) but a single pipeline covers both sources.",
+        points=2,
+    )
+
+    # Lesson 3.2 — Execution (TA0002)
+    m3l2 = _add_lesson(
+        session, mod3, order=3,
+        title="Execution (TA0002) — top techniques and their EQL+ES|QL fingerprints",
+        lesson_type=LessonType.READING, duration_min=26,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Hunt **T1059 Command and Scripting Interpreter** sub-techniques using the suspicious-PowerShell vocabulary memo
+> 2. Express **T1204 User Execution** click-paths as EQL `sequence` queries from Office / browser parents
+> 3. Hunt the **T1218 LOLBAS** family in one query — `mshta.exe`, `regsvr32.exe`, `rundll32.exe`, `msiexec.exe`, `cmstp.exe`, `hh.exe`
+> 4. Detect **T1053.005 Scheduled Task** creation and **T1569.002 PsExec-class service execution** via EID 4698 / 7045 + process-tree pairs
+> 5. Recognise when an alert needs an EQL behavioural-chain rule vs an ES|QL aggregation
+
+## T1059 Command and Scripting Interpreter — the workhorse
+
+Sub-techniques most relevant to L2 hunts on Windows:
+
+- **.001 PowerShell** — `process.name in ("powershell.exe", "pwsh.exe")`.
+- **.003 Windows Command Shell** — `process.name == "cmd.exe"`.
+- **.005 Visual Basic** — `process.name in ("wscript.exe", "cscript.exe")` running `.vbs`.
+- **.007 JavaScript** — `wscript`/`cscript` running `.js`; HTML-smuggled SVG-with-JS.
+
+### The suspicious-PowerShell vocabulary memo
+
+Memorise these substrings; the L2 should be able to write a single hunt that catches them all:
+
+| Substring | What it indicates |
+|---|---|
+| `-EncodedCommand`, `-enc` | Base64-encoded payload |
+| `-ExecutionPolicy Bypass`, `-ep bypass` | Policy bypass |
+| `-NoProfile`, `-nop` | Skip user profile (avoids forensic artefacts) |
+| `-WindowStyle Hidden`, `-w hidden` | UI suppression |
+| `IEX`, `Invoke-Expression` | In-line code execution |
+| `DownloadString`, `DownloadFile`, `Net.WebClient` | Remote code fetch |
+| `FromBase64String` | Base64 decode |
+| `Invoke-Mimikatz`, `Invoke-PSExec`, `Invoke-WMIExec` | Offensive-tool fingerprints |
+| `[Reflection.Assembly]::Load` | Reflective .NET load |
+| `AmsiUtils`, `amsiInitFailed` | AMSI bypass attempt |
+
+KQL hunt for the cluster:
+
+```kql
+event.category: process and event.action: ("start" or "process_started")
+  and process.name: ("powershell.exe" or "pwsh.exe")
+  and process.command_line: (*-EncodedCommand* or *-enc * or *FromBase64String*
+                             or *DownloadString* or *Invoke-Expression* or *IEX *
+                             or *AmsiUtils* or *amsiInitFailed*
+                             or *[Reflection.Assembly]::Load*)
+```
+
+EQL form (case-insensitive `:`):
+
+```eql
+process where event.action : ("start", "process_started")
+  and process.name : ("powershell.exe", "pwsh.exe")
+  and process.command_line : ("*-EncodedCommand*", "*-enc *", "*FromBase64String*",
+                              "*DownloadString*", "*Invoke-Expression*", "*IEX *",
+                              "*AmsiUtils*", "*[Reflection.Assembly]::Load*")
+```
+
+ES|QL with embedded KQL filter — for fleet-wide aggregation:
+
+```esql
+FROM logs-endpoint.events.process-*, winlogbeat-*
+| WHERE @timestamp > NOW() - 7d
+  AND KQL("process.name: (powershell.exe or pwsh.exe)
+          AND process.command_line: (*EncodedCommand* or *FromBase64String* or *DownloadString* or *Invoke-Expression* or *AmsiUtils*)")
+| STATS event_count = COUNT(),
+        commands = VALUES(process.command_line),
+        parents = VALUES(process.parent.name)
+  BY host.name, user.name
+| SORT event_count DESC
+| LIMIT 200
+```
+
+### PowerShell script-block logging — the second source
+
+PowerShell EID 4103 (module logging) and 4104 (script-block logging) surface in Elastic via `winlog.channel: "Microsoft-Windows-PowerShell/Operational"`. Script-block logging captures the *deobfuscated* script content, which can catch encoded commands that the process-create event sees only in base64.
+
+```kql
+winlog.channel: "Microsoft-Windows-PowerShell/Operational"
+  and event.code: "4104"
+  and powershell.file.script_block_text: (*Invoke-Mimikatz* or *FromBase64String* or *AmsiUtils*)
+```
+
+## T1204 User Execution — click-path chains
+
+The Module-6 (L1) phishing click-path joins ATT&CK here. Two canonical chains:
+
+- **Office macro / link** → `WINWORD.EXE`/`EXCEL.EXE`/`OUTLOOK.EXE` → script host
+- **Browser drive-by** → `msedge.exe`/`chrome.exe`/`firefox.exe` → script host
+
+EQL `sequence` for the browser click-path joined with a network event:
+
+```eql
+sequence by host.name with maxspan=10m
+  [ network where event.action == "url_click_allowed"
+              and url.domain : ("*.azurewebsites.net", "*.workers.dev", "*.r2.dev") ]
+  [ process where process.parent.name : ("msedge.exe", "chrome.exe", "firefox.exe")
+              and process.name : ("powershell.exe", "cmd.exe", "mshta.exe", "rundll32.exe") ]
+```
+
+EQL `sequence` for the Office click-path:
+
+```eql
+sequence by host.name with maxspan=5m
+  [ process where process.name : ("WINWORD.EXE", "EXCEL.EXE", "POWERPNT.EXE", "OUTLOOK.EXE") ]
+  [ process where process.parent.name : ("WINWORD.EXE", "EXCEL.EXE", "POWERPNT.EXE", "OUTLOOK.EXE")
+              and process.name : ("powershell.exe", "cmd.exe", "wscript.exe", "cscript.exe", "mshta.exe") ]
+```
+
+The first step *anchors* the chain to an Office process invocation; the second step finds the script-host child within 5 minutes.
+
+## T1218 LOLBAS — the catalogue and a single covering hunt
+
+The LOLBAS catalogue (`lolbas-project.github.io`) maintains every signed Microsoft Windows binary with abuse potential, mapped to ATT&CK technique IDs. Common sub-techniques:
+
+| Sub-tech | Binary | Abuse pattern |
+|---|---|---|
+| .001 | `hh.exe` | Compiled HTML File launcher |
+| .003 | `cmstp.exe` | Connection Manager profile installer; INF SCT scriptlets |
+| .005 | `mshta.exe` | `mshta.exe http://.../payload.hta` |
+| .007 | `msiexec.exe` | `msiexec /i http://.../x.msi /quiet` |
+| .010 | `regsvr32.exe` | Squiblydoo: `regsvr32 /s /u /n /i:http://.../x.sct scrobj.dll` |
+| .011 | `rundll32.exe` | `rundll32 javascript:...`; `rundll32 url.dll,...` |
+
+Single covering EQL hunt for any LOLBAS launcher invoking remote code:
+
+```eql
+process where process.name : ("mshta.exe", "regsvr32.exe", "rundll32.exe",
+                              "msiexec.exe", "cmstp.exe", "hh.exe",
+                              "installutil.exe", "regasm.exe", "regsvcs.exe",
+                              "wmic.exe", "csc.exe")
+  and process.command_line : ("*http://*", "*https://*", "*\\\\\\\\*\\\\*",
+                              "*javascript:*", "*vbscript:*",
+                              "*scrobj.dll*", "*xsl*", "*.sct*")
+```
+
+The L2's reflex when this hunt produces a result: cross-reference the binary in LOLBAS to confirm the documented abuse pattern matches. Refresh against the catalogue quarterly — new entries land regularly.
+
+## T1053.005 Scheduled Task
+
+Three telemetry surfaces:
+
+- **Native EID 4698** (task created), **4702** (updated), **4700** (enabled). `winlog.event_data.TaskName` and `winlog.event_data.TaskContent` (XML) carry the task definition.
+- **Sysmon process create** with parent `svchost.exe -k netsvcs` (the host of the Schedule service).
+- **Process-create form** of the user-driven creation: `process.name == "schtasks.exe"` with `/create /tn ... /tr ... /sc minute /mo 1 /ru SYSTEM`.
+
+EQL hunt covering the user-driven form:
+
+```eql
+process where process.name : "schtasks.exe"
+  and process.command_line : "*/create*"
+  and (process.command_line : "*/sc minute*"
+       or process.command_line : "*/sc hourly*"
+       or process.command_line : "*/ru system*"
+       or process.command_line : "*\\\\\\\\*"
+       or process.command_line : "*http*")
+```
+
+KQL hunt for the native EID 4698:
+
+```kql
+event.code: "4698"
+  and (winlog.event_data.TaskContent: *http* or winlog.event_data.TaskContent: *powershell*
+       or winlog.event_data.TaskContent: *cmd.exe* or winlog.event_data.TaskContent: *base64*)
+```
+
+## T1569.002 System Services — PsExec class
+
+SCM creates a service whose binary path is the payload, runs as `LOCAL SYSTEM`, then deletes the service. **EID 7045** (service installed) is the canonical signal.
+
+Service-name patterns:
+
+- Random 16-char strings (Impacket `psexec.py` default; many Cobalt Strike service-named beacons).
+- Literal `PSEXESVC` (Sysinternals PsExec).
+- Vendor-bait names (`Defender`, `WindowsUpdate`) when the operator masquerades.
+
+EQL `sequence` for the SCM-spawned payload:
+
+```eql
+sequence by host.name with maxspan=2m
+  [ iam where event.code == "7045" ]
+  [ process where process.parent.name : "services.exe"
+              and process.executable : ("?:\\\\Windows\\\\TEMP\\\\*",
+                                         "?:\\\\Users\\\\Public\\\\*",
+                                         "?:\\\\PerfLogs\\\\*",
+                                         "?:\\\\ProgramData\\\\*") ]
+```
+
+The first step is the service-install event; the second step is the SCM-spawned payload from a user-writable path. The 2-minute window keeps the FP rate low because legitimate services usually install from `Program Files`.
+
+## When to author a sequence rule vs an aggregation
+
+**EQL `sequence` rule** when the hunt is fundamentally a *behavioural chain*:
+- Office → script host (T1204 → T1059)
+- Service install → SCM payload spawn (T1569.002)
+- LSASS access → DCSync (T1003.001 → T1003.006, covered in M5)
+
+**ES|QL aggregation rule / dashboard** when the hunt is fundamentally a *threshold or pivot*:
+- ≥ N suspicious-PowerShell hits per host per hour
+- Rare LOLBAS binary per fleet
+- Encoded-command count by user
+
+EQL rule bodies become Kibana Security EQL detection rules with no rewriting; ES|QL aggregations typically become dashboards or threshold rules.
+
+## Glossary
+
+- **LOLBAS** — *Living Off The Land Binaries, Scripts and Libraries* (`lolbas-project.github.io`). Catalogue of signed Windows binaries with abuse potential.
+- **PowerShell EID 4104** — script-block logging; deobfuscated script content surfaces here.
+- **EID 4698 / 7045** — scheduled task created / service installed.
+- **Squiblydoo** — `regsvr32 /s /u /n /i:http://.../x.sct scrobj.dll` — a T1218.010 sub-technique pattern.
+- **PSEXESVC** — Sysinternals PsExec's service-name fingerprint.
+
+## Further reading
+
+- LOLBAS — `lolbas-project.github.io`.
+- Elastic Security prebuilt-rule library — EQL rules for T1059 / T1218 / T1053 / T1569.
+- ATT&CK technique pages — `attack.mitre.org/techniques/T1059/`, `T1218/`, etc.
+""",
+    )
+    m3l2q = _add_lesson(
+        session, mod3, order=4, title="Execution — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on the suspicious-PowerShell vocabulary, T1218 LOLBAS coverage, T1569.002 PsExec fingerprints, and EQL sequence vs ES|QL aggregation rule selection.",
+    )
+    _add_q(session, m3l2q, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following PowerShell command-line substrings should an L2's hunt for *suspicious PowerShell* (T1059.001) explicitly catch?",
+        options=[
+            {"value": "enc", "label": "`-EncodedCommand` / `-enc`"},
+            {"value": "iex_ds", "label": "`IEX` and `DownloadString`"},
+            {"value": "amsi", "label": "`AmsiUtils` / `amsiInitFailed` (AMSI bypass)"},
+            {"value": "frombase", "label": "`FromBase64String`"},
+            {"value": "azc", "label": "`Get-AzContext` (Azure auth-context check)"},
+        ],
+        correct=["enc", "iex_ds", "amsi", "frombase"],
+        explanation_md="Encoded commands, IEX+DownloadString chains, AMSI-bypass strings, and FromBase64String are reliably suspicious. `Get-AzContext` is benign developer / DevOps activity that the L2 should *not* alert on. Knowing which patterns are FP-class is the L2's everyday discipline — exclusion lists matter as much as inclusion lists.",
+        points=3,
+    )
+    _add_q(session, m3l2q, order=2, kind=QuestionKind.SINGLE,
+        stem_md="A LOLBAS hunt should cover any signed Microsoft binary that fetches remote code. Which set best represents the *core* T1218 LOLBAS launchers an L2 should include in a single covering query?",
+        options=[
+            {"value": "narrow", "label": "Only `mshta.exe` and `regsvr32.exe`"},
+            {"value": "core", "label": "`mshta.exe`, `regsvr32.exe`, `rundll32.exe`, `msiexec.exe`, `cmstp.exe`, `hh.exe`, `installutil.exe`, `regasm.exe`, `wmic.exe`"},
+            {"value": "broad", "label": "Every binary in `C:\\\\Windows\\\\System32`"},
+            {"value": "office", "label": "Office binaries (`WINWORD.EXE`, `EXCEL.EXE`)"},
+        ],
+        correct="core",
+        explanation_md="The LOLBAS catalogue (`lolbas-project.github.io`) maintains the canonical list. The core set covers the .001/.003/.005/.007/.010/.011 sub-techniques plus `wmic`, `installutil`, `regasm` for breadth. Narrower lists miss real abuse; broader lists (every System32 binary) generate noise. Refresh quarterly as LOLBAS adds entries.",
+        points=2,
+    )
+    _add_q(session, m3l2q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="An L2 hunts for **T1569.002 PsExec-class service execution** and wants high specificity with low FP. Which combination of telemetry, joined as an EQL `sequence by host.name with maxspan=2m`, gives the strongest signal?",
+        options=[
+            {"value": "name_only", "label": "Service name == `PSEXESVC` only"},
+            {"value": "eid7045_path", "label": "EID 7045 (service installed) followed by a process whose parent is `services.exe` and whose executable is in a user-writable path (`%TEMP%`, `Users\\Public`, `PerfLogs`, `ProgramData`)"},
+            {"value": "any_service", "label": "Any EID 7045 event"},
+            {"value": "anything_temp", "label": "Anything running from `%TEMP%`"},
+        ],
+        correct="eid7045_path",
+        explanation_md="Pairing EID 7045 with the SCM-spawned payload (parent `services.exe` from a user-writable path) is the textbook PsExec fingerprint with low FP. Service-name-only filters miss bespoke randomised names. Any-EID-7045 alone produces FP from legitimate vendor installs. Anything-from-TEMP catches non-service activity. The behavioural pair gives both halves of the signal in one rule.",
+        points=2,
+    )
+    _add_q(session, m3l2q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="When a hunt is fundamentally a *behavioural chain* (e.g. Office process → script-host child within 5 minutes), the L2 should author it as an **EQL `sequence` rule** for Kibana Security; when a hunt is fundamentally a *threshold or pivot* (e.g. ≥ 10 suspicious-PowerShell hits per host per hour), an **ES|QL aggregation** is the better fit.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** EQL `sequence` is the only Elastic query language with first-class behavioural-chain semantics — the rule body translates 1:1 to a Kibana Security EQL detection rule. ES|QL is unmatched for thresholds, aggregations, and pivots, and runs as a Kibana Security ES|QL rule from 8.13 onward. Choose by question shape, not by language preference.",
+        points=2,
+    )
+
+    # Lesson 3.3 — Defense Evasion (TA0005)
+    m3l3 = _add_lesson(
+        session, mod3, order=5,
+        title="Defense Evasion (TA0005) — top techniques and their fingerprints",
+        lesson_type=LessonType.READING, duration_min=26,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Hunt **T1027 Obfuscated Files or Information** — command-obfuscation patterns and packing
+> 2. Detect **T1070 Indicator Removal** — log clearing, command-history clearing, file deletion, timestomping
+> 3. Catch **T1562 Impair Defenses** — EDR/AV tampering, log-disable, firewall-disable, safe-mode boot
+> 4. Surface **T1036 Masquerading** — invalid signatures and `svchost`/`lsass` running outside System32
+> 5. Hunt **T1112 Modify Registry** — LSA Protection, AMSI providers, WDigest credential caching
+
+## T1027 Obfuscated Files or Information
+
+Three sub-techniques relevant to L2 process-event hunts:
+
+- **.002 Software Packing** — UPX, custom packers. Caught at hash / static-analysis layer; visible in `process.code_signature.status: "untrusted"` paired with high entropy.
+- **.006 HTML Smuggling** — Module 6 (L1) phishing.
+- **.010 Command Obfuscation** — Invoke-Obfuscation patterns: `^` carets in cmd, `${var}` PowerShell tricks, concatenated strings, backtick-escapes, character substitution (`p^o^w^e^r^s^h^e^l^l`).
+
+ES|QL hunt for command-obfuscation special-character density (proxy for entropy):
+
+```esql
+FROM logs-endpoint.events.process-*, winlogbeat-*
+| WHERE @timestamp > NOW() - 7d
+  AND process.name IN ("powershell.exe", "pwsh.exe", "cmd.exe", "wscript.exe", "cscript.exe")
+| EVAL cmd_len = LENGTH(process.command_line)
+| EVAL specials = LENGTH(process.command_line) -
+                  LENGTH(REPLACE(REPLACE(REPLACE(process.command_line, "^", ""), "`", ""), "$", ""))
+| EVAL density = TO_DOUBLE(specials) / TO_DOUBLE(cmd_len)
+| WHERE cmd_len > 300 AND density > 0.05
+| KEEP @timestamp, host.name, user.name, process.name, process.command_line, cmd_len, specials, density
+| SORT density DESC
+| LIMIT 200
+```
+
+A hand-tuned threshold — `cmd_len > 300 AND density > 0.05` — catches Invoke-Obfuscation-style outputs without much noise. Re-baseline per fleet.
+
+## T1070 Indicator Removal
+
+### .001 Clear Windows Event Logs
+
+Native: **EID 1102** (Security log cleared) and **EID 104** (System log cleared). Process-side: `process.name == "wevtutil.exe"` with `cl` or `clear-log`.
+
+```kql
+event.code: ("1102" or "104")
+  or (process.name: "wevtutil.exe" and process.command_line: (*cl Security* or *cl System* or *clear-log*))
+```
+
+EID 1102 in particular is rare in normal operations and a *page-IR* alert when it fires unattributed.
+
+### .003 Clear Command History
+
+`Clear-History` in PowerShell; `del %USERPROFILE%\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt`.
+
+```eql
+file where event.action == "deletion"
+  and file.path : "*\\\\PSReadLine\\\\ConsoleHost_history.txt"
+```
+
+### .004 File Deletion
+
+Payload self-deletes on completion. Catch with `logs-endpoint.events.file-*` `event.action: "deletion"` cross-joined with the recently-executed binary's path:
+
+```eql
+sequence by host.name with maxspan=5m
+  [ process where event.action : ("start", "process_started")
+              and not process.code_signature.trusted == true ]
+  [ file where event.action == "deletion" and file.path : "?:\\\\Users\\\\*\\\\AppData\\\\Local\\\\Temp\\\\*" ]
+```
+
+### .006 Timestomp
+
+Modifying file MAC times. Sysmon Event 2 (`FileCreateTime`) catches this directly; ECS exposes `file.mtime` (last modified) and `file.created`. The classical fingerprint: `file.mtime` *earlier* than `file.created`.
+
+```esql
+FROM logs-endpoint.events.file-*
+| WHERE @timestamp > NOW() - 7d
+  AND file.mtime < file.created
+| KEEP @timestamp, host.name, file.path, file.mtime, file.created
+| LIMIT 200
+```
+
+## T1562 Impair Defenses
+
+Comprehensive coverage in a single EQL hunt:
+
+```eql
+process where (
+  // .001 — sc stop / kill EDR
+  (process.name : "sc.exe" and process.command_line : ("*stop Sense*", "*stop WinDefend*", "*stop MsMpSvc*", "*stop CSFalconService*"))
+  or (process.name : ("powershell.exe", "pwsh.exe")
+      and process.command_line : ("*Set-MpPreference*-DisableRealtimeMonitoring*",
+                                   "*Set-MpPreference*-DisableIOAVProtection*",
+                                   "*Set-MpPreference*-DisableScriptScanning*",
+                                   "*Add-MpPreference*-ExclusionPath*"))
+  or (process.name : "taskkill.exe" and process.command_line : ("*MsMpEng.exe*", "*SenseIR*", "*CSFalconService*", "*MsSense*"))
+  // .002 — disable Event Log
+  or (process.name : "auditpol.exe" and process.command_line : "*disable*")
+  or (process.name : "sc.exe" and process.command_line : "*config eventlog*disabled*")
+  // .004 — disable firewall
+  or (process.name : "netsh.exe" and process.command_line : "*advfirewall*off*")
+  // .009 — Safe Mode boot
+  or (process.name : "bcdedit.exe" and process.command_line : "*safeboot*")
+)
+```
+
+Each sub-clause maps to a sub-technique. The ransomware-affiliate pre-encryption sequence often runs three or four of these in quick succession — a `sample by host.name` (M2 Lesson 3) catches the cluster:
+
+```eql
+sample by host.name
+  [ process where process.name : "sc.exe" and process.command_line : "*stop*Sense*" ]
+  [ process where process.name : ("powershell.exe", "pwsh.exe")
+              and process.command_line : "*Set-MpPreference*-DisableRealtimeMonitoring*" ]
+  [ process where process.name : "vssadmin.exe" and process.command_line : "*delete shadows*" ]
+```
+
+This finds hosts where all three pre-ransomware actions occurred in any order — a high-priority *page-IR* signal.
+
+## T1036 Masquerading
+
+### .005 Match Legitimate Name or Location
+
+`svchost.exe`, `lsass.exe`, `csrss.exe`, `winlogon.exe`, `services.exe` running from anywhere *other* than the Windows system directory:
+
+```kql
+event.category: process
+  and process.name: ("svchost.exe" or "lsass.exe" or "csrss.exe" or "winlogon.exe"
+                     or "services.exe" or "smss.exe" or "explorer.exe")
+  and not process.executable: ("C:\\Windows\\System32\\*"
+                                or "C:\\Windows\\SysWOW64\\*"
+                                or "C:\\Windows\\explorer.exe")
+```
+
+The path is the giveaway — adversaries name their payload `svchost.exe` and drop it in `%TEMP%` or `%PUBLIC%` to dodge name-based filters.
+
+### .001 Invalid Code Signature
+
+Payload signed with a stolen / unauthorised cert, or self-signed posing as a known vendor. ECS:
+
+```kql
+event.category: process
+  and event.action: ("start" or "process_started")
+  and process.code_signature.exists: true
+  and process.code_signature.trusted: false
+  and process.code_signature.subject_name: *Microsoft*
+```
+
+The combination of *signature exists*, *trust = false*, *subject_name claims Microsoft* is the textbook stolen-cert / spoofed-CN pattern.
+
+## T1112 Modify Registry — defense evasion specifically
+
+A few specific keys the L2 should hunt:
+
+| Registry key | What it disables |
+|---|---|
+| `HKLM\\System\\CurrentControlSet\\Control\\Lsa\\RunAsPPL` | LSA Protection (PPL) — set to 0 disables |
+| `HKLM\\Software\\Microsoft\\AMSI\\Providers\\*` | AMSI provider (deletion bypasses AMSI) |
+| `HKLM\\System\\CurrentControlSet\\Control\\SecurityProviders\\WDigest\\UseLogonCredential` | WDigest plaintext-credential caching (set to 1 re-enables Win7-era plaintext caching) |
+| `HKLM\\Software\\Policies\\Microsoft\\Windows Defender\\*` | Defender policy override |
+
+EQL hunt against `logs-endpoint.events.registry-*`:
+
+```eql
+registry where event.action == "modification"
+  and registry.path : ("*\\\\AMSI\\\\Providers\\\\*",
+                        "*\\\\Lsa\\\\RunAsPPL*",
+                        "*\\\\WDigest\\\\UseLogonCredential*",
+                        "*\\\\Windows Defender\\\\*")
+```
+
+A modification to any one of these is a strong evasion signal; chained modifications across the cluster within a short window indicates active credential-access preparation.
+
+## T1140 Deobfuscate, T1497 Sandbox Evasion — recognise
+
+- **T1140 Deobfuscate/Decode Files or Information** — the second-stage pattern. A small stager pulls a base64/AES-encrypted blob and decrypts it in memory. Telemetry: high-entropy strings in command lines, .NET reflective loads, AMSI-captured deobfuscated content (PowerShell EID 4104).
+- **T1497 Virtualisation/Sandbox Evasion** — malware checks for VM artefacts (`vmtoolsd`, `vboxservice`) before executing payload. Less directly L1/L2-actionable but flagged in EDR triage notes.
+
+## Glossary
+
+- **EID 1102** — Security log cleared (T1070.001); rare in normal ops, page-IR signal.
+- **`file.mtime < file.created`** — timestomp fingerprint (T1070.006).
+- **PPL / LSA Protection** — Process Protected Light; protects LSASS from non-protected-process access. Disabled via `HKLM\\System\\...\\Lsa\\RunAsPPL`.
+- **WDigest plaintext re-enable** — adversary re-enables Win7-era plaintext-credential caching to harvest passwords from LSASS without dumping.
+- **`sample by host.name`** — EQL primitive for unordered correlation; ideal for the "all of these tools fired in any order" cluster signal.
+
+## Further reading
+
+- ATT&CK technique pages — T1027, T1070, T1562, T1036, T1112, T1140.
+- Microsoft docs — *Configure RunAsPPL* (LSA Protection).
+- Elastic Security prebuilt-rule library — Defense Evasion EQL rules.
+""",
+    )
+    m3l3q = _add_lesson(
+        session, mod3, order=6, title="Defense Evasion — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on T1070 log-clear severity, T1036 masquerading-by-path, the T1562 / vssadmin ransomware pre-encryption cluster, and the timestomp fingerprint.",
+    )
+    _add_q(session, m3l3q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Windows Event ID **1102** (the Security event log was cleared) appears unattributed on a production host. What is the correct L2 reading?",
+        options=[
+            {"value": "info", "label": "Tag as informational; log clearing is routine"},
+            {"value": "monitor", "label": "Open a low-severity ticket and monitor for follow-on activity"},
+            {"value": "page", "label": "Treat as a page-IR signal — unattributed Security log clearing is a high-confidence T1070.001 indicator-removal action; it is rare in normal operations and frequently appears as a pre-encryption / pre-cleanup adversary action"},
+            {"value": "tune", "label": "Submit a tuning ticket — the rule must be FP-rich"},
+        ],
+        correct="page",
+        explanation_md="EID 1102 is rare in legitimate operations (Group Policy enforces retention; admins rarely clear logs ad-hoc). When it fires unattributed, it is a textbook T1070.001 *Clear Windows Event Logs* signal — frequently pre-encryption tradecraft to remove forensic artefacts. Page IR; do not monitor.",
+        points=2,
+    )
+    _add_q(session, m3l3q, order=2, kind=QuestionKind.SINGLE,
+        stem_md="Which of the following ECS predicates best fingerprints **T1036.005 Masquerading: Match Legitimate Name or Location** for a process called `svchost.exe`?",
+        options=[
+            {"value": "name", "label": "`process.name: svchost.exe` is sufficient"},
+            {"value": "hash", "label": "`process.hash.sha256` differs from the known good"},
+            {"value": "path", "label": "`process.name: svchost.exe AND NOT process.executable: (\"C:\\\\Windows\\\\System32\\\\*\" OR \"C:\\\\Windows\\\\SysWOW64\\\\*\")` — the *path* is the giveaway, not the name"},
+            {"value": "user", "label": "The process is running as `SYSTEM`"},
+        ],
+        correct="path",
+        explanation_md="T1036.005 by definition keeps the *legitimate name* (`svchost.exe`) but moves the binary to a non-system location (`%TEMP%`, `%PUBLIC%`, `%APPDATA%`). Path-based exclusion of System32 / SysWOW64 catches the masquerade. Hash-based detection works but only against known-bad samples; path-based catches novel ones.",
+        points=2,
+    )
+    _add_q(session, m3l3q, order=3, kind=QuestionKind.MULTI,
+        stem_md="Which of the following process events, occurring on the same host within minutes of each other, fingerprint a **ransomware pre-encryption** evasion + impact cluster (combination of T1562 + T1490 / T1489)?",
+        options=[
+            {"value": "set_mp", "label": "`Set-MpPreference -DisableRealtimeMonitoring $true`"},
+            {"value": "sc_stop", "label": "`sc stop Sense` (Defender for Endpoint sensor)"},
+            {"value": "vss", "label": "`vssadmin delete shadows /all /quiet`"},
+            {"value": "bcdedit", "label": "`bcdedit /set {default} recoveryenabled No`"},
+            {"value": "ipconfig", "label": "`ipconfig /all`"},
+        ],
+        correct=["set_mp", "sc_stop", "vss", "bcdedit"],
+        explanation_md="`Set-MpPreference -DisableRealtimeMonitoring` and `sc stop Sense` are T1562.001 (impair defenses); `vssadmin delete shadows` and `bcdedit recoveryenabled No` are T1490 (inhibit system recovery). Three or four of these chained within minutes is a *page-IR* ransomware-staging signal — the encryption phase is typically 2–10 minutes away. `ipconfig /all` is a discovery command (T1016) — common on its own, not a cluster signal here.",
+        points=3,
+    )
+    _add_q(session, m3l3q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="A file's `file.mtime` (last-modified time) is *earlier* than its `file.created` time. Which ATT&CK sub-technique does this fingerprint? (T-number plus short name.)",
+        options=None,
+        correct=["T1070.006", "t1070.006", "T1070.006 timestomp", "timestomp", "T1070.006 timestomping"],
+        explanation_md="**T1070.006 Timestomp** — the modify-time precedes creation-time, which is impossible in normal filesystem semantics. Adversaries set `mtime` backwards (often to match a benign system file's date) to evade timeline-analysis. The hunt `WHERE file.mtime < file.created` catches it directly.",
+        points=2,
+    )
+
+    # Lesson 3.4 — Statistical hunts + cross-source pivots + capstone
+    m3l4 = _add_lesson(
+        session, mod3, order=7,
+        title="Statistical hunts in ES|QL, cross-source pivots, and a worked end-to-end capstone",
+        lesson_type=LessonType.READING, duration_min=26,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Author **rare-process** and **rare-parent-child-pair** hunts in ES|QL using `COUNT_DISTINCT` and `COUNT`
+> 2. Compute a **command-line entropy proxy** with ES|QL `EVAL` and `LENGTH`/`REPLACE`
+> 3. Hunt **signed-vs-unsigned ratio anomalies** per host
+> 4. Surface **time-of-day anomalies** with `BUCKET()` and per-host baselining
+> 5. Pivot between Elastic Agent and Sysmon sources in a single multi-index query
+> 6. Walk the worked **PEAK capstone** for *encoded PowerShell from Office parent* end-to-end and produce a Kibana Security EQL detection-rule body
+
+## Statistical hunts — when single-event filters miss
+
+A single-event filter answers *"is X present?"* A statistical hunt answers *"is X *unusual* given my baseline?"* This is the hunting-maturity-model HM3 work: the L2 produces detections that fire on *deviation from expected behaviour*, not just on known-bad strings.
+
+### Rare-process by SHA256
+
+Hunt the long tail — processes seen on ≤ N hosts, low invocation count, not signed by a known publisher. Likely to be either a tooling rarity (developer-laptop one-off) or a novel adversary payload.
+
+```esql
+FROM logs-endpoint.events.process-*
+| WHERE @timestamp > NOW() - 30d AND host.os.family == "windows"
+| STATS host_count = COUNT_DISTINCT(host.name),
+        invocation_count = COUNT(),
+        sample_paths = VALUES(process.executable),
+        signed_status = VALUES(process.code_signature.status)
+  BY process.hash.sha256, process.name
+| WHERE host_count <= 3 AND invocation_count <= 10
+| WHERE NOT signed_status == "trusted"
+| SORT invocation_count ASC
+| LIMIT 200
+```
+
+### Rare parent-child pair
+
+`(process.parent.name, process.name)` pairs that are unusual fleet-wide. The `outlook.exe → cmd.exe` pair is rare on most fleets — when it appears, it's worth investigating.
+
+```esql
+FROM logs-endpoint.events.process-*
+| WHERE @timestamp > NOW() - 30d
+| STATS pair_count = COUNT(),
+        host_count = COUNT_DISTINCT(host.name)
+  BY process.parent.name, process.name
+| WHERE pair_count < 50 AND host_count < 5
+| SORT pair_count ASC
+| LIMIT 100
+```
+
+The threshold (`pair_count < 50 AND host_count < 5`) is fleet-size-dependent. Re-baseline per estate.
+
+### Command-line entropy proxy
+
+Approximate command-line entropy via special-character density. Useful for catching Invoke-Obfuscation outputs without running real entropy at query time:
+
+```esql
+FROM logs-endpoint.events.process-*
+| WHERE @timestamp > NOW() - 7d
+  AND process.name IN ("powershell.exe", "pwsh.exe", "cmd.exe", "wscript.exe", "cscript.exe")
+| EVAL cmd_len = LENGTH(process.command_line)
+| EVAL specials = LENGTH(process.command_line) -
+                  LENGTH(REPLACE(REPLACE(REPLACE(process.command_line, "^", ""), "`", ""), "$", ""))
+| EVAL density = TO_DOUBLE(specials) / TO_DOUBLE(cmd_len)
+| WHERE cmd_len > 300 AND density > 0.05
+| KEEP @timestamp, host.name, user.name, process.name, process.command_line, cmd_len, density
+| SORT density DESC
+| LIMIT 200
+```
+
+### Signed-vs-unsigned ratio per host
+
+Hosts whose proportion of unsigned-binary invocations spikes anomalously over the baseline. Catches a scenario where a wave of dropped-payload activity hits one host while the rest of the estate looks normal.
+
+```esql
+FROM logs-endpoint.events.process-*
+| WHERE @timestamp > NOW() - 7d AND host.os.family == "windows"
+| EVAL is_unsigned = CASE(process.code_signature.trusted == true, 0, 1)
+| STATS total = COUNT(),
+        unsigned = SUM(is_unsigned)
+  BY host.name, BUCKET(@timestamp, 1d)
+| EVAL unsigned_ratio = TO_DOUBLE(unsigned) / TO_DOUBLE(total)
+| WHERE total > 100 AND unsigned_ratio > 0.30
+| SORT unsigned_ratio DESC
+| LIMIT 100
+```
+
+A 30% unsigned-ratio is the threshold for further investigation; on most well-managed Windows fleets the steady-state ratio is below 5%.
+
+### Time-of-day anomalies
+
+Process invocations at hours when the host historically has no activity. The ES|QL form uses `BUCKET()` and per-host baselining:
+
+```esql
+FROM logs-endpoint.events.process-*
+| WHERE @timestamp > NOW() - 30d
+  AND process.name IN ("powershell.exe", "pwsh.exe", "cmd.exe")
+| EVAL hour_of_day = DATE_EXTRACT("HOUR_OF_DAY", @timestamp)
+| STATS event_count = COUNT() BY host.name, hour_of_day
+| WHERE event_count > 0 AND (hour_of_day < 6 OR hour_of_day > 22)
+| SORT event_count DESC
+| LIMIT 100
+```
+
+Combine with a host-baseline subquery (or a follow-up enrichment step) to suppress hosts that legitimately operate overnight (servers in different time zones).
+
+## Cross-source pivots — Elastic Agent vs Sysmon
+
+When both sources are present:
+
+```esql
+FROM logs-endpoint.events.process-*, winlogbeat-*
+| WHERE @timestamp > NOW() - 7d
+  AND (event.action IN ("start", "process_started")
+       OR event.code == "1"           // Sysmon
+       OR event.code == "4688")       // native
+  AND process.name == "powershell.exe"
+| STATS event_count = COUNT(),
+        sources = VALUES(event.dataset)
+  BY host.name
+```
+
+`event.dataset` typically resolves to `endpoint.events.process` (Elastic Agent) or `winlogbeat.sysmon` / `winlogbeat.security` (Winlogbeat) — surfacing which source produced each event. The L2 reflex when results look thin: confirm both sources are populating; sometimes Elastic Agent endpoint integration is enabled but Sysmon's command-line capture is configured differently.
+
+## The PEAK capstone — encoded PowerShell from Office parent
+
+A complete L2-grade hunt walked end-to-end, from hypothesis to detection-rule submission.
+
+### Prepare
+
+**Hypothesis (four-element from M1):** *In the past 30 days, an adversary has used T1059.001 PowerShell with `-EncodedCommand` from an Office process parent on at least one endpoint, observable in `logs-endpoint.events.process-*` where `process.parent.name` is one of the Office binaries and `process.command_line` contains a base64-shape encoded command.*
+
+- **Hypothesis type:** TTP-based.
+- **ATT&CK mapping:** T1059.001 + T1027.010 + T1204.002.
+- **Data sources:** `logs-endpoint.events.process-*`, `winlogbeat-*`, optionally `winlog.channel: "Microsoft-Windows-PowerShell/Operational"` for EID 4104.
+- **Window:** explicit UTC.
+- **Navigator coverage:** check the team's existing layer; expect *red* if no current detection.
+
+### Execute
+
+**Q1 broad** — KQL in Discover:
+
+```kql
+event.category: process
+  and event.action: ("start" or "process_started")
+  and process.name: ("powershell.exe" or "pwsh.exe")
+  and process.command_line: (*-EncodedCommand* or *-enc * or *FromBase64String*)
+```
+
+**Q2 narrow** — add the Office parent:
+
+```kql
+event.category: process
+  and event.action: ("start" or "process_started")
+  and process.name: ("powershell.exe" or "pwsh.exe")
+  and process.command_line: (*-EncodedCommand* or *-enc * or *FromBase64String*)
+  and process.parent.name: ("WINWORD.EXE" or "EXCEL.EXE" or "POWERPNT.EXE" or "OUTLOOK.EXE")
+```
+
+**Q3 enrichment** — EQL `sequence` for the click-context:
+
+```eql
+sequence by host.name with maxspan=5m
+  [ process where process.name : ("WINWORD.EXE", "EXCEL.EXE", "POWERPNT.EXE", "OUTLOOK.EXE") ]
+  [ process where process.name : ("powershell.exe", "pwsh.exe")
+              and process.command_line : ("*-EncodedCommand*", "*-enc *", "*FromBase64String*") ]
+```
+
+**Q4 disposition** — ES|QL aggregation for triage-grade output:
+
+```esql
+FROM logs-endpoint.events.process-*, winlogbeat-*
+| WHERE @timestamp > NOW() - 30d
+  AND KQL("process.name: (powershell.exe or pwsh.exe)
+          AND process.command_line: (*EncodedCommand* or *FromBase64String* or *DownloadString*)
+          AND process.parent.name: (WINWORD.EXE or EXCEL.EXE or POWERPNT.EXE or OUTLOOK.EXE)")
+| STATS event_count = COUNT(),
+        users = VALUES(user.name),
+        parents = VALUES(process.parent.command_line),
+        first_seen = MIN(@timestamp),
+        last_seen = MAX(@timestamp)
+  BY host.name, BUCKET(@timestamp, 1h)
+| SORT event_count DESC
+| LIMIT 100
+```
+
+### Act
+
+Disposition the survivor list:
+
+- TPs → IR handoff per Module 1.
+- BTPs → record the legitimate-tooling pattern (e.g. some IT-automation scripts use `Outlook.exe` COM-automation legitimately; document the FP-class and add to the rule whitelist on conversion).
+- FPs → refine the query.
+- Inconclusive → out-of-band verification.
+
+### Know
+
+Update the team's Navigator coverage from red → orange (hunting coverage) and propose the detection rule.
+
+### The detection-rule body
+
+The Q3 EQL `sequence` becomes the rule body in Kibana Security:
+
+```eql
+sequence by host.name with maxspan=5m
+  [ process where process.name : ("WINWORD.EXE", "EXCEL.EXE", "POWERPNT.EXE", "OUTLOOK.EXE") ]
+  [ process where process.name : ("powershell.exe", "pwsh.exe")
+              and process.command_line : ("*-EncodedCommand*", "*-enc *", "*FromBase64String*",
+                                          "*DownloadString*", "*Invoke-Expression*", "*IEX *")
+              and not user.name : ("svc_*", "admin_*") ]
+```
+
+Metadata for the rule: severity *high*; threat tactic `TA0002 Execution`; technique `T1059.001` + `T1204.002`; runbook reference; owner team; data source dependency.
+
+After 90 days of FP-rate measurement and whitelist refinement, Navigator transitions orange → yellow → green. The hunt cycle closes.
+
+## Glossary
+
+- **Rare-process / rare-pair / entropy / signed-ratio / time-of-day** — the five canonical statistical-hunt patterns.
+- **`BUCKET()`** — ES|QL time-bucketing function; the workhorse for time-series anomaly hunts.
+- **Cross-source pivot** — querying `logs-endpoint.events.process-*` and `winlogbeat-*` together via multi-index `FROM`.
+- **Detection-rule body** — the EQL `sequence` (or ES|QL pipeline) that becomes a Kibana Security rule with no rewriting.
+
+## Further reading
+
+- Elastic docs — *Kibana Security detection rules* (EQL rule type, ES|QL rule type from 8.13).
+- ION's TIDE integration — the L2's hand-off path for converted hunts (covered in L2 Module 8 capstone).
+- ATT&CK Navigator — for the team's coverage layer.
+""",
+    )
+    m3l4q = _add_lesson(
+        session, mod3, order=8, title="Statistical hunts & capstone — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on the rare-process pattern, signed-ratio anomaly, the cross-source `event.action`/`event.code` disjunction, and the EQL detection-rule body shape.",
+    )
+    _add_q(session, m3l4q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 wants to hunt the *long tail* — Windows process binaries that are present on a small number of hosts, run rarely, and are *not* signed by a trusted publisher. Which ES|QL aggregation pattern is canonical?",
+        options=[
+            {"value": "all", "label": "Just `STATS COUNT() BY process.name` and look at the bottom of the list"},
+            {"value": "rare", "label": "`STATS host_count = COUNT_DISTINCT(host.name), invocation_count = COUNT(), signed_status = VALUES(process.code_signature.status) BY process.hash.sha256, process.name | WHERE host_count <= 3 AND invocation_count <= 10 AND NOT signed_status == \"trusted\"`"},
+            {"value": "process_only", "label": "`STATS COUNT() BY process.name | WHERE COUNT() < 5`"},
+            {"value": "name_filter", "label": "Filter by suspicious process names (`powershell.exe`, `cmd.exe`) and aggregate"},
+        ],
+        correct="rare",
+        explanation_md="The canonical *rare-process by SHA256* pattern keys aggregation on the hash (not the name — adversaries rename), counts both the host fan-out and the total invocations, and excludes trusted-signed binaries. The combination of *low host_count + low invocation_count + not-trusted-signed* is the high-signal long-tail filter.",
+        points=2,
+    )
+    _add_q(session, m3l4q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are valid ES|QL idioms for **statistical / anomaly hunting** on process events?",
+        options=[
+            {"value": "bucket", "label": "Use `BUCKET(@timestamp, 1h)` for time-bucketing inside `STATS BY`"},
+            {"value": "case_unsigned", "label": "`EVAL is_unsigned = CASE(process.code_signature.trusted == true, 0, 1)` then `SUM(is_unsigned)` for a per-host unsigned-ratio"},
+            {"value": "entropy_proxy", "label": "Compute a special-character density via `LENGTH` minus `LENGTH(REPLACE(...))` as an entropy proxy"},
+            {"value": "join_inline", "label": "Use `LOOKUP JOIN` against a small enrich-policy index for asset-criticality joins"},
+            {"value": "sequence", "label": "Use `SEQUENCE BY host.name WITH MAXSPAN=5m` for behavioural-chain correlation in ES|QL"},
+        ],
+        correct=["bucket", "case_unsigned", "entropy_proxy", "join_inline"],
+        explanation_md="The trap is the last option. `sequence` is **EQL's** primitive, not ES|QL's — ES|QL has no behavioural-chain operator yet (as of 8.16). For chains, switch to EQL. The other four are correct ES|QL statistical-hunt idioms.",
+        points=3,
+    )
+    _add_q(session, m3l4q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="An L2 writes an ES|QL multi-index query against both Elastic Agent endpoint integration and Winlogbeat+Sysmon to catch process-create events from either source. What's the correct disjunction in the `WHERE` clause to cover *both* schemas?",
+        options=[
+            {"value": "act_only", "label": "`event.action IN (\"start\", \"process_started\")` only"},
+            {"value": "code_only", "label": "`event.code == \"1\"` only"},
+            {"value": "disj", "label": "`event.action IN (\"start\", \"process_started\") OR event.code == \"1\" OR event.code == \"4688\"` — Elastic Agent uses `event.action`; Sysmon EID 1 surfaces as `event.code: \"1\"`; native Windows EID 4688 surfaces as `event.code: \"4688\"`"},
+            {"value": "name_only", "label": "Filter only by `process.name`"},
+        ],
+        correct="disj",
+        explanation_md="The three sources expose process-create through different fields: `event.action` (Elastic Agent), `event.code: \"1\"` (Sysmon EID 1), `event.code: \"4688\"` (native Windows). A multi-index hunt needs the disjunction to cover all three. Filtering only by `process.name` works but loses the schema-specific context that downstream `STATS` may need.",
+        points=2,
+    )
+    _add_q(session, m3l4q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="The EQL `sequence` query authored as a hunt's *Q3 enrichment* step in PEAK can become the body of a Kibana Security EQL detection rule with **no rewriting** — the same query that found the hunt finding fires the rule. Whitelisting and metadata are added on conversion.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** Kibana Security's EQL rule type accepts an EQL `sequence` body directly. The L2's hunt query *is* the candidate rule body. The five-gate hand-off (M1 Lesson 4) adds FP-rate measurement, whitelist filters, severity / runbook / owner metadata, the TIDE submission, and the lifecycle plan — but the *query body* itself doesn't change. This 1:1 hunt-to-detection mapping is the architectural reason EQL is the preferred chain-rule language for Elastic Security.",
+        points=2,
+    )
+
+    print(f"  L2: {course.title} — 3 modules, 24 lessons (Module 3 Process+File Events @ proper depth)")
     return course
 
 

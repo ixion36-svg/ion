@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.11.14 (2026-04-28)
+
+### L2 Module 3 — Process & file events: Execution + Defense Evasion
+
+Third L2 ship. **L2 Module 3 — Process & file events — Execution + Defense Evasion** authored from a research-agent dossier at BTL1+/SANS depth. ~9,000 words, 8 lessons (4 reading + 4 quiz), 16 quiz questions. First *concrete-hunt* module in L2 — applies the PEAK methodology of Module 1 and the KQL/EQL/ES|QL fluency of Module 2 to the **Execution (TA0002)** and **Defense Evasion (TA0005)** ATT&CK tactic families against Elastic indices.
+
+#### Lesson breakdown
+
+| # | Title | Type | Quiz qs |
+|---|---|---|---|
+| 3.1 | The process-event data plane in Elastic and the ECS field reference for hunters | reading | — |
+| 3.2 | Data plane & ECS — quiz | quiz | 4 |
+| 3.3 | Execution (TA0002) — top techniques and their EQL+ES&#x7C;QL fingerprints | reading | — |
+| 3.4 | Execution — quiz | quiz | 4 |
+| 3.5 | Defense Evasion (TA0005) — top techniques and their fingerprints | reading | — |
+| 3.6 | Defense Evasion — quiz | quiz | 4 |
+| 3.7 | Statistical hunts in ES&#x7C;QL, cross-source pivots, and a worked end-to-end capstone | reading | — |
+| 3.8 | Statistical hunts & capstone — quiz | quiz | 4 |
+
+#### Topics covered
+
+- **Process-event data plane** — three sources: Elastic Agent endpoint integration (`logs-endpoint.events.process-*`, `.file-*`, `.library-*`, `.registry-*`); Winlogbeat + Sysmon (`winlogbeat-*` with EID 1/2/3/7/8/10/11/13/22/25 mapped via `event.code`); native Windows Security log (4624/4688/4698/4720/7045/1102/104). The **EID 4688 command-line gap** (requires *Audit Process Creation* GPO + *Include command line* sub-policy). ECS field reference table for process / file / library / registry hunts. **`process.entity_id` as the host-stable join key** for chain reconstruction. Cross-source schema differences in a comparison table. Multi-index `FROM logs-endpoint.events.process-*, winlogbeat-*` pattern in ES&#x7C;QL with the `event.action` / `event.code` disjunction. Worked broad-to-narrow KQL → EQL → ES&#x7C;QL on the encoded-PowerShell-from-Office-parent hunt
+- **Execution TA0002** — T1059 Command and Scripting Interpreter (.001 PowerShell, .003 cmd, .005 VBS, .007 JS) with the **suspicious-PowerShell vocabulary memo** (`-EncodedCommand` / `-enc` / `-ep bypass` / `-w hidden` / `IEX` / `DownloadString` / `FromBase64String` / `Invoke-Mimikatz` / `[Reflection.Assembly]::Load` / `AmsiUtils` / `amsiInitFailed`); **PowerShell EID 4104** script-block logging; T1204 User Execution click-paths (Office → script-host, browser → script-host) as EQL `sequence` queries with `maxspan`; **T1218 LOLBAS** family with the catalogue overlay (`mshta.exe`, `regsvr32.exe`/Squiblydoo, `rundll32.exe javascript:`, `msiexec.exe`, `cmstp.exe`, `hh.exe`, `installutil.exe`, `regasm.exe`, `wmic.exe`) in a single covering EQL hunt; T1053.005 Scheduled Task with EID 4698/4702/4700 and `schtasks /create`; T1569.002 PsExec-class with EID 7045 service-install paired with SCM-spawned payload from user-writable path. **When to author EQL `sequence` rules vs ES&#x7C;QL aggregations** — chain vs threshold/pivot
+- **Defense Evasion TA0005** — T1027.010 command obfuscation with special-character density proxy in ES&#x7C;QL `EVAL`; T1027.002 packing via `process.code_signature.status`; T1070 Indicator Removal — .001 EID 1102/104 + `wevtutil cl Security` (page-IR signal), .003 PSReadLine `ConsoleHost_history.txt` deletion, .004 file-deletion EQL chains, **.006 Timestomp via `file.mtime < file.created`**; T1562 Impair Defenses cluster — .001 (`sc stop Sense` / `Set-MpPreference -DisableRealtimeMonitoring` / `taskkill MsMpEng.exe`), .002 (`Auditpol disable` / `EventLog stop`), .004 (`netsh advfirewall set allprofiles state off`), .009 (`bcdedit safeboot`); the **ransomware pre-encryption `sample by host.name` cluster** (T1562.001 + T1490 `vssadmin delete shadows` + `bcdedit recoveryenabled No`); T1036 Masquerading — .005 `svchost`/`lsass` running outside `System32`/`SysWOW64`, .001 invalid signature with claimed-Microsoft subject_name; T1112 Modify Registry — LSA Protection / AMSI providers / WDigest UseLogonCredential / Defender policy; T1140 deobfuscate, T1497 sandbox evasion (recognise)
+- **Statistical hunts + cross-source pivots + capstone** — five canonical statistical patterns: rare-process by SHA256 (`COUNT_DISTINCT(host.name)` ≤ N + unsigned), rare parent-child pair, command-line entropy proxy via `LENGTH` − `LENGTH(REPLACE(...))`, signed-vs-unsigned ratio per host with `BUCKET(@timestamp, 1d)`, time-of-day anomalies via `DATE_EXTRACT("HOUR_OF_DAY", @timestamp)`. Cross-source pivots Elastic Agent ↔ Sysmon with `event.action`/`event.code` disjunction. **Worked PEAK capstone** — full hunt for *encoded PowerShell from Office parent*: hypothesis (4-element + SMART), Q1 broad KQL, Q2 narrowed KQL with parent filter, Q3 EQL `sequence` for click-context, Q4 ES&#x7C;QL aggregation for triage with `STATS BY BUCKET(1h)`, then the **Kibana Security EQL detection-rule body** ready for TIDE submission with severity / runbook / whitelist metadata. Full hunt-cycle close from red → orange → yellow → green Navigator coverage
+
+8 Mermaid diagrams across the module: data-plane taxonomy (3 sources), verb-field crosswalk, T1218 LOLBAS catalogue overlay, T1204 click-path sequence, Defense-Evasion family tree, TA0005 triage flowchart, statistical-hunt decision tree, cross-source pivot flow.
+
+L2 course now sits at **3 modules / 24 lessons / 48 questions**.
+
+#### Upgrade
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
+Idempotent — wipes `demo-*` courses and re-seeds.
+
+---
+
 ## v0.11.13 (2026-04-28)
 
 ### L2 Module 2 — KQL, EQL, and ES|QL: the Elastic-stack query languages
