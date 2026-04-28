@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.11.15 (2026-04-28)
+
+### L2 Module 4 — Identity & sign-in: Credential Access + Lateral Movement
+
+Fourth L2 ship. **L2 Module 4 — Identity & sign-in — Credential Access + Lateral Movement** authored from a research-agent dossier at BTL1+/SANS depth. ~9,200 words, 8 lessons (4 reading + 4 quiz), 16 quiz questions. Covers the on-prem Windows Security log + Entra ID / Azure AD sign-in plane, with the cross-pivot pattern.
+
+#### Lesson breakdown
+
+| # | Title | Type | Quiz qs |
+|---|---|---|---|
+| 4.1 | The identity-event data plane in Elastic and the auth-event ECS reference | reading | — |
+| 4.2 | Identity data plane — quiz | quiz | 4 |
+| 4.3 | Credential Access (TA0006) — top techniques and EQL fingerprints | reading | — |
+| 4.4 | Credential Access — quiz | quiz | 4 |
+| 4.5 | Lateral Movement (TA0008) — top techniques and their fingerprints | reading | — |
+| 4.6 | Lateral Movement — quiz | quiz | 4 |
+| 4.7 | Cloud-identity hunts (Entra/Azure AD), AiTM signals, and a worked end-to-end capstone | reading | — |
+| 4.8 | Cloud identity & capstone — quiz | quiz | 4 |
+
+#### Topics covered
+
+- **Identity data plane** — on-prem Windows Security log canonical events (4624 / 4625 / 4634 / 4647 / 4672 / 4720 / 4732 / 4738 / 4768 / 4769 / 4776 / 4662 / 4778 / 4779) and **Windows logon types** (2 Interactive / 3 Network / 4 Batch / 5 Service / 7 Unlock / 8 NetworkCleartext / 9 NewCredentials / 10 RemoteInteractive / 11 CachedInteractive); ECS field reference (`user.name`, `user.target.name`, `winlog.event_data.LogonType` / `TargetUserName` / `IpAddress` / `LogonProcessName` / `AuthenticationPackageName` / `TicketEncryptionType` / `Properties`); Entra ID sign-in log fields (`azure.signinlogs.properties.user_principal_name`, `app_display_name`, `client_app_used`, `authentication_requirement`, `risk_level_during_sign_in`, **`risk_event_types_v2`** with the 12 documented values, `session_id`, `correlation_id`, `device_detail.*`, `location.*`); cross-pivot multi-index `FROM winlogbeat-*, logs-azure.signinlogs-*` pattern keyed on `user.name`
+- **Credential Access TA0006** — T1003 OS dumping (.001 LSASS via Sysmon EID 10 GrantedAccess masks `0x1010`/`0x1410`/`0x1438`/`0x143a`/`0x1F0FFF`/`0x1FFFFF`, .002 SAM via `reg save HKLM\\SAM`, .003 NTDS via `ntdsutil ifm` / `vssadmin create shadow` on DC, **.006 DCSync via EID 4662 with the replication GUID `{1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}` from non-DC source — page-IR signal**); T1110 Brute Force (.001 password guessing — many failures one user, .003 password spraying — many distinct users low per-user count, .004 credential stuffing — failures-then-success cluster); T1539 Steal Web Session Cookie downstream from M6 phishing; T1187 Forced Authentication (outbound 445 to non-RFC1918); T1558 Kerberos (.003 Kerberoasting via 4769 `TicketEncryptionType: 0x17` RC4 downgrade + high TGS volume, .004 AS-REP Roasting via 4768 `PreAuthType: 0`, .001 Golden / .002 Silver Tickets); T1621 MFA Request Generation push-bombing detection in Entra logs
+- **Lateral Movement TA0008** — T1021 Remote Services (.001 RDP via 4624 LT10 + 4778/4779, .002 SMB via 4624 LT3 to ADMIN$/C$/IPC$, .003 DCOM via `mmc.exe` parent of script-host, .004 SSH password-auth, .005 VNC, .006 WinRM via 4624 with `LogonProcessName: \"WinRM\"`); T1570 Lateral Tool Transfer (`bitsadmin /transfer`, `certutil -urlcache -split -f`, `Invoke-WebRequest`, SMB copy to admin share); T1550 Use Alternate Authentication Material (.002 Pass-the-Hash via 4624 NTLM LT9 from non-DC, .003 Pass-the-Ticket); T1210 Exploitation of Remote Services (EternalBlue / ProxyShell / ZeroLogon / PrintNightmare); **multi-key EQL `sequence by host.name, user.name with maxspan` for lateral chains** distinguishing per-user pivots from incidental noise
+- **Cloud identity + AiTM + capstone** — high-risk Entra sign-in aggregations; **legacy authentication detection** (`client_app_used IN (IMAP4, POP3, Authenticated SMTP, Other clients)` — bypasses MFA at protocol level); **the AiTM session-cookie reuse pattern** as EQL `sequence by user_principal_name, session_id with maxspan=15m` matching MFA `satisfied` followed by `previouslySatisfied`; ES|QL aggregation flagging same `(user, session_id)` with multiple `device_detail.device_id` or `device_detail.browser` in 30-min window; Entra audit-log signals — `New-InboxRule` / `Set-InboxRule` with finance keywords, `Add-MailboxPermission`, `Set-Mailbox -ForwardingSmtpAddress`, `Update application` / `Add service principal credentials` (T1098.001 OAuth backdoor), `Add member to role`; **federation tampering T1556.006** via `Set federation settings on domain` — page-IR signal paving Golden SAML T1606.002; **the worked PEAK capstone — Kerberoasting → Lateral RDP → DCSync chain** as a single EQL `sequence by host.name with maxspan=30m` covering all three steps with the explicit Kibana Security rule body + threat metadata (TA0006 / TA0008 / T1558.003 / T1021.001 / T1003.006)
+
+6 Mermaid diagrams across the module: auth-event taxonomy, Kerberos protocol with hunt anchors, AiTM session-cookie reuse, Pass-the-Hash chain, lateral-movement matrix, Entra `risk_event_types_v2` decision tree.
+
+L2 course now sits at **4 modules / 32 lessons / 64 questions**.
+
+#### Upgrade
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
+Idempotent — wipes `demo-*` courses and re-seeds.
+
+---
+
 ## v0.11.14 (2026-04-28)
 
 ### L2 Module 3 — Process & file events: Execution + Defense Evasion

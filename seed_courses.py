@@ -10034,7 +10034,1003 @@ After 90 days of FP-rate measurement and whitelist refinement, Navigator transit
         points=2,
     )
 
-    print(f"  L2: {course.title} — 3 modules, 24 lessons (Module 3 Process+File Events @ proper depth)")
+    # ── Module 4 — Identity & sign-in: Credential Access + Lateral Movement
+    mod4 = _add_module(
+        session, course, order=4,
+        title="Identity & sign-in — Credential Access + Lateral Movement",
+        description_md=(
+            "Hunting on the identity plane. Windows Security log auth "
+            "events (4624 / 4625 / 4768 / 4769 / 4662 / 4720); Entra "
+            "ID / Azure AD sign-in logs (`logs-azure.signinlogs-*`) and "
+            "the AiTM `session_id` reuse pattern; **Credential Access "
+            "(TA0006)** — T1003 OS dumping (LSASS / SAM / NTDS / "
+            "DCSync), T1110 brute force, T1539 cookie theft, T1187 "
+            "forced auth, T1558 Kerberos ticket forging (Kerberoast / "
+            "AS-REP roast / Golden / Silver), T1621 MFA bombing; "
+            "**Lateral Movement (TA0008)** — T1021 RDP / SMB / DCOM / "
+            "WinRM / SSH / VNC, T1570 lateral tool transfer, T1550 "
+            "Pass-the-Hash / Pass-the-Ticket, T1210 remote-service "
+            "exploitation. Cloud-identity AiTM signals; worked PEAK "
+            "capstone for *Kerberoasting → Lateral RDP → DCSync* end "
+            "to end with a Kibana Security EQL detection-rule body."
+        ),
+        estimated_minutes=240,
+    )
+
+    # Lesson 4.1 — Identity-event data plane + ECS reference
+    m4l1 = _add_lesson(
+        session, mod4, order=1,
+        title="The identity-event data plane in Elastic and the auth-event ECS reference",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Recognise the **on-prem auth events** in `winlogbeat-*` — 4624 / 4625 / 4768 / 4769 / 4662 / 4720 / 4738 / 4776 — and what each tells the L2
+> 2. Read the **Windows logon types** (2 / 3 / 4 / 5 / 7 / 9 / 10 / 11) and their security implications
+> 3. Pivot to **Entra ID / Azure AD sign-in logs** in `logs-azure.signinlogs-*` and read `azure.signinlogs.properties.*` fields
+> 4. Recognise `risk_event_types_v2` values and use them as hunt anchors
+> 5. Cross-pivot between on-prem AD events and cloud Entra events keyed on `user.name`
+>
+> **Prerequisites.** L2 Modules 1–3.
+
+## The two halves of the identity plane
+
+A modern enterprise's identity plane straddles on-prem and cloud:
+
+- **On-prem** — Active Directory and the Windows Security log. Surfaces in `winlogbeat-*` (Windows Event Forwarding + Winlogbeat) or `logs-system.security-*` (Elastic Agent Windows integration). The classical 4624 / 4625 / 4768 / 4769 / 4662 cluster.
+- **Cloud** — Entra ID (Azure AD), Okta, Google Workspace. Surfaces via the relevant Elastic integration: `logs-azure.signinlogs-*` (interactive + non-interactive sign-ins), `logs-azure.auditlogs-*` (admin actions), `logs-okta.system-*` (Okta system log).
+
+A real intrusion frequently crosses the line — phishing → cloud sign-in (cloud) → device registration (cloud) → *on-prem-synced device* → lateral movement (on-prem). The L2 must hunt across both and know how to join them.
+
+## On-prem auth events — the canonical set
+
+| Event Code | What it means | Hunt value |
+|---|---|---|
+| **4624** | Successful logon | The workhorse. `LogonType` discriminates how |
+| **4625** | Failed logon | Brute-force / spray clusters; account-lockout pattern |
+| **4634** / **4647** | Logoff | Pair with 4624 to compute session length |
+| **4672** | Special privileges assigned | Admin sign-in fingerprint |
+| **4720** | User account created | T1136 |
+| **4732** / **4728** | Member added to local / domain group | T1098 (privilege esc) |
+| **4738** | User account changed | Password change, SPN change, trust change |
+| **4768** | Kerberos TGT issued | AS-REP Roasting hunts here |
+| **4769** | Kerberos TGS issued | Kerberoasting hunts here |
+| **4776** | NTLM credential validation | Pass-the-Hash anchor |
+| **4662** | Directory access | DCSync hunt with the replication GUID |
+| **4778** / **4779** | RDP reconnect / disconnect | Lateral movement T1021.001 |
+
+### Windows logon types — the 2/3/10 reflex
+
+`winlog.event_data.LogonType` is the discriminator on 4624:
+
+| Type | Name | What it means | L2 reading |
+|---|---|---|---|
+| **2** | Interactive | Console logon | Local user at the keyboard |
+| **3** | Network | SMB / file share / RPC remote | Lateral SMB to admin shares |
+| **4** | Batch | Scheduled task | Often `SYSTEM` |
+| **5** | Service | Service started | Service context |
+| **7** | Unlock | Unlock screensaver | Routine |
+| **8** | NetworkCleartext | Network with cleartext password | Legacy / IIS basic auth |
+| **9** | NewCredentials | `runas /netonly` | Pass-the-Hash classical pattern |
+| **10** | RemoteInteractive | RDP | T1021.001 lateral |
+| **11** | CachedInteractive | Cached domain logon | Offline laptop |
+
+**Rule of thumb**: LT3 + admin account from non-DC source = SMB lateral. LT9 from a workstation = PtH candidate. LT10 from external IP = RDP-from-internet (or VPN).
+
+KQL for SMB lateral pattern:
+
+```kql
+event.code: "4624"
+  and winlog.event_data.LogonType: "3"
+  and winlog.event_data.TargetUserName: ("Administrator" or "Admin*" or "*-adm")
+  and not winlog.event_data.IpAddress: ("-" or "::1" or "127.0.0.1")
+```
+
+## ECS field reference for identity hunts
+
+| Category | Field |
+|---|---|
+| User identity | `user.name`, `user.domain`, `user.id`, `user.target.name`, `user.target.domain` |
+| Source | `source.ip`, `source.user.name`, `source.address` |
+| Host | `host.name`, `host.ip`, `host.os.family` |
+| Event | `event.action`, `event.category` (= `authentication`), `event.code`, `event.outcome` (`success` / `failure`) |
+| Windows-specific | `winlog.event_id`, `winlog.event_data.LogonType`, `winlog.event_data.TargetUserName`, `winlog.event_data.IpAddress`, `winlog.event_data.LogonProcessName`, `winlog.event_data.AuthenticationPackageName`, `winlog.event_data.TicketEncryptionType`, `winlog.event_data.ServiceName`, `winlog.event_data.Properties` |
+| Cloud (Azure) | `azure.signinlogs.properties.user_principal_name`, `azure.signinlogs.properties.ip_address`, `azure.signinlogs.properties.app_display_name`, `azure.signinlogs.properties.client_app_used`, `azure.signinlogs.properties.authentication_requirement`, `azure.signinlogs.properties.risk_level_during_sign_in`, `azure.signinlogs.properties.risk_event_types_v2`, `azure.signinlogs.properties.session_id`, `azure.signinlogs.properties.correlation_id`, `azure.signinlogs.properties.device_detail.browser`, `azure.signinlogs.properties.device_detail.operating_system`, `azure.signinlogs.properties.device_detail.trust_type`, `azure.signinlogs.properties.location.country_or_region`, `azure.signinlogs.properties.location.city` |
+
+## Entra ID sign-in logs — the cloud half
+
+Entra sign-in logs surface in `logs-azure.signinlogs-*`. The fields the L2 reaches for daily:
+
+- **`properties.user_principal_name`** — the UPN (e.g. `alex@corp.onmicrosoft.com`).
+- **`properties.app_display_name`** — the application the user signed into (`Microsoft Office`, `Office 365 Exchange Online`, etc.).
+- **`properties.client_app_used`** — `Browser`, `Mobile Apps and Desktop clients`, `IMAP4`, `POP3`, `Authenticated SMTP`, `Other clients`. *Legacy auth* is the latter four — flag for hunts.
+- **`properties.authentication_requirement`** — `singleFactorAuthentication` / `multiFactorAuthentication`.
+- **`properties.risk_level_during_sign_in`** — `none` / `low` / `medium` / `high`.
+- **`properties.risk_event_types_v2`** — array of risk reasons. The values an L2 must recognise:
+  - `unfamiliarFeatures`
+  - `anonymizedIPAddress` (Tor / VPN)
+  - `maliciousIPAddress`
+  - `unlikelyTravel` ("impossible travel")
+  - `passwordSpray`
+  - `tokenIssuerAnomaly`
+  - `suspiciousBrowser`
+  - `riskyIPAddress`
+  - `mcasImpossibleTravel`
+  - `mcasFinSuspiciousInboxManipulationRules`
+  - `tokenIssuedFromAnonymousIP`
+  - `mcasSuspiciousOAuthAppFileDownloadActivities`
+  - `anomalousToken`, `anomalousUserActivity`
+- **`properties.session_id`** — the gold field for AiTM detection.
+- **`properties.correlation_id`** — request-correlation ID for Entra request tracing.
+
+KQL for high-risk sign-ins in the last 24h:
+
+```kql
+event.dataset: "azure.signinlogs"
+  and azure.signinlogs.properties.risk_level_during_sign_in: ("high" or "medium")
+  and @timestamp >= "now-24h"
+```
+
+ES|QL aggregation by user with risk-event types:
+
+```esql
+FROM logs-azure.signinlogs-*
+| WHERE @timestamp > NOW() - 7d
+  AND azure.signinlogs.properties.risk_level_during_sign_in IN ("high", "medium")
+| STATS event_count = COUNT(),
+        risk_types = VALUES(azure.signinlogs.properties.risk_event_types_v2),
+        ips = VALUES(azure.signinlogs.properties.ip_address)
+  BY azure.signinlogs.properties.user_principal_name
+| SORT event_count DESC
+| LIMIT 100
+```
+
+## Cross-pivot — on-prem ↔ cloud
+
+The most common cross-pivot pattern: a cloud sign-in flagged with `risk_level_during_sign_in: "high"` for `user.name = alex@corp` followed by an on-prem 4624 LT10 (RDP) for the same user from the same source IP — confirming the cloud takeover translated to on-prem access.
+
+ES|QL multi-index hunt:
+
+```esql
+FROM winlogbeat-*, logs-azure.signinlogs-*
+| WHERE @timestamp > NOW() - 24h
+  AND (event.code == "4624" OR event.dataset == "azure.signinlogs")
+  AND user.name == "alex"
+| STATS event_count = COUNT(),
+        sources = VALUES(source.ip),
+        kinds = VALUES(event.dataset)
+  BY user.name, BUCKET(@timestamp, 1h)
+```
+
+## Glossary
+
+- **LogonType 2 / 3 / 9 / 10** — interactive / network (SMB) / NewCredentials (PtH) / RemoteInteractive (RDP).
+- **`session_id`** — Entra sign-in field; same value reused from new IP/UA = AiTM cookie replay.
+- **`risk_event_types_v2`** — Entra-side anomaly signals; the L2's first cloud-hunt anchor.
+- **Cross-pivot** — on-prem AD ↔ cloud Entra hunt joined on `user.name` and time window.
+
+## Further reading
+
+- Microsoft Learn — *Audit Account Logon Events*.
+- Elastic docs — *Azure integration* (`logs-azure.*` indices).
+- ATT&CK technique pages T1003 / T1110 / T1558 / T1021 / T1550.
+""",
+    )
+    m4l1q = _add_lesson(
+        session, mod4, order=2, title="Identity data plane — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on logon-type discrimination, cross-source pivots, Entra risk_event_types_v2, and the session_id field.",
+    )
+    _add_q(session, m4l1q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 sees a 4624 successful-logon event with `winlog.event_data.LogonType: \"9\"` against a workstation, sourced from another non-DC workstation in the same VLAN. Which pattern does this most precisely fingerprint?",
+        options=[
+            {"value": "interactive", "label": "Interactive console logon (LT2)"},
+            {"value": "rdp", "label": "RDP lateral (LT10)"},
+            {"value": "pth", "label": "Pass-the-Hash candidate — `runas /netonly` / `NewCredentials` logon type"},
+            {"value": "service", "label": "Service start (LT5)"},
+        ],
+        correct="pth",
+        explanation_md="LogonType 9 (`NewCredentials`) is the `runas /netonly` / Pass-the-Hash classical fingerprint — it's how an attacker uses a stolen NTLM hash to authenticate to a remote resource without needing the plaintext password. LT9 from a workstation against an admin account from a non-DC source is a high-confidence T1550.002 signal.",
+        points=2,
+    )
+    _add_q(session, m4l1q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are values an L2 should recognise in `azure.signinlogs.properties.risk_event_types_v2` as anomaly anchors for cloud-identity hunts?",
+        options=[
+            {"value": "anon_ip", "label": "`anonymizedIPAddress` — Tor / VPN exit"},
+            {"value": "malicious_ip", "label": "`maliciousIPAddress` — Microsoft-flagged known-bad"},
+            {"value": "unlikely_travel", "label": "`unlikelyTravel` — impossible travel"},
+            {"value": "anom_token", "label": "`anomalousToken` / `tokenIssuedFromAnonymousIP` — token-replay signals"},
+            {"value": "ipconfig", "label": "`ipconfigDiscovery` — discovery command run from the host"},
+        ],
+        correct=["anon_ip", "malicious_ip", "unlikely_travel", "anom_token"],
+        explanation_md="The trap is `ipconfigDiscovery` — that's an on-prem process-event pattern (T1016), not an Entra risk-event type. The other four are documented `risk_event_types_v2` values surfaced by Entra ID sign-in risk scoring. Recognising these on sight is the L2's daily reflex.",
+        points=3,
+    )
+    _add_q(session, m4l1q, order=3, kind=QuestionKind.SHORTANSWER,
+        stem_md="Which Entra ID sign-in field is the *gold field* for AiTM session-cookie replay detection — same value reused from a new IP / UA / device within minutes signals cookie theft? (Field path.)",
+        options=None,
+        correct=["session_id", "azure.signinlogs.properties.session_id", "properties.session_id", "sessionId"],
+        explanation_md="`azure.signinlogs.properties.session_id` (or simply `session_id`) — the same session ID re-used from a new IP/UA/device within minutes, with MFA `previouslySatisfied`, is the textbook AiTM cookie-replay fingerprint. Module 6 (L1) introduced this; the L2 hunt query targets it directly.",
+        points=2,
+    )
+    _add_q(session, m4l1q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="A successful-logon event with EID 4624 and LogonType 3 (network) targeting an admin share like `\\\\HOST\\C$` from a non-DC workstation is a high-confidence indicator of SMB lateral movement (T1021.002).",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** LT3 to ADMIN$/C$/IPC$ from a non-DC workstation is the canonical SMB-lateral signature. Routine non-malicious LT3s in an estate are usually inter-server or backup-agent traffic; workstation-as-source against admin-share targets stands out cleanly.",
+        points=2,
+    )
+
+    # Lesson 4.2 — Credential Access (TA0006)
+    m4l2 = _add_lesson(
+        session, mod4, order=3,
+        title="Credential Access (TA0006) — top techniques and EQL fingerprints",
+        lesson_type=LessonType.READING, duration_min=26,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Hunt **T1003 OS Credential Dumping** — LSASS access (.001), SAM (.002), NTDS (.003), and **DCSync (.006)** via the EID 4662 replication GUID
+> 2. Detect **T1110 Brute Force** — password guessing (.001), spray (.003), credential stuffing (.004) — by 4625 clusters
+> 3. Hunt **T1558 Kerberos** — Kerberoasting (.003) via 4769 + RC4 downgrade, AS-REP Roasting (.004) via 4768 preauth-not-required, Golden / Silver Tickets
+> 4. Recognise **T1539 Steal Web Session Cookie** (downstream from M6 phishing) and **T1187 Forced Authentication**
+> 5. Detect **T1621 MFA Request Generation** push-bombing in Entra sign-in logs
+
+## T1003 OS Credential Dumping
+
+### .001 LSASS Memory
+
+Mimikatz, `procdump -ma lsass.exe`, the **comsvcs.exe minidump trick** (`rundll32.exe C:\\Windows\\System32\\comsvcs.dll, MiniDump <PID> lsass.dmp full`), `nanodump`, `pypykatz`. The Sysmon EID 10 ProcessAccess fingerprint is the gold signal:
+
+```eql
+process where event.code == "10"
+  and winlog.event_data.TargetImage : "?:\\\\Windows\\\\System32\\\\lsass.exe"
+  and winlog.event_data.GrantedAccess : ("0x1010", "0x1410", "0x1438", "0x143a", "0x1F0FFF", "0x1FFFFF")
+  and not winlog.event_data.SourceImage : ("?:\\\\Program Files\\\\Windows Defender\\\\*",
+                                            "?:\\\\Program Files\\\\Windows Defender Advanced Threat Protection\\\\*",
+                                            "?:\\\\Program Files (x86)\\\\Microsoft\\\\EdgeUpdate\\\\*")
+```
+
+The `GrantedAccess` mask values are the access rights — `0x1010` is `PROCESS_VM_READ`+`PROCESS_QUERY_LIMITED_INFORMATION`, `0x1F0FFF` is `PROCESS_ALL_ACCESS`. The exclusion list catches the legitimate-EDR initiators that read LSASS routinely.
+
+ES|QL pivoted view (count of LSASS reads per host per hour):
+
+```esql
+FROM winlogbeat-*
+| WHERE @timestamp > NOW() - 24h
+  AND event.code == "10"
+  AND winlog.event_data.TargetImage LIKE "%lsass.exe"
+  AND winlog.event_data.GrantedAccess IN ("0x1010", "0x1410", "0x1438", "0x143a", "0x1F0FFF", "0x1FFFFF")
+| STATS access_count = COUNT(),
+        sources = VALUES(winlog.event_data.SourceImage)
+  BY host.name, BUCKET(@timestamp, 1h)
+| SORT access_count DESC
+```
+
+### .002 SAM hive
+
+`reg save HKLM\\SAM ...` or VSS shadow-copy extraction:
+
+```eql
+process where process.name : ("reg.exe", "regedit.exe")
+  and process.command_line : ("*save*HKLM\\\\SAM*", "*save*HKLM\\\\SECURITY*", "*save*HKLM\\\\SYSTEM*")
+```
+
+### .003 NTDS
+
+Domain-controller `ntds.dit` extraction via VSS or `ntdsutil ifm`. Hunt for `ntdsutil.exe` invocation and `vssadmin create shadow` chains targeting the `C:` volume on a DC:
+
+```eql
+process where (process.name : "ntdsutil.exe"
+               and process.command_line : ("*ac i ntds*", "*ifm*"))
+   or (process.name : "vssadmin.exe"
+       and process.command_line : "*create shadow*"
+       and host.os.platform : "windows"
+       and host.role : "domain_controller")
+```
+
+### .006 DCSync — the EID 4662 replication-GUID hunt
+
+The canonical signal: **EID 4662** with the AD replication GUID `{1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}` (DS-Replication-Get-Changes) or `{1131f6ad-9c07-11d1-f79f-00c04fc2dcd2}` (DS-Replication-Get-Changes-All) sourced from a *non-DC* host:
+
+```eql
+iam where event.code == "4662"
+  and winlog.event_data.Properties : ("*1131f6aa-9c07-11d1-f79f-00c04fc2dcd2*",
+                                       "*1131f6ad-9c07-11d1-f79f-00c04fc2dcd2*",
+                                       "*89e95b76-444d-4c62-991a-0facbeda640c*")
+  and not source.ip : ("10.10.10.0/24")  // your DC subnet
+```
+
+Replace the `source.ip` exclusion with the actual DC subnet. A 4662 with the replication GUID from a *workstation* is *page-IR* — the operator is one step from Tier-0.
+
+## T1110 Brute Force
+
+### .001 Password Guessing — single account, many passwords
+
+```esql
+FROM winlogbeat-*
+| WHERE @timestamp > NOW() - 1h AND event.code == "4625"
+| STATS failure_count = COUNT() BY user.name, source.ip, BUCKET(@timestamp, 5m)
+| WHERE failure_count > 10
+| SORT failure_count DESC
+```
+
+### .003 Password Spraying — many accounts, few passwords
+
+The inverted shape — many distinct usernames, low per-account failure count, all from one source:
+
+```esql
+FROM winlogbeat-*
+| WHERE @timestamp > NOW() - 1h AND event.code == "4625"
+| STATS user_count = COUNT_DISTINCT(user.name),
+        failure_count = COUNT()
+  BY source.ip, BUCKET(@timestamp, 10m)
+| WHERE user_count > 20 AND failure_count > 30
+| SORT user_count DESC
+```
+
+### .004 Credential Stuffing — leaked-creds reuse
+
+Surfaces in Entra sign-in logs as *one success following many failures from the same source*:
+
+```eql
+sequence by source.ip with maxspan=10m
+  [ any where event.dataset == "azure.signinlogs"
+          and azure.signinlogs.properties.status.error_code != 0 ]
+    until [ any where event.dataset == "azure.signinlogs"
+                  and azure.signinlogs.properties.status.error_code == 0 ]
+  [ any where event.dataset == "azure.signinlogs"
+          and azure.signinlogs.properties.status.error_code == 0 ]
+```
+
+(The `until` halts the sequence on the *first* success — the hunt finds clusters of failures terminated by a success from the same source.)
+
+## T1558 Kerberos Ticket Forging / Theft
+
+### .003 Kerberoasting
+
+Request TGS for SPN-bearing accounts, crack offline. **EID 4769** with `TicketEncryptionType: 0x17` (RC4-HMAC) when AES is policy is the signal:
+
+```eql
+iam where event.code == "4769"
+  and winlog.event_data.TicketEncryptionType == "0x17"
+  and not winlog.event_data.ServiceName : ("*$",  // exclude machine-account TGS
+                                            "krbtgt")
+```
+
+ES|QL aggregation flagging high-volume TGS from one source:
+
+```esql
+FROM winlogbeat-*
+| WHERE @timestamp > NOW() - 24h
+  AND event.code == "4769"
+  AND winlog.event_data.TicketEncryptionType == "0x17"
+  AND NOT winlog.event_data.ServiceName LIKE "%$"
+| STATS tgs_count = COUNT(),
+        distinct_spns = COUNT_DISTINCT(winlog.event_data.ServiceName)
+  BY winlog.event_data.IpAddress, user.name, BUCKET(@timestamp, 10m)
+| WHERE tgs_count > 5 OR distinct_spns > 3
+| SORT tgs_count DESC
+```
+
+### .004 AS-REP Roasting
+
+Accounts with the *Do not require Kerberos preauth* flag set. **EID 4768** with `PreAuthType: "0"`:
+
+```eql
+iam where event.code == "4768"
+  and winlog.event_data.PreAuthType == "0"
+```
+
+### .001 / .002 Golden / Silver Ticket
+
+Forged TGTs (`krbtgt` hash) / TGSs (service-account hash). Detection is hard — the tickets are crypto-valid. Hunt on anomalies: a TGS with extremely long lifetime, a TGT issued with no preceding 4768, a sign-in with a stale or duplicate ticket nonce. Often surfaces only in retrospective hunts after lateral movement is detected via other paths.
+
+## T1539 Steal Web Session Cookie — downstream from phishing
+
+The Module 6 (L1) AiTM payoff. Detection is downstream:
+
+- The *use* of the stolen cookie shows up as an Entra sign-in from a new device / IP with the same `session_id` as the legitimate sign-in moments earlier.
+- Pair with `azure.signinlogs.properties.authentication_details` showing MFA `previouslySatisfied` for the second sign-in.
+
+```esql
+FROM logs-azure.signinlogs-*
+| WHERE @timestamp > NOW() - 24h
+| STATS sources = VALUES(azure.signinlogs.properties.ip_address),
+        device_count = COUNT_DISTINCT(azure.signinlogs.properties.device_detail.device_id),
+        ua_count = COUNT_DISTINCT(azure.signinlogs.properties.device_detail.browser),
+        events = COUNT()
+  BY azure.signinlogs.properties.user_principal_name,
+     azure.signinlogs.properties.session_id,
+     BUCKET(@timestamp, 30m)
+| WHERE device_count > 1 OR ua_count > 1
+| SORT events DESC
+```
+
+Same `session_id` + multiple devices / UAs / IPs in a 30-minute window is the AiTM session-replay fingerprint.
+
+## T1187 Forced Authentication
+
+The Module 6 OPSEC trap revisited from the L2 vantage. SMB UNC path or `.url` file with `IconFile=\\\\attacker\\share\\icon` causes the client to send the NTLM hash to attacker. Hunt outbound 445 to non-RFC1918:
+
+```eql
+network where destination.port == 445
+  and host.os.family : "windows"
+  and not cidrMatch(destination.ip, "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+                                     "127.0.0.0/8", "fe80::/10")
+```
+
+## T1621 MFA Request Generation — push bombing
+
+Many Entra sign-in attempts with MFA challenges in rapid succession from the same IP, pre-empting the user into approving:
+
+```esql
+FROM logs-azure.signinlogs-*
+| WHERE @timestamp > NOW() - 1h
+  AND azure.signinlogs.properties.authentication_requirement == "multiFactorAuthentication"
+| STATS attempt_count = COUNT() BY azure.signinlogs.properties.user_principal_name,
+                                    azure.signinlogs.properties.ip_address,
+                                    BUCKET(@timestamp, 5m)
+| WHERE attempt_count > 5
+| SORT attempt_count DESC
+```
+
+Five MFA prompts in a 5-minute window from the same IP is suspicious; ten is push-bombing.
+
+## Glossary
+
+- **DCSync replication GUID** — `{1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}` (DS-Replication-Get-Changes); a 4662 with this GUID from a non-DC source is *page-IR*.
+- **TicketEncryptionType 0x17** — RC4-HMAC; the Kerberoasting downgrade signal when AES is the environment policy.
+- **PreAuthType 0** — Kerberos preauth-not-required, the AS-REP Roasting flag.
+- **GrantedAccess masks** (`0x1010`, `0x1F0FFF`) — Sysmon EID 10 access-rights values for LSASS reads.
+
+## Further reading
+
+- Microsoft Learn — *Audit Account Logon Events* and *Audit Directory Service Access*.
+- ATT&CK — T1003 / T1110 / T1558 / T1187 / T1621 / T1539.
+- Elastic Security prebuilt rules — Credential Access EQL/ES|QL rules.
+""",
+    )
+    m4l2q = _add_lesson(
+        session, mod4, order=4, title="Credential Access — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on the DCSync replication GUID, password-spray vs guessing, Kerberoasting downgrade, and the AiTM session-replay shape.",
+    )
+    _add_q(session, m4l2q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 sees **EID 4662** on a domain controller with `winlog.event_data.Properties` containing the GUID `{1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}`, sourced from a workstation IP. What ATT&CK sub-technique does this most precisely fingerprint, and what is the correct L2 disposition?",
+        options=[
+            {"value": "lsass_monitor", "label": "T1003.001 LSASS Memory — open a low-severity case"},
+            {"value": "dcsync_page", "label": "T1003.006 DCSync — *page-IR* signal; the operator is one step from Tier-0 control of the domain"},
+            {"value": "tgs_request", "label": "T1558.003 Kerberoasting — wait for the second TGS"},
+            {"value": "guess", "label": "T1110.001 password guessing — review for failure clusters"},
+        ],
+        correct="dcsync_page",
+        explanation_md="The replication GUID `{1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}` is `DS-Replication-Get-Changes` — abuse of the AD replication API to request password material for any account. From a *non-DC* source, this is the canonical T1003.006 DCSync fingerprint and a *page-IR* signal. The operator has cracked credentials with replication rights and is one step from Tier-0 control.",
+        points=2,
+    )
+    _an2 = _add_q(session, m4l2q, order=2, kind=QuestionKind.SINGLE,
+        stem_md="Which 4625-cluster shape best fingerprints **T1110.003 Password Spraying** (vs T1110.001 Password Guessing)?",
+        options=[
+            {"value": "guess", "label": "Many failures against *one* user from one source — `failure_count > 10` per `user.name` per 5min"},
+            {"value": "spray", "label": "Many *distinct users* with low per-user failure count from one source — `COUNT_DISTINCT(user.name) > 20 AND COUNT() > 30` per `source.ip` per 10min"},
+            {"value": "any", "label": "Any failure burst regardless of user-fan-out"},
+            {"value": "single", "label": "A single 4625 event"},
+        ],
+        correct="spray",
+        explanation_md="Password spraying inverts the brute-force shape — *many distinct users, few passwords each* (typically 1–3 attempts per user to evade lockout policy). The aggregation key is the **source IP**, with `COUNT_DISTINCT(user.name)` as the user-fan-out signal. Per-user failure clusters are guessing (T1110.001), not spraying.",
+        points=2,
+    )
+    _add_q(session, m4l2q, order=3, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *correct* fingerprints for **T1558 Kerberos ticket forging / theft** sub-techniques?",
+        options=[
+            {"value": "kerberoast", "label": "T1558.003 Kerberoasting: EID 4769 with `TicketEncryptionType: 0x17` (RC4-HMAC) when AES is policy + high-volume TGS from one source"},
+            {"value": "asrep", "label": "T1558.004 AS-REP Roasting: EID 4768 with `PreAuthType: 0` (preauth-not-required)"},
+            {"value": "golden", "label": "T1558.001 Golden Ticket: a 4624 successful logon at `LogonType: 2` from a console"},
+            {"value": "silver", "label": "T1558.002 Silver Ticket is hard to detect deterministically — often surfaces only via post-hoc lateral-movement anomaly"},
+        ],
+        correct=["kerberoast", "asrep", "silver"],
+        explanation_md="The trap is the Golden Ticket option — Golden Tickets are *forged TGTs* signed with the `krbtgt` hash; they bypass the entire 4768 issuance step, so an interactive 4624 is unrelated. Detection of Golden / Silver Tickets is genuinely hard (tickets are crypto-valid) and usually surfaces via anomalies in ticket lifetime, missing 4768 issuance, or replay nonces — covered in retrospective hunts.",
+        points=3,
+    )
+    _add_q(session, m4l2q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="The Sysmon EID 10 ProcessAccess `GrantedAccess` mask values `0x1010` and `0x1F0FFF` against `lsass.exe` are reliable fingerprints of T1003.001 LSASS dumping — but modern attackers tune their requested access rights to evade these specific masks, so the L2's hunt should treat them as *common* signals (not definitive) and pair with behavioural / process-tree context.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** `0x1010` and `0x1F0FFF` (and adjacent values `0x1410` / `0x1438` / `0x143a` / `0x1FFFFF`) are the most common LSASS-dump GrantedAccess masks, but tools like `nanodump` request narrower access rights specifically to evade detection. The L2's hunt covers the common values and pairs with parent-process context (`procdump.exe`, `rundll32.exe comsvcs.dll`, browser-spawned tooling) for high-confidence triage.",
+        points=2,
+    )
+
+    # Lesson 4.3 — Lateral Movement (TA0008)
+    m4l3 = _add_lesson(
+        session, mod4, order=5,
+        title="Lateral Movement (TA0008) — top techniques and their fingerprints",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Hunt **T1021 Remote Services** — RDP (.001), SMB / Admin Shares (.002), DCOM (.003), SSH (.004), VNC (.005), WinRM (.006)
+> 2. Detect **T1570 Lateral Tool Transfer** — `bitsadmin /transfer`, `certutil -urlcache -split -f`, `\\\\host\\C$\\Users\\Public\\` copies
+> 3. Hunt **T1550 Use Alternate Authentication Material** — Pass-the-Hash (.002) and Pass-the-Ticket (.003)
+> 4. Recognise **T1210 Exploitation of Remote Services** — EternalBlue, ProxyShell, ZeroLogon, PrintNightmare
+> 5. Author multi-key EQL `sequence by host.name, user.name with maxspan` for lateral chains
+
+## T1021 Remote Services
+
+### .001 RDP
+
+LogonType 10 + EID 4778/4779 reconnect events. Source from external IP or non-jumpbox workstation:
+
+```eql
+authentication where event.code == "4624"
+  and winlog.event_data.LogonType == "10"
+  and not winlog.event_data.IpAddress : ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+                                          "::1", "127.0.0.1", "-")
+```
+
+For lateral RDP from a workstation that isn't a jumpbox:
+
+```eql
+sequence by host.name with maxspan=2m
+  [ authentication where event.code == "4624" and winlog.event_data.LogonType == "10" ]
+  [ network where destination.port == 3389 and source.ip : "192.168.0.0/16" ]
+```
+
+### .002 SMB / Admin Shares
+
+LT3 to ADMIN$ / C$ / IPC$:
+
+```kql
+event.code: "4624"
+  and winlog.event_data.LogonType: "3"
+  and (winlog.event_data.ShareName: ("\\\\\\\\*\\\\ADMIN$" or "\\\\\\\\*\\\\C$" or "\\\\\\\\*\\\\IPC$")
+       or winlog.event_data.TargetUserName: ("Administrator" or "Admin*"))
+  and not source.ip: ("10.10.10.0/24")  // exclude DC subnet, backup-server subnet
+```
+
+### .003 DCOM
+
+`MMC20.Application.ExecuteShellCommand` / `ShellWindows` / `ShellBrowserWindow` abused for remote execution. Surfaces as `process.parent.name : "mmc.exe"` with `process.name : ("powershell.exe", "cmd.exe")` on the target host, paired with a 4624 LT3 from the source. EQL:
+
+```eql
+sequence by host.name with maxspan=1m
+  [ authentication where event.code == "4624" and winlog.event_data.LogonType == "3" ]
+  [ process where process.parent.name : ("mmc.exe", "explorer.exe")
+              and process.name : ("powershell.exe", "cmd.exe", "wscript.exe") ]
+```
+
+### .004 SSH
+
+`sshd` accepting password auth where keys are policy. Surfaces in `auth.log` (Linux Beats / Filebeat system module) with `event.action: "ssh_login"`:
+
+```kql
+event.dataset: ("system.auth" or "system.security")
+  and event.action: "ssh_login"
+  and event.outcome: "success"
+  and not source.ip: ("10.0.0.0/8" or "172.16.0.0/12" or "192.168.0.0/16")
+```
+
+### .005 VNC
+
+Port 5900 + attacker tooling. Less common in mature estates.
+
+### .006 WinRM
+
+Port 5985 (HTTP) / 5986 (HTTPS); `Enter-PSSession`, `Invoke-Command`. **EID 4624 with `LogonProcessName: "WinRM"`** is the giveaway:
+
+```kql
+event.code: "4624"
+  and winlog.event_data.LogonType: "3"
+  and winlog.event_data.LogonProcessName: "WinRM"
+```
+
+## T1570 Lateral Tool Transfer
+
+Copying tooling between hosts after initial pivot. Common patterns:
+
+```eql
+process where (
+  // BITS abuse
+  (process.name : "bitsadmin.exe" and process.command_line : ("*/transfer*", "*/create*"))
+  // certutil downloader
+  or (process.name : "certutil.exe" and process.command_line : ("*-urlcache*", "*-split*", "*-f http*"))
+  // PowerShell remote copy
+  or (process.name : ("powershell.exe", "pwsh.exe")
+      and process.command_line : ("*Invoke-WebRequest*", "*Net.WebClient*", "*Start-BitsTransfer*"))
+  // SMB copy to admin share
+  or (process.name : "cmd.exe" and process.command_line : "*copy*\\\\\\\\*\\\\C$\\\\*")
+)
+```
+
+## T1550 Use Alternate Authentication Material
+
+### .002 Pass-the-Hash
+
+NTLM hash reused without plaintext password. Three telemetry surfaces:
+
+- **EID 4624** NTLM with `LogonType: 9` (`NewCredentials`) from a non-DC source against an admin account.
+- **EID 4624** `LogonType: 3` with `LogonProcessName: "NtLmSsp"` and `AuthenticationPackageName: "NTLM"` against an admin account from a non-DC.
+- **EID 4776** NTLM credential validation with high failure rate (often paired with success).
+
+```kql
+event.code: "4624"
+  and winlog.event_data.LogonType: ("3" or "9")
+  and winlog.event_data.AuthenticationPackageName: "NTLM"
+  and winlog.event_data.TargetUserName: ("Administrator" or "Admin*" or "*-adm")
+  and not source.ip: ("10.10.10.0/24")  // exclude DC subnet
+```
+
+### .003 Pass-the-Ticket
+
+Kerberos TGT/TGS reuse. Surfaces as 4768/4769 with anomalous source — a TGT issuance for an account that didn't 4624 from that source IP.
+
+## T1210 Exploitation of Remote Services
+
+EternalBlue (MS17-010), ProxyShell (Exchange CVE-2021-34473 chain), ZeroLogon (CVE-2020-1472), PrintNightmare (CVE-2021-34527). Detection is exploit-specific; the L2's reflex on a fresh CVE in the KEV catalogue is to:
+
+1. Pull `network` events for the affected ports / protocols.
+2. Pull `process` events for child processes of the vulnerable service (`spoolsv.exe`, `Exchange OWA app pool`, etc.).
+3. Pull `file` events for new files on disk in the vulnerable service's directory.
+
+ZeroLogon (CVE-2020-1472) example — abnormal Netlogon RPC traffic to a DC:
+
+```kql
+event.dataset: "system.security" and event.code: ("4742" or "4624")
+  and winlog.event_data.LogonProcessName: "Netlogon"
+  and winlog.event_data.PasswordLastSet: "2020*"  // reset after exploitation; use UTC bound
+```
+
+## Authoring multi-key EQL `sequence` for lateral chains
+
+The L2's signature query shape. Two-step pattern joining the source-host event with the destination-host event by *both* host and user:
+
+```eql
+sequence by host.name, user.name with maxspan=10m
+  [ process where process.name : ("powershell.exe", "pwsh.exe")
+              and process.command_line : "*Invoke-Mimikatz*" ]
+  [ authentication where event.code == "4624"
+                     and winlog.event_data.LogonType == "3"
+                     and not source.ip : ("10.10.10.0/24") ]
+```
+
+Multi-key `by` correlates the whole chain on the same host *and* user — which usually distinguishes a lateral pivot (same user, new host) from a reauthentication (same user, same host).
+
+## Worked end-to-end — *Kerberoast → Lateral RDP* chain
+
+```eql
+sequence by host.name with maxspan=30m
+  [ iam where event.code == "4769" and winlog.event_data.TicketEncryptionType == "0x17" ]
+  [ authentication where event.code == "4624"
+                     and winlog.event_data.LogonType == "10"
+                     and not winlog.event_data.IpAddress : ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16") ]
+```
+
+Step 1 catches the Kerberoasting TGS request; step 2 catches a lateral RDP from a non-RFC1918 source within 30 minutes. The chain implies *credential cracked offline → RDP from attacker infrastructure*.
+
+## Glossary
+
+- **LogonType 9 + NTLM** — Pass-the-Hash classical fingerprint.
+- **`LogonProcessName: "WinRM"`** — WinRM lateral fingerprint.
+- **EID 4778 / 4779** — RDP reconnect / disconnect; pair with 4624 LT10.
+- **DCOM lateral pattern** — `mmc.exe` parent of `cmd.exe` / `powershell.exe` after a 4624 LT3.
+- **`bitsadmin /transfer` / `certutil -urlcache`** — T1570 lateral-tool-transfer tradecraft.
+
+## Further reading
+
+- ATT&CK — T1021 / T1570 / T1550 / T1210.
+- Microsoft Learn — *Pass-the-Hash mitigations* and *Restrict NTLM*.
+- Elastic Security prebuilt rules — Lateral Movement EQL rules.
+""",
+    )
+    m4l3q = _add_lesson(
+        session, mod4, order=6, title="Lateral Movement — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on PtH logon-type fingerprints, WinRM `LogonProcessName`, T1570 lateral-tool-transfer tradecraft, and multi-key EQL sequence keys.",
+    )
+    _add_q(session, m4l3q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Which of the following is the most precise EID 4624 signature of **T1550.002 Pass-the-Hash** lateral movement?",
+        options=[
+            {"value": "lt2_ntlm", "label": "LogonType 2 (Interactive) with `AuthenticationPackageName: NTLM`"},
+            {"value": "lt9_ntlm", "label": "LogonType 9 (NewCredentials) with `AuthenticationPackageName: NTLM` against an admin account from a non-DC source"},
+            {"value": "lt10_kerb", "label": "LogonType 10 (RemoteInteractive) with `AuthenticationPackageName: Kerberos`"},
+            {"value": "lt5_ntlm", "label": "LogonType 5 (Service) with NTLM"},
+        ],
+        correct="lt9_ntlm",
+        explanation_md="LogonType 9 is `NewCredentials` (`runas /netonly`) — the classical Pass-the-Hash pattern: the attacker uses a stolen NTLM hash to authenticate to a remote resource without the plaintext password. Combined with `AuthenticationPackageName: NTLM` against an admin account from a non-DC source, it's the textbook PtH fingerprint. LT3 with NTLM is also a PtH variant but LT9 is the most specific.",
+        points=2,
+    )
+    _add_q(session, m4l3q, order=2, kind=QuestionKind.SINGLE,
+        stem_md="An L2 hunts for **T1021.006 WinRM** lateral movement and wants the most specific 4624 fingerprint (low FP). Which field-value combination should the hunt key on?",
+        options=[
+            {"value": "lt3_only", "label": "LogonType 3 only"},
+            {"value": "winrm_proc", "label": "LogonType 3 with `LogonProcessName: \"WinRM\"` — distinguishes WinRM from generic SMB / RPC traffic that also produces LT3"},
+            {"value": "port", "label": "Port 5985 / 5986 in network events only"},
+            {"value": "psexec", "label": "Service installs (EID 7045) — that's PsExec, not WinRM"},
+        ],
+        correct="winrm_proc",
+        explanation_md="`LogonProcessName: \"WinRM\"` on a 4624 LT3 is what distinguishes WinRM from generic SMB / RPC logon-type-3 traffic. The port (5985/5986) is a complementary signal but the LogonProcessName is the deterministic fingerprint. Service installs are PsExec (T1569.002 / T1021.002), not WinRM.",
+        points=2,
+    )
+    _add_q(session, m4l3q, order=3, kind=QuestionKind.MULTI,
+        stem_md="Which of the following process patterns are *typical* T1570 Lateral Tool Transfer fingerprints?",
+        options=[
+            {"value": "bitsadmin", "label": "`bitsadmin.exe /transfer ...` or `bitsadmin /create ...`"},
+            {"value": "certutil", "label": "`certutil.exe -urlcache -split -f http://...`"},
+            {"value": "iwr", "label": "`Invoke-WebRequest` or `Net.WebClient` from PowerShell"},
+            {"value": "smb_admin", "label": "`copy ... \\\\\\\\HOST\\\\C$\\\\Users\\\\Public\\\\...` (cmd-side SMB copy to admin share)"},
+            {"value": "ipconfig", "label": "`ipconfig /all` — discovery"},
+        ],
+        correct=["bitsadmin", "certutil", "iwr", "smb_admin"],
+        explanation_md="`bitsadmin /transfer`, `certutil -urlcache -split -f`, PowerShell `Invoke-WebRequest` / `Net.WebClient`, and SMB copies to admin shares are all canonical T1570 lateral-tool-transfer patterns. `ipconfig /all` is a T1016 discovery command — different tactic family.",
+        points=3,
+    )
+    _add_q(session, m4l3q, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="An EQL `sequence by host.name, user.name with maxspan=10m` is more precise than `sequence by host.name with maxspan=10m` for lateral-movement chains because it correlates the chain on *both* host and user — distinguishing a lateral pivot (same user, new host) from incidental noise.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** Multi-key `by host.name, user.name` keeps the user identity stable across the chain — a lateral pivot is the *same user appearing on a new host*, which is exactly what this correlation captures. Single-key `by host.name` correlates events on the destination but loses the per-user signal, producing false matches when multiple users transit a host.",
+        points=2,
+    )
+
+    # Lesson 4.4 — Cloud-identity hunts + AiTM + capstone
+    m4l4 = _add_lesson(
+        session, mod4, order=7,
+        title="Cloud-identity hunts (Entra/Azure AD), AiTM signals, and a worked end-to-end capstone",
+        lesson_type=LessonType.READING, duration_min=26,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Read **Entra ID sign-in log** fields (`azure.signinlogs.properties.*`) — `risk_level_during_sign_in`, `risk_event_types_v2`, `client_app_used`, `authentication_requirement`, `session_id`, `correlation_id`, `device_detail.*`, `location.*`
+> 2. Author the **AiTM session-cookie reuse** detection — same `session_id` reused from new IP / UA / device within minutes, MFA `previouslySatisfied`
+> 3. Hunt **Entra audit log** signals — `Add user`, `Add member to role`, `Consent to application`, `Add service principal`, mailbox-rule and inbox-forwarding patterns
+> 4. Recognise **federation tampering** (T1556.006) — Domain Federation Settings, Golden SAML
+> 5. Walk the **PEAK capstone** for *Kerberoasting → Lateral RDP → DCSync* end to end with a Kibana Security EQL detection-rule body
+
+## Entra ID sign-in logs — the daily L2 surface
+
+`logs-azure.signinlogs-*` carries every interactive and non-interactive sign-in. The fields the L2 reaches for daily are listed in Lesson 4.1; here we apply them to concrete hunts.
+
+### High-risk sign-ins overview
+
+```esql
+FROM logs-azure.signinlogs-*
+| WHERE @timestamp > NOW() - 24h
+  AND azure.signinlogs.properties.risk_level_during_sign_in IN ("high", "medium")
+| STATS event_count = COUNT(),
+        risk_types = VALUES(azure.signinlogs.properties.risk_event_types_v2),
+        ips = VALUES(azure.signinlogs.properties.ip_address),
+        client_apps = VALUES(azure.signinlogs.properties.client_app_used)
+  BY azure.signinlogs.properties.user_principal_name
+| SORT event_count DESC
+| LIMIT 100
+```
+
+### Legacy authentication — the silent gap
+
+`client_app_used` values `IMAP4`, `POP3`, `Authenticated SMTP`, `Other clients` indicate **legacy authentication** — protocols that bypass MFA at the protocol level. Microsoft has deprecated basic auth for most but estate coverage is mixed.
+
+```kql
+event.dataset: "azure.signinlogs"
+  and azure.signinlogs.properties.client_app_used: ("IMAP4" or "POP3" or "Authenticated SMTP" or "Other clients")
+  and azure.signinlogs.properties.status.error_code: 0
+```
+
+A successful legacy-auth sign-in is *especially* suspicious for an MFA-enrolled user — it likely indicates a configuration gap an attacker has exploited.
+
+## The AiTM session-cookie replay pattern — *the* L2 cloud-hunt
+
+The textbook AiTM signal in Entra logs:
+
+1. Successful interactive sign-in from the user's normal IP, MFA satisfied via Authenticator push.
+2. Within minutes, a non-interactive sign-in for the *same `session_id`* from a different IP / country / UA, MFA `previouslySatisfied`.
+3. Inbox rule creation in the Unified Audit Log (`logs-azure.auditlogs-*`).
+4. New device or auth-method registration (T1098.005).
+
+EQL `sequence` for steps 1–2:
+
+```eql
+sequence by azure.signinlogs.properties.user_principal_name,
+            azure.signinlogs.properties.session_id
+            with maxspan=15m
+  [ any where event.dataset == "azure.signinlogs"
+          and azure.signinlogs.properties.authentication_requirement == "multiFactorAuthentication"
+          and azure.signinlogs.properties.authentication_details : "*satisfied*" ]
+  [ any where event.dataset == "azure.signinlogs"
+          and azure.signinlogs.properties.authentication_details : "*previouslySatisfied*" ]
+```
+
+Adding the IP-divergence check via ES|QL aggregation:
+
+```esql
+FROM logs-azure.signinlogs-*
+| WHERE @timestamp > NOW() - 24h
+| STATS sources = VALUES(azure.signinlogs.properties.ip_address),
+        device_count = COUNT_DISTINCT(azure.signinlogs.properties.device_detail.device_id),
+        ua_count = COUNT_DISTINCT(azure.signinlogs.properties.device_detail.browser),
+        events = COUNT()
+  BY azure.signinlogs.properties.user_principal_name,
+     azure.signinlogs.properties.session_id,
+     BUCKET(@timestamp, 30m)
+| WHERE device_count > 1 OR ua_count > 1
+| SORT events DESC
+| LIMIT 100
+```
+
+When `device_count > 1` or `ua_count > 1` for the same `(user, session_id)` in a 30-minute window, the cookie has likely been replayed from an attacker-controlled host.
+
+## Entra audit-log signals — post-takeover tradecraft
+
+`logs-azure.auditlogs-*` carries admin actions. The signals that follow a cloud takeover:
+
+- **`New-InboxRule`** / **`Set-InboxRule`** — auto-forward, move-to-RSS-Feeds, delete-on-receipt with finance keywords.
+- **`Add-MailboxPermission`** — granting Full Access / Send-As to another mailbox.
+- **`Set-Mailbox -ForwardingSmtpAddress`** — mailbox-level forwarding to attacker.
+- **`Update application` / `Add service principal credentials` / `Consent to application`** — OAuth backdoor establishment.
+- **`Add member to role`** — privilege escalation (e.g. `Global Administrator`, `Privileged Role Administrator`).
+
+KQL hunt for finance-keyword inbox rules (the BEC fingerprint from L1 M6):
+
+```kql
+event.dataset: "azure.auditlogs"
+  and azure.auditlogs.operation_name: ("New-InboxRule" or "Set-InboxRule")
+  and azure.auditlogs.properties.target_resources: (*invoice* or *wire* or *swift*
+                                                     or *payment* or *bank* or *remit*)
+```
+
+ES|QL hunt for service-principal credential additions — the OAuth-backdoor fingerprint:
+
+```esql
+FROM logs-azure.auditlogs-*
+| WHERE @timestamp > NOW() - 7d
+  AND azure.auditlogs.operation_name IN ("Update application – Certificates and secrets management",
+                                          "Add service principal credentials",
+                                          "Add owner to service principal")
+| STATS event_count = COUNT(),
+        actors = VALUES(azure.auditlogs.properties.initiated_by.user.user_principal_name),
+        targets = VALUES(azure.auditlogs.properties.target_resources)
+  BY azure.auditlogs.properties.target_resources, BUCKET(@timestamp, 1h)
+| SORT event_count DESC
+| LIMIT 100
+```
+
+A spike in this signal — *especially* if the actor is a non-admin user, or the target is a high-privilege app like `Microsoft Graph PowerShell` — is the **T1098.001** *Additional Cloud Credentials* fingerprint.
+
+## Federation tampering — T1556.006
+
+Adversaries who have Tier-0 access can pivot to *long-term persistence* by adding a rogue federated domain or trust. **`Set domain authentication`** / **`Set federation settings on domain`** in the audit log:
+
+```kql
+event.dataset: "azure.auditlogs"
+  and azure.auditlogs.operation_name: ("Set domain authentication"
+                                       or "Set federation settings on domain"
+                                       or "Update domain")
+```
+
+Any such operation is rare in normal ops and a *page-IR* signal when not part of a documented federation change.
+
+**Golden SAML** (T1606.002) — sign tokens with a stolen ADFS / token-signing key. Detection is hard from sign-in logs alone (the tokens are crypto-valid); often surfaces only when the federation-settings change is paired with anomalous service-principal sign-ins.
+
+## The PEAK capstone — *Kerberoasting → Lateral RDP → DCSync* chain
+
+A complete L2-grade hunt walked end-to-end.
+
+### Prepare
+
+**Hypothesis (four-element):** *In the past 30 days, an adversary has chained Kerberoasting (T1558.003) → Lateral RDP from a non-RFC1918 source (T1021.001) → DCSync (T1003.006) on at least one domain, observable in `winlogbeat-*` via EID 4769 with `TicketEncryptionType: 0x17` followed by EID 4624 LT10 from a non-RFC1918 source followed by EID 4662 with the replication GUID from a non-DC source, all within 30 minutes.*
+
+- **Hypothesis type:** TTP-based (chain).
+- **ATT&CK mapping:** T1558.003 → T1021.001 → T1003.006.
+- **Data sources:** `winlogbeat-*` (4769 / 4624 / 4662 events).
+- **Window:** explicit UTC.
+
+### Execute
+
+The full EQL `sequence`:
+
+```eql
+sequence by host.name with maxspan=30m
+  [ iam where event.code == "4769"
+         and winlog.event_data.TicketEncryptionType == "0x17"
+         and not winlog.event_data.ServiceName : ("*$", "krbtgt") ]
+  [ authentication where event.code == "4624"
+                     and winlog.event_data.LogonType == "10"
+                     and not winlog.event_data.IpAddress : ("10.0.0.0/8",
+                                                             "172.16.0.0/12",
+                                                             "192.168.0.0/16") ]
+  [ iam where event.code == "4662"
+         and winlog.event_data.Properties : ("*1131f6aa-9c07-11d1-f79f-00c04fc2dcd2*",
+                                              "*1131f6ad-9c07-11d1-f79f-00c04fc2dcd2*") ]
+```
+
+### Act
+
+Survivor list:
+
+- **0 TPs** — confidence-medium-high on negative; document.
+- **TP found** — *page-IR immediately.* The chain implies credential cracking offline, lateral RDP from attacker infrastructure, and replication-rights abuse against the DC. Tier-0 control is one step away.
+
+### Know
+
+Update Navigator coverage red → orange. Propose the EQL rule body (above) as a Kibana Security detection rule with severity *critical*, runbook `RUNBOOK-T1003.006-DCSYNC`, owner `IR-team`. Once shipped, transition orange → yellow → green.
+
+### The Kibana Security rule body
+
+The Q3 EQL `sequence` *is* the rule body — no rewriting. Add metadata:
+
+```yaml
+rule_type: eql
+severity: critical
+threat:
+  - tactic_id: TA0006
+    technique_id: T1558.003
+  - tactic_id: TA0008
+    technique_id: T1021.001
+  - tactic_id: TA0006
+    technique_id: T1003.006
+runbook: RUNBOOK-T1003.006-DCSYNC
+owner: IR-team
+```
+
+## Glossary
+
+- **`session_id` reuse** — same value across IPs / UAs / devices in minutes = AiTM cookie replay.
+- **Legacy auth (`IMAP4` / `POP3` / `Authenticated SMTP`)** — protocols that bypass MFA at the protocol level; flag for hunts.
+- **`previouslySatisfied` MFA** — second-event MFA value that pairs with `session_id` reuse to fingerprint AiTM.
+- **`Set federation settings on domain`** — T1556.006 / Golden SAML preparation; *page-IR* signal.
+- **Three-step chain (T1558.003 → T1021.001 → T1003.006)** — the canonical Kerberoasting → Lateral → DCSync attack path.
+
+## Further reading
+
+- Microsoft Learn — *Sign-in logs in Microsoft Entra ID* (`risk_event_types_v2` reference).
+- ATT&CK — T1078.004 / T1098 / T1539 / T1556.006 / T1606.002.
+- Elastic docs — *Azure integration* sub-modules (`signinlogs`, `auditlogs`).
+""",
+    )
+    m4l4q = _add_lesson(
+        session, mod4, order=8, title="Cloud identity & capstone — quiz",
+        lesson_type=LessonType.QUIZ, duration_min=8,
+        content_md="Four questions on the AiTM `session_id` pattern, legacy-auth signals, federation-tampering severity, and the three-step chain rule body.",
+    )
+    _add_q(session, m4l4q, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 sees an Entra sign-in for `alex@corp` with `session_id: \"abc-123\"` from London at 09:14 UTC (MFA satisfied). At 09:21 UTC the same `session_id` appears from a Tor-exit IP with `device_detail.browser: \"Chrome on Linux\"` and `authentication_details` containing `previouslySatisfied`. What is the L2's correct reading?",
+        options=[
+            {"value": "vpn", "label": "Likely a corporate VPN — close as benign"},
+            {"value": "aitm", "label": "Textbook **AiTM session-cookie replay** (T1539) — same `session_id` reused from a new IP / UA / device with MFA `previouslySatisfied`. Page IR; revoke sessions and refresh tokens"},
+            {"value": "mfa_fatigue", "label": "MFA fatigue / push bombing"},
+            {"value": "spray", "label": "Password spray"},
+        ],
+        correct="aitm",
+        explanation_md="Same `session_id` + new IP/UA/device + `previouslySatisfied` MFA within minutes is the canonical AiTM cookie-replay fingerprint. Module 6 (L1) covered the user-side phishing entry; here the L2 catches the *replay* on the cloud side. Revoke active sessions and refresh tokens via `Revoke-MgUserSignInSession`; the password reset alone won't kill the stolen cookie.",
+        points=2,
+    )
+    _add_q(session, m4l4q, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following Entra sign-in `client_app_used` values indicate **legacy authentication** that bypasses MFA at the protocol level?",
+        options=[
+            {"value": "imap", "label": "`IMAP4`"},
+            {"value": "pop", "label": "`POP3`"},
+            {"value": "smtp", "label": "`Authenticated SMTP`"},
+            {"value": "other", "label": "`Other clients`"},
+            {"value": "browser", "label": "`Browser`"},
+        ],
+        correct=["imap", "pop", "smtp", "other"],
+        explanation_md="IMAP4, POP3, Authenticated SMTP, and *Other clients* are the canonical legacy-auth values — they bypass MFA at the protocol level. `Browser` is modern-auth and respects MFA. A successful legacy-auth sign-in for an MFA-enrolled user is especially suspicious — it usually indicates a configuration gap an attacker has exploited.",
+        points=3,
+    )
+    _add_q(session, m4l4q, order=3, kind=QuestionKind.SINGLE,
+        stem_md="An Entra audit-log event `Set federation settings on domain` fires unattributed (no documented federation change in the change-management ticket). What's the correct L2 disposition?",
+        options=[
+            {"value": "monitor", "label": "Tag as informational; federation settings change rarely"},
+            {"value": "queue", "label": "Open a low-severity case and queue"},
+            {"value": "page", "label": "**Page IR immediately** — `Set federation settings on domain` is a T1556.006 fingerprint and paves the path to *Golden SAML* (T1606.002) tenant-wide persistence; Tier-0-equivalent risk in the cloud control plane"},
+            {"value": "tune", "label": "Submit a tuning ticket — the rule must be FP-rich"},
+        ],
+        correct="page",
+        explanation_md="Federation-settings changes are extremely rare in normal ops (often once a year, with a documented change). When they fire unattributed, the operator is establishing tenant-wide persistence via a rogue federated domain — the path to *Golden SAML* token forging that bypasses every conditional-access control. Page IR; revoke any in-progress federation change; freeze the affected domain.",
+        points=2,
+    )
+    _add_q(session, m4l4q, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="Map the canonical *Kerberoasting → Lateral RDP → DCSync* attack chain to the **three ATT&CK sub-technique IDs** in order. Format: `T####.### → T####.### → T####.###`.",
+        options=None,
+        correct=["T1558.003 → T1021.001 → T1003.006", "T1558.003 -> T1021.001 -> T1003.006", "1558.003 → 1021.001 → 1003.006", "T1558.003, T1021.001, T1003.006", "T1558.003 T1021.001 T1003.006"],
+        explanation_md="**T1558.003 (Kerberoasting) → T1021.001 (RDP lateral) → T1003.006 (DCSync)**. The three steps form the textbook on-prem domain-takeover chain — service-account hash cracked offline, lateral RDP from attacker infrastructure, replication-rights abuse against the DC for full domain credential material. The L2's EQL `sequence by host.name with maxspan=30m` covering all three is *the* high-value detection in this module.",
+        points=2,
+    )
+
+    print(f"  L2: {course.title} — 4 modules, 32 lessons (Module 4 Identity & Sign-in @ proper depth)")
     return course
 
 
