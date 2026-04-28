@@ -1,5 +1,60 @@
 # Changelog
 
+## v0.11.12 (2026-04-28) — L2 begins
+
+### L2 Module 1 — The Hunt Hypothesis (PEAK methodology) — first L2 ship at BTL1+/SANS depth
+
+L2 *Threat Hunting with KQL* leaves the v0.11.2 stub state. **L2 Module 1 — The Hunt Hypothesis (PEAK methodology)** authored from a research-agent dossier at the BTL1+/SANS GCIH+/FOR578-equivalent depth bar. ~10,000 words, 8 lessons (4 reading + 4 quiz), 16 quiz questions. The previous v0.11.2 stub (1 module / 2 lessons covering PEAK at framework-demo depth) is *replaced* — same module slot, eight times the depth.
+
+#### Lesson breakdown
+
+| # | Title | Type | Quiz qs |
+|---|---|---|---|
+| 1.1 | Why hunt? The strategic frame | reading | — |
+| 1.2 | Why hunt? — quiz | quiz | 4 |
+| 1.3 | The PEAK loop end-to-end (Prepare → Execute → Act → Know) | reading | — |
+| 1.4 | PEAK loop — quiz | quiz | 4 |
+| 1.5 | The hypothesis: four-element + SMART, hypothesis types, criticism | reading | — |
+| 1.6 | The hypothesis — quiz | quiz | 4 |
+| 1.7 | Documenting and learning: hunt reports, the negative-result discipline, ION surfaces, and a worked T1218.011 hunt | reading | — |
+| 1.8 | Documenting & ION — quiz | quiz | 4 |
+
+#### Topics covered
+
+- **Why hunt? Strategic frame** — detection-only SOCs are structurally blind; *detection rule = hypothesis frozen in code*; hunt fills the gap. The dwell-time problem with current-year medians — 5–10 day medians for ransomware, sub-24h for fast-flux, much longer for quiet identity-tier intrusions; the long-tail matters more than the median; *hunting is asymmetrically valuable on cases the rules missed*. CTID **threat-informed defence** doctrine — Top Techniques calculator + Adversary Emulation Library. **Pyramid of Pain reframed for hunters** — for triage, hunt the bottom; for hunting, prioritise the top three layers (TTPs / tools / artefacts) because re-engineering tradecraft is the most expensive thing you can make an adversary do. Five-axis distinction between **hunt vs IR vs DE** (trigger / stance / disposition / timebox / output) — *the hunt produces the idea; detection engineering produces the rule*. Bianco's **Hunting Maturity Model HM0 → HM4** — most SOCs sit at HM1–HM2, L2 hunters individually unblock HM3. Why L2 hunting is the career-defining skill — builds the mental model for IR, DE, threat-intel, and red-team work; epistemic shift from response to interrogation
+- **The PEAK loop** — Splunk SURGe (2023) successor to the Sqrrl Hunting Loop and TaHiTI; Prepare ~20–30% (topic pick / hypothesis / data-source confirmation / success criteria / window / intent) → Execute ~40–50% (broad-to-narrow KQL with audit trail) → Act ~15–20% (TP / BTP / FP / Inconclusive / no-findings disposition) → Know ~10–15% (retro / Navigator update / next-hunt seed). Iteration *within* phases is legitimate as long as time-budget drift is tracked. **Sprint hunts** as PEAK at 90-minute scale for fresh-CTI response. Predecessor lineage — HEAT → Sqrrl Hunting Loop → TaHiTI → Sqrrl Reference Model → PEAK; NIST SP 800-150 feeds Prepare. Where PEAK improves: cleaner phase split, hypothesis as first-class artefact, *Know* phase makes negatives valuable, TIDE/Sigma compatible
+- **The hypothesis** — the **four-element template** (TTP + artefact + data source + window) and the **SMART criteria** (Specific, Measurable, Adversary-relevant, Realistic, Time-bounded). Worked good vs weak hypotheses with rewrite flow. Five **hypothesis types** — TTP-based / anomaly-based / situational-awareness / threat-actor-based / custom-detector-based — with worked seed examples. The four-question **criticism step** before Execute (data-source resolution / FP base-rate / variants that escape / null hypothesis). Three failure modes — *hypothesis-as-keyword*, *hypothesis-as-tool-list*, *hypothesis-as-fishing-trip*
+- **Documenting and learning** — the **hunt-report template** (Hunt ID / Hypothesis verbatim / Type / ATT&CK mapping / Data sources / Window / Queries Q1–Qn / Findings TP/BTP/FP/Inconclusive / Verdict / Confidence-on-negative / Action items / Time by phase). The **negative-result discipline** with the three-component confidence-on-absence statement (quantify the negative + quantify data confidence + state residual uncertainty); the **false-confidence trap** with bounded-claim discipline. **Worked PEAK hunt for T1218.011 Rundll32 javascript** end-to-end — Prepare 1.5h, Execute 3.0h with the five-query progression (broad → parent filter → account filter → process-tree enrichment → network correlation), Act 1.0h with 0 TPs / 7 BTPs / 4 FPs / 1 Inconclusive, Know 0.8h with confidence-medium-high and a follow-up T1218.010 hunt seeded. The **five-gate detection-rule hand-off** (FP-rate measurement → whitelist → metadata → TIDE submission → lifecycle). **ATT&CK Navigator coverage states** (red → orange → yellow → green) and the rolling 90-day re-hunt cadence on orange cells. **ION-specific surfaces** — hunt-tagged cases routing to IR with the hunt report attached, AlertPromptTemplate matcher tier 2 (regex) and tier 3 (technique) authoring by L2 hunters, Bob's hunt-derived reasoning citing hunt-report IDs, the **hunt repository** indexed semantically by pgvector, and Bob's *triage-augmentation* role on Execute results. The **data-gap log** as the SOC's strongest argument for telemetry budget
+
+7 Mermaid diagrams across the module: PEAK loop with time-budgets, predecessor-models lineage, HMM HM0–HM4 vertical pyramid, four-element hypothesis quadrant, weak-to-strong hypothesis rewrite flow, hunt-vs-IR-vs-DE comparison, T1218.011 PEAK timeline, hunt-to-detection five-gate pipeline.
+
+L2 course now sits at **1 module / 8 lessons / 16 questions**.
+
+#### L2 roadmap
+
+The L2 *Threat Hunting with KQL* curriculum will be eight modules:
+
+| M | Title | Status |
+|---|---|---|
+| 1 | The Hunt Hypothesis (PEAK methodology) | **v0.11.12** |
+| 2 | KQL fundamentals — tabular operators | pending |
+| 3 | Process & file events — execution & defense evasion | pending |
+| 4 | Identity & sign-in — credential access & lateral | pending |
+| 5 | Network telemetry — command & control, exfiltration | pending |
+| 6 | Email & collaboration — initial access | pending |
+| 7 | Anomaly hunts — statistical methods | pending |
+| 8 | Hunt to detection capstone — TIDE / DE conversion | pending |
+
+#### Upgrade
+
+```
+cat seed_courses.py | docker exec -i ion python -
+```
+
+Idempotent — wipes `demo-*` courses and re-seeds.
+
+---
+
 ## v0.11.11 (2026-04-28) — L1 COMPLETE
 
 ### L1 Module 8 — Common ATT&CK Techniques (the L1 finale)
