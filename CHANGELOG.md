@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.12.3 (2026-04-29) — feature
+
+### CyAB Onboarding Studio — wire-up: per-data-source use-case status + coverage rollup on system detail
+
+v0.12.2 filled the catalogue. v0.12.3 wires it up: operators can now mark each detection / audit use case as `shipped` / `partial` / `gap` / `n/a` against the data source, and a coverage rollup appears on the `/cyab` system detail page summarising readiness per sub-profile.
+
+#### What changed
+
+- **`cyab_data_sources.use_case_status`** is reframed from free-text into a JSON map keyed by use-case id with the four allowed values. Pre-v0.12.3 free-text values are tolerated on read (returned as `legacy_text`) and discarded on first write — no migration needed.
+- **3 new API routes** under `/api/cyab/studio/`:
+  - `GET /systems/{sys_id}/data-sources?subprofile_id=…` — list data sources for a system, optionally filtered by sub-profile.
+  - `GET /data-sources/{ds_id}/use-case-status` — parsed status map.
+  - `POST /data-sources/{ds_id}/use-case-status` — merge status updates (send `null` to clear; unknown values rejected with 400).
+- **Studio: status pill on every use-case card.** Click cycles `gap → partial → shipped → n/a → gap`. A coverage banner above the use-case grid shows shipped/partial/total + the resolved data source name. The Studio resolves which data source to write against by `(system_id, subprofile_id)`. If multiple data sources match, status writes to the first (alphabetical by name). If none match, the banner instructs the operator to assign a sub-profile in `/cyab` first.
+- **`/cyab` system detail: new "Onboarding Studio coverage" card** rendered alongside the existing alert rollup. Shows per-sub-profile bars for Intake / Detection / Audit, with a deep link to the Studio (`/cyab/studio?system=<id>`).
+
+#### Verifying the feature
+
+1. `docker compose pull ion && docker compose up -d`
+2. Open `/cyab` and pick the SmokeTest System (or any system with a data source whose `subprofile_id` is set). The detail panel should now show two rollups (alerts + coverage).
+3. Open `/cyab/studio?system=<id>`, navigate to a sub-profile whose data source matches, switch to **Detection library**. The banner above the grid should report `Coverage: 0 shipped / 0 partial / N total · 0%`. Click any use-case status pill — it cycles colour and `status saved · HH:MM:SS` appears at the bottom of the intake area.
+4. Refresh — status persists. Reopen `/cyab` → system detail; the coverage card reflects the new shipped count.
+
+No data-model migration; no new tables. Pure column-semantic + UI wire-up.
+
+---
+
 ## v0.12.2 (2026-04-29) — feature
 
 ### CyAB Onboarding Studio — catalogue fill (12 skeletons → full depth)

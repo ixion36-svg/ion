@@ -85,6 +85,20 @@ class AnswersPatch(BaseModel):
     subprofile_id: Optional[str] = None  # for telemetry / future use; not required
 
 
+class UseCaseStatusPatch(BaseModel):
+    """Per-data-source use-case status patch (v0.12.3).
+
+    The JSON column ``cyab_data_sources.use_case_status`` is reframed
+    from free-text into a JSON map keyed by use-case id with one of the
+    four values: shipped / partial / gap / n/a. Sending None for a key
+    clears it.
+    """
+    statuses: Dict[str, Optional[str]]
+
+
+_VALID_UC_STATUSES = {"shipped", "partial", "gap", "n/a"}
+
+
 # ---------------------------------------------------------------------------
 # Catalogue read
 # ---------------------------------------------------------------------------
@@ -384,6 +398,124 @@ def patch_system_answers(
         "system_id": sys_id,
         "studio_assessment_id": row.id,
         "answer_count": len(existing),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Per-data-source use-case status (v0.12.3)
+# ---------------------------------------------------------------------------
+
+@router.get("/systems/{sys_id}/data-sources")
+def list_data_sources_for_system(
+    sys_id: int,
+    subprofile_id: Optional[str] = None,
+    session: Session = Depends(get_db_session),
+):
+    """List data sources for a system, optionally filtered by sub-profile.
+
+    Used by the Studio to resolve which data source's use_case_status
+    column to read/write for the current (system, sub-profile) context.
+    """
+    sys = session.get(CyabSystem, sys_id)
+    if sys is None:
+        raise HTTPException(status_code=404, detail="Unknown system")
+    q = select(CyabDataSource).where(CyabDataSource.system_id == sys_id)
+    if subprofile_id:
+        q = q.where(CyabDataSource.subprofile_id == subprofile_id)
+    q = q.order_by(CyabDataSource.name.asc())
+    rows = session.scalars(q).all()
+    return {
+        "system_id": sys_id,
+        "subprofile_id": subprofile_id,
+        "data_sources": [
+            {
+                "id": r.id,
+                "name": r.name,
+                "data_source_type": r.data_source_type,
+                "subprofile_id": r.subprofile_id,
+                "data_namespace": r.data_namespace,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/data-sources/{ds_id}/use-case-status")
+def get_data_source_uc_status(
+    ds_id: int,
+    session: Session = Depends(get_db_session),
+):
+    """Return the parsed use_case_status JSON for one data source.
+
+    The column may carry pre-v0.12.3 free-text — return ``{}`` in that
+    case rather than raising, and surface the raw text under
+    ``legacy_text`` so the UI can flag it for migration.
+    """
+    ds = session.get(CyabDataSource, ds_id)
+    if ds is None:
+        raise HTTPException(status_code=404, detail="Unknown data source")
+    raw = ds.use_case_status
+    parsed: Dict[str, str] = {}
+    legacy: Optional[str] = None
+    if raw:
+        try:
+            obj = json.loads(raw)
+            if isinstance(obj, dict):
+                parsed = {k: v for k, v in obj.items() if v in _VALID_UC_STATUSES}
+            else:
+                legacy = raw
+        except json.JSONDecodeError:
+            legacy = raw
+    return {
+        "data_source_id": ds_id,
+        "subprofile_id": ds.subprofile_id,
+        "statuses": parsed,
+        "legacy_text": legacy,
+    }
+
+
+@router.post(
+    "/data-sources/{ds_id}/use-case-status",
+    dependencies=[Depends(require_permission("case:write"))],
+)
+def patch_data_source_uc_status(
+    ds_id: int,
+    body: UseCaseStatusPatch,
+    session: Session = Depends(get_db_session),
+):
+    """Merge use-case statuses into a data source.
+
+    Sending value None for a key removes it. Unknown status values
+    (anything outside shipped/partial/gap/n/a) are rejected with 400.
+    """
+    ds = session.get(CyabDataSource, ds_id)
+    if ds is None:
+        raise HTTPException(status_code=404, detail="Unknown data source")
+    raw = ds.use_case_status
+    existing: Dict[str, str] = {}
+    if raw:
+        try:
+            obj = json.loads(raw)
+            if isinstance(obj, dict):
+                existing = {k: v for k, v in obj.items() if v in _VALID_UC_STATUSES}
+        except json.JSONDecodeError:
+            pass  # legacy free-text: starting fresh
+    for k, v in (body.statuses or {}).items():
+        if v is None:
+            existing.pop(k, None)
+            continue
+        if v not in _VALID_UC_STATUSES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status '{v}' for {k}; must be one of {sorted(_VALID_UC_STATUSES)}",
+            )
+        existing[k] = v
+    ds.use_case_status = json.dumps(existing, sort_keys=True)
+    session.commit()
+    return {
+        "data_source_id": ds_id,
+        "statuses": existing,
+        "count": len(existing),
     }
 
 
