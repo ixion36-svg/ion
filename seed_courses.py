@@ -22021,7 +22021,770 @@ Module 8 picks up: **Capstone exercise** — a full purple-team programme review
         points=2,
     )
 
-    print(f"  L3: {course.title} — 7 modules, 56 lessons (Module 7 OOH validation @ proper depth)")
+    # ── Module 8 — Capstone — Full purple-team programme ──────────────
+    mod8 = _add_module(
+        session, course, order=8,
+        title="Capstone — full purple-team programme review",
+        description_md=(
+            "L3 finale. Integrates all 7 prior modules into one "
+            "quarterly programme cycle: planning + execution + "
+            "scoring + retrospective. The mid-quarter pivot when CTI "
+            "shifts the threat profile; integration with the org's "
+            "risk register; the quarterly leadership / board package "
+            "(coverage + response time + TP backlog + investment asks); "
+            "career-path post-L3 (IR / detection-eng / architect / CTI); "
+            "the L3 anti-patterns that derail mature programmes; "
+            "handing off the programme to a successor."
+        ),
+        estimated_minutes=180,
+    )
+
+    # Lesson 8.1 — Full cycle
+    m8l1 = _add_lesson(
+        session, mod8, order=1,
+        title="The full cycle: plan → exercise → score → action → close",
+        lesson_type=LessonType.READING, duration_min=14,
+        content_md="""
+> **Learning objectives.**
+> 1. Recite the **five phases** of the L3's quarterly cycle
+> 2. Allocate **calendar weeks** to each phase
+> 3. Recognise the **rhythm** that makes a sustainable programme
+> 4. Spot when a phase is being **skipped** at the cost of programme depth
+
+## The five phases
+
+The L3's quarter is structured. Five phases, allocated across 12-13 weeks:
+
+| Phase | Weeks | Purpose |
+|---|---|---|
+| **1 — Plan** | W1-W2 | Threat-profile review; calendar; per-exercise authorisation drafts |
+| **2 — Execute** | W3-W10 | Run the exercises (single-TTP weekly + OOH monthly + chain mid-quarter) |
+| **3 — Score** | W3-W10 (parallel) | Per-exercise scorecard + TuningProposal authoring |
+| **4 — Action** | W3-W11 (parallel) | Engineering closes TPs; L3 re-tests; loop closes |
+| **5 — Retrospective + plan-next** | W11-W12 | Quarterly audit + report-up + Q+1 plan |
+
+Phases 2-4 run concurrently (you don't wait for week 11 to start scoring). Phases 1 and 5 are bookends.
+
+## Rhythm that makes the programme sustainable
+
+A programme without rhythm collapses. Common failure modes:
+
+- **All exercises in W11-W12** — analyst burns out; no time for engineering action.
+- **Skipping the retrospective** — same gaps recur quarter-over-quarter.
+- **Plan-as-perfectionism** — W1-W2 expands to W1-W6; less execution time.
+- **Chain at quarter-end** — chain findings have no time to convert to TPs before the quarter closes.
+
+The right rhythm: *one exercise per week*, plus the dedicated chain mid-quarter, plus retrospective at quarter-end. Predictable, sustainable, learnable.
+
+## Skipped-phase signals
+
+The L3 watches for signals that a phase is being skipped:
+
+- **No quarterly audit** → telemetry quality drift goes undetected (M4).
+- **No retrospective** → no team learning; same mistakes recur.
+- **TPs unclosed at quarter-end** → engineering capacity issue OR no re-test discipline.
+- **Pre-brief skipped on a single exercise** → mistaken-IR-engagement risk (M6.7).
+
+Each skip has a specific recovery: re-run the audit; schedule the retro; escalate stuck TPs; reinforce pre-brief.
+
+## Glossary
+
+- **Five-phase quarterly cycle** — plan / execute / score / action / retrospective+plan.
+- **Rhythm** — the predictable cadence of exercises across weeks.
+- **Skipped phase** — a phase whose absence has specific failure modes.
+- **Programme depth** — sustainable rhythm + retrospective + telemetry audit + leadership reporting.
+
+## Further reading
+
+- L1 / L2 / L3 prior modules — all integrate here.
+- Florian Roth — *Detection Engineering Programme Maturity*.
+""",
+    )
+    _add_q(session, m8l1, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="Name the **five phases** of the L3's quarterly purple-team cycle, in order. Format: comma-separated.",
+        options=None,
+        correct=[
+            "plan, execute, score, action, retrospective",
+            "plan, execute, score, action, retrospective+plan-next",
+            "plan, execute, score, action, retro",
+            "Plan, Execute, Score, Action, Retrospective",
+            "planning, execution, scoring, action, retrospective",
+            "plan, run, score, action, retrospective",
+        ],
+        explanation_md="**Plan, execute, score, action, retrospective.** The L3's quarter is structured around these five phases: Plan (W1-W2: threat profile + calendar + auth drafts), Execute (W3-W10: weekly single-TTP + monthly OOH + mid-quarter chain), Score (parallel with execute: per-exercise scorecards + TPs), Action (parallel: engineering closes TPs + L3 re-tests), Retrospective + plan-next (W11-W12: audit + report + Q+1 plan). Skipping any phase has specific failure modes (skipped retrospective → no team learning; skipped audit → telemetry drift undetected; etc.). The rhythm is what makes the programme sustainable.",
+        points=2,
+    )
+
+    # Lesson 8.2 — Worked Q3 plan
+    m8l2 = _add_lesson(
+        session, mod8, order=2,
+        title="A worked Q3 12-week programme plan",
+        lesson_type=LessonType.READING, duration_min=14,
+        content_md="""
+> **Learning objectives.**
+> 1. Author a **week-by-week programme calendar**
+> 2. Balance **single-TTP / OOH / chain** exercises across the quarter
+> 3. Pick the right **mid-quarter chain** for the threat profile
+> 4. Reserve **buffer weeks** for slip / re-test / emergent CTI
+
+## Q3 2026 programme — finance sector
+
+```
+Threat profile:  FIN6, FIN7, Conti, Carbanak, BlackCat
+Tools:           ART (single-TTP); Caldera (chain)
+Targets:         12 single-TTP in-hours + 4 OOH + 1 mid-quarter chain
+Calendar:
+
+W1   Plan          ▪ Threat-profile review (CTI updates from Q2 retrospective)
+                   ▪ Exercise calendar drafted
+                   ▪ Per-exercise auth started
+W2   Plan          ▪ Auth signed off
+                   ▪ Pre-brief templates ready
+                   ▪ Caldera lab tested
+W3   Execute       Single-TTP: T1059.001 (PowerShell) on PT-LAB-04 (in-hours)
+W4   Execute       Single-TTP: T1003.001 (LSASS) on PT-LAB-04 (in-hours)
+W5   Execute       OOH: T1078.004 (Cloud account) — paging test
+                     Mid-quarter chain plan ready
+W6   Execute       Single-TTP: T1110.003 (Spray) on Entra (in-hours)
+                     Chain authorisation finalised
+W7   Execute       FIN6 chain — 4 hosts, in-hours, full kill chain
+                     (M6 worked example)
+W8   Execute       Single-TTP: T1547.001 (Persistence) on PT-LAB-04 (in-hours)
+                     Chain TPs raised + closed-loop tracking
+W9   Execute       OOH: dual-window for W7's chain phases
+                     (M7 dual-window comparison)
+W10  Execute       Single-TTP: T1486 (Impact, sandboxed) on PT-LAB-06 (in-hours)
+W11  Audit         M4 telemetry quality audit + M7 OOH parity audit
+                   Programme retrospective draft
+W12  Retro+Plan    Retrospective meeting (30 min, all teams)
+                   Q4 plan + report-up package + risk register update
+```
+
+12 weeks; all 5 phases visible. Notable design choices:
+- The chain is mid-quarter (W7), so its TPs have W8-W11 to close before quarter-end.
+- OOH exercises are W5 (initial) + W9 (dual-window with chain). Two windows, two on-call shifts tested.
+- Audit and retro are separated weeks (W11 / W12) to avoid one-week burnout.
+- Buffer is built in: W2's "ready" milestone leaves slack; W12's retro meeting is short (30 min).
+
+## Balancing the exercise mix
+
+Per quarter, the typical mix:
+
+| Type | Count | Time per |
+|---|---|---|
+| Single-TTP in-hours | 8-12 | 1-2 hours |
+| OOH (single-TTP or short chain) | 2-4 | 1 hour |
+| Full chain (M6) | 1 | 1-2 hours per chain run |
+
+The single-TTP atomic count is high to maintain DML coverage across the threat profile. The OOH count is lower because OOH exercises are expensive (on-call disruption + pre-brief overhead). The chain is rare because it's the highest-cost / highest-leverage exercise.
+
+Mature programmes settle around 12-15 exercises per quarter. Less than 8 = under-tested; more than 20 = analyst fatigue.
+
+## Picking the mid-quarter chain
+
+Pick from the AEL (M2.6) for an actor in the threat profile:
+- **FIN6** — finance-sector classic; good for ransomware-staging chains.
+- **FIN7** — POS-targeting; relevant for retail / hospitality.
+- **Carbanak** — banking-targeted; lateral-movement-heavy.
+- **APT29** — for govt + tech sectors.
+
+The L3 picks a different actor each quarter — annual rotation through the threat profile's top 4 keeps coverage broad.
+
+## Buffer weeks
+
+Realistic programmes need slack. Build into W2 (planning) and W11 (audit) — these are "soft deadlines" the L3 can compress to absorb slip. W12's retrospective + plan-next is the firm deadline.
+
+## Glossary
+
+- **Mid-quarter chain** — the one chain exercise per quarter, scheduled mid-cycle.
+- **Exercise mix** — single-TTP + OOH + chain in proportions.
+- **Buffer weeks** — soft-deadline weeks that absorb slip.
+- **Annual rotation** — different actor in the chain each quarter.
+
+## Further reading
+
+- M2.6 — AEL plans for chain selection.
+- M6.2 — chain plan document.
+""",
+    )
+    _add_q(session, m8l2, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A new L3 plans their first quarterly purple-team programme. They schedule **20 single-TTP exercises** in W3-W11 (across 9 weeks), zero OOH exercises, no chain, and a final-week retrospective. Pick the **most-load-bearing critique**.",
+        options=[
+            {"value": "too_many", "label": "20 exercises is too many — analyst burnout risk"},
+            {"value": "no_ooh", "label": "Zero OOH exercises — half the SOC's posture (the OOH half) is untested"},
+            {"value": "no_chain", "label": "No chain — response-time KPI isn't measured"},
+            {"value": "all_three", "label": "All three — over-loading single-TTP at the cost of OOH and chain coverage"},
+        ],
+        correct="all_three",
+        explanation_md="**All three.** The 20-single-TTP-only plan over-indexes on detection fidelity at the cost of two equally important measurements: OOH posture (M7) and chain response time (M6). Single-TTP exercises measure *fidelity*; OOH measures *parity*; chain measures *response time + containment leverage*. A balanced mix has all three: 8-12 single-TTP + 2-4 OOH + 1 chain. The 20-only plan also risks burnout (>15 exercises/quarter degrades quality) and leaves no slack for slip / re-test / emergent CTI. The L3's reflex: balance the mix; defend the time investment in OOH + chain by framing them as distinct measurements that can't be derived from single-TTP runs.",
+        points=2,
+    )
+
+    # Lesson 8.3 — Mid-quarter pivot
+    m8l3 = _add_lesson(
+        session, mod8, order=3,
+        title="Mid-quarter pivot: when CTI changes the threat profile",
+        lesson_type=LessonType.READING, duration_min=12,
+        content_md="""
+> **Learning objectives.**
+> 1. Recognise valid **pivot triggers** that justify replanning mid-quarter
+> 2. Apply the **two-week pivot rule**: surface the new TTP within two weeks
+> 3. Update the **rest of the quarter** to accommodate the pivot
+> 4. Avoid the **pivot fatigue** anti-pattern
+
+## Valid pivot triggers
+
+The plan isn't sacred. Some events justify replanning mid-quarter:
+
+| Trigger | Action |
+|---|---|
+| Sector ISAC publishes a new actor / TTP | Add to threat profile + plan focused exercise within 2 weeks |
+| Mandiant / CrowdStrike major report drops | Same |
+| A tested actor pivots tooling | Re-test old coverage + add new TTPs |
+| The org has a real incident with a TTP from outside the profile | Immediate add + exercise + audit gap |
+| ATT&CK release adds new sub-techniques relevant to the profile | Update technique mappings + audit existing rules |
+
+Each is *evidence* the threat profile shifted. Pivoting isn't laziness — it's responsiveness.
+
+## Invalid pivot triggers
+
+These are *not* valid:
+- *"This new TTP looks cool"* — academic interest doesn't justify mid-quarter re-plan.
+- *"Vendor blog said something"* — vendor blogs aren't always actionable; cross-reference CTI.
+- *"My boss read an article"* — emotional reactivity, not threat data.
+- *"Everyone's testing X this quarter"* — peer-pressure-driven planning.
+
+The L3's reflex: pivot triggers are *evidence-based*; reject the impulse to re-plan otherwise.
+
+## Two-week pivot rule
+
+Once a valid trigger lands, the L3 schedules a focused exercise within two weeks. Why two weeks?
+
+- Long enough to author authorisation + pre-brief properly.
+- Short enough that the threat data is still relevant.
+- Doesn't compress the rest of the quarter's calendar to dust.
+
+The plan: pick the technique, drop one in-hours single-TTP from the original calendar, slot the new exercise in the freed week, run, score, raise TPs.
+
+## Updating the rest of the quarter
+
+Pivots displace original work. The L3 picks one to drop:
+- **Lower-priority single-TTP** — the original plan ranked techniques by TTP-pick formula (M1.2); drop the lowest-ranked.
+- **A scheduled re-test** — defer to next quarter if the prior fix hasn't deployed.
+- **Buffer week** — use slack rather than displace existing work.
+
+The pivot exercise produces its own TPs; if those TPs need close-the-loop within the same quarter, the calendar tightens further.
+
+## Avoiding pivot fatigue
+
+A programme that pivots every quarter is unsustainable — the team never settles, momentum collapses. The L3's discipline:
+
+- Maximum **one** mid-quarter pivot per quarter.
+- Pivots are *additive* (new TTP exercise) more than they're *substitutive* (replacing the calendar).
+- The pivot's findings get the same close-the-loop treatment as planned exercises.
+- Don't pivot in W11-W12; absorb into next quarter's plan.
+
+The retrospective each quarter reviews how many pivots happened and whether the plan was responsive enough. Two pivots → review the planning process.
+
+## Glossary
+
+- **Pivot trigger** — evidence-based justification to re-plan mid-quarter.
+- **Two-week pivot rule** — surface the new TTP exercise within two weeks of the trigger.
+- **Pivot fatigue** — anti-pattern of constant re-planning.
+- **Additive vs substitutive** — pivots add an exercise; substitution should be rare.
+
+## Further reading
+
+- M1.2 — TTP-pick decision rule.
+- The org's CTI ingestion process.
+""",
+    )
+    _add_q(session, m8l3, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *valid* mid-quarter pivot triggers that justify re-planning?",
+        options=[
+            {"value": "isac", "label": "Sector ISAC publishes a new actor / TTP relevant to the org"},
+            {"value": "report", "label": "Mandiant / CrowdStrike major threat report drops"},
+            {"value": "actor_pivot", "label": "A tested actor pivots their tooling (CTI confirms)"},
+            {"value": "real_incident", "label": "The org had a real incident involving a TTP outside the profile"},
+            {"value": "attack_release", "label": "ATT&CK adds new sub-techniques relevant to the profile"},
+            {"value": "boss_article", "label": "L3's boss read an article and got excited"},
+            {"value": "academic", "label": "Cool new TTP from academic conference"},
+            {"value": "peer_pressure", "label": "Other SOCs are testing X this quarter"},
+        ],
+        correct=["isac", "report", "actor_pivot", "real_incident", "attack_release"],
+        explanation_md="The five valid triggers are evidence-based: ISAC publication, Mandiant / CrowdStrike major report, actor tooling pivot (CTI-confirmed), real incident, ATT&CK release. The other three are not pivot triggers: emotional reactivity (boss's article), academic interest (conference TTP without operational evidence), and peer pressure. The L3's reflex: pivot decisions follow *threat data*, not noise. Maximum one pivot per quarter; additive (new exercise) more than substitutive (replace calendar). The retrospective reviews pivot count; two pivots in a quarter triggers a planning-process review.",
+        points=3,
+    )
+
+    # Lesson 8.4 — Quarterly retrospective
+    m8l4 = _add_lesson(
+        session, mod8, order=4,
+        title="The quarterly retrospective: what worked, what to change",
+        lesson_type=LessonType.READING, duration_min=12,
+        content_md="""
+> **Learning objectives.**
+> 1. Run a **30-minute retrospective meeting** with the right participants
+> 2. Capture **one win, one ask, one observation** per participant
+> 3. Identify **systemic** issues (recurring across quarters) vs **local** ones
+> 4. Document outputs in the **programme retrospective doc**
+
+## The retrospective meeting
+
+Format:
+- **Duration**: 30 minutes (firm).
+- **Participants**: detection-eng + IR (or IR Lead) + L1 lead + L3 + optional CISO observation.
+- **Facilitator**: L3.
+- **Agenda**: each participant says one win, one ask, one observation. L3 captures.
+
+The 30-min cap is critical — longer meetings drift into theatre. The triple-prompt format (win / ask / observation) keeps it structured.
+
+## What to capture per participant
+
+**Win** — something specific that went well. *"The W7 chain exercise's TP-201 closed within 14 days — fastest closure all year."*
+
+**Ask** — something the participant wants from the wider team. *"L1 needs more clarity on the difference between Tier-2 and Tier-3 in scorecard rows; can we add an example to the runbook?"*
+
+**Observation** — something noticed, not yet a request. *"OOH parity climbed 7pp this quarter. Trajectory is good but we still have specific medium-class gaps."*
+
+The L3 writes each into the retrospective doc:
+```
+W: TP-201 closed in 14 days
+A: L1 needs Tier-2 vs Tier-3 examples in runbook
+O: OOH parity +7pp; medium-class gaps remain
+```
+
+## Identifying systemic issues
+
+The L3 reads the retrospective notes plus the prior 2-3 quarters' retros to spot patterns:
+- *Recurring asks* — same need surfaces multiple quarters → systemic gap; needs investment.
+- *Recurring observations* — same drift signal → posture problem; needs leadership decision.
+- *Wins that don't replicate* — once a quarter; shouldn't be celebrated as patterns.
+
+| Pattern | Action |
+|---|---|
+| Same systemic ask 3 quarters running | Programme-level investment ask |
+| Same observation each quarter | Leadership trade-off discussion |
+| Single-quarter win | Note; don't lock in as best-practice |
+| Multi-quarter trend (parity rising) | Lock in the practice; invest more if accelerable |
+
+## The retrospective doc
+
+```yaml
+retrospective: Q3 2026
+date: 2026-10-08
+participants:
+  - L3: J. Doe
+  - Detection-eng: P. Khan
+  - IR Lead: R. Patel
+  - L1 Lead: S. Lee
+  - CISO: T. Brown (observer)
+
+wins:
+  - L3: TP-201 closed in 14 days
+  - Det-eng: New Caldera rule auto-fires on chain start
+  - IR Lead: Pre-brief discipline reached 100% this quarter
+  - L1 Lead: Tier-1 detection rate hit 85%
+
+asks:
+  - L3: 1 more on-call shift weekly
+  - Det-eng: SOAR engineering capacity for OOH playbooks
+  - IR Lead: Cross-team containment override path documented
+  - L1 Lead: Scorecard runbook examples
+
+observations:
+  - L3: OOH parity +7pp qoq; trajectory good
+  - Det-eng: Schema-debt backlog growing; need to invest
+  - IR Lead: Mid-quarter pivot on T1556.006 worked; institutional muscle
+  - L1 Lead: TPs are landing fast; engineering capacity is right-sized for now
+
+systemic_issues:
+  - Schema-debt backlog growth (3 quarters running) — leadership ask Q4
+
+action_items:
+  - Author SOAR-engineering playbook for cross-team containment (det-eng)
+  - Add Tier-2/Tier-3 examples to L1 runbook (L3 + L1 Lead)
+  - Q4 leadership package: investment-ask for schema-debt closure (L3 → CISO)
+```
+
+## When to skip the retro (don't)
+
+There's no valid reason to skip the retrospective. Common bad excuses:
+- *"We're too busy this quarter"* — the retro is what makes future quarters less busy.
+- *"Nothing went wrong; nothing to discuss"* — wins also need capturing; *why* it went well matters.
+- *"Everyone's tired"* — the 30-min cap is short; tired analysts get a clear-out moment.
+
+The L3's reflex: retro is firmly scheduled in W12; nothing displaces it.
+
+## Glossary
+
+- **30-min retrospective** — firm cap; one win / ask / observation per participant.
+- **Systemic vs local** — repeated issues are systemic; one-time issues are local.
+- **Action items** — concrete follow-ups with owners and deadlines.
+- **Leadership ask** — systemic issues that need investment, escalated through the CISO.
+
+## Further reading
+
+- *Agile Retrospectives* (Derby + Larsen) — facilitation patterns.
+- L3 M5 — close-the-loop discipline; retros are part of it.
+""",
+    )
+    _add_q(session, m8l4, order=1, kind=QuestionKind.SINGLE,
+        stem_md="At the quarterly retrospective, the L3 reads the prior 3 quarters' retros and notices: every retrospective has had \"schema-debt backlog growing\" as an observation. What's the right L3 next step?",
+        options=[
+            {"value": "ignore", "label": "Ignore — observations are just commentary"},
+            {"value": "local_action", "label": "Add a local action item this quarter — fix one schema-debt issue"},
+            {"value": "systemic", "label": "**Recognise this as a systemic issue** — three quarters of the same observation indicates the schema-debt backlog isn't draining at the rate engineering work is producing it. Escalate as a leadership-package item: schema-debt is a structural investment ask, not a local fix"},
+            {"value": "blame", "label": "Blame data-engineering for not closing schema-debt"},
+        ],
+        correct="systemic",
+        explanation_md="**Systemic issue.** Three quarters of the same observation isn't local noise; it's a structural pattern. Schema-debt backlog growing across quarters means the rate of new schema-debt items exceeds the rate of closure — the team needs more data-engineering capacity, not just diligence. The L3 escalates this as a leadership package item with the closure trajectory: *\"Q1 backlog 7 items, Q2 9 items, Q3 12 items. At current rate, Q4 will be 14+ items. Investment options: 1 FTE on data-engineering ($X / year) closes within 2 quarters; or accept the trajectory and the dependent rule risk.\"* The CISO + leadership decide; the L3's role is to surface the pattern explicitly, not to hide it as a local issue. Blaming data-engineering is wrong — they're working at capacity; the gap is structural.",
+        points=2,
+    )
+
+    # Lesson 8.5 — Risk register integration
+    m8l5 = _add_lesson(
+        session, mod8, order=5,
+        title="Integrating with the org's risk register",
+        lesson_type=LessonType.READING, duration_min=10,
+        content_md="""
+> **Learning objectives.**
+> 1. Recognise the **risk register** as the org's canonical risk-tracking surface
+> 2. Provide **L3 inputs** to the register — control-effectiveness ratings per risk
+> 3. Re-rate quarterly based on **DML coverage + OOH parity**
+> 4. Surface **trade-offs** through the register, not just the SOC scorecard
+
+## What the risk register tracks
+
+Most enterprise risk registers list:
+- Risk name (e.g. *Ransomware*, *BEC*, *Data exfil*).
+- Likelihood (categorical: Low / Medium / High / Critical).
+- Impact (categorical or financial).
+- Control effectiveness (1-5 scale; 1 = ineffective, 5 = highly effective).
+- Residual risk = Likelihood × Impact × (1 - Effectiveness).
+- Owner (typically a business / function lead).
+
+The L3's inputs feed the **Control effectiveness** column.
+
+## How L3 data feeds control effectiveness
+
+For each risk, the L3 provides quarterly:
+
+| Risk | Relevant TTPs | DML coverage | OOH parity | Control effectiveness |
+|---|---|---|---|---|
+| Ransomware | T1486, T1078, T1110, T1059, T1003 | DML-3 to DML-4 | 80% | 3 (moderate-good) |
+| BEC | T1078.004, T1098, T1114, T1534 | DML-2 to DML-4 | 75% | 3 (moderate) |
+| Data exfil | T1567, T1041, T1530, T1213 | DML-2 to DML-3 | 70% | 2 (concerning) |
+| Insider threat | T1078, T1052 | DML-1 to DML-2 | 65% | 2 (concerning) |
+
+The Control effectiveness rating is a roll-up of the DML coverage + OOH parity for the relevant TTPs. The L3's data drives the rating; the risk owner re-rates each quarter using L3 inputs.
+
+## Re-rating quarterly
+
+Each quarter, the L3 sends the risk owner the updated DML + parity data. The owner re-rates control effectiveness, recomputes residual risk, and surfaces trends to leadership.
+
+This integration ensures:
+- The risk register reflects *empirical* control effectiveness (not theoretical).
+- Trends in control effectiveness are visible at the risk level (where leadership reasons).
+- Investment decisions (more on-call? new SOAR? schema-debt closure?) feed the risk register.
+
+## Surfacing trade-offs
+
+The risk register is also where the L3 surfaces unresolvable trade-offs:
+
+- *Data exfil residual risk is High; control effectiveness 2; OOH parity 70%; specific gap in T1567.002 cloud-storage exfil. Investment options: vendor 24/7 ($X), bigger on-call ($Y), or accept residual risk.*
+
+This framing routes the trade-off through the risk register's escalation path (typically risk committee or board), where leadership reasons.
+
+## What the L3 doesn't do
+
+The L3 doesn't:
+- **Decide control effectiveness** — that's the risk owner's call.
+- **Re-rate likelihood / impact** — those are business / threat-data calls.
+- **Choose investment** — that's leadership.
+
+The L3's job is *evidence + framing*. Empirical data; trade-offs surfaced; explicit choice for leadership.
+
+## Glossary
+
+- **Risk register** — canonical org-wide risk-tracking surface.
+- **Control effectiveness** — 1-5 rating; the L3's inputs.
+- **Residual risk** — Likelihood × Impact × (1 - Effectiveness).
+- **L3's role** — evidence + framing, not decision.
+
+## Further reading
+
+- ISO 27001 / NIST RMF — standard risk-register frameworks.
+- The org's risk-management documentation.
+""",
+    )
+    _add_q(session, m8l5, order=1, kind=QuestionKind.SINGLE,
+        stem_md="What's the L3's **role** in the org's risk register?",
+        options=[
+            {"value": "decide", "label": "Decide control effectiveness ratings"},
+            {"value": "rerate_risk", "label": "Re-rate likelihood and impact"},
+            {"value": "investment", "label": "Choose which investments to prioritise"},
+            {"value": "evidence_framing", "label": "Provide **evidence + framing** — empirical DML coverage + OOH parity feeding the control-effectiveness column; surface trade-offs explicitly so leadership can decide"},
+        ],
+        correct="evidence_framing",
+        explanation_md="**Provide evidence + framing.** The L3 supplies the *empirical data* (DML coverage, OOH parity, specific gaps) that the risk owner uses to re-rate control effectiveness. The L3 *frames* trade-offs (investment options vs accept residual risk) but doesn't decide which to pick — that's leadership. Deciding control effectiveness is the risk owner's call; deciding likelihood / impact is the business / threat-data lead's call; investment decisions are CISO / board territory. The L3's role is evidence + framing, full stop. This division of labour matters: an L3 who tries to decide *for* leadership generates resistance; an L3 who provides clear evidence + framing enables leadership to decide well.",
+        points=2,
+    )
+
+    # Lesson 8.6 — Quarterly board update
+    m8l6 = _add_lesson(
+        session, mod8, order=6,
+        title="The quarterly board update: what the CISO carries up",
+        lesson_type=LessonType.READING, duration_min=10,
+        content_md="""
+> **Learning objectives.**
+> 1. Identify the **board-package contents** the L3 prepares for the CISO
+> 2. Use the **one-page-per-section** format for board consumption
+> 3. Surface **deferred TPs** explicitly so leadership can prioritise
+> 4. Frame **investment asks** as risk-register-tied trade-offs
+
+## Board-package contents
+
+The board cares about: *are we secure enough? are we improving? what's the spend?*  The L3's data answers the second; the CISO carries it.
+
+Quarterly board package, one page per section:
+
+### Page 1 — Detection coverage summary
+
+```
+DML heatmap (per-actor × per-tactic) — colour-coded coverage
+OOH parity (78% Q3, +3pp qoq, target 90% by Q1 2027)
+TP closure rate (12 of 14 closed within quarter; 2 deferred)
+Trajectory: parity rising, schema-debt growing
+```
+
+### Page 2 — Response-time summary
+
+```
+In-hours MTTR: 9 min (Q3, -1 min qoq)
+OOH MTTR: 14 min (Q3, -2 min qoq, but parity gap remains)
+Critical-class TTR: 4 min in-hours / 8 min OOH (acceptable)
+Time-to-fix median: 38 days (down from 47 in Q2)
+```
+
+### Page 3 — TP backlog summary
+
+```
+Open TPs: 11 (Q3 closed 7, opened 9, net +2)
+Critical: 1 (TP-301 — SOAR auto-isolate on T1078.004; 23 days open)
+High: 3
+Medium: 5
+Low: 2
+Schema-debt items: 4 (3 quarters of growth; structural ask)
+```
+
+### Page 4 — Deferred TP discussion
+
+```
+TP-298 — Vendor 24/7 Tier-3 expansion (89 days; awaiting CISO decision)
+TP-299 — Schema-debt #SD-301 entropy at ingest (>90 days; data-engineering capacity)
+
+Why they're deferred:
+  TP-298: budget question; needs board-level decision
+  TP-299: data-engineering team is over-committed; schema-debt
+          backlog growing across quarters
+
+Risk impact:
+  TP-298: medium — vendor support gap on critical EDR product OOH
+  TP-299: low for now, but rising — DGA-style detection is blocked
+```
+
+### Page 5 — Investment asks (if any)
+
+```
+Ask 1: 1 FTE on data-engineering ($X K/year) — closes schema-debt backlog
+       within 2 quarters; risk register's Data-exfil control effectiveness
+       lifts from 2 to 4
+Ask 2: Vendor 24/7 Tier-3 expansion ($Y K/year) — closes TP-298;
+       Ransomware control effectiveness lifts from 3 to 4
+
+Both tied to specific risk-register entries; both have measurable
+outcomes within 2 quarters.
+```
+
+Five pages. Direct, measurable, traceable.
+
+## What the L3 doesn't include in the board package
+
+- **Detailed scorecard rows** — too granular for board.
+- **Specific rule names** — the board reasons about risks, not rules.
+- **TP descriptions** — names + numbers + status; not full text.
+- **Speculative concerns** — only data-driven asks; speculation is filtered out.
+
+The CISO carries the package; the L3 prepares it. The CISO presents and answers questions.
+
+## Glossary
+
+- **Board package** — quarterly L3 output for CISO's leadership reporting.
+- **One-page-per-section format** — five pages: coverage, response, TPs, deferred, asks.
+- **Risk-register-tied investment asks** — every ask names the specific risk register entry it lifts.
+
+## Further reading
+
+- L3 M7.7 — split-scorecard reporting.
+- L3 M8.5 — risk-register integration.
+""",
+    )
+    _add_q(session, m8l6, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *valid* contents of the L3's quarterly board package for the CISO?",
+        options=[
+            {"value": "coverage", "label": "Detection coverage summary (DML heatmap, OOH parity, trajectory)"},
+            {"value": "response", "label": "Response-time summary (in-hours MTTR, OOH MTTR, critical-class TTR)"},
+            {"value": "tp_backlog", "label": "TP backlog summary (open / closed / deferred counts; severity breakdown)"},
+            {"value": "deferred_tps", "label": "Deferred TP discussion (named TPs > 90 days; why; risk impact)"},
+            {"value": "investment_asks", "label": "Investment asks (tied to risk-register entries; measurable outcomes)"},
+            {"value": "scorecard_rows", "label": "Full scorecard rows for every exercise"},
+            {"value": "rule_names", "label": "Detailed list of every detection rule shipped"},
+            {"value": "speculation", "label": "Speculative concerns about future threats"},
+        ],
+        correct=["coverage", "response", "tp_backlog", "deferred_tps", "investment_asks"],
+        explanation_md="The five valid contents are: coverage summary, response-time summary, TP backlog summary, deferred TP discussion, investment asks. Detailed scorecard rows are too granular for board reasoning; the board reasons about risks, not individual exercises. Specific rule names are operational detail — the board doesn't need them. Speculative concerns get filtered out — only data-driven asks reach the board package. The L3's reflex: every ask in the package is **measurable** (we can verify the outcome), **time-bounded** (it lifts within N quarters), and **risk-tied** (it changes a specific risk-register entry's control effectiveness). That framing produces decisions; vague concerns don't.",
+        points=3,
+    )
+
+    # Lesson 8.7 — Career path + anti-patterns
+    m8l7 = _add_lesson(
+        session, mod8, order=7,
+        title="Career path post-L3 and the L3 anti-patterns to avoid",
+        lesson_type=LessonType.READING, duration_min=10,
+        content_md="""
+> **Learning objectives.**
+> 1. Identify the **four canonical career paths** post-L3
+> 2. Recognise the **L3 anti-patterns** that derail mature programmes
+> 3. Plan the **handoff** when transitioning to a new role
+> 4. Recognise that L3 is a **stage, not a destination**
+
+## Four canonical career paths
+
+L3 is a foundation, not a final state. The four common transitions:
+
+| Path | Focus | Skill emphasis |
+|---|---|---|
+| **IR / DFIR specialist** | Incident response + forensic investigation | Memory analysis, malware reverse engineering, timeline construction |
+| **Detection-engineering specialist** | Rule authoring + production deployment + tuning lifecycle | Detection languages, FP rate engineering, rule-as-code |
+| **Security architect** | Control framework design + organisational security strategy | Compliance, risk, system design |
+| **CTI analyst** | Threat-actor research + intelligence production | Open-source intelligence, malware family tracking, attribution |
+
+Each path values L3 fundamentals (purple-team thinking, ATT&CK literacy, response-time KPIs) but specialises further. Pick based on what the L3 found *most engaging* during their year — that's typically the right path.
+
+## L3 anti-patterns
+
+Avoid these patterns that derail mature programmes:
+
+### Coverage-fatigue
+
+Running exercises mechanically without learning. The L3 schedules exercises, runs them, marks the scorecard, but doesn't reflect on findings. The programme produces metrics but not improvements.
+
+**Fix**: stricter retrospectives. *What did we learn?* is the question.
+
+### Tool-tunnel-vision
+
+Over-investing in ART or Caldera at the cost of programme balance. The L3 becomes the *Caldera person* but doesn't engage with the broader programme: detection-engineering, risk register, leadership.
+
+**Fix**: rotate tooling deliberately; spend at most 50% of the L3's time on a single tool.
+
+### Ego on detection
+
+Measuring success by rule-count rather than outcome. Shipping 30 rules per quarter is impressive on paper but doesn't help if the rules don't fire on real activity. The L3 falls in love with their own detections.
+
+**Fix**: measure by *outcome KPIs* (DML coverage, OOH parity, MTTR) not output (rule count).
+
+### Skipping retrospectives
+
+The retro is the most-skippable phase, and skipping it is the most-damaging. The L3 says *"we're too busy"*; the team loses the learning loop; same gaps recur.
+
+**Fix**: 30 min, firmly scheduled, no exceptions.
+
+### Becoming a single point of failure
+
+The L3 owns all programme knowledge — calendar, authorisations, on-call relationships, SOAR playbook quirks. When the L3 is on holiday, the programme stalls.
+
+**Fix**: document everything. Hand off knowledge; build a successor's runbook.
+
+## Handing off the programme
+
+When the L3 transitions to a new role, the handoff package:
+
+1. **Programme calendar** — current quarter + Q+1 sketch.
+2. **Authorisation templates** — pre-populated with org names + standard scopes.
+3. **Pre-brief contact list** — current on-call rotas + chat channels.
+4. **TP backlog** — open / deferred / structural items.
+5. **Risk register integration notes** — which risks have which TTP coverage.
+6. **Quarterly retrospective doc** — last 4 quarters; pattern analysis.
+7. **L3-specific runbooks** — Caldera setup, ART invocation patterns, Sysmon-config audits.
+
+Successor reads in 1-2 days; the handoff is complete in 2 weeks.
+
+## Glossary
+
+- **Career paths** — IR / detection-eng / architect / CTI; pick by engagement.
+- **Anti-patterns** — coverage-fatigue / tool-tunnel-vision / ego-on-detection / skipping retros / single-point-of-failure.
+- **Handoff package** — seven-item knowledge bundle for the successor.
+- **L3 is a stage** — foundation for further specialisation, not a destination.
+
+## Further reading
+
+- L3 M5.6 — outcome KPIs vs output metrics.
+- L3 M8.4 — retrospective discipline.
+""",
+    )
+    _add_q(session, m8l7, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *valid* L3 anti-patterns to avoid?",
+        options=[
+            {"value": "fatigue", "label": "**Coverage-fatigue** — running exercises mechanically without learning"},
+            {"value": "tunnel", "label": "**Tool-tunnel-vision** — over-investing in ART or Caldera at the cost of programme balance"},
+            {"value": "ego", "label": "**Ego on detection** — measuring success by rule-count rather than outcome"},
+            {"value": "no_retro", "label": "**Skipping retrospectives** — the team loses the learning loop"},
+            {"value": "spof", "label": "**Becoming a single point of failure** — owning all programme knowledge"},
+            {"value": "no_lunch", "label": "Skipping lunch breaks"},
+            {"value": "wearing_red", "label": "Wearing a red shirt"},
+        ],
+        correct=["fatigue", "tunnel", "ego", "no_retro", "spof"],
+        explanation_md="The five valid anti-patterns: coverage-fatigue, tool-tunnel-vision, ego-on-detection, skipping retros, and single-point-of-failure. Each has a specific failure mode (mechanical exercises produce no learning; tool tunnels narrow the programme; ego on rule-count obscures outcome; skipped retros lose institutional learning; single-point-of-failure stalls the programme on holidays). Lunch breaks and shirt colours aren't programme concerns. The L3's reflex: review own behaviour quarterly; if any anti-pattern is creeping in, course-correct. The programme's longevity depends on the L3 *not* falling into them.",
+        points=3,
+    )
+
+    # Lesson 8.8 — Capstone quiz
+    m8l8 = _add_lesson(
+        session, mod8, order=8,
+        title="L3 finale capstone — programme integration + post-L3 transition",
+        lesson_type=LessonType.QUIZ, duration_min=10,
+        content_md="""
+Two-question capstone. After this, the L3 syllabus is complete. The full curriculum (L1 + L2 + L3) covers the analyst's path from first-day triage through detection-engineering programme leadership.
+
+The L3's next career step is up to them — IR specialism, detection engineering depth, security architecture, or CTI analyst. The fundamentals here transfer to all four.
+""",
+    )
+    _add_q(session, m8l8, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L3 has run 3 quarters of programme: parity rising +5pp / quarter, MTTR dropping -2 min / quarter, schema-debt backlog stable. The CISO asks *\"are we improving fast enough?\"* What's the right L3 response?",
+        options=[
+            {"value": "yes_definitively", "label": "*\"Yes, we're improving — every quarter shows positive movement.\"*"},
+            {"value": "no_definitively", "label": "*\"No, we should be improving faster.\"*"},
+            {"value": "depends", "label": "*\"The trajectory shows steady improvement at +5pp parity / quarter and -2 min / quarter MTTR. Whether that's fast enough depends on threat-actor velocity in our sector and the org's risk appetite. At this rate, we reach 90% parity in ~6 quarters and 5-min OOH MTTR in ~5 quarters. Is that the target horizon, or do we need to invest to compress it?\"*"},
+            {"value": "external", "label": "*\"Let me check with our peers and benchmarks.\"*"},
+        ],
+        correct="depends",
+        explanation_md="The third option is the right L3 response. It surfaces the *trajectory* (improvement is real and measurable), names the *uncertainty* (whether the rate is fast enough depends on threat-actor velocity and risk appetite — not L3 calls), and *flips the question* back to leadership with concrete numbers (6 quarters to 90% parity, 5 quarters to 5-min OOH MTTR). The CISO can then decide: accept the trajectory, or invest to compress. Definitive yes/no answers (options 1 and 2) collapse the leadership question into an L3 opinion. External benchmarking (option 4) avoids the L3's own analytical work. The L3's reflex: surface trajectory + uncertainty + leadership-decision framing.",
+        points=2,
+    )
+    _add_q(session, m8l8, order=2, kind=QuestionKind.SINGLE,
+        stem_md="An L3 transitions to a new role (security architect track) after a year in the role. The team is mid-programme, with TPs open and Q4 in progress. What should the L3's **handoff package** contain to set up the successor for success?",
+        options=[
+            {"value": "minimal", "label": "Just the calendar + the Caldera login"},
+            {"value": "complete", "label": "**Seven-item bundle**: programme calendar (Q4 + Q1 sketch); authorisation templates; pre-brief contact list with on-call rotas; TP backlog (open / deferred / structural); risk-register integration notes; quarterly retrospective doc with 4 quarters of pattern analysis; L3-specific runbooks for Caldera / ART / Sysmon audits"},
+            {"value": "verbal", "label": "Verbal handover meeting only"},
+            {"value": "exit_email", "label": "Just an exit email summarising the year"},
+        ],
+        correct="complete",
+        explanation_md="**The seven-item bundle.** A successor reading the seven-item bundle in 1-2 days is fully ramped within 2 weeks. Calendar tells them what's pending; auth templates save them re-creating; pre-brief contacts save them scrambling on relationships; TP backlog tells them what's outstanding (especially the deferred / structural items); risk register integration shows how their work feeds leadership; retrospective patterns show what's been tried and what's worked; runbooks save them re-figuring out the tooling. Minimal handoffs (Caldera login + verbal) leave the successor scrambling for weeks; the programme stalls during the transition. The L3's reflex when transitioning: assume the successor knows nothing org-specific; document everything that isn't already in public-facing docs.",
+        points=2,
+    )
+
+    print(f"  L3: {course.title} — 8 modules, 64 lessons (Module 8 Capstone @ proper depth — L3 COMPLETE)")
     return course
 
 
