@@ -14345,7 +14345,1045 @@ Six new detections from one capstone walk. M8 covers the conversion gates each m
         points=2,
     )
 
-    print(f"  L2: {course.title} — 7 modules, 56 lessons (Module 7 Anomaly Hunts @ proper depth)")
+    # ── Module 8 — Hunt-to-Detection Capstone ─────────────────────────────
+    mod8 = _add_module(
+        session, course, order=8,
+        title="Hunt-to-Detection Capstone — turning confirmed hunts into TIDE rules",
+        description_md=(
+            "L2's finale. A confirmed hunt finding is *not* a "
+            "production detection — it's a candidate. The conversion "
+            "is gated through five steps: G1 data quality, G2 false-"
+            "positive rate (backtest against 30d historical), G3 "
+            "ATT&CK technique + sub-technique mapping, G4 kill-chain "
+            "step + playbook routing, and G5 metadata completeness "
+            "(severity, threat block, runbook, owner, lifecycle "
+            "plan). This module walks every gate, the failure mode "
+            "for each, the worked end-to-end conversion of one of "
+            "the M7 capstone's six APT-chain candidates, and the "
+            "post-ship tuning lifecycle. Closes Level 2."
+        ),
+        estimated_minutes=240,
+    )
+
+    # Lesson 8.1 — From hunt finding to detection candidate; pipeline overview
+    m8l1 = _add_lesson(
+        session, mod8, order=1,
+        title="Hunt finding → candidate → production rule: the five-gate pipeline",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Distinguish a **hunt finding**, a **detection candidate**, and a **production rule** by their respective contracts
+> 2. Recite the **five-gate pipeline** between candidate and production
+> 3. Recognise the **two-track conversion** — behavioural-hunt → EQL/KQL rule, statistical-hunt → threshold / ML-attached rule
+> 4. Identify which gate a given conversion failure belongs to
+
+## Vocabulary that L2 must use precisely
+
+A *hunt finding*, a *detection candidate*, and a *production rule* are different artefacts and the L2 must not conflate them.
+
+| Term | What it is | Lifetime | Audience |
+|---|---|---|---|
+| **Hunt finding** | One or more concrete events the analyst confirmed during a PEAK hunt — an actor, a host, a sequence | One investigation | The hunt's analyst + handoff to IR if real |
+| **Detection candidate** | The *reusable rule body* extracted from the hunt finding, intended to fire on this TTP every time it recurs | Days–weeks (until shipped or deprecated) | The detection-engineering team |
+| **Production rule** | The candidate after passing all five gates and deployed in TIDE / Kibana Security | Months–years (with periodic re-review) | The whole SOC — every shift |
+
+The most common confusion: an analyst confirms one Kerberoasting case, ships the literal query that found it as a "rule", and the FP rate is unmanageable because the query body wasn't engineered for production. The query body that finds *this* finding and the rule body that fires *every* future Kerberoasting are different artefacts.
+
+## The five conversion gates
+
+Every detection candidate must pass these five gates in order. A candidate failing any gate is not deployable.
+
+| Gate | Question | Pass criterion |
+|---|---|---|
+| **G1 — Data quality** | Does the underlying telemetry support the rule reliably? | ECS schema stable, retention ≥ rule look-back, parsers healthy in last 30d |
+| **G2 — FP rate** | Will the rule fire at a sustainable rate? | ≤ 5 unique findings/week against 30d backtest, TP rate > 30% on a sample of 10 |
+| **G3 — MITRE mapping** | Does the rule have a defensible technique tag? | Technique + sub-technique + tactic, pinned to a live ATT&CK version |
+| **G4 — Kill-chain step + routing** | Where does this fit in the response taxonomy? | One primary tactic, named playbook id / runbook reference |
+| **G5 — Metadata completeness** | Is the rule production-ready? | Severity + threat block + runbook + owner + lifecycle review cadence |
+
+Each gate is covered in detail in Lessons 8.2–8.6.
+
+## The two-track conversion
+
+A behavioural-hunt finding maps onto a *behavioural* rule body. A statistical-hunt finding maps onto a *statistical* rule body. The query languages differ; the gates apply identically.
+
+### Track A — Behavioural-hunt → EQL / KQL threshold rule
+
+The hunt body becomes the rule body. EQL `sequence` queries map to Kibana Security EQL rule bodies with no rewriting (the M6 capstone walked this). KQL `event.action: ... and ...` clusters map to Kibana Security KQL threshold rules with a `count > N` aggregator.
+
+### Track B — Statistical-hunt → threshold / ML-attached rule
+
+A stack-count rare-tail hunt (M7 L7.2) becomes a Kibana Security threshold rule with `aggregating-count + value match` semantics. A beacon-CV hunt (M7 L7.3) becomes a scheduled Watcher with the CV computation in a Painless script, since native ES|QL `STDDEV` shape varies. An Elastic ML population job (M7 L7.7) becomes a *machine_learning* rule type that hangs off the job's anomaly score.
+
+The rule **type** is determined by the hunt; the **gates** are the same.
+
+## Fast-failure modes per gate
+
+The L2 should be able to identify which gate a candidate fails *before* attempting backtest. This saves cycles.
+
+- **G1 fail signs**: the candidate query refers to a runtime field on one estate but a pre-computed field on another. ECS field path was renamed in 8.x and your hunt used the old name. The look-back window exceeds index retention.
+- **G2 fail signs**: the candidate fires > 50 times in 7 days during the hunt window — hunting and detecting are different population sizes; the candidate is unsustainable. Threshold values feel "tuned to fit one finding" rather than to the TTP itself.
+- **G3 fail signs**: the candidate's TTP doesn't map cleanly to one technique — it spans Discovery + Lateral Movement and the L2 can't pick. Pick whichever has the higher-leverage response (typically Lateral Movement).
+- **G4 fail signs**: no clear playbook for this alert class exists in the SOAR / runbook wiki. The rule shouldn't ship until the playbook does — a rule with no SOP is just noise.
+- **G5 fail signs**: severity is "Medium" by default rather than reasoned. Owner is "TBD". Lifecycle review cadence is unset.
+
+## Why the gates are sequential, not parallel
+
+Backtest (G2) costs analyst time. Mapping (G3 / G4) costs engineering review. Metadata (G5) costs documentation. **Failing later gates wastes the work done in earlier ones.** The L2 walks the gates in order and bails as soon as one fails.
+
+The exception is G1 — the L2 should pre-screen G1 *before even drafting the candidate*. A candidate built on broken telemetry is wasted work full stop.
+
+## Glossary
+
+- **Hunt finding** — one investigation's confirmed positive; not a rule.
+- **Detection candidate** — a reusable rule body proposed for production.
+- **Production rule** — a candidate after passing all five gates and deployed.
+- **Two-track conversion** — behavioural-hunt → EQL/KQL rule; statistical-hunt → threshold / ML-attached rule.
+
+## Further reading
+
+- Florian Roth — *Detection Maturity Model* (DML levels).
+- Elastic Security rule reference — rule types and the threat-metadata block.
+- ATT&CK Enterprise — technique pages for the hunt-fingerprint reference.
+""",
+    )
+    _add_q(session, m8l1, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 confirms a Kerberoasting attempt during a PEAK hunt, then sends the literal query body that surfaced the finding to the SOC engineering team and asks for it to be deployed as a production rule. The engineer pushes back. Why?",
+        options=[
+            {"value": "naming", "label": "The rule body needs a different naming convention"},
+            {"value": "candidate", "label": "The hunt finding is not the same artefact as a detection candidate — the rule body needs to be engineered for the *whole population* of future cases, with the five gates applied"},
+            {"value": "ml", "label": "Kerberoasting must be detected with a machine-learning rule"},
+            {"value": "kibana", "label": "Production rules can only be written in Kibana Security DSL"},
+        ],
+        correct="candidate",
+        explanation_md="A hunt finding's query was tuned to surface *this case*. A detection candidate is a different artefact: it must fire on every future occurrence of the TTP at sustainable cost. The five gates exist to bridge the two — G1 data quality, G2 backtest-measured FP rate against 30d historical, G3 MITRE mapping, G4 kill-chain + playbook routing, G5 metadata completeness. Naming convention, ML choice, and DSL choice are downstream concerns; the load-bearing point is the gates and the change in audience (one investigator → the whole SOC over months / years).",
+        points=2,
+    )
+
+    # Lesson 8.2 — Gate 1: Data quality
+    m8l2 = _add_lesson(
+        session, mod8, order=2,
+        title="Gate 1 — data quality: ECS schema stability, retention, and parser health",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Apply the **G1 checklist**: schema stability, retention sufficiency, parser health
+> 2. Recognise the most common ECS schema breakages across 8.x
+> 3. Validate that rule look-back ≤ index retention before drafting
+> 4. Operationalise parser-health monitoring (`ingest.failed_documents`)
+
+## Why G1 first
+
+A rule built on broken telemetry produces nothing — silently. The classic failure mode: a beautifully-engineered rule ships, fires zero alerts for a week, and only on the M9 (next month's) deep-dive does someone notice that the field it queries no longer exists. By then, the TTP has been active and undetected for 30 days.
+
+The L2 pre-screens G1 *before drafting* the candidate, not after.
+
+## G1 checklist
+
+The rule passes G1 if and only if:
+
+1. Every ECS field referenced exists in the live schema and has been stable for ≥ 30 days.
+2. The index retention covers the rule's look-back window with margin (typical: retention ≥ 1.5× look-back).
+3. The parser / Beats / Agent module ingesting the underlying telemetry is healthy — `ingest.failed_documents` count is < 0.1% of input over the last 30 days.
+4. The data view that the rule will run against contains the fields with non-null values for the populations the rule is targeting.
+
+## ECS schema stability across 8.x
+
+ECS bumps fields between minor versions. The L2 should know the common breakages:
+
+| Field path (old) | Field path (new / current) | Released |
+|---|---|---|
+| `source.user.name` | `user.name` (with `event.outcome` discriminating direction) | 8.0 |
+| `event.original.message` (free-text) | `event.original` raw / `message` (parsed) | 8.0 |
+| `process.parent.name` (sysmon) | unchanged but populated only when Sysmon ≥ v15 | 2023 sysmon update |
+| `dns.question.registered_domain` | unchanged but only populated when ECS-aware parsing is on | 8.4 |
+| `email.*` namespace | added in 8.6 | 8.6 |
+| `o365.audit.Workload` | unchanged but renamed values across O365 audit-log v3 | M365 audit log v3 |
+
+The L2 reads the *Beats Reference* / *Elastic Agent integration* docs for the relevant package version pinned in the estate. The CHANGELOG of each integration version lists field renames.
+
+## Retention check
+
+Rule look-back = the time window the rule scans on each fire. A `count > 100 in 5min` threshold rule has a 5-minute look-back; a `sequence by user with maxspan=2h` EQL rule has a 2-hour look-back. The retention check:
+
+- Look-back ≤ retention: rule works.
+- Look-back > retention: rule misses real positives because the historical events have aged out.
+- Margin: retention should be ≥ 1.5× look-back so a rule re-run for back-fill works.
+
+ION's typical Elastic estate has 90d hot retention with 365d cold. Most L2 rules look back ≤ 24h; these are well within budget. The exceptions: rules that compute weekly baselines (M7 L7.4 / L7.6) need ≥ 7d hot to be reliable.
+
+## Parser-health monitoring
+
+The dashboard. `ingest.failed_documents` per data stream:
+
+```kql
+event.dataset: ingest_pipeline_stats
+| stats failed_pct = sum(failed) / sum(input) by data_stream
+| where failed_pct > 0.001
+| sort failed_pct desc
+```
+
+A data stream with > 0.1% failed documents in the last 30d fails G1 on every rule that depends on it.
+
+The L2 reflex: bookmark the data-stream health dashboard. If a hunt's data stream is unhealthy, fix the parser *before* drafting the rule.
+
+## Schema-debt backlog
+
+Candidates that fail G1 and can't be fixed quickly land on a *schema-debt backlog*. These are tracked separately so the team knows what detection coverage is *waiting on telemetry quality*. Common backlog entries:
+
+- "Need entropy on `dns.question.registered_domain` pre-computed at ingest" — runtime field is too slow.
+- "Need `process.command_line` capture from a vendor whose Sysmon-equivalent is broken in 8.11."
+- "Need `email.attachments.file.hash.sha256` populated by the email gateway integration."
+
+The schema-debt backlog feeds the platform / data-engineering team, not detection engineering. The L2 raises tickets; doesn't try to fix.
+
+## Worked: an M7 candidate fails G1
+
+An L2 ships a candidate from M7 L7.5 — `dns.question.registered_domain.entropy > 3.7`. The hunt confirmed it works on Estate-A where the entropy field is pre-computed at ingest.
+
+Estate-B parses DNS via a different beats module that doesn't run the entropy ingest processor. The field is null on every doc. The candidate fires zero alerts on Estate-B.
+
+Two recovery paths:
+1. Standardise the ingest pipeline across estates (add the entropy processor to Estate-B). Right answer; takes weeks.
+2. Pin the rule to Estate-A. Pragmatic; doesn't help Estate-B.
+3. Re-author the rule to compute entropy at query time via runtime fields. Slow; uses estate compute. Not recommended for production rules.
+
+The L2 raises (1) on the schema-debt backlog and ships the rule with (2) until (1) lands.
+
+## Glossary
+
+- **G1 checklist** — schema stability, retention sufficiency, parser health, populated fields.
+- **Schema-debt backlog** — candidates blocked on telemetry quality; raised to the platform team.
+- **Look-back** — the time window the rule scans on each fire.
+- **Retention margin** — retention should be ≥ 1.5× look-back to allow back-fill.
+
+## Further reading
+
+- ECS Reference — current field index.
+- Elastic Beats / Agent integration CHANGELOGs.
+- Elastic blog *Ingest Pipeline Best Practices*.
+""",
+    )
+    _add_q(session, m8l2, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *valid* G1 (data-quality) failure modes for a candidate detection rule?",
+        options=[
+            {"value": "renamed", "label": "The candidate references an ECS field renamed in 8.0; the new name isn't in the rule body"},
+            {"value": "retention", "label": "The candidate's look-back is 14 days; index retention is 7 days"},
+            {"value": "parser", "label": "The data stream the rule depends on has 5% `ingest.failed_documents` over the last 30 days"},
+            {"value": "fp", "label": "The candidate fires 200 times per week in backtest"},
+            {"value": "missing_field", "label": "The candidate references a field that's pre-computed on Estate-A but null on Estate-B"},
+            {"value": "naming", "label": "The candidate's name doesn't follow the team's naming convention"},
+        ],
+        correct=["renamed", "retention", "parser", "missing_field"],
+        explanation_md="The four valid G1 failures are schema rename, retention < look-back, parser unhealthy, and field unpopulated on a target estate. The 200 FP/week is a **G2** (FP rate) failure. Naming convention is a process / hygiene concern, not a deployability gate. The L2 should pre-screen G1 *before* drafting the candidate — the cost of finding a G1 issue at G2 time is wasted analyst hours.",
+        points=3,
+    )
+
+    # Lesson 8.3 — Gate 2: FP rate measurement & backtest
+    m8l3 = _add_lesson(
+        session, mod8, order=3,
+        title="Gate 2 — false-positive rate measurement and backtest methodology",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.**
+> 1. Run a **30-day backtest** against historical data without tuning the candidate body
+> 2. Compute the **predicted weekly FP rate** from a 30-day finding count
+> 3. Sample 10 random findings and classify them TP / FP / Indeterminate
+> 4. Apply the canonical pass criterion: **≤ 5 weekly findings AND TP rate > 30%**
+> 5. Recognise the **tuning-during-backtest** anti-pattern
+
+## The methodology
+
+The L2 walks G2 in five strict steps. Order matters; tuning during backtest is the most common failure mode.
+
+### Step 1 — Lock the candidate body
+
+Before backtest starts, the candidate body is *frozen*. No threshold tweaks, no field-path changes, no allowlist additions. The candidate body that goes into backtest is the candidate body that ships if it passes.
+
+If the L2 wants to iterate, that's iteration on the *next* candidate, not this one. Locking is the only defence against overfitting to the backtest corpus.
+
+### Step 2 — Replay against 30d historical
+
+The candidate is run against the most recent 30 days of historical data. Tools:
+
+- **Kibana Security rule preview** — runs the candidate over a chosen historical window and returns the would-be alerts.
+- **Custom Watcher with explicit `range` filter** — for rule types Security doesn't preview natively.
+- **ES|QL replay** — for ML-job rules, run the job retrospectively on historical buckets via the `_start` API.
+
+The output: a list of *findings* (would-be alerts) the candidate would have produced.
+
+### Step 3 — De-duplicate to unique findings
+
+A `count > 100 / 5min` threshold rule fires once per 5-minute bucket. The L2 de-duplicates findings on the rule's natural key — typically `(host.name, source.ip)` per bucket, or `(user.name)` per bucket, or `(o365.audit.UserId)` per bucket. The unique-findings count is what's used for FP-rate prediction; the raw bucket count is misleading.
+
+### Step 4 — Compute the predicted weekly FP rate
+
+```
+predicted weekly = unique_30d_findings × (7/30)
+```
+
+A candidate firing 21 unique findings in 30d → 21 × 0.233 = **4.9 findings/week**.
+
+### Step 5 — Sample 10 random findings and classify
+
+The L2 reviews 10 random findings, classifies each:
+- **TP** — true positive; the candidate fired correctly on real malicious / risky activity.
+- **FP** — false positive; the trigger wasn't actually the TTP.
+- **Indeterminate** — can't tell from the data; missing context.
+
+Sample TP rate = `TP_count / 10`.
+
+```
+predicted weekly TP = predicted_weekly × TP_rate
+predicted weekly FP = predicted_weekly × (FP_rate)
+```
+
+For the candidate firing 21 in 30d, with sample TP=8 / FP=2:
+- predicted weekly = 4.9
+- predicted weekly TP = 4.9 × 0.8 = **3.92**
+- predicted weekly FP = 4.9 × 0.2 = **0.98**
+
+## The pass criterion
+
+A candidate passes G2 if:
+
+1. **predicted weekly findings ≤ 5** (FP-budget constraint), AND
+2. **TP rate ≥ 30%** in the sample.
+
+The 30% TP-rate floor is the SOC's signal-floor — anything below it produces alert fatigue. Rules between 30% and 60% are flagged for *post-ship tuning* (G6 lifecycle, not yet covered).
+
+## Worked: M3 EQL `process.parent.name == "lsass.exe"` rare-cmdline candidate
+
+The candidate body:
+
+```eql
+process where event.action == "start"
+  and process.parent.name == "lsass.exe"
+  and process.command_line not in (
+    "/known/legit/binary/...",
+    "/another/known/legit/...",
+  )
+```
+
+Backtest: 30 days, 8 unique findings (deduped on `(host.name, process.command_line)`). 8 × 7/30 = **1.87 findings/week**.
+
+Sample 8: 6 TP (Mimikatz, ProcDump, comsvcs.dll), 2 FP (an EDR product the analyst hadn't seen).
+
+- predicted weekly = 1.87
+- predicted weekly TP = 1.87 × 0.75 = **1.4 / week**
+- predicted weekly FP = 1.87 × 0.25 = **0.47 / week**
+
+Both criteria met (1.87 ≤ 5 ✅, 75% ≥ 30% ✅). **Passes G2.** Add the EDR product to the not-in allowlist in G5 (or in a separate post-ship tune).
+
+## The tuning-during-backtest anti-pattern
+
+The most common L2 failure: the analyst sees the backtest produces 200 findings, edits the threshold from `count > 100` to `count > 500`, runs it again to find 7 findings, and reports "passed."
+
+Two problems:
+1. **Overfitting to the corpus.** The backtest sample is finite; the threshold tuned to the sample over-indexes on its specific noise. The real-world FP rate will exceed the backtest prediction.
+2. **Loss of signal.** Tuning up the threshold to fit the FP budget mostly removes the noisy *low-volume* TPs. The rule that survives detects only the loudest cases — and the SOC's hardest-to-catch cases are usually the quiet ones.
+
+The right move: **lock the body, iterate on the next candidate.** If the original body fails G2, redesign the rule with the M7 statistical-hunt and per-entity-baseline frames in mind. Don't tune.
+
+## Edge cases
+
+**Sparse populations.** If the rule fires fewer than 5 times in 30d, the sample size is insufficient for TP-rate estimation. Two options:
+1. Extend the backtest to 90d.
+2. Ship at *Low* severity with a 90d post-ship review pre-scheduled.
+
+**Densely populated rules with high TP rate.** Rule fires 100+ times in 30d, but every one is a TP. This is over-fired (alert fatigue) but accurate. Re-design as a roll-up — bucket findings into per-entity-per-day summaries, alert on the summary instead of the raw events.
+
+**Cross-estate variation.** A candidate that passes G2 on Estate-A may fail on Estate-B (different population sizes, different baseline activity). The L2 backtests on each estate the rule will deploy to.
+
+## Glossary
+
+- **Backtest** — running the candidate query against historical data to predict its production behaviour.
+- **Unique findings** — de-duplicated by the rule's natural key.
+- **Predicted weekly FP rate** — (unique 30d findings × 7/30) × FP rate from sample.
+- **Tuning-during-backtest** — overfitting the threshold to the corpus; produces optimistic FP-rate predictions.
+
+## Further reading
+
+- Elastic Security — *Rule preview* docs.
+- Florian Roth — *Detection Engineering KPIs*.
+- ATT&CK CAR (Cyber Analytics Repository) — analytics with associated FP-rate notes.
+""",
+    )
+    _add_q(session, m8l3, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="A candidate detection rule produces **21 unique findings in 30 days** during backtest. The L2 samples 10 of them and classifies **8 TP, 2 FP**. Compute the predicted weekly FP rate. Format: a single number, rounded to 2 decimal places.",
+        options=None,
+        correct=[
+            "0.98",
+            "0.97",
+            "0.99",
+            "≈0.98",
+            "~0.98",
+            "0.98 / week",
+            "0.98/week",
+        ],
+        explanation_md="**0.98 FP/week.** Step 1: predicted weekly findings = 21 × (7/30) = **4.9**. Step 2: FP rate from sample = 2/10 = **0.20**. Step 3: predicted weekly FP = 4.9 × 0.20 = **0.98**. The candidate also produces ≈3.92 TP/week, so total findings (4.9) are below the FP-budget cap of 5, and TP rate (80%) is well above the 30% floor — both pass criteria are met. The L2 ships, then schedules a post-ship review at 90d to re-measure.",
+        points=2,
+    )
+
+    # Lesson 8.4 — Gate 3: ATT&CK mapping
+    m8l4 = _add_lesson(
+        session, mod8, order=4,
+        title="Gate 3 — ATT&CK mapping: technique, sub-technique, tactic, and version pinning",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Recite why ATT&CK mapping is **load-bearing** for kill-chain rollups, threat-actor profiles, and Navigator export
+> 2. Apply the **decision tree**: technique → sub-technique → tactic
+> 3. Avoid common mis-mappings (parent technique when sub-technique is correct)
+> 4. **Pin the ATT&CK version** in rule metadata; bump rules when ATT&CK releases majors
+
+## Why mapping matters
+
+ATT&CK mapping isn't paperwork. It's the load-bearing field that drives:
+
+1. **TIDE coverage rollups** — what fraction of techniques the SOC covers.
+2. **Threat-actor coverage matrices** — given threat actor X uses techniques T1, T2, T3, what's our coverage?
+3. **Navigator JSON export** — the heatmap visualisation across the matrix.
+4. **Cross-rule correlation** — if two rules tag the same technique, the SOC can group their alerts.
+5. **Detection-maturity reporting** — *"we cover Credential Access at 78%; we cover Lateral Movement at 31%"*.
+
+A rule with no technique tag is invisible to all five.
+
+## Technique vs sub-technique vs tactic — the decision tree
+
+ATT&CK Enterprise has 14 tactics, 196 techniques, and 411 sub-techniques (v15.0). The decision tree:
+
+1. **Identify the attacker behaviour** the rule fires on.
+2. **Find the most-specific sub-technique** that matches.
+3. **If a sub-technique matches**, use *both* the parent technique AND the sub-technique.
+4. **If no sub-technique matches**, use only the parent technique.
+5. **Tactic is implied by the technique** — affirm in metadata.
+
+Example mapping:
+
+- A rule firing on Kerberos TGS bulk-request with RC4-HMAC encryption.
+- Behaviour: extracting service-account password hashes for offline cracking.
+- Sub-technique candidate: **T1558.003 — Kerberoasting** (specific). ✅
+- Parent technique: **T1558 — Steal or Forge Kerberos Tickets**.
+- Tactic: **TA0006 — Credential Access**.
+
+## Common mis-mappings
+
+| Wrong | Right | Why |
+|---|---|---|
+| T1059 (Command and Scripting Interpreter) on a PowerShell-only rule | T1059.001 (PowerShell) | T1059 is a parent; sub-tech is more specific |
+| T1078 on a cloud-account rule | T1078.004 (Cloud Accounts) | Sub-tech specifies the account class |
+| T1003 on an LSASS-dump rule | T1003.001 (LSASS Memory) | Sub-tech specifies the dump source |
+| T1547 on a Run-key rule | T1547.001 (Registry Run Keys / Startup Folder) | Sub-tech specifies the persistence path |
+| T1190 on a generic web exploit alert | T1190 (no sub-tech yet) | Some techniques have no sub-tech — parent only is correct |
+
+The L2's reflex: **always look for a sub-technique first**. Rules tagged at the parent-technique level when a sub-technique exists are coverage gaps for everyone downstream.
+
+## Multi-technique rules
+
+Some rules legitimately fire on chains spanning multiple techniques. The metadata block supports an array — list every technique the rule's chain touches:
+
+```yaml
+threat:
+  - tactic_id: TA0001       # Initial Access
+    technique_id: T1078.004  # Cloud Accounts
+  - tactic_id: TA0006       # Credential Access
+    technique_id: T1539      # Steal Web Session Cookie
+  - tactic_id: TA0003       # Persistence
+    technique_id: T1098.005  # Device Registration
+  - tactic_id: TA0009       # Collection
+    technique_id: T1114.003  # Email Forwarding Rule
+```
+
+The first entry is the **primary technique** — the one the rule's response is most leveraged against. The rest provide context. M6 capstone walked exactly this case.
+
+## Version pinning
+
+ATT&CK releases minor versions every quarter and majors annually. Field renames, technique deprecations, and new sub-techniques shift between versions. The rule metadata pins the specific version:
+
+```yaml
+threat_framework: MITRE ATT&CK
+threat_framework_version: v15.0
+```
+
+When ATT&CK releases a major (e.g. v16.0), the detection-engineering team's quarterly review re-maps every rule and bumps the version. This is the only sustainable way to keep mapping in sync as ATT&CK evolves.
+
+## Cross-checking with TIDE / OpenCTI
+
+The detection-engineering team's quality bar: every shipped rule's technique mapping is verified against the live ATT&CK Navigator. The TIDE backend exposes a coverage matrix joining `rule.technique_id` with the matrix; gaps in the matrix become the next quarter's detection-engineering backlog.
+
+## Worked — tag the M7 capstone's six candidates
+
+| Candidate | Primary technique | Sub-technique | Tactic |
+|---|---|---|---|
+| Rare SP `appDisplayName` | T1098 | T1098.003 (Additional Cloud Roles) | TA0003 (Persistence) |
+| Per-entity z on role-grant rate | T1098 | T1098.003 | TA0003 |
+| Beacon CV on `(source, dest, port)` | T1071 | T1071.001 (Web) — when destination is HTTPS | TA0011 (Command and Control) |
+| Four-signal DGA combo | T1568 | T1568.002 (Domain Generation Algorithms) | TA0011 |
+| ML population — distinct mailboxes per SP | T1114 | T1114.002 (Remote Email Collection) | TA0009 (Collection) |
+| Per-entity z on outbound bytes per host | T1041 | (none — T1041 has no sub-techs) | TA0010 (Exfiltration) |
+
+Each rule's primary technique is the most-specific match; secondary techniques (chain context) get added when relevant.
+
+## Glossary
+
+- **Technique** — a category of attacker behaviour (T1003, T1078, etc.).
+- **Sub-technique** — a more-specific instance (T1078.004 = cloud accounts).
+- **Tactic** — the kill-chain phase (TA0006 = Credential Access).
+- **Primary technique** — the technique the rule's response is leveraged against; first in the array.
+- **Version pinning** — record the ATT&CK version in rule metadata; re-map on majors.
+
+## Further reading
+
+- ATT&CK Enterprise — current matrix.
+- ATT&CK CHANGELOG — release notes per version.
+- MITRE D3FEND — counter-technique mapping.
+""",
+    )
+    _add_q(session, m8l4, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A detection rule fires on Event ID 4769 (Kerberos Service Ticket Requested) where the encryption type is **0x17 (RC4-HMAC)** and a single user.name has > 50 such requests for non-krbtgt service names in 1 hour. Pick the *most-specific correct* ATT&CK mapping.",
+        options=[
+            {"value": "t1078", "label": "T1078 — Valid Accounts"},
+            {"value": "t1558", "label": "T1558 — Steal or Forge Kerberos Tickets (parent only)"},
+            {"value": "t1558_003", "label": "T1558.003 — Kerberoasting (sub-technique under T1558)"},
+            {"value": "t1003_006", "label": "T1003.006 — DCSync"},
+        ],
+        correct="t1558_003",
+        explanation_md="**T1558.003 Kerberoasting** is the right answer. The behaviour — bulk TGS requests for SPN-bound service accounts using RC4-HMAC so the AS-REP ticket can be cracked offline — maps exactly to the Kerberoasting sub-technique. T1558 (parent) is correct but less specific; the L2's reflex is to **always pick the most-specific sub-technique** when one matches. T1078 is unrelated (account abuse); T1003.006 is DCSync (replication-API credential extraction, different telemetry). Pinning at the sub-technique level is load-bearing for kill-chain rollups, threat-actor coverage, and Navigator export.",
+        points=2,
+    )
+
+    # Lesson 8.5 — Gate 4: Kill-chain step + playbook routing
+    m8l5 = _add_lesson(
+        session, mod8, order=5,
+        title="Gate 4 — kill-chain step and playbook routing: where the response actually lives",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Pick the **primary tactic** for a rule from MITRE's 14-tactic frame
+> 2. Apply the **response-leverage rule**: pick the tactic where the *response* is most effective, not where the *activity* is detected
+> 3. Name the **playbook id / runbook reference** that routes the alert to the right SOP
+> 4. Recognise multi-tactic rules and pick the right primary
+
+## Why pick a *primary* tactic
+
+A rule can touch many techniques and tactics. It needs **one** primary tactic for routing. The primary drives:
+
+- Which playbook the SOAR / runbook system invokes.
+- Which alert queue the L1 / L2 sees the alert in (e.g. `cred_access_queue`).
+- The default response template (revoke session for Initial Access; isolate host for Execution; reset password for Credential Access).
+- The on-call rota that pages on critical-severity alerts.
+
+Pick the wrong primary, and the alert lands in the wrong queue, the wrong on-call sees it, and the response is delayed or wrong.
+
+## The response-leverage rule
+
+The L2's heuristic: **pick the tactic where the response is most effective**, not where the activity is detected.
+
+Worked example: a rule fires on a *Credential Access* technique (Kerberoasting), but the highest-leverage response is at *Persistence* (rotate the service-account password and disable PAC validation bypass). Wrong: tag *Credential Access*. Right: tag the rule on the activity but **route the playbook to the password-rotation runbook**, which the team owns under Persistence response.
+
+Worked example #2: M6 capstone's AiTM-to-BEC chain. The rule's `sequence` spans Initial Access → Credential Access → Persistence → Collection. Where's the response leveraged? At *Initial Access* — revoke the session, password reset, kill all active tokens. That kills every downstream step. Pick **TA0001 (Initial Access)** as the primary even though the chain touches all four.
+
+## MITRE 14-tactic frame
+
+| Tactic | Code | When it's the primary |
+|---|---|---|
+| Reconnaissance | TA0043 | Pre-compromise; rare for SOC rules |
+| Resource Development | TA0042 | Pre-compromise; threat-intel territory |
+| **Initial Access** | TA0001 | Phishing, public-facing exploit, valid-account abuse — response is session/credential revocation |
+| **Execution** | TA0002 | Process spawn, scripting interpreter — response is host isolation |
+| **Persistence** | TA0003 | Run-keys, scheduled tasks, service install — response is removal of persistence + scoped re-image |
+| **Privilege Escalation** | TA0004 | Token impersonation, UAC bypass — response is session revocation + privilege audit |
+| **Defence Evasion** | TA0005 | Process injection, AV disable — response is alerting + escalation; rule rarely sole-trigger |
+| **Credential Access** | TA0006 | LSASS dump, Kerberoasting — response is password rotation |
+| **Discovery** | TA0007 | AD enum, port scan — response is suppression + lateral-watch |
+| **Lateral Movement** | TA0008 | Pass-the-hash, RDP, PsExec — response is host quarantine + credential rotation |
+| **Collection** | TA0009 | Mailbox sync, file scan — response is access revocation |
+| **Command and Control** | TA0011 | Beacon, C2 channel — response is destination block + host isolation |
+| **Exfiltration** | TA0010 | Outbound large transfer — response is destination block + investigation of source |
+| **Impact** | TA0040 | Ransomware, wiper — response is contain + rebuild |
+
+## Playbook id and runbook reference
+
+Every rule's metadata names *one* of:
+
+- **Playbook id** — the SOAR system's playbook identifier (e.g. `pb_kerberoasting_triage`). The SOAR auto-routes the alert to the playbook on fire.
+- **Runbook URL** — a wiki page the analyst follows step-by-step (e.g. `https://wiki/runbooks/kerberoasting`).
+- **Module pointer** — a course-module reference for first-mile actions (e.g. *L1 M5 IOC Handling* for an indicator-based alert). Used when no formal runbook exists.
+
+The L2 prefers playbook ids over wiki links — automation > documentation. Wiki links are the fallback for rules that aren't worth full SOAR automation.
+
+## Multi-tactic rule walk
+
+Take an EQL `sequence` rule covering Initial Access → Credential Access → Persistence → Collection (the M6 capstone). The metadata block lists all four techniques in the `threat` array. The **primary tactic** is picked using the response-leverage rule:
+
+```yaml
+threat:
+  - tactic_id: TA0001       # Initial Access — PRIMARY
+    technique_id: T1078.004
+  - tactic_id: TA0006       # Credential Access
+    technique_id: T1539
+  - tactic_id: TA0003       # Persistence
+    technique_id: T1098.005
+  - tactic_id: TA0009       # Collection
+    technique_id: T1114.003
+playbook_id: pb_aitm_session_revoke
+```
+
+The playbook routes to *session revocation* — kills the entire chain.
+
+## When the primary is *not obvious*
+
+Tie-breakers:
+
+1. **Where's the highest-leverage response?** (default heuristic)
+2. **What does the L1 see first?** Often the alert's first-mile action lives in one tactic; pick that.
+3. **What's the dominant TTP class?** (look at the rule's name; the noun is usually the primary).
+4. **What does the playbook actually do?** Read its first three steps; the tactic they target is the primary.
+
+If three of these point to the same tactic, that's the primary. If they disagree, the rule probably needs to be split.
+
+## Glossary
+
+- **Primary tactic** — one of MITRE's 14 tactics; drives routing.
+- **Response-leverage rule** — pick the tactic where the response is most effective.
+- **Playbook id** — SOAR system's playbook identifier; preferred over wiki links.
+- **Runbook URL** — fallback when no SOAR playbook exists.
+
+## Further reading
+
+- MITRE ATT&CK Enterprise — tactic descriptions.
+- *Incident Response & Computer Forensics, 3rd ed* — Mandiant — playbook-design chapter.
+- The org's runbook wiki (or whatever passes for it).
+""",
+    )
+    _add_q(session, m8l5, order=1, kind=QuestionKind.SINGLE,
+        stem_md="The M6 capstone EQL rule fires on a four-step `sequence` spanning T1078.004 (cloud account abuse) → T1539 (steal session cookie) → T1098.005 (device register) → T1114.003 (email forwarding rule). Which tactic should be the **primary** in the rule's threat metadata, and why?",
+        options=[
+            {"value": "ta0006", "label": "TA0006 (Credential Access) — because session-cookie theft is in the chain"},
+            {"value": "ta0003", "label": "TA0003 (Persistence) — because device registration is in the chain"},
+            {"value": "ta0001", "label": "TA0001 (Initial Access) — because the highest-leverage response (session revoke + password reset) lives here"},
+            {"value": "ta0009", "label": "TA0009 (Collection) — because the impact in the chain is mailbox forwarding"},
+        ],
+        correct="ta0001",
+        explanation_md="**TA0001 (Initial Access)** is the right primary. The L2's heuristic — pick the tactic where the *response* is most effective, not where the activity is detected — points to Initial Access because the response (revoke active session + force password reset + kill refresh tokens) **kills every downstream step in the chain**. Tagging Credential Access, Persistence, or Collection puts the alert in the wrong queue and routes it to a less-effective response. The threat metadata array still lists all four techniques (chain context); only the primary tactic / routing changes.",
+        points=2,
+    )
+
+    # Lesson 8.6 — Gate 5: Severity, threat block, runbook, owner, lifecycle
+    m8l6 = _add_lesson(
+        session, mod8, order=6,
+        title="Gate 5 — severity, threat metadata, runbook, owner, lifecycle plan",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Apply the four-tier **severity matrix** (Critical / High / Medium / Low) using stable criteria
+> 2. Author the **threat metadata block** in Kibana Security YAML
+> 3. Pick the right **owner** (team or role)
+> 4. Define the **lifecycle plan** — review cadence, KPIs, deprecation criteria
+
+## The severity matrix
+
+Severity is the most-misused field in detection metadata. The L2's reflex — set everything to *Medium* — produces uncalibrated alert queues where the analyst can't prioritise. The criteria below are stable across rule classes:
+
+| Severity | Criteria | Examples |
+|---|---|---|
+| **Critical** | Confirmed compromise / page IR / business impact in progress | DCSync from non-DC; full ransomware-staging chain; > GB exfil; Global Admin assignment to unknown user; CloudTrail stopped |
+| **High** | High-confidence, requires same-day response | Kerberoasting; AS-REP roasting; OAuth illicit consent on `Mail.ReadWrite`; MailItemsAccessed cluster post-AiTM; LSASS dump |
+| **Medium** | Suspicious; requires investigation; not page-class | Failed-auth spike per user; rare command-line under known-bad parent; single OAuth grant to an unverified app |
+| **Low** | Anomalous; batch-review (next business day) | Stack-count rare value alone; single beacon CV match without DGA reinforcement; lone process-create on a Temp path |
+
+The mapping isn't free-form. Each rule's severity is justified in metadata — typically as a one-line rationale. *"Critical because the rule fires only when the four-step AiTM chain completes; expected base-rate < 1/week; response is page-on-call."*
+
+## The threat metadata block
+
+Kibana Security's rule metadata format. Required fields:
+
+```yaml
+type: eql                  # or kql / threshold / threat_match / machine_learning
+language: eql
+query: |
+  sequence by user.target.name with maxspan=2h
+    [authentication where ... ]
+    [audit where ... ]
+    ...
+severity: high
+risk_score: 73             # 0-100; correlates with severity
+threat:
+  - framework: MITRE ATT&CK
+    tactic:
+      id: TA0001
+      name: Initial Access
+      reference: https://attack.mitre.org/tactics/TA0001/
+    technique:
+      - id: T1078
+        name: Valid Accounts
+        reference: https://attack.mitre.org/techniques/T1078/
+        subtechnique:
+          - id: T1078.004
+            name: Cloud Accounts
+            reference: https://attack.mitre.org/techniques/T1078/004/
+threat_framework_version: v15.0
+runbook: https://wiki/runbooks/aitm-session-revoke
+playbook_id: pb_aitm_session_revoke
+owner: team-detection
+```
+
+Risk score (0-100) typically tracks severity:
+- Critical: 87-100
+- High: 60-86
+- Medium: 30-59
+- Low: 1-29
+
+The risk score affects alert ordering in queues; severity is the categorical class.
+
+## Owner — a team or role, not a person
+
+The rule's owner is named in metadata. Common options:
+
+- **`team-detection`** — the detection-engineering team owns rule lifecycle.
+- **`team-cloud-security`** — cloud-specific rules owned by the cloud team.
+- **`team-identity`** — identity-platform rules.
+- **`team-platform-tier`** — platform-team-owned rules per service tier.
+
+Rules with no named owner rot. When ATT&CK changes, no one re-maps. When FP rate creeps, no one tunes. When the TTP evolves, no one updates the rule body. The owner is the answer to *"who's accountable when this rule needs change?"*
+
+Avoid naming a person; people leave teams. The role / team-name pattern survives turnover.
+
+## Lifecycle plan
+
+Every rule has explicit lifecycle metadata:
+
+```yaml
+lifecycle:
+  review_cadence_days: 90    # quarterly review
+  kpis:
+    - fp_rate_weekly
+    - tp_rate_sample_quarterly
+    - mean_time_to_triage_hours
+  deprecation_criteria:
+    - "TTP no longer in active threat-actor profiles"
+    - "Replacement rule covers superset"
+    - "Telemetry source decommissioned"
+```
+
+The 90d review cadence is the conventional default. The detection-engineering team queues rules quarterly and re-measures. KPIs come from the SOAR / Kibana Security integration. Deprecation criteria — the L2's job is to write them at ship time so the team knows when to retire the rule rather than ship and forget.
+
+### KPIs in detail
+
+- **`fp_rate_weekly`** — actual FPs / week from analyst feedback. Compare to backtest prediction; drift > 50% is a red flag for retraining.
+- **`tp_rate_sample_quarterly`** — sample 10 alerts each quarter, classify TP / FP / Indeterminate. Compute TP rate. Drop below 30% → re-tune.
+- **`mean_time_to_triage_hours`** — from alert fire to L1 ack. > 4h on a Critical rule is a routing problem.
+
+## Worked: complete G5 metadata for the M6 capstone rule
+
+```yaml
+name: AiTM session-cookie chain (Initial Access → Persistence → Collection)
+type: eql
+language: eql
+query: |
+  sequence by user.target.name with maxspan=2h
+    [authentication where azure.signinlogs.properties.risk_level_aggregated >= "high"]
+    [audit where event.action == "Add device"]
+    [audit where event.action in ("New-InboxRule", "Set-InboxRule") and o365.audit.parameters like "*ForwardTo*"]
+    [audit where event.action == "FileDownloaded" and o365.audit.Workload == "SharePoint"]
+severity: critical
+risk_score: 92
+threat:
+  - framework: MITRE ATT&CK
+    tactic:
+      id: TA0001
+      name: Initial Access
+    technique:
+      - id: T1078
+        subtechnique:
+          - id: T1078.004
+  - framework: MITRE ATT&CK
+    tactic:
+      id: TA0006
+      name: Credential Access
+    technique:
+      - id: T1539
+  - framework: MITRE ATT&CK
+    tactic:
+      id: TA0003
+      name: Persistence
+    technique:
+      - id: T1098
+        subtechnique:
+          - id: T1098.005
+  - framework: MITRE ATT&CK
+    tactic:
+      id: TA0009
+      name: Collection
+    technique:
+      - id: T1114
+        subtechnique:
+          - id: T1114.003
+threat_framework_version: v15.0
+runbook: https://wiki/runbooks/aitm-bec-exfil
+playbook_id: pb_aitm_session_revoke
+owner: team-detection
+lifecycle:
+  review_cadence_days: 60     # tighter — high-impact rule
+  kpis:
+    - fp_rate_weekly
+    - tp_rate_sample_quarterly
+    - mean_time_to_triage_hours
+  deprecation_criteria:
+    - "Microsoft adds first-party AiTM detection in Defender for O365 with > 90% TP coverage"
+    - "Replacement rule covers AiTM-to-BEC + AiTM-to-other-Collection chain"
+```
+
+Severity Critical (page-class), risk score 92 (top-decile), tactic primary Initial Access (response-leverage), three secondary tactics in the array, owner `team-detection`, lifecycle 60d review (tighter than default 90d).
+
+## Glossary
+
+- **Severity matrix** — Critical / High / Medium / Low criteria.
+- **Threat metadata block** — YAML structure listing tactic + technique + sub-tech per chain step.
+- **Risk score** — 0-100 ordering value.
+- **Owner** — team / role accountable for rule lifecycle.
+- **Lifecycle plan** — review cadence, KPIs, deprecation criteria.
+
+## Further reading
+
+- Elastic Security — *Rule schema reference*.
+- Florian Roth — *Detection Engineering KPIs*.
+- ATT&CK CHANGELOG — for version-bump triggers.
+""",
+    )
+    _add_q(session, m8l6, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *required* components of a complete G5 metadata block on a production detection rule?",
+        options=[
+            {"value": "sev", "label": "**Severity** with documented rationale"},
+            {"value": "threat", "label": "**Threat metadata block** (technique + sub-technique + tactic, with ATT&CK version pinned)"},
+            {"value": "runbook", "label": "**Runbook reference or playbook id**"},
+            {"value": "owner", "label": "**Owner** — named team or role (not a person)"},
+            {"value": "lifecycle", "label": "**Lifecycle plan** — review cadence, KPIs, deprecation criteria"},
+            {"value": "author", "label": "Author's email address"},
+            {"value": "build", "label": "Continuous-integration build status"},
+        ],
+        correct=["sev", "threat", "runbook", "owner", "lifecycle"],
+        explanation_md="The five required G5 components are: severity (with rationale), threat metadata block (technique + sub-technique + tactic + version pin), runbook or playbook id (alert routing), owner (team / role, not a person), and lifecycle plan (review cadence + KPIs + deprecation criteria). Author email is *optional* — provenance is nice but doesn't affect deployability. CI build status is irrelevant to the rule itself; it's a delivery-pipeline concern, not a rule-quality gate.",
+        points=3,
+    )
+
+    # Lesson 8.7 — Worked end-to-end
+    m8l7 = _add_lesson(
+        session, mod8, order=7,
+        title="Worked end-to-end: M7 APT chain → six production rules",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.**
+> 1. Walk one of the M7 capstone's six candidates through all five gates
+> 2. Author the production rule body in the right Kibana Security rule type
+> 3. Recognise the differences in conversion across rule types (threshold / EQL / threat_match / machine_learning)
+> 4. Identify the failure modes that a candidate hits at each gate
+
+## The six candidates from M7's capstone
+
+The M7 capstone APT chain produced six detection candidates:
+
+1. **Rare SP `appDisplayName`** — stack-count rare-tail (M7 L7.2).
+2. **Per-entity z on role-grant rate per SP** — z-score baseline (M7 L7.6).
+3. **Beacon CV per `(source, dest, port)`** — interval CV (M7 L7.3).
+4. **Four-signal DGA combo** — entropy + length + TLD + per-source (M7 L7.5).
+5. **ML population — distinct mailboxes per SP** — ML population job (M7 L7.7).
+6. **Per-entity z on outbound bytes per host** — z-score baseline (M7 L7.6).
+
+This lesson walks **#5 — the ML population job** end-to-end as the worked exemplar. The other five follow the same shape with rule-type variations.
+
+## G1 — Data quality
+
+- **ECS fields**: `o365.audit.UserId`, `o365.audit.Operation`, `o365.audit.AppId`. Stable since 8.0; populated reliably on this estate.
+- **Retention**: ML job's bucket span is 15m; rule look-back 1h. Estate retention is 90d. ✅ (margin > 200×).
+- **Parser health**: 30d `ingest.failed_documents` on `logs-microsoft_o365.audit-*` is 0.02%. ✅ (< 0.1%).
+- **Field populated for target population**: `o365.audit.AppId` is non-null on 99.7% of audit events. ✅.
+
+**Passes G1.**
+
+## G2 — FP rate via backtest
+
+The candidate runs the ML population job retrospectively over 30d:
+
+- Anomaly score > 75 produced 4 alerts.
+- 4 × (7/30) = **0.93 findings/week** predicted.
+- Sample classification: 1 TP (the M6-AiTM case from last week), 1 FP (legit DLP scan), 1 FP (legit eDiscovery search), 1 FP (vacation-handover where one user inherited 30 mailboxes).
+
+TP rate = 1/4 = **25%**.
+
+This is **borderline**. The pass criterion is TP rate ≥ 30%. The L2's options:
+1. Lock body, ship at *High* severity (not Critical), schedule 60d review.
+2. Add an allowlist filter for known DLP / eDiscovery / vacation-handover SPs and re-backtest.
+3. Reject and redesign.
+
+The L2 picks (2). The DLP / eDiscovery / vacation-handover SPs are well-known operationally; adding an allowlist is sound engineering, not tuning-during-backtest (the *body* doesn't change; the allowlist is metadata).
+
+Re-backtest with allowlist: 1 alert (the AiTM case). 1 × 7/30 = **0.23 findings/week**, TP rate 100%. **Passes G2** — but the sample is small enough that the L2 schedules a 30d post-ship review instead of 90d.
+
+## G3 — ATT&CK mapping
+
+The activity: a service principal accessing a wide range of mailboxes in a short window — programmatic mailbox extraction.
+
+- Most-specific sub-technique: **T1114.002 — Email Collection: Remote Email Collection**.
+- Parent: **T1114 — Email Collection**.
+- Tactic: **TA0009 — Collection**.
+- ATT&CK version: v15.0.
+
+**Passes G3.**
+
+## G4 — Kill-chain step + playbook routing
+
+Primary tactic: **TA0009 (Collection)** — the rule fires *during* the collection step.
+
+The response-leverage check: the highest-leverage response is *upstream* at Persistence (revoke the SP's permissions / delete the SP). But the alert *fires* during Collection, and the L1's first-mile action is to assess the access pattern; that work happens at Collection. So **primary = Collection**, with the playbook routing to:
+
+- L1 ack within 30m.
+- L2 takes within 2h.
+- Playbook id: `pb_oauth_mailbox_recon`.
+- First step in the playbook: enumerate the SP's permissions (cross-cuts to Persistence response).
+- Second step: revoke / suspend the SP if the access pattern is suspicious.
+
+**Passes G4.**
+
+## G5 — Metadata completeness
+
+```yaml
+name: ML population — distinct mailboxes per service principal anomaly
+type: machine_learning
+machine_learning_job_id: o365-mailitemsaccessed-population
+anomaly_threshold: 75
+severity: high
+risk_score: 73
+threat:
+  - framework: MITRE ATT&CK
+    tactic:
+      id: TA0009
+      name: Collection
+      reference: https://attack.mitre.org/tactics/TA0009/
+    technique:
+      - id: T1114
+        name: Email Collection
+        reference: https://attack.mitre.org/techniques/T1114/
+        subtechnique:
+          - id: T1114.002
+            name: Remote Email Collection
+            reference: https://attack.mitre.org/techniques/T1114/002/
+threat_framework_version: v15.0
+runbook: https://wiki/runbooks/oauth-mailbox-recon
+playbook_id: pb_oauth_mailbox_recon
+owner: team-detection
+allowlist:
+  - app_display_name_in: ["DLP-Scanner", "eDiscovery-Compliance", "vacation-handover-bot"]
+lifecycle:
+  review_cadence_days: 30        # tightened — borderline backtest sample
+  kpis: [fp_rate_weekly, tp_rate_sample_quarterly, mean_time_to_triage_hours]
+  deprecation_criteria:
+    - "Microsoft adds first-party detection in Defender for Cloud Apps with > 90% TP coverage"
+    - "Replacement ML job covers superset (per-app + per-tenant peer comparison)"
+```
+
+**Passes G5.**
+
+## Submission to TIDE
+
+The rule body is committed to the TIDE rule repository. CI runs:
+- Schema validation against Kibana Security rule format.
+- Cross-check the threat metadata against the live ATT&CK matrix.
+- Smoke-test the rule against a 7d preview window.
+- Lint the runbook URL and playbook id against the runbook / SOAR catalogue.
+
+On green CI, the rule deploys via Detection Engine API. Kibana Security shows it under *Rules → Detection rules* with status **Enabled**.
+
+## The other five candidates — rule-type variations
+
+| # | Hunt source | Production rule type | Notes |
+|---|---|---|---|
+| 1 | Stack-count rare SP | `threshold` (Kibana Security) | Aggregating-count + value match |
+| 2 | Per-entity z on role-grant rate | `threshold` with custom Painless score | The z-score lives in a runtime field; threshold trips on `z > 3 AND count > 1` |
+| 3 | Beacon CV | scheduled `Watcher` | ES&#124;QL `STDDEV` shape varies; Watcher with Painless is portable |
+| 4 | DGA combo | `threshold` with multi-field filter | Pre-computed `entropy` field at ingest is a G1 prerequisite |
+| 5 | ML population — mailbox count | `machine_learning` (this lesson's worked example) | Anomaly threshold 75 |
+| 6 | Per-entity z on outbound bytes | `threshold` with custom Painless score | Same shape as #2 |
+
+The G1–G5 walk is identical for each; only the rule type and the rule-body language change.
+
+## Glossary
+
+- **Allowlist filter** — a metadata-level filter that doesn't change the rule body but suppresses known-benign matches.
+- **Anomaly threshold** — for ML rule type, the score above which the rule fires.
+- **Rule-type variation** — different Kibana Security rule types (threshold / EQL / threat_match / machine_learning); the gates apply identically across types.
+
+## Further reading
+
+- Elastic Security — *Rule schema reference*.
+- Kibana Security *Detection Engine API*.
+- TIDE / OpenCTI integration docs.
+""",
+    )
+
+    # Lesson 8.8 — Capstone quiz
+    m8l8 = _add_lesson(
+        session, mod8, order=8,
+        title="L2 Capstone — five-gate conversion quiz",
+        lesson_type=LessonType.QUIZ, duration_min=18,
+        content_md="""
+> Four-question capstone covering G1 fail-detection, G3 mapping, G4 routing reasoning, and the post-ship lifecycle.
+
+This is the L2 finale. Pass the capstone quiz, the L2 has authored every gate of the hunt-to-detection pipeline; rules they ship from this point on are production-grade.
+
+The next step in the analyst's path is L3 — *Adversary Emulation Basics* — where the focus shifts from **defending** against TTPs to **executing them in a sanctioned way and verifying that the SOC catches them**.
+""",
+    )
+    _add_q(session, m8l8, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A candidate detection rule queries `email.attachments.file.hash.sha256`. Backtest produces zero findings over 30 days, but the L2 knows the TTP is in active use because IR worked a case last week. Which gate has failed and what's the next step?",
+        options=[
+            {"value": "g1_field", "label": "G1 — the `email.*` namespace was added in ECS 8.6 and the gateway integration on this estate hasn't been upgraded; the field is null on every doc. Next step: raise on the schema-debt backlog and ship the rule pinned to the upgraded estate"},
+            {"value": "g2_fp", "label": "G2 — the FP rate is too low; tune the threshold to fire more"},
+            {"value": "g3_map", "label": "G3 — the technique mapping is wrong; re-map and retry"},
+            {"value": "g4_route", "label": "G4 — the kill-chain step is wrong; pick a different tactic"},
+        ],
+        correct="g1_field",
+        explanation_md="**G1 — data quality**, specifically the schema-stability check. The `email.*` ECS namespace was added in 8.6, but the email-gateway integration on this estate hasn't been upgraded; the field is unpopulated, so the candidate fires zero alerts even though the underlying TTP is active. The L2's correct response: raise the schema-upgrade ticket on the **schema-debt backlog** for the platform team, and ship the rule pinned to the estate(s) that *do* have the field. G2 / G3 / G4 are downstream — none of them apply when the candidate's underlying telemetry is missing. The L2's reflex must always be to **pre-screen G1 before drafting** the candidate; finding it at backtest time is wasted analyst hours.",
+        points=2,
+    )
+    _add_q(session, m8l8, order=2, kind=QuestionKind.SHORTANSWER,
+        stem_md="A backtest produces **35 unique findings in 30 days**. Sample 10 → **3 TP, 4 FP, 3 Indeterminate**. Compute the predicted weekly TP rate **and** decide whether the candidate passes the canonical G2 criteria (≤ 5/week findings AND TP rate ≥ 30%). Format: `tp_rate=<pct>, findings_per_week=<num>, passes=<yes/no>`.",
+        options=None,
+        correct=[
+            "tp_rate=30%, findings_per_week=8.17, passes=no",
+            "tp_rate=30, findings_per_week=8.17, passes=no",
+            "tp_rate=30%,findings_per_week=8.17,passes=no",
+            "tp_rate=30, findings_per_week=8.2, passes=no",
+            "tp_rate=30%, findings_per_week=8.17, passes=No",
+            "tp_rate = 30%, findings_per_week = 8.17, passes = no",
+        ],
+        explanation_md="findings_per_week = 35 × 7/30 = **8.17 / week** — fails the FP-budget criterion of ≤ 5/week. TP rate = 3/10 = **30%** — meets the floor exactly. **Passes = no** because the FP-budget constraint fails. Note: indeterminates (3) are *not* counted as TPs in the conservative TP-rate computation. The L2's options: redesign the rule body (do not tune-during-backtest) to reduce findings, or split into two narrower candidates each below 5/week. Adding an allowlist for known-benign matches is metadata-level and OK; threshold tweaks on the body are not.",
+        points=3,
+    )
+    _add_q(session, m8l8, order=3, kind=QuestionKind.MULTI,
+        stem_md="A candidate detection rule's threat metadata array correctly lists FOUR tactics in this order: TA0001 Initial Access, TA0006 Credential Access, TA0003 Persistence, TA0009 Collection. The L2 must pick the **primary tactic** for routing. Which heuristics correctly identify Initial Access as the primary?",
+        options=[
+            {"value": "leverage", "label": "**Response-leverage rule** — revoking the session at Initial Access kills every downstream step in the chain"},
+            {"value": "queue", "label": "**Alert-queue routing** — Initial Access alerts route to the credential / identity team's queue, which has the right tooling for session revocation"},
+            {"value": "first", "label": "**First in the array** — the array's first entry is by convention the primary"},
+            {"value": "playbook", "label": "**Playbook target** — the playbook's first three steps target Initial Access response (revoke session, password reset, audit refresh tokens)"},
+            {"value": "alphabetical", "label": "**Alphabetical** — pick the tactic whose name comes first alphabetically"},
+            {"value": "highest_severity", "label": "**Highest-severity tactic** — Initial Access is more severe than the others"},
+        ],
+        correct=["leverage", "queue", "first", "playbook"],
+        explanation_md="Four valid heuristics: (1) response-leverage (the load-bearing rule), (2) alert-queue routing pointing at Initial Access, (3) the convention that the array's first entry is the primary, and (4) the playbook's first steps targeting Initial Access response. Alphabetical ordering is meaningless. There's no inherent severity hierarchy among tactics — Persistence, Credential Access, and Collection can all be Critical depending on context. The four valid heuristics, applied together, all converge on Initial Access being the right primary for this AiTM-to-BEC-to-exfil chain. (Recap: the rule's M6 capstone analogue uses primary TA0001 for exactly this reason.)",
+        points=3,
+    )
+    _add_q(session, m8l8, order=4, kind=QuestionKind.TRUEFALSE,
+        stem_md="Once a detection rule passes all five gates and ships, the L2's work on it is complete. Lifecycle metadata (review cadence, KPIs, deprecation criteria) is for documentation only and doesn't affect rule quality.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** The lifecycle plan is *active* metadata that the detection-engineering team operates against quarterly. KPIs (FP rate, TP rate, mean time to triage) are measured against actual production data; drift > 50% from backtest predictions is a re-tune trigger. Deprecation criteria define when to retire the rule rather than ship-and-forget — TTPs evolve, telemetry sources are decommissioned, vendors add native detection. A rule with no lifecycle metadata silently rots: ATT&CK changes don't get re-mapped, FP creep goes undetected, and TTP evolution leaves the rule firing on yesterday's behaviour. The 90-day review cadence is the conventional default; high-impact rules tighten to 30–60 days. The rule's *owner* (team / role) is the named accountable party for all of this.",
+        points=2,
+    )
+
+    print(f"  L2: {course.title} — 8 modules, 64 lessons (Module 8 Hunt-to-Detection Capstone @ proper depth — L2 COMPLETE)")
     return course
 
 
