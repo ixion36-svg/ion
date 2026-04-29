@@ -13227,7 +13227,1125 @@ owner: IR-team
         points=2,
     )
 
-    print(f"  L2: {course.title} — 6 modules, 48 lessons (Module 6 Email & Collaboration @ proper depth)")
+    # ── Module 7 — Anomaly Hunts (statistical methods) ────────────────────
+    mod7 = _add_module(
+        session, course, order=7,
+        title="Anomaly Hunts — statistical methods",
+        description_md=(
+            "When a behavioural EQL `sequence` rule can't catch a "
+            "TTP — because the TTP is novel, the kill-chain order is "
+            "unknown, or the malicious activity *only* differs from "
+            "normal in volume / frequency / rarity — the L2 reaches "
+            "for **statistical hunts**. This module covers the PEAK "
+            "Model-Assisted arm: stack counting & rarity, beacon "
+            "detection by interval coefficient of variation, "
+            "time-series spikes against rolling baselines, Shannon "
+            "entropy on DNS labels for DGA, per-entity z-score "
+            "baselining (so noisy users don't drown quiet ones), and "
+            "Elastic ML `anomaly_detector` jobs for problems that "
+            "exceed a single query. Closes with a worked APT campaign "
+            "where every chain step is invisible to behavioural rules "
+            "but lights up across the statistical-hunt suite — "
+            "pre-handing-off to Module 8's hunt-to-detection capstone."
+        ),
+        estimated_minutes=240,
+    )
+
+    # Lesson 7.1 — Statistical-hunt frame; PEAK Model-Assisted reflex
+    m7l1 = _add_lesson(
+        session, mod7, order=1,
+        title="The statistical-hunt frame: PEAK Model-Assisted, FP budgets, and per-entity baselines",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.** By the end of this lesson you'll be able to:
+> 1. Choose between **behavioural** and **statistical** hunts and explain when each fits the PEAK frame
+> 2. Recognise the *aggregate-then-anomaly-detect* shape that defines a statistical hunt
+> 3. Apply the **FP budget** concept and explain why fleet-wide thresholds blow it
+> 4. Identify the four problem classes statistical hunts catch that behavioural rules miss
+>
+> **Prerequisites.** L2 Modules 1 (PEAK methodology), 2 (KQL/EQL/ES|QL), and 5/6 (per-domain hunts you can now generalise from).
+
+## Behavioural vs. statistical: two hunt frames
+
+The L2 has been authoring **behavioural** hunts since Module 3 — every EQL `sequence by` query, every KQL `event.action` cluster, every "process A spawned process B then B opened socket to internet" pattern. Behavioural hunts encode a known pattern of activity; the analyst names the actions, names the order, and the rule fires when the pattern matches.
+
+Statistical hunts encode a different question. They ask: *given a baseline of what normal looks like, is this current period unusual?* The hunt doesn't name a sequence. It names a **field**, a **bucket** (per-host, per-user, per-domain), a **metric** (count, rate, interval, distribution), and a **threshold**. The data tells you whether anything in the bucket has crossed the threshold.
+
+| Frame | Statistical | Behavioural |
+|---|---|---|
+| **Inputs** | Aggregate fields — counts, rates, intervals, distributions | Discrete events arranged in a sequence |
+| **Tooling** | KQL aggs, ES&#124;QL `STATS`, Elastic ML jobs, Lens / Vega | EQL `sequence`, KQL action clusters, ATT&CK heatmap |
+| **Strengths** | Catches *novel* / *unknown-unknown* TTPs, baseline drift, beaconing | Catches *known* TTPs, kill chains, rule-able patterns |
+| **Failure mode** | False positives in noisy populations; needs per-entity baselining | Misses anything outside the encoded sequence |
+| **PEAK fit** | Hypothesis-driven + **Baseline / Model-Assisted** | Hypothesis-driven + **Baseline** |
+| **M-coverage** | M7 (this module) | M3 / M4 / M5 / M6 |
+
+## The aggregate-then-anomaly-detect shape
+
+Every statistical hunt in this module follows the same three-stage shape:
+
+1. **Aggregate.** Reduce raw events to a per-bucket summary. The bucket is a `(field, time-window)` tuple — *per-source.ip per-hour*, *per-user.name per-day*, *per-process.name per-12h*. The aggregation is a count, mean, std-dev, percentile, distinct-count, or entropy.
+2. **Threshold.** Apply a rule to the aggregated value. Either a *static* threshold (`count > 100`, `cv < 0.10`) or a *baseline-relative* one (`count > μ + 3σ`).
+3. **Filter & escalate.** Reduce to the rows above threshold; allowlist known-noisy entities; pivot to raw events for the surviving anomalies.
+
+The L2 cannot skip stage 3. Every statistical hunt produces noise; the allowlist is mandatory and the per-entity pivot is what actually carries the investigation.
+
+## The FP-budget concept
+
+A SOC has a finite **false-positive budget**. Concretely: given the team's analyst capacity, a hunt that produces > 5 unique findings per week is unsustainable; one that produces 1–3 per week is.
+
+The FP-budget budget governs threshold choice. The L2 sets thresholds *empirically*: run the candidate query against 7 days of historical data, count how many findings it would have produced, and tune the threshold until the count fits the budget. If the threshold can't be tuned to the budget without removing real signal — the hunt is the wrong shape and needs re-thinking.
+
+**Red-flag pattern.** A hunt that fires 200 times in 7 days "but they're all real" doesn't fit the budget — analysts will start dismissing without reading. The hunt itself is now a *new* false-negative source.
+
+## Why fleet-wide thresholds blow the FP budget
+
+Consider a hunt for "more than 10 PowerShell invocations in an hour." On a 5,000-endpoint estate the threshold is wrong. The DevOps build farm runs 200 PowerShell invocations / hour as part of normal pipeline activity — that fires every hour. Meanwhile a quiet finance laptop running 8 invocations is well below threshold but is the actual incident.
+
+The fix is **per-entity baselining**. Compute μ_e and σ_e *per host*. Threshold on z-score: `(x − μ_e) / σ_e > 3`. Now the build farm's 200 events are normal (matches its own baseline) and the finance laptop's 8 events are 4σ above its own ~1-event baseline.
+
+Lesson 7.6 covers the per-entity z-score implementation. It is the single most-load-bearing technique in this module.
+
+## Four problem classes statistical hunts catch
+
+| Class | Example | Module link |
+|---|---|---|
+| **Volume drift** | NXDOMAIN burst from one host (DGA failover) | L7.4 |
+| **Periodic timing** | Beacon emitting every 30s ± jitter | L7.3 |
+| **Rare value** | Service principal with name "Marketing-AnalyticsBot" issuing role grants | L7.2 |
+| **Distributional shape** | High-entropy DNS labels (DGA), weird command-line lexicon | L7.5 |
+
+Behavioural rules cannot encode any of these without first reducing the problem to a statistical one. *"More than 100 NXDOMAIN per source"* is a statistical hunt with a behavioural-looking trigger; *"long high-entropy DNS label"* is statistical full stop.
+
+## Where in PEAK statistical hunts live
+
+PEAK has three arms: **Hypothesis-driven**, **Baseline**, and **Model-Assisted**. Statistical hunts span the latter two:
+
+- **Baseline hunts** answer "is the current state different from a known-good baseline of *this* entity / population?" — Lessons 7.4 and 7.6.
+- **Model-Assisted hunts** use a model (Elastic ML, a Painless scoring function, an offline-trained classifier) to surface anomalies the analyst couldn't write a query for — Lessons 7.5 (entropy as a poor-person's model) and 7.7 (Elastic ML jobs proper).
+
+The Hypothesis-driven arm continues to live in M3 / M4 / M5 / M6 territory: known TTP, known sequence, query the data.
+
+## Glossary
+
+- **Coefficient of variation (CV)** = σ / μ. Beacons have CV < 0.1; jittered beacons CV < 0.3; user traffic CV ≫ 1.
+- **Shannon entropy** of a string s = −Σ p(c) log₂ p(c), summed over characters. Random labels score ~4.5–5.0 over the ASCII alphabet; English words score ~2.5–3.0.
+- **Stack count** = enumerate every distinct value of a field, sort by count ascending, take the bottom-N. The "rare tail" is N = bottom 1% or absolute bottom 100, whichever is smaller.
+- **z-score** = (x − μ) / σ. Threshold > 3 is the conventional one-tailed "anomaly" cut-off (equivalent to ~99.7% confidence under Normal, but field distributions rarely are).
+
+## Further reading
+
+- SANS *FOR578 — Cyber Threat Intelligence* and *SEC555 — SIEM* sections on statistical hunting.
+- Active Countermeasures — *Hunting C2 with RITA / FreqServer*.
+- Elastic ML reference — `anomaly_detector` job types and detector functions.
+""",
+    )
+    _add_q(session, m7l1, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L2 wants to detect a never-before-documented C2 channel that beacons over HTTPS at a fixed 90-second interval. The TTP isn't catalogued in ATT&CK and no rule exists. Which hunt frame fits, and why?",
+        options=[
+            {"value": "behavioural", "label": "Behavioural — write an EQL `sequence` rule for the protocol pattern"},
+            {"value": "statistical", "label": "Statistical — aggregate inter-arrival intervals per `(source.ip, destination.ip, destination.port)` and threshold on coefficient of variation"},
+            {"value": "either", "label": "Either works equally well"},
+            {"value": "neither", "label": "Neither — wait for a CTI report"},
+        ],
+        correct="statistical",
+        explanation_md="**Statistical**, because the TTP is *novel* (no encoded sequence to match) but has a measurable *timing distribution* (fixed interval ≈ low CV). Behavioural rules need a known sequence of actions; here, only the *interval distribution* is anomalous, not any individual event. This is the L7.3 beacon-CV hunt — covered in detail there. Waiting for a CTI report is the failure mode the *Model-Assisted* arm of PEAK explicitly mitigates.",
+        points=2,
+    )
+
+    # Lesson 7.2 — Stack counting and rarity
+    m7l2 = _add_lesson(
+        session, mod7, order=2,
+        title="Stack counting and rarity: surfacing the long tail of an aggregate",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.**
+> 1. Build a **stack count** over an arbitrary ECS field and sort to the rare tail
+> 2. Apply the **cardinality-aware threshold** to set a sensible bottom-N cut-off
+> 3. Recognise high-cardinality fields where stack counts produce only noise
+> 4. Run worked stack-count hunts on `process.command_line`, Entra `appDisplayName`, OAuth scopes, and `o365.audit.UserId` for sensitive operations
+
+## What stack counting actually is
+
+Stack counting is the simplest statistical hunt: list every distinct value of a field, count how often each appears, sort ascending. The bottom-N — the *rare tail* — is the hunt finding.
+
+The conceptual model:
+
+```
+field_value           count
+----------------      -----
+"net user /add..."   1
+"whoami /priv"       1
+"powershell -enc ..."  2
+"ipconfig /all"     14
+...
+"explorer.exe"       1,200,438
+```
+
+The rare tail (`count == 1`) carries the interesting outliers. The thick part of the distribution carries the population behaviour you don't care about. The L2's reflex is *sort ASC, LIMIT N* — opposite of every other dashboard, where you'd sort DESC by count.
+
+## ES|QL skeleton
+
+```esql
+FROM logs-windows.sysmon-*
+| WHERE event.code == "1"
+| STATS count = COUNT(*) BY process.command_line
+| SORT count ASC
+| LIMIT 100
+```
+
+KQL equivalents in Lens / Discover use the **Top values of `process.command_line` (descending)** then scroll to the tail, or a Vega chart with the same shape.
+
+## Cardinality-aware thresholds
+
+Bottom-100 of a 100-cardinality field captures *every* value in the field — useless. Bottom-100 of a 100M-cardinality field captures everything that fired exactly once over the look-back, which is mostly noise.
+
+The L2 sets the bottom-N cut-off based on the field's cardinality:
+
+| Cardinality | Bottom-N cut-off | Rationale |
+|---|---|---|
+| < 100 | Don't stack-count; use rarity flag from a known list | Stack count fails — any "rare" value is an artefact |
+| 100–1,000 | Bottom 1–5% (5–50 values) | Fine-grained; hand-review every result |
+| 1,000–100,000 | `count == 1` (singletons) plus bottom 0.1% | Singletons are the highest-signal class |
+| > 100,000 | `count == 1` only over a *narrowed* sub-population (e.g. per host) | Fleet-wide singletons are noise; per-entity singletons are signal |
+
+**Cardinality estimation in ES|QL:**
+```esql
+... | STATS distinct = COUNT_DISTINCT(process.command_line)
+```
+
+## Worked hunt 1 — rare process command lines per host
+
+```esql
+FROM logs-windows.sysmon-*
+| WHERE event.code == "1" AND @timestamp > NOW() - 7 days
+| STATS count = COUNT(*) BY host.name, process.command_line
+| WHERE count == 1
+| SORT @timestamp DESC
+| LIMIT 200
+```
+
+Per-host singletons of `process.command_line` are the highest-signal subset for many estates: a host that ran *one* unique command-line in 7 days is unusual. Allowlist `MsiExec.exe /I` and `taskhostw.exe ...` patterns; the survivors are typically privilege-escalation tools or LOLBin abuse.
+
+## Worked hunt 2 — rare service-principal `appDisplayName` issuing role grants
+
+```esql
+FROM logs-azure.auditlogs-*
+| WHERE event.action == "Add member to role"
+| STATS count = COUNT(*) BY azure.auditlogs.properties.initiated_by.app.display_name
+| SORT count ASC
+| LIMIT 50
+```
+
+A service principal that has issued role grants *once ever* in 30 days is the highest-signal class. M6 covered the OAuth-grant patterns; here we add the rarity-of-actor lens.
+
+## Worked hunt 3 — rare OAuth consent scopes accepted
+
+```esql
+FROM logs-azure.auditlogs-*
+| WHERE event.action == "Consent to application"
+| EVAL scope = azure.auditlogs.properties.modified_properties.new_value
+| STATS count = COUNT(*) BY scope
+| SORT count ASC
+| LIMIT 30
+```
+
+Scopes seen on ≤ 3 grants fleet-wide are the high-signal subset — `Mail.ReadWrite`, `offline_access`, and the wildcards.
+
+## Worked hunt 4 — rare `o365.audit.UserId` running sensitive operations
+
+```esql
+FROM logs-microsoft_o365.audit-*
+| WHERE o365.audit.Operation IN ("Set-Mailbox", "New-InboxRule", "Add-MailboxPermission")
+| STATS count = COUNT(*) BY o365.audit.UserId, o365.audit.Operation
+| WHERE count == 1
+| SORT @timestamp DESC
+```
+
+Per-user singletons of mailbox-administration operations: a user who ran *one* `Set-Mailbox` in 30 days is unusual; pair with M6's BEC chain.
+
+## High-cardinality anti-patterns
+
+Stack-counting on these fields produces only noise:
+
+- `event.id` / `_id` — every value is unique by definition.
+- `@timestamp` — same.
+- `message` (full free-text) — near-unique per event.
+- `process.entity_id` — uuid per process.
+- IP+port combinations of high-throughput services — each session is unique.
+
+Use **categorisation** (Elastic ML's `categorisation_field_name`, L7.7) for free-text rather than stack-counting.
+
+## Combining stack count with a behavioural prefilter
+
+The strongest statistical hunts combine a coarse behavioural filter with a rarity threshold:
+
+```esql
+FROM logs-windows.sysmon-*
+| WHERE event.code == "1"
+  AND process.parent.name == "lsass.exe"
+| STATS count = COUNT(*) BY process.command_line
+| WHERE count <= 3
+```
+
+Children of `lsass.exe` are already a small population; rare command lines among them are a near-certainty for credential-dumping tooling.
+
+## Glossary
+
+- **Stack count** — enumerate values of a field, sort by count ascending, take the bottom-N.
+- **Singleton** — a value that appears exactly once in the look-back window. The most common high-signal class for high-cardinality fields.
+- **Rare-tail cut-off** — the bottom-N threshold; cardinality-aware.
+- **Behavioural prefilter** — narrow the universe with a known-malicious context (e.g. parent == lsass.exe), then apply rarity inside it.
+
+## Further reading
+
+- David J Bianco's *Pyramid of Pain* — value of fragile (rare) vs durable (behavioural) indicators.
+- Elastic blog — *Stack counting in Lens*.
+- ATT&CK technique pages for the LOLBin / role-grant / consent-grant techniques referenced.
+""",
+    )
+    _add_q(session, m7l2, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *valid* fields for a fleet-wide stack-count rare-tail hunt? (Pick all that apply.)",
+        options=[
+            {"value": "cmdline", "label": "`process.command_line`"},
+            {"value": "appname", "label": "`azure.signinlogs.properties.app_display_name`"},
+            {"value": "scope", "label": "OAuth scope value"},
+            {"value": "msgid", "label": "`email.message_id`"},
+            {"value": "evid", "label": "`event.id`"},
+            {"value": "spname", "label": "Service principal `appDisplayName` issuing role grants"},
+        ],
+        correct=["cmdline", "appname", "scope", "spname"],
+        explanation_md="`process.command_line`, `appDisplayName`, OAuth scopes, and SP `appDisplayName` are all moderate-cardinality fields where the rare tail (singletons / bottom 1%) carries signal. `email.message_id` and `event.id` are *unique-per-event* by design — every value is a singleton, so stack-counting produces only noise. The L2 needs to recognise the high-cardinality anti-pattern.",
+        points=3,
+    )
+
+    # Lesson 7.3 — Beacon detection via interval CV
+    m7l3 = _add_lesson(
+        session, mod7, order=3,
+        title="Beacon detection: interval coefficient of variation and the tells of jittered C2",
+        lesson_type=LessonType.READING, duration_min=26,
+        content_md="""
+> **Learning objectives.**
+> 1. Compute the **coefficient of variation (CV)** of inter-arrival intervals for a `(source, destination, port)` tuple
+> 2. Apply the canonical CV thresholds: **< 0.1 fixed beacon, < 0.3 jittered beacon, > 1 user traffic**
+> 3. Recognise tells of jittered C2: **bimodal distributions, even-multiple jitter, narrow-band CV cliffs**
+> 4. Distinguish C2 beacons from benign periodic traffic (NTP, scheduled tasks, telemetry agents)
+
+## What a beacon looks like in the data
+
+A beacon is a child process or implant that calls home at a near-constant interval. The simplest implementation: every 60 seconds, GET https://attacker/. Slightly less detectable: every 60 seconds plus a uniform jitter of ±10 seconds. Slightly less still: every 60 seconds plus a 50% jitter range. Past about ±90% jitter the beacon is "user-traffic-shaped" and beats interval-CV detection — but at that point the operator has slowed the C2 cadence so much that other detections (TLS fingerprint, JA3, destination reputation) have time to fire.
+
+The L2's job: **catch beacons up to ~50% jitter using interval CV alone**, then escalate to enrichment for the rest.
+
+## Coefficient of variation in 30 seconds
+
+For a series of inter-arrival gaps gᵢ = tᵢ − tᵢ₋₁:
+
+- mean μ = Σ gᵢ / n
+- standard deviation σ = √( Σ (gᵢ − μ)² / n )
+- **CV = σ / μ**
+
+CV is unitless, scale-free. A 60-second beacon and a 6-hour beacon with the same *relative* jitter score the same CV. This is what makes it the right metric for beacon detection: you don't have to know the cadence in advance.
+
+| Source | Typical CV |
+|---|---|
+| Fixed beacon (e.g. `Sleep(60)` exactly) | ~0 (limited by clock skew) |
+| Jittered beacon (`Sleep(60 + uniform(-10, +10))`) | 0.05–0.15 |
+| Heavily-jittered beacon (`Sleep(60 ± 30s)`) | 0.20–0.35 |
+| NTP polls | 0.01–0.05 (looks like a beacon) |
+| Telemetry agent heartbeat | 0.02–0.20 (looks like a beacon) |
+| Real user web browsing | 1.0–5.0 |
+| Real user email client polling | 0.5–2.0 |
+| Cron-driven scheduled tasks | 0.0–0.2 (looks like a beacon) |
+
+The CV is a necessary signal, not a sufficient one. Allowlists carry the rest.
+
+## ES|QL skeleton (concept)
+
+The exact ES|QL syntax for window-lag (`PREV(@timestamp)`) and `STDDEV` varies by Elastic version. The conceptual query:
+
+```esql
+FROM logs-network.firewall-*
+| WHERE event.outcome == "allowed" AND network.direction == "outbound"
+  AND @timestamp > NOW() - 24h
+| SORT @timestamp ASC
+| EVAL gap_ms = TS_DIFF(@timestamp, LAG(@timestamp, 1)) BY source.ip, destination.ip, destination.port
+| STATS samples = COUNT(*), mean_gap = AVG(gap_ms), stddev_gap = STDDEV(gap_ms)
+        BY source.ip, destination.ip, destination.port
+| WHERE samples >= 50
+| EVAL cv = stddev_gap / mean_gap
+| WHERE cv < 0.30
+| SORT cv ASC
+| LIMIT 100
+```
+
+For Elastic versions where `STDDEV` isn't yet ES|QL-native, fall back to a transform-driven daily summary index (write `(samples, mean_gap, stddev_gap, cv)` per `(source, destination, port, day)` then query the summary).
+
+## The 50-sample floor
+
+CV is meaningless on small samples. With `samples = 5`, both real beacons and bursty user traffic look the same. The conventional floor is **≥ 50 samples** in the look-back window. Tune up if FP rate is high.
+
+A 24h look-back with a 60-second beacon produces 1,440 samples — well above the floor. A 24h look-back with a 30-minute beacon produces 48 samples — at the floor. Below the floor, raise the look-back to 7 days.
+
+## Tells of jittered C2
+
+When you've narrowed to low-CV tuples, three patterns separate real beacons from benign periodic traffic:
+
+### Tell 1 — bimodal distributions
+
+Plot the histogram of gaps for the suspect tuple. NTP polls show one tight peak. C2 beacons sometimes show **two peaks** — the normal cadence and a "fail-then-retry" cadence (e.g. 60s normal + 5s retry on connection failure). The bimodal shape is rare in benign agents.
+
+### Tell 2 — even-multiple jitter
+
+If the jitter is `60 ± 10s` you see gaps in the 50–70s band. If the operator forgot to seed the RNG and the implant uses `60 + (id % 10)`, the gaps cluster at exactly 6 values. Benign agents don't have this discrete structure.
+
+### Tell 3 — narrow-band CV cliffs
+
+When you list the suspect tuples sorted by CV ascending, the boundary between "tight beacons" and "everything else" is often a sharp cliff: 30 tuples at CV 0.05–0.20, then a jump to CV 0.7+. The cliff is the actionable subset; everything past the cliff is benign agents you've allowlisted before.
+
+## Allowlists for benign periodic traffic
+
+| Source | Allowlist key |
+|---|---|
+| NTP | `destination.port == 123` |
+| Domain controller / sysvol replication | `destination.port == 445` to `host.name` of DCs |
+| Telemetry agents (Elastic Agent, CrowdStrike, Tanium) | `process.name` of the agent on the source side |
+| Software-update services | `destination.domain` matching `*.windowsupdate.com`, `*.apple.com`, `*.canonical.com`, etc. |
+| Scheduled Task heartbeats | `process.parent.name == "svchost.exe"` with task id matching corp tasks |
+
+The allowlist is mandatory. Without it the hunt fires on every estate-internal periodic agent and the FP budget collapses.
+
+## Worked finding — a 30s beacon to a new domain
+
+The L2 runs the CV hunt with a 24h window. The result table is sorted ASC by CV. The top row:
+
+```
+source.ip          destination.ip  port  samples  mean   stddev  cv
+10.0.4.121         203.0.113.42    443   2,855    30.2s  0.7s    0.023
+```
+
+Next steps:
+1. Pivot to `dns` index, find what name resolved to `203.0.113.42`. (L7.5 — DGA entropy hunt fires on the same domain.)
+2. Pivot to `endpoint.events.process` on `host.name == "WS-Marketing-04"`, find the process making the connections.
+3. Pivot to `endpoint.events.network` to confirm the cadence at the host level.
+4. Cross-check enrichment (VirusTotal, AbuseIPDB) on the destination — sometimes the answer is *immediate* and the rest is academic.
+5. Hand off to L1 IR per the M7-Escalation framework.
+
+## Glossary
+
+- **Coefficient of variation (CV)** = σ / μ. Beacons CV < 0.1; jittered beacons CV < 0.3; user traffic CV ≫ 1.
+- **50-sample floor** — minimum samples for CV to be meaningful. Below the floor, raise the look-back window or use a different hunt.
+- **Bimodal distribution** — two peaks in the gap histogram. Rare in benign periodic agents; common in C2 with retry logic.
+- **Narrow-band CV cliff** — sharp boundary between low-CV tuples and the rest, marking the actionable subset.
+
+## Further reading
+
+- Active Countermeasures *RITA* — open-source beacon detector implementing this exact frame.
+- Eric Conrad — *FreqServer / DomainStats / RITA* triumvirate.
+- ATT&CK T1071 (Application-layer C2), T1571 (Non-standard port).
+""",
+    )
+    _add_q(session, m7l3, order=1, kind=QuestionKind.TRUEFALSE,
+        stem_md="A `(source.ip, destination.ip, destination.port)` tuple shows samples=200, mean inter-arrival=58s, stddev=4s over 24h. The L2 reads CV ≈ 0.069 and concludes this is C2.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="false",
+        explanation_md="**False.** CV ≈ 0.069 *qualifies* the tuple as a candidate beacon — but it is **not** sufficient evidence to call it C2. NTP polls, software-update heartbeats, EDR-agent telemetry, scheduled tasks, and Domain Controller replication all produce CV in the 0.02–0.10 range. The L2 must apply the allowlist (NTP / agents / WSUS / DC), pivot to enrichment on `destination.ip` / domain, and pivot to `process` events to identify the responsible binary before escalating. CV alone is necessary, not sufficient.",
+        points=2,
+    )
+
+    # Lesson 7.4 — Time-series spikes & rolling baselines
+    m7l4 = _add_lesson(
+        session, mod7, order=4,
+        title="Time-series spikes: rolling baselines and 3σ thresholds",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Build a **rolling 7-day baseline mean μ + std-dev σ** for a per-entity metric
+> 2. Apply the canonical **μ + 3σ** alert threshold and explain when it's appropriate
+> 3. Use **hour-of-day filters** to surface OOH spikes that day-of-business spikes mask
+> 4. Implement spike detection via Elastic transforms / rollups vs. raw aggregation in Lens / Vega
+> 5. Recognise distributional pitfalls — **non-Normal data**, **zero-inflated counts**, **hour-of-day seasonality**
+
+## The pattern
+
+Spike detection asks: *given the past 7 days of how much X this entity emitted, is the current period unusually high?*
+
+Concrete instances:
+- **NXDOMAIN per source.ip** — one host's 7d baseline mean is, say, 3 NX/h. Today it's 290. This is the DGA-fallover fingerprint covered in M5; here we baseline it.
+- **`4625` Failed Logon per user.name** — one service account's baseline is < 5/h. Today's count is 240. Credential-spray vs forgotten password.
+- **`Send` per `o365.audit.UserId`** — one user's baseline is 25/h business hours, < 1/h OOH. Today at 03:14 the count is 80. M6 internal-spear-phishing (T1534) post-AiTM.
+- **`DataAccessRead` per `azure.signinlogs.properties.app_display_name`** — one OAuth app's baseline is steady 100/h business hours; today's count jumped to 5,000. Mass mailbox sync post-illicit-grant.
+
+## The threshold formula
+
+For each entity *e*:
+- **Baseline window:** 7 days, hourly buckets ending one hour before *now*.
+- **Baseline mean μ_e** = average over the 168 hourly buckets.
+- **Baseline std-dev σ_e** = std-dev over the 168 hourly buckets.
+- **Current bucket x** = the count in the most recent hour.
+- **Alert if x > μ_e + 3σ_e**.
+
+The 3σ threshold roughly captures the top 0.15% of buckets under a Normal distribution. Real count data isn't Normal — counts are zero-inflated and right-skewed — so the actual FPR is higher than 0.15%; tune up if needed (4σ or 5σ for fleet-wide hunts).
+
+## Worked — NXDOMAIN burst per host
+
+Stage 1: pre-aggregate via an Elastic *transform* into a daily summary index (`logs-summary.dns-by-host`):
+
+```yaml
+# transform pivot
+group_by:
+  source.ip: { terms: { field: source.ip } }
+  hour:     { date_histogram: { field: '@timestamp', fixed_interval: '1h' } }
+aggregations:
+  nxdomain_count:
+    filter: { term: { dns.response_code: NXDOMAIN } }
+    aggs:
+      n: { value_count: { field: '@timestamp' } }
+```
+
+Stage 2: hunt query against the summary index:
+
+```esql
+FROM logs-summary.dns-by-host
+| WHERE @timestamp > NOW() - 7 days
+| STATS mu = AVG(nxdomain_count), sigma = STDDEV(nxdomain_count)
+        BY source.ip
+| ENRICH last_hour ON source.ip
+| WHERE last_hour.nxdomain_count > mu + 3 * sigma
+| SORT last_hour.nxdomain_count DESC
+```
+
+(The exact `ENRICH` shape depends on your Elastic version; the alternative is a join in a Watcher / Transform / SIEM rule body.)
+
+Stage 3: filter survivors against the NX-burst allowlist (DNS sinkhole servers, telemetry agents that probe non-existent domains, internal CI runners hitting unresolvable hostnames during build).
+
+## Hour-of-day filter — surfacing OOH spikes
+
+A 50-Send/h count for a finance UPN at 14:00 is normal; the same count at 03:14 is striking. The OOH refinement:
+
+```esql
+... | WHERE HOUR_OF_DAY(@timestamp) NOT IN (8, 9, 10, 11, 12, 13, 14, 15, 16, 17)
+```
+
+Apply this *after* the 3σ filter, not before — the OOH count is much smaller than business hours, so the OOH baseline is less noisy and 3σ thresholds work better there.
+
+## Why per-entity matters here too
+
+A fleet-wide threshold of "200 NXDOMAIN/h" misses a finance laptop suddenly emitting 30 NXDOMAIN against its 0.5 baseline. Per-entity 3σ catches it; the fleet threshold doesn't. (Lesson 7.6 covers per-entity in depth.)
+
+## Distributional pitfalls
+
+**Non-Normal data.** Counts of network events follow Poisson-ish distributions, not Normal. The 3σ threshold over-fires on heavy-tailed entities. Two mitigations:
+
+1. **Log-transform** the count before computing μ and σ. `log(1 + count)` is closer to Normal.
+2. Use **percentile-based** thresholds instead. Alert when current bucket > 99.5th percentile of the entity's 7d buckets.
+
+**Zero-inflated counts.** Many entities have median 0 (most hours, no activity). σ is dominated by the rare non-zero hours; μ + 3σ ends up small but most non-zero hours hit it. Two mitigations:
+
+1. Threshold on **non-zero hours only** for the baseline.
+2. Use a **count-based minimum** in addition to 3σ — `(x > μ + 3σ) AND (x > 5)`.
+
+**Hour-of-day seasonality.** A user's 18:00 mean is 30, 03:00 mean is 0. A flat baseline thinks 30 at 03:00 is normal. Mitigation: bucket the baseline *by hour-of-day* — one μ_h, σ_h per hour-of-day per entity.
+
+## Implementation paths in Elastic
+
+| Approach | Tool | When to use |
+|---|---|---|
+| **Transform pivot to summary index** | Elastic Transforms | Production hunts; aggregates pre-computed nightly |
+| **Roll-up index** | Elastic Rollups | Same shape, older API; deprecated in favour of Transforms |
+| **Vega in Lens** | Vega-Lite | One-off hunts, exploratory analysis |
+| **Watcher** | Elasticsearch Watcher | Scheduled detection, sends notification |
+| **Detection Engine custom rule** | Kibana Security | Production rule with ATT&CK metadata |
+| **Elastic ML anomaly_detector job** | Elastic ML | When the per-entity baseline needs continuous re-training (covered L7.7) |
+
+The L2's reflex: prototype in Discover / Lens, productionise via Transform + Detection Engine rule.
+
+## Glossary
+
+- **Rolling baseline** — μ and σ computed over a moving look-back window (typically 7d hourly buckets).
+- **3σ threshold** — μ + 3σ; the canonical "anomaly" cut-off.
+- **Hour-of-day filter** — restrict the alert period to OOH for higher signal.
+- **Zero-inflated** — a count distribution with many zero buckets and a few non-zero. 3σ over-fires here without log-transform or non-zero-only baselining.
+
+## Further reading
+
+- Elastic docs — *Transforms* and *Rollup jobs*.
+- Cosma Shalizi — *Advanced Data Analysis from an Elementary Point of View* (free online textbook), chapters on Poisson regression and quantile baselining.
+""",
+    )
+    _add_q(session, m7l4, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="An entity's 7-day rolling baseline gives μ_e = 12 and σ_e = 4 events/hour. The current hour x = 30. Compute the z-score and decide whether the canonical μ + 3σ threshold is crossed. Format your answer as `z=<value>, alert=<yes/no>`.",
+        options=None,
+        correct=[
+            "z=4.5, alert=yes",
+            "z=4.5,alert=yes",
+            "z = 4.5, alert = yes",
+            "z=4.5 alert=yes",
+            "z=4.5,alert= yes",
+        ],
+        explanation_md="z = (x − μ) / σ = (30 − 12) / 4 = **4.5**. The threshold is x > μ + 3σ = 12 + 12 = 24, and 30 > 24 → **alert: yes**. (Equivalently, z=4.5 > 3.) The threshold-formula version (μ + 3σ) and the z-score version are the same arithmetic. Also note the L2 should immediately ask: is this entity's baseline *Normal*-shaped, or is it zero-inflated? If it's zero-inflated, the 3σ threshold is unreliable and the L2 should switch to a percentile or log-transformed baseline before trusting the alert.",
+        points=2,
+    )
+
+    # Lesson 7.5 — Entropy and DGA detection
+    m7l5 = _add_lesson(
+        session, mod7, order=5,
+        title="Shannon entropy on DNS labels: DGA, domain fronting, and the entropy + length + TLD combo",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Compute **Shannon entropy** on a string and explain why random labels score higher than dictionary words
+> 2. Combine **entropy + length + TLD novelty + per-source uniqueness** into a high-confidence DGA hunt
+> 3. Recognise legitimate high-entropy traffic (CDN buckets, AWS S3, Akamai) and allowlist it
+> 4. Pivot from a DGA-flagged label to the host process responsible
+
+## Shannon entropy in 60 seconds
+
+Shannon entropy of a string s, treating it as a sample from a character-frequency distribution:
+
+H(s) = − Σ p(c) · log₂ p(c)
+
+…where p(c) is the relative frequency of character c in the string. Units: bits per character.
+
+Empirical scores:
+
+| String | Entropy |
+|---|---|
+| `aaaaa` | 0.0 |
+| `google` | 2.25 |
+| `microsoft.com` | 3.18 |
+| `kqxblpzfwermgha` (random alphanumeric) | ~4.0 |
+| `kqxbl-zf3w_5er8mgha7` (random with mixed alphabet) | ~4.5 |
+| `pkdq8w7vxjbn4l2y3` (DGA-shape) | ~3.9 |
+
+DGA labels score 3.5–4.5; English-word labels score 2.0–3.0; CDN labels can score *anywhere* (S3 bucket names like `prd-eu-w1-acme-events-2026q2` score 3.5+). Entropy alone isn't enough.
+
+## ES|QL implementation
+
+Most Elastic deployments don't expose a string-entropy function natively. Two paths:
+
+1. **Painless runtime field** — write a Painless script that computes entropy at query time. Slow on large indices; fine for hunts.
+2. **Pre-computation in the parser pipeline** — add an `entropy` field at ingest time via an ingest pipeline + Painless processor. Cheap at query time, costly at ingest.
+
+ION's L2 hunts assume Path 2 (`dns.question.registered_domain.entropy` is available). For estates without it, the runtime-field version:
+
+```painless
+def s = doc['dns.question.registered_domain.keyword'].value;
+if (s == null) return null;
+def freq = new HashMap();
+for (def c : s.toCharArray()) freq.merge(c, 1, (a, b) -> a + b);
+def n = s.length();
+def h = 0.0;
+for (def v : freq.values()) {
+    def p = v / n;
+    h -= p * Math.log(p) / Math.log(2);
+}
+return h;
+```
+
+…attach as a runtime field on the index, query as `entropy > 3.7`.
+
+## The entropy + length + TLD + per-source combo
+
+Entropy alone fires on every CDN bucket. The high-confidence DGA hunt combines four signals:
+
+| Signal | Threshold | Why |
+|---|---|---|
+| Entropy on `dns.question.registered_domain` label | > 3.7 | Random-shaped strings |
+| Length | > 12 chars | Short random labels (e.g. `xn--abc.com`) are noisy |
+| TLD novelty | TLD in `{.xyz, .top, .icu, .live, .pw, .work, .click, .country, .download, .stream, ...}` | DGA campaigns concentrate in cheap TLDs |
+| Per-source uniqueness | One `source.ip` resolving > 20 distinct high-entropy labels in 1h | A single host hitting *many* DGA names is the C2-fallover fingerprint |
+
+```esql
+FROM logs-network.dns-*
+| WHERE dns.question.registered_domain.entropy > 3.7
+  AND LENGTH(dns.question.registered_domain) > 12
+  AND dns.question.top_level_domain IN ("xyz", "top", "icu", "live", "pw", "click", "stream")
+  AND @timestamp > NOW() - 1h
+| STATS uniq_labels = COUNT_DISTINCT(dns.question.registered_domain) BY source.ip
+| WHERE uniq_labels > 20
+| SORT uniq_labels DESC
+```
+
+False-positive rate on this combination is typically < 1 finding per week per estate.
+
+## CDN / cloud allowlist
+
+| Pattern | Allowlist mechanism |
+|---|---|
+| `*.s3.amazonaws.com`, `*.amazonaws.com` | Allowlist by `dns.answers.data` matching AWS CIDRs |
+| `*.azureedge.net`, `*.azurewebsites.net` | Allowlist by Azure CIDR |
+| `*.cloudfront.net`, `*.akamaihd.net`, `*.fastly.net` | CDN ASN allowlist |
+| `*.googleusercontent.com`, `*.fbcdn.net`, `*.cloudflare.com` | ditto |
+
+The `dns.answers.data` field carries the resolved IP. Allowlist on the IP, not the name — the name is what's high-entropy and you don't want to whitelist on it.
+
+## Pivot from flagged label to host process
+
+Once a `(source.ip, suspicious_label)` row clears the hunt:
+
+1. **DNS pivot** — `dns.answers.data` = the IP the host is contacting.
+2. **Process pivot** — `endpoint.events.network` for `host.name`, `destination.ip` matching the resolved IP, capture `process.name`, `process.executable`.
+3. **Hash pivot** — extract `process.hash.sha256` from `endpoint.events.process` for the same `process.entity_id`.
+4. **Hunt-confirm** — drop the SHA-256 into the EDR / sandbox / VT.
+
+The DGA finding *suggests* C2; the process pivot *confirms* it.
+
+## Combining entropy with the L7.3 beacon hunt
+
+The strongest C2 detection is the intersection: a host that is **both**:
+- Resolving high-entropy DGA-shaped names (L7.5 fires).
+- Beacons to the resolved IPs at low CV (L7.3 fires).
+
+When both fire on the same `source.ip` within an hour: page-IR-class signal.
+
+## Glossary
+
+- **Shannon entropy** — H(s) = − Σ p(c) log₂ p(c). DGA labels score 3.5–4.5; English-word labels 2.0–3.0.
+- **DGA** — Domain Generation Algorithm. Malware computes destination domain from a seed (date, hash); the operator pre-registers a subset.
+- **Cheap-TLD novelty** — DGA registrations cluster in `.xyz`, `.top`, `.icu`, etc.
+- **CDN-bucket noise** — high-entropy benign names from S3 / Azure / CloudFront. Allowlist on resolved IP, not name.
+
+## Further reading
+
+- ATT&CK T1568.002 (DGA), T1071.004 (DNS), T1090.003 (Anonymisers).
+- Eric Conrad — *DomainStats / FreqServer* — open-source entropy scoring.
+- Akamai blog series on DGA detection.
+""",
+    )
+    _add_q(session, m7l5, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which combination of signals produces a **high-confidence** DGA hunt with a manageable false-positive rate?",
+        options=[
+            {"value": "ent_only", "label": "`entropy > 3.7` alone"},
+            {"value": "ent_len_tld_pers", "label": "`entropy > 3.7` AND `length > 12` AND `TLD` in cheap-TLD list AND per-source uniqueness > 20"},
+            {"value": "ent_len_only", "label": "`entropy > 3.7` AND `length > 12`"},
+            {"value": "ent_per_src", "label": "`entropy > 3.7` AND per-source uniqueness > 20"},
+            {"value": "len_only", "label": "`length > 12` alone"},
+        ],
+        correct=["ent_len_tld_pers"],
+        explanation_md="The four-signal combination — entropy + length + cheap-TLD + per-source uniqueness — is the canonical DGA hunt. Entropy alone over-fires on CDN / S3 bucket names; length alone catches every long domain. The per-source uniqueness threshold (one host hitting 20+ distinct high-entropy names in 1h) is the load-bearing constraint that brings the FP rate down to < 1/week. The L2 should pair this with the L7.3 beacon-CV hunt and require both to fire on the same `source.ip` for a page-IR-class call.",
+        points=3,
+    )
+
+    # Lesson 7.6 — Per-entity baselining (rolling z-score)
+    m7l6 = _add_lesson(
+        session, mod7, order=6,
+        title="Per-entity baselining: rolling z-scores so noisy hosts don't drown quiet ones",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Explain the **fleet-wide-threshold trap** — why one threshold for all entities silently misses signal
+> 2. Compute a **rolling z-score per entity** and threshold appropriately
+> 3. Implement per-entity baselining in Elastic via **Transforms keyed by `entity_id`**
+> 4. Recognise when **per-entity-per-hour-of-day** baselining is needed
+>
+> Per-entity baselining is the single most-load-bearing technique in M7. Read this twice.
+
+## The fleet-wide-threshold trap
+
+Imagine a hunt with the rule: *alert when a host emits > 100 PowerShell invocations in an hour.*
+
+On a 5,000-endpoint estate:
+- The DevOps build farm (10 hosts) emits **800 PowerShell invocations / hour** as part of every CI run. The threshold fires every hour. Analysts whitelist the build farm.
+- A finance laptop sees its first ever PowerShell invocation today. The 8-event count is well below the threshold. The hunt sleeps. The investigation never happens.
+
+The threshold isn't wrong — it's the wrong *shape*. Each entity has its own normal level of activity; the threshold has to be relative to that level, not absolute.
+
+## Per-entity z-score
+
+For each entity *e* (host, user, service principal, OAuth app):
+
+- Maintain a 7-day rolling history of hourly counts.
+- Compute the entity's mean μ_e and std-dev σ_e over those 168 buckets.
+- For the current hour count x:
+  - z_e = (x − μ_e) / σ_e
+- Alert when **z_e > 3** (one-tailed; equivalent to ~99.85% under Normal).
+
+Now the build farm's 800 events are at z ≈ 0 (normal for it). The finance laptop's 8 events are at z = (8 − 0.05) / 0.3 ≈ 26 — far above threshold.
+
+## Worked — Kerberoasting baselined per service account
+
+M4 introduced the Kerberoasting fingerprint: a single principal pulling many TGS tickets in a window. The naive fleet-wide threshold (`count > 50 / 5min`) over-fires on the SQL-server service account that legitimately requests dozens of TGS tickets per minute and under-fires on the AD-admin service account that should never request more than 2 / day.
+
+Per-entity baseline:
+
+```esql
+FROM logs-summary.tgs-by-account
+| WHERE @timestamp > NOW() - 7 days
+| STATS mu = AVG(tgs_count), sigma = STDDEV(tgs_count)
+        BY user.name
+| ENRICH last_5min_tgs ON user.name
+| EVAL z = (last_5min_tgs.count - mu) / sigma
+| WHERE z > 3 AND last_5min_tgs.count > 5
+| SORT z DESC
+```
+
+The `last_5min_tgs.count > 5` floor is a defensive guard: when σ is very small (< 1), z scales explosively for tiny absolute counts, and the alert fires for noise. Pair every z-threshold with an absolute floor.
+
+## Implementation in Elastic — keyed Transforms
+
+The clean implementation uses an Elastic Transform that pivots raw events into per-entity-per-hour summary docs:
+
+```yaml
+# transform pivot
+group_by:
+  user.name: { terms: { field: 'user.name' } }
+  hour:      { date_histogram: { field: '@timestamp', fixed_interval: '1h' } }
+aggregations:
+  tgs_count: { value_count: { field: 'event.action' } }
+```
+
+Frequency: continuous. The destination index `logs-summary.tgs-by-account` carries one doc per (user, hour). The hunt query reads from the summary index — fast, cheap, and the baseline math is straightforward.
+
+## When to add per-hour-of-day
+
+A user's working pattern is rarely flat. A 14:00 z-score against a flat 7d baseline mis-attributes business-hour traffic as anomalous on the OOH side and vice versa.
+
+The fix: **µ_h, σ_h per hour-of-day per entity**. Now you have 24 baselines per entity instead of 1. Compute via:
+
+```yaml
+group_by:
+  user.name:    { terms: { field: 'user.name' } }
+  hour_of_day:  { script: "doc['@timestamp'].value.getHour()" }
+  hour:         { date_histogram: { field: '@timestamp', fixed_interval: '1h' } }
+```
+
+…then query:
+
+```esql
+... | EVAL hod = HOUR_OF_DAY(@timestamp)
+| ENRICH baseline_per_hod ON user.name, hod
+| EVAL z = (count - baseline.mu) / baseline.sigma
+| WHERE z > 3
+```
+
+This is overkill for low-volume metrics. Reserve it for high-volume per-user hunts (Send rate, sign-in count, MailItemsAccessed rate).
+
+## When per-entity is *not* enough
+
+Some attacks evade per-entity by **pacing the activity over many entities**. Password-spray over 200 users with 3 attempts each is invisible per-user (z ≈ 0 each); it's visible only at the *population* level. Lesson 7.7 covers Elastic ML's **population** job template, which catches exactly this.
+
+## Glossary
+
+- **Per-entity baseline** — μ and σ computed *for each entity*, not fleet-wide.
+- **Rolling 7d window** — 168 hourly buckets ending at *now*.
+- **Absolute floor** — a count threshold paired with the z-threshold to suppress alerts when σ is tiny.
+- **Per-hour-of-day baseline** — 24 baselines per entity, one per hour of day. Reserved for high-volume per-user hunts.
+
+## Further reading
+
+- Elastic docs — *Transforms* (continuous mode and pivots).
+- Cosma Shalizi *ADAfaEPoV* — Chapter 7 on group-mean estimation.
+- ATT&CK T1110.003 (Password Spraying) — the population-level evasion case.
+""",
+    )
+    _add_q(session, m7l6, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A service account `svc_backup` shows μ_e = 1.2, σ_e = 0.4 TGS requests/5min over the past 7 days. In the current 5-minute window x = 12. The fleet-wide threshold for Kerberoasting is `count > 50 / 5min`. Which fires?",
+        options=[
+            {"value": "fleet", "label": "Fleet-wide only — 12 < 50, but 12 above this account's μ"},
+            {"value": "z", "label": "Per-entity z-score only — z ≈ 27 ≫ 3, but 12 < fleet threshold of 50"},
+            {"value": "both", "label": "Both fire"},
+            {"value": "neither", "label": "Neither fires"},
+        ],
+        correct="z",
+        explanation_md="Only the **per-entity z-score** fires. The fleet-wide threshold (`count > 50 / 5min`) is below the actual count of 12, so it doesn't fire. The per-entity z-score is z = (12 − 1.2) / 0.4 = **27**, far above the threshold of 3 — it fires loudly. This is the textbook fleet-wide-threshold trap: the absolute count of 12 is small for a noisy SQL-server service account but enormous for a quiet backup account. Per-entity baselining catches the second case; the fleet threshold doesn't. Note: the L2 should also pair the z-threshold with an absolute floor (`x > 5`) so tiny-σ entities don't fire on noise — see L7.6.",
+        points=2,
+    )
+
+    # Lesson 7.7 — Elastic ML anomaly_detector jobs
+    m7l7 = _add_lesson(
+        session, mod7, order=7,
+        title="Elastic ML anomaly_detector jobs: when query-driven hunts aren't enough",
+        lesson_type=LessonType.READING, duration_min=24,
+        content_md="""
+> **Learning objectives.**
+> 1. Recognise the four canonical Elastic ML job templates: **single-metric, multi-metric, population, rare**
+> 2. Pick the right **detector function**: `count`, `mean`, `rare`, `freq_rare`, `info_content`
+> 3. Tune **bucket span** to the cadence of the underlying signal
+> 4. Apply ML jobs to problems unreachable by single queries — **password spray (population), insider mass-pull (population), `MailItemsAccessed` cluster (rare)**
+
+## When ML earns its weight
+
+Single-query hunts (L7.2–L7.6) cover most statistical-hunt problems. ML earns its weight in three cases:
+
+1. **Continuous re-baselining.** Your μ and σ drift over months — the bookkeeping is annoying via Transforms; ML jobs do it for you.
+2. **Population analysis.** "Find the entity that's unlike its peers." Hard to express in one query; native to ML's **population** template.
+3. **Categorisation.** "Find the new log-message category that didn't exist before." Native to ML's **categorisation** detector.
+
+Otherwise: don't reach for ML. A Transform + 3σ rule is faster to author, debug, and own.
+
+## Job template 1 — Single-metric
+
+One detector on one partition.
+
+- Use case: "alert when `count by host.name` deviates from baseline."
+- Detector: `count`, `high_count`, `low_count`, `mean`, `min`, `max`.
+- Partition field: `host.name` / `user.name` / etc.
+- Bucket span: cadence of the metric (15m for events, 1h for aggregates, 1d for daily roll-ups).
+
+## Job template 2 — Multi-metric
+
+Multiple detectors on the same partition. Cheaper than running multiple single-metric jobs because the bucketing is shared.
+
+- Use case: per-host `count`, `mean(network.bytes)`, `count(distinct destination.ip)` together.
+- Each detector shares the same bucket-span and partition.
+
+## Job template 3 — Population (over-by)
+
+The killer ML feature. Asks: "**among all entities in the partition, which one's behaviour is unlike its peers?**"
+
+Spec:
+- **Population field** (`partition_field_name`) — e.g. `user.name`.
+- **Detector** — e.g. `high_count by event.action over user.name`.
+- **Bucket span** — 15m / 1h.
+
+Worked example — **`MailItemsAccessed` cluster post-AiTM** (M6 cross-link):
+
+```
+detector_description: "high count of MailItemsAccessed per user vs peers"
+function: high_count
+by_field_name: event.action
+over_field_name: o365.audit.UserId
+detectors:
+  - function: high_count
+    by_field_name: o365.audit.Operation
+    over_field_name: o365.audit.UserId
+bucket_span: 15m
+```
+
+This catches the user who, *within a 15-minute bucket*, accessed many more mailboxes than their peers — even if their absolute count would not have crossed any per-entity threshold.
+
+Worked example — **password spray** (M3 / M4 cross-link):
+
+```
+function: high_distinct_count
+by_field_name: user.name
+over_field_name: source.ip
+bucket_span: 5m
+```
+
+Catches the source IP that hits many distinct usernames within 5 minutes — even when each user only sees 2 attempts (below the per-user spray threshold).
+
+## Job template 4 — Rare
+
+Detector functions: `rare`, `freq_rare`. Asks: "what value of this field has not appeared *recently* in this partition?"
+
+Worked: rare `process.name` per `host.name`:
+
+```
+function: rare
+by_field_name: process.name
+partition_field_name: host.name
+bucket_span: 1h
+```
+
+The host emits a process that the host hasn't run in the last 14 days — alert. Useful for noisy fleets where rare-tail stack-counting (L7.2) over-fires.
+
+## Detector functions cheat-sheet
+
+| Function | What it scores | When to pick |
+|---|---|---|
+| `count` / `high_count` / `low_count` | Bucket count | Volume drift |
+| `mean` / `high_mean` / `low_mean` | Mean of a field | Average bytes, average response time |
+| `sum` / `high_sum` / `low_sum` | Sum of a field | Bandwidth, total spend |
+| `distinct_count` / `high_distinct_count` | Distinct values of a field | Spray (distinct users), recon (distinct ports) |
+| `rare` / `freq_rare` | Rare values | New process, new domain, new SP |
+| `info_content` / `high_info_content` | Shannon entropy of values | DGA-style high-information patterns |
+| `time_of_day` / `time_of_week` | When in the diurnal cycle | OOH activity by users |
+
+## Bucket-span tuning
+
+The single most-common ML job mis-config. Defaults are 15m, which works for many problems but is wrong for:
+
+- **Daily-cadence problems** — set 1h or 1d. A 15m bucket on a daily-cadence metric mostly sees zeros and trips on noise.
+- **Sub-minute beacons** — set 5m or 1m. A 15m bucket aggregates away the periodicity ML is meant to learn.
+- **Long-tail behaviours** — set 1d. Looking at "weekly mass-mailbox pull" through a 15m window misses the pattern entirely.
+
+The L2's reflex: **bucket span ≈ the cadence of the metric you're analysing, halved**. If the signal cadence is 30 minutes, bucket span is 15 minutes; if it's 1 day, bucket span is 12 hours.
+
+## Influencer fields
+
+Each ML job carries `influencers` — fields the job tags as "responsible" for the anomaly. For population jobs the over-field is automatically an influencer; add user, host, IP, application as supplementary influencers.
+
+The L2 reads ML alerts via the **Anomaly Explorer** UI:
+- Anomaly score (0–100, higher worse).
+- Top influencer values for the bucket.
+- The raw bucket data so the analyst can sanity-check.
+
+## Anti-patterns
+
+- **Default bucket span on a non-default cadence problem.** As above.
+- **No partition / over field.** A job with no partition aggregates the whole estate; the anomaly is "yesterday was a Monday." Always partition.
+- **Over-tuning the model.** The job has a `model_memory_limit` — exceeding it forces it to drop entities. Tune up if noisy; don't tune down to "save resources" without measuring impact.
+- **Treating ML alerts as ground truth.** ML scores are *anomaly* scores, not *malicious* scores. A high score is a hunt finding to investigate, not a confirmed incident.
+
+## Glossary
+
+- **Anomaly score** — 0–100 ML score; > 75 is the conventional "interesting" threshold.
+- **Influencer** — field the job correlates with the anomaly bucket.
+- **Population template** — finds the entity unlike its peers.
+- **Bucket span** — the time window the job aggregates over before scoring.
+
+## Further reading
+
+- Elastic ML reference docs (`anomaly_detector` job spec).
+- *Practical Machine Learning for Cyber Security* (Chio & Freeman) — population vs single-metric framing.
+- ATT&CK T1110.003 (Password Spraying) and T1530 (Cloud Storage Object Access) — population-job poster cases.
+""",
+    )
+    _add_q(session, m7l7, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="An L2 wants an Elastic ML job that catches a single OAuth app issuing **many distinct mail-read calls** within 15 minutes — much more than its peer apps, even when no single bucket crosses a static threshold. Pick the right job template (single-metric / multi-metric / population / rare) and the right detector function. Format: `template=<x>, detector=<y>`.",
+        options=None,
+        correct=[
+            "template=population, detector=high_distinct_count",
+            "template=population,detector=high_distinct_count",
+            "template=population, detector=distinct_count",
+            "template=Population, detector=high_distinct_count",
+            "population, high_distinct_count",
+        ],
+        explanation_md="**`template=population, detector=high_distinct_count`**. The question asks for the entity (one OAuth app) whose behaviour is *unlike its peers* — that's exactly the population-template's contract. The detector function is `high_distinct_count` because we're scoring the *number of distinct mail-read targets*, not raw event count. The over-field is the app id; the by-field is the operation. A static threshold per-app misses this case because no single app may cross — the anomaly is *relative to peer apps*. The L2 should set bucket span ≈ 15m (matching the question), partition by `o365.audit.AppId`, and add `o365.audit.UserId` as an influencer.",
+        points=2,
+    )
+
+    # Lesson 7.8 — Capstone + quiz
+    m7l8 = _add_lesson(
+        session, mod7, order=8,
+        title="Capstone: a chained APT campaign caught only across statistical hunts",
+        lesson_type=LessonType.QUIZ, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Walk a worked APT chain where every step is invisible to behavioural rules but lights up across the M7 statistical-hunt suite
+> 2. Sequence the M7 hunts that fire at each step and explain why each fits
+> 3. Hand off the chain to **M8 Hunt-to-Detection Capstone** as a set of detection candidates
+>
+> Four-question quiz at the end.
+
+## The campaign
+
+A nation-state actor compromises a single SaaS-broker account. The first 24 hours are textbook *"slow and quiet"*. None of the L1 / L2 behavioural rules fire. The L2's statistical-hunt suite catches every step.
+
+### Hour 0 — initial access (rare-value)
+
+A new Entra service principal is created with `appDisplayName: "Marketing-AnalyticsBot"`. The name is plausible but the SP has never existed in the tenant before. The naming convention used elsewhere is `m365-bot-<dept>-<owner>`.
+
+**Hunt that fires:** L7.2 stack-count rare-tail on `azure.signinlogs.properties.app_display_name` over a 30-day window. The new name is a singleton.
+
+### Hour 1 — privileged action (per-entity z-score)
+
+The new SP issues a single `Add member to role` granting itself `Mail.ReadWrite.All` API permission. From a population perspective, the SP has μ ≈ 0 role-grant operations / hour over the prior 7 days (it didn't exist), σ ≈ 0. Any non-zero count is z = ∞ — but the absolute floor (`count > 0` is trivially true; we want `> 1` realistically) is what matters here.
+
+**Hunt that fires:** L7.6 per-entity z-score on `Add member to role` rate per SP, with absolute floor count > 0.
+
+### Hour 6 — beacon stand-up (interval CV)
+
+A workstation in the marketing department starts beaconing to a new domain at exactly 30 seconds ± 2 seconds. CV ≈ 0.067.
+
+**Hunt that fires:** L7.3 beacon CV.
+
+### Hour 6 — DGA cover (entropy + length + TLD + per-source uniqueness)
+
+The beacon's destination resolves to a label of length 18, entropy 4.3, TLD `.icu`, and the workstation hits 24 distinct such labels in the same hour as the C2 fails over.
+
+**Hunt that fires:** L7.5 four-signal DGA combo.
+
+### Hour 12 — recon attempt (population ML job)
+
+Across the tenant, the compromised SP issues **`MailItemsAccessed`** against 30 distinct mailboxes within a 15-minute bucket. Per-SP, this is a high count — but other automation SPs in the tenant routinely hit 200–500 mailboxes / 15min for backup / DLP scanning, so the absolute count of 30 doesn't cross fleet thresholds.
+
+**Hunt that fires:** L7.7 population-template ML job, `high_distinct_count by mailbox over o365.audit.AppId`. The compromised SP's behaviour is unlike its peers because *backup/DLP SPs hit a known stable subset of mailboxes* and this SP hits a *random* subset.
+
+### Hour 18 — exfiltration (time-series spike + per-entity z)
+
+The same workstation suddenly emits 280 MB outbound to the C2 domain in a single hour, against a 7-day per-host baseline of < 10 MB / hour.
+
+**Hunt that fires:** L7.4 + L7.6 (rolling baseline + per-entity z on `network.bytes` per host).
+
+## Why each step needed a statistical hunt
+
+| Step | Why behavioural rules miss it | Statistical hunt that fires |
+|---|---|---|
+| New SP "Marketing-AnalyticsBot" | The action (SP creation) is normal; only the *name* is anomalous | L7.2 rare-value |
+| Self role-grant by new SP | Action by a new actor; no encoded sequence yet | L7.6 per-entity z |
+| 30s beacon | Novel C2 protocol, no signature | L7.3 CV |
+| DGA cover | Domains are unique; no IOC | L7.5 entropy combo |
+| Mass mailbox sample | Doesn't cross fleet threshold | L7.7 population ML |
+| Exfil spike | One host's volume drift only | L7.4 + L7.6 |
+
+## Hand-off to M8
+
+Each statistical hunt that fired in this campaign becomes a candidate detection rule. M8 walks the conversion: data-quality gate, FP-rate measurement, MITRE mapping, kill-chain step assignment, severity / runbook / owner metadata, TIDE submission, lifecycle plan.
+
+Specifically the L2 will hand off:
+
+1. **Rare-value SP `appDisplayName`** → Kibana Security threshold rule.
+2. **Per-entity z-score on role-grant rate per SP** → Detection Engine rule with custom Painless score.
+3. **Beacon CV per `(source, destination, port)`** → scheduled Watcher.
+4. **Four-signal DGA combo** → Detection Engine threshold + filter rule.
+5. **Population ML job — distinct mailboxes per SP** → Anomaly job with attached rule.
+6. **Per-entity z-score on outbound bytes per host** → Detection Engine custom rule.
+
+Six new detections from one capstone walk. M8 covers the conversion gates each must clear.
+
+## Glossary
+
+- **Slow-and-quiet APT** — campaign paced under behavioural-rule thresholds; only statistical hunts catch it pre-impact.
+- **Detection candidate** — a hunt finding promoted to a draft rule, awaiting M8 conversion gates.
+
+## Further reading
+
+- ATT&CK Cloud techniques: T1098.003, T1098.001, T1530, T1071.001, T1568.002.
+- *Threat Hunting* (Conrad / Misenar / Feldman) — chapter on chained statistical hunts.
+""",
+    )
+    _add_q(session, m7l8, order=1, kind=QuestionKind.SINGLE,
+        stem_md="In the M7 capstone APT chain, the compromised service principal issues `MailItemsAccessed` against 30 distinct mailboxes in a 15-minute window. Other backup / DLP service principals in the tenant routinely hit 200–500 mailboxes / 15min, so the absolute count of 30 doesn't cross any fleet threshold. Which M7 technique catches this?",
+        options=[
+            {"value": "stack", "label": "L7.2 stack-count rare-tail"},
+            {"value": "cv", "label": "L7.3 beacon coefficient of variation"},
+            {"value": "spike", "label": "L7.4 time-series spike against 7d baseline"},
+            {"value": "pop", "label": "L7.7 Elastic ML population job — `high_distinct_count` by mailbox over SP"},
+            {"value": "entropy", "label": "L7.5 entropy + length + TLD + per-source DGA combo"},
+        ],
+        correct="pop",
+        explanation_md="**L7.7 population-template ML job** is the right answer. Per-SP z-score (L7.6) doesn't fire because the SP's own baseline is 0 — its first appearance — and σ is 0; the threshold is meaningless. The fleet-wide spike threshold (L7.4) doesn't fire because the absolute count of 30 is well below the 200–500 normal volume of peer backup/DLP SPs. The population template asks the right question: *given the population of SPs, is this one's distinct-mailbox-count behaviour unlike its peers?* Yes — backup/DLP SPs hit a known stable subset; the compromised SP hits a random subset. The score crosses threshold and the L2 catches the recon. This is the canonical case where ML population jobs earn their weight over single-query hunts.",
+        points=2,
+    )
+    _add_q(session, m7l8, order=2, kind=QuestionKind.MULTI,
+        stem_md="From the M7 capstone walk, which statistical hunts must fire on the **same `source.ip` within an overlapping window** to constitute a page-IR-class C2 finding (rather than a single-hunt finding worth deeper investigation)?",
+        options=[
+            {"value": "cv", "label": "L7.3 — beacon CV < 0.30 with samples ≥ 50"},
+            {"value": "dga", "label": "L7.5 — DGA four-signal combo (entropy + length + TLD + per-source > 20 distinct)"},
+            {"value": "spike", "label": "L7.4 — time-series spike on outbound bytes per host"},
+            {"value": "stack", "label": "L7.2 — rare command-line on the host"},
+            {"value": "pop", "label": "L7.7 — population-template ML job"},
+        ],
+        correct=["cv", "dga", "spike"],
+        explanation_md="The strongest C2 multi-hunt cluster is **CV beacon + DGA + outbound-byte spike** on the same `source.ip`. Beacon CV alone has a base-rate of benign periodic agents; DGA alone has CDN-bucket noise; outbound-byte spike alone catches mostly large file uploads to legit cloud storage. Their *intersection* — same host, same hour — has near-zero base-rate of benign activity. The rare command-line (L7.2) and population ML (L7.7) are valuable but operate on different entity types (process / SP) — they don't combine to the same source.ip on the network plane the way the three above do. Page-IR.",
+        points=3,
+    )
+    _add_q(session, m7l8, order=3, kind=QuestionKind.TRUEFALSE,
+        stem_md="Per-entity z-score thresholds (L7.6) should be paired with an **absolute count floor** (e.g. `x > 5`) to suppress alerts when σ_e is very small.",
+        options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
+        correct="true",
+        explanation_md="**True.** When σ_e is tiny (< 1), the z-score scales explosively for tiny absolute counts — a quiet entity with μ=0.05, σ=0.1 emitting one event scores z ≈ 9.5. Without an absolute floor, the alert fires for noise; with `x > 5` the alert is reserved for actually-meaningful absolute counts. Every per-entity z-score hunt the L2 deploys should pair the z-threshold with a count floor, calibrated empirically against 7d historical data.",
+        points=2,
+    )
+    _add_q(session, m7l8, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="What's the conventional **bucket-span tuning rule** for an Elastic ML anomaly_detector job, expressed as a function of the underlying signal's cadence?",
+        options=None,
+        correct=[
+            "bucket span ≈ cadence / 2",
+            "bucket span ~= cadence / 2",
+            "bucket span = cadence / 2",
+            "half the cadence",
+            "approximately half the cadence",
+            "half of the signal cadence",
+        ],
+        explanation_md="The L2's reflex is **bucket span ≈ the cadence of the signal, halved.** A 30-minute beacon → 15-minute bucket span. A daily-cadence metric → 12-hour bucket span. Too-large bucket span aggregates away the periodicity the job is meant to learn; too-small wastes model memory and over-fires on noise. The rule is approximate; tune empirically against historical anomaly score distributions.",
+        points=2,
+    )
+
+    print(f"  L2: {course.title} — 7 modules, 56 lessons (Module 7 Anomaly Hunts @ proper depth)")
     return course
 
 

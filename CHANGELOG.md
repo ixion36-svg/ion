@@ -1,5 +1,62 @@
 # Changelog
 
+## v0.12.5 (2026-04-29) — curriculum
+
+### L2 Module 7 — Anomaly Hunts (statistical methods)
+
+L2 advances 6/8 → 7/8. Module 7 covers the PEAK Model-Assisted arm: stack counting & rarity, beacon detection by interval coefficient of variation, time-series spikes against rolling baselines, Shannon entropy on DNS labels for DGA, per-entity z-score baselining (so noisy users don't drown quiet ones), and Elastic ML `anomaly_detector` jobs for problems that exceed a single query. Closes with a worked APT-campaign capstone where every chain step is invisible to behavioural rules but lights up across the M7 hunt suite.
+
+#### What's authored
+
+8 lessons (7 reading + 1 capstone-quiz), 8 questions, ~16k words at BTL1 / SANS GCTH depth.
+
+| Lesson | Topic | Focus |
+|---|---|---|
+| 7.1 | Statistical-hunt frame | PEAK Model-Assisted, FP budgets, why fleet-wide thresholds fail |
+| 7.2 | Stack counting & rarity | Cardinality-aware bottom-N, worked hunts on `process.command_line`, OAuth scopes, SP `appDisplayName` |
+| 7.3 | Beacon detection by interval CV | CV thresholds (< 0.10 fixed, < 0.30 jittered), 50-sample floor, allowlist mandatories |
+| 7.4 | Time-series spikes & rolling baselines | μ + 3σ formula, hour-of-day filters, distributional pitfalls (zero-inflated, non-Normal) |
+| 7.5 | Shannon entropy & DGA | Four-signal combo: entropy + length + cheap-TLD + per-source uniqueness |
+| 7.6 | Per-entity baselining (z-score) | The fleet-wide-threshold trap, z = (x − μ_e) / σ_e, absolute-count floor pairing |
+| 7.7 | Elastic ML `anomaly_detector` jobs | Single-metric / multi-metric / population / rare templates, bucket-span tuning |
+| 7.8 | Capstone | A chained APT campaign caught only across the M7 suite; hand-off to M8 detection-engineering |
+
+ATT&CK mapped through the lessons: T1098.001 / .003 / .005, T1071.001 / .004, T1568.002, T1556.006, T1110.003, T1530, T1571, T1027.
+
+Cross-links to prior modules: M3 (Windows event mapping), M4 (Kerberoasting baselined per service account), M5 (NXDOMAIN + DGA upstream + downstream), M6 (`MailItemsAccessed` + AiTM cluster), M1 (PEAK methodology — Model-Assisted arm).
+
+#### Curriculum status
+
+- **L1**: 8/8 ✅
+- **L2**: 7/8 (M8 Hunt-to-Detection Capstone is next, v0.12.6)
+- **L3**: 1/8 stub — replacement starts v0.12.7
+
+#### Verifying the feature
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+# Force a re-seed of courses since the catalogue grew
+docker compose exec ion python /app/seed_all.py --force
+```
+
+After the seeder runs:
+1. Open `/courses` and find *Threat Hunting with KQL*. The module count should now show **7 modules**.
+2. Open Module 7 — *Anomaly Hunts*. 8 lessons; the final lesson is a 4-question capstone quiz.
+3. Read Lesson 7.3 (Beacon detection); the CV formula and 50-sample-floor concept should both appear.
+4. The capstone quiz Q1 should test population-template ML jobs against per-entity z-score and time-series spikes.
+
+#### Upgrade
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+The course seeder is idempotent and re-runs on every boot; existing user enrolments and progress are preserved.
+
+---
+
 ## v0.12.4 (2026-04-29) — feature
 
 ### CyAB Onboarding Studio — operator authoring polish (in-page add forms + custom sub-profiles)
