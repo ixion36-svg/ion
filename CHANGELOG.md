@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.12.9 (2026-04-29) — curriculum
+
+### L3 Module 3 — MITRE Caldera operations
+
+L3 advances 2/8 → **3/8**. M3 covers the agent-based half of L3's toolkit: server stand-up, sandcat agents and the beacon mechanic, ability authoring, adversary profile chaining, the four planners (`batch` / `atomic` / `buckets` / `look`), multi-host operations with cross-agent fact propagation, and the agent-removal-after rule at scale.
+
+#### What's authored
+
+8 lessons (7 reading + 1 quiz capstone), 9 questions, ~16k words at BTL1/SANS GCTH depth.
+
+| Lesson | Topic |
+|---|---|
+| 3.1 | Five core concepts — server / agent / ability / adversary / operation; ART vocabulary mapping |
+| 3.2 | Server stand-up — canonical docker-compose, `--recursive` clone, plugin set, default-cred rotation, contact channels |
+| 3.3 | Sandcat agent — Win/Lin/macOS deploy, beacon mechanic (paw / group / platform), jitter, agent-removal-after |
+| 3.4 | Ability authoring — YAML format, `#{var}` fact substitution, requirements, plugin loading |
+| 3.5 | Adversary profiles — `atomic_ordering`, fact dependencies, `atomic` plugin bridging ART → Caldera |
+| 3.6 | Operations — four planners (`batch` / `atomic` / `buckets` / `look`), operation report, pause/resume |
+| 3.7 | Multi-host operations — fact propagation across agents, `look` planner, agent-to-agent abilities |
+| 3.8 | Capstone — submodule failure mode + multi-host planner pick |
+
+#### Curriculum status
+
+- **L1**: 8/8 ✅
+- **L2**: 8/8 ✅
+- **L3**: **3/8** authored at proper depth (M1 / M2 / M3). M4 — Telemetry quality assessment — is next.
+
+---
+
 ## v0.12.8 (2026-04-29) — curriculum
 
 ### L3 Module 2 — Atomic Red Team library deep-dive
