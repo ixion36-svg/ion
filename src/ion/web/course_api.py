@@ -341,6 +341,192 @@ def list_my_courses(
     return {"courses": out, "count": len(out)}
 
 
+# ── Course-completion certificate (v0.13.0) ──────────────────────────────
+
+
+def _render_certificate_html(
+    course: Course, user: User, enrolment: UserEnrolment,
+) -> str:
+    """Build the weasyprint HTML for a single course-completion certificate.
+
+    The artefact a learner downloads after completing a course. Carries
+    the level / course title / learner name / completion date / aggregate
+    score / module + lesson totals. Uses the same weasyprint pattern as
+    the CyAB Onboarding Pack (v0.12.0).
+    """
+    import html as _html_mod
+
+    def h(v: Any) -> str:
+        return _html_mod.escape("" if v is None else str(v), quote=True)
+
+    completed_on = enrolment.completed_at or datetime.utcnow()
+    completed_str = completed_on.strftime("%d %B %Y")
+
+    # Module / lesson totals from the course
+    total_modules = len(course.modules or [])
+    total_lessons = sum(len(m.lessons or []) for m in (course.modules or []))
+
+    # Display name fallback: full_name / email / username
+    learner_name = (
+        getattr(user, "full_name", None)
+        or getattr(user, "name", None)
+        or user.email
+        or user.username
+    )
+
+    # Level styling
+    level_text = (course.level or "").upper()
+    level_palette = {
+        "L1": ("#0ea5e9", "#082f49"),  # cyan
+        "L2": ("#a78bfa", "#1e1b4b"),  # iris
+        "L3": ("#facc15", "#451a03"),  # amber
+        "L4": ("#f97316", "#431407"),  # orange
+    }
+    level_fg, level_bg = level_palette.get(level_text, ("#64748b", "#0f172a"))
+
+    score_block = (
+        f'<tr><td>Aggregate score</td><td><strong>{h(enrolment.score_pct)}%</strong></td></tr>'
+        if enrolment.score_pct is not None else ""
+    )
+
+    style = """
+    <style>
+      @page { size: A4 landscape; margin: 14mm; }
+      body { font-family: "Times New Roman", Georgia, serif; color: #1a1a1a; }
+      .frame { border: 4px double #0b3d91; padding: 38mm 24mm 24mm 24mm; min-height: calc(210mm - 28mm - 8px);
+               position: relative; }
+      .seal { position: absolute; top: 18mm; right: 18mm; width: 38mm; height: 38mm;
+              border: 3px solid #0b3d91; border-radius: 50%;
+              display: flex; align-items: center; justify-content: center;
+              font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+              font-weight: 700; color: #0b3d91; font-size: 11pt; line-height: 1.1; text-align: center; }
+      .level-pill { display: inline-block; padding: 3pt 10pt; border-radius: 4pt;
+                    font-family: -apple-system, "Segoe UI", sans-serif; font-weight: 700;
+                    font-size: 11pt; letter-spacing: 0.18em; }
+      h1 { font-size: 38pt; margin: 6pt 0 0 0; line-height: 1.05; color: #0b3d91; }
+      h2 { font-size: 16pt; margin: 22pt 0 4pt 0; color: #444; font-weight: 400; letter-spacing: 0.04em; }
+      .learner { font-size: 30pt; margin: 4pt 0 22pt 0; color: #1a1a1a; font-weight: 700; }
+      .body-text { font-size: 13pt; line-height: 1.55; max-width: 200mm; }
+      table.meta { margin-top: 22pt; border-collapse: collapse; font-family: -apple-system, "Segoe UI", sans-serif; }
+      table.meta td { border: none; padding: 4pt 24pt 4pt 0; font-size: 11pt; vertical-align: top; }
+      table.meta td:first-child { color: #555; }
+      .signoff { margin-top: 24pt; font-family: -apple-system, "Segoe UI", sans-serif;
+                 display: flex; justify-content: space-between; gap: 30mm; font-size: 10pt; color: #444; }
+      .sig-block { flex: 1; border-top: 1px solid #555; padding-top: 4pt; }
+      .footer-id { position: absolute; bottom: 10mm; right: 24mm; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+                   color: #888; font-size: 8pt; }
+    </style>
+    """
+
+    body = f"""
+    <div class="frame">
+      <div class="seal">
+        ION<br>SOC<br>CURRICULUM
+      </div>
+
+      <div>
+        <span class="level-pill" style="background:{level_bg};color:{level_fg};">{h(level_text)}</span>
+      </div>
+
+      <h2>Certificate of Completion</h2>
+      <h1>{h(course.title)}</h1>
+
+      <p class="body-text" style="margin-top: 22pt;">
+        This is to certify that
+      </p>
+      <div class="learner">{h(learner_name)}</div>
+      <p class="body-text">
+        has successfully completed the <strong>{h(course.title)}</strong> course
+        — <strong>{h(total_modules)} modules</strong> and <strong>{h(total_lessons)} lessons</strong> at
+        BTL1 / SANS GCTH-equivalent depth — on <strong>{h(completed_str)}</strong>.
+      </p>
+
+      <table class="meta">
+        <tr><td>Course level</td><td>{h(level_text)}</td></tr>
+        <tr><td>Modules completed</td><td>{h(total_modules)}</td></tr>
+        <tr><td>Lessons completed</td><td>{h(total_lessons)}</td></tr>
+        {score_block}
+        <tr><td>Completion date</td><td>{h(completed_str)}</td></tr>
+      </table>
+
+      <div class="signoff">
+        <div class="sig-block">
+          ION SOC Curriculum<br>
+          Issued by the Detection-Engineering Programme
+        </div>
+        <div class="sig-block" style="text-align: right;">
+          Verification: enrolment #{h(enrolment.id)}<br>
+          Issued {h(datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC'))}
+        </div>
+      </div>
+
+      <div class="footer-id">CERT-{h(course.slug)}-{h(enrolment.id)}-{h(completed_on.strftime('%Y%m%d'))}</div>
+    </div>
+    """
+    return f"<!DOCTYPE html><html><head><meta charset=\"UTF-8\">{style}</head><body>{body}</body></html>"
+
+
+@router.get("/api/courses/{slug}/certificate.pdf")
+def get_course_certificate(
+    slug: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Render and return a PDF course-completion certificate for the current user.
+
+    Returns 404 if the course doesn't exist; 403 if the user isn't enrolled
+    or hasn't completed the course; 200 + application/pdf otherwise.
+    """
+    from fastapi.responses import Response
+
+    course = session.query(Course).filter(Course.slug == slug).one_or_none()
+    if course is None:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    enr = (
+        session.query(UserEnrolment)
+        .filter_by(user_id=current_user.id, course_id=course.id)
+        .one_or_none()
+    )
+    if enr is None:
+        raise HTTPException(status_code=403, detail="Not enrolled")
+    if enr.completed_at is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Course not yet completed — finish all lessons first",
+        )
+
+    full_html = _render_certificate_html(course, current_user, enr)
+
+    # Cache the URL-style metadata so the catalog can show the issued state.
+    if not enr.certificate_url:
+        enr.certificate_url = f"/api/courses/{slug}/certificate.pdf"
+        session.commit()
+
+    try:
+        from weasyprint import HTML as WpHTML
+        pdf_bytes = WpHTML(string=full_html).write_pdf()
+        slug_safe = re.sub(r"[^A-Za-z0-9._-]+", "_", slug).strip("_")[:60] or "certificate"
+        filename = f"ion_certificate_{slug_safe}_enr{enr.id}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+    except (ImportError, OSError):
+        return Response(
+            content=full_html,
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+
 # ── Lesson endpoints ─────────────────────────────────────────────────────
 
 

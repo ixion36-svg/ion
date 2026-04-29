@@ -100,7 +100,13 @@ function render(c) {
 
   const enrolBtn = c.enrolment.enrolled
     ? (c.enrolment.completed_at
-        ? `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-ion-lime/10 text-ion-lime text-[12px] font-semibold">✓ Completed${c.enrolment.score_pct != null ? ' · ' + c.enrolment.score_pct + '%' : ''}</span>`
+        ? `<span class="inline-flex items-center gap-2">
+             <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-ion-lime/10 text-ion-lime text-[12px] font-semibold">✓ Completed${c.enrolment.score_pct != null ? ' · ' + c.enrolment.score_pct + '%' : ''}</span>
+             <a href="/api/courses/${encodeURIComponent(c.slug)}/certificate.pdf" target="_blank" rel="noopener" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]" title="Download your PDF certificate">
+               <svg class="w-3.5 h-3.5"><use href="#i-file-text"/></svg>
+               Download certificate
+             </a>
+           </span>`
         : `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-white/5 text-slate-300 text-[12px] font-semibold">Enrolled</span>`
       )
     : `<button onclick="enrol(${c.id})" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold">Enrol</button>`;
