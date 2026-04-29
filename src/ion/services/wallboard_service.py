@@ -1,9 +1,14 @@
-"""Wallboard snapshot service (v0.14.0).
+"""Wallboard snapshot service (v0.15.0).
 
 A single point-in-time snapshot of the whole ION estate, intended for
-display on a wall monitor. Six metric panels (alerts, cases, Bob,
-detection, CYAB, curriculum), a service-health strip, and the most
-recent ticker entries.
+display on a wall monitor. Six metric panels (alerts, cases, Bob, rules,
+topology, threat landscape), and the most recent ticker entries.
+
+v0.15.0: detection / cyab / curriculum panels were swapped for
+operational content — the detection panel now surfaces real rule posture
+metrics from TIDE; cyab was replaced with a hub-and-spoke platform
+topology graph; curriculum was replaced with an AI-generated threat
+landscape summary (5-min cached).
 
 **Caching strategy:** the snapshot is computed at most once per 5 min.
 Concurrent wallboard loads serve the cached snapshot; the cache
@@ -230,127 +235,237 @@ def _collect_bob(session: Session) -> Dict[str, Any]:
     }
 
 
-def _collect_detection(session: Session) -> Dict[str, Any]:
-    """TIDE / detection-engineering rollup from cached snapshots."""
-    from ion.models.tide_snapshot import TideSnapshot
-    from ion.models.alert_prompt import AlertPromptTemplate
+def _collect_rules(session: Session) -> Dict[str, Any]:
+    """Detection-rule posture metrics from TIDE.
 
-    # AlertPromptTemplate count — Bob's per-rule guides, count of
-    # populated templates.
-    template_count = int(session.scalar(
-        select(func.count()).select_from(AlertPromptTemplate)
-    ) or 0)
+    Returns the real shape of the rule estate: total / enabled / disabled,
+    severity distribution, quality bands, MITRE technique coverage. Falls
+    back to a stats-only response if TIDE is offline.
+    """
+    from ion.services.tide_service import get_tide_service
 
-    # Most recent TIDE snapshots — return the data_key + age.
-    rows = session.execute(
-        select(TideSnapshot.data_key, TideSnapshot.fetched_at, TideSnapshot.error)
-        .order_by(TideSnapshot.fetched_at.desc())
-        .limit(20)
-    ).all()
-    tide_snapshots = []
-    for k, fa, err in rows:
-        age_min = int((datetime.utcnow() - fa).total_seconds() / 60) if fa else None
-        tide_snapshots.append({
-            "data_key": k,
-            "fetched_at": fa.isoformat() if fa else None,
-            "age_min": age_min,
-            "ok": not err,
-        })
+    tide = get_tide_service()
+    posture = None
+    try:
+        posture = tide.get_posture_stats() if tide else None
+    except Exception as exc:
+        logger.warning("wallboard: TIDE posture fetch failed: %s", exc)
+        posture = None
+
+    if not posture:
+        return {
+            "total_rules": 0, "enabled_rules": 0, "disabled_rules": 0,
+            "severity": {}, "quality": {}, "unmapped_rules": 0,
+            "covered_techniques": 0, "total_techniques": 0,
+            "tide_unavailable": True,
+        }
 
     return {
-        "alert_prompt_template_count": template_count,
-        "tide_snapshots": tide_snapshots,
-        "tide_healthy_count": sum(1 for s in tide_snapshots if s["ok"]),
-        "tide_total_count": len(tide_snapshots),
+        "total_rules": int(posture.get("total_rules") or 0),
+        "enabled_rules": int(posture.get("enabled_rules") or 0),
+        "disabled_rules": int(posture.get("disabled_rules") or 0),
+        "severity": posture.get("severity") or {},
+        "quality": posture.get("quality") or {},
+        "unmapped_rules": int(posture.get("unmapped_rules") or 0),
+        "covered_techniques": int(posture.get("covered_techniques") or 0),
+        "total_techniques": int(posture.get("total_techniques") or 0),
+        "total_systems": int(posture.get("total_systems") or 0),
+        "tide_unavailable": False,
     }
 
 
-def _collect_cyab(session: Session) -> Dict[str, Any]:
-    """CYAB systems + sub-profile assignment + Onboarding Studio rollup."""
-    from ion.models.cyab import CyabSystem, CyabDataSource
-    from ion.models.cyab_subprofile import CyabSubProfile
+def _collect_topology(health: Dict[str, Any]) -> Dict[str, Any]:
+    """Hub-and-spoke topology rollup. ION sits at the centre; every
+    integration is a spoke labelled with its current status.
 
-    system_count = int(session.scalar(
-        select(func.count()).select_from(CyabSystem)
-    ) or 0)
-    avg_readiness = session.scalar(
-        select(func.avg(CyabSystem.readiness_score)).select_from(CyabSystem)
-    )
-    avg_readiness = round(float(avg_readiness)) if avg_readiness is not None else 0
-
-    by_status = dict(session.execute(
-        select(CyabSystem.status, func.count())
-        .group_by(CyabSystem.status)
-    ).all())
-    by_status = {str(k or "unknown"): int(v) for k, v in by_status.items()}
-
-    # Onboarding Studio: how many data sources have a subprofile_id?
-    ds_total = int(session.scalar(
-        select(func.count()).select_from(CyabDataSource)
-    ) or 0)
-    ds_with_subprofile = int(session.scalar(
-        select(func.count()).select_from(CyabDataSource)
-        .where(CyabDataSource.subprofile_id.isnot(None))
-    ) or 0)
-    subprofile_assignment_pct = (
-        round(ds_with_subprofile * 100 / ds_total) if ds_total else 0
-    )
-
-    subprofile_count = int(session.scalar(
-        select(func.count()).select_from(CyabSubProfile)
-    ) or 0)
-
-    return {
-        "system_count": system_count,
-        "avg_readiness_score": avg_readiness,
-        "system_by_status": by_status,
-        "data_source_total": ds_total,
-        "data_source_with_subprofile": ds_with_subprofile,
-        "subprofile_assignment_pct": subprofile_assignment_pct,
-        "subprofile_catalogue_count": subprofile_count,
-    }
-
-
-def _collect_curriculum(session: Session) -> Dict[str, Any]:
-    """Course enrolments + completions + top-3 courses by enrolment."""
-    from ion.models.course import Course, UserEnrolment, Lesson
-
-    enrolment_total = int(session.scalar(
-        select(func.count()).select_from(UserEnrolment)
-    ) or 0)
-    completion_total = int(session.scalar(
-        select(func.count()).select_from(UserEnrolment)
-        .where(UserEnrolment.completed_at.isnot(None))
-    ) or 0)
-    cert_issued_count = int(session.scalar(
-        select(func.count()).select_from(UserEnrolment)
-        .where(UserEnrolment.certificate_url.isnot(None))
-    ) or 0)
-
-    # Top-3 enrolled courses
-    rows = session.execute(
-        select(Course.title, Course.level, func.count(UserEnrolment.id).label("cnt"))
-        .join(UserEnrolment, UserEnrolment.course_id == Course.id, isouter=True)
-        .group_by(Course.id, Course.title, Course.level)
-        .order_by(func.count(UserEnrolment.id).desc())
-        .limit(3)
-    ).all()
-    top_courses = [
-        {"title": str(t), "level": str(lv), "enrolments": int(c)}
-        for t, lv, c in rows
+    The renderer uses these to draw an SVG graph; this service only
+    decides node order, role labels, and groupings so that the layout is
+    stable across refreshes (don't re-shuffle nodes when something flips
+    state — the eye reads movement as instability on a wall display).
+    """
+    # Stable node order, grouped clockwise from top so the visual flows
+    # data-source → analytics → output. Each label keeps role + family
+    # so a glance tells you "this is the SIEM, this is the LLM, etc."
+    NODE_DEFS = [
+        {"key": "elasticsearch", "label": "Elasticsearch", "family": "siem",       "role": "ingest"},
+        {"key": "kibana",        "label": "Kibana",        "family": "siem",       "role": "ingest"},
+        {"key": "tide",          "label": "TIDE",          "family": "intel",      "role": "intel"},
+        {"key": "opencti",       "label": "OpenCTI",       "family": "intel",      "role": "intel"},
+        {"key": "ollama",        "label": "Ollama",        "family": "ai",         "role": "ai"},
+        {"key": "bob",           "label": "Bob",           "family": "ai",         "role": "ai"},
+        {"key": "postgres",      "label": "Postgres",      "family": "infra",      "role": "store"},
     ]
 
-    # Lesson totals across all courses (catalogue size)
-    lesson_total = int(session.scalar(
-        select(func.count()).select_from(Lesson)
+    nodes: List[Dict[str, Any]] = []
+    for d in NODE_DEFS:
+        h = (health or {}).get(d["key"]) or {}
+        nodes.append({
+            "key":     d["key"],
+            "label":   d["label"],
+            "family":  d["family"],
+            "role":    d["role"],
+            "status":  h.get("status") or "off",
+            "details": h.get("details") or "",
+        })
+
+    counts = {
+        "up":   sum(1 for n in nodes if n["status"] == "up"),
+        "down": sum(1 for n in nodes if n["status"] == "down"),
+        "off":  sum(1 for n in nodes if n["status"] == "off"),
+    }
+    return {"nodes": nodes, "counts": counts}
+
+
+def _gather_threat_stats(session: Session) -> Dict[str, Any]:
+    """Aggregate the inputs the LLM uses to write the landscape summary.
+
+    Always cheap (a handful of grouped counts). Returned as part of the
+    snapshot regardless of whether Ollama is reachable — the renderer
+    falls back to a "stats only" view if the LLM-produced paragraph is
+    missing.
+    """
+    from ion.models.alert_triage import AlertTriage, AlertCase, AlertCaseStatus
+
+    cutoff_24h = datetime.utcnow() - timedelta(hours=24)
+    cutoff_7d = datetime.utcnow() - timedelta(days=7)
+
+    alerts_24h = int(session.scalar(
+        select(func.count()).select_from(AlertTriage)
+        .where(AlertTriage.created_at >= cutoff_24h)
     ) or 0)
 
+    # Priority distribution across last-24h alerts. (AlertTriage tracks
+    # `priority`, not `severity` — severity lives on AlertCase.)
+    pri_rows = session.execute(
+        select(AlertTriage.priority, func.count())
+        .where(AlertTriage.created_at >= cutoff_24h)
+        .where(AlertTriage.priority.isnot(None))
+        .group_by(AlertTriage.priority)
+    ).all()
+    severity_dist = {str(k): int(v) for k, v in pri_rows if k}
+
+    # Verdict distribution across last-7d alerts (longer window, more signal).
+    verdict_rows = session.execute(
+        select(AlertTriage.suggested_verdict, func.count())
+        .where(AlertTriage.created_at >= cutoff_7d)
+        .where(AlertTriage.suggested_verdict.isnot(None))
+        .group_by(AlertTriage.suggested_verdict)
+    ).all()
+    verdict_dist = {str(k): int(v) for k, v in verdict_rows if k}
+
+    # Top closed-case closure reasons in the last 7d.
+    closure_rows = session.execute(
+        select(AlertCase.closure_reason, func.count())
+        .where(AlertCase.closed_at >= cutoff_7d)
+        .where(AlertCase.closure_reason.isnot(None))
+        .group_by(AlertCase.closure_reason)
+        .order_by(func.count().desc())
+        .limit(5)
+    ).all()
+    top_closures = [{"reason": str(r), "count": int(c)} for r, c in closure_rows if r]
+
+    # Open-case backlog severity profile (what's currently weighing on the team).
+    backlog_rows = session.execute(
+        select(AlertCase.severity, func.count())
+        .where(AlertCase.status != AlertCaseStatus.CLOSED)
+        .group_by(AlertCase.severity)
+    ).all()
+    open_backlog = {str(k or "unknown"): int(v) for k, v in backlog_rows}
+
     return {
-        "enrolment_total": enrolment_total,
-        "completion_total": completion_total,
-        "cert_issued_count": cert_issued_count,
-        "top_courses": top_courses,
-        "catalogue_lesson_count": lesson_total,
+        "alerts_24h_total":  alerts_24h,
+        "severity_24h":      severity_dist,
+        "verdict_7d":        verdict_dist,
+        "top_closures_7d":   top_closures,
+        "open_backlog_sev":  open_backlog,
+    }
+
+
+def _build_threat_summary_prompt(stats: Dict[str, Any]) -> str:
+    """Pack the stats into a compact analyst-grade prompt."""
+    sev = ", ".join(f"{k}={v}" for k, v in (stats.get("severity_24h") or {}).items()) or "—"
+    ver = ", ".join(f"{k}={v}" for k, v in (stats.get("verdict_7d") or {}).items()) or "—"
+    closures = ", ".join(
+        f"{c.get('reason')}={c.get('count')}" for c in (stats.get("top_closures_7d") or [])
+    ) or "—"
+    backlog = ", ".join(f"{k}={v}" for k, v in (stats.get("open_backlog_sev") or {}).items()) or "—"
+    return (
+        "You are a SOC duty manager writing a wall-display summary for analysts on shift.\n"
+        "Output 2-3 short sentences in plain English describing the current threat landscape, "
+        "followed by 2-3 single-line bullet trends prefixed with '- '.\n\n"
+        f"Last 24h alerts: {stats.get('alerts_24h_total', 0)}\n"
+        f"Severity (24h): {sev}\n"
+        f"Verdicts (7d): {ver}\n"
+        f"Top closure reasons (7d): {closures}\n"
+        f"Open case backlog by severity: {backlog}\n\n"
+        "Keep total output under 90 words. No headings, no preamble, no markdown bold/italic. "
+        "Lead with the most actionable observation."
+    )
+
+
+def _generate_landscape_text(prompt: str, *, timeout: float = 15.0) -> Optional[str]:
+    """Synchronous Ollama call. Returns None if Ollama is unreachable.
+
+    Uses the bare /api/generate endpoint with a tight timeout so the
+    snapshot collector can't be blocked indefinitely. The wallboard's
+    5-min cache TTL means this is called at most once per TTL.
+    """
+    import os
+    try:
+        import httpx  # type: ignore
+    except Exception:
+        return None
+
+    url = (
+        os.environ.get("ION_OLLAMA_URL")
+        or os.environ.get("OLLAMA_HOST")
+        or os.environ.get("OLLAMA_URL")
+    )
+    if not url:
+        return None
+    if not url.startswith(("http://", "https://")):
+        url = "http://" + url
+
+    model = (
+        os.environ.get("ION_WALLBOARD_OLLAMA_MODEL")
+        or os.environ.get("ION_OLLAMA_MODEL")
+        or "llama3.1:8b"
+    )
+
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            r = client.post(
+                f"{url.rstrip('/')}/api/generate",
+                json={
+                    "model": model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"temperature": 0.4, "num_predict": 220},
+                },
+            )
+            r.raise_for_status()
+            text = (r.json().get("response") or "").strip()
+            return text or None
+    except Exception as exc:
+        logger.info("wallboard: threat-landscape Ollama call failed: %s", exc)
+        return None
+
+
+def _collect_threat_landscape(session: Session) -> Dict[str, Any]:
+    """AI-generated threat landscape summary + the stats that backed it.
+
+    Always returns the stats; the LLM paragraph is optional. The renderer
+    shows the paragraph if present, otherwise composes a stats-only
+    fallback locally so the panel never goes blank on a wall display.
+    """
+    stats = _gather_threat_stats(session)
+    prompt = _build_threat_summary_prompt(stats)
+    text = _generate_landscape_text(prompt)
+    return {
+        "summary":      text,
+        "summary_kind": "ai" if text else "stats",
+        "stats":        stats,
+        "generated_at": _utc_now_iso(),
     }
 
 
@@ -455,16 +570,17 @@ def _collect_service_health(session: Session) -> Dict[str, Any]:
 
 def _gather(session: Session) -> Dict[str, Any]:
     """Build a single snapshot. Each panel is in its own try/except."""
+    health = _safe("service_health", lambda: _collect_service_health(session), default={})
     return {
-        "captured_at": _utc_now_iso(),
-        "alerts": _safe("alerts", lambda: _collect_alerts(session), default={"by_status": {}, "last_24h_total": 0}),
-        "cases": _safe("cases", lambda: _collect_cases(session), default={"by_status": {}, "open_by_severity": {}, "closures_24h_total": 0}),
-        "bob": _safe("bob", lambda: _collect_bob(session), default={"investigations_24h": 0, "agreement_pct": None}),
-        "detection": _safe("detection", lambda: _collect_detection(session), default={"alert_prompt_template_count": 0, "tide_snapshots": []}),
-        "cyab": _safe("cyab", lambda: _collect_cyab(session), default={"system_count": 0, "avg_readiness_score": 0}),
-        "curriculum": _safe("curriculum", lambda: _collect_curriculum(session), default={"enrolment_total": 0, "completion_total": 0, "top_courses": []}),
-        "ticker": _safe("ticker", lambda: _collect_ticker(session), default={"items": [], "count": 0}),
-        "service_health": _safe("service_health", lambda: _collect_service_health(session), default={}),
+        "captured_at":      _utc_now_iso(),
+        "alerts":           _safe("alerts", lambda: _collect_alerts(session), default={"by_status": {}, "last_24h_total": 0}),
+        "cases":            _safe("cases", lambda: _collect_cases(session), default={"by_status": {}, "open_by_severity": {}, "closures_24h_total": 0}),
+        "bob":              _safe("bob", lambda: _collect_bob(session), default={"investigations_24h": 0, "agreement_pct": None}),
+        "rules":            _safe("rules", lambda: _collect_rules(session), default={"total_rules": 0, "enabled_rules": 0, "severity": {}, "tide_unavailable": True}),
+        "topology":         _safe("topology", lambda: _collect_topology(health), default={"nodes": [], "counts": {}}),
+        "threat_landscape": _safe("threat_landscape", lambda: _collect_threat_landscape(session), default={"summary": None, "summary_kind": "stats", "stats": {}}),
+        "ticker":           _safe("ticker", lambda: _collect_ticker(session), default={"items": [], "count": 0}),
+        "service_health":   health,
     }
 
 

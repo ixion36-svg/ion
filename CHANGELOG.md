@@ -1,5 +1,51 @@
 # Changelog
 
+## v0.15.0 (2026-04-29) — feature
+
+### Wallboard — operational panel swap (Rules + Topology + Threat Landscape)
+
+The v0.14.x wallboard pulled three of its panels from areas that aren't useful on a SOC wall display (`detection` was just a template count, `cyab` was onboarding KPIs, `curriculum` was course enrolments). v0.15.0 swaps all three for content that earns its place on a wall:
+
+| Panel | Was | Now |
+|---|---|---|
+| Detection | AlertPromptTemplate count + TIDE healthy/total | **Rules** — real rule posture from TIDE |
+| CyAB | systems + readiness donut + sub-profile bar | **Platform Topology** — hub-and-spoke SVG of the estate |
+| Curriculum | enrolments + completions + top-3 courses | **Threat Landscape** — Ollama-generated 24h summary |
+
+#### Panel 4 — Rules (real posture)
+
+Calls `tide_service.get_posture_stats()`. Big number is **enabled rules** (the count that actually matters for coverage); subtitle shows enabled / total. Body shows MITRE technique coverage as a fraction + percentage, plus the avg rule quality score. Severity rows (critical / high / medium / low) render as stacked bars where the brighter overlay shows the *enabled* fraction so disabled rules read as a darker stub. Falls back to a "TIDE not configured" tile when the integration is offline.
+
+#### Panel 5 — Platform Topology
+
+Replaces both the panel content and the header service-health dots — a single SVG hub-and-spoke graph with ION at the centre and seven integration spokes (Postgres, Elasticsearch, Kibana, TIDE, OpenCTI, Ollama, Bob). Edge colour matches status: ion-lime (up), ion-coral pulsing (down), grey-dashed (off / not configured). Node order is fixed so the only thing that moves between snapshots is the colour — the eye reads movement as instability on a wall display.
+
+The header now shows a compact `up / down / off` count strip instead of the dot row, since the topology panel is the canonical place to read service status.
+
+#### Panel 6 — Threat Landscape (AI summary)
+
+Aggregates last-24h alert severity, last-7d verdict distribution, top closure reasons (7d), and the open-case backlog severity profile. Builds an analyst-grade prompt and POSTs to Ollama via the `/api/generate` endpoint with a 15s timeout. The wallboard's 5-min cache TTL means Ollama is hit at most once per 5 minutes regardless of how many wall displays are loaded.
+
+If Ollama is unreachable or unconfigured, the panel falls back to a stats-only sentence so it never goes blank. Configure with `ION_OLLAMA_URL` (or `OLLAMA_HOST`) + optional `ION_WALLBOARD_OLLAMA_MODEL` (defaults to `llama3.1:8b`).
+
+#### Backend changes
+
+- `_collect_detection` → `_collect_rules` (sources from TIDE posture stats)
+- `_collect_cyab` → `_collect_topology` (derives from existing service-health collection — no new data sources)
+- `_collect_curriculum` → `_collect_threat_landscape` (calls Ollama via httpx sync client; falls back gracefully)
+- `_gather` rewired; the snapshot keys are now `rules`, `topology`, `threat_landscape` (the previous `detection` / `cyab` / `curriculum` keys are removed — any external snapshot consumer will need to update)
+
+#### Verifying
+
+```bash
+docker compose pull ion
+docker compose up -d ion
+```
+
+Hit `/wallboard`. The Rules panel populates from TIDE on the first refresh; the topology renders immediately from service-health; the threat-landscape paragraph appears after the first Ollama round-trip (~10-15s on the first load after TTL expiry, cached afterwards).
+
+---
+
 ## v0.14.1 (2026-04-29) — polish
 
 ### Wallboard restyle — ION design tokens, sparklines, donut
