@@ -15671,8 +15671,802 @@ When you're ready, take the **Running an Atomic test for T1059.001** quiz to loc
 """,
     )
 
-    l2 = _add_lesson(
-        session, mod, order=2, title="Running an Atomic test for T1059.001 — quiz",
+    # Lesson 1.2 — Picking a TTP from your threat profile
+    l1_2 = _add_lesson(
+        session, mod, order=2,
+        title="Picking a TTP: threat profiles, ATT&CK Navigator overlays, sector-specific TTPs",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Build a **threat profile** for your organisation from CTI sources (Mandiant M-Trends, CrowdStrike OverWatch, MITRE CTID Top Techniques, sector-ISAC reports)
+> 2. Use **ATT&CK Navigator overlays** to find the high-frequency techniques across multiple actors
+> 3. Apply the **TTP-pick decision rule**: highest profile-frequency × lowest current detection coverage × highest impact-if-undetected
+> 4. Justify the next-quarter purple-team exercise calendar against the threat profile
+
+## Threat profile — what it is, where it comes from
+
+A *threat profile* is the list of adversaries (and their TTPs) that realistically target your sector + region + technology stack. It's not a generic attacker model; it's a curated, evidence-backed enumeration of the actors you should test against.
+
+CTI inputs that feed a threat profile:
+
+| Source | Cadence | What it gives you |
+|---|---|---|
+| **Mandiant M-Trends** | Annual | Top techniques observed in real Mandiant IR engagements last year, by industry |
+| **CrowdStrike OverWatch / Global Threat Report** | Annual | Threat-actor activity by sector + region + their canonical TTPs |
+| **MITRE Engenuity CTID — Top Techniques** | Continuous | Empirically-most-used techniques across CTID's incident corpus |
+| **Sector ISAC** (FS-ISAC, H-ISAC, E-ISAC, etc.) | Weekly | Sector-specific actor activity, often with TTP detail |
+| **CISA Joint Advisories** | As-released | Government-attributed advisories with mapped techniques |
+| **Red Canary Threat Detection Report** | Annual | Open-source: top observed techniques across customers |
+
+The threat profile is a living document. Expectations: ~10–20 named adversaries, each with their canonical TTPs mapped to ATT&CK technique IDs.
+
+## ATT&CK Navigator overlays — finding the high-frequency techniques
+
+Once you have a threat profile, the next step is to find the techniques that *multiple* profile actors use. These are the highest-leverage purple-team targets.
+
+ATT&CK Navigator (https://mitre-attack.github.io/attack-navigator/) lets you create a *layer* per actor and combine them. Each actor's published TTP list becomes a layer; combining layers (additive scoring) shows the cells where multiple actors converge.
+
+```
+Layer 1 — FIN7:           T1059.001, T1078, T1055, T1486, ...
+Layer 2 — Conti:          T1059.001, T1078, T1486, T1003, ...
+Layer 3 — Rhysida:        T1059.001, T1078, T1486, T1110, ...
+                          ────────────────────────────────────
+Combined score per cell:  T1059.001 = 3, T1078 = 3, T1486 = 3, T1003 = 1, ...
+```
+
+The cells with the highest combined score are the techniques that the most actors in your profile use. Those are the next-quarter exercise calendar.
+
+## The TTP-pick decision rule
+
+Even within the high-frequency cells, not every TTP is the right next exercise. The L3's decision rule:
+
+```
+priority(TTP) = profile_frequency(TTP) × (1 − current_coverage(TTP)) × impact_if_undetected(TTP)
+```
+
+- **profile_frequency** — the Navigator overlay score (0..N actors).
+- **current_coverage** — empirical: did the last quarter's purple-team test fire? (0..1).
+- **impact_if_undetected** — categorical scaled to 0..1: 0.3 (Discovery), 0.6 (Persistence / Credential Access / Execution), 1.0 (Impact / Collection / Exfiltration).
+
+Highest-priority TTP that hasn't been tested in 90 days wins. If the top three are already covered (Tier-1 fired last quarter), drop to position 4. The list is the calendar.
+
+## Worked — pick the next-quarter calendar for a finance-sector org
+
+Threat profile (compressed): FIN7, Conti, Rhysida, Lazarus, BlackCat.
+
+Navigator overlay score (top entries):
+
+| Technique | Frequency | Current coverage | Impact | Priority |
+|---|---|---|---|---|
+| T1059.001 PowerShell | 5 | 0.7 (Tier-1 last quarter on test 3) | 0.6 | 5 × 0.3 × 0.6 = **0.9** |
+| T1078 Valid Accounts | 5 | 0.4 (Tier-2 — gap) | 0.6 | 5 × 0.6 × 0.6 = **1.8** |
+| T1486 Data Encrypted for Impact | 5 | 0.0 (never tested) | 1.0 | 5 × 1.0 × 1.0 = **5.0** |
+| T1110.003 Password Spray | 3 | 0.5 (Tier-1 with concerns) | 0.6 | 3 × 0.5 × 0.6 = **0.9** |
+| T1003.001 LSASS Dump | 2 | 0.8 (Tier-1 last month) | 0.6 | 2 × 0.2 × 0.6 = **0.24** |
+
+T1486 wins (priority 5.0). Next-quarter top-3: T1486, T1078, T1059.001 / T1110.003 (tied 0.9).
+
+The L3 schedules T1486 for next sprint. Note: T1486 needs careful blast-radius scoping — *Atomic Red Team's* T1486 atomics encrypt files in a sandbox directory, not real production data. Always verify the test before running.
+
+## Where the exercise calendar lives
+
+Per-quarter calendar in a wiki / scoreboard / Confluence page:
+
+```
+2026 Q3 Purple-Team Calendar
+============================
+Week 1: T1486 (Atomic test 1) — host: PT-LAB-04
+Week 2: T1078 .004 (manual cloud-account abuse exercise) — Entra tenant: tenant-test
+Week 3: T1059.001 (Atomic test 7 — new for Q3) — host: PT-LAB-04
+Week 4: T1110.003 (manual) — Entra
+Week 5: ... etc
+```
+
+The calendar is *defensible* — every entry is justified by the threat profile + decision rule. When a CFO asks "why are we exercising this and not that?" the answer is the priority-rule output.
+
+## Glossary
+
+- **Threat profile** — curated list of sector / region / stack-relevant actors and their TTPs.
+- **Navigator overlay** — combined-score view of multiple actor layers; high-score cells are the next purple-team targets.
+- **TTP-pick decision rule** — priority = frequency × (1 − coverage) × impact; highest wins.
+- **Exercise calendar** — quarterly schedule of TTP exercises, defensibly justified.
+
+## Further reading
+
+- ATT&CK Navigator — https://mitre-attack.github.io/attack-navigator/.
+- MITRE Engenuity CTID Top Techniques — https://top-attack-techniques.mitre-engenuity.org/.
+- Mandiant M-Trends — annual; latest at https://www.mandiant.com/resources/.
+- Red Canary 2026 Threat Detection Report — open-source.
+""",
+    )
+    _add_q(session, l1_2, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A finance-sector L3 has the following candidates for next quarter's purple-team exercise. The TTP-pick decision rule is `priority = frequency × (1 − coverage) × impact`. Which TTP wins?",
+        options=[
+            {"value": "t1486", "label": "T1486 (Impact: ransomware encryption) — frequency=5, coverage=0.0, impact=1.0 → priority=5.0"},
+            {"value": "t1078", "label": "T1078.004 (Cloud accounts) — frequency=5, coverage=0.4, impact=0.6 → priority=1.8"},
+            {"value": "t1059", "label": "T1059.001 (PowerShell) — frequency=5, coverage=0.7, impact=0.6 → priority=0.9"},
+            {"value": "t1003", "label": "T1003.001 (LSASS dump) — frequency=2, coverage=0.8, impact=0.6 → priority=0.24"},
+        ],
+        correct="t1486",
+        explanation_md="**T1486 wins (priority 5.0).** The decision rule rewards high-frequency TTPs that the SOC has *no current coverage on* and *high impact if undetected*. T1486 (ransomware encryption) checks all three: every actor in the profile uses it, no test has fired Tier-1 in the current cycle (coverage=0), and the impact is maximum (data destruction is end-game). T1078 is also high-priority but the existing partial coverage and lower impact knock it to second place. T1003.001 is the lowest priority because it's already well-covered and the impact (credential dump) is more contained. Note: T1486 needs careful blast-radius scoping — Atomic tests run against a sandbox directory, not production data.",
+        points=2,
+    )
+
+    # Lesson 1.3 — Authorisation, scoping, and pre-briefing
+    l1_3 = _add_lesson(
+        session, mod, order=3,
+        title="Authorisation, scoping, and pre-briefing the L1 shift",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Author a written **authorisation** with the four required scoping constraints
+> 2. Apply the **pre-brief format** to prevent real-IR collisions
+> 3. Recognise when verbal-only authorisation fails (it always does, eventually)
+> 4. Communicate **legal exposure** if scoping fails — to your management and your team
+
+## Why written authorisation is non-negotiable
+
+Adversary emulation is, by literal definition, executing offensive tooling on production systems. Without explicit written authorisation it's *unauthorised access* and your own SIEM should catch it. The L3 who runs an unauthorised exercise — even one that's "obviously a test" to them — sets up a chain of failures:
+
+1. The L1 who sees the alert opens a real case.
+2. IR engages because the technique fired matches an actor in the profile.
+3. The L3 explains "no, it was me, just a test" — but there's no document.
+4. The post-incident review goes badly. Trust between the SOC and the testers fragments.
+5. Worst case: legal gets involved when the test happened on a system whose owner didn't consent.
+
+The fix is the four-line authorisation sentence, in writing, before any execution.
+
+## The four required scoping constraints
+
+Every written authorisation must specify:
+
+1. **Technique ID** (and sub-technique) — the exact ATT&CK technique being emulated.
+2. **Host(s)** — by name. No "any host in the lab"; one or more named hosts.
+3. **Time window** — start and end timestamps. Not "Tuesday afternoon" — `2026-04-27 14:00 to 14:30 UTC`.
+4. **Authoriser(s)** — at minimum, CISO and IR lead. Both names + initials on the document.
+
+If any of the four is missing, the authorisation is incomplete and the exercise should not run.
+
+The minimal-acceptable text:
+
+> *"Authorised to execute T1059.001-3 (mshta encoded PowerShell, Atomic Red Team test) against host ABACWKS042 between 2026-04-27 14:00 and 14:30 UTC. Authorised by: J. Smith (CISO), R. Patel (IR Lead). Date signed: 2026-04-25."*
+
+That's it. The text fits in one paragraph. Add to it: blast-radius expectations, expected-outcome statements, fallback contact for emergency abort.
+
+## The pre-brief format — preventing real-IR collisions
+
+Even with a written authorisation, the L1 shift on duty needs to know the test is happening — otherwise they open a real case the moment Bob's investigation fires, then waste 30 minutes confirming it's a test. The pre-brief is the SOC-internal communication that prevents this:
+
+```
+EXERCISE NOTICE — EX-2026-04-001
+Date: 2026-04-27
+Window: 14:00–14:30 UTC
+Host: ABACWKS042 (test workstation, IT Ops scope)
+TTP: T1059.001-3 — Encoded PowerShell via mshta
+Atomic test: T1059.001 #3 from Atomic Red Team
+Expected SIEM activity:
+  - Process creation events on Sysmon Event 1 from mshta + powershell
+  - Possibly outbound to test.example.com
+Expected detection:
+  - Rule "Suspicious PowerShell -enc" should fire within 5 min, severity 'high'
+Run by: J. Doe (L3 Detection Engineer)
+Authorised by: J. Smith (CISO), R. Patel (IR Lead) — Auth Doc Ref: AUTH-2026-04-014
+Cancel/abort contact: J. Doe, mobile +44 7..., or pager #soc-oncall
+```
+
+This sentence — exactly that — goes in:
+- The exercise log file (typically a markdown wiki page).
+- The L1 shift chat 1–4 hours before execution.
+- The L2 chat at exercise -1h (so they know to look for the activity, not respond as real).
+- IR's standby chat at exercise +0h (so if the test goes wrong, the abort path is known).
+
+After the exercise, the same log entry gets a **result block** appended:
+
+```
+RESULT — EX-2026-04-001
+Outcome: Tier-1 with concerns (rule fired but 12-min latency, severity 'medium' not 'high')
+TuningProposal: TP-2026-04-118 (severity tune; latency investigation)
+Owner-of-fix: detection-eng (J. Khan)
+```
+
+## Authorisation common failures
+
+| Failure | Why it bites you | Fix |
+|---|---|---|
+| Verbal-only authorisation | No document; "I never said that" emerges in post-incident review | Always written, always with date + initials |
+| Authoriser not the CISO | Sub-CISO doesn't have authority for this; legal flags it later | CISO sign-off mandatory |
+| No IR lead sign-off | IR doesn't know to expect activity; reacts as real | IR lead + name + initials |
+| No abort contact | If the test goes wrong, no one knows who to page | Phone + on-call channel |
+| Window too wide (e.g. "this week") | Real-IR collisions during the wide window are ambiguous | Half-hour window max for first runs |
+| Host vague (e.g. "lab subnet") | Test fires on a host you didn't expect; collision with real ops | Named hosts only |
+
+## Legal — what's at stake
+
+In most jurisdictions, executing offensive tooling without authorisation maps to:
+
+- **UK**: Computer Misuse Act 1990 §1 (unauthorised access).
+- **US**: Computer Fraud and Abuse Act (18 U.S.C. § 1030).
+- **EU**: National-level computer-misuse laws derived from EU Directive 2013/40/EU.
+
+A written authorisation is the L3's defence. Without it: the L3 is on the wrong side of the statute even if the intent was legitimate.
+
+The org's legal counsel should review the authorisation template once. After that, every exercise reuses the template with TTP / host / window / authoriser swapped in. The legal review is one-time-only investment for the program's lifetime.
+
+## Glossary
+
+- **Written authorisation** — signed document specifying technique + host + window + authoriser.
+- **Pre-brief** — exercise notice to L1 / L2 / IR before execution.
+- **Result block** — post-exercise append to the log capturing outcome + tuning ticket + owner.
+- **Abort contact** — named + reachable person to call if the test goes wrong.
+
+## Further reading
+
+- ISC2 / SANS *Adversary Emulation* whitepapers — authorisation chain templates.
+- MITRE *Adversary Emulation Plans* — example authorisation language.
+- The org's legal counsel — they should review the template once.
+""",
+    )
+    _add_q(session, l1_3, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *required* components of a complete written authorisation for an adversary-emulation exercise?",
+        options=[
+            {"value": "tech_id", "label": "**ATT&CK technique ID** (and sub-technique)"},
+            {"value": "host", "label": "**Named host(s)** — not 'any host in the lab'"},
+            {"value": "window", "label": "**Time window** with explicit start + end timestamps"},
+            {"value": "auth", "label": "**Authoriser(s)** — at minimum, CISO + IR lead with names + initials + date"},
+            {"value": "abort", "label": "**Abort contact** — named + reachable person"},
+            {"value": "ssh_key", "label": "An SSH key for the test host"},
+            {"value": "ascii_art", "label": "ASCII art logo of the team"},
+        ],
+        correct=["tech_id", "host", "window", "auth", "abort"],
+        explanation_md="The five required components: technique ID, named host(s), time window with timestamps, authoriser names + initials + date, and abort contact. SSH key is host-access infrastructure (not authorisation paperwork). ASCII art is decoration. The four scoping constraints (technique / host / window / authoriser) are the load-bearing fields; abort contact is the failure-recovery line. Verbal-only authorisation is non-compliant in every jurisdiction the org operates in; written-and-dated is the L3's legal defence under UK Computer Misuse Act / US CFAA / EU Directive 2013/40/EU.",
+        points=3,
+    )
+
+    # Lesson 1.4 — Atomic Red Team — installation, invocation, clean-up
+    l1_4 = _add_lesson(
+        session, mod, order=4,
+        title="Atomic Red Team: installation, invocation, and clean-up",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Install **Invoke-AtomicRedTeam** (PowerShell module) and the Atomics repo
+> 2. Recognise the **prereq → test → cleanup** structure of every atomic
+> 3. Pick the right test number when a technique has multiple atomic tests (T1059.001-1, -2, -3, ...)
+> 4. Run **clean-up** every time — clean-up is mandatory, not optional
+
+## What Atomic Red Team is
+
+Atomic Red Team is an open-source test library maintained by Red Canary. Each *atomic* is a small, executable test that emulates one ATT&CK technique. A test takes seconds-to-minutes to run, leaves a clear forensic footprint for the SIEM to detect, and ships with a clean-up procedure that returns the host to its pre-test state.
+
+Repository: https://github.com/redcanaryco/atomic-red-team.
+
+Repo structure:
+```
+atomic-red-team/
+└── atomics/
+    ├── T1059.001/
+    │   ├── T1059.001.yaml          # canonical test definitions
+    │   ├── T1059.001.md             # readable description
+    │   └── src/                     # any helper scripts
+    ├── T1078/
+    │   └── T1078.yaml
+    └── ... (one folder per technique)
+```
+
+The YAML carries multiple `atomic_tests` per technique (test 1, test 2, ...). Each test has:
+- `name` — short title.
+- `description` — what it emulates.
+- `supported_platforms` — windows / linux / macos.
+- `input_arguments` — variables (with defaults) the test accepts.
+- `dependencies` (optional) — prereqs the test needs (download a file, install a tool).
+- `executor` — the command to run (PowerShell, bash, sh, command_prompt).
+- `cleanup_command` — restores pre-test state.
+
+## Invoke-AtomicRedTeam — the PowerShell runner
+
+Invoke-AtomicRedTeam (IART) is the PowerShell module that runs atomics with the prereq → test → cleanup phases. Repository: https://github.com/redcanaryco/invoke-atomicredteam.
+
+Install (PowerShell 5+ on the test host):
+
+```powershell
+IEX (IWR 'https://raw.githubusercontent.com/redcanaryco/invoke-atomicredteam/master/install-atomicredteam.ps1' -UseBasicParsing)
+Install-AtomicRedTeam -getAtomics
+```
+
+After install, the atomics live at `C:\\AtomicRedTeam\\atomics\\T<ID>\\`.
+
+## Running an atomic — the full lifecycle
+
+Every atomic runs in three phases. The L3 invokes them in order and skips none.
+
+```powershell
+# Phase 1 — Prereq check (downloads any files, installs any tools)
+Invoke-AtomicTest T1059.001 -TestNumbers 3 -CheckPrereqs
+Invoke-AtomicTest T1059.001 -TestNumbers 3 -GetPrereqs   # if any are missing
+
+# Phase 2 — Execute the test
+Invoke-AtomicTest T1059.001 -TestNumbers 3
+
+# Phase 3 — Clean up (restore pre-test state)
+Invoke-AtomicTest T1059.001 -TestNumbers 3 -Cleanup
+```
+
+The clean-up phase is mandatory. Skipping it leaves persistence artefacts (registry keys, scheduled tasks, files) on the host that may cause the *next* test to fail spuriously, or worse, get caught in real-monitoring as residual junk.
+
+## Linux atomics
+
+For Linux + macOS atomics, the YAML's `executor` is bash or sh:
+
+```bash
+# Run by hand — no Invoke-AtomicRedTeam equivalent on Linux as a first-class tool
+cat /path/to/atomics/T1003.008/T1003.008.yaml  # find the test you want
+bash /path/to/atomics/T1003.008/src/copy_etc_passwd.sh   # execute
+# manual clean-up per the YAML's cleanup_command field
+rm /tmp/etc-passwd-copy
+```
+
+For Linux estates the L3 typically wraps the YAML invocation in a small Python or Go runner. Some teams use the third-party `pyatomicredteam` for parity with IART.
+
+## Picking the right test number
+
+A technique like T1059.001 ships with ~14 different atomic tests:
+
+```
+T1059.001-1: PowerShell encoded base64 command
+T1059.001-2: Mimikatz launched via PowerShell
+T1059.001-3: Mshta executes PowerShell  ← the worked example
+T1059.001-4: Powershell Invoke-DownloadCradle
+... (more)
+```
+
+Pick by *fidelity to the actor* the exercise is calibrated to:
+- If the threat profile says *FIN7 uses mshta to launch PowerShell*, pick test 3.
+- If the threat profile says *Conti uses powershell -enc*, pick test 1.
+- If the test that's least-likely-to-fire is more interesting (gap-finding mode), pick the one your detection rules don't list verbatim.
+
+The L3 documents the picked test number in the exercise log. *Test 3* and *test 1* are different artefacts; conflating them in the scorecard misrepresents coverage.
+
+## When IART isn't enough
+
+IART runs single atomics. Three cases where it doesn't fit:
+
+1. **Chained TTPs** — running T1078 → T1003.001 → T1059.001 in sequence as one actor would. IART runs them independently, with clean-up between each. Caldera (next lesson) is the right tool for chains.
+2. **Long-running campaigns** — emulating a multi-day actor that drips activity. IART is one-shot.
+3. **Multi-host lateral movement** — IART tests one host. Caldera + sandcat agents on multiple hosts can move between them.
+
+For single-TTP atomic exercises (the normal case), IART is the right tool.
+
+## Worked — T1059.001-3 full cycle
+
+```powershell
+# Pre-test state check
+Get-Process | Where-Object { $_.Name -in ("mshta", "powershell") }
+# (No mshta or powershell instances expected; baseline)
+
+# Phase 1
+Invoke-AtomicTest T1059.001 -TestNumbers 3 -CheckPrereqs
+# → all prereqs satisfied (no downloads needed for this test)
+
+# Phase 2 — record start time
+$start = Get-Date
+"Exercise EX-2026-04-001 starting at $start" | Out-File -Append C:\\PT-LOG\\ex.log
+Invoke-AtomicTest T1059.001 -TestNumbers 3
+# → mshta spawns, executes the encoded PowerShell, exits
+
+# Phase 3 — clean-up
+Invoke-AtomicTest T1059.001 -TestNumbers 3 -Cleanup
+# → no persistence to remove for this test; cleanup is a no-op but always run
+
+# Post-test state check
+Get-Process | Where-Object { $_.Name -in ("mshta", "powershell") }
+# Should match baseline
+```
+
+The exercise log captures the start timestamp; the SIEM check (next lesson) uses it to pivot.
+
+## Glossary
+
+- **Atomic Red Team** — open-source ATT&CK-mapped test library by Red Canary.
+- **Invoke-AtomicRedTeam (IART)** — PowerShell runner with prereq/test/cleanup phases.
+- **Test number** — disambiguates multiple atomic tests under one technique.
+- **Cleanup phase** — mandatory; restores pre-test state.
+
+## Further reading
+
+- Atomic Red Team — https://github.com/redcanaryco/atomic-red-team.
+- Invoke-AtomicRedTeam — https://github.com/redcanaryco/invoke-atomicredteam.
+- Red Canary blog — *Getting Started with Atomic Red Team* series.
+""",
+    )
+    _add_q(session, l1_4, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="An L3 wants to run **Atomic Red Team test #5 for T1003.008** (LSASS dumping via /etc/shadow). Using `Invoke-AtomicRedTeam`, what's the canonical PowerShell command to **execute** the test (after prereqs are satisfied)? Format: a single line.",
+        options=None,
+        correct=[
+            "Invoke-AtomicTest T1003.008 -TestNumbers 5",
+            "Invoke-AtomicTest T1003.008 -TestNumbers 5 ",
+            "Invoke-AtomicTest -AtomicTechnique T1003.008 -TestNumbers 5",
+            "Invoke-AtomicTest 'T1003.008' -TestNumbers 5",
+        ],
+        explanation_md="**`Invoke-AtomicTest T1003.008 -TestNumbers 5`** is the canonical invocation. The technique id is positional (or `-AtomicTechnique T1003.008`); `-TestNumbers 5` selects the 5th atomic test under that technique. Prereq check (`-CheckPrereqs`) happens first, the execute is naked (no flag), and clean-up is `-Cleanup` afterwards. Note: T1003.008 is *Steal Local Credentials: /etc/passwd and /etc/shadow*, a Linux technique — running it via PowerShell + IART implies the test host is running PowerShell-on-Linux or the YAML's executor is `bash` and IART invokes it.",
+        points=2,
+    )
+
+    # Lesson 1.5 — MITRE Caldera as alternative
+    l1_5 = _add_lesson(
+        session, mod, order=5,
+        title="MITRE Caldera: agent-based emulation for chained, multi-host exercises",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Recognise **Caldera's** model: server + sandcat agents + adversary profiles
+> 2. Pick **Caldera over Atomic Red Team** when the exercise is chained, multi-host, or long-running
+> 3. Pick **Atomic Red Team over Caldera** for single-TTP fidelity-tier scoring
+> 4. Apply the **agent-removal-after** rule that Caldera exercises require
+
+## What Caldera is
+
+MITRE Caldera (https://github.com/mitre/caldera) is an open-source adversary-emulation framework. Architecture:
+
+- **Caldera server** — runs the campaigns, queues abilities (atomic-equivalents) for agents to execute, collects results.
+- **Sandcat agent** — small native binary (~5MB) that runs on the target host. Beacons to the server, picks up abilities, runs them, reports results.
+- **Adversary profile** — a chain of abilities scripted to emulate a named threat actor (FIN6, APT3, OilRig, etc.). The campaign engine plays them in order or by graph dependency.
+
+Caldera ships with adversary profiles for many actors; the curated *Plugin Library* on the Caldera repo lists what's available.
+
+## When Caldera over Atomic Red Team
+
+| Scenario | Tool |
+|---|---|
+| Single TTP, scorecard-driven | **Atomic Red Team** |
+| Chained TTPs (T1078 → T1003 → T1059 → T1486) | **Caldera** |
+| Long-running campaign (drip activity over days) | **Caldera** |
+| Multi-host lateral movement | **Caldera** |
+| Air-gapped or sensitive estate where no agent is welcome | **Atomic Red Team** |
+| Emulating a *named actor* end-to-end | **Caldera** |
+
+The choice isn't either-or: most mature purple-team programs use both. ART for the granular fidelity-tier scoring; Caldera for the named-actor chains that test *response* rather than *detection-only*.
+
+## The agent-removal-after rule
+
+Caldera exercises land an active agent on the target host. The agent IS the artefact — it persists, it reaches out, it can run more abilities at any time. Authorisation MUST cover:
+
+1. The agent's installation duration.
+2. Removal-after — the agent is uninstalled at exercise end.
+3. Verification — confirm no residual processes / files / registry keys / scheduled tasks remain.
+
+Sandcat removal:
+
+```powershell
+# Stop the running agent
+Get-Process | Where-Object { $_.ProcessName -in ("sandcat", "splunkd") } | Stop-Process -Force
+
+# Remove the binary
+Remove-Item -Path 'C:\\Sandcat\\sandcat.exe' -Force
+Remove-Item -Path 'C:\\Sandcat' -Recurse -Force
+
+# Remove any persistence the agent's profile installed
+schtasks /Query /Tn "Sandcat" 2>$null && schtasks /Delete /Tn "Sandcat" /F
+Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\Sandcat' -ErrorAction SilentlyContinue
+```
+
+Common mistake: the agent is removed but a registry persistence key isn't. Six months later a developer notices `sandcat.exe missing` errors in Event Viewer; the post-mortem reveals the residual key. Always validate with the EDR's process-tree view post-cleanup.
+
+## Worked — emulating a FIN6-style chain
+
+The L3 chains: **T1078 (cloud account) → T1003.001 (LSASS dump) → T1110.003 (password spray internal) → T1486 (encryption sandboxed)**.
+
+Caldera setup:
+1. Install server (one-time, on a dedicated VM).
+2. Install sandcat agents on three test hosts: `PT-LAB-04` (initial-access target), `PT-LAB-05` (lateral target), `PT-LAB-06` (impact target).
+3. Authorise: each agent install + chain execution + agent uninstall, with named hosts + window + abort contact.
+4. Execute via the FIN6-modelled adversary profile (custom-built or from the Plugin Library).
+5. Observe SOC response across all three hosts.
+6. Score: did the SIEM detect at each step? Did the SOAR contain at any step? At which step would containment have been most leveraged?
+7. Uninstall agents, validate clean-up.
+
+The result is a chain-level scorecard: *the detection fired at step 1 (T1078) but the response wasn't initiated until step 3 (T1110.003). Time-to-contain = 47 min from initial access. Target: < 15 min.*
+
+## Authorisation differences vs Atomic
+
+The agent install is a separate authorised step. Some orgs require:
+
+- A **separate agent-install authorisation** that covers the full window (often days).
+- A **per-exercise authorisation** that covers each individual chain run within the agent-install window.
+
+Practical pattern: the L3 stands up the agents for a 5-day exercise window with one over-arching authorisation, then runs 3-5 chain exercises within that window with day-by-day pre-briefs to L1 / L2 / IR.
+
+## Caldera-specific risks
+
+- **Server compromise** — Caldera's server holds the campaign queue + agent inventory. If breached, an attacker has a ready-made C2 with implants on every test host. Run it on an isolated subnet with hardened access.
+- **Agent leakage** — agents installed for exercise day might persist past the exercise window. Always validate uninstall + reboot the host post-exercise.
+- **CTI signal — wrong** — the EDR flags sandcat as "potentially unwanted"; some EDRs mark it as malware. Coordinate with the EDR team to allowlist the agent fingerprint for the exercise window only.
+
+## Glossary
+
+- **Caldera** — MITRE's agent-based adversary-emulation framework.
+- **Sandcat** — Caldera's native agent that runs on target hosts.
+- **Adversary profile** — chained abilities scripted to emulate a named actor.
+- **Agent-removal-after** — mandatory uninstall + verify post-exercise.
+
+## Further reading
+
+- MITRE Caldera — https://github.com/mitre/caldera.
+- Caldera plugin library — https://github.com/mitre/caldera/blob/master/docs/Plugin-library.md.
+- MITRE Adversary Emulation Plans — https://github.com/center-for-threat-informed-defense/adversary_emulation_library.
+""",
+    )
+    _add_q(session, l1_5, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L3 wants to test the SOC's response to a **chained FIN6-style attack** that spans T1078 (cloud account) → T1003.001 (LSASS dump) → T1110.003 (password spray) → T1486 (sandboxed encryption) across **three test hosts**. Which tool is the right pick, and why?",
+        options=[
+            {"value": "art_only", "label": "Atomic Red Team only — run each technique independently and score each"},
+            {"value": "caldera", "label": "MITRE Caldera — agent-based, chained adversary profile, multi-host"},
+            {"value": "either", "label": "Either tool fits equally well"},
+            {"value": "neither", "label": "Neither — chain emulation is too high-risk for production-mirror hosts"},
+        ],
+        correct="caldera",
+        explanation_md="**Caldera** is the right pick. The exercise is chained (atomic Red Team's prereq/test/cleanup model isn't designed for chains), multi-host (sandcat agents on each target), and the goal is response-quality measurement (time-to-contain, kill-chain step where containment was leveraged) — exactly what Caldera's adversary-profile model captures. Atomic Red Team is the right tool for *single-TTP fidelity scoring* (the M1 Lesson 1 worked example); Caldera is the right tool for *named-actor chains*. Both belong in the L3's toolkit; this exercise's shape points at Caldera. Note: agent install + uninstall + post-exercise validation are mandatory; the M1 Lesson 5 covers the rule and the failure modes.",
+        points=2,
+    )
+
+    # Lesson 1.6 — Telemetry verification + four fidelity tiers (deeper)
+    l1_6 = _add_lesson(
+        session, mod, order=6,
+        title="Telemetry verification: the 30-minute wait, four fidelity tiers, and the pivot path",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Apply the **30-minute wait** before declaring any missed detection
+> 2. Walk the **pivot path** through the four fidelity tiers in order
+> 3. Classify a result correctly: Tier-1 (alerted) / Tier-2 (logged-not-alerted) / Tier-3 (logged-not-parsed) / Tier-4 (not-logged)
+> 4. Route the gap to the right team based on the tier
+
+## The 30-minute wait — half of perceived gaps disappear
+
+The new L3 runs the test, refreshes the SIEM, sees no alert, and declares *"missed detection!"*. The reality on most production estates: ingestion lag is real. Beats / Elastic Agent batch every 30s; SIEM rules evaluate every 1-5min; aggregation rules at 5-15min windows; ML jobs at 15min buckets. From event-on-host to alert-in-Kibana, the floor is typically 5 minutes; the realistic 99th-percentile is 30 minutes.
+
+Therefore: **wait 30 minutes before declaring a missed detection.**
+
+The wait is hard. The L3 is keyed up to find a gap; the test ran cleanly; the SIEM is right there. Discipline: set a 30-minute timer, get coffee, come back. Half of perceived gaps disappear. The remaining real gaps are easier to fight when you've eliminated false-misses.
+
+## The pivot path — through the four tiers in order
+
+A confirmed-missed detection (after the 30-min wait) needs classification. The four-tier framework is the L3's reflex; classification is by **pivot path** in this order:
+
+```
+Step 1: Did the alert fire? (Kibana Security alerts panel, etc.)
+  ├─ YES → Tier 1 (alerted). Score latency + fidelity. Done.
+  └─ NO → continue to step 2.
+
+Step 2: Search the SIEM for the EXPECTED EVENT without the rule filter.
+        e.g. for T1059.001-3, search winlogbeat for `process.parent.name: mshta.exe`
+  ├─ Event found → continue to step 3.
+  └─ Event NOT found → continue to step 4.
+
+Step 3: Confirm the FIELD is queryable.
+        e.g. is `process.command_line` present and populated for this event?
+  ├─ Field present and matches expected → Tier 2 (logged-not-alerted). Detection-eng.
+  └─ Field missing or empty → Tier 3 (logged-not-parsed). SIEM team.
+
+Step 4: Confirm the DATA SOURCE is ingested at all.
+        e.g. is winlogbeat-* receiving any data from ABACWKS042 in this window?
+  ├─ Data source healthy but missing this event → likely sub-source (channel) gap; SIEM team.
+  └─ Data source absent / unhealthy → Tier 4 (not-logged). Platform team.
+```
+
+This is the only correct order. Skipping step 2 lets you misattribute a Tier-3 (parsing) gap as a Tier-2 (rule) gap — wrong owner, wrong fix.
+
+## Worked classifications
+
+### Scenario A — Alert fired
+
+T1059.001-3 ran at 14:02. At 14:32 the L3 checks Kibana Security: the *Suspicious PowerShell -enc* rule fired at 14:07, severity high, on host ABACWKS042. **Tier 1.** Score: latency 5min (excellent), fidelity high (matches expected severity). No further action; record on scorecard as pass.
+
+### Scenario B — Event in SIEM, no rule fired
+
+T1059.001-3 ran at 14:02. At 14:32 the L3 checks Kibana Security: no alert. The L3 searches `winlogbeat-* AND process.parent.name: mshta.exe AND process.name: powershell.exe AND @timestamp >= "14:00"`. Result: 1 event. The L3 inspects `process.command_line`: `"powershell.exe -nop -w hidden -enc <base64>"` — fully populated. **Tier 2 (logged-not-alerted).** Owner: detection-eng. Action: open `TuningProposal` for a new or extended rule.
+
+### Scenario C — Event in SIEM, field empty
+
+T1059.001-3 ran at 14:02. At 14:32 the L3 finds the event but `process.command_line` is empty / null. The base64 payload is invisible. **Tier 3 (logged-not-parsed).** Owner: SIEM team. Action: investigate the parser / Sysmon config — `ProcessCreationIncludeCmdLine_Enabled` is the registry switch that controls whether 4688 carries the command line. Tier-3 gaps mean the *raw event* isn't carrying the field; rules can't fire on it.
+
+### Scenario D — No event in SIEM at all
+
+T1059.001-3 ran at 14:02. At 14:32 the L3 finds no event matching the test parameters. The L3 broadens: `winlogbeat-* AND host.name: ABACWKS042 AND @timestamp >= "14:00"`. Result: 0 events. The L3 broadens further: `winlogbeat-* AND host.name: ABACWKS042 AND @timestamp >= "12:00"`. Result: 0 events. The host is silent. **Tier 4 (not-logged).** Owner: platform team. Action: investigate why ABACWKS042 isn't shipping logs — is the agent running? Is the data stream healthy? Is the host network-isolated from the SIEM endpoint?
+
+## Tier-3 vs Tier-4 confusion
+
+The most common mis-classification: an L3 finds *some* events for the host but not the test event, and calls it Tier-4 (not-logged). Wrong tier — Tier-4 is "data source absent". The correct call is **Tier-3 with a sub-channel gap**: the data source is present but the specific channel (Microsoft-Windows-Sysmon/Operational, or Security event log) isn't being collected.
+
+The fix differs:
+- True Tier-4: deploy the agent / fix the network path.
+- Tier-3 sub-channel gap: extend the agent's collected channels.
+
+The L3 documents which sub-tier in the result: "Tier-4 (full data source absent)" vs "Tier-3 (sub-channel Microsoft-Windows-Sysmon/Operational not enabled)".
+
+## Latency and fidelity scoring at Tier-1
+
+Tier-1 isn't binary. Two axes:
+
+- **Latency** — minutes from event-on-host to alert-in-Kibana. Excellent: < 5min. Acceptable: 5-15min. Concerning: 15-60min. Bad: > 1h.
+- **Fidelity** — does severity, threat-tag, and risk-score match the actual TTP impact?
+  - Severity *Critical* on a benign rule firing on noise → false-high.
+  - Severity *Informational* on a real LotL technique → false-low (under-weighting).
+  - Severity matches the response leverage → fidelity good.
+
+Tier-1 with concerns: alerted, but at wrong severity *or* with high latency. Score: pass-with-concerns. Detection-eng's responsibility to tune.
+
+## Glossary
+
+- **30-minute wait** — discipline to avoid false-misses from ingestion lag.
+- **Pivot path** — the four-step diagnostic walk through the fidelity tiers.
+- **Sub-channel gap** — Tier-3-with-clarification when the data source is present but a specific channel isn't.
+- **Pass-with-concerns** — Tier-1 alerted but with latency or fidelity issues.
+
+## Further reading
+
+- ECS docs — `event.dataset` and `event.module` mapping.
+- Sysmon configuration baselines (Olaf Hartong, SwiftOnSecurity).
+- Elastic Beats / Agent — supported channel list per integration.
+""",
+    )
+    _add_q(session, l1_6, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L3 runs T1059.001-3 at 14:02. At 14:32 the SIEM shows no alert. The L3 searches `winlogbeat-* AND host.name: ABACWKS042 AND process.parent.name: mshta.exe` — finds **1 event**. Inspecting it, `process.command_line` is **empty / null**. Pick the correct fidelity tier and the responsible team.",
+        options=[
+            {"value": "t1", "label": "Tier 1 (alerted) — detection-eng owns latency tuning"},
+            {"value": "t2", "label": "Tier 2 (logged-not-alerted) — detection-eng owns rule extension"},
+            {"value": "t3", "label": "Tier 3 (logged-not-parsed) — SIEM team owns parser / Sysmon-config fix"},
+            {"value": "t4", "label": "Tier 4 (not-logged) — platform team owns agent rollout"},
+        ],
+        correct="t3",
+        explanation_md="**Tier 3 — logged-not-parsed.** The event was logged (event found in winlogbeat) but the field that should match the rule (`process.command_line`) is empty. That's a parsing / configuration problem, not a rule problem. Owner: the SIEM team. Action: investigate why `process.command_line` isn't being carried — typical cause is the registry switch `ProcessCreationIncludeCmdLine_Enabled` not being set on the host, or Sysmon's config not capturing CommandLine. Calling this Tier-2 (logged-not-alerted) sends the ticket to the wrong team — detection-eng can't fix what they can't see. The L3's pivot path through the four tiers exists exactly to prevent this misattribution.",
+        points=2,
+    )
+
+    # Lesson 1.7 — Scoring + scorecards + quarterly trending
+    l1_7 = _add_lesson(
+        session, mod, order=7,
+        title="Scoring, scorecards, and quarter-over-quarter trending",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Author a **scorecard row** with the eight required fields per exercise
+> 2. Compute **empirical detection coverage** as a percentage of profile-relevant techniques tested Tier-1
+> 3. Trend coverage **quarter-over-quarter** and recognise drift signals
+> 4. Convert every Tier-2 / Tier-3 / Tier-4 gap into a `TuningProposal` ticket with the right fields
+
+## The scorecard row
+
+Every exercise produces one row in the org's purple-team scorecard. Eight fields — required, every time:
+
+| Field | Example |
+|---|---|
+| **Exercise id** | EX-2026-04-001 |
+| **Date** | 2026-04-27 |
+| **Technique** | T1059.001-3 (mshta encoded PowerShell) |
+| **Host** | ABACWKS042 |
+| **Authoriser** | J. Smith (CISO), R. Patel (IR) |
+| **Tier-result** | Tier-1, Tier-1 with concerns, Tier-2, Tier-3, Tier-4 |
+| **Latency (min)** | 12 (only meaningful for Tier-1) |
+| **Owner-of-fix** | none (Tier-1) / detection-eng (Tier-2) / SIEM team (Tier-3) / platform (Tier-4) |
+| **TuningProposal id** | TP-2026-04-118 (if applicable) |
+| **Status** | open / in-progress / resolved |
+
+This data lives in an editable wiki / Confluence / spreadsheet. The L3 owns the scorecard; detection-eng / SIEM / platform consume it for their backlogs.
+
+## Empirical detection coverage
+
+The headline KPI. Compute as:
+
+```
+detection_coverage = count(Tier-1 OR Tier-1-with-concerns)
+                   / count(all exercises in the period)
+```
+
+For a quarter with 12 exercises:
+- 8 Tier-1
+- 1 Tier-1-with-concerns
+- 2 Tier-2 (detection gap, since fixed)
+- 1 Tier-4 (telemetry gap, in-progress)
+
+Coverage = (8 + 1) / 12 = **75%**.
+
+The number on its own isn't the point — the *trend* is. Quarter Q1 73%, Q2 75%, Q3 80%: the program is working.
+
+The CISO + board want the headline number with one-quarter trend. They don't want the technique-by-technique gap list. Detection-eng + SIEM + platform want the gap list, prioritised by tier and impact.
+
+## Coverage isn't the only KPI
+
+Some teams over-index on the coverage number and miss other axes of program quality:
+
+- **Latency** — Tier-1 alerts averaging 12min vs 30min vs 90min are very different program states. Track median latency per quarter.
+- **Tier-1-with-concerns rate** — high % of "concerns" indicates fidelity issues even when alerts fire. Detection-eng tuning backlog.
+- **Repeat gaps** — same technique fails Tier-2 in Q3 that failed Tier-2 in Q2 → the proposed fix didn't ship or didn't work. Operational signal.
+- **Time-to-fix** — median days from gap-found to gap-fixed. Correlates with engineering capacity and prioritisation.
+- **Test breadth** — # of distinct techniques tested vs threat-profile size. 30 / 60 = 50% breadth coverage; means half the profile is untested.
+
+The reporting up should bundle: coverage, latency-median, time-to-fix-median, breadth, with the prior-quarter delta on each.
+
+## TuningProposal — the gap-to-action conversion
+
+Every Tier-2 / Tier-3 / Tier-4 result must produce a `TuningProposal` ticket. ION's automation models this exact flow (cross-link: `TuningProposal` model in `services/tuning_proposal_service.py`, since v0.10.3).
+
+Required fields on the ticket:
+
+- **Exercise id** — for traceback to the scorecard.
+- **Tier** — tells the queue who owns it.
+- **Owner-of-fix** — named team / role (e.g. `team-detection`, not a person).
+- **Technique** — for ATT&CK rollups.
+- **Reproducer** — the test command, the host, the timestamp, the SIEM screenshot showing the gap.
+- **Proposed fix** — the L3's first-pass suggestion (a rule, a parser change, a logging enable).
+- **Acceptance criteria** — what's the re-test going to validate? *"Re-run T1059.001-3 on ABACWKS042. Expect alert within 5 min, severity high."*
+
+The acceptance-criteria field is what makes the ticket *closeable*. Without it, fixes get marked done without re-testing. The L3's reflex: write the acceptance criteria on the ticket *before* it's pushed to engineering.
+
+## Quarter-over-quarter trending — failure modes
+
+Trends drift in characteristic ways. The L3 should recognise the patterns:
+
+| Trend | What it means | Action |
+|---|---|---|
+| Coverage up + latency down | Program working | Keep going |
+| Coverage up + latency up | New rules added but performance regressed | Detection-eng has capacity issue |
+| Coverage flat + breadth up | Testing more techniques but coverage isn't catching up | Fix-velocity behind test-velocity |
+| Coverage down (drift) | Existing detections degrading | Re-test prior-quarter passing techniques to find the regression |
+| Coverage drops on telemetry change | New ingestion pipeline broke parsers | Coordinate with SIEM team on rollback / fix |
+| Same technique fails repeatedly | Gap fix isn't sticking | Re-open the previous TuningProposal and re-investigate |
+
+## Worked Q1 scorecard (compressed)
+
+| Date | Tech | Host | Tier | Latency | Fix-owner | TP | Status |
+|---|---|---|---|---|---|---|---|
+| 2026-01-15 | T1059.001-3 | PT-LAB-04 | Tier-1 | 5 | — | — | — |
+| 2026-01-22 | T1078.004 | (Entra) | Tier-2 | — | detection-eng | TP-001 | resolved |
+| 2026-01-29 | T1003.001 | PT-LAB-04 | Tier-1 | 8 | — | — | — |
+| 2026-02-05 | T1486 | PT-LAB-04 | Tier-3 | — | SIEM team | TP-002 | resolved |
+| 2026-02-12 | T1110.003 | (Entra) | Tier-1-w/c | 35 | detection-eng | TP-003 | in-progress |
+| 2026-02-19 | T1027 | PT-LAB-04 | Tier-1 | 12 | — | — | — |
+| 2026-02-26 | T1547.001 | PT-LAB-04 | Tier-1 | 7 | — | — | — |
+| 2026-03-05 | T1071.004 | PT-LAB-04 | Tier-2 | — | detection-eng | TP-004 | open |
+| 2026-03-12 | T1098.005 | (Entra) | Tier-1 | 4 | — | — | — |
+| 2026-03-19 | T1556.006 | (Entra) | Tier-2 | — | detection-eng | TP-005 | resolved |
+| 2026-03-26 | T1539 | (Entra) | Tier-1 | 9 | — | — | — |
+| 2026-03-30 | T1018 | PT-LAB-04 | Tier-1 | 11 | — | — | — |
+
+Counts: 8 Tier-1, 1 Tier-1-with-concerns, 3 Tier-2, 1 Tier-3, 0 Tier-4. Coverage = 9/12 = **75%**. Median latency = 9min. Open TPs at Q-end: 2.
+
+The Q2 plan: re-test T1110.003 (verify TP-003 lands), close TP-004 (T1071.004), continue testing. Expand to T1486 chained with T1078 once Caldera workflow is stood up.
+
+## Glossary
+
+- **Scorecard** — the per-exercise log of date / technique / tier / owner / TP-id / status.
+- **Detection coverage** — Tier-1 fraction of total exercises in a window.
+- **TuningProposal** — ticket converting a gap into actionable engineering work.
+- **Acceptance criteria** — the re-test that validates the fix; required on every TP.
+
+## Further reading
+
+- ION's `TuningProposal` model — `services/tuning_proposal_service.py`.
+- The org's runbook wiki — for example scorecards.
+- Florian Roth — *Detection Maturity Model* — DML levels for orientation.
+""",
+    )
+    _add_q(session, l1_7, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="A quarter's purple-team program ran 12 exercises with results: 8 Tier-1, 1 Tier-1-with-concerns, 2 Tier-2, 1 Tier-3, 0 Tier-4. Compute the **empirical detection coverage** as a percentage. Format: a single integer percentage (no decimal).",
+        options=None,
+        correct=[
+            "75%",
+            "75",
+            "75 percent",
+            "75 %",
+            "= 75%",
+        ],
+        explanation_md="**75%.** Coverage = (Tier-1 count + Tier-1-with-concerns count) / total = (8 + 1) / 12 = 9/12 = **0.75 = 75%**. Both Tier-1 and Tier-1-with-concerns count toward coverage because the alert *did* fire — the *with-concerns* qualifier flags fidelity / latency issues for tuning but doesn't subtract from coverage. Tier-2 (logged-not-alerted), Tier-3 (logged-not-parsed), and Tier-4 (not-logged) are the three gap classes; their sum (3) is the inverse-coverage. Reporting up: *'Q1 detection coverage 75%, median latency 9min, 2 open TuningProposals at quarter-end.'*",
+        points=2,
+    )
+
+    # Existing Lesson 8 — quiz capstone (was l2 at order=2; now order=8)
+    l1_8 = _add_lesson(
+        session, mod, order=8, title="Running an Atomic test for T1059.001 — quiz",
         lesson_type=LessonType.QUIZ, duration_min=15,
         content_md="""
 ## A worked Atomic Red Team exercise
@@ -15696,7 +16490,7 @@ You execute it on `ABACWKS042`, log the timestamp, and now ask:
 Take the quiz to lock in the analysis flow.
 """,
     )
-    _add_q(session, l2, order=1, kind=QuestionKind.SINGLE,
+    _add_q(session, l1_8, order=1, kind=QuestionKind.SINGLE,
         stem_md="No alert fires from the SIEM. You query winlogbeat and find that `process.command_line` *does* contain the payload, but no rule matched. What's the right ATT&CK fidelity tier and what's the next action?",
         options=[
             {"value": "alerted_no_action", "label": "Alerted — score latency, no action needed"},
@@ -15708,7 +16502,7 @@ Take the quiz to lock in the analysis flow.
         explanation_md="**Logged but not alerted.** The data was there (you confirmed the field exists in winlogbeat) but no rule matched. That's a detection-engineering gap — the right action is opening a `TuningProposal` ticket so the detection-eng team writes a new rule (or extends an existing one). Don't conflate it with a *parsing* gap (where the field doesn't exist) or a *telemetry* gap (where the data source isn't collected at all).",
         points=2,
     )
-    _add_q(session, l2, order=2, kind=QuestionKind.MULTI,
+    _add_q(session, l1_8, order=2, kind=QuestionKind.MULTI,
         stem_md="Which of the following are valid pre-execution sanity checks? (Pick all that apply.)",
         options=[
             {"value": "ciso_auth", "label": "CISO + IR have signed off on the technique + window"},
@@ -15721,14 +16515,14 @@ Take the quiz to lock in the analysis flow.
         explanation_md="The first four are mandatory. *Off-hours* is wrong for first-attempt purple teaming — you actively *want* detection-eng on hand if you find a gap. Out-of-hours testing is a separate exercise validating after-hours coverage and should follow a successful in-hours run. The *production-host* one is sometimes contentious; prefer a representative production-mirror host where possible, but a vanilla golden-image VM doesn't tell you anything about your real telemetry.",
         points=3,
     )
-    _add_q(session, l2, order=3, kind=QuestionKind.SHORTANSWER,
+    _add_q(session, l1_8, order=3, kind=QuestionKind.SHORTANSWER,
         stem_md="What's the MITRE ATT&CK technique ID for the parent technique 'Command and Scripting Interpreter'? (Format: T followed by 4 digits.)",
         options=None,
         correct=["T1059", "t1059"],
         explanation_md="**T1059** is the parent technique. Sub-techniques are T1059.001 (PowerShell), T1059.003 (Windows Command Shell), T1059.005 (Visual Basic), etc. When recording emulation results, capture both the parent and the sub-technique — your coverage map needs both.",
         points=1,
     )
-    _add_q(session, l2, order=4, kind=QuestionKind.SINGLE,
+    _add_q(session, l1_8, order=4, kind=QuestionKind.SINGLE,
         stem_md="A detection rule fires, but with severity *informational* and 4 hours after the event. What do you record on the exercise scorecard?",
         options=[
             {"value": "pass", "label": "Pass — detection fired"},
@@ -15741,7 +16535,23 @@ Take the quiz to lock in the analysis flow.
         points=2,
     )
 
-    print(f"  L3: {course.title} — 1 module, 2 lessons")
+    _add_q(session, l1_8, order=5, kind=QuestionKind.MULTI,
+        stem_md="The L3 finds a Tier-3 (logged-not-parsed) gap during a purple-team exercise. Which of the following actions / fields belong on the resulting `TuningProposal` ticket?",
+        options=[
+            {"value": "owner", "label": "**Owner-of-fix** — `team-siem` (the parser-fix owner), not detection-eng"},
+            {"value": "reproducer", "label": "**Reproducer** — exact test command + host + timestamp + SIEM screenshot showing the empty field"},
+            {"value": "acceptance", "label": "**Acceptance criteria** — re-run the test, expect `process.command_line` populated and rule X to fire within 5min"},
+            {"value": "exercise", "label": "**Exercise id** — for traceback to the scorecard"},
+            {"value": "tier", "label": "**Tier** classification (Tier-3) — routes the ticket to the right queue"},
+            {"value": "tweet", "label": "A tweet announcing the gap"},
+            {"value": "bonus", "label": "Bonus criteria for the analyst who found the gap"},
+        ],
+        correct=["owner", "reproducer", "acceptance", "exercise", "tier"],
+        explanation_md="The five required ticket fields: owner (team / role), reproducer (test + host + timestamp + screenshot), acceptance criteria (re-test that validates the fix), exercise id (scorecard traceback), and tier (queue routing). Public communication of the gap is a security-disclosure question, not a TuningProposal field. The *acceptance criteria* field is the load-bearing one — it makes the ticket *closeable*; without it, fixes get marked done without re-testing. The L3's reflex is to write the acceptance criteria *before* pushing the ticket to engineering.",
+        points=3,
+    )
+
+    print(f"  L3: {course.title} — 1 module, 8 lessons (Module 1 Purple-team flow @ proper depth)")
     return course
 
 
