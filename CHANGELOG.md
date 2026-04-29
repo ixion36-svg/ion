@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.12.4 (2026-04-29) — feature
+
+### CyAB Onboarding Studio — operator authoring polish (in-page add forms + custom sub-profiles)
+
+The Studio gains four authoring affordances that let operators extend the catalogue without touching code. Every save flips `is_custom=true` so the seeder leaves it alone on subsequent boots.
+
+#### What's new
+
+- **+ Add intake question** button on the Detailed Intake tab. Inline form: question text, answer type (yesno / single / multi), custom options (`value=Label` per line for single/multi). Saves via PATCH to the sub-profile catalogue.
+- **+ Add detection use case** button on the Detection library tab. Inline form: title, summary, description, risk, MITRE IDs (CSV), logic language (ES|QL / KQL / EQL / SPL), logic snippet, optional SOAR playbook id. Appends to `detection_use_cases`.
+- **+ Add audit use case** button on the Audit & compliance tab. Same as detection, with an extra "Compliance frames" CSV field.
+- **+ New sub-profile** button at the bottom of the sub-profile rail. Inline form: id (a-z / 0-9 / underscore), label, pillar (dropdown of the 6), icon (Lucide name), description. POSTs `/api/cyab/studio/subprofiles`; on success the rail refreshes and the new sub-profile is auto-selected.
+
+#### New API
+
+- `POST /api/cyab/studio/subprofiles` — create an operator-authored sub-profile under a pillar. Validates `id` shape (`[a-z0-9_]{2,64}`), pillar existence, and id uniqueness. Catalogue starts with empty arrays; operators populate via the existing PATCH route.
+
+#### Verifying the feature
+
+1. `docker compose pull ion && docker compose up -d`
+2. Open `/cyab/studio`. In the rail, click **+ New sub-profile**. Pick a pillar (Identity), give it an id (`my_test`), label, save. The new sub-profile appears in the rail with the `●` custom marker.
+3. With the new sub-profile selected, switch to **Detection library**. Click **+ Add detection use case**. Fill the form. Save. The new use case appears in the grid.
+4. Refresh the page; URL state restores; new content is still there.
+5. Reboot the container with `docker compose up -d --force-recreate ion` — the seeder log line should report `subprofiles_skipped_custom: 1` (or higher) — your edits survived.
+
+No DB migration. Pure UI + one new POST route.
+
+---
+
 ## v0.12.3 (2026-04-29) — feature
 
 ### CyAB Onboarding Studio — wire-up: per-data-source use-case status + coverage rollup on system detail

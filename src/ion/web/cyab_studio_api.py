@@ -99,6 +99,22 @@ class UseCaseStatusPatch(BaseModel):
 _VALID_UC_STATUSES = {"shipped", "partial", "gap", "n/a"}
 
 
+class SubprofileCreate(BaseModel):
+    """Operator-authored sub-profile (v0.12.4).
+
+    The new row is created with ``is_custom=true`` so the seeder won't
+    overwrite it. Catalogue starts empty; operators populate via the
+    add-question / add-use-case affordances.
+    """
+    id: str
+    pillar_id: str
+    label: str
+    icon: Optional[str] = "cpu"
+    description: Optional[str] = None
+    ecs_anchors: Optional[List[str]] = None
+    expected_feeds: Optional[List[str]] = None
+
+
 # ---------------------------------------------------------------------------
 # Catalogue read
 # ---------------------------------------------------------------------------
@@ -140,6 +156,71 @@ def get_subprofile(
     if full is None:
         raise HTTPException(status_code=404, detail="Unknown sub-profile")
     return full
+
+
+@router.post(
+    "/subprofiles",
+    dependencies=[Depends(require_permission("case:write"))],
+)
+def create_subprofile_route(
+    body: SubprofileCreate,
+    session: Session = Depends(get_db_session),
+):
+    """Create a new operator-authored sub-profile under a pillar.
+
+    Validates id is unique + pillar exists. Catalogue starts empty;
+    operators populate via the add-question / add-use-case routes
+    (PATCH /subprofiles/{id}).
+    """
+    # Validate id shape — keep it filesystem-safe + URL-safe
+    if not re.fullmatch(r"[a-z0-9_]{2,64}", body.id):
+        raise HTTPException(
+            status_code=400,
+            detail="id must be 2–64 chars of [a-z0-9_]",
+        )
+    pillar = session.get(CyabPillar, body.pillar_id)
+    if pillar is None:
+        raise HTTPException(status_code=404, detail="Unknown pillar")
+    existing = session.get(CyabSubProfile, body.id)
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="Sub-profile id already exists")
+    row = CyabSubProfile(
+        id=body.id,
+        pillar_id=body.pillar_id,
+        label=body.label,
+        icon=body.icon or "cpu",
+        ecs_anchors=json.dumps(body.ecs_anchors or []),
+        expected_feeds=json.dumps(body.expected_feeds or []),
+        catalogue_json=json.dumps({
+            "intake_questions": [],
+            "recommended_tasks": [],
+            "detection_use_cases": [],
+            "audit_use_cases": [],
+            "references": [],
+        }, sort_keys=True),
+        catalogue_version=1,
+        is_custom=True,
+        description=body.description,
+    )
+    session.add(row)
+    session.commit()
+    return _row_to_full_dict_for_api(row)
+
+
+def _row_to_full_dict_for_api(row: CyabSubProfile) -> Dict[str, Any]:
+    """Local mirror of svc._row_to_full_dict to avoid private-import."""
+    return {
+        "id": row.id,
+        "pillar_id": row.pillar_id,
+        "label": row.label,
+        "icon": row.icon,
+        "description": row.description,
+        "ecs_anchors": json.loads(row.ecs_anchors or "[]"),
+        "expected_feeds": json.loads(row.expected_feeds or "[]"),
+        "catalogue": json.loads(row.catalogue_json or "{}"),
+        "catalogue_version": row.catalogue_version,
+        "is_custom": row.is_custom,
+    }
 
 
 @router.patch(
