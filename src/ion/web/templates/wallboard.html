@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wallboard · ION</title>
+  <link rel="icon" type="image/png" href="/static/img/ion-favicon.png">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #0a0e17; color: #e2e8f0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow: hidden; }
+    .wb-shell { display: grid; grid-template-rows: 60px 1fr 56px; height: 100vh; padding: 16px 16px 12px 16px; gap: 12px; }
+
+    /* Header */
+    .wb-head { display: flex; align-items: center; gap: 24px; padding: 0 8px; }
+    .wb-brand { display: flex; align-items: center; gap: 12px; }
+    .wb-brand-logo { width: 36px; height: 36px; border-radius: 8px;
+                     background: linear-gradient(135deg, #6de4ff 0%, #a78bfa 100%);
+                     display: flex; align-items: center; justify-content: center;
+                     font-family: ui-monospace, "SF Mono", Menlo, monospace;
+                     font-weight: 800; font-size: 18px; color: #0a0e17; }
+    .wb-brand-text { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+    .wb-brand-sub { font-size: 12px; color: #94a3b8; letter-spacing: 0.1em; text-transform: uppercase; }
+    .wb-head-meta { margin-left: auto; display: flex; align-items: center; gap: 24px; }
+    .wb-services { display: flex; gap: 14px; }
+    .wb-service { display: flex; align-items: center; gap: 6px; font-size: 11px; text-transform: uppercase;
+                  letter-spacing: 0.08em; color: #cbd5e1; font-weight: 600; }
+    .wb-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .wb-dot-up   { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.6); }
+    .wb-dot-off  { background: #475569; }
+    .wb-dot-down { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.6);
+                   animation: wb-pulse 2s infinite; }
+    @keyframes wb-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+    .wb-clock { display: flex; flex-direction: column; align-items: flex-end; }
+    .wb-clock-time { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 24px; font-weight: 700; color: #e2e8f0; line-height: 1; }
+    .wb-clock-meta { font-size: 11px; color: #64748b; letter-spacing: 0.05em; margin-top: 4px; }
+
+    /* Body grid: 3 columns × 2 rows */
+    .wb-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 12px; min-height: 0; }
+
+    .wb-panel { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column;
+                min-height: 0; position: relative; overflow: hidden; }
+    .wb-panel-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+    .wb-panel-title { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #94a3b8; }
+    .wb-panel-stamp { font-size: 11px; color: #475569; font-family: ui-monospace, "SF Mono", monospace; }
+    .wb-panel-error { font-size: 12px; color: #f87171; padding: 6px 10px; background: rgba(239,68,68,0.08);
+                      border-radius: 6px; margin-top: 8px; font-family: ui-monospace, monospace; }
+
+    /* Big numbers + supporting metric strip */
+    .wb-bignum { font-size: 64px; font-weight: 800; color: #ffffff; line-height: 1; letter-spacing: -0.03em;
+                 font-variant-numeric: tabular-nums; margin-bottom: 8px; }
+    .wb-bignum-sub { font-size: 13px; color: #94a3b8; font-weight: 500; }
+    .wb-bignum.cyan  { color: #6de4ff; }
+    .wb-bignum.iris  { color: #a78bfa; }
+    .wb-bignum.lime  { color: #84cc16; }
+    .wb-bignum.amber { color: #fbbf24; }
+    .wb-bignum.rose  { color: #fb7185; }
+
+    .wb-stack { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: auto; padding-top: 12px;
+                border-top: 1px solid rgba(255,255,255,0.06); }
+    .wb-stack-item { display: flex; flex-direction: column; gap: 2px; }
+    .wb-stack-num { font-size: 24px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+    .wb-stack-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+
+    .wb-bars { display: flex; flex-direction: column; gap: 7px; margin-top: 8px; }
+    .wb-bar { display: grid; grid-template-columns: 100px 1fr 40px; gap: 10px; align-items: center; font-size: 12px; }
+    .wb-bar-label { color: #cbd5e1; font-weight: 500; text-transform: capitalize; }
+    .wb-bar-track { height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+    .wb-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+    .wb-bar-fill.severity-critical { background: #ef4444; }
+    .wb-bar-fill.severity-high     { background: #f97316; }
+    .wb-bar-fill.severity-medium   { background: #fbbf24; }
+    .wb-bar-fill.severity-low      { background: #6de4ff; }
+    .wb-bar-fill.verdict-true_positive       { background: #ef4444; }
+    .wb-bar-fill.verdict-false_positive      { background: #84cc16; }
+    .wb-bar-fill.verdict-benign_true_positive { background: #fbbf24; }
+    .wb-bar-fill.verdict-inconclusive        { background: #94a3b8; }
+    .wb-bar-fill { background: #6de4ff; }
+    .wb-bar-num { color: #e2e8f0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+    .wb-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+    .wb-list-item { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 10px;
+                    background: rgba(255,255,255,0.025); border-radius: 6px; font-size: 12px; }
+    .wb-list-pill { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+                    letter-spacing: 0.08em; text-transform: uppercase; }
+    .wb-list-pill.L1 { background: rgba(34,197,94,0.18); color: #86efac; }
+    .wb-list-pill.L2 { background: rgba(109,228,255,0.18); color: #6de4ff; }
+    .wb-list-pill.L3 { background: rgba(245,158,11,0.18); color: #fbbf24; }
+    .wb-list-pill.L4 { background: rgba(239,68,68,0.18); color: #fca5a5; }
+    .wb-list-title { color: #e2e8f0; font-weight: 500; }
+    .wb-list-num { color: #94a3b8; font-variant-numeric: tabular-nums; font-size: 11px; }
+
+    .wb-progress { margin-top: 10px; }
+    .wb-progress-track { height: 10px; background: rgba(255,255,255,0.06); border-radius: 5px; overflow: hidden; }
+    .wb-progress-fill { height: 100%; background: linear-gradient(90deg, #6de4ff, #a78bfa); transition: width 0.4s; }
+    .wb-progress-meta { display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-top: 6px; }
+
+    /* Ticker */
+    .wb-ticker { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+                 padding: 0 16px; display: flex; align-items: center; gap: 18px; overflow: hidden; }
+    .wb-ticker-label { font-size: 11px; font-weight: 800; color: #fbbf24; letter-spacing: 0.12em; text-transform: uppercase;
+                       padding: 6px 10px; background: rgba(245,158,11,0.12); border-radius: 5px; flex-shrink: 0; }
+    .wb-ticker-track { flex: 1; overflow: hidden; }
+    .wb-ticker-content { display: inline-flex; gap: 36px; white-space: nowrap;
+                         animation: wb-ticker-scroll 60s linear infinite; }
+    @keyframes wb-ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    .wb-ticker-item { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #cbd5e1; }
+    .wb-ticker-sev { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .wb-ticker-sev.critical { background: #ef4444; }
+    .wb-ticker-sev.high { background: #f97316; }
+    .wb-ticker-sev.medium { background: #fbbf24; }
+    .wb-ticker-sev.info { background: #6de4ff; }
+    .wb-ticker-empty { font-size: 12px; color: #64748b; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="wb-shell">
+
+    <!-- Header strip -->
+    <header class="wb-head">
+      <div class="wb-brand">
+        <div class="wb-brand-logo">I</div>
+        <div>
+          <div class="wb-brand-text">ION Wallboard</div>
+          <div class="wb-brand-sub">SOC Operations Snapshot</div>
+        </div>
+      </div>
+      <div class="wb-head-meta">
+        <div class="wb-services" id="wb-services">
+          <!-- service-health dots populated from snapshot -->
+        </div>
+        <div class="wb-clock">
+          <div class="wb-clock-time" id="wb-clock-time">--:--:--</div>
+          <div class="wb-clock-meta">Snapshot refreshed <span id="wb-cache-age">—</span></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 6-panel grid -->
+    <main class="wb-grid">
+
+      <!-- Panel 1: Alerts -->
+      <section class="wb-panel">
+        <div class="wb-panel-head">
+          <div class="wb-panel-title">Alerts</div>
+          <div class="wb-panel-stamp" id="wb-alerts-stamp">last 24h</div>
+        </div>
+        <div class="wb-bignum cyan" id="wb-alerts-24h">—</div>
+        <div class="wb-bignum-sub" id="wb-alerts-status">— open · — acknowledged · — closed</div>
+        <div class="wb-bars" id="wb-alerts-bars">
+          <!-- verdict distribution bars -->
+        </div>
+      </section>
+
+      <!-- Panel 2: Cases -->
+      <section class="wb-panel">
+        <div class="wb-panel-head">
+          <div class="wb-panel-title">Cases</div>
+          <div class="wb-panel-stamp" id="wb-cases-stamp">open right now</div>
+        </div>
+        <div class="wb-bignum amber" id="wb-cases-open">—</div>
+        <div class="wb-bignum-sub" id="wb-cases-closures">— closures in last 24h</div>
+        <div class="wb-bars" id="wb-cases-bars">
+          <!-- severity bars -->
+        </div>
+      </section>
+
+      <!-- Panel 3: Bob (AI analyst) -->
+      <section class="wb-panel">
+        <div class="wb-panel-head">
+          <div class="wb-panel-title">Bob — AI Analyst</div>
+          <div class="wb-panel-stamp" id="wb-bob-stamp">last 7d</div>
+        </div>
+        <div class="wb-bignum iris" id="wb-bob-investigations-24h">—</div>
+        <div class="wb-bignum-sub" id="wb-bob-total">— investigations total · — feedback rows</div>
+        <div class="wb-progress">
+          <div class="wb-progress-track"><div class="wb-progress-fill" id="wb-bob-agreement-fill" style="width:0%"></div></div>
+          <div class="wb-progress-meta">
+            <span>Analyst-Bob agreement</span>
+            <span id="wb-bob-agreement-num">— / —</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 4: Detection coverage -->
+      <section class="wb-panel">
+        <div class="wb-panel-head">
+          <div class="wb-panel-title">Detection</div>
+          <div class="wb-panel-stamp" id="wb-detection-stamp">posture</div>
+        </div>
+        <div class="wb-bignum lime" id="wb-detection-templates">—</div>
+        <div class="wb-bignum-sub">alert-prompt templates</div>
+        <div class="wb-stack" id="wb-detection-stack">
+          <!-- TIDE healthy / total + AlertPrompt / etc -->
+        </div>
+      </section>
+
+      <!-- Panel 5: CYAB Onboarding -->
+      <section class="wb-panel">
+        <div class="wb-panel-head">
+          <div class="wb-panel-title">CyAB Onboarding</div>
+          <div class="wb-panel-stamp" id="wb-cyab-stamp">all systems</div>
+        </div>
+        <div class="wb-bignum" id="wb-cyab-systems">—</div>
+        <div class="wb-bignum-sub" id="wb-cyab-readiness">avg readiness — %</div>
+        <div class="wb-progress">
+          <div class="wb-progress-track"><div class="wb-progress-fill" id="wb-cyab-subprofile-fill" style="width:0%"></div></div>
+          <div class="wb-progress-meta">
+            <span>Sub-profile assignment</span>
+            <span id="wb-cyab-subprofile-num">— / —</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 6: Curriculum -->
+      <section class="wb-panel">
+        <div class="wb-panel-head">
+          <div class="wb-panel-title">Curriculum</div>
+          <div class="wb-panel-stamp" id="wb-curr-stamp">all enrolments</div>
+        </div>
+        <div class="wb-bignum cyan" id="wb-curr-completed">—</div>
+        <div class="wb-bignum-sub" id="wb-curr-totals">— enrolments · — certificates issued</div>
+        <div class="wb-list" id="wb-curr-top">
+          <!-- top 3 enrolled courses -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Ticker strip -->
+    <footer class="wb-ticker">
+      <div class="wb-ticker-label">⚡ Ticker</div>
+      <div class="wb-ticker-track">
+        <div class="wb-ticker-content" id="wb-ticker-content">
+          <span class="wb-ticker-empty">No active ticker entries</span>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+<script>
+const REFRESH_MS = 5 * 60 * 1000;  // 5 minutes — matches the server-side TTL
+
+const SERVICES = ['postgres', 'elasticsearch', 'kibana', 'tide', 'opencti', 'ollama', 'bob'];
+
+function el(id){ return document.getElementById(id); }
+function escHtml(s){
+  if(s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+}
+function fmtN(n){
+  if(n == null || isNaN(n)) return '—';
+  if(n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return String(n);
+}
+
+function tickClock(){
+  const d = new Date();
+  const t = d.toTimeString().split(' ')[0];
+  const ts = el('wb-clock-time');
+  if(ts) ts.textContent = t;
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+function renderServices(health){
+  const wrap = el('wb-services');
+  wrap.innerHTML = '';
+  SERVICES.forEach(name => {
+    const s = (health || {})[name];
+    const status = (s && s.status) || 'off';
+    const cls = status === 'up' ? 'wb-dot-up' : (status === 'down' ? 'wb-dot-down' : 'wb-dot-off');
+    const div = document.createElement('div');
+    div.className = 'wb-service';
+    div.title = (s && s.details) || status;
+    div.innerHTML = '<span class="wb-dot ' + cls + '"></span>' + escHtml(name);
+    wrap.appendChild(div);
+  });
+}
+
+function renderAlerts(a){
+  if(a.error){ renderError('wb-alerts-bars', a.error); return; }
+  const total = a.last_24h_total || 0;
+  el('wb-alerts-24h').textContent = fmtN(total);
+  const open = (a.by_status && a.by_status.OPEN) || (a.by_status && a.by_status.open) || 0;
+  const ack  = (a.by_status && a.by_status.ACKNOWLEDGED) || (a.by_status && a.by_status.acknowledged) || 0;
+  const closed = (a.by_status && a.by_status.CLOSED) || (a.by_status && a.by_status.closed) || 0;
+  el('wb-alerts-status').textContent = `${fmtN(open)} open · ${fmtN(ack)} acknowledged · ${fmtN(closed)} closed`;
+
+  // Verdict distribution bars
+  const dist = a.verdict_distribution_7d || {};
+  const max = Math.max(1, ...Object.values(dist));
+  const order = ['true_positive', 'false_positive', 'benign_true_positive', 'inconclusive'];
+  const bars = el('wb-alerts-bars');
+  bars.innerHTML = '';
+  let any = false;
+  order.forEach(k => {
+    const v = dist[k] || 0;
+    if(!v && Object.keys(dist).length === 0) return;
+    any = true;
+    const pct = Math.round(v * 100 / max);
+    const div = document.createElement('div');
+    div.className = 'wb-bar';
+    div.innerHTML = `
+      <div class="wb-bar-label">${escHtml(k.replace(/_/g, ' '))}</div>
+      <div class="wb-bar-track"><div class="wb-bar-fill verdict-${escHtml(k)}" style="width:${pct}%"></div></div>
+      <div class="wb-bar-num">${fmtN(v)}</div>`;
+    bars.appendChild(div);
+  });
+  if(!any){
+    bars.innerHTML = '<div class="wb-bignum-sub" style="margin-top:8px;">No verdicts captured in the last 7d.</div>';
+  }
+}
+
+function renderCases(c){
+  if(c.error){ renderError('wb-cases-bars', c.error); return; }
+  const open = (c.by_status && (c.by_status.OPEN || c.by_status.open)) || 0;
+  const ack  = (c.by_status && (c.by_status.ACKNOWLEDGED || c.by_status.acknowledged)) || 0;
+  el('wb-cases-open').textContent = fmtN(open + ack);
+  el('wb-cases-closures').textContent = `${fmtN(c.closures_24h_total || 0)} closures in last 24h`;
+
+  // Severity bars
+  const sev = c.open_by_severity || {};
+  const max = Math.max(1, ...Object.values(sev));
+  const order = ['critical', 'high', 'medium', 'low'];
+  const bars = el('wb-cases-bars');
+  bars.innerHTML = '';
+  let any = false;
+  order.forEach(k => {
+    const v = sev[k] || 0;
+    if(!v && Object.keys(sev).length === 0) return;
+    any = true;
+    const pct = Math.round(v * 100 / max);
+    const div = document.createElement('div');
+    div.className = 'wb-bar';
+    div.innerHTML = `
+      <div class="wb-bar-label">${escHtml(k)}</div>
+      <div class="wb-bar-track"><div class="wb-bar-fill severity-${escHtml(k)}" style="width:${pct}%"></div></div>
+      <div class="wb-bar-num">${fmtN(v)}</div>`;
+    bars.appendChild(div);
+  });
+  if(!any){
+    bars.innerHTML = '<div class="wb-bignum-sub" style="margin-top:8px;">No open cases right now.</div>';
+  }
+}
+
+function renderBob(b){
+  if(b.error){ renderError('wb-bob-investigations-24h', b.error); return; }
+  el('wb-bob-investigations-24h').textContent = fmtN(b.investigations_24h || 0);
+  el('wb-bob-total').textContent = `${fmtN(b.investigations_total || 0)} investigations total · ${fmtN(b.feedback_7d_total || 0)} feedback rows`;
+  const pct = b.agreement_pct != null ? b.agreement_pct : 0;
+  el('wb-bob-agreement-fill').style.width = pct + '%';
+  el('wb-bob-agreement-num').textContent = b.agreement_pct != null
+    ? `${b.agreement_count || 0} of ${b.feedback_7d_total || 0} (${pct}%)`
+    : '— / —';
+}
+
+function renderDetection(d){
+  if(d.error){ renderError('wb-detection-templates', d.error); return; }
+  el('wb-detection-templates').textContent = fmtN(d.alert_prompt_template_count || 0);
+  const stack = el('wb-detection-stack');
+  stack.innerHTML = '';
+  const items = [
+    { num: d.tide_healthy_count || 0,        label: 'TIDE healthy', cls: 'lime' },
+    { num: d.tide_total_count || 0,          label: 'TIDE total',   cls: '' },
+    { num: (d.tide_total_count || 0) - (d.tide_healthy_count || 0), label: 'TIDE errors', cls: 'rose' },
+  ];
+  items.forEach(i => {
+    const div = document.createElement('div');
+    div.className = 'wb-stack-item';
+    div.innerHTML = `<div class="wb-stack-num ${i.cls ? 'wb-bignum ' + i.cls : ''}" style="font-size:24px;line-height:1;">${fmtN(i.num)}</div>
+                     <div class="wb-stack-label">${escHtml(i.label)}</div>`;
+    stack.appendChild(div);
+  });
+}
+
+function renderCyab(c){
+  if(c.error){ renderError('wb-cyab-systems', c.error); return; }
+  el('wb-cyab-systems').textContent = fmtN(c.system_count || 0);
+  el('wb-cyab-readiness').textContent = `avg readiness ${c.avg_readiness_score != null ? c.avg_readiness_score : '—'}%`;
+  const pct = c.subprofile_assignment_pct || 0;
+  el('wb-cyab-subprofile-fill').style.width = pct + '%';
+  el('wb-cyab-subprofile-num').textContent = `${c.data_source_with_subprofile || 0} / ${c.data_source_total || 0} (${pct}%)`;
+}
+
+function renderCurriculum(c){
+  if(c.error){ renderError('wb-curr-completed', c.error); return; }
+  el('wb-curr-completed').textContent = fmtN(c.completion_total || 0);
+  el('wb-curr-totals').textContent = `${fmtN(c.enrolment_total || 0)} enrolments · ${fmtN(c.cert_issued_count || 0)} certificates issued`;
+  const top = el('wb-curr-top');
+  top.innerHTML = '';
+  (c.top_courses || []).slice(0, 3).forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'wb-list-item';
+    const lvl = String(t.level || '').replace('CourseLevel.', '');
+    div.innerHTML = `
+      <span class="wb-list-pill ${escHtml(lvl)}">${escHtml(lvl)}</span>
+      <div class="wb-list-title">${escHtml(t.title)}</div>
+      <div class="wb-list-num">${fmtN(t.enrolments || 0)} enrolled</div>`;
+    top.appendChild(div);
+  });
+  if(!(c.top_courses && c.top_courses.length)){
+    top.innerHTML = '<div class="wb-bignum-sub" style="margin-top:8px;">No enrolments yet.</div>';
+  }
+}
+
+function renderTicker(t){
+  const wrap = el('wb-ticker-content');
+  if(!t || !t.items || !t.items.length){
+    wrap.innerHTML = '<span class="wb-ticker-empty">No active ticker entries</span>';
+    wrap.style.animation = 'none';
+    return;
+  }
+  // Duplicate the items for the marquee loop
+  const items = t.items.concat(t.items);
+  wrap.innerHTML = items.map(i => `
+    <span class="wb-ticker-item">
+      <span class="wb-ticker-sev ${escHtml(String(i.severity || 'info').toLowerCase())}"></span>
+      <strong>${escHtml(i.title || '(untitled)')}</strong>
+      ${i.body ? '<span style="color:#94a3b8;">&mdash; ' + escHtml(i.body.substring(0, 140)) + '</span>' : ''}
+    </span>`).join('');
+  wrap.style.animation = 'wb-ticker-scroll 60s linear infinite';
+}
+
+function renderError(targetId, msg){
+  const target = el(targetId);
+  if(target){ target.textContent = '—'; }
+  console.warn('Wallboard panel error:', targetId, msg);
+}
+
+function fmtAge(seconds){
+  if(seconds == null || seconds < 0) return 'just now';
+  if(seconds < 60) return seconds + 's ago';
+  if(seconds < 3600) return Math.round(seconds / 60) + 'm ago';
+  return Math.round(seconds / 3600) + 'h ago';
+}
+
+async function refresh(){
+  try {
+    const r = await fetch('/api/wallboard/snapshot', { credentials: 'include' });
+    if(!r.ok){
+      console.warn('snapshot fetch failed', r.status);
+      return;
+    }
+    const s = await r.json();
+    renderServices(s.service_health || {});
+    renderAlerts(s.alerts || {});
+    renderCases(s.cases || {});
+    renderBob(s.bob || {});
+    renderDetection(s.detection || {});
+    renderCyab(s.cyab || {});
+    renderCurriculum(s.curriculum || {});
+    renderTicker(s.ticker || {});
+    el('wb-cache-age').textContent = fmtAge(s.cache_age_seconds || 0);
+  } catch(e) {
+    console.error('refresh error', e);
+  }
+}
+refresh();
+setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>
