@@ -1422,6 +1422,105 @@ This comment carries forward the timeline, the verbatim pivots, the IOCs, and th
         points=2,
     )
 
+    # Lesson 2.9 — LAB: Read your first alert in /alerts (v0.13.2)
+    m2_lab = _add_lesson(
+        session, mod2, order=9,
+        title="LAB — Read your first alert in /alerts",
+        lesson_type=LessonType.LAB, duration_min=20,
+        lab_target_url="/alerts",
+        content_md="""
+> **Hands-on lab.** Open `/alerts` in another tab and complete the task before answering the verification questions.
+>
+> **Prerequisites.** Module 2 readings on alert / triage / case vocabulary.
+
+## Task
+
+The L1 SOC analyst's day starts at the alerts queue. This lab walks you through the first-mile actions on **one open alert** of your choice.
+
+1. Open `/alerts` in a new tab.
+2. Pick any alert in **Open** status; if none exist, ask the L1 lead to seed one or move to the SmokeTest data.
+3. Click the alert to open the detail page. Spend 2-3 minutes reading the rule's metadata, the matched events, and the affected entities.
+4. Identify the following fields on the detail page:
+   - `rule.name` — the detection rule that fired.
+   - `rule.severity` — the severity classification.
+   - `host.name` — the host the alert is about.
+   - `user.name` — the user account involved (if any).
+   - `event.action` / `event.category` — the ECS event class.
+5. Read the alert's MITRE technique mapping (if present).
+6. Decide whether you'd close the alert as **true_positive**, **false_positive**, **benign_true_positive**, or **inconclusive** based on the evidence.
+
+The point of the exercise is to *practice navigating the alert UI* — not to make a perfect call. Your goal is fluency with the panel layout.
+
+## What to expect
+
+The alert detail page surfaces:
+- Summary: rule name, fired at, severity, status.
+- Affected entities: hosts, users, IPs, processes.
+- Triggered events: the ECS rows that matched the rule.
+- Closure controls: dropdown for closure reason + notes textbox.
+- Pivots: links to related observables, similar cases, the rule's tuning page.
+
+Common rookie mistake: forgetting that the closure-reason value drives detection-engineering metrics. Picking the wrong reason isn't *just* notation — it skews FP rate calculations the SOC reports up to leadership.
+
+## Verification
+
+Answer the 4 questions below based on the alert you reviewed.
+""",
+    )
+    _add_q(session, m2_lab, order=1, kind=QuestionKind.SINGLE,
+        stem_md="On the alert detail page, which field uniquely identifies the **detection rule that produced the alert** (i.e. would you use to look up the rule's tuning history or runbook)?",
+        options=[
+            {"value": "rule_name", "label": "`rule.name` — human-readable rule title"},
+            {"value": "rule_id", "label": "`rule.id` — the rule's unique identifier (UUID-like)"},
+            {"value": "alert_id", "label": "`alert.id` — the alert's own id"},
+            {"value": "event_id", "label": "`event.id` — the matched event's id"},
+        ],
+        correct="rule_id",
+        explanation_md="**`rule.id`** is the unique identifier. `rule.name` is human-readable but can change as the rule is tuned (the same rule's name might evolve from \"PowerShell encoded command\" → \"Suspicious encoded PowerShell\" without breaking the underlying id). The L1's reflex when looking up tuning history is to pivot on `rule.id` because it's stable across renames. `alert.id` and `event.id` identify the *alert* and the *matched event*, not the rule. ION's tuning UI keys on `rule.id`.",
+        points=2,
+    )
+    _add_q(session, m2_lab, order=2, kind=QuestionKind.SINGLE,
+        stem_md="You closed an alert as `true_positive`. The actor's IP turned out to be **a security scanner from a contracted pen-test firm** that the security team forgot to allowlist. What's the **correct closure reason**?",
+        options=[
+            {"value": "true_positive", "label": "true_positive — the rule matched real attacker-shape behaviour"},
+            {"value": "false_positive", "label": "false_positive — the activity isn't malicious; rule is over-firing"},
+            {"value": "benign_true_positive", "label": "benign_true_positive — the rule matched real attacker-shape activity, but the actor's intent was authorised (pentest, red team)"},
+            {"value": "inconclusive", "label": "inconclusive — can't tell from the data"},
+        ],
+        correct="benign_true_positive",
+        explanation_md="**benign_true_positive** is the right closure. The rule fired correctly on real attacker-shape activity (the pentest scanner *did* exhibit the technique the rule was looking for), but the actor's intent was authorised. Marking it false_positive would skew the SOC's FP rate downward and potentially trigger an unnecessary tuning cycle — the rule is fine, the *context* is what's benign. true_positive overstates the threat (a contracted pentest isn't an active intrusion). The `benign_true_positive` value exists exactly for this case; it's what the L2 / L3 tuning analysis filters on to distinguish *rule needs tuning* from *rule worked, intent was authorised*. (See the closure-reason taxonomy in `models/alert_triage.py`.)",
+        points=2,
+    )
+    _add_q(session, m2_lab, order=3, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are **valid first-mile pivots** from an alert detail page that the L1 should make routinely (pick all that apply)?",
+        options=[
+            {"value": "host_history", "label": "Pivot to host.name's recent alerts to spot a cluster"},
+            {"value": "user_history", "label": "Pivot to user.name's recent alerts / sessions"},
+            {"value": "rule_tuning", "label": "Pivot to the rule's tuning history (recent FP rate / drift)"},
+            {"value": "similar_cases", "label": "Pivot to similar-case suggestions (if KB-RAG / case-similarity is enabled)"},
+            {"value": "lol_mitre", "label": "Pivot to the MITRE technique page on attack.mitre.org"},
+            {"value": "delete", "label": "Delete the underlying ECS event"},
+            {"value": "edit_rule", "label": "Edit the rule's body directly from the alert detail"},
+        ],
+        correct=["host_history", "user_history", "rule_tuning", "similar_cases", "lol_mitre"],
+        explanation_md="The five valid pivots are host history, user history, rule-tuning history, similar-case suggestions, and MITRE technique reference. Deleting ECS events is destructive and not the L1's responsibility (data is read-only at the alert-detail level). Editing the rule's body is detection-engineering work; the L1 raises a TuningProposal instead. The L1's reflex on every alert: walk these five pivots before deciding the closure reason. Most false positives surface from one of host/user history (the same alert keeps firing for a known-good service) or rule-tuning (the rule has a known drift). The pivots aren't optional; they're the minimum diligence.",
+        points=3,
+    )
+    _add_q(session, m2_lab, order=4, kind=QuestionKind.SHORTANSWER,
+        stem_md="You triage an alert and decide to escalate to L2. What's the **single field** on the alert / case detail that determines who gets paged on-call out-of-hours?",
+        options=None,
+        correct=[
+            "severity",
+            "rule.severity",
+            "alert.severity",
+            "kibana.alert.severity",
+            "Severity",
+            "case.severity",
+        ],
+        explanation_md="**`severity`** (rule.severity / alert.severity / case.severity — the same value flows through). The on-call paging rota is keyed on severity in most SOAR / paging configurations: Critical pages immediately; High pages OOH; Medium queues for next-business-day; Low batches for review. Wrong severity → wrong on-call routing. The L1's reflex on escalation is to confirm severity matches the case's actual impact before triggering the L2 / IR engagement; setting severity too high wakes people unnecessarily, too low delays response on real incidents.",
+        points=2,
+    )
+
     # ── Module 3 — Windows Event Logs (v0.11.6) ──────────────────────────
     # Authored at BTL1/SANS depth from research-agent dossier. ECS-first
     # throughout; pairs every event ID discussion with the ATT&CK
@@ -4099,6 +4198,123 @@ flowchart TD
         points=2,
     )
 
+    # Lesson 5.9 — LAB: Tag and triage an observable (v0.13.2)
+    m5_lab = _add_lesson(
+        session, mod5, order=9,
+        title="LAB — Tag and triage an observable",
+        lesson_type=LessonType.LAB, duration_min=20,
+        lab_target_url="/observables",
+        content_md="""
+> **Hands-on lab.** Open `/observables` in another tab and complete the task before answering the verification questions.
+>
+> **Prerequisites.** Module 5 readings on TLP/PAP, IOC types, watchlist patterns.
+
+## Task
+
+The L1 SOC analyst regularly handles observables — IPs, domains, file hashes, email addresses. This lab walks you through the per-observable workflow: classification, TLP/PAP tagging, watchlist behaviour.
+
+1. Open `/observables` in a new tab.
+2. Click **+ New Observable** (or equivalent UI action).
+3. Create a new observable:
+   - **Type**: pick `ip` (or your choice — `domain` / `hash` / `email` are equivalent for this exercise).
+   - **Value**: `203.0.113.42` (TEST-NET-3 reserved range — guaranteed-fake; never resolves to real infrastructure).
+   - **Description**: "Practice IOC for ION course lab".
+   - **TLP**: pick a value (start with `amber` — see verification questions).
+   - **PAP**: pick a value.
+   - **`is_ioc` flag**: enable.
+4. Save. The observable should appear in the table.
+5. Click your new observable's row to open the detail page.
+6. Read the watchlist-hit log (likely empty for the test value).
+7. Optionally edit the observable: tweak the TLP value; observe how the change is recorded.
+8. Optionally **delete** the observable (or leave it — no harm).
+
+## What to expect
+
+The observables UI surfaces:
+- A list of all observables with type / value / TLP / PAP / IOC-flag / linked-cases-count.
+- New / edit / delete actions.
+- The detail page shows linked alerts / cases / sightings + the watchlist-hit log if the observable has been seen on incoming alerts.
+
+## TLP & PAP — the load-bearing concepts
+
+**TLP (Traffic Light Protocol)** governs *who can read* the observable:
+- `red` — named individuals only (rare).
+- `amber` — only the recipient organisation (common).
+- `amber+strict` — only the recipient's SOC team.
+- `green` — wider community (other SOCs / vendors).
+- `clear` — public.
+
+**PAP (Permissible Actions Protocol)** governs *what actions can be taken* with the observable:
+- `red` — no action without sender approval (rare; usually paired with TLP:RED).
+- `amber` — passive actions only (search, correlate; no blocking).
+- `green` — active actions allowed (blocklist push, EDR detonation).
+- `clear` — public sharing OK.
+
+The two are **independent**. An observable can be TLP:AMBER (your org only) + PAP:GREEN (you can block it freely). Or TLP:GREEN (share with other SOCs) + PAP:AMBER (don't block yet — sender wants to monitor).
+
+## `ignore_similarity` — the high-noise escape hatch
+
+Some observables are inherently noisy: `8.8.8.8` (Google DNS), corporate gateway IPs, public CDN endpoints. Setting `ignore_similarity` on these tells ION's case-similarity / KB-similarity systems to skip them when computing related-case suggestions. Otherwise every alert touching `8.8.8.8` gets clustered with every other one — useless.
+
+## Verification
+
+Answer the 4 questions below based on the workflow you just walked.
+""",
+    )
+    _add_q(session, m5_lab, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Your CTI feed shares a malicious-IP observable as **TLP:AMBER**. The SOC's automated blocklist push pipeline is configured to act on observables with **PAP:GREEN**. Can you push this IP to the blocklist?",
+        options=[
+            {"value": "yes_amber", "label": "Yes — TLP:AMBER lets you act within your org"},
+            {"value": "no_pap", "label": "No — you need to read the PAP value separately. TLP governs sharing, PAP governs action. If the CTI feed didn't supply PAP, default to PAP:AMBER (passive only) and check with the sender before pushing"},
+            {"value": "yes_pap_implied", "label": "Yes — TLP:AMBER implies PAP:GREEN by default"},
+            {"value": "no_tlp", "label": "No — TLP:AMBER means you can't use the IP at all"},
+        ],
+        correct="no_pap",
+        explanation_md="**You need to read PAP separately.** TLP and PAP are *independent* dimensions. TLP:AMBER means *only your org can read it*. PAP governs *what actions can be taken*. A common mistake is to assume TLP:AMBER implies PAP:GREEN (active blocking allowed) — it doesn't. If the CTI feed shared the observable without explicitly stating PAP, the L1's reflex is to default to PAP:AMBER (passive only — search and correlate) and check with the sender before any action that affects production (blocklist push, EDR detonation, mailbox quarantine). Mismarking is itself an incident in some regulated contexts. (See FIRST TLP 2.0, 2022.)",
+        points=2,
+    )
+    _add_q(session, m5_lab, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which observables should typically have **`ignore_similarity = true`** set on them in ION? (Pick all that apply.)",
+        options=[
+            {"value": "google_dns", "label": "8.8.8.8 (Google Public DNS)"},
+            {"value": "cf_dns", "label": "1.1.1.1 (Cloudflare Public DNS)"},
+            {"value": "corp_gateway", "label": "The org's corporate egress IP / NAT gateway IP"},
+            {"value": "akamai_cdn", "label": "Akamai / Cloudflare / AWS CloudFront CDN destination IP"},
+            {"value": "specific_threat", "label": "A specific threat-actor's known C2 IP"},
+            {"value": "ransomware_hash", "label": "A confirmed ransomware-binary SHA256 hash"},
+        ],
+        correct=["google_dns", "cf_dns", "corp_gateway", "akamai_cdn"],
+        explanation_md="The first four (public DNS, corp gateway, CDN endpoints) appear on enormous numbers of alerts — they're high-cardinality, high-noise observables that match across nearly every case. Without `ignore_similarity`, ION's case-similarity / KB-RAG systems cluster every alert touching them with every other one. The flag tells those systems to skip these observables when computing relatedness. Specific-threat IPs and confirmed ransomware hashes are *exactly the opposite* — those are high-signal indicators where similarity matters; never set `ignore_similarity` on them. The L1's reflex when adding a new observable: ask *is this value high-noise or high-signal?* and tag accordingly.",
+        points=3,
+    )
+    _add_q(session, m5_lab, order=3, kind=QuestionKind.SHORTANSWER,
+        stem_md="A CTI feed sends you an observable marked **TLP:RED**. The SOC's cleanup script wants to add it to the blocklist. What's the **correct response**?",
+        options=None,
+        correct=[
+            "do not act without sender approval",
+            "do not act",
+            "do not push to blocklist; check with sender",
+            "request explicit sender approval before action",
+            "default to no action; ask sender",
+            "no action without sender approval",
+            "do not act without explicit sender approval",
+        ],
+        explanation_md="**Do not act without explicit sender approval.** TLP:RED is the most-restrictive class — *named individuals only*; any action beyond reading needs the sender's explicit OK. The default L1 reflex is *don't push, ask*. PAP isn't even consulted here — TLP:RED's implicit PAP is also restrictive. If the cleanup script auto-pushes TLP:RED items, that's a programme-level bug; raise on the SOC-process backlog. The L1 / L2 should manually intercept TLP:RED items pre-action, not let them flow through automation.",
+        points=2,
+    )
+    _add_q(session, m5_lab, order=4, kind=QuestionKind.SINGLE,
+        stem_md="You've created an observable for a malicious IP. **Three weeks later** the alert / case it was originally tied to is closed; the campaign moved on. What should happen to the observable?",
+        options=[
+            {"value": "delete", "label": "Delete it — the campaign is over"},
+            {"value": "leave", "label": "Leave it as-is — every observable should accumulate in the database forever"},
+            {"value": "expire", "label": "Mark expired or stale — retain for historical hunting / threat-actor profiling, but flag so it's not re-acted-on. Most CTI feeds attach an expiry date for exactly this reason"},
+            {"value": "rename", "label": "Rename it to indicate the campaign is over"},
+        ],
+        correct="expire",
+        explanation_md="**Mark expired / stale.** Observables aren't atomic facts — they have a temporal dimension. An IP that was C2 for FIN6 last quarter might be a recycled VPS hosting a small-business website this quarter. Pushing it to the blocklist permanently produces FPs against legitimate traffic. The right pattern: most CTI feeds attach an expiry date (e.g. 90 days post-first-seen); ION should respect that and stop auto-acting after expiry. Retain the observable for historical hunting / threat-actor profiling — the data is still valuable for *was this actor here?* questions — but flag it so the auto-blocking pipeline ignores it. Deleting is the wrong move (loses history); leaving it un-flagged is the wrong move (perpetual FP source). The middle path is *expire + retain*.",
+        points=2,
+    )
+
     # ── Module 6 — Phishing Triage ───────────────────────────────────────
     # End-to-end phishing alert triage: taxonomy, email auth (SPF/DKIM/DMARC/
     # ARC), lure analysis, attachment+link triage, gateway+EDR telemetry,
@@ -6252,6 +6468,113 @@ This scenario shows how a single L1 ticket cascades into **9 escalation paths wi
         points=2,
     )
 
+    # Lesson 7.9 — LAB: Escalate via the runbook (v0.13.2)
+    m7_lab = _add_lesson(
+        session, mod7, order=9,
+        title="LAB — Escalate a case via the runbook",
+        lesson_type=LessonType.LAB, duration_min=20,
+        lab_target_url="/cases?status=acknowledged",
+        content_md="""
+> **Hands-on lab.** Open `/cases?status=acknowledged` in another tab and complete the task before answering the verification questions.
+>
+> **Prerequisites.** Module 7 readings on escalation criteria, TLP/PAP markings, runbook structure.
+
+## Task
+
+The L1 SOC analyst regularly escalates cases up to L2 / IR / detection-engineering. This lab walks you through the canonical escalation flow on **one acknowledged case**.
+
+1. Open `/cases?status=acknowledged` in a new tab.
+2. Pick an Acknowledged case (or create a fresh test case if none exist).
+3. Open the case detail. Read the case summary, the linked alerts, and any analyst notes.
+4. Identify the case's:
+   - **Severity** (drives the escalation tier).
+   - **Linked alerts** (the rule firings under the case).
+   - **Affected hosts / users** (scope).
+   - **TLP / PAP markings** on linked observables (controls what actions are permitted).
+5. Decide who you'd escalate to (L2 SOC / IR Lead / detection-eng / cloud-team / etc.) based on the case's profile.
+6. Author an **escalation handoff note** in the case's notes section that includes:
+   - The case's verdict so far (TP / FP / inconclusive).
+   - The reason for escalation (e.g. *needs IR engagement; suspected data exfil*).
+   - Any TLP / PAP markings the receiving team must respect.
+   - The next step you recommend.
+7. Optionally update the case status to `escalated` (if your escalation requires it).
+
+## Anatomy of a good escalation note
+
+The L1's escalation note is the receiving team's only context until they re-read everything. Common structure:
+
+```
+ESCALATION — case CASE-2026-04-001
+Reason: suspected data exfiltration via OAuth-grant abuse; T1098.001 chain confirmed
+Verdict so far: true_positive (high confidence)
+Affected: user.name=alice@corp, host.name=PT-LAB-04, SP=Marketing-AnalyticsBot
+TLP / PAP: AMBER+STRICT / AMBER (do not blocklist; passive monitoring only per CTI feed)
+Recommended next step: revoke active sessions; force password reset; review SP grants in last 7 days
+```
+
+That sentence is what the L2 / IR reads first. Vague escalations ("looks bad") force the receiving team to redo the L1's diligence; specific ones with clear next-step suggestions accelerate response.
+
+## When to escalate
+
+Module 7 gave you the matrix. The shortcut: escalate when **any one** of:
+- Severity Critical (regardless of confidence).
+- High severity + confirmed TP.
+- Behavioural cluster (multiple correlated alerts; the chain hint).
+- Cross-zone movement (alert spans network zones / cloud-on-prem).
+- Confirmed credential exposure.
+- Outside-of-business-hours posture concerns.
+
+Don't escalate Critical-severity FPs without first confirming the FP — L2 / IR's time is the SOC's most-leveraged resource.
+
+## Verification
+
+Answer the 3 questions below based on your handoff.
+""",
+    )
+    _add_q(session, m7_lab, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *required* fields on a complete escalation note (per Module 7's runbook)?",
+        options=[
+            {"value": "case_id", "label": "Case ID — for traceback"},
+            {"value": "verdict", "label": "Verdict so far (TP / FP / inconclusive) with confidence"},
+            {"value": "reason", "label": "Reason for escalation (named pattern matching the matrix)"},
+            {"value": "scope", "label": "Affected entities (hosts, users, IPs, processes)"},
+            {"value": "tlp_pap", "label": "TLP / PAP markings on linked observables"},
+            {"value": "next_step", "label": "Recommended next step the receiving team should take"},
+            {"value": "weather", "label": "Weather forecast for the next 24 hours"},
+            {"value": "your_lunch", "label": "What you ate for lunch"},
+        ],
+        correct=["case_id", "verdict", "reason", "scope", "tlp_pap", "next_step"],
+        explanation_md="The six valid fields: case ID, verdict + confidence, escalation reason, affected scope, TLP / PAP, recommended next step. Each addresses a specific failure mode: missing case-ID forces the receiver to search; missing verdict means they redo your work; missing reason means they don't know why this matters; missing scope means they don't know who's affected; missing TLP/PAP risks a compliance breach (active action on TLP:RED data); missing next step means the L1 hasn't actually thought through the escalation. Lunch and weather aren't escalation concerns. The L1's reflex: write all six fields *before* clicking the escalate button.",
+        points=3,
+    )
+    _add_q(session, m7_lab, order=2, kind=QuestionKind.SINGLE,
+        stem_md="A case is **Critical** severity but you've spent 20 minutes reviewing and concluded it's a **false positive** (the alert fired on a known-good vendor scanner that wasn't allowlisted). What's the right next step?",
+        options=[
+            {"value": "escalate_anyway", "label": "Escalate to IR anyway — Critical severity always escalates"},
+            {"value": "close_fp_tune", "label": "Close as `false_positive` (or `benign_true_positive` if the scanner's intent was authorised), document the reasoning, and **raise a TuningProposal** to allowlist the vendor scanner so the rule stops firing"},
+            {"value": "ignore", "label": "Ignore the case — Critical FPs are a noise problem"},
+            {"value": "delete_alert", "label": "Delete the alert from the database"},
+        ],
+        correct="close_fp_tune",
+        explanation_md="**Close as FP / benign_TP, document, raise TuningProposal.** Escalating Critical-severity FPs to IR wastes their time — the value of *Critical = automatic page* depends on Critical alerts being *real*. The L1's reflex on a confirmed Critical FP: close with the right reason, write a clear FP rationale, and immediately raise a TuningProposal to fix the rule (allowlist the vendor scanner, narrow the rule's behavioural pattern, etc.). This both (a) closes the loop on the noise and (b) preserves IR's bandwidth for actual incidents. Deleting alerts is destructive and not the L1's responsibility. The closure-reason is what feeds the per-rule FP rate metric (M7 / M8 detection-engineering tooling cross-link).",
+        points=2,
+    )
+    _add_q(session, m7_lab, order=3, kind=QuestionKind.SHORTANSWER,
+        stem_md="A case has linked observables marked **TLP:AMBER+STRICT**. Your escalation handoff goes to detection-engineering. What's the **single most-load-bearing thing** to include in the handoff note about TLP/PAP?",
+        options=None,
+        correct=[
+            "the TLP+PAP markings explicitly",
+            "TLP/PAP markings explicitly",
+            "explicit TLP and PAP values",
+            "the TLP+PAP values",
+            "explicit TLP/PAP values + permitted action scope",
+            "explicit TLP and PAP markings with permitted action scope",
+            "the markings with the permitted action scope",
+        ],
+        explanation_md="**The TLP / PAP markings explicitly + the permitted action scope.** TLP:AMBER+STRICT means *only the recipient's SOC team* can read; the detection-eng team is part of the SOC, so they can read but the markings travel with the data. Detection-eng might want to publish a Sigma rule based on the observables — the TLP markings constrain whether the rule can be shared back to the CTI community. The handoff note must surface this: *don't ship a public rule with these IOCs in it; check with the CTI source first*. Mismarking is itself an incident; the L1's reflex on every escalation is to **propagate TLP/PAP forward** with explicit values, not assume the receiver will look it up.",
+        points=2,
+    )
+
     # ── Module 8 — Common ATT&CK Techniques (L1 FINALE) ──────────────────
     # Capstone lesson: ties Modules 1-7 together by walking the L1 through
     # the ATT&CK techniques most often seen in real triage, anchored to
@@ -7161,7 +7484,7 @@ T-03m  taskkill.exe /F /IM "sqlservr.exe"                    [T1489]
         points=2,
     )
 
-    print(f"  L1: {course.title} — 8 modules, 59 lessons (Module 8 Common ATT&CK Techniques @ proper depth — L1 COMPLETE)")
+    print(f"  L1: {course.title} — 8 modules, 62 lessons (3 LAB lessons added v0.13.2; L1 COMPLETE)")
     return course
 
 
@@ -9009,6 +9332,102 @@ flowchart LR
         correct=["KQL", "kql", "KQL()", "kql()", "WHERE KQL", "where kql"],
         explanation_md="`KQL(\"...\")` — used as `WHERE KQL(\"process.name: powershell* AND process.parent.name: WINWORD.EXE\")`. The pattern is idiomatic in modern Elastic for hunts that need both KQL's intellisense-friendly filter ergonomics and ES|QL's `STATS BY BUCKET()` aggregation. The companion function `MATCH(field, \"value\")` does the same thing for full-text matches.",
         points=2,
+    )
+
+    # Lesson 2.9 — LAB: Hunt with KQL on /discover (v0.13.2)
+    m2_lab = _add_lesson(
+        session, mod2, order=9,
+        title="LAB — Hunt with KQL / EQL / ES|QL on /discover",
+        lesson_type=LessonType.LAB, duration_min=22,
+        lab_target_url="/discover",
+        content_md="""
+> **Hands-on lab.** Open `/discover` in another tab and complete the task before answering the verification questions.
+>
+> **Prerequisites.** Module 2 readings on KQL, EQL, ES|QL syntax + ECS field discipline.
+
+## Task
+
+The L2 hunter's daily reach is the Discover view in Kibana / ION. This lab walks you through three queries against your local data view to lock in the syntactic + semantic differences between KQL, EQL, and ES|QL.
+
+1. Open `/discover` (or your Kibana Discover URL if ION proxies elsewhere).
+2. Pick the data view that surfaces your Sysmon / Windows Security events (commonly `winlogbeat-*` or `logs-windows.*`).
+3. **Query 1 — KQL.** Build a KQL query in the Discover search bar that surfaces all `event.action: process-started` events from any host within the last 24 hours.
+4. **Query 2 — EQL.** Switch the data view to EQL mode (or open Kibana Security's Timeline EQL pane). Build an EQL `sequence` query that surfaces *any process spawning powershell.exe with command-line containing `-EncodedCommand` within 5 seconds of an mshta.exe parent firing*. The skeleton:
+
+```eql
+sequence with maxspan=5s
+  [process where event.action == "started" and process.name == "mshta.exe"]
+  [process where event.action == "started" and process.name == "powershell.exe" and process.command_line == "*-EncodedCommand*"]
+```
+
+5. **Query 3 — ES|QL.** Open the ES|QL editor (Discover → ES|QL). Build a STATS aggregation that returns the **top 100 rare command-lines** per host (the rare-tail hunt from L2 M7):
+
+```esql
+FROM logs-windows.sysmon-*
+| WHERE event.code == "1" AND @timestamp > NOW() - 7 days
+| STATS count = COUNT(*) BY host.name, process.command_line
+| WHERE count == 1
+| SORT @timestamp DESC
+| LIMIT 100
+```
+
+6. Document the *count of results* each query returns. Log the *time spent* per query.
+
+## What to expect
+
+The three query languages serve different shapes:
+- **KQL** — exploratory, single-event matching, great for filtering Discover by field values.
+- **EQL** — sequence + behavioural, ideal for chained TTP detection in Kibana Security rule bodies.
+- **ES|QL** — analytical, supports aggregation + cross-index joins; the L2 hunt's working language for stat-driven hunts.
+
+Common pitfalls:
+- KQL doesn't support aggregation in the Discover search bar (use Lens / ES|QL instead).
+- EQL `sequence` requires the events match in order; reversing the steps fails.
+- ES|QL queries must start with `FROM <index>`; no implicit "current view" like KQL has.
+
+## Verification
+
+Answer the 3 questions below.
+""",
+    )
+    _add_q(session, m2_lab, order=1, kind=QuestionKind.SINGLE,
+        stem_md="You want to *aggregate* event counts by host over a 24-hour window in Discover. Which query language is the right pick?",
+        options=[
+            {"value": "kql", "label": "KQL — pipe a STATS clause through the search bar"},
+            {"value": "eql", "label": "EQL — its sequence body supports aggregation"},
+            {"value": "esql", "label": "ES|QL — its STATS pipe is the canonical aggregation operator"},
+            {"value": "lucene", "label": "Lucene query syntax — the original Elasticsearch language"},
+        ],
+        correct="esql",
+        explanation_md="**ES|QL.** Its `STATS count = COUNT(*) BY host.name` pipe is the canonical aggregation. KQL doesn't support aggregation directly in the search bar — you'd need Lens or a Vega visualisation. EQL is sequence-driven (chains of events in order); aggregation isn't its frame. Lucene is the legacy syntax (still supported in some Kibana panels) but doesn't have aggregation either. The L2's reflex when reaching for *count by* / *avg by* / *distinct count* — that's ES|QL.",
+        points=2,
+    )
+    _add_q(session, m2_lab, order=2, kind=QuestionKind.SHORTANSWER,
+        stem_md="An EQL `sequence` query has `maxspan=5s` and two steps: `[mshta.exe spawn]` then `[powershell.exe -EncodedCommand spawn]`. The mshta event arrived at T+0; the powershell event arrived at **T+8 seconds** (8 seconds after the mshta). Does the sequence match? Format: yes/no.",
+        options=None,
+        correct=[
+            "no",
+            "No",
+            "NO",
+            "no, exceeds maxspan",
+            "no — exceeds maxspan",
+        ],
+        explanation_md="**No.** `maxspan=5s` means the events must occur within 5 seconds of each other. 8 > 5, so the sequence doesn't match — the EQL engine drops the candidate match. The L2's reflex when authoring sequences is to pick the maxspan to match the *expected real-world timing* of the chain: phishing → execution typically completes within seconds; lateral-movement → impact can take hours. Tuning maxspan too tight produces FN; too loose produces FP. For a fast LOLBin chain like mshta → encoded PS, 5-30s is the typical window. If you set maxspan=30s, the question's example *would* match.",
+        points=2,
+    )
+    _add_q(session, m2_lab, order=3, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are **valid characteristics** of a rare-tail stack-count hunt in ES|QL (per L2 M2 + L2 M7 readings)?",
+        options=[
+            {"value": "sort_asc", "label": "`SORT count ASC` (ascending; bottom-N is the rare tail)"},
+            {"value": "limit_n", "label": "`LIMIT 100` (or other reasonable N to bound results)"},
+            {"value": "stats_by_field", "label": "`STATS count = COUNT(*) BY <high-cardinality field>`"},
+            {"value": "where_count_eq_1", "label": "`WHERE count == 1` to extract pure singletons"},
+            {"value": "sort_desc", "label": "`SORT count DESC` (descending — most-common values first)"},
+            {"value": "no_field", "label": "No `BY` clause — aggregate over all events"},
+        ],
+        correct=["sort_asc", "limit_n", "stats_by_field", "where_count_eq_1"],
+        explanation_md="The four valid characteristics: ASC sort (rare tail), bounded LIMIT, BY a high-cardinality field, optional WHERE count==1 for singletons. `SORT count DESC` is the *opposite* of a rare-tail hunt — it surfaces the most-common values, which are typically benign noise. Aggregating over all events without a BY clause produces a single count value, useless for hunting. The L2's reflex when stack-counting: cardinality-aware threshold (M7 L7.2) — singletons for high-cardinality fields, bottom-N% for moderate-cardinality, don't bother for low-cardinality.",
+        points=3,
     )
 
     # ── Module 3 — Process & file events: Execution + Defense Evasion ────
@@ -12151,6 +12570,108 @@ Both bodies submit to TIDE with severity *high*, threat metadata `T1071.001` + `
         options=[{"value": "true", "label": "True"}, {"value": "false", "label": "False"}],
         correct="true",
         explanation_md="**True.** The L2's signature capstone shape: ES|QL aggregates per-host beacon shape on the network side, EQL `sequence` joins the network event to the spawning process via `process.entity_id`. This produces *triage-grade* output — the L2 hands off the hunt with both the destination beacon evidence and the process that initiated it, ready for L1 triage or IR escalation.",
+        points=2,
+    )
+
+    # Lesson 5.9 — LAB: Hunt a beacon with ES|QL CV (v0.13.2)
+    m5_lab = _add_lesson(
+        session, mod5, order=9,
+        title="LAB — Hunt a beacon with ES|QL coefficient-of-variation",
+        lesson_type=LessonType.LAB, duration_min=24,
+        lab_target_url="/discover",
+        content_md="""
+> **Hands-on lab.** Open `/discover` in another tab and complete the task before answering the verification questions.
+>
+> **Prerequisites.** Module 5 readings on Network telemetry (C2 + Exfil); also leans on M7 L7.3 beacon CV technique.
+
+## Task
+
+The L2 hunter routinely hunts for periodic C2 beacons. This lab walks you through a coefficient-of-variation (CV) hunt against firewall / network telemetry.
+
+1. Open `/discover` and switch to **ES|QL** mode.
+2. Pick a data view that surfaces firewall / network logs (typically `logs-network.firewall-*` or vendor-specific).
+3. Build the CV skeleton — the conceptual query, version-tolerant:
+
+```esql
+FROM logs-network.firewall-*
+| WHERE event.outcome == "allowed" AND network.direction == "outbound"
+  AND @timestamp > NOW() - 24h
+| SORT @timestamp ASC
+| EVAL gap_ms = TS_DIFF(@timestamp, LAG(@timestamp, 1))
+   BY source.ip, destination.ip, destination.port
+| STATS samples = COUNT(*),
+        mean_gap = AVG(gap_ms),
+        stddev_gap = STDDEV(gap_ms)
+   BY source.ip, destination.ip, destination.port
+| WHERE samples >= 50
+| EVAL cv = stddev_gap / mean_gap
+| WHERE cv < 0.30
+| SORT cv ASC
+| LIMIT 100
+```
+
+4. **Run the query.** If your Elastic version doesn't expose `STDDEV` or `LAG` in ES|QL, fall back to the Watcher / Painless approach (M7 L7.3 covers — pre-aggregate via Transform; query the summary).
+5. Document the **count of low-CV tuples** (CV < 0.30 with samples ≥ 50). Realistic estates surface 5-50 such tuples in 24h.
+6. Pick **one** suspect tuple and pivot:
+   - DNS pivot: what name resolved to `destination.ip`?
+   - Process pivot: which `process.name` made the connection on `source.ip`?
+   - Enrichment: AbuseIPDB / VirusTotal on `destination.ip`.
+7. Decide whether the tuple is benign (NTP / agent telemetry / scheduled task) or suspicious (C2).
+
+## What to expect
+
+Real estates surface a **mix** of low-CV tuples:
+- NTP polls (CV ~0.02-0.05; benign).
+- Telemetry agents (Elastic Agent, CrowdStrike, Tanium — beacons every 60-300s).
+- Domain-controller replication (SMB to DCs).
+- Software-update services (Windows Update, Apple).
+- *Maybe* one or two genuine beacons in a noisy estate.
+
+The mandatory allowlist (M7 L7.3 covers): NTP / agents / WSUS / DCs. Without it, the FP rate is unworkable. Apply your estate's allowlist before pivoting.
+
+## Verification
+
+Answer the 3 questions below.
+""",
+    )
+    _add_q(session, m5_lab, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="An ES|QL CV hunt returns: a tuple `(source.ip=10.0.4.121, destination.ip=203.0.113.42, port=443)` with **samples=2855, mean_gap=30.2s, stddev_gap=0.7s**. Compute the **coefficient of variation** rounded to 3 decimals. Format: a single number.",
+        options=None,
+        correct=[
+            "0.023",
+            "0.0231",
+            "0.02",
+            "≈0.023",
+            "~0.023",
+        ],
+        explanation_md="**0.023.** Computing: CV = stddev / mean = 0.7 / 30.2 = **0.0231** (≈ 0.023). Well under the 0.30 jittered-beacon threshold and even under the 0.10 fixed-beacon threshold (M7 L7.3 vocabulary). This *qualifies* as a candidate beacon — but is **not** sufficient evidence to call it C2 alone. NTP, software-update services, EDR-agent telemetry, scheduled tasks, and DC replication all produce CV in the 0.02-0.10 range. The L2's reflex: apply the allowlist, pivot to `dns.answers.data` to find the name, pivot to `process` events to identify the binary on `source.ip`, then decide. CV is necessary, not sufficient.",
+        points=2,
+    )
+    _add_q(session, m5_lab, order=2, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *mandatory allowlist entries* before relying on a beacon-CV hunt's output (per M7 L7.3)?",
+        options=[
+            {"value": "ntp", "label": "NTP (port 123)"},
+            {"value": "dcs", "label": "Domain-controller replication (SMB to your DC list)"},
+            {"value": "edr", "label": "EDR / SIEM / Sysmon agent telemetry endpoints"},
+            {"value": "wsus", "label": "Software-update destinations (`*.windowsupdate.com`, `*.apple.com`, vendor patches)"},
+            {"value": "scheduled_tasks", "label": "Scheduled-task heartbeat traffic (svchost-driven)"},
+            {"value": "any_outbound", "label": "Any outbound HTTPS"},
+            {"value": "user_traffic", "label": "User browsing traffic"},
+        ],
+        correct=["ntp", "dcs", "edr", "wsus", "scheduled_tasks"],
+        explanation_md="The five mandatory allowlist categories cover the *known-benign periodic emitters* in any estate: NTP, DC replication, agent telemetry, software-update CDN endpoints, scheduled-task heartbeats. Without these, a CV hunt fires on every internal periodic agent and the FP rate collapses. Allowlisting *any outbound HTTPS* would defeat the hunt entirely (real C2 beacons hide in HTTPS traffic). User browsing traffic is high-CV and naturally filtered out by the < 0.30 threshold; no allowlist needed for it. The allowlist is mandatory but specific — name the periodic-but-benign sources, don't blanket-allow categories that include real-C2 traffic.",
+        points=3,
+    )
+    _add_q(session, m5_lab, order=3, kind=QuestionKind.SINGLE,
+        stem_md="A CV hunt returns 30 low-CV tuples. After applying the allowlist, **5 remain**. The L2 pivots one — the DNS name is a high-entropy DGA-shape `.icu` domain registered 4 days ago. The process is a workstation user's outdated browser. What's the **right L2 next step**?",
+        options=[
+            {"value": "ignore", "label": "Ignore — outdated browser is just user behaviour"},
+            {"value": "page_ir", "label": "Page IR — the combination (low-CV beacon + DGA-shape domain + recent registration + outdated browser) is page-class evidence; isolate the host and engage IR for malware analysis"},
+            {"value": "tune_rule", "label": "Tune the rule — the allowlist needs more entries"},
+            {"value": "delete_domain", "label": "Delete the domain from the resolved-name table"},
+        ],
+        correct="page_ir",
+        explanation_md="**Page IR.** The cluster is page-class: low-CV beacon (M7 L7.3) + DGA-shape entropy domain (M7 L7.5) + recent registration + suspicious initiating process. Each individual signal has a real base-rate of FP, but their *intersection* on the same `source.ip` within an hour is near-zero base-rate — exactly the *intersection-of-rare-signals* page-class pattern from M7's capstone. The right L2 reflex: trigger SOAR auto-isolate (or manual host quarantine if no auto-isolate), capture process artefacts for malware analysis, engage IR. Tuning the rule is wrong — the rule found the right thing. Ignoring is wrong — outdated browser is a *vulnerability indicator* not a benign explanation.",
         points=2,
     )
 
@@ -15383,7 +15904,98 @@ The next step in the analyst's path is L3 — *Adversary Emulation Basics* — w
         points=2,
     )
 
-    print(f"  L2: {course.title} — 8 modules, 64 lessons (Module 8 Hunt-to-Detection Capstone @ proper depth — L2 COMPLETE)")
+    # Lesson 8.9 — LAB: Convert a hunt finding into a TIDE rule (v0.13.2)
+    m8_lab = _add_lesson(
+        session, mod8, order=9,
+        title="LAB — Convert a hunt finding to a TIDE rule (five-gate walk)",
+        lesson_type=LessonType.LAB, duration_min=24,
+        lab_target_url="/cyab/studio",
+        content_md="""
+> **Hands-on lab.** Open `/cyab/studio` (CyAB Onboarding Studio) in another tab and complete the task before answering the verification questions.
+>
+> **Prerequisites.** Module 8 readings on the five-gate hunt-to-detection conversion (G1 data quality, G2 FP rate, G3 ATT&CK mapping, G4 kill-chain step + routing, G5 metadata).
+
+## Task
+
+The L2's finale is converting a confirmed hunt finding into a production TIDE rule. This lab walks one candidate through all five gates using ION's CyAB Onboarding Studio (added v0.12.0) as the target surface.
+
+Pick **one** of the M7 capstone candidates you'd like to walk:
+- **Stack-count rare SP `appDisplayName`** (M7 L7.2) → mapped to T1098.003.
+- **Beacon CV per `(source, dest, port)`** (M7 L7.3) → T1071.001.
+- **Four-signal DGA combo** (M7 L7.5) → T1568.002.
+- **Per-entity z on outbound bytes per host** (M7 L7.6) → T1041.
+
+For your pick:
+
+1. **Open `/cyab/studio`.** Pick the relevant pillar (Network for the beacon-CV / DGA candidates; Identity for the rare-SP candidate).
+2. **Drill into the matching sub-profile.** For example, "Network → Next-Gen Firewall" for the beacon-CV.
+3. Switch to **Detection Library** tab. Confirm the use case for your candidate exists (or click *+ Add detection use case* to author it from scratch).
+4. **Walk the five gates** for your candidate. For each gate, write a one-paragraph evaluation in the use case's *description* (or in a personal scratchpad):
+   - **G1** — data quality: are the fingerprint fields populated on this estate?
+   - **G2** — FP rate: would a 30-day backtest produce ≤ 5 weekly findings?
+   - **G3** — MITRE: technique + sub-tech + tactic at the right specificity?
+   - **G4** — kill-chain: which tactic is primary; what's the playbook routing?
+   - **G5** — metadata: severity + threat block + runbook + owner + lifecycle plan?
+5. Click **Generate TIDE rule stub** on the use case. Confirm the stub is created.
+6. Optionally, navigate to the TIDE UI (or wherever ION exposes TIDE rules) and review the stub.
+
+## What "passing the five gates" means in practice
+
+For most M7 capstone candidates:
+- **G1 typically passes** if the underlying telemetry has been around for 6+ months on the estate.
+- **G2 is the hardest gate** — backtest reveals the rule's actual FP rate; tuning post-G2 is forbidden (tuning-during-backtest = overfit).
+- **G3 is straightforward** if the candidate's TTP has a sub-technique; trickier when the technique is broad (T1059) and you need to pick which sub.
+- **G4 routes via response-leverage** — pick the tactic where the response is most leveraged.
+- **G5 is checklist-tedious but essential** — a rule with no owner, no runbook, no lifecycle plan rots.
+
+The Studio's *Generate TIDE rule stub* button bridges G3 → TIDE submission; it auto-generates a rule body from the catalogue's logic snippet + MITRE IDs + risk class.
+
+## Verification
+
+Answer the 3 questions below based on your walk.
+""",
+    )
+    _add_q(session, m8_lab, order=1, kind=QuestionKind.SINGLE,
+        stem_md="During your G2 backtest, the candidate fires **21 unique findings in 30 days**. You sample 10 and classify **8 TP, 2 FP**. Predicted weekly findings + TP rate sample. Does the candidate **pass G2**?",
+        options=[
+            {"value": "passes", "label": "Passes — 4.9 findings/week ≤ 5 cap; 80% TP rate ≥ 30% floor; both criteria met"},
+            {"value": "fails_fp", "label": "Fails — too many FPs"},
+            {"value": "fails_tp", "label": "Fails — TP rate too low"},
+            {"value": "fails_count", "label": "Fails — 21 findings is too many to triage"},
+        ],
+        correct="passes",
+        explanation_md="**Passes G2.** Computing: predicted weekly = 21 × (7/30) = 4.9 findings/week (≤ 5 cap ✓); TP rate from sample = 8/10 = 80% (≥ 30% floor ✓). Both criteria met. The candidate ships pending G3-G5 review. (Cross-reference L2 M8 L8.3 for the canonical formula and L2 M8 L8.8 capstone for the worked variant with 35 findings + 30% TP — that variant *fails* the cap, distinct from this one.) Common failure mode at this stage: tuning the threshold to fit FP-rate targets — that's overfitting; the rule's real-world FP will exceed the backtest. Lock the body; if it fails, redesign.",
+        points=2,
+    )
+    _add_q(session, m8_lab, order=2, kind=QuestionKind.SINGLE,
+        stem_md="A four-step EQL `sequence` chain rule covers Initial Access (T1078.004) → Credential Access (T1539) → Persistence (T1098.005) → Collection (T1114.003). What's the **right primary tactic** for routing per G4 response-leverage rule?",
+        options=[
+            {"value": "ta0006", "label": "TA0006 (Credential Access) — because session-cookie theft is in the chain"},
+            {"value": "ta0003", "label": "TA0003 (Persistence) — because device registration is in the chain"},
+            {"value": "ta0001", "label": "TA0001 (Initial Access) — because the highest-leverage response (revoke session + force password reset) lives here; killing this kills the entire chain downstream"},
+            {"value": "ta0009", "label": "TA0009 (Collection) — because the impact in the chain is mailbox forwarding"},
+        ],
+        correct="ta0001",
+        explanation_md="**TA0001 (Initial Access)** is the right primary. The L2's heuristic (M8 L8.5) — pick the tactic where the *response* is most effective — points to Initial Access because the response (revoke active session + force password reset + kill refresh tokens) **kills every downstream step in the chain**. Tagging Credential Access, Persistence, or Collection puts the alert in the wrong queue and routes it to a less-effective response. The threat metadata array still lists all four techniques (chain context); only the primary tactic + routing changes. (Recap from M8 L8.5 worked example.)",
+        points=2,
+    )
+    _add_q(session, m8_lab, order=3, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *required* fields in a complete G5 metadata block?",
+        options=[
+            {"value": "severity", "label": "Severity with documented rationale"},
+            {"value": "threat", "label": "Threat metadata block (technique + sub-tech + tactic with ATT&CK version pinned)"},
+            {"value": "runbook", "label": "Runbook reference or playbook id"},
+            {"value": "owner", "label": "Owner — named team / role (not a person)"},
+            {"value": "lifecycle", "label": "Lifecycle plan — review cadence + KPIs + deprecation criteria"},
+            {"value": "author_email", "label": "Author's email address"},
+            {"value": "ci_status", "label": "CI build status indicator"},
+        ],
+        correct=["severity", "threat", "runbook", "owner", "lifecycle"],
+        explanation_md="The five required G5 fields: severity (with rationale), threat metadata block, runbook / playbook id, owner (team / role), lifecycle plan. Author email is optional metadata (provenance is nice but doesn't affect deployability). CI status is a delivery-pipeline concern, not a rule-quality gate. Each of the five required fields addresses a specific failure mode — no severity → uncalibrated alerting; no threat block → invisible to coverage rollups; no runbook → analyst sees alert with no SOP; no owner → rule rots when ATT&CK changes; no lifecycle plan → no re-review cadence; same gaps recur quarter-over-quarter.",
+        points=3,
+    )
+
+    print(f"  L2: {course.title} — 8 modules, 67 lessons (3 LAB lessons added v0.13.2; L2 COMPLETE)")
     return course
 
 
@@ -18677,6 +19289,96 @@ Module 4 picks up: **Telemetry quality assessment** — the engineering side of 
         points=2,
     )
 
+    # Lesson 3.9 — LAB: Caldera operation end-to-end (v0.13.2)
+    m3_lab = _add_lesson(
+        session, mod3, order=9,
+        title="LAB — Caldera operation end-to-end",
+        lesson_type=LessonType.LAB, duration_min=30,
+        lab_target_url="http://caldera.local:8888",
+        content_md="""
+> **Hands-on lab.** Open your local Caldera server (default `http://localhost:8888`; substitute your URL if different) and complete the task.
+>
+> **Prerequisites.** L3 Module 3 readings; a stood-up Caldera server with at least one sandcat agent reachable. If you haven't installed Caldera yet, follow M3.2 first.
+
+## Task
+
+The L3 stands up a real Caldera operation — adversary profile + agent + planner — and reads the operation report.
+
+1. **Open Caldera UI.** Login (default `red:admin` if not rotated; rotate before any production-mirror exercise per M3.2).
+2. **Verify a sandcat agent is alive.** *Agents → Active Agents.* If none, deploy one to a test host using the bootstrap command from M3.3.
+3. **Stand up an operation:**
+   - *Operations → Add operation.*
+   - Name: `LAB-CH-2026-04-001 — your name + course-lab tag`.
+   - **Adversary**: pick from the stockpile library — *Discovery (basic)* if available, or any short adversary with 3-5 abilities.
+   - **Group**: `red` (or whichever your sandcat is tagged).
+   - **Planner**: `atomic` for a single-host fact-driven walk; `batch` for sequential.
+   - **Obfuscator**: `plain-text` (so the SIEM sees the raw command — first runs).
+   - **Jitter**: `0,5` (low — fast iteration).
+4. **Run.** Observe the *Active Operations* tab; abilities transition created → running → success/failure.
+5. **Wait for completion.** Or click *Pause* if you need to stop early.
+6. **Read the operation report.** *Operations → <name> → debrief.* Note: per-ability outcome, total wall time, facts collected, ATT&CK technique coverage.
+7. **Clean up:** *Agents → Kill* for any sandcat you deployed; verify the binary is removed from the host (M3.3 agent-removal-after rule).
+
+## What to expect
+
+Even short adversaries (3 abilities) produce useful data:
+- Per-ability success/failure with stdout / stderr captured.
+- Facts collected (e.g. `host.user.name` from a discovery ability).
+- ATT&CK Navigator overlay (via the `compass` plugin).
+- Total wall time — for a 3-ability sequential operation, typically 10-60 seconds depending on beacon cadence (default 60s ± 20% jitter).
+
+Common things that go wrong:
+- Sandcat hasn't beaconed recently — the operation hangs in *created* state. Restart the agent.
+- Ability requires admin context but agent is running as a low-privilege user. Re-deploy with elevation.
+- Plain-text obfuscator surfaces in EDR — the EDR may have killed the agent mid-test. Allowlist the lab path or use `base64` obfuscator.
+
+## Verification
+
+Answer the 3 questions below based on your operation.
+""",
+    )
+    _add_q(session, m3_lab, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="What's the **default username** for the Caldera UI on a fresh `docker compose up` install (rotate before any production-mirror exercise)? Format: `<username>:<password>`.",
+        options=None,
+        correct=[
+            "red:admin",
+            "red / admin",
+            "red admin",
+            "red, admin",
+            "red:admin (default)",
+            "red:admin (must be rotated before production-mirror exercises)",
+        ],
+        explanation_md="**`red:admin`** is the default for the red-team account; `blue:admin` for the blue-team account. **Both must be rotated before any production-mirror exercise** — the defaults are public knowledge and any attacker who reaches the Caldera server's port has a free C2 with implants on every test host. Rotate via `conf/local.yml`'s `users.red.password` and `users.blue.password`. (M3.2 covered this; rotation is the load-bearing pre-exercise step.)",
+        points=2,
+    )
+    _add_q(session, m3_lab, order=2, kind=QuestionKind.SINGLE,
+        stem_md="You're authoring a **multi-host chain** that uses fact-dependencies between phases (e.g. T1003.001 LSASS dump on Agent A produces `host.user.password`; T1021.002 SMB lateral on Agent B requires it). Which **planner** should the operation use?",
+        options=[
+            {"value": "batch", "label": "`batch` — sequential, YAML-order; runs one ability at a time waiting for each to complete"},
+            {"value": "atomic", "label": "`atomic` — single-agent fact-driven; runs one host at a time"},
+            {"value": "buckets", "label": "`buckets` — tactic-grouped concurrent; runs multiple abilities in same tactic concurrently"},
+            {"value": "look", "label": "`look` — concurrent multi-agent scheduler; finds next runnable ability across all agents and dispatches as facts arrive"},
+        ],
+        correct="look",
+        explanation_md="**`look`** is the planner for concurrent multi-agent fact-driven chains. Its strategy: scan all agents, find the next ability whose requirements are satisfied on some agent, schedule it. Multiple abilities can run concurrently across agents. `batch` is sequential and would wait through the YAML order even when ability 6's facts are ready earlier on a different agent. `atomic` is fact-driven but typically used for single-agent chains. `buckets` is tactic-grouped, useful for wide-coverage testing but not for chain timing measurement. The L3's reflex (M3.7 cross-link): single-host linear → batch; single-host fact-driven → atomic; multi-host parallel fact-driven → look.",
+        points=2,
+    )
+    _add_q(session, m3_lab, order=3, kind=QuestionKind.MULTI,
+        stem_md="**After** an operation completes, which **agent-removal-after** steps are mandatory? (Pick all that apply, per M3.3 and M1.5.)",
+        options=[
+            {"value": "kill", "label": "Kill the sandcat process (UI: *Agents → Kill*; or local `kill <pid>`)"},
+            {"value": "remove_binary", "label": "Remove the sandcat binary from disk (`/tmp/sandcat`, `%TEMP%\\sc-*`, etc.)"},
+            {"value": "verify_proc", "label": "Verify with `pgrep sandcat` (or equivalent) that no sandcat process remains"},
+            {"value": "verify_persistence", "label": "Audit any persistence the chain's abilities might have created (registry Run keys, scheduled tasks); remove those independently"},
+            {"value": "reboot_optional", "label": "Reboot the host as a belt-and-braces final step"},
+            {"value": "snapshot_shutdown", "label": "Permanently delete the test host's VM"},
+            {"value": "leave_running", "label": "Leave the agent running for 'next time'"},
+        ],
+        correct=["kill", "remove_binary", "verify_proc", "verify_persistence", "reboot_optional"],
+        explanation_md="The five mandatory cleanup steps: kill, remove binary, verify process gone, audit persistence (the chain's abilities may have left registry keys / scheduled tasks behind that sandcat itself doesn't track), optional reboot. Permanent VM deletion is wasteful (you'll want the lab host again next quarter); leaving the agent running is the *opposite* of the rule — sandcat in memory means an open C2 path that any compromiser could re-use against you. The agent-removal-after rule is non-negotiable; mature programmes audit it as part of the M6.7 mistaken-IR-engagement recovery procedure too. Common failure: forgetting to audit persistence (e.g. an ability used T1547.001 to add a registry Run key; killing sandcat doesn't remove it — that's a separate cleanup).",
+        points=3,
+    )
+
     # ── Module 4 — Telemetry quality assessment ───────────────────────
     mod4 = _add_module(
         session, course, order=4,
@@ -21262,6 +21964,123 @@ Module 7 picks up: **Out-of-hours / off-shift validation** — testing the SOC's
         points=2,
     )
 
+    # Lesson 6.9 — LAB: Run a 3-host FIN6 chain (v0.13.2)
+    m6_lab = _add_lesson(
+        session, mod6, order=9,
+        title="LAB — Run a 3-host FIN6 chain via Caldera + measure response time",
+        lesson_type=LessonType.LAB, duration_min=40,
+        lab_target_url="http://caldera.local:8888",
+        content_md="""
+> **Hands-on lab.** Open your local Caldera server. Plan + run a 3-host chain. Document the timing.
+>
+> **Prerequisites.** L3 M1 + M3 + M5 + M6 readings. Caldera + sandcat agents on at least 3 test hosts.
+
+## Task
+
+The L3's longest-running practical lab. Plan + execute a multi-host chain, measure per-phase TTR + end-to-end chain time, populate the chain-level scorecard.
+
+1. **Pre-exercise checklist** (per M6.3):
+   - Per-host authorisations written for each test host.
+   - Pre-brief published in operational chats (L1 / L2 / IR).
+   - Abort contact named.
+   - Network-path approval (firewall / EDR allowlist for the exercise window).
+   - Snapshots taken on the impact target (M2.7 safety harness).
+
+2. **Deploy sandcat to 3 test hosts** with role-tagged groups:
+   - PT-LAB-04 → group `red-initial` (initial-access target).
+   - PT-LAB-05 → group `red-lateral` (privileged target).
+   - PT-LAB-06 → group `red-impact` (impact target — sandboxed encryption only).
+
+3. **Verify all 3 agents are alive** in the Caldera UI's *Agents* section.
+
+4. **Stand up the operation**:
+   - **Adversary**: pick a short FIN6 / FIN7-style chain — 4-6 abilities is plenty for a first lab. Use the `atomic`-bridged ART abilities for the chain phases (M2.6 cross-link to AEL plans).
+   - **Group**: comma-separated `red-initial,red-lateral,red-impact`.
+   - **Planner**: `look` (concurrent multi-agent fact-driven).
+   - **Obfuscator**: `plain-text` for first run.
+   - **Jitter**: `0,5`.
+   - **Auto-close**: enabled.
+
+5. **Run.** Open the operation's progress view + the SIEM in another tab.
+
+6. **For each phase** as it fires, record:
+   - Phase / technique.
+   - Atomic ran at (Caldera report timestamp).
+   - Alert fired at (SIEM timestamp).
+   - L1 ack at (the moment a SOC analyst — could be you on the lab — would have ack'd).
+   - Tier (1 = Tier-1 alert; 2 = logged-not-alerted; 3 = logged-not-parsed; 4 = not-logged).
+
+7. **End-to-end chain time** — Caldera's *operation report* gives this directly.
+
+8. **Compute the chain-vs-containment gap** (M6.5):
+   - If SOAR auto-isolate were configured, when would it fire (alert + SOAR SLA)?
+   - Compare to chain end time.
+   - Gap = chain time − containment time.
+   - Negative gap → actor reaches impact pre-response.
+
+9. **Populate the chain-level scorecard** (M6.6) with per-phase tiers, TTRs, primary-tactic, deferred TPs.
+
+10. **Clean up** all 3 agents (M3.3 + M6.7 — kill sandcat, remove binaries, verify, audit persistence, reboot).
+
+## What this practises
+
+- The full chain-emulation loop M6 sets up.
+- Per-phase TTR measurement against real SIEM data.
+- Containment-leverage analysis (M6.5).
+- The chain-level scorecard (M6.6).
+- Multi-host cleanup (M3.3 + M6.7).
+
+A first run typically takes 30-50 minutes; subsequent runs (after the chain plan is templated) drop to 15-25 minutes. The exercise teaches *response timing* in a way single-TTP exercises can't.
+
+## Verification
+
+Answer the 3 questions below based on your run.
+""",
+    )
+    _add_q(session, m6_lab, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="Your chain ran for **18 minutes** end-to-end. Initial-access alert fired at T+0:02 (2-min latency). The SOAR auto-isolate is configured to fire **5 min after alert** (per the SOC's stated SLA). Compute the **chain-vs-containment gap**. Format: `gap=<minutes>, contained_in_time=<yes/no>`.",
+        options=None,
+        correct=[
+            "gap=+11, contained_in_time=yes",
+            "gap=11, contained_in_time=yes",
+            "gap=+11 min, contained_in_time=yes",
+            "gap=11 min, contained_in_time=yes",
+            "gap = +11, contained = yes",
+            "gap=+11,contained_in_time=yes",
+        ],
+        explanation_md="**gap=+11, contained_in_time=yes.** Computing: containment time = T+0:02 (alert) + 5 min (SOAR SLA) = T+0:07. Chain end = T+0:18. Gap = T+0:18 − T+0:07 = **+11 min**. Positive gap = SOC contained pre-impact, with 11 minutes of margin. The chain-level finding: *Detection works AND response works; healthy posture for this chain*. Key insight: containment at *Initial Access* (the highest-leverage phase per M6.5) kills every downstream step, so even though the actor has 11 min of \"runway\", they don't reach impact. (M6.5 + M6.6 cross-link.)",
+        points=2,
+    )
+    _add_q(session, m6_lab, order=2, kind=QuestionKind.SINGLE,
+        stem_md="You're reporting the chain exercise's results to the CISO. Which **single sentence** captures the load-bearing finding most usefully?",
+        options=[
+            {"value": "tps", "label": "*\"We raised three TuningProposals from this chain — TP-201, TP-202, TP-203.\"*"},
+            {"value": "phases", "label": "*\"Seven of eight phases fired Tier-1 alerts within 7 minutes; one phase was a Tier-2 gap.\"*"},
+            {"value": "headline", "label": "*\"Detection works (alerts fire fast); response is the gap (containment fires 2 min after the chain completes). Highest-leverage fix: SOAR auto-isolate on initial-access alerts. Re-test next quarter.\"*"},
+            {"value": "list", "label": "*\"The chain ran for 25 min. Phase 1: T1078.004, Phase 2: T1059.001, Phase 3: T1547.001, Phase 4: T1003.001, ...\"*"},
+        ],
+        correct="headline",
+        explanation_md="The third option is the right headline (per M6.6 + M6.8 capstone). It captures the load-bearing finding (detection works, response is the gap), names the highest-leverage fix (SOAR auto-isolate), and commits to next-step (re-test next quarter). The TP list is detail without takeaway. The phase summary is metrics without interpretation. The phase-by-phase list is overwhelming detail; reporters lose CISOs in the second sentence. The L3's reflex: lead with the **finding + fix + next step**, not the data. The data lives in the scorecard; the headline is the reduction.",
+        points=2,
+    )
+    _add_q(session, m6_lab, order=3, kind=QuestionKind.MULTI,
+        stem_md="Pre-exercise, you completed which of these checklist items? (Pick all that apply per M6.3 — the multi-host chain pre-exercise discipline.)",
+        options=[
+            {"value": "per_host_auth", "label": "Per-host authorisation written for each of PT-LAB-04, -05, -06"},
+            {"value": "ciso_ir", "label": "CISO + IR Lead overall sign-off"},
+            {"value": "owner_signoff", "label": "Per-team owner sign-off (IT Ops / DBA / Cloud whichever applies)"},
+            {"value": "operational_chats", "label": "Pre-brief in *each* operational chat (L1 / L2 / IR / per-team owners / engineering)"},
+            {"value": "abort", "label": "Named abort contact (mobile + chat channel)"},
+            {"value": "network", "label": "Network-path approval / EDR allowlist for the exercise window"},
+            {"value": "snapshot", "label": "Snapshot on the impact target (high-blast-radius host)"},
+            {"value": "lunch", "label": "Lunch coordination"},
+            {"value": "skip_brief", "label": "Skip the pre-brief because OOH alerts already happen"},
+        ],
+        correct=["per_host_auth", "ciso_ir", "owner_signoff", "operational_chats", "abort", "network", "snapshot"],
+        explanation_md="The seven valid pre-exercise items: per-host auths, CISO + IR Lead sign-off, per-team owner sign-off, pre-brief in operational chats, abort contact, network-path approval, snapshot on the impact target. Each addresses a specific failure mode. Lunch coordination isn't a detection-engineering concern. Skipping the pre-brief is the *most-common cause* of mistaken-IR-engagement (M6.7) — never skip. The L3's reflex: 7-item checklist run, written-down, timestamped before exercise start; the chain-plan document references each item by id (auth-doc-refs, owner names, etc.).",
+        points=3,
+    )
+
     # ── Module 7 — Out-of-hours / off-shift validation ────────────────
     mod7 = _add_module(
         session, course, order=7,
@@ -22784,7 +23603,7 @@ The L3's next career step is up to them — IR specialism, detection engineering
         points=2,
     )
 
-    print(f"  L3: {course.title} — 8 modules, 64 lessons (Module 8 Capstone @ proper depth — L3 COMPLETE)")
+    print(f"  L3: {course.title} — 8 modules, 66 lessons (2 LAB lessons added v0.13.2; L3 COMPLETE)")
     return course
 
 

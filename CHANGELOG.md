@@ -1,5 +1,69 @@
 # Changelog
 
+## v0.13.2 (2026-04-29) — feature
+
+### Labs (foundational) — 8 hands-on labs across L1 / L2 / L3 + the missing /my-courses page
+
+The third post-curriculum backlog item lands. 8 LAB-type lessons added to the curriculum, each pointing at an ION URL with a written task description + 3-4 verification questions. Plus the missing `/my-courses` analyst dashboard that the nav has linked to since v0.11.x but that was never actually built.
+
+#### What's authored
+
+| # | Course | Module | Title | Target URL |
+|---|---|---|---|---|
+| 1 | L1 | M2 SIEM Fundamentals | Read your first alert | `/alerts` |
+| 2 | L1 | M5 IOC Handling | Tag and triage an observable | `/observables` |
+| 3 | L1 | M7 Escalation Workflow | Escalate via the runbook | `/cases?status=acknowledged` |
+| 4 | L2 | M2 KQL/EQL/ES&#124;QL | Hunt with KQL on Discover | `/discover` |
+| 5 | L2 | M5 Network telemetry | Hunt a beacon with ES&#124;QL CV | `/discover` |
+| 6 | L2 | M8 Hunt-to-Detection | Convert a hunt finding to TIDE rule | `/cyab/studio` |
+| 7 | L3 | M3 Caldera operations | Caldera operation end-to-end | `http://caldera.local:8888` |
+| 8 | L3 | M6 Multi-host chain | 3-host FIN6 chain via Caldera | `http://caldera.local:8888` |
+
+Each LAB lesson is a `Lesson` row with `lesson_type=LAB` + `lab_target_url`; verification questions attach via the existing `Question` model. Reuses the `LessonType.LAB` enum and `lab_target_url` column that have been on the model since v0.11.2 but went unused until now.
+
+#### Lesson totals after this ship
+
+| Course | Modules | Lessons (was → now) |
+|---|---|---|
+| L1 — Alert Triage Fundamentals | 8 | 59 → **62** (+3 labs) |
+| L2 — Threat Hunting with KQL | 8 | 64 → **67** (+3 labs) |
+| L3 — Adversary Emulation Basics | 8 | 64 → **66** (+2 labs) |
+| **Total** | **24** | **187 → 195** |
+
+#### `/my-courses` page — fixed
+
+The `/my-courses` route was referenced in the top-nav across `base.html` and `courses.html` since v0.11.x, but neither the page route nor the template existed. v0.13.2 fixes the gap:
+
+- New page route `GET /my-courses` in `course_api.py`.
+- New template `my_courses.html` rendering the user's enrolments with: aggregate stats (enrolled / completed / in-progress / avg-score), per-course rows with status badges, and direct **Download Certificate** buttons (cross-link to v0.13.0) on completed courses.
+
+#### LAB rendering already wired
+
+The `course_detail.html` and `lesson.html` templates already had LAB-distinct rendering wired (lab pill colour, "Hands-on lab" banner with link to `lab_target_url`, verification-quiz form). v0.13.2 contributes content; the UI surface was already live.
+
+#### Verifying the feature
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+docker exec ion python /app/seed_all.py --force
+```
+
+After re-seed:
+1. `/courses` → any of L1 / L2 / L3 → the course-detail page now lists LAB lessons (orange pill) alongside reading + quiz lessons.
+2. Open any LAB lesson — orange "🛠 Hands-on lab" banner with a link to the target URL; markdown task description; verification questions below.
+3. `/my-courses` now works — shows enrolled courses with completion status + cert download buttons.
+4. Complete a lab (mark its verification questions correct enough to pass `pass_threshold` on the lesson); the course's overall progress updates; if all lessons (including labs) are complete, completion fires + certificate becomes available.
+
+#### Why the foundational scope
+
+This is the "foundational" Labs scope per `_research_labs_design.md`. Subsequent ships:
+
+- **v0.13.3** — Lab fixtures: a new `lab_fixtures` table holding seed-data fixtures (mock alerts / cases / observables) that get inserted on lab launch and torn down on completion. Makes labs replayable with predictable content.
+- **v0.14.0** — Adaptive grading: an audit-log subscriber that watches the analyst's actions in ION (queries run, alerts triaged, cases closed) and grades against expected actions. Verification quizzes become reinforcement; primary score comes from the grading hooks.
+
+---
+
 ## v0.13.1 (2026-04-29) — feature
 
 ### Elastic Agent Skills consumer — Bob's 6th matcher tier

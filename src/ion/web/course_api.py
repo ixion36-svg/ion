@@ -1322,6 +1322,14 @@ def lesson_page(
     )
 
 
+# v0.13.2 — analyst's "My Courses" enrolment dashboard
+# (was referenced in nav since v0.11.x but the page route + template
+# were never built — fixing the gap as part of the labs ship)
+@router.get("/my-courses", response_class=HTMLResponse)
+def my_courses_page(request: Request, _user: User = Depends(require_page_auth)):
+    return _templates.TemplateResponse(request=request, name="my_courses.html")
+
+
 # v0.11.4 — admin authoring pages
 @router.get("/admin/courses", response_class=HTMLResponse)
 def admin_courses_page(request: Request, _user: User = Depends(require_page_auth)):
