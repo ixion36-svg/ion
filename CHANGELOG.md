@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.14.1 (2026-04-29) — polish
+
+### Wallboard restyle — ION design tokens, sparklines, donut
+
+The v0.14.0 wallboard shipped functional but with a generic palette. This pass brings it in line with `dashboard_v2.html` / `analytics.html` so the wall display reads as part of the same product.
+
+#### Visual changes
+
+- **Tailwind-token panels** — each panel now uses `rounded-[16px] border border-white/5 bg-ink-900/50` to match the dashboard cards. Big numbers move to `font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px]` with ION accent colours (`text-ion-cyan` / `iris` / `lime` / `amber` / `coral`) per panel.
+- **SVG sparklines** — Alerts panel gains a 24-hour hourly sparkline; Cases panel a 7-day closures sparkline; Bob panel a 7-day investigations sparkline. Hand-drawn SVG (no Chart.js dep), matching the pattern already used on `dashboard_v2`.
+- **Donut for CyAB readiness** — replaces the plain percentage with a 60×60 stroke-dasharray donut + numeric centre, coloured by score band.
+- **Distribution bars** with grid layout (`110px / 1fr / 44px`) and ION-coloured fills (`ion-coral` for critical/malicious, `ion-lime` for benign/healthy, `ion-amber` for warn/investigating, `ion-cyan` for closed).
+- **Service-health dots** — `bg-ion-lime` (up), `bg-slate-600` (off / not configured), `bg-ion-coral` with `wb-pulse-down` animation (down).
+- **Marquee ticker** — kept full-width, but now uses `wb-scroll 60s linear infinite` keyframes and ION accent colours per priority tier.
+- **CSS bundle** — page now loads `lucide.css` + `style.css` + `design-system.css` + `tailwind.css`, identical to the rest of the app, so token changes flow through automatically.
+
+#### Backend additions
+
+- `_collect_alerts` now emits `histogram_24h` (24 hourly buckets, last-24h) for the sparkline.
+- `_collect_cases` now emits `closures_history_7d` (7 daily buckets) for the sparkline.
+- `_collect_bob` now emits `history_7d` (7 daily buckets of investigations) for the sparkline.
+
+All three are derived from the same data already being aggregated; cost-neutral relative to v0.14.0.
+
+#### Verifying
+
+```bash
+docker compose pull ion
+docker compose up -d ion
+```
+
+Hit `/wallboard` and put it on a wall display. The histograms populate immediately on first refresh. `GET /api/wallboard/snapshot` now includes the three new arrays so external consumers (dashboards, Grafana plugins) can render their own charts.
+
+---
+
 ## v0.14.0 (2026-04-29) — feature
 
 ### Wallboard dashboard — full-screen ION snapshot for wall display

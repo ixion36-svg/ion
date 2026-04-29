@@ -73,7 +73,7 @@ def _safe(label: str, fn, *, default: Any = None) -> Any:
 
 
 def _collect_alerts(session: Session) -> Dict[str, Any]:
-    """Open / acked / closed counts; verdict distribution from the last 24h."""
+    """Open / acked / closed counts; verdict distribution + 24h hourly histogram."""
     from ion.models.alert_triage import AlertTriage, AlertTriageStatus
 
     by_status = {
@@ -98,10 +98,25 @@ def _collect_alerts(session: Session) -> Dict[str, Any]:
     ).all()
     verdict_distribution = {str(k): int(v) for k, v in rows if k}
 
+    # 24-hour hourly histogram for the sparkline. Build all 24 buckets so
+    # the renderer always gets a smooth line even on a quiet estate.
+    histogram_24h: List[Dict[str, Any]] = []
+    now = datetime.utcnow()
+    for i in range(23, -1, -1):
+        bucket_start = (now - timedelta(hours=i + 1)).replace(minute=0, second=0, microsecond=0)
+        bucket_end = bucket_start + timedelta(hours=1)
+        count = int(session.scalar(
+            select(func.count()).select_from(AlertTriage)
+            .where(AlertTriage.created_at >= bucket_start)
+            .where(AlertTriage.created_at < bucket_end)
+        ) or 0)
+        histogram_24h.append({"hour": bucket_start.isoformat(), "count": count})
+
     return {
         "by_status": by_status,
         "last_24h_total": last_24h_total,
         "verdict_distribution_7d": verdict_distribution,
+        "histogram_24h": histogram_24h,
     }
 
 
@@ -135,11 +150,25 @@ def _collect_cases(session: Session) -> Dict[str, Any]:
     closures_24h = {str(k): int(v) for k, v in rows if k}
     closures_24h_total = sum(closures_24h.values())
 
+    # 7-day daily histogram of closures for the sparkline.
+    history_7d: List[Dict[str, Any]] = []
+    now = datetime.utcnow()
+    for i in range(6, -1, -1):
+        bucket_start = (now - timedelta(days=i + 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        bucket_end = bucket_start + timedelta(days=1)
+        count = int(session.scalar(
+            select(func.count()).select_from(AlertCase)
+            .where(AlertCase.closed_at >= bucket_start)
+            .where(AlertCase.closed_at < bucket_end)
+        ) or 0)
+        history_7d.append({"day": bucket_start.isoformat(), "count": count})
+
     return {
         "by_status": by_status,
         "open_by_severity": open_by_severity,
         "closures_24h": closures_24h,
         "closures_24h_total": closures_24h_total,
+        "closures_history_7d": history_7d,
     }
 
 
@@ -178,12 +207,26 @@ def _collect_bob(session: Session) -> Dict[str, Any]:
         round(agreement_count * 100 / feedback_7d_total) if feedback_7d_total else None
     )
 
+    # 7-day daily histogram of Bob investigations.
+    history_7d: List[Dict[str, Any]] = []
+    now = datetime.utcnow()
+    for i in range(6, -1, -1):
+        bucket_start = (now - timedelta(days=i + 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        bucket_end = bucket_start + timedelta(days=1)
+        count = int(session.scalar(
+            select(func.count()).select_from(Investigation)
+            .where(Investigation.created_at >= bucket_start)
+            .where(Investigation.created_at < bucket_end)
+        ) or 0)
+        history_7d.append({"day": bucket_start.isoformat(), "count": count})
+
     return {
         "investigations_24h": investigations_24h,
         "investigations_total": investigations_total,
         "feedback_7d_total": feedback_7d_total,
         "agreement_pct": agreement_pct,
         "agreement_count": agreement_count,
+        "history_7d": history_7d,
     }
 
 

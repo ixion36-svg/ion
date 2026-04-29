@@ -5,441 +5,537 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wallboard · ION</title>
   <link rel="icon" type="image/png" href="/static/img/ion-favicon.png">
+  <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.28">
+  <link rel="stylesheet" href="/static/css/style.css?v=0.9.80-lightmode">
+  <link rel="stylesheet" href="/static/css/design-system.css?v=0.9.72">
+  <link rel="stylesheet" href="/static/css/tailwind.css?v=0.9.80-lightmode">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; background: #0a0e17; color: #e2e8f0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow: hidden; }
-    .wb-shell { display: grid; grid-template-rows: 60px 1fr 56px; height: 100vh; padding: 16px 16px 12px 16px; gap: 12px; }
-
-    /* Header */
-    .wb-head { display: flex; align-items: center; gap: 24px; padding: 0 8px; }
-    .wb-brand { display: flex; align-items: center; gap: 12px; }
-    .wb-brand-logo { width: 36px; height: 36px; border-radius: 8px;
-                     background: linear-gradient(135deg, #6de4ff 0%, #a78bfa 100%);
-                     display: flex; align-items: center; justify-content: center;
-                     font-family: ui-monospace, "SF Mono", Menlo, monospace;
-                     font-weight: 800; font-size: 18px; color: #0a0e17; }
-    .wb-brand-text { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-    .wb-brand-sub { font-size: 12px; color: #94a3b8; letter-spacing: 0.1em; text-transform: uppercase; }
-    .wb-head-meta { margin-left: auto; display: flex; align-items: center; gap: 24px; }
-    .wb-services { display: flex; gap: 14px; }
-    .wb-service { display: flex; align-items: center; gap: 6px; font-size: 11px; text-transform: uppercase;
-                  letter-spacing: 0.08em; color: #cbd5e1; font-weight: 600; }
-    .wb-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-    .wb-dot-up   { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.6); }
-    .wb-dot-off  { background: #475569; }
-    .wb-dot-down { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.6);
-                   animation: wb-pulse 2s infinite; }
+    html, body { height: 100%; margin: 0; padding: 0; background: #0a0e17; overflow: hidden; }
+    .wb-marquee { display: inline-flex; gap: 36px; white-space: nowrap;
+                  animation: wb-scroll 60s linear infinite; }
+    @keyframes wb-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    .wb-pulse-down { animation: wb-pulse 2s infinite; }
     @keyframes wb-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
-    .wb-clock { display: flex; flex-direction: column; align-items: flex-end; }
-    .wb-clock-time { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 24px; font-weight: 700; color: #e2e8f0; line-height: 1; }
-    .wb-clock-meta { font-size: 11px; color: #64748b; letter-spacing: 0.05em; margin-top: 4px; }
-
-    /* Body grid: 3 columns × 2 rows */
-    .wb-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 12px; min-height: 0; }
-
-    .wb-panel { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.08);
-                border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column;
-                min-height: 0; position: relative; overflow: hidden; }
-    .wb-panel-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
-    .wb-panel-title { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #94a3b8; }
-    .wb-panel-stamp { font-size: 11px; color: #475569; font-family: ui-monospace, "SF Mono", monospace; }
-    .wb-panel-error { font-size: 12px; color: #f87171; padding: 6px 10px; background: rgba(239,68,68,0.08);
-                      border-radius: 6px; margin-top: 8px; font-family: ui-monospace, monospace; }
-
-    /* Big numbers + supporting metric strip */
-    .wb-bignum { font-size: 64px; font-weight: 800; color: #ffffff; line-height: 1; letter-spacing: -0.03em;
-                 font-variant-numeric: tabular-nums; margin-bottom: 8px; }
-    .wb-bignum-sub { font-size: 13px; color: #94a3b8; font-weight: 500; }
-    .wb-bignum.cyan  { color: #6de4ff; }
-    .wb-bignum.iris  { color: #a78bfa; }
-    .wb-bignum.lime  { color: #84cc16; }
-    .wb-bignum.amber { color: #fbbf24; }
-    .wb-bignum.rose  { color: #fb7185; }
-
-    .wb-stack { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: auto; padding-top: 12px;
-                border-top: 1px solid rgba(255,255,255,0.06); }
-    .wb-stack-item { display: flex; flex-direction: column; gap: 2px; }
-    .wb-stack-num { font-size: 24px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-    .wb-stack-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
-
-    .wb-bars { display: flex; flex-direction: column; gap: 7px; margin-top: 8px; }
-    .wb-bar { display: grid; grid-template-columns: 100px 1fr 40px; gap: 10px; align-items: center; font-size: 12px; }
-    .wb-bar-label { color: #cbd5e1; font-weight: 500; text-transform: capitalize; }
-    .wb-bar-track { height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
-    .wb-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
-    .wb-bar-fill.severity-critical { background: #ef4444; }
-    .wb-bar-fill.severity-high     { background: #f97316; }
-    .wb-bar-fill.severity-medium   { background: #fbbf24; }
-    .wb-bar-fill.severity-low      { background: #6de4ff; }
-    .wb-bar-fill.verdict-true_positive       { background: #ef4444; }
-    .wb-bar-fill.verdict-false_positive      { background: #84cc16; }
-    .wb-bar-fill.verdict-benign_true_positive { background: #fbbf24; }
-    .wb-bar-fill.verdict-inconclusive        { background: #94a3b8; }
-    .wb-bar-fill { background: #6de4ff; }
-    .wb-bar-num { color: #e2e8f0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-
-    .wb-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
-    .wb-list-item { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 10px;
-                    background: rgba(255,255,255,0.025); border-radius: 6px; font-size: 12px; }
-    .wb-list-pill { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
-                    letter-spacing: 0.08em; text-transform: uppercase; }
-    .wb-list-pill.L1 { background: rgba(34,197,94,0.18); color: #86efac; }
-    .wb-list-pill.L2 { background: rgba(109,228,255,0.18); color: #6de4ff; }
-    .wb-list-pill.L3 { background: rgba(245,158,11,0.18); color: #fbbf24; }
-    .wb-list-pill.L4 { background: rgba(239,68,68,0.18); color: #fca5a5; }
-    .wb-list-title { color: #e2e8f0; font-weight: 500; }
-    .wb-list-num { color: #94a3b8; font-variant-numeric: tabular-nums; font-size: 11px; }
-
-    .wb-progress { margin-top: 10px; }
-    .wb-progress-track { height: 10px; background: rgba(255,255,255,0.06); border-radius: 5px; overflow: hidden; }
-    .wb-progress-fill { height: 100%; background: linear-gradient(90deg, #6de4ff, #a78bfa); transition: width 0.4s; }
-    .wb-progress-meta { display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-top: 6px; }
-
-    /* Ticker */
-    .wb-ticker { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
-                 padding: 0 16px; display: flex; align-items: center; gap: 18px; overflow: hidden; }
-    .wb-ticker-label { font-size: 11px; font-weight: 800; color: #fbbf24; letter-spacing: 0.12em; text-transform: uppercase;
-                       padding: 6px 10px; background: rgba(245,158,11,0.12); border-radius: 5px; flex-shrink: 0; }
-    .wb-ticker-track { flex: 1; overflow: hidden; }
-    .wb-ticker-content { display: inline-flex; gap: 36px; white-space: nowrap;
-                         animation: wb-ticker-scroll 60s linear infinite; }
-    @keyframes wb-ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-    .wb-ticker-item { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #cbd5e1; }
-    .wb-ticker-sev { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .wb-ticker-sev.critical { background: #ef4444; }
-    .wb-ticker-sev.high { background: #f97316; }
-    .wb-ticker-sev.medium { background: #fbbf24; }
-    .wb-ticker-sev.info { background: #6de4ff; }
-    .wb-ticker-empty { font-size: 12px; color: #64748b; font-style: italic; }
+    .wb-grid-bg {
+      background:
+        radial-gradient(ellipse at top right, rgba(109,228,255,0.04) 0%, transparent 60%),
+        radial-gradient(ellipse at bottom left, rgba(167,139,250,0.04) 0%, transparent 60%),
+        #0a0e17;
+    }
+    /* Hide scrollbars on the wall display */
+    ::-webkit-scrollbar { display: none; }
   </style>
 </head>
-<body>
-  <div class="wb-shell">
+<body class="ion-tw font-sans text-slate-200 wb-grid-bg overflow-hidden">
 
-    <!-- Header strip -->
-    <header class="wb-head">
-      <div class="wb-brand">
-        <div class="wb-brand-logo">I</div>
+  <div class="h-screen flex flex-col px-5 py-4 gap-4">
+
+    <!-- ═══════════════════ HEADER STRIP ═══════════════════ -->
+    <header class="flex items-center gap-6">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-[8px] bg-gradient-to-br from-ion-cyan to-ion-iris grid place-items-center">
+          <span class="font-mono text-[16px] font-bold text-ink-950">I</span>
+        </div>
         <div>
-          <div class="wb-brand-text">ION Wallboard</div>
-          <div class="wb-brand-sub">SOC Operations Snapshot</div>
+          <div class="font-sans font-semibold text-[20px] tracking-tight text-white leading-none">ION Wallboard</div>
+          <div class="label-tiny text-slate-500 mt-1">SOC Operations Snapshot</div>
         </div>
       </div>
-      <div class="wb-head-meta">
-        <div class="wb-services" id="wb-services">
-          <!-- service-health dots populated from snapshot -->
+
+      <div class="flex items-center gap-5 ml-auto">
+        <!-- Service health dots -->
+        <div id="wb-services" class="flex items-center gap-4">
+          <!-- populated from snapshot -->
         </div>
-        <div class="wb-clock">
-          <div class="wb-clock-time" id="wb-clock-time">--:--:--</div>
-          <div class="wb-clock-meta">Snapshot refreshed <span id="wb-cache-age">—</span></div>
+
+        <!-- Clock -->
+        <div class="text-right border-l border-white/10 pl-5">
+          <div id="wb-clock-time" class="font-mono font-bold text-[24px] text-white tabular-nums leading-none">--:--:--</div>
+          <div class="label-tiny text-slate-500 mt-1">Snapshot <span id="wb-cache-age" class="text-slate-400">—</span></div>
         </div>
       </div>
     </header>
 
-    <!-- 6-panel grid -->
-    <main class="wb-grid">
+    <!-- ═══════════════════ 6-PANEL GRID ═══════════════════ -->
+    <main class="flex-1 grid grid-cols-3 grid-rows-2 gap-4 min-h-0">
 
-      <!-- Panel 1: Alerts -->
-      <section class="wb-panel">
-        <div class="wb-panel-head">
-          <div class="wb-panel-title">Alerts</div>
-          <div class="wb-panel-stamp" id="wb-alerts-stamp">last 24h</div>
+      <!-- ┌─── PANEL 1: ALERTS ───┐ -->
+      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
+        <div class="flex items-baseline justify-between mb-3">
+          <span class="label-tiny text-slate-500">Alerts</span>
+          <span id="wb-alerts-stamp" class="label-tiny text-slate-600">last 24h</span>
         </div>
-        <div class="wb-bignum cyan" id="wb-alerts-24h">—</div>
-        <div class="wb-bignum-sub" id="wb-alerts-status">— open · — acknowledged · — closed</div>
-        <div class="wb-bars" id="wb-alerts-bars">
-          <!-- verdict distribution bars -->
+
+        <div class="flex items-end justify-between gap-4 mb-2">
+          <div id="wb-alerts-24h" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-ion-cyan">—</div>
+          <svg id="wb-alerts-spark" viewBox="0 0 160 50" preserveAspectRatio="none"
+               class="w-[160px] h-[50px] text-ion-cyan shrink-0" aria-hidden="true">
+            <defs>
+              <linearGradient id="wb-spark-cyan" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
+                <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path id="wb-alerts-spark-fill" fill="url(#wb-spark-cyan)" d=""/>
+            <path id="wb-alerts-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
+          </svg>
+        </div>
+        <div id="wb-alerts-status" class="text-[13px] text-slate-400 mb-3">— open · — ack · — closed</div>
+
+        <!-- Verdict distribution bars -->
+        <div id="wb-alerts-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-white/5">
+          <!-- bars populated from snapshot -->
         </div>
       </section>
 
-      <!-- Panel 2: Cases -->
-      <section class="wb-panel">
-        <div class="wb-panel-head">
-          <div class="wb-panel-title">Cases</div>
-          <div class="wb-panel-stamp" id="wb-cases-stamp">open right now</div>
+      <!-- ┌─── PANEL 2: CASES ───┐ -->
+      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
+        <div class="flex items-baseline justify-between mb-3">
+          <span class="label-tiny text-slate-500">Cases</span>
+          <span id="wb-cases-stamp" class="label-tiny text-slate-600">open right now</span>
         </div>
-        <div class="wb-bignum amber" id="wb-cases-open">—</div>
-        <div class="wb-bignum-sub" id="wb-cases-closures">— closures in last 24h</div>
-        <div class="wb-bars" id="wb-cases-bars">
-          <!-- severity bars -->
+
+        <div class="flex items-end justify-between gap-4 mb-2">
+          <div id="wb-cases-open" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-ion-amber">—</div>
+          <svg id="wb-cases-spark" viewBox="0 0 160 50" preserveAspectRatio="none"
+               class="w-[160px] h-[50px] text-ion-amber shrink-0" aria-hidden="true">
+            <defs>
+              <linearGradient id="wb-spark-amber" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
+                <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path id="wb-cases-spark-fill" fill="url(#wb-spark-amber)" d=""/>
+            <path id="wb-cases-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
+          </svg>
+        </div>
+        <div id="wb-cases-closures" class="text-[13px] text-slate-400 mb-3">— closures in last 24h</div>
+
+        <!-- Severity bars -->
+        <div id="wb-cases-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-white/5">
+          <!-- bars -->
         </div>
       </section>
 
-      <!-- Panel 3: Bob (AI analyst) -->
-      <section class="wb-panel">
-        <div class="wb-panel-head">
-          <div class="wb-panel-title">Bob — AI Analyst</div>
-          <div class="wb-panel-stamp" id="wb-bob-stamp">last 7d</div>
+      <!-- ┌─── PANEL 3: BOB (AI ANALYST) ───┐ -->
+      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
+        <div class="flex items-baseline justify-between mb-3">
+          <span class="label-tiny text-slate-500 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>
+            Bob — AI Analyst
+          </span>
+          <span id="wb-bob-stamp" class="label-tiny text-slate-600">last 7d</span>
         </div>
-        <div class="wb-bignum iris" id="wb-bob-investigations-24h">—</div>
-        <div class="wb-bignum-sub" id="wb-bob-total">— investigations total · — feedback rows</div>
-        <div class="wb-progress">
-          <div class="wb-progress-track"><div class="wb-progress-fill" id="wb-bob-agreement-fill" style="width:0%"></div></div>
-          <div class="wb-progress-meta">
-            <span>Analyst-Bob agreement</span>
-            <span id="wb-bob-agreement-num">— / —</span>
+
+        <div class="flex items-end justify-between gap-4 mb-2">
+          <div id="wb-bob-investigations-24h" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-ion-iris">—</div>
+          <svg id="wb-bob-spark" viewBox="0 0 160 50" preserveAspectRatio="none"
+               class="w-[160px] h-[50px] text-ion-iris shrink-0" aria-hidden="true">
+            <defs>
+              <linearGradient id="wb-spark-iris" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
+                <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path id="wb-bob-spark-fill" fill="url(#wb-spark-iris)" d=""/>
+            <path id="wb-bob-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
+          </svg>
+        </div>
+        <div id="wb-bob-total" class="text-[13px] text-slate-400 mb-3">— investigations · — feedback rows</div>
+
+        <div class="mt-auto pt-3 border-t border-white/5">
+          <div class="flex items-baseline justify-between mb-2">
+            <span class="label-tiny text-slate-500">Analyst-Bob agreement</span>
+            <span id="wb-bob-agreement-num" class="text-[12px] text-slate-300 tabular-nums">— / —</span>
+          </div>
+          <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+            <div id="wb-bob-agreement-fill" class="h-full rounded-full bg-gradient-to-r from-ion-iris to-ion-cyan transition-[width] duration-700" style="width:0%"></div>
           </div>
         </div>
       </section>
 
-      <!-- Panel 4: Detection coverage -->
-      <section class="wb-panel">
-        <div class="wb-panel-head">
-          <div class="wb-panel-title">Detection</div>
-          <div class="wb-panel-stamp" id="wb-detection-stamp">posture</div>
+      <!-- ┌─── PANEL 4: DETECTION ───┐ -->
+      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
+        <div class="flex items-baseline justify-between mb-3">
+          <span class="label-tiny text-slate-500">Detection</span>
+          <span class="label-tiny text-slate-600">posture</span>
         </div>
-        <div class="wb-bignum lime" id="wb-detection-templates">—</div>
-        <div class="wb-bignum-sub">alert-prompt templates</div>
-        <div class="wb-stack" id="wb-detection-stack">
-          <!-- TIDE healthy / total + AlertPrompt / etc -->
-        </div>
-      </section>
 
-      <!-- Panel 5: CYAB Onboarding -->
-      <section class="wb-panel">
-        <div class="wb-panel-head">
-          <div class="wb-panel-title">CyAB Onboarding</div>
-          <div class="wb-panel-stamp" id="wb-cyab-stamp">all systems</div>
+        <div class="flex items-end justify-between gap-4 mb-2">
+          <div id="wb-detection-templates" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-ion-lime">—</div>
+          <div class="text-right">
+            <div class="label-tiny text-slate-500">prompt templates</div>
+            <div class="text-[11px] text-slate-600 mt-1">5-tier matcher</div>
+          </div>
         </div>
-        <div class="wb-bignum" id="wb-cyab-systems">—</div>
-        <div class="wb-bignum-sub" id="wb-cyab-readiness">avg readiness — %</div>
-        <div class="wb-progress">
-          <div class="wb-progress-track"><div class="wb-progress-fill" id="wb-cyab-subprofile-fill" style="width:0%"></div></div>
-          <div class="wb-progress-meta">
-            <span>Sub-profile assignment</span>
-            <span id="wb-cyab-subprofile-num">— / —</span>
+
+        <div class="grid grid-cols-3 gap-3 mt-auto pt-3 border-t border-white/5">
+          <div>
+            <div id="wb-detection-tide-healthy" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-lime">—</div>
+            <div class="label-tiny text-slate-500 mt-1.5">TIDE healthy</div>
+          </div>
+          <div>
+            <div id="wb-detection-tide-total" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-white">—</div>
+            <div class="label-tiny text-slate-500 mt-1.5">TIDE total</div>
+          </div>
+          <div>
+            <div id="wb-detection-tide-errors" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-coral">—</div>
+            <div class="label-tiny text-slate-500 mt-1.5">errors</div>
           </div>
         </div>
       </section>
 
-      <!-- Panel 6: Curriculum -->
-      <section class="wb-panel">
-        <div class="wb-panel-head">
-          <div class="wb-panel-title">Curriculum</div>
-          <div class="wb-panel-stamp" id="wb-curr-stamp">all enrolments</div>
+      <!-- ┌─── PANEL 5: CYAB ───┐ -->
+      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
+        <div class="flex items-baseline justify-between mb-3">
+          <span class="label-tiny text-slate-500">CyAB Onboarding</span>
+          <span class="label-tiny text-slate-600">all systems</span>
         </div>
-        <div class="wb-bignum cyan" id="wb-curr-completed">—</div>
-        <div class="wb-bignum-sub" id="wb-curr-totals">— enrolments · — certificates issued</div>
-        <div class="wb-list" id="wb-curr-top">
-          <!-- top 3 enrolled courses -->
+
+        <div class="flex items-end justify-between gap-4 mb-3">
+          <div id="wb-cyab-systems" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-white">—</div>
+          <!-- Donut for avg readiness -->
+          <svg id="wb-cyab-donut" viewBox="0 0 60 60" class="w-[60px] h-[60px] shrink-0" aria-hidden="true">
+            <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6"/>
+            <circle id="wb-cyab-donut-arc" cx="30" cy="30" r="24" fill="none" stroke="currentColor" class="text-ion-cyan"
+                    stroke-width="6" stroke-linecap="round" stroke-dasharray="0 150.8" transform="rotate(-90 30 30)"/>
+            <text id="wb-cyab-donut-label" x="30" y="33" text-anchor="middle"
+                  class="fill-white" style="font-size: 13px; font-weight: 700;" font-family="ui-monospace, monospace">—</text>
+          </svg>
+        </div>
+        <div id="wb-cyab-readiness" class="text-[13px] text-slate-400 mb-3">avg readiness — %</div>
+
+        <div class="mt-auto pt-3 border-t border-white/5">
+          <div class="flex items-baseline justify-between mb-2">
+            <span class="label-tiny text-slate-500">Sub-profile assignment</span>
+            <span id="wb-cyab-subprofile-num" class="text-[12px] text-slate-300 tabular-nums">— / —</span>
+          </div>
+          <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
+            <div id="wb-cyab-subprofile-fill" class="h-full rounded-full bg-gradient-to-r from-ion-cyan to-ion-lime transition-[width] duration-700" style="width:0%"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ┌─── PANEL 6: CURRICULUM ───┐ -->
+      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
+        <div class="flex items-baseline justify-between mb-3">
+          <span class="label-tiny text-slate-500">Curriculum</span>
+          <span class="label-tiny text-slate-600">all enrolments</span>
+        </div>
+
+        <div class="flex items-end justify-between gap-4 mb-2">
+          <div id="wb-curr-completed" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-ion-cyan">—</div>
+          <div class="text-right">
+            <div class="label-tiny text-slate-500">completions</div>
+            <div id="wb-curr-cert-count" class="text-[11px] text-slate-400 mt-1 tabular-nums">— certs issued</div>
+          </div>
+        </div>
+        <div id="wb-curr-totals" class="text-[13px] text-slate-400 mb-3">— enrolments</div>
+
+        <!-- Top 3 enrolled courses -->
+        <div id="wb-curr-top" class="space-y-1.5 mt-auto pt-3 border-t border-white/5">
+          <!-- top courses -->
         </div>
       </section>
 
     </main>
 
-    <!-- Ticker strip -->
-    <footer class="wb-ticker">
-      <div class="wb-ticker-label">⚡ Ticker</div>
-      <div class="wb-ticker-track">
-        <div class="wb-ticker-content" id="wb-ticker-content">
-          <span class="wb-ticker-empty">No active ticker entries</span>
+    <!-- ═══════════════════ TICKER STRIP ═══════════════════ -->
+    <footer class="rounded-[16px] border border-white/5 bg-ink-900/50 h-[56px] flex items-center gap-4 px-5 overflow-hidden">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-ion-amber/10 text-ion-amber shrink-0">
+        <svg class="w-3.5 h-3.5"><use href="#i-zap"/></svg>
+        <span class="label-tiny font-bold">Ticker</span>
+      </div>
+      <div class="flex-1 overflow-hidden">
+        <div id="wb-ticker-content" class="wb-marquee">
+          <span class="text-[13px] text-slate-500 italic">No active ticker entries</span>
         </div>
       </div>
     </footer>
 
   </div>
 
+  <!-- Embed Lucide icon sprite (subset used here) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+  </svg>
+
 <script>
-const REFRESH_MS = 5 * 60 * 1000;  // 5 minutes — matches the server-side TTL
+const REFRESH_MS = 5 * 60 * 1000;  // matches the server-side TTL
 
-const SERVICES = ['postgres', 'elasticsearch', 'kibana', 'tide', 'opencti', 'ollama', 'bob'];
+const SERVICES = [
+  { key: 'postgres',      label: 'Postgres' },
+  { key: 'elasticsearch', label: 'ES' },
+  { key: 'kibana',        label: 'Kibana' },
+  { key: 'tide',          label: 'TIDE' },
+  { key: 'opencti',       label: 'OpenCTI' },
+  { key: 'ollama',        label: 'Ollama' },
+  { key: 'bob',           label: 'Bob' },
+];
 
-function el(id){ return document.getElementById(id); }
-function escHtml(s){
-  if(s == null) return '';
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
-}
-function fmtN(n){
-  if(n == null || isNaN(n)) return '—';
-  if(n >= 1000) return (n/1000).toFixed(1).replace(/\.0$/, '') + 'k';
+const $ = (id) => document.getElementById(id);
+const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtN = (n) => {
+  if (n == null || isNaN(n)) return '—';
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
   return String(n);
-}
+};
+const fmtAge = (s) => {
+  if (s == null || s < 0) return 'just now';
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.round(s / 60) + 'm ago';
+  return Math.round(s / 3600) + 'h ago';
+};
 
-function tickClock(){
+// ── Clock (UTC, 1Hz) ─────────────────────────────────────────
+function tickClock() {
   const d = new Date();
-  const t = d.toTimeString().split(' ')[0];
-  const ts = el('wb-clock-time');
-  if(ts) ts.textContent = t;
+  const t = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}:${String(d.getUTCSeconds()).padStart(2, '0')}`;
+  $('wb-clock-time').textContent = t;
 }
-setInterval(tickClock, 1000);
-tickClock();
+setInterval(tickClock, 1000); tickClock();
 
-function renderServices(health){
-  const wrap = el('wb-services');
+// ── SVG sparkline drawer ─────────────────────────────────────
+//
+// Mirrors dashboard_v2.html's renderSparkline pattern: build line + fill
+// paths from a histogram of {count} buckets. If ≤ 1 bucket, hide.
+function drawSparkline(svgId, fillId, lineId, buckets) {
+  const svg  = $(svgId);
+  const fill = $(fillId);
+  const line = $(lineId);
+  if (!svg || !fill || !line) return;
+
+  if (!Array.isArray(buckets) || buckets.length < 2) {
+    svg.style.display = 'none';
+    return;
+  }
+  svg.style.display = '';
+
+  const W = 160, H = 50, PAD = 2;
+  const n = buckets.length;
+  const max = Math.max(1, ...buckets.map(b => b.count || 0));
+  const stepX = (W - PAD * 2) / (n - 1);
+  const pts = buckets.map((b, i) => {
+    const x = PAD + i * stepX;
+    const y = H - PAD - ((b.count || 0) / max) * (H - PAD * 2 - 4);
+    return [x, y];
+  });
+  const linePath = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const fillPath = `${linePath} L${(W - PAD).toFixed(1)},${H} L${PAD.toFixed(1)},${H} Z`;
+  line.setAttribute('d', linePath);
+  fill.setAttribute('d', fillPath);
+}
+
+// ── Donut renderer (single-value circular gauge) ─────────────
+function drawDonut(arcId, labelId, value, max) {
+  const arc = $(arcId);
+  const label = $(labelId);
+  if (!arc) return;
+  const pct = Math.max(0, Math.min(100, max > 0 ? (value / max) * 100 : 0));
+  const r = 24;
+  const circ = 2 * Math.PI * r;  // ≈ 150.8
+  const filled = (pct / 100) * circ;
+  arc.setAttribute('stroke-dasharray', `${filled.toFixed(1)} ${circ.toFixed(1)}`);
+  if (label) label.textContent = `${Math.round(pct)}%`;
+}
+
+// ── Service-health dots ──────────────────────────────────────
+function renderServices(health) {
+  const wrap = $('wb-services');
   wrap.innerHTML = '';
-  SERVICES.forEach(name => {
-    const s = (health || {})[name];
+  SERVICES.forEach(({ key, label }) => {
+    const s = (health || {})[key];
     const status = (s && s.status) || 'off';
-    const cls = status === 'up' ? 'wb-dot-up' : (status === 'down' ? 'wb-dot-down' : 'wb-dot-off');
+    const dotCls = status === 'up'
+      ? 'bg-ion-lime shadow-[0_0_8px_rgba(132,204,22,0.6)]'
+      : status === 'down'
+        ? 'bg-ion-coral shadow-[0_0_8px_rgba(251,113,133,0.6)] wb-pulse-down'
+        : 'bg-slate-600';
     const div = document.createElement('div');
-    div.className = 'wb-service';
+    div.className = 'flex items-center gap-1.5';
     div.title = (s && s.details) || status;
-    div.innerHTML = '<span class="wb-dot ' + cls + '"></span>' + escHtml(name);
+    div.innerHTML = `<span class="h-1.5 w-1.5 rounded-full ${dotCls}"></span>
+                     <span class="label-tiny text-slate-400">${escHtml(label)}</span>`;
     wrap.appendChild(div);
   });
 }
 
-function renderAlerts(a){
-  if(a.error){ renderError('wb-alerts-bars', a.error); return; }
-  const total = a.last_24h_total || 0;
-  el('wb-alerts-24h').textContent = fmtN(total);
-  const open = (a.by_status && a.by_status.OPEN) || (a.by_status && a.by_status.open) || 0;
-  const ack  = (a.by_status && a.by_status.ACKNOWLEDGED) || (a.by_status && a.by_status.acknowledged) || 0;
-  const closed = (a.by_status && a.by_status.CLOSED) || (a.by_status && a.by_status.closed) || 0;
-  el('wb-alerts-status').textContent = `${fmtN(open)} open · ${fmtN(ack)} acknowledged · ${fmtN(closed)} closed`;
+// ── Renderers ────────────────────────────────────────────────
+function renderAlerts(a) {
+  if (a.error) { $('wb-alerts-24h').textContent = '—'; return; }
+  $('wb-alerts-24h').textContent = fmtN(a.last_24h_total || 0);
+  const open = (a.by_status && (a.by_status.OPEN || a.by_status.open)) || 0;
+  const ack  = (a.by_status && (a.by_status.ACKNOWLEDGED || a.by_status.acknowledged)) || 0;
+  const closed = (a.by_status && (a.by_status.CLOSED || a.by_status.closed)) || 0;
+  $('wb-alerts-status').innerHTML =
+    `<span class="text-ion-coral font-semibold">${fmtN(open)}</span> open · ` +
+    `<span class="text-ion-amber font-semibold">${fmtN(ack)}</span> ack · ` +
+    `<span class="text-slate-300">${fmtN(closed)}</span> closed`;
+
+  drawSparkline('wb-alerts-spark', 'wb-alerts-spark-fill', 'wb-alerts-spark-line', a.histogram_24h || []);
 
   // Verdict distribution bars
   const dist = a.verdict_distribution_7d || {};
+  const order = [
+    { key: 'true_positive', label: 'true positive', cls: 'bg-ion-coral' },
+    { key: 'false_positive', label: 'false positive', cls: 'bg-ion-lime' },
+    { key: 'benign_true_positive', label: 'benign TP', cls: 'bg-ion-amber' },
+    { key: 'inconclusive', label: 'inconclusive', cls: 'bg-slate-500' },
+  ];
   const max = Math.max(1, ...Object.values(dist));
-  const order = ['true_positive', 'false_positive', 'benign_true_positive', 'inconclusive'];
-  const bars = el('wb-alerts-bars');
+  const bars = $('wb-alerts-bars');
   bars.innerHTML = '';
-  let any = false;
-  order.forEach(k => {
-    const v = dist[k] || 0;
-    if(!v && Object.keys(dist).length === 0) return;
-    any = true;
-    const pct = Math.round(v * 100 / max);
-    const div = document.createElement('div');
-    div.className = 'wb-bar';
-    div.innerHTML = `
-      <div class="wb-bar-label">${escHtml(k.replace(/_/g, ' '))}</div>
-      <div class="wb-bar-track"><div class="wb-bar-fill verdict-${escHtml(k)}" style="width:${pct}%"></div></div>
-      <div class="wb-bar-num">${fmtN(v)}</div>`;
-    bars.appendChild(div);
-  });
-  if(!any){
-    bars.innerHTML = '<div class="wb-bignum-sub" style="margin-top:8px;">No verdicts captured in the last 7d.</div>';
+  if (Object.keys(dist).length === 0) {
+    bars.innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No verdicts captured in the last 7d.</div>';
+    return;
   }
+  order.forEach(({ key, label, cls }) => {
+    const v = dist[key] || 0;
+    const pct = Math.round((v / max) * 100);
+    const row = document.createElement('div');
+    row.className = 'grid grid-cols-[110px_1fr_44px] gap-2.5 items-center text-[12px]';
+    row.innerHTML = `
+      <div class="text-slate-400 capitalize">${escHtml(label)}</div>
+      <div class="h-1.5 rounded-full bg-white/5 overflow-hidden">
+        <div class="${cls} h-full rounded-full transition-[width] duration-700" style="width:${pct}%"></div>
+      </div>
+      <div class="text-right text-slate-200 tabular-nums font-semibold">${fmtN(v)}</div>`;
+    bars.appendChild(row);
+  });
 }
 
-function renderCases(c){
-  if(c.error){ renderError('wb-cases-bars', c.error); return; }
+function renderCases(c) {
+  if (c.error) { $('wb-cases-open').textContent = '—'; return; }
   const open = (c.by_status && (c.by_status.OPEN || c.by_status.open)) || 0;
   const ack  = (c.by_status && (c.by_status.ACKNOWLEDGED || c.by_status.acknowledged)) || 0;
-  el('wb-cases-open').textContent = fmtN(open + ack);
-  el('wb-cases-closures').textContent = `${fmtN(c.closures_24h_total || 0)} closures in last 24h`;
+  $('wb-cases-open').textContent = fmtN(open + ack);
+  $('wb-cases-closures').innerHTML =
+    `<span class="text-ion-lime font-semibold">${fmtN(c.closures_24h_total || 0)}</span> closures in last 24h`;
+
+  drawSparkline('wb-cases-spark', 'wb-cases-spark-fill', 'wb-cases-spark-line', c.closures_history_7d || []);
 
   // Severity bars
   const sev = c.open_by_severity || {};
+  const order = [
+    { key: 'critical', cls: 'bg-ion-coral' },
+    { key: 'high',     cls: 'bg-ion-amber' },
+    { key: 'medium',   cls: 'bg-ion-cyan' },
+    { key: 'low',      cls: 'bg-slate-500' },
+  ];
   const max = Math.max(1, ...Object.values(sev));
-  const order = ['critical', 'high', 'medium', 'low'];
-  const bars = el('wb-cases-bars');
+  const bars = $('wb-cases-bars');
   bars.innerHTML = '';
-  let any = false;
-  order.forEach(k => {
-    const v = sev[k] || 0;
-    if(!v && Object.keys(sev).length === 0) return;
-    any = true;
-    const pct = Math.round(v * 100 / max);
-    const div = document.createElement('div');
-    div.className = 'wb-bar';
-    div.innerHTML = `
-      <div class="wb-bar-label">${escHtml(k)}</div>
-      <div class="wb-bar-track"><div class="wb-bar-fill severity-${escHtml(k)}" style="width:${pct}%"></div></div>
-      <div class="wb-bar-num">${fmtN(v)}</div>`;
-    bars.appendChild(div);
-  });
-  if(!any){
-    bars.innerHTML = '<div class="wb-bignum-sub" style="margin-top:8px;">No open cases right now.</div>';
+  if (Object.keys(sev).length === 0) {
+    bars.innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No open cases right now.</div>';
+    return;
   }
+  order.forEach(({ key, cls }) => {
+    const v = sev[key] || 0;
+    const pct = Math.round((v / max) * 100);
+    const row = document.createElement('div');
+    row.className = 'grid grid-cols-[110px_1fr_44px] gap-2.5 items-center text-[12px]';
+    row.innerHTML = `
+      <div class="text-slate-400 capitalize">${escHtml(key)}</div>
+      <div class="h-1.5 rounded-full bg-white/5 overflow-hidden">
+        <div class="${cls} h-full rounded-full transition-[width] duration-700" style="width:${pct}%"></div>
+      </div>
+      <div class="text-right text-slate-200 tabular-nums font-semibold">${fmtN(v)}</div>`;
+    bars.appendChild(row);
+  });
 }
 
-function renderBob(b){
-  if(b.error){ renderError('wb-bob-investigations-24h', b.error); return; }
-  el('wb-bob-investigations-24h').textContent = fmtN(b.investigations_24h || 0);
-  el('wb-bob-total').textContent = `${fmtN(b.investigations_total || 0)} investigations total · ${fmtN(b.feedback_7d_total || 0)} feedback rows`;
+function renderBob(b) {
+  if (b.error) { $('wb-bob-investigations-24h').textContent = '—'; return; }
+  $('wb-bob-investigations-24h').textContent = fmtN(b.investigations_24h || 0);
+  $('wb-bob-total').innerHTML =
+    `<span class="text-slate-300 tabular-nums">${fmtN(b.investigations_total || 0)}</span> investigations · ` +
+    `<span class="text-slate-300 tabular-nums">${fmtN(b.feedback_7d_total || 0)}</span> feedback rows`;
+
+  drawSparkline('wb-bob-spark', 'wb-bob-spark-fill', 'wb-bob-spark-line', b.history_7d || []);
+
   const pct = b.agreement_pct != null ? b.agreement_pct : 0;
-  el('wb-bob-agreement-fill').style.width = pct + '%';
-  el('wb-bob-agreement-num').textContent = b.agreement_pct != null
-    ? `${b.agreement_count || 0} of ${b.feedback_7d_total || 0} (${pct}%)`
+  $('wb-bob-agreement-fill').style.width = pct + '%';
+  $('wb-bob-agreement-num').textContent = b.agreement_pct != null
+    ? `${b.agreement_count || 0} / ${b.feedback_7d_total || 0} (${pct}%)`
     : '— / —';
 }
 
-function renderDetection(d){
-  if(d.error){ renderError('wb-detection-templates', d.error); return; }
-  el('wb-detection-templates').textContent = fmtN(d.alert_prompt_template_count || 0);
-  const stack = el('wb-detection-stack');
-  stack.innerHTML = '';
-  const items = [
-    { num: d.tide_healthy_count || 0,        label: 'TIDE healthy', cls: 'lime' },
-    { num: d.tide_total_count || 0,          label: 'TIDE total',   cls: '' },
-    { num: (d.tide_total_count || 0) - (d.tide_healthy_count || 0), label: 'TIDE errors', cls: 'rose' },
-  ];
-  items.forEach(i => {
-    const div = document.createElement('div');
-    div.className = 'wb-stack-item';
-    div.innerHTML = `<div class="wb-stack-num ${i.cls ? 'wb-bignum ' + i.cls : ''}" style="font-size:24px;line-height:1;">${fmtN(i.num)}</div>
-                     <div class="wb-stack-label">${escHtml(i.label)}</div>`;
-    stack.appendChild(div);
-  });
+function renderDetection(d) {
+  if (d.error) { $('wb-detection-templates').textContent = '—'; return; }
+  $('wb-detection-templates').textContent = fmtN(d.alert_prompt_template_count || 0);
+  $('wb-detection-tide-healthy').textContent = fmtN(d.tide_healthy_count || 0);
+  $('wb-detection-tide-total').textContent = fmtN(d.tide_total_count || 0);
+  $('wb-detection-tide-errors').textContent = fmtN((d.tide_total_count || 0) - (d.tide_healthy_count || 0));
 }
 
-function renderCyab(c){
-  if(c.error){ renderError('wb-cyab-systems', c.error); return; }
-  el('wb-cyab-systems').textContent = fmtN(c.system_count || 0);
-  el('wb-cyab-readiness').textContent = `avg readiness ${c.avg_readiness_score != null ? c.avg_readiness_score : '—'}%`;
+function renderCyab(c) {
+  if (c.error) { $('wb-cyab-systems').textContent = '—'; return; }
+  $('wb-cyab-systems').textContent = fmtN(c.system_count || 0);
+  $('wb-cyab-readiness').innerHTML =
+    `avg readiness <span class="text-ion-cyan tabular-nums font-semibold">${c.avg_readiness_score != null ? c.avg_readiness_score : '—'}%</span>`;
+
+  // Donut: avg readiness as a percentage gauge
+  drawDonut('wb-cyab-donut-arc', 'wb-cyab-donut-label', c.avg_readiness_score || 0, 100);
+
   const pct = c.subprofile_assignment_pct || 0;
-  el('wb-cyab-subprofile-fill').style.width = pct + '%';
-  el('wb-cyab-subprofile-num').textContent = `${c.data_source_with_subprofile || 0} / ${c.data_source_total || 0} (${pct}%)`;
+  $('wb-cyab-subprofile-fill').style.width = pct + '%';
+  $('wb-cyab-subprofile-num').textContent =
+    `${c.data_source_with_subprofile || 0} / ${c.data_source_total || 0} (${pct}%)`;
 }
 
-function renderCurriculum(c){
-  if(c.error){ renderError('wb-curr-completed', c.error); return; }
-  el('wb-curr-completed').textContent = fmtN(c.completion_total || 0);
-  el('wb-curr-totals').textContent = `${fmtN(c.enrolment_total || 0)} enrolments · ${fmtN(c.cert_issued_count || 0)} certificates issued`;
-  const top = el('wb-curr-top');
+function renderCurriculum(c) {
+  if (c.error) { $('wb-curr-completed').textContent = '—'; return; }
+  $('wb-curr-completed').textContent = fmtN(c.completion_total || 0);
+  $('wb-curr-totals').innerHTML =
+    `<span class="text-slate-300 tabular-nums">${fmtN(c.enrolment_total || 0)}</span> enrolments`;
+  $('wb-curr-cert-count').textContent = `${fmtN(c.cert_issued_count || 0)} certs issued`;
+
+  const top = $('wb-curr-top');
   top.innerHTML = '';
+  const PILL_BG = { L1: 'bg-ion-lime/15 text-ion-lime', L2: 'bg-ion-cyan/15 text-ion-cyan', L3: 'bg-ion-amber/15 text-ion-amber', L4: 'bg-ion-coral/15 text-ion-coral' };
   (c.top_courses || []).slice(0, 3).forEach(t => {
-    const div = document.createElement('div');
-    div.className = 'wb-list-item';
     const lvl = String(t.level || '').replace('CourseLevel.', '');
-    div.innerHTML = `
-      <span class="wb-list-pill ${escHtml(lvl)}">${escHtml(lvl)}</span>
-      <div class="wb-list-title">${escHtml(t.title)}</div>
-      <div class="wb-list-num">${fmtN(t.enrolments || 0)} enrolled</div>`;
-    top.appendChild(div);
+    const pill = PILL_BG[lvl] || 'bg-slate-700/40 text-slate-300';
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2.5 py-1';
+    row.innerHTML = `
+      <span class="${pill} text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">${escHtml(lvl)}</span>
+      <div class="flex-1 text-[12.5px] text-slate-200 truncate">${escHtml(t.title)}</div>
+      <div class="text-[11px] text-slate-500 tabular-nums shrink-0">${fmtN(t.enrolments || 0)}</div>`;
+    top.appendChild(row);
   });
-  if(!(c.top_courses && c.top_courses.length)){
-    top.innerHTML = '<div class="wb-bignum-sub" style="margin-top:8px;">No enrolments yet.</div>';
+  if (!(c.top_courses && c.top_courses.length)) {
+    top.innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No enrolments yet.</div>';
   }
 }
 
-function renderTicker(t){
-  const wrap = el('wb-ticker-content');
-  if(!t || !t.items || !t.items.length){
-    wrap.innerHTML = '<span class="wb-ticker-empty">No active ticker entries</span>';
+function renderTicker(t) {
+  const wrap = $('wb-ticker-content');
+  if (!t || !t.items || !t.items.length) {
+    wrap.innerHTML = '<span class="text-[13px] text-slate-500 italic">No active ticker entries</span>';
     wrap.style.animation = 'none';
     return;
   }
-  // Duplicate the items for the marquee loop
-  const items = t.items.concat(t.items);
-  wrap.innerHTML = items.map(i => `
-    <span class="wb-ticker-item">
-      <span class="wb-ticker-sev ${escHtml(String(i.severity || 'info').toLowerCase())}"></span>
-      <strong>${escHtml(i.title || '(untitled)')}</strong>
-      ${i.body ? '<span style="color:#94a3b8;">&mdash; ' + escHtml(i.body.substring(0, 140)) + '</span>' : ''}
-    </span>`).join('');
-  wrap.style.animation = 'wb-ticker-scroll 60s linear infinite';
+  const SEV_DOT = { critical: 'bg-ion-coral', high: 'bg-ion-amber', medium: 'bg-ion-cyan', info: 'bg-slate-500' };
+  const items = t.items.concat(t.items);  // duplicate for marquee loop
+  wrap.innerHTML = items.map(i => {
+    const dot = SEV_DOT[String(i.severity || 'info').toLowerCase()] || 'bg-slate-500';
+    return `<span class="inline-flex items-center gap-2 text-[13px]">
+              <span class="h-2 w-2 rounded-full ${dot} shrink-0"></span>
+              <strong class="text-white">${escHtml(i.title || '(untitled)')}</strong>
+              ${i.body ? `<span class="text-slate-400">— ${escHtml(i.body.substring(0, 140))}</span>` : ''}
+            </span>`;
+  }).join('');
+  wrap.style.animation = 'wb-scroll 60s linear infinite';
 }
 
-function renderError(targetId, msg){
-  const target = el(targetId);
-  if(target){ target.textContent = '—'; }
-  console.warn('Wallboard panel error:', targetId, msg);
-}
-
-function fmtAge(seconds){
-  if(seconds == null || seconds < 0) return 'just now';
-  if(seconds < 60) return seconds + 's ago';
-  if(seconds < 3600) return Math.round(seconds / 60) + 'm ago';
-  return Math.round(seconds / 3600) + 'h ago';
-}
-
-async function refresh(){
+// ── Refresh loop ─────────────────────────────────────────────
+async function refresh() {
   try {
     const r = await fetch('/api/wallboard/snapshot', { credentials: 'include' });
-    if(!r.ok){
+    if (!r.ok) {
       console.warn('snapshot fetch failed', r.status);
       return;
     }
@@ -452,8 +548,8 @@ async function refresh(){
     renderCyab(s.cyab || {});
     renderCurriculum(s.curriculum || {});
     renderTicker(s.ticker || {});
-    el('wb-cache-age').textContent = fmtAge(s.cache_age_seconds || 0);
-  } catch(e) {
+    $('wb-cache-age').textContent = 'refreshed ' + fmtAge(s.cache_age_seconds || 0);
+  } catch (e) {
     console.error('refresh error', e);
   }
 }
