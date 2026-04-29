@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.13.1 (2026-04-29) — feature
+
+### Elastic Agent Skills consumer — Bob's 6th matcher tier
+
+ION now consumes the Anthropic-originated **Agent Skills** format (`SKILL.md` folders with YAML frontmatter + Markdown body). Loaded skills are matched against the current alert via the existing alert context — technique-id, rule-group, keyword overlap with `when_to_use` — and injected into the system prompt rendered by `render_system_prompt`. The matcher is **keyword / technique / tag-driven, not embedding-driven** — works on estates with `ION_EMBEDDING_ENABLED=false` and `ION_KB_RAG_ENABLED=false`.
+
+#### What's authored
+
+- **`services/skill_loader.py`** — parses bundled + runtime SKILL.md folders, matches against alert via `matches_techniques` (parent-sub tolerant), `matches_rule_groups`, and a keyword scan of `when_to_use`. ~250 LOC.
+- **Two bundled skills** in `src/ion/data/skills/`:
+  - `elasticsearch-esql/SKILL.md` — ES|QL idioms, ECS field discipline, aggregation patterns, time-windowing. Triggered when `rule.language: esql` or alert is from Elastic Security / Sigma / Elastic Agent rule groups.
+  - `process-tree-investigation/SKILL.md` — process parent-child reasoning, integrity-level shifts, LOLBin patterns. Triggered on Sysmon / EDR / process techniques (T1059, T1003, T1055, T1218, T1547.001).
+- **Runtime override** at `${ION_SKILLS_DIR}` or `${ION_DATA_DIR}/skills` — operator can drop skills there to override or supplement bundled ones (skills with the same `name` overwrite by source-precedence: runtime > bundled).
+- **`alert_prompt_service.render_system_prompt`** — appends a "Loaded Skills (Tier-6 augmentation)" block to the system prompt after the per-rule template, KB context, and gold exemplars; before the canonical output contract.
+- **`pyproject.toml package-data`** updated to include `data/**/*.md` so the bundled SKILL.md files install with `pip install .`.
+
+#### Verifying the feature
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+After restart:
+1. Alerts whose rule mentions ES|QL or matches Elastic Security rule groups gain a *Loaded Skills* block in the LLM system prompt with the `elasticsearch-esql` skill body inline.
+2. Endpoint alerts on Sysmon / process techniques gain the `process-tree-investigation` skill.
+3. Operator can drop new SKILL.md folders into `${ION_DATA_DIR}/skills/<name>/SKILL.md` and they're picked up on next investigation invocation (no restart needed).
+
+#### Why it's keyword-driven, not embedding-driven
+
+Skills are **prompt augmentations**, not retrieval results. The matching dimension (technique-id / rule-group / explicit tag) is well-defined enough to not need vector similarity. ION's existing 5-tier `AlertPromptTemplate` matcher is also keyword-driven, by the same reasoning. This means Skills work cleanly on estates with embeddings disabled — no `nomic-embed-text` dependency, no pgvector requirement.
+
+The follow-on **publisher** angle (export ION's `AlertPromptTemplate` rows as `SKILL.md` folders for cross-SOC reuse) is deferred until the consumer path is in production for a quarter.
+
+---
+
 ## v0.13.0 (2026-04-29) — feature
 
 ### PDF course-completion certificates
