@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # v0.12.0 — added sub-profile-namespaced keys (sub_<pillar>_<sub>_*)
 
 
 def _q(

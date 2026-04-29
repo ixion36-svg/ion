@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.12.0 (2026-04-29) — feature
+
+### CyAB Onboarding Studio — sub-profile-driven onboarding intake, detection library, audit catalogue
+
+The CyAB feature gains a second-generation onboarding workflow that complements the existing strategic 6-step wizard with a **technical, sub-profile-driven layer**. Operators now pick a top-level **pillar** (Identity / Endpoint / Network / Cloud / Data / OT) → a **sub-profile** (Active Directory, Windows endpoint, Next-Gen Firewall, etc.) → and work three tabs of curated content: **Detailed intake** (sub-profile-specific config questions), **Detection library** (use cases with ECS|QL logic + MITRE mapping + SOAR + TIDE links), **Audit & compliance** (audit use cases keyed to NIST / CIS frames). A bottom drawer surfaces the full use-case anatomy. A footer action exports a bundled **Onboarding Pack** PDF for sign-off.
+
+#### What's new
+
+- **New page:** `/cyab/studio` — separate from the existing `/cyab` dashboard. The CyAB header now carries an "Onboarding Studio →" link.
+- **New tables:** `cyab_pillars` (6 rows) + `cyab_subprofiles` (15 rows). Both are code-seeded from `services/cyab_subprofile_catalogue.py` on first boot and respect an `is_custom` flag on subsequent boots so operator edits survive seeder runs.
+- **New columns:**
+  - `cyab_data_sources.subprofile_id` — FK to `cyab_subprofiles.id`. Backfilled on first boot from the legacy `data_source_type` string via the catalogue's migration table. Three legacy types are ambiguous (`windows_security`, `edr`, unrecognised) and stay NULL until an operator confirms.
+  - `cyab_systems.containment_authority` — TEXT, captured on the Onboarding Pack approval flow.
+- **New router:** `/api/cyab/studio/*` — 9 routes (list pillars, list sub-profiles in a pillar, get full sub-profile catalogue, PATCH operator overlay, get one use case, generate TIDE rule stub, per-system coverage rollup, render Onboarding Pack PDF, sign Onboarding Pack).
+- **Catalogue:** 3 sub-profiles authored to full depth (Active Directory, Windows endpoint, Next-Gen Firewall — full intake banks, 4–6 detection use cases each with ES|QL snippets + MITRE IDs, 2–4 audit use cases each with compliance frame mapping). 11 sub-profiles ship as skeletons (label + ECS anchors + expected feeds, empty content arrays) — v0.12.1 will fill them.
+- **TIDE coupling — both modes:** the use-case drawer links to existing TIDE rules when `tide_rule_ids[]` is non-empty, AND offers a "Generate TIDE rule stub" action when it's empty. The stub-generate POST creates a TIDE rule from the catalogue's logic snippet + MITRE IDs + risk + tags, then writes the new rule id back into the use case (flips `is_custom=true`).
+- **Onboarding Pack PDF:** weasyprint-rendered, modeled on the existing `/cyab/tide/de/readiness-pdf` route. Sections: cover (system + governance), strategic context (latest org assessment), system scope (data sources), per-sub-profile readiness (intake answers + detection coverage + audit coverage), containment authority, sign-off block. POST `/sign` persists `sign_dept_name`, `sign_soc_name`, and the new `containment_authority` column; if both signatures are present, the system status flips to `ACTIVE`.
+- **Schema version bump:** `cyab_assessment_questions.SCHEMA_VERSION` 1 → 2 — sub-profile-namespaced keys (`sub_id_ad_*`, `sub_ep_win_*`, `sub_net_fw_*`) extend the existing question schema; old v1 submissions remain valid.
+
+#### Design background
+
+The redesign is documented in `_research_cyab_onboarding_studio.md` at the repo root — Gemini gold-standard frame (NIST SP 800-61, SANS PICERL, MITRE 11 Strategies), React mockup translation, ION's existing CYAB surface inventory (5 tables + 56 routes preserved), and the 4-ship phased delivery plan. v0.12.0 is **ship 1: plumbing**. Ship 2 is catalogue fill, ship 3 is per-data-source `use_case_status` JSON wire-up, ship 4 is operator authoring polish.
+
+#### Verifying the feature
+
+1. `docker compose pull ion seeder && docker compose up -d`
+2. Open `/cyab/studio`. The pillar pills row should populate (Identity / Endpoints / Network / Cloud / Data / OT). Pick **Identity & Access** → **Active Directory** → **Detection library** tab. You should see 5 detection use cases. Click **Kerberoasting**; the bottom drawer should render the ES|QL snippet + MITRE T1558.003 chip.
+3. From `/cyab` (the dashboard), the new **Onboarding Studio →** link should be visible in the header.
+4. From `/cyab/studio`, type a system ID into the footer input + click **Export Onboarding Pack** — should download a PDF.
+5. `psql -c "SELECT id, label, priority FROM cyab_pillars ORDER BY priority"` — six rows.
+6. `psql -c "SELECT id, pillar_id, is_custom FROM cyab_subprofiles ORDER BY pillar_id, label"` — 15 rows, all `is_custom=false`.
+
+#### Upgrade
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+The seeder runs idempotently and respects operator edits; safe to run on every boot. Existing CyAB systems and data sources are untouched apart from the `subprofile_id` backfill.
+
+---
+
 ## v0.11.21 (2026-04-28) — feature
 
 ### System Analytics — logs ingested per system, alongside alerts and TIDE coverage

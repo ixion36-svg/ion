@@ -80,6 +80,7 @@ LOCK_CASE_GROUPER_BG        = 1017
 LOCK_TICKER_BG              = 1018
 LOCK_CASE_EMBEDDING_BG      = 1019
 LOCK_KB_EMBEDDING_BG        = 1020
+LOCK_SEED_CYAB_SUBPROFILES  = 1021  # v0.12.0 — Onboarding Studio catalogue seeder
 
 
 @contextmanager
@@ -589,6 +590,19 @@ def _run_migrations(engine: Engine) -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE cyab_data_sources ADD COLUMN data_namespace VARCHAR(128)"))
                 logger.info("Migrated: cyab_data_sources.data_namespace")
+        # v0.12.0: Onboarding Studio sub-profile tag.
+        if "subprofile_id" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE cyab_data_sources ADD COLUMN subprofile_id VARCHAR(64)"))
+                logger.info("Migrated: cyab_data_sources.subprofile_id")
+
+    # v0.12.0: Onboarding Pack containment_authority field on cyab_systems.
+    if insp.has_table("cyab_systems"):
+        existing = {col["name"] for col in insp.get_columns("cyab_systems")}
+        if "containment_authority" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE cyab_systems ADD COLUMN containment_authority TEXT"))
+                logger.info("Migrated: cyab_systems.containment_authority")
 
     # Performance indexes on hot tables (alert_cases, alert_triage).
     # create_all() creates indexes for new tables but NOT for tables that
