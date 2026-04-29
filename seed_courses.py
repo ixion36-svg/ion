@@ -21262,7 +21262,766 @@ Module 7 picks up: **Out-of-hours / off-shift validation** — testing the SOC's
         points=2,
     )
 
-    print(f"  L3: {course.title} — 6 modules, 48 lessons (Module 6 Multi-host chains @ proper depth)")
+    # ── Module 7 — Out-of-hours / off-shift validation ────────────────
+    mod7 = _add_module(
+        session, course, order=7,
+        title="Out-of-hours validation — testing the SOC at 03:14 on Sunday",
+        description_md=(
+            "In-hours coverage doesn't imply OOH coverage. The "
+            "response stack changes at 03:14 — L1 shift reduced or "
+            "remote, L2/L3 on-call only, SOAR is the front line, "
+            "non-critical alerts wait for morning. This module covers "
+            "OOH-specific exercise design, the dual-window comparison "
+            "(same chain in-hours and OOH), OOH-coverage parity audit, "
+            "common OOH-specific gaps (dashboards no one watches, "
+            "automation that's 9-5 only, vendor-support hour gaps), "
+            "and leadership reporting that surfaces the OOH posture "
+            "distinctly so the trade-off (longer TTR, lower coverage, "
+            "or invest more) is explicit and chosen."
+        ),
+        estimated_minutes=180,
+    )
+
+    # Lesson 7.1
+    m7l1 = _add_lesson(
+        session, mod7, order=1,
+        title="Why in-hours coverage doesn't imply OOH coverage",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Recite the **ten things that change** in OOH SOC operation
+> 2. Recognise that **MTTR measured in-hours is not OOH MTTR**
+> 3. Apply the rule: **every chain exercise needs an in-hours run AND an OOH run**
+> 4. Surface the OOH gap as a **leadership-relevant** metric (not just operational)
+
+## Ten things change at 03:14 on Sunday
+
+1. **L1 shift reduced or remote.** The day-shift 8-analyst floor becomes 1-2 on-call.
+2. **L2 / L3 not on shift.** On-call rota only; ack windows longer.
+3. **SOAR is the front line.** Auto-isolation is the only sub-30-min response.
+4. **Critical alerts page; rest wait.** Medium-severity alerts may not be triaged until morning.
+5. **Detection-engineering not available.** No mid-incident rule tuning.
+6. **Vendor support reduced.** EDR vendor Tier-3 is business-hours; cloud-vendor escalation longer.
+7. **Network team typically not on shift.** Network-quarantine actions need explicit override.
+8. **Database team typically not on shift.** Containment actions on DBs may need DBA approval.
+9. **Cloud / IT Ops on-call.** Their on-call may not be SOC-aware.
+10. **The actor knows this.** Real adversaries time their attacks for OOH.
+
+## MTTR measured in-hours is not OOH MTTR
+
+A SOC that reports *"median MTTR is 14 minutes"* without specifying *in-hours only* is unintentionally misleading. The OOH MTTR is typically 2-4× higher; alerts that would ack in 5 min in-hours can ack in 30+ min OOH.
+
+The L3's reflex: split the metric. *"In-hours MTTR: 9 min; OOH MTTR: 14 min"* is the honest report.
+
+## Every chain exercise needs both windows
+
+The rule: a chain exercise hasn't been validated until it's run in both in-hours and OOH windows. The deltas tell the story.
+
+If in-hours run completes Tier-1 at 4-min TTR and OOH run completes Tier-1 at 8-min TTR — that's acceptable parity. If OOH stays Tier-2 (no detection at night), the SOC has a posture problem.
+
+## OOH gap as a leadership-relevant metric
+
+Why this matters at the leadership level: the OOH gap is a *trade-off*, not a *problem*. The org can choose:
+- **Invest more in OOH coverage** (bigger on-call rota, more SOAR maturity, vendor extended support).
+- **Accept longer TTR OOH** (the actor's chain time is shorter than in-hours, but containment is still pre-impact).
+- **Don't run critical-data businesses OOH** (e.g. crypto trading desk closes Friday afternoon).
+
+The L3's role: surface the data so the trade-off is explicit. *"Our OOH MTTR is 14 min; if a real chain attacker hits us at 03:14, our containment will be at 14 min minimum + SOAR delay. Is that acceptable?"* The CISO + CEO answer; the L3 ensures the question gets asked.
+
+## When OOH testing isn't necessary
+
+Two cases where OOH testing is skip-worthy:
+- **The org genuinely has no OOH operations.** Some businesses close at 17:00, no critical systems running OOH; the SOC mirrors. (Rare in modern.)
+- **The OOH window is staffed at full intensity.** Some 24/7 ops orgs (financial trading, healthcare, telecom) staff 24/7; OOH = in-hours. Test in one window.
+
+For everyone else: dual-window testing is the discipline.
+
+## Glossary
+
+- **OOH** — out-of-hours; outside the SOC's primary shift coverage.
+- **Dual-window comparison** — same chain run in-hours and OOH; deltas tell the story.
+- **OOH front line** — SOAR + on-call rota become load-bearing.
+- **Posture problem** — Tier-1 in-hours but Tier-2 OOH; needs leadership decision.
+
+## Further reading
+
+- Mandiant M-Trends — typically reports both in-hours and OOH attack timing.
+- The org's on-call rota documentation — what's the actual response infrastructure?
+""",
+    )
+    _add_q(session, m7l1, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A SOC reports their median MTTR is **14 minutes**. The reporting doesn't distinguish in-hours from OOH. The L3 should flag this as misleading because:",
+        options=[
+            {"value": "exact", "label": "14 min isn't precise enough; should report seconds"},
+            {"value": "split", "label": "OOH MTTR is typically 2-4× higher than in-hours; reporting an aggregate masks the OOH posture and the trade-off the org has implicitly accepted"},
+            {"value": "fast_enough", "label": "14 min is too fast — alerts shouldn't fire that quickly"},
+            {"value": "scope", "label": "MTTR isn't the right metric; should use TP rate"},
+        ],
+        correct="split",
+        explanation_md="**OOH MTTR is typically 2-4× higher than in-hours.** Aggregating masks the distinct postures: in-hours might be 9 min (good) and OOH 25 min (concerning), and the average 14 min hides both. The L3's reflex: split the report. *\"In-hours MTTR: 9 min; OOH MTTR: 25 min\"* lets leadership see the trade-off and decide whether to invest in OOH (more on-call, better SOAR auto-containment) or accept the longer OOH TTR. The aggregated number creates a false sense of security: the actor *knows* OOH is slower and times attacks accordingly. The honest report drives the right conversation.",
+        points=2,
+    )
+
+    # Lesson 7.2 — OOH response stack
+    m7l2 = _add_lesson(
+        session, mod7, order=2,
+        title="The OOH response stack: SOAR + on-call as the load-bearing layer",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Map the **OOH response stack** layer by layer
+> 2. Recognise the **shift in centre-of-gravity** to SOAR + on-call
+> 3. Identify which layers are **load-bearing OOH** vs **secondary**
+> 4. Test each load-bearing layer in OOH exercises specifically
+
+## In-hours vs OOH response stack
+
+The shift, layer by layer:
+
+| Layer | In-hours | OOH | Load-bearing OOH? |
+|---|---|---|---|
+| L1 detection (analyst monitoring) | 8-analyst floor | 1-2 on-call | Reduced |
+| L1 alert ack | < 30 min for all severities | < 30 min for critical only | Reduced |
+| L2 escalation | Same shift | On-call rota | Reduced |
+| L3 / IR engagement | Same-day | < 30 min for page-class | Reduced |
+| **SOAR auto-isolation** | Backup to L1 | **Front line** | **Yes** |
+| **On-call paging** | Rare | **Primary escalation** | **Yes** |
+| Vendor support | Standard | Tier-3 reduced | Reduced |
+| Detection-eng tuning | Mid-day | Next business day | Out |
+| Network team | On shift | Not on shift / on-call | Reduced |
+| Database team | On shift | Not on shift / on-call | Reduced |
+
+The two load-bearing OOH components are **SOAR auto-isolation** and **on-call paging**. If either fails, OOH coverage doesn't exist.
+
+## Why SOAR auto-isolation is load-bearing
+
+In-hours, SOAR is *backup*. The L1 analyst typically initiates containment; SOAR handles routine cases (allowlist updates, ticket creation, enrichment).
+
+OOH, SOAR is *front-line*. There's no L1 floor to manually trigger containment; the auto-isolate playbook fires on the alert and the host is quarantined. If the playbook is broken / mis-configured / not deployed for the alert class, the host stays compromised until on-call ack — which can be 30+ min OOH.
+
+The L3 audits SOAR auto-isolate per-alert-class quarterly:
+- Does the playbook exist for this alert class?
+- Is it enabled?
+- What's its actual time-to-fire (alert fire → containment action)?
+- Are there any conditions that prevent it firing OOH (e.g. depends on an in-hours service)?
+
+## Why on-call paging is load-bearing
+
+The page is the only escalation path OOH. If:
+- The page doesn't reach the on-call (mis-configured rota, wrong phone number, paging service outage).
+- The on-call doesn't ack within 5 min.
+- The on-call routes to the wrong team (cloud team paged for endpoint alert).
+
+Then the alert *might as well not fire*. OOH coverage requires the page-and-ack loop working.
+
+The L3 tests this in OOH exercises: pre-brief the on-call, fire a controlled alert, measure the page → ack delta.
+
+## What's *out* OOH
+
+Detection-engineering tuning is out. If a rule fires noisily mid-incident OOH, the detection engineer is asleep; the on-call has to live with the noise until morning.
+
+This means rules that ship with poor FP rate become much more expensive OOH — the on-call's FP fatigue is high. The L3's reflex: rules with FP rate > 2/week shouldn't auto-page; they should batch-review during business hours.
+
+## Cross-team OOH coordination
+
+The chain exercise sometimes needs cross-team containment OOH. Example: a workstation on PT-LAB-04 is compromised; SOAR auto-isolates. But the lateral target PT-LAB-05 is a database server; quarantining it needs DBA approval, and DBA is on-call.
+
+The L3 documents these cross-team paths and tests them OOH:
+- **Paths that work** — the SOC's automation contains via SOAR.
+- **Paths that need explicit override** — DBA-approved override path documented, on-call rota pre-arranged.
+- **Paths that don't exist OOH** — the SOC accepts that some containment waits until morning.
+
+## Glossary
+
+- **OOH front line** — SOAR auto-isolation + on-call paging.
+- **Page-and-ack loop** — alert → page reaches on-call → on-call acks within 5 min.
+- **Cross-team OOH coordination** — paths requiring multi-team approval; needs explicit override or wait.
+- **Out-of-hours-only-pages** — rules that auto-page; FP-rate budget is tighter than in-hours.
+
+## Further reading
+
+- L3 M3 (Caldera) — operation-level coordination.
+- The org's SOAR playbook catalogue.
+""",
+    )
+    _add_q(session, m7l2, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are **load-bearing OOH** components of the SOC's response stack?",
+        options=[
+            {"value": "soar", "label": "SOAR auto-isolation — front line for containment OOH"},
+            {"value": "oncall", "label": "On-call paging — primary escalation path OOH"},
+            {"value": "l1_floor", "label": "L1 8-analyst floor — present in-hours, reduced OOH"},
+            {"value": "vendor_t3", "label": "Vendor Tier-3 support — reduced OOH"},
+            {"value": "det_eng", "label": "Detection-engineering tuning — out OOH"},
+            {"value": "network_team", "label": "Network team on shift — out OOH (on-call only)"},
+        ],
+        correct=["soar", "oncall"],
+        explanation_md="The two load-bearing OOH components are **SOAR auto-isolation** and **on-call paging**. The other options are *reduced* or *out* OOH but aren't load-bearing — they're degraded versions of in-hours infrastructure. Load-bearing means: *if this layer fails, OOH coverage doesn't exist*. SOAR fails → no automated containment → 30+ min wait for on-call ack. Page fails → on-call doesn't know to ack → alert sits indefinitely. The L3 audits these two specifically per-quarter, in OOH exercises, with pre-brief to the actual on-call: *can the page reach you, can you ack in 5 min, does SOAR auto-isolate within 5 min of alert fire on critical-class*?",
+        points=3,
+    )
+
+    # Lesson 7.3 — OOH exercise design
+    m7l3 = _add_lesson(
+        session, mod7, order=3,
+        title="OOH exercise design and scoping: testing without surprising the wrong shift",
+        lesson_type=LessonType.READING, duration_min=16,
+        content_md="""
+> **Learning objectives.**
+> 1. Pick the right **OOH window** for the exercise (Tuesday 02:00, not Sunday)
+> 2. Pre-brief the **on-call rota** explicitly
+> 3. **Time-box tightly** — OOH exercises run < 1 hour
+> 4. Test **specific OOH-load-bearing components** rather than generic chains
+
+## Picking the OOH window
+
+OOH spans nights + weekends. Pick the *Tuesday-Wednesday 02:00-03:00* window for first OOH exercises:
+
+- Mid-week: avoids weekend scheduling fragility.
+- 02:00 local: deep OOH; testing the actual reduced response infrastructure.
+- 1-hour window: long enough for a 4-host chain; short enough to not exhaust on-call.
+
+Avoid:
+- **Weekends** — on-call rota is harder to pre-brief; team has reduced bandwidth.
+- **Holiday-weeks** — staffing is non-standard; pre-brief is unreliable.
+- **Quarter-end** — competing priorities for engineering / IR.
+
+For ongoing OOH testing, rotate windows to test different on-call shifts:
+- Q1 — Tuesday 02:00 (Eastern night shift).
+- Q2 — Saturday 14:00 (weekend day shift).
+- Q3 — Monday 22:00 (transitional shift hand-over).
+- Q4 — Sunday 04:00 (deep weekend OOH).
+
+Different windows test different on-call subsets; quarterly rotation surfaces gaps that a single-window test misses.
+
+## Pre-brief the on-call rota explicitly
+
+The pre-brief target for OOH exercises is *the named on-call person*, not a chat channel:
+
+- Identify the on-call for the exercise window.
+- Get their direct contact (mobile + chat handle).
+- Pre-brief them 24-48h ahead via email + chat.
+- Confirm receipt explicitly (not just chat acknowledgement; an email reply or text confirmation).
+- Re-confirm 1h before exercise start.
+
+Why direct: at 02:00 the on-call's chat client may be muted or off; they may only see the page. The pre-brief needs to land in a channel they actually read at the exercise time.
+
+## Tight time-box
+
+OOH exercises run < 1 hour. Reasons:
+- The on-call's awake-time is bounded; respect their sleep.
+- Engineering team can't tune mid-exercise; bugs that surface need to wait for morning.
+- The exercise is testing one or two specific components, not the SOC's full posture.
+
+For a chain exercise OOH, the L3 picks 4-6 phases (not 8-10) and times the chain to complete in 30-40 min, leaving buffer.
+
+## Test specific components
+
+Each OOH exercise targets a specific load-bearing component:
+
+- **OOH SOAR auto-isolate test** — fire a controlled critical alert; measure SOAR action time.
+- **OOH page test** — fire a paging alert; measure page → on-call ack time.
+- **OOH chain test** — full chain across 4 hosts; measure end-to-end TTR.
+- **OOH cross-team handoff test** — alert requires DBA approval to contain; measure approval → action time.
+
+Each test produces specific findings. The L3 doesn't run a generic "OOH exercise" — they run a focused test of one OOH-load-bearing component.
+
+## OOH abort path
+
+OOH exercises need an abort path that doesn't require waking the CISO:
+- Named L3 with phone (the exerciser).
+- Named secondary contact (typically the IR Lead's deputy).
+- Operations team's on-call (Caldera server may need restart if the agent goes haywire).
+
+The abort criteria:
+- The on-call doesn't ack within 15 min of paging.
+- A real-IR situation surfaces alongside the test.
+- The exercise reveals a critical control gap that needs immediate engineering response.
+
+The L3's reflex: abort is the default if uncertainty is high; re-schedule for a future window.
+
+## Glossary
+
+- **OOH window** — Tuesday 02:00-03:00 is the canonical first-time pick.
+- **Direct on-call pre-brief** — email + mobile + explicit confirmation; not just chat.
+- **Tight time-box** — < 1 hour for OOH; respects sleep, limits exposure.
+- **Specific component test** — one load-bearing OOH layer per exercise.
+- **OOH abort path** — named contacts; default to abort on uncertainty.
+
+## Further reading
+
+- L3 M1 (purple-team flow) — pre-brief discipline; OOH version is the same plus direct contact.
+- The org's on-call rota docs — how to identify the on-call for any window.
+""",
+    )
+    _add_q(session, m7l3, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *valid* design choices for an OOH purple-team exercise?",
+        options=[
+            {"value": "tuesday", "label": "Pick a **Tuesday 02:00** window for first-time OOH testing (mid-week, deep OOH)"},
+            {"value": "direct_oncall", "label": "Pre-brief the **on-call by name** with direct contact (email + mobile + explicit confirmation), not just a chat channel"},
+            {"value": "timebox", "label": "**Time-box** the exercise to < 1 hour"},
+            {"value": "specific_component", "label": "Target a **specific load-bearing OOH component** (e.g. SOAR auto-isolate, paging, cross-team handoff)"},
+            {"value": "abort_path", "label": "Named **OOH abort path** (L3 + secondary + ops on-call) that doesn't require waking the CISO"},
+            {"value": "weekend", "label": "Pick a Friday-after-Christmas-week window so the team isn't busy"},
+            {"value": "no_brief", "label": "Skip the pre-brief because OOH alerts already happen"},
+        ],
+        correct=["tuesday", "direct_oncall", "timebox", "specific_component", "abort_path"],
+        explanation_md="The five valid choices: Tuesday 02:00 window, direct on-call pre-brief, < 1 hour time-box, specific component focus, named abort path. Holiday-week windows are *anti-pick* — staffing is non-standard, pre-brief is unreliable. Skipping pre-brief is the most-common cause of OOH mistaken-IR-engagement (M6.7 cross-link); never skip. The L3's reflex on OOH design: pick a clean window, pre-brief the actual on-call directly, scope tightly to one load-bearing component, and have an abort path that's appropriate for the OOH context.",
+        points=3,
+    )
+
+    # Lesson 7.4 — Dual-window comparison
+    m7l4 = _add_lesson(
+        session, mod7, order=4,
+        title="Dual-window comparison: same chain in-hours AND OOH",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Run the **same chain** in-hours and OOH on equivalent test infrastructure
+> 2. Capture **per-phase TTR delta** (OOH minus in-hours)
+> 3. Read the **delta pattern** — small for critical-class, large for medium-class
+> 4. Drive **severity reclassification** based on OOH deltas
+
+## The dual-window protocol
+
+Run the same chain twice:
+1. **In-hours**: a Tuesday 14:00 (familiar from M6).
+2. **OOH**: a Tuesday 02:00 in the same week (same on-call team, same systems, same-week telemetry).
+
+Same chain plan, same authorisations (extended to cover both windows), same Caldera operation template (parameterised per window).
+
+The output: per-phase TTR delta. Phases where OOH is much slower than in-hours have an OOH-specific gap; phases where the delta is small have parity.
+
+## Worked deltas from a FIN6 chain
+
+| Phase | In-hours TTR | OOH TTR | Delta | Cause |
+|---|---|---|---|---|
+| Initial Access | 4 min | 8 min | +4 min | On-call ack slower than shift (acceptable) |
+| Execution | 6 min | 12 min | +6 min | L1 shift smaller; ack queued |
+| Persistence | 7 min | 14 min | +7 min | Same as Execution |
+| Cred Access | (Tier-2) | (Tier-2) | (same gap) | — |
+| Discovery | 13 min | 22 min | +9 min | Same |
+| **Lateral Movement** | **6 min** | **25 min** | **+19 min** | **Wrong on-call team paged; second escalation** |
+| C2 | 28 min | 35 min | +7 min | Beacon-CV rule fires regardless of shift |
+| Impact | 5 min | 8 min | +3 min | Critical-class paging works |
+
+The lateral phase delta of +19 min is the outlier. Analysis: the lateral alert was severity Medium, so the on-call routing didn't auto-page; the alert sat in the queue until the cloud-team on-call (mistakenly routed) noticed it 25 min later.
+
+The fix has three parts:
+1. **Reclassify lateral movement to severity High** (M5.2 cross-link to severity matrix).
+2. **Update on-call routing** so Medium / High lateral-movement alerts page the SOC on-call directly (not the cloud team).
+3. **Re-test in next quarter's OOH exercise** to validate.
+
+## Reading delta patterns
+
+The L3's analytical reflex: deltas tell different stories.
+
+| Delta pattern | Meaning |
+|---|---|
+| Small (+0 to +5 min) on critical-class | Critical paging works; OOH posture is good |
+| Medium (+5 to +15 min) on medium-class | Acceptable; queued ack |
+| Large (+15+ min) on any class | OOH gap; investigate routing / SOAR |
+| Huge (+30+ min) on any class | Posture problem; likely wrong on-call team or no SOAR coverage |
+
+Specific deltas drive specific TuningProposals. The chain's OOH-specific TPs cohere — they collectively address the OOH posture.
+
+## When OOH deltas drive severity reclassification
+
+A common finding: the L2 / L3 ranked an alert Medium because the in-hours response was acceptable (ack within 30 min). OOH testing reveals Medium-class doesn't page on-call directly; ack delta is hours, not minutes.
+
+The fix isn't "make Medium page on-call" (that floods the on-call). It's reclassifying the alert: if the OOH delta is unacceptable, the alert is actually High-class, just under-rated. M5's severity matrix (Critical / High / Medium / Low) is the rubric; the L3 re-rates and updates the rule.
+
+## When in-hours and OOH posture should differ
+
+Some alerts deliberately have different in-hours vs OOH treatment:
+- **Compliance / audit alerts** — Critical for in-hours review; Medium OOH (analyst will get to it Monday morning).
+- **Capacity / performance** — Medium in-hours; Low OOH (engineering can investigate next-day).
+- **Hunt-finding alerts** (DML-2 rules surfacing tool-class matches) — Medium in-hours; Low OOH (high FP cost on the on-call).
+
+The L3's reflex on these: document the deliberate difference; it's not a bug, it's a chosen posture.
+
+## Glossary
+
+- **Dual-window protocol** — same chain run in both windows; deltas computed.
+- **Per-phase TTR delta** — OOH minus in-hours, per phase.
+- **Severity reclassification** — driven by unacceptable OOH delta on a Medium-class alert.
+- **Deliberate posture difference** — some alerts have different severity in-hours vs OOH; document.
+
+## Further reading
+
+- L3 M5 — severity matrix.
+- L3 M6 — chain timing.
+""",
+    )
+    _add_q(session, m7l4, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A dual-window FIN6 chain produces this lateral-movement delta: in-hours TTR **6 min**, OOH TTR **25 min** (+19 min delta). All other phases have +3 to +9 min deltas. What's the right interpretation and action?",
+        options=[
+            {"value": "ignore", "label": "Ignore — +19 min isn't huge in absolute terms"},
+            {"value": "fix_oncall", "label": "OOH routing problem on lateral-movement alerts. Investigate why the on-call team didn't auto-page on Medium severity; consider reclassifying lateral movement to High and adjusting on-call routing"},
+            {"value": "blame_oncall", "label": "On-call slacking — blame and document"},
+            {"value": "reduce_window", "label": "Reduce the OOH window so the test doesn't take so long"},
+        ],
+        correct="fix_oncall",
+        explanation_md="**OOH routing problem.** The +19-min delta on lateral movement, while other phases are +3 to +9, is the outlier. Specifically: lateral was Medium severity; OOH on-call didn't auto-page on Medium; the alert sat queued until someone noticed. The fix is two-part: (1) reclassify lateral movement to High severity (the OOH delta indicates Medium under-rates the impact when response is paged-only), and (2) update on-call routing so Medium / High lateral alerts page the SOC on-call directly, not the (mistakenly routed) cloud team. Blaming the on-call is wrong — the on-call followed the documented routing; the routing was the bug. Reducing the OOH window doesn't address the routing gap. The chain's OOH-specific TP comes from this exact analysis.",
+        points=2,
+    )
+
+    # Lesson 7.5 — OOH-specific gap audit
+    m7l5 = _add_lesson(
+        session, mod7, order=5,
+        title="OOH-specific gap audit: dashboards, automation, vendor hours",
+        lesson_type=LessonType.READING, duration_min=14,
+        content_md="""
+> **Learning objectives.**
+> 1. Identify **dashboards no one watches OOH**
+> 2. Audit **automation that's 9-5 only** (calls a service desk that's closed)
+> 3. Audit **vendor support hours** for critical components
+> 4. Document each gap with appropriate **backlog routing**
+
+## Five OOH-specific gap classes
+
+The audit looks for gaps that don't surface in single-TTP testing:
+
+### 1. Dashboards no one watches
+
+The L1 floor monitors a dashboard during shift. OOH the on-call doesn't watch dashboards; they react to pages. Gap pattern: alerts that fire without paging stay invisible OOH.
+
+Audit: every dashboard alert class — does it page? If yes, what's the page-and-ack delta? If no, what's the morning-review-time delta?
+
+### 2. Automation that's 9-5 only
+
+A SOAR playbook calls a service desk that's only staffed 9-5. OOH, the playbook fails or queues. Gap pattern: automated containment paths that depend on human-in-the-loop services.
+
+Audit: every SOAR playbook — does its critical path depend on services that are 9-5? If yes, document the OOH degradation.
+
+### 3. Paged escalation paths broken
+
+The page reaches the wrong on-call (cloud team paged for endpoint). The page reaches no one (mis-configured rota). The page reaches but isn't acknowledged. Each is its own gap.
+
+Audit: per alert class, fire a controlled test alert. Measure page → ack time. Failures route to on-call rota tooling team.
+
+### 4. Vendor support hours
+
+Tier-3 vendor escalation (EDR vendor's deep technical team) is typically business-hours only. OOH, vendor responses come from generic Tier-1. Gap pattern: a serious EDR misbehaviour OOH waits for morning vendor response.
+
+Audit: each vendor's documented OOH support coverage. Critical vendors (EDR, SIEM) without 24/7 Tier-3 are leadership-discussion items.
+
+### 5. Network team availability
+
+Quarantining a host requires network-team approval (in some orgs). OOH, network team is on-call only; ack delta is hours not minutes. Gap pattern: containment that needs cross-team approval.
+
+Audit: per-containment-action, document the approval chain. OOH-only items need explicit override paths.
+
+## Backlog routing for OOH gaps
+
+| Gap class | Backlog |
+|---|---|
+| Dashboard no one watches | SOC-process (set page on the alert class) |
+| Automation 9-5 only | SOAR tooling (rewrite playbook to be OOH-resilient) |
+| Page-rota broken | On-call tooling (PagerDuty / Opsgenie config) |
+| Vendor hours | Leadership decision (renegotiate contract or accept) |
+| Cross-team approval | SOC-process (override path, on-call rota for the team) |
+
+Each gap routes to one backlog. The L3 raises the ticket with the right owner; lumping into a generic "OOH improvements" backlog produces no progress.
+
+## Quarterly OOH audit
+
+The L3 runs a quarterly OOH audit, separate from the in-hours audit:
+
+1. Dashboard inventory — does each dashboard alert have a paging path?
+2. SOAR playbook inventory — which depend on 9-5 services?
+3. Page-rota test — fire one controlled alert per alert class; measure delta.
+4. Vendor hours review — which vendors lack 24/7 Tier-3?
+5. Cross-team containment-path review — which paths need OOH override?
+
+Output: 5-15 OOH-specific TPs. Each routes to its specific backlog.
+
+## Glossary
+
+- **Dashboard-no-one-watches** — alert that fires without paging; invisible OOH.
+- **9-5 automation** — playbook depending on a service that's only staffed business-hours.
+- **Page-and-ack delta** — time from page send → on-call ack.
+- **Vendor Tier-3 hours** — typically business-hours; critical vendors should have 24/7.
+- **Cross-team approval path** — containment that needs another team's approval.
+
+## Further reading
+
+- The org's SOAR playbook catalogue.
+- Vendor support contract terms (read carefully; OOH coverage often has carve-outs).
+""",
+    )
+    _add_q(session, m7l5, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are valid **OOH-specific gap classes** the L3 should audit quarterly?",
+        options=[
+            {"value": "dashboard", "label": "Dashboards no one watches OOH (alerts fire without paging)"},
+            {"value": "automation_9_5", "label": "SOAR automation depending on 9-5-only services"},
+            {"value": "rota", "label": "Paged escalation paths broken (mis-routed / unacked)"},
+            {"value": "vendor_hours", "label": "Vendor Tier-3 support hours (typically business-hours only)"},
+            {"value": "cross_team", "label": "Cross-team containment paths (DBA / network approval needed OOH)"},
+            {"value": "lunch_break", "label": "Lunch break coverage"},
+            {"value": "office_decor", "label": "SOC office decor refresh"},
+        ],
+        correct=["dashboard", "automation_9_5", "rota", "vendor_hours", "cross_team"],
+        explanation_md="The five valid OOH gap classes: dashboards-no-one-watches, 9-5 automation, broken page rotas, vendor hour limits, cross-team containment paths. Each surfaces *only* in OOH testing — single-TTP in-hours exercises miss them all. Each routes to a specific backlog (SOC-process, SOAR tooling, on-call tooling, leadership, SOC-process respectively). Lunch breaks and office decor are not detection-engineering concerns. The L3's quarterly OOH audit produces 5-15 specific TPs, each with named ownership; lumping into a generic \"OOH improvements\" backlog produces no progress.",
+        points=3,
+    )
+
+    # Lesson 7.6 — OOH-coverage parity
+    m7l6 = _add_lesson(
+        session, mod7, order=6,
+        title="OOH-coverage parity: same Tier-1 in-hours should be Tier-1 OOH",
+        lesson_type=LessonType.READING, duration_min=15,
+        content_md="""
+> **Learning objectives.**
+> 1. Compute **OOH-coverage parity** as a percentage
+> 2. Apply the **80% / 100% bands** for parity classification
+> 3. Make the **trade-off explicit** for leadership: lower OOH coverage or invest more
+> 4. Track parity **quarterly** as a leadership KPI
+
+## The parity rule
+
+Every Tier-1 result in-hours should be Tier-1 OOH at acceptable TTR. The parity rule:
+
+```
+parity = (OOH_Tier-1_count / in-hours_Tier-1_count) × 100
+```
+
+For a quarter where 12 in-hours exercises produced 9 Tier-1 and 12 OOH exercises produced 7 Tier-1:
+
+```
+parity = 7 / 9 = 78%
+```
+
+## Parity bands
+
+| Parity | Meaning | Action |
+|---|---|---|
+| 100% | Full parity | Maintain |
+| 80-99% | Concerning | Investigate; specific rules / paths fail OOH |
+| < 80% | Posture problem | Leadership discussion needed |
+
+A SOC running at 78% parity has chosen (deliberately or not) a different posture in-hours vs OOH. The L3's reflex: make the choice *explicit*. Either the org accepts the 78% (lower OOH coverage; longer OOH MTTR) or they invest to lift parity (more on-call, better SOAR maturity, vendor OOH expansion).
+
+## Worked Q3 parity
+
+```
+Q3 in-hours exercises: 12
+  Tier-1: 9, Tier-2: 2, Tier-3: 1
+Q3 OOH exercises: 12 (same techniques, dual-window protocol)
+  Tier-1: 7, Tier-2: 3, Tier-3: 2
+parity = 7 / 9 = 78%
+```
+
+Reading: parity below the 80% threshold → posture problem. Investigate which OOH-Tier-1 results dropped to Tier-2. Common causes:
+- A rule didn't auto-page OOH; alert went to dashboard-no-one-watches.
+- The on-call rota was wrong for that alert class; routing failed.
+- A SOAR playbook depended on a 9-5 service.
+
+Each diagnosis becomes a specific OOH TP.
+
+## Computing parity per technique
+
+Aggregate parity is a leadership headline; per-technique parity is the operational data. The L3 maintains:
+
+| Technique | In-hours tier | OOH tier | Parity status |
+|---|---|---|---|
+| T1059.001 | Tier-1 | Tier-1 | ✓ Parity |
+| T1003.001 | Tier-1 | Tier-1 | ✓ Parity |
+| T1078.004 | Tier-1 | Tier-1 | ✓ Parity |
+| T1110.003 | Tier-1 | **Tier-2** | ✗ OOH gap (TP-301) |
+| T1486 | Tier-1 | Tier-1 | ✓ Parity |
+| T1018 | Tier-1 | Tier-1 | ✓ Parity |
+| T1098.005 | Tier-2 | Tier-2 | (in-hours gap, separate TP) |
+| T1071.001 | Tier-1 | **Tier-2** | ✗ OOH gap (TP-302) |
+| T1547.001 | Tier-1 | Tier-1 | ✓ Parity |
+
+Two specific OOH gaps (T1110.003 spray; T1071.001 C2). Two specific TPs.
+
+## Reporting parity to leadership
+
+```
+Q3 OOH posture:
+  Coverage parity: 78% (Q2: 75%, +3pp)
+  Critical-class parity: 100% (acceptable; critical paging works)
+  Medium-class parity: 67% (concerning; on-call routing gap)
+
+Open OOH-specific TPs: 4
+  TP-301: Lateral-movement severity from Medium → High + on-call routing fix
+  TP-302: C2 detection — beacon-CV rule needs OOH-specific tuning
+  TP-303: SOAR playbook for cloud-account-abuse — handles 9-5 service dependency
+  TP-304: Vendor Tier-3 hours expansion (RFP'd; awaiting CISO decision)
+
+Trend: parity rising +3pp/quarter; reaching 80% target by Q1 2027 if continued
+```
+
+The leadership question: *invest more in OOH (close to 100% parity faster) or accept the trajectory?*
+
+## Glossary
+
+- **OOH-coverage parity** — (OOH Tier-1 count / in-hours Tier-1 count) × 100.
+- **80% threshold** — below this, posture problem; needs leadership discussion.
+- **Per-technique parity** — operational data feeding aggregate parity.
+- **Trajectory reporting** — quarter-over-quarter parity trend.
+
+## Further reading
+
+- L3 M4 (telemetry quality) — DML coverage; complements parity.
+- Florian Roth — *Detection Maturity KPIs*.
+""",
+    )
+    _add_q(session, m7l6, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="A SOC ran 12 dual-window exercises in Q3. In-hours: **10 Tier-1**. OOH: **6 Tier-1**. Compute the **OOH-coverage parity** as a percentage rounded to nearest integer.",
+        options=None,
+        correct=[
+            "60%",
+            "60",
+            "60 percent",
+            "60 %",
+        ],
+        explanation_md="**60%.** Computing: parity = OOH Tier-1 / in-hours Tier-1 = 6 / 10 = **0.60 = 60%**. This is well below the 80% concerning threshold — it's a posture problem requiring leadership discussion. The SOC has substantially less coverage OOH than in-hours; the trade-off (longer OOH TTR, lower OOH coverage, or invest more) needs explicit leadership choice. The L3's report: \"Q3 parity 60%; OOH posture problem; 4 specific TPs raised; without investment, parity will not exceed 75% by year-end.\" The CISO answers — fund OOH improvements (more on-call, better SOAR maturity, vendor 24/7 expansion) or accept the lower posture explicitly.",
+        points=2,
+    )
+
+    # Lesson 7.7 — Reporting OOH posture
+    m7l7 = _add_lesson(
+        session, mod7, order=7,
+        title="Reporting OOH posture distinctly: in-hours and OOH metrics side-by-side",
+        lesson_type=LessonType.READING, duration_min=12,
+        content_md="""
+> **Learning objectives.**
+> 1. Split the **leadership scorecard** into in-hours and OOH columns
+> 2. Surface the **trade-off** explicitly (lower coverage vs more investment)
+> 3. Track the **parity trajectory** quarter-over-quarter
+> 4. Frame OOH as a **leadership decision**, not an operational problem
+
+## The split scorecard
+
+The L3's quarterly report to leadership has separate columns for in-hours and OOH:
+
+```
+Q3 2026 Detection Coverage Report
+
+                              In-hours    OOH         Parity
+  Detection coverage          78%         64%         82%
+  Median MTTR                 9 min       14 min      —
+  Critical-class TTR          4 min       8 min       —
+  Coverage trend qoq          +5pp        +3pp        +1pp
+  Open TPs                    8           4           —
+
+Specific OOH posture:
+  Critical-class parity:      100%  ✓
+  Medium-class parity:        67%   ✗ (TP-301, TP-302)
+
+Trade-off:
+  Current OOH MTTR is 1.5× in-hours. The actor reaches T+25 min;
+  OOH containment is at T+14 min plus L1 ack. 11-min margin.
+  The margin is narrower than in-hours (where containment fires
+  pre-impact).
+
+Decision needed:
+  Option A — accept the current OOH posture (no new investment).
+  Option B — invest in OOH improvements:
+    - Bigger on-call rota (cost: 2 FTE)
+    - Tier-3 vendor 24/7 expansion (cost: $X K/year contract)
+    - SOAR auto-isolate on Medium-class lateral movement (cost: ~5 days engineering)
+  Option C — accept the OOH posture for now; review next quarter.
+```
+
+## Why split
+
+Aggregating in-hours + OOH metrics:
+- Hides the OOH trade-off.
+- Implies the SOC has uniform 24/7 posture (it doesn't).
+- Lets leadership avoid the explicit choice (more investment vs accept lower OOH).
+
+Splitting forces the question: *is our OOH MTTR acceptable?*
+
+## Trajectory tracking
+
+Quarter-over-quarter parity:
+- Q1: 73%.
+- Q2: 75% (+2pp).
+- Q3: 82% (+7pp).
+- Q4 (target): 90% (+8pp).
+
+The trajectory tells leadership *direction*. Stagnant parity → investment isn't translating to outcomes. Climbing parity → the strategy is working.
+
+## Framing OOH as a leadership decision
+
+The L3's reflex: present OOH posture as a *trade-off* the org has chosen, not a *problem* the SOC has failed to fix. Three framings:
+
+| Framing | Effect |
+|---|---|
+| "OOH coverage is a problem we need to fix" | Implies failure; defensive response |
+| "OOH posture is a trade-off; here are the options" | Leadership can decide on cost-vs-coverage |
+| "We're tracking OOH separately because the actor times attacks for OOH" | Frames OOH as a known threat-actor pattern; investment is a defensive necessity |
+
+The third framing is most effective for budget conversations.
+
+## Glossary
+
+- **Split scorecard** — separate in-hours and OOH columns.
+- **Parity trajectory** — quarter-over-quarter parity trend.
+- **Trade-off framing** — present OOH posture as a chosen trade-off, not a failure.
+- **Threat-actor framing** — actor knows OOH is slower; investment is defensive.
+
+## Further reading
+
+- L3 M5.6 — lifecycle KPI reporting.
+- L3 M6.6 — chain-level scorecard.
+""",
+    )
+    _add_q(session, m7l7, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L3 reports OOH posture to the CISO. Which framing is **most effective**?",
+        options=[
+            {"value": "problem", "label": "*\"OOH coverage is a problem we need to fix; we're underperforming.\"*"},
+            {"value": "tradeoff", "label": "*\"OOH posture is a chosen trade-off; the org currently accepts longer OOH MTTR. Here are the options to lift parity (investment) vs accept the trajectory.\"*"},
+            {"value": "blame_oncall", "label": "*\"The on-call rota isn't responsive enough.\"*"},
+            {"value": "benchmark", "label": "*\"Other SOCs have the same OOH posture, so we're fine.\"*"},
+        ],
+        correct="tradeoff",
+        explanation_md="**Trade-off framing** is most effective. It presents OOH posture as a *chosen* state — the org currently accepts a particular OOH MTTR and parity level — not a *failed* state the SOC needs to apologise for. From this framing, leadership can choose: invest more (more on-call, vendor 24/7, SOAR maturity) to lift parity, or explicitly accept the trade-off. The \"problem\" framing produces defensive responses; the \"blame on-call\" framing scapegoats people for a structural choice; benchmarking against other SOCs avoids the question. The threat-actor framing (\"the actor knows OOH is slower\") is also strong for budget conversations because it frames investment as a defensive necessity, not a cost-cutting target.",
+        points=2,
+    )
+
+    # Lesson 7.8 — Capstone
+    m7l8 = _add_lesson(
+        session, mod7, order=8,
+        title="L3 M7 Capstone — OOH discipline review",
+        lesson_type=LessonType.QUIZ, duration_min=10,
+        content_md="""
+Two-question capstone covering parity computation and OOH gap routing.
+
+Module 8 picks up: **Capstone exercise** — a full purple-team programme review across the L3 syllabus, integrating all six prior modules into one quarterly cycle.
+""",
+    )
+    _add_q(session, m7l8, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="An L3 finds during the OOH audit: a **SOAR auto-isolate playbook** for T1078.004 alerts depends on calling a service desk that's only staffed 9-5. OOH, the playbook fails. Which **backlog** owns the fix?",
+        options=None,
+        correct=[
+            "SOAR tooling",
+            "SOAR",
+            "SOAR-tooling",
+            "SOAR team",
+            "SOAR engineering",
+            "soar tooling",
+            "the SOAR tooling backlog",
+        ],
+        explanation_md="**SOAR tooling.** The playbook is a SOAR artefact; rewriting it to be OOH-resilient (e.g. by skipping the service-desk dependency OOH and proceeding with auto-isolation, or by escalating to on-call instead) is SOAR-engineering work. It's not a detection-eng issue (the alert fires correctly), not a SIEM-team issue (the parser works), not a platform issue (the data source is healthy), not schema-debt (no missing field). The SOC-process backlog might *also* get an entry (the operational decision: should auto-isolate proceed without service-desk in the loop OOH?), but the load-bearing fix is in SOAR.",
+        points=2,
+    )
+    _add_q(session, m7l8, order=2, kind=QuestionKind.SINGLE,
+        stem_md="An L3's quarterly report shows in-hours coverage **78%**, OOH coverage **64%**, parity **82%**. The trajectory shows parity climbing **+3pp / quarter**. CISO asks: *\"Should we invest in OOH improvements or accept the trajectory?\"* What's the **right L3 response**?",
+        options=[
+            {"value": "always_invest", "label": "Always invest — more coverage is better"},
+            {"value": "always_accept", "label": "Always accept — investment is wasteful"},
+            {"value": "tradeoff_options", "label": "Lay out the trade-off explicitly: at +3pp/quarter, parity reaches the 100% target in ~6 quarters. Investment options can shorten that to ~2 quarters at $X cost. The decision is the CISO's based on the org's risk-acceptance + OOH-attack-likelihood; the L3's job is to make the trade-off explicit, not pre-decide it"},
+            {"value": "consult_external", "label": "Consult an external vendor for benchmarking"},
+        ],
+        correct="tradeoff_options",
+        explanation_md="**Lay out the trade-off explicitly.** The L3's role is to surface the data so leadership can decide. The trajectory shows the SOC is improving (+3pp / quarter); investment can accelerate that. The CISO's decision depends on factors the L3 doesn't own: budget, risk appetite, threat-actor likelihood (does the actor target OOH?), org's hours of operation. Pre-deciding (\"always invest\" or \"always accept\") removes the leadership choice; consulting external vendors avoids the L3's own analytical work. The right response makes the trade-off explicit with cost/time scales, names the decision-makers, and respects that this is a leadership question — exactly the M7.7 framing.",
+        points=2,
+    )
+
+    print(f"  L3: {course.title} — 7 modules, 56 lessons (Module 7 OOH validation @ proper depth)")
     return course
 
 

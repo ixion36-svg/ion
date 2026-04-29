@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.12.13 (2026-04-29) — curriculum
+
+### L3 Module 7 — Out-of-hours / off-shift validation
+
+L3 advances 6/8 → **7/8**. Why in-hours coverage doesn't imply OOH; the OOH response stack (SOAR + on-call as load-bearing front line); OOH exercise design + scoping (Tuesday 02:00 window, direct on-call pre-brief, < 1h time-box); the dual-window comparison (same chain in-hours and OOH; per-phase TTR delta); OOH-specific gap audit (dashboards no one watches, 9-5 automation, vendor-support hours, cross-team paths); OOH-coverage parity rule (80% threshold); leadership reporting that splits in-hours and OOH metrics with explicit trade-off framing.
+
+#### What's authored
+
+8 lessons (7 reading + 1 quiz capstone), 9 questions, ~14k words at BTL1/SANS GCTH depth.
+
+| Lesson | Topic |
+|---|---|
+| 7.1 | In-hours ≠ OOH — ten things change at 03:14; MTTR splitting |
+| 7.2 | OOH response stack — SOAR + on-call as front line |
+| 7.3 | OOH exercise design — Tuesday 02:00, direct pre-brief, time-box |
+| 7.4 | Dual-window comparison — per-phase TTR delta drives severity reclassification |
+| 7.5 | OOH-specific gap audit — five gap classes with backlog routing |
+| 7.6 | Coverage parity — 80% / 100% bands; per-technique parity |
+| 7.7 | Leadership reporting — split scorecard; trade-off framing |
+| 7.8 | Capstone — backlog routing for OOH gaps + investment-vs-accept framing |
+
+#### Curriculum status
+
+- **L1**: 8/8 ✅
+- **L2**: 8/8 ✅
+- **L3**: **7/8** authored at proper depth (M1-M7). M8 — Capstone — next, then L3 COMPLETE.
+
+---
+
 ## v0.12.12 (2026-04-29) — curriculum
 
 ### L3 Module 6 — Multi-host chain emulation
