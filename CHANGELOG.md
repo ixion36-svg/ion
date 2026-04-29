@@ -1,5 +1,55 @@
 # Changelog
 
+## v0.14.0 (2026-04-29) — feature
+
+### Wallboard dashboard — full-screen ION snapshot for wall display
+
+A single page intended for full-screen wall monitoring of the SOC. Six metric panels (alerts, cases, Bob, detection, CYAB, curriculum), a service-health strip across the top, a marquee ticker across the bottom, and a clock. Auto-refreshes every 5 minutes client-side; the underlying snapshot is server-cached with a 5-min TTL so N concurrent wall displays cost the same as 1.
+
+#### What's authored
+
+- **`services/wallboard_service.py`** — single-snapshot service. `get_snapshot(session)` returns a fresh snapshot if the cached one is older than 5 min, otherwise serves cached. Each panel-collector is wrapped in a try/except so a broken integration (e.g. ES unreachable) emits a partial result with `error: <msg>` rather than blowing up the whole snapshot. ~340 LOC.
+- **`web/wallboard_api.py`** — three routes: `GET /wallboard` (HTML page), `GET /api/wallboard/snapshot` (JSON; cached), `POST /api/wallboard/refresh` (force-recompute).
+- **`web/templates/wallboard.html`** — standalone full-screen template (does not extend `base.html` to maximise screen real estate). 1920×1080-friendly grid: header + 3×2 panel grid + ticker. High-contrast colour palette; all numbers in tabular-nums for visual stability under live update; service-health dots with pulse animation on `down` state.
+
+#### What each panel surfaces
+
+| Panel | Big number | Supporting metrics |
+|---|---|---|
+| **Alerts** | `last 24h count` | open / acknowledged / closed; verdict distribution (last 7d) |
+| **Cases** | `open right now` | closures last 24h; severity distribution of open cases |
+| **Bob — AI Analyst** | `investigations 24h` | total investigations; feedback rows; analyst-Bob agreement % bar |
+| **Detection** | `alert-prompt template count` | TIDE healthy / total; TIDE error count |
+| **CyAB Onboarding** | `system count` | avg readiness score; sub-profile assignment progress bar |
+| **Curriculum** | `completed courses` | total enrolments; certificates issued; top 3 enrolled courses |
+
+#### Service health strip
+
+Six dots across the header — Postgres / Elasticsearch / Kibana / TIDE / OpenCTI / Ollama / Bob. Green = up, grey = off (not configured), red-pulsing = down. Best-effort checks; never blocks the snapshot.
+
+#### Caching strategy
+
+The first wallboard load after a TTL-expiry recomputes the snapshot; subsequent loads within the next 5 minutes serve the cached version. `cache_age_seconds` is exposed on the response so the page can render *Snapshot refreshed Nm ago* in the header. Setting `force=true` (or hitting `POST /api/wallboard/refresh`) bypasses the cache for admin / cron use.
+
+#### Verifying the feature
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+Then in a browser, navigate to `/wallboard` (auth-required) and put it on a wall display. The page auto-refreshes every 5 min. Direct API access at `/api/wallboard/snapshot` returns the same JSON with `cache_age_seconds` indicating when the snapshot was last computed.
+
+For dedicated kiosk-mode deployment, point a Chromium kiosk session at the URL after a one-time login. The snapshot auto-refreshes; no further interaction needed.
+
+#### Notes on extension
+
+- New panel? Add a `_collect_<x>(session)` function to `wallboard_service.py`, hook into `_gather()`, add a `<section class="wb-panel">` in `wallboard.html`, write a `render<X>` JS function. ~30 LOC per panel.
+- New service-health entry? Add to `_collect_service_health` in the service + add the name to the `SERVICES` JS array.
+- Tighter refresh? Set `_CACHE_TTL_SECONDS` lower in `wallboard_service.py` and the matching `REFRESH_MS` in the template. Default is 300 / 5 minutes; tighter than that risks DB load on multi-display deployments.
+
+---
+
 ## v0.13.2 (2026-04-29) — feature
 
 ### Labs (foundational) — 8 hands-on labs across L1 / L2 / L3 + the missing /my-courses page

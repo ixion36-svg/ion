@@ -45,6 +45,7 @@ from ion.web.threat_landscape_api import router as threat_landscape_router
 from ion.web.threat_watch_gap_api import router as threat_watch_gap_router
 from ion.web.cyab_api import router as cyab_router
 from ion.web.cyab_studio_api import router as cyab_studio_router
+from ion.web.wallboard_api import router as wallboard_router
 from ion.web.social_api import router as social_router
 from ion.web.analytics_api import router as analytics_router
 from ion.web.engineering_analytics_api import router as engineering_analytics_router
@@ -276,6 +277,7 @@ app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(engineering_analytics_router, prefix="/api/engineering/analytics")
 app.include_router(cyab_router, prefix="/api/cyab")
 app.include_router(cyab_studio_router, prefix="/api/cyab/studio")
+app.include_router(wallboard_router, prefix="")
 app.include_router(threat_intel_router, prefix="/api/threat-intel")
 app.include_router(threat_watch_gap_router, prefix="/api/threat-intel")
 app.include_router(threat_landscape_router, prefix="/api")
