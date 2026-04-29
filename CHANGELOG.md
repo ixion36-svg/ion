@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.13.0 (2026-04-29) — feature
+
+### PDF course-completion certificates
+
+With the full curriculum (L1 + L2 + L3) shipped at v0.12.14, course completers can now download a PDF certificate. The cert is generated weasyprint-side at request time, A4-landscape, with ION branding, course / level / learner-name / completion-date / aggregate-score / module + lesson totals, and a verification id of the form `CERT-<slug>-<enr-id>-<YYYYMMDD>`.
+
+#### What's authored
+
+- New API route `GET /api/courses/{slug}/certificate.pdf` — generates the certificate PDF for the current user's enrolment. Returns 404 if the course doesn't exist, 403 if the user isn't enrolled or hasn't completed the course, 200 + `application/pdf` otherwise. Falls back to HTML render if weasyprint unavailable.
+- `_render_certificate_html()` — internal renderer building the styled HTML body. Same weasyprint pattern as the v0.12.0 CyAB Onboarding Pack.
+- `course_detail.html` — *Download certificate* button rendered on completed courses, alongside the existing "✓ Completed · NN%" pill. Links directly to the new endpoint.
+- The pre-existing `course_enrolments.certificate_url` column (defined v0.11.7+) is now populated on first download — caches the URL so the catalog can show issued state without re-rendering.
+
+#### Verifying the feature
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+After upgrade:
+1. Open `/courses` and pick any course (e.g. *Adversary Emulation Basics*).
+2. Enrol; complete every lesson (mark as done; submit quizzes with passing scores).
+3. The course-detail header shows ✓ Completed + a *Download certificate* button.
+4. Click — a PDF downloads named `ion_certificate_<slug>_enr<id>.pdf`. Open it; A4-landscape with the framed cert, learner name, completion date, score, verification id at the bottom.
+5. Re-clicking issues the same PDF (idempotent rendering; `certificate_url` is cached after first download).
+
+No DB migration — uses the existing `certificate_url` column that has been on `UserEnrolment` since v0.11.7.
+
+---
+
 ## v0.12.14 (2026-04-29) — curriculum (L3 COMPLETE; FULL CURRICULUM SHIPPED)
 
 ### L3 Module 8 — Capstone — Full purple-team programme review
