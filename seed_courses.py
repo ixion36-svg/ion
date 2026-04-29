@@ -20377,7 +20377,892 @@ Module 6 picks up: **Multi-host chain emulation** — the worked end-to-end FIN6
         points=2,
     )
 
-    print(f"  L3: {course.title} — 5 modules, 40 lessons (Module 5 Detection-eng loops @ proper depth)")
+    # ── Module 6 — Multi-host chain emulation ─────────────────────────
+    mod6 = _add_module(
+        session, course, order=6,
+        title="Multi-host chain emulation — measuring response time and containment leverage",
+        description_md=(
+            "Single-TTP exercises measure detection fidelity. Chain "
+            "exercises measure something different and harder: the "
+            "SOC's *response time* and *containment leverage* across "
+            "a real adversary's kill chain. This module walks the "
+            "design (pick adversary, map phases, identify host "
+            "roles), per-host authorisation + pre-brief, Caldera "
+            "execution with the `look` planner and cross-agent fact "
+            "propagation, per-phase + end-to-end timing measurement, "
+            "the chain-level scorecard with kill-chain columns, "
+            "mid-exercise mistaken-IR-engagement recovery, and the "
+            "containment-leverage analysis that picks which phase's "
+            "response is most effective at stopping the chain."
+        ),
+        estimated_minutes=200,
+    )
+
+    # Lesson 6.1 — From single-TTP to chain
+    m6l1 = _add_lesson(
+        session, mod6, order=1,
+        title="Single-TTP vs chain: when chain emulation earns its weight",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Distinguish what **single-TTP exercises** vs **chain exercises** measure
+> 2. Recognise when the SOC's question requires a chain (not single-TTP)
+> 3. Pick the right exercise shape for a given operational question
+> 4. Apply the **rule of N**: at least 4 hosts before "chain" earns its weight
+
+## What each exercise measures
+
+The two exercise types answer fundamentally different questions:
+
+| Exercise | Primary measurement | Secondary measurement |
+|---|---|---|
+| **Single-TTP atomic** | Detection fidelity per technique | Latency, severity correctness |
+| **Multi-host chain** | End-to-end response time | Containment leverage, per-phase TTR |
+
+A single-TTP atomic asks: *do my detections fire on this technique?* A chain asks: *would my SOC contain a real intrusion in time, and at which step is response most effective?*
+
+## The right exercise for the question
+
+| Operational question | Exercise type |
+|---|---|
+| Do we detect T1059.001? | Single-TTP atomic |
+| Do we detect every TTP in our threat profile? | Single-TTP atomics — many of them |
+| Do we detect FIN6 end-to-end? | Chain — multiple TTPs in FIN6's order |
+| How fast do we contain a real intrusion? | Chain with response-time measurement |
+| Which step's containment kills the chain fastest? | Chain with containment-leverage scoring |
+| Does our SOAR auto-isolate work mid-chain? | Chain with SOAR validation |
+| Has our chain time improved over the year? | Chain re-tested quarterly with same baseline |
+
+A SOC that only runs single-TTP atomics has perfect *fidelity* metrics but no *speed* metrics — they don't know whether they'd contain a real intrusion in time. The chain exercise produces the speed metrics.
+
+## The rule of N
+
+Chains need **at least 4 distinct hosts** for the response-time measurement to be meaningful:
+
+- **1 host**: single-TTP at most.
+- **2 hosts**: lateral movement is possible but limited; only one direction.
+- **3 hosts**: initial / lateral / impact triangle; minimum viable chain.
+- **4+ hosts**: realistic adversary topology (initial / pivot / privileged target / impact).
+
+Below 4 hosts, the chain isn't testing the SOC's *cross-zone response* (which is where most real campaigns get caught — at the network-zone boundary). The L3's reflex: a "chain" with 2 hosts is really *a sequence of single-TTPs across two hosts*. Don't conflate the two.
+
+## When NOT to run chains
+
+Chains are expensive: more hosts, more authorisation, more pre-briefing, more orchestration overhead. Don't reach for chains when:
+
+- The team is still building single-TTP coverage. Get to DML-4 across the threat profile first.
+- The team's SOAR isn't capable of automated containment. Chain exercises measure a containment loop; if there's no loop to measure, the exercise produces noise.
+- The SOC is small (< 5 analysts). The pre-briefing alone is half a day; the cost-benefit shifts.
+
+For mature programs (DML-4 across ~70% of profile, SOAR auto-isolate working), chains earn their weight. For early-stage programs, prioritise single-TTP fidelity first.
+
+## How chains complement single-TTP work
+
+Chains DON'T replace single-TTP atomics. Both belong in the toolkit:
+
+- **Single-TTP** is the granular fidelity-tier scoring (M1.6 four-tier, M5.6 lifecycle KPIs).
+- **Chain** is the response-time scoring.
+
+A SOC's quarterly purple-team calendar typically has:
+- 3-4 single-TTP atomics per week (covers ~50 techniques per quarter).
+- 1 chain per quarter (full-actor end-to-end).
+
+The chain tests *integrated* response; the single-TTP atomics test *individual detection*. Both feed the leadership scorecard.
+
+## Glossary
+
+- **Single-TTP atomic** — one technique, one host, fidelity-focused.
+- **Multi-host chain** — multiple techniques across 4+ hosts, response-time-focused.
+- **Containment leverage** — which step's containment stops the most downstream.
+- **Rule of N** — chain exercises need ≥ 4 hosts for the measurement to be meaningful.
+
+## Further reading
+
+- L3 M3 (Caldera operations).
+- MITRE Adversary Emulation Library — chain plans.
+""",
+    )
+    _add_q(session, m6l1, order=1, kind=QuestionKind.SINGLE,
+        stem_md="The CISO asks the SOC: *\"If a real adversary launched a Conti-style ransomware campaign on us today, would we contain it before encryption fires?\"* Which exercise shape answers that question?",
+        options=[
+            {"value": "single", "label": "Single-TTP atomic — run T1486 (encryption) and check if the rule fires"},
+            {"value": "chain", "label": "Multi-host chain — emulate the full Conti kill chain and measure end-to-end response time vs chain time"},
+            {"value": "either", "label": "Either works equally well"},
+            {"value": "tabletop", "label": "Tabletop exercise only — no technical exercise needed"},
+        ],
+        correct="chain",
+        explanation_md="**Multi-host chain.** The CISO's question is about *response time* across a chain, not detection fidelity per technique. A single-TTP T1486 atomic answers *do we detect encryption?* — a useful question, but not the one asked. The chain exercise emulates the full Conti kill chain (initial access → cred access → lateral → impact) across multiple hosts, measures per-phase TTR + end-to-end chain time, and tells the CISO whether the SOC's containment is faster than the chain. Containment-leverage analysis (which phase's containment kills the chain fastest) drops out as a free side-product. Tabletop exercises validate the team's playbooks but don't produce empirical timing data — they're complementary, not substitutes.",
+        points=2,
+    )
+
+    # Lesson 6.2 — Designing the chain
+    m6l2 = _add_lesson(
+        session, mod6, order=2,
+        title="Designing the chain: pick adversary, map phases, identify host roles",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Pick a chain **adversary** from the threat profile + AEL
+> 2. Map **kill-chain phases** to specific TTPs
+> 3. Assign **host roles** — initial-access, lateral, impact targets
+> 4. Document the chain plan as a **shippable artefact** before exercise day
+
+## Step 1 — Pick the adversary
+
+Source from the threat profile (M1.2). The right adversary for a chain:
+- Active in the last 12 months in your sector.
+- Has a documented end-to-end kill chain (multiple kill-chain phases).
+- Has a published emulation plan (AEL — M2.6) OR known TTPs detailed in CTI.
+- Tools / tradecraft are within the SOC's emulation capability.
+
+Common picks for finance: FIN6, FIN7, Conti, Carbanak, BlackByte, BlackCat. For health: Royal, BlackByte, Hive (historical). For govt: APT29, Sandworm. For tech: Lazarus, APT38.
+
+## Step 2 — Map kill-chain phases
+
+ATT&CK has 14 tactics; a typical chain touches 6-9 of them. From the AEL plan or CTI source, list the TTPs:
+
+```
+FIN6 chain (compressed):
+  Initial Access (TA0001):       T1566.002 — spearphishing-link
+  Execution (TA0002):            T1059.001 — mshta encoded PS
+  Persistence (TA0003):          T1547.001 — registry Run key
+  Credential Access (TA0006):    T1003.001 — LSASS dump
+  Discovery (TA0007):            T1018 — net group enum
+  Lateral Movement (TA0008):     T1021.002 — SMB lateral
+  Command & Control (TA0011):    T1071.001 — HTTPS C2
+  Impact (TA0040):               T1486 — file encryption sandbox
+```
+
+8 phases / 8 TTPs. The L3 picks specific atomic test numbers per phase (M2.1 atomic_tests array; M3.4 Caldera abilities).
+
+## Step 3 — Assign host roles
+
+The chain needs distinct hosts per role:
+
+| Host role | What it represents | Chain abilities |
+|---|---|---|
+| **Initial-access target** | The host phishing lands on; the foothold | T1566.* / T1078.* / T1190 |
+| **Privilege-escalation host** | Where the actor escalates (often the same as initial) | T1547.* / T1055.* / T1003.* |
+| **Lateral target** | The privileged host the actor pivots to | T1021.* / T1018 |
+| **Collection / staging** | Where the actor stages before exfil | T1005 / T1213 |
+| **Impact target** | Where encryption / wiper fires | T1486 / T1561 |
+
+For a 4-host chain: initial-access host + lateral target + collection host + impact host. The privilege-escalation step often happens on the initial-access host, so doesn't need its own.
+
+## The chain plan document
+
+The chain plan is a shippable artefact authored before exercise day. Template:
+
+```yaml
+chain_id: CH-2026-04-001
+adversary: FIN6 Compressed
+threat_profile_source: Mandiant M-Trends 2026 + sector ISAC bulletins Q1 2026
+ael_reference: https://github.com/center-for-threat-informed-defense/adversary_emulation_library/tree/master/fin6
+exercise_window: 2026-04-29 14:00 - 15:00 UTC
+hosts:
+  initial_access: PT-LAB-04 (Windows 10, EDR active, Sysmon SwiftOnSecurity baseline)
+  lateral: PT-LAB-05 (Windows Server 2019, member of test domain)
+  collection: PT-LAB-05 (same as lateral; collection happens in-place)
+  impact: PT-LAB-06 (Windows Server 2019, isolated test subnet)
+phases:
+  - phase: Initial Access (TA0001)
+    technique: T1566.002 spearphishing-link
+    atomic: ART T1566.002 #2
+    expected_detection: rule "Suspicious URL in email" fires within 5 min
+    expected_response: SOAR auto-isolate of source mailbox
+  - phase: Execution (TA0002)
+    technique: T1059.001 mshta encoded PS
+    atomic: ART T1059.001 #3
+    expected_detection: rule "Suspicious PowerShell -enc" fires within 5 min
+    expected_response: L1 ack within 30 min
+  - phase: Persistence (TA0003)
+    technique: T1547.001 registry Run key
+    atomic: ART T1547.001 #1
+    expected_detection: rule "Registry Run key add" fires within 5 min
+  - phase: Credential Access (TA0006)
+    technique: T1003.001 LSASS dump
+    atomic: ART T1003.001 #2 (comsvcs.dll mini-dump)
+    expected_detection: rule "LSASS access (0x1010 mask)" fires within 5 min
+  - phase: Discovery (TA0007)
+    technique: T1018 net group enum
+    atomic: ART T1018 #1
+    expected_detection: rule "AD enum" fires within 5 min
+  - phase: Lateral Movement (TA0008)
+    technique: T1021.002 SMB lateral
+    atomic: ART T1021.002 #1
+    expected_detection: rule "Suspicious SMB" fires within 5 min
+  - phase: Command and Control (TA0011)
+    technique: T1071.001 HTTPS C2
+    atomic: ART T1071.001 #1 (sandbox C2 server)
+    expected_detection: rule "Beacon CV" fires within 30 min
+  - phase: Impact (TA0040)
+    technique: T1486 file encryption (sandboxed)
+    atomic: ART T1486 #1 (sandbox dir only)
+    expected_detection: rule "Mass file encryption" fires within 5 min
+authorisations:
+  per-host:
+    PT-LAB-04: AUTH-2026-04-014 (CISO + IR Lead, expires 2026-05-01)
+    PT-LAB-05: AUTH-2026-04-015
+    PT-LAB-06: AUTH-2026-04-016
+abort_contacts:
+  primary: J. Doe, mobile +44 7..., #soc-oncall
+  secondary: K. Khan, IR lead
+caldera_operation: To be created at exercise start; planner = look; obfuscator = plain-text
+```
+
+This document is shipped to L1 / L2 / IR / engineering for pre-brief 24-48h before exercise day. Anyone who needs context has it.
+
+## Glossary
+
+- **Chain plan** — pre-exercise document detailing adversary, phases, hosts, authorisations, abort contacts.
+- **Host role** — initial-access / lateral / collection / impact target.
+- **Per-phase expected detection** — what should fire when.
+
+## Further reading
+
+- MITRE Adversary Emulation Library — actor-by-actor plan templates.
+- Mandiant M-Trends — annual; surfaces top adversary chains by sector.
+""",
+    )
+    _add_q(session, m6l2, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *valid* host roles in a multi-host chain emulation design?",
+        options=[
+            {"value": "initial", "label": "Initial-access target — the foothold host"},
+            {"value": "lateral", "label": "Lateral target — the privileged host the actor pivots to"},
+            {"value": "collection", "label": "Collection / staging host — where the actor stages before exfil"},
+            {"value": "impact", "label": "Impact target — where encryption / wiper fires"},
+            {"value": "priv_esc", "label": "Privilege-escalation host (often the same as initial-access)"},
+            {"value": "rubber_duck", "label": "Rubber-duck consultant"},
+            {"value": "lunch_zone", "label": "Lunch zone"},
+        ],
+        correct=["initial", "lateral", "collection", "impact", "priv_esc"],
+        explanation_md="The five valid host roles are initial-access, lateral, collection / staging, impact, and privilege-escalation (typically same host as initial-access; assigned its own role only when escalation needs a distinct context). Each role represents a distinct phase of the kill chain; the exercise's response-time measurement depends on having distinct hosts so the cross-zone response is exercised. The minimum viable chain has 3 distinct hosts (initial / lateral / impact); 4+ hosts is more realistic. Rubber-duck consulting and lunch zones are not load-bearing detection-engineering concerns.",
+        points=3,
+    )
+
+    # Lesson 6.3 — Per-host authorisation
+    m6l3 = _add_lesson(
+        session, mod6, order=3,
+        title="Per-host authorisation and pre-brief: the multi-host scaling of M1.3",
+        lesson_type=LessonType.READING, duration_min=16,
+        content_md="""
+> **Learning objectives.**
+> 1. Author **per-host authorisations** with the four scoping constraints (M1.3 cross-link)
+> 2. Coordinate **owner sign-off** when chain hosts span teams
+> 3. Pre-brief **L1 / L2 / IR per host** in their working chat channels
+> 4. Get **network-path approval** when the chain crosses zones
+
+## Per-host authorisation
+
+Single-TTP exercises need one written authorisation. Chains need one *per host*. Same four scoping constraints (M1.3) per authorisation:
+
+- Technique ID(s) the host carries.
+- Host name (one per authorisation).
+- Time window.
+- Authoriser (CISO + IR Lead minimum).
+
+Why per-host: different hosts may have different owners (IT Ops vs DBA vs Cloud team); different blast-radius profiles; different response infrastructure. Lumping into one auth document obscures the per-host accountability.
+
+## Owner sign-off across teams
+
+A chain that spans:
+- IT Ops's workstations (PT-LAB-04, initial-access target).
+- DBA's database servers (PT-LAB-05, lateral target).
+- Cloud team's storage (PT-LAB-06, impact target).
+
+Needs three owner sign-offs in addition to CISO + IR Lead. The L3's pre-exercise checklist:
+1. CISO sign-off (overall exercise).
+2. IR Lead sign-off (response coordination).
+3. IT Ops owner sign-off (PT-LAB-04).
+4. DBA team owner sign-off (PT-LAB-05).
+5. Cloud team owner sign-off (PT-LAB-06).
+
+Five sign-offs, but the discipline is the same: written, dated, with all four scoping constraints per host.
+
+## Pre-brief in operational chats
+
+The pre-brief (M1.3) goes in the *operational* chat — where the team works — not the L3's preferred chat. For a chain spanning teams:
+
+| Audience | Chat | Timing |
+|---|---|---|
+| L1 SOC | #soc-shift | T-1h |
+| L2 SOC | #soc-l2 | T-2h |
+| IR Lead | #ir-oncall | T-1h |
+| IT Ops (PT-LAB-04 owner) | #it-ops | T-2h |
+| DBA team (PT-LAB-05 owner) | #dba-ops | T-2h |
+| Cloud team (PT-LAB-06 owner) | #cloud-eng | T-2h |
+| Engineering (detection-eng) | #detection-eng | T-2h |
+
+Six chats, one notice per. The notice is the M1.3 EXERCISE NOTICE template, scaled to multi-host:
+
+```
+EXERCISE NOTICE — CH-2026-04-001 (FIN6 Compressed chain)
+Window: 2026-04-29 14:00-15:00 UTC
+Hosts: PT-LAB-04, PT-LAB-05, PT-LAB-06
+Phases: TA0001 → TA0040 (8 phases, ATT&CK techniques in chain plan)
+Expected SIEM activity: process spawns, SMB lateral connections, encryption events on impact target
+Caldera operation: TBD-on-launch; sandcat agents on each host
+Authorised by: J. Smith (CISO), R. Patel (IR), [team owners per host]
+Auth Doc Refs: AUTH-2026-04-014, -015, -016
+Abort contact: J. Doe, +44 7..., #soc-oncall
+Run by: J. Doe (L3 Detection Engineer)
+Chain plan: <link to CH-2026-04-001 chain plan document>
+```
+
+Six teams now know what's happening, when, and who to call.
+
+## Network-path approval
+
+If the chain crosses network zones (e.g. lateral movement from PT-LAB-04 to PT-LAB-05 across a firewall), get the network team's approval:
+- Confirm the path is allowed for the exercise window.
+- Confirm the path is logged (for response measurement).
+- Confirm the chain doesn't trigger automated network-isolation that abort the exercise prematurely.
+
+Some EDRs automatically isolate hosts on suspicion; the L3 coordinates with EDR team to allowlist the test hosts for the exercise window.
+
+## Pre-exercise checklist
+
+```
+[ ] Per-host authorisations written with all four scoping constraints (one doc per host)
+[ ] Owner sign-offs across all teams whose hosts are involved
+[ ] CISO + IR Lead sign-off on overall chain
+[ ] Pre-brief in 6 operational chats (1-4h before)
+[ ] Abort contact named (mobile + chat channel)
+[ ] Network-path approval (firewall / EDR allowlist)
+[ ] Snapshots taken on high-blast-radius hosts (impact target especially)
+[ ] Chain plan document published to all stakeholders
+[ ] Caldera server reachable from all hosts; sandcat deployed
+[ ] Auth tokens / API keys current (for any cloud-component abilities)
+```
+
+10 items. Skipping any has produced documented mis-engagement events in real programs (M6.7 covers).
+
+## Glossary
+
+- **Per-host authorisation** — separate written document per host; same four scoping constraints.
+- **Owner sign-off** — host owners (IT Ops / DBA / cloud / etc.) approve in addition to CISO + IR.
+- **Operational chat** — where the team works; pre-brief here, not L3's preferred chat.
+- **Network-path approval** — firewall / EDR allowlist for the exercise window.
+
+## Further reading
+
+- M1.3 — single-host pre-brief and authorisation.
+- The org's incident-management chat conventions.
+""",
+    )
+    _add_q(session, m6l3, order=1, kind=QuestionKind.MULTI,
+        stem_md="Pre-exercise, the L3 must complete which of the following items for a multi-host chain?",
+        options=[
+            {"value": "per_host_auth", "label": "Per-host authorisations with the four scoping constraints (one doc per host)"},
+            {"value": "owner_signoff", "label": "Owner sign-off from each team whose hosts are in scope (IT Ops / DBA / Cloud / etc.)"},
+            {"value": "ciso_ir", "label": "Overall CISO + IR Lead sign-off on the chain"},
+            {"value": "pre_brief", "label": "Pre-brief in **each** operational chat (L1 / L2 / IR / per-team owners / engineering)"},
+            {"value": "abort", "label": "Named abort contact (mobile + chat channel)"},
+            {"value": "network", "label": "Network-path approval / EDR allowlist for the exercise window"},
+            {"value": "snapshot", "label": "Snapshots on high-blast-radius hosts (especially impact target)"},
+            {"value": "office_lunch", "label": "Office-lunch coordination"},
+            {"value": "name_pet", "label": "Name a pet for the chain"},
+        ],
+        correct=["per_host_auth", "owner_signoff", "ciso_ir", "pre_brief", "abort", "network", "snapshot"],
+        explanation_md="The seven valid pre-exercise items: per-host auths, owner sign-offs, CISO + IR Lead, pre-brief in operational chats, abort contact, network-path approval, snapshots on high-blast-radius hosts. Each maps to a specific failure mode the discipline prevents: skipping any has produced documented mis-engagement events. Lunch coordination and pet-naming are not detection-engineering concerns. The L3's reflex: the 7-item checklist is run, written-down, and timestamped before the exercise starts; the chain plan document references each item by id (auth-doc-refs, owner names, etc.).",
+        points=3,
+    )
+
+    # Lesson 6.4 — Caldera execution
+    m6l4 = _add_lesson(
+        session, mod6, order=4,
+        title="Caldera execution: deploy agents, run with `look` planner, observe",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Deploy sandcat agents to every host in the chain
+> 2. Stand up the Caldera operation with the **`look` planner**
+> 3. Observe the operation in real-time via the UI
+> 4. Verify cross-agent fact propagation as the chain progresses
+
+## Step 1 — Deploy agents
+
+Per the chain plan, deploy sandcat to each host with role-tagged groups:
+
+```powershell
+# PT-LAB-04 (initial-access target)
+Invoke-WebRequest http://caldera.lab:8888/file/download `
+  -Headers @{ platform="windows"; file="sandcat.go" } `
+  -OutFile $env:TEMP\\sandcat.exe
+Start-Process $env:TEMP\\sandcat.exe -ArgumentList `
+  "-server","http://caldera.lab:8888","-group","red-initial"
+```
+
+Repeat for each host with the appropriate `-group` tag (`red-lateral`, `red-collection`, `red-impact`).
+
+Verify each agent appears in the Caldera UI's *Agents* section within one beacon interval (60s default). Cross-check the reported `host`, `platform`, `group` against the chain plan.
+
+## Step 2 — Stand up the operation
+
+Caldera UI: *Operations → Add operation*. Fill in:
+
+| Field | Value |
+|---|---|
+| Name | EX-2026-04-001 — FIN6 Compressed on PT-LAB-{04,05,06} |
+| Adversary | FIN6 Compressed (custom or stockpile) |
+| Group | All four red-* groups (or use a comma-separated list) |
+| Planner | `look` |
+| Obfuscator | `plain-text` (first run; SIEM sees the raw command) |
+| Jitter | `0,5` (low — for fast iteration) |
+| Auto-close | enabled |
+
+Click *Run*. The operation transitions to *running*.
+
+## Step 3 — Observe in real-time
+
+Open *Operations → <name>* in another browser tab. The view shows:
+
+- **Active agents** — the four sandcat agents tagged red-*.
+- **Abilities** — the chain's 8 abilities; each transitions created → running → success/failure.
+- **Facts collected** — populated as abilities discover them.
+
+The L3 watches for:
+- **Each ability completing within ~60s** (the beacon cadence). If an ability sits in *running* for > 5 min, sandcat is having trouble executing or the ability's prereqs failed.
+- **Facts appearing in the *Facts* section** as expected. E.g. after T1003.001 fires, `host.user.password` should appear; if it doesn't, the dump didn't capture credentials.
+- **Abilities marked failed**. The output captures stdout/stderr — read it to diagnose.
+
+## Step 4 — Verify cross-agent fact propagation
+
+The most-fragile part of a chain is the cross-agent fact handoff. After T1003.001 (LSASS dump) fires on PT-LAB-04:
+
+1. Open the *Facts* section.
+2. Confirm `host.user.password` is populated with discovered creds.
+3. Wait for T1021.002 (SMB lateral) to start on PT-LAB-05.
+4. Inspect that ability's input — Caldera substitutes the `host.user.password` fact.
+5. Confirm SMB session is established on PT-LAB-05.
+
+If step 4 fails (substitution doesn't happen), the chain breaks at the lateral phase. Common causes:
+- Fact isn't named correctly (the LSASS dump emitted `host.user.creds` but the lateral ability needs `host.user.password`).
+- Operation's fact filter excludes the fact group.
+- Sandcat agent on PT-LAB-05 doesn't have permission for the SMB connection.
+
+The L3 catches these in real-time and pauses the operation if needed.
+
+## When abilities fail
+
+The L3's first-mile diagnostic for a failed ability:
+1. Read the ability's *output* tab — stdout / stderr / exit code.
+2. Confirm the host's prereqs are met (sandcat alive, network reachable, etc.).
+3. Check Caldera's server logs (`caldera/server.log`) for stack traces.
+4. If the ability fundamentally can't run on the chosen host, swap the host (with re-authorisation) or skip the ability.
+
+For most chain failures, the cause is per-host privilege (the chain plan needed admin context on PT-LAB-05 but the sandcat agent's user doesn't have it). Pre-exercise, the L3 should verify the agent's privilege context matches the chain plan.
+
+## Glossary
+
+- **Per-host group tag** — sandcat's `-group` argument; routes the operation's abilities to the right host.
+- **`look` planner** — concurrent multi-agent scheduler.
+- **Plain-text obfuscator** — first-run pick so the SIEM sees the raw command.
+- **Cross-agent fact propagation** — facts collected by agent A are available to agent B in the same operation.
+
+## Further reading
+
+- L3 M3 (Caldera operations) — full operation-launch flow.
+- Caldera operation logs — `caldera/server.log` + per-operation report.
+""",
+    )
+    _add_q(session, m6l4, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L3 launches a multi-host Caldera operation with sandcat agents on 4 hosts and a chain that has fact dependencies between phases (e.g. lateral phase needs `host.user.password` discovered by an earlier credential-access phase). Which **planner** is the right pick for fast end-to-end execution?",
+        options=[
+            {"value": "batch", "label": "`batch` — runs abilities in YAML order, sequentially"},
+            {"value": "atomic", "label": "`atomic` — single-agent fact-driven; runs one host at a time"},
+            {"value": "buckets", "label": "`buckets` — tactic-grouped concurrent; useful for wide-coverage testing"},
+            {"value": "look", "label": "`look` — concurrent multi-agent scheduler; runs abilities on whichever agent's requirements are met first"},
+        ],
+        correct="look",
+        explanation_md="**`look`** is the right planner for concurrent multi-agent fact-driven chains. Its strategy: scan all agents, find the next ability whose requirements are satisfied on some agent, schedule it. Multiple abilities can run concurrently across different agents. `batch` is sequential (slow). `atomic` is fact-driven but typically single-agent; multi-host chains need the concurrent variant. `buckets` is tactic-grouped, useful for wide-coverage testing but not for chain timing measurement. The L3's reflex from M3.6: *single-host linear → batch; single-host fact-driven → atomic; multi-host parallel fact-driven → look*. For chain exercises measuring response time, `look` produces the fastest end-to-end execution and the most realistic timing measurement.",
+        points=2,
+    )
+
+    # Lesson 6.5 — Per-phase response time + chain time
+    m6l5 = _add_lesson(
+        session, mod6, order=5,
+        title="Measuring per-phase response time and end-to-end chain time",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Pull **per-phase TTR** from the SIEM (alert fire → L1 ack)
+> 2. Pull **end-to-end chain time** from the Caldera operation report
+> 3. Compute the **chain-vs-containment gap** — was the SOC fast enough?
+> 4. Identify the **highest-leverage containment phase**
+
+## The two timing measurements
+
+The chain produces two timing series; the L3 captures both.
+
+### Per-phase TTR (Time to Respond)
+
+For each phase: alert fire timestamp → L1 ack timestamp. Pull from the SIEM:
+
+```esql
+FROM .alerts-security-* | WHERE rule.name LIKE "*[chain phase rule pattern]*"
+  AND @timestamp >= "2026-04-29T14:00:00Z" AND @timestamp <= "2026-04-29T15:00:00Z"
+| SORT @timestamp ASC
+| EVAL ttr_min = (kibana.alert.workflow_status_updated_at - @timestamp) / 60000
+| KEEP @timestamp, rule.name, ttr_min, kibana.alert.severity
+```
+
+For each phase, you get TTR in minutes. Useful per-phase numbers: < 5 min (excellent), 5-15 min (acceptable), > 15 min (concerning), > 1h (failure).
+
+### End-to-end chain time
+
+From the Caldera operation report:
+- **Operation start** — the timestamp the first ability ran.
+- **Operation end** — the timestamp the last ability completed.
+- **Total wall time** = end - start.
+
+The total wall time is the *chain time* — how long the actor's full kill chain takes against the test environment. Real-actor chains usually run between 10 minutes (fast ransomware) and several hours (slow APT). The exercise's chain time should be within an order of magnitude of the actor's documented behaviour; if it's wildly different, the exercise's pacing is wrong.
+
+## Computing the chain-vs-containment gap
+
+The CISO's question (M6.1's example) is *can we contain in time?* The arithmetic:
+
+```
+Chain time = end-of-impact-ability - start-of-initial-access-ability
+Containment time = SOAR-isolate-action timestamp - end-of-initial-access-alert
+Gap = Chain time - Containment time
+```
+
+| Gap | Meaning |
+|---|---|
+| Gap > 0 | Chain finished after containment fired → SOC won the race |
+| Gap = 0 | Chain finished as containment fired → too close to call |
+| Gap < 0 | Chain finished before containment fired → actor reached impact pre-response |
+
+A **negative gap** is the failure case the CISO worries about. The fix isn't faster detection (alerts already fired); it's faster *response* — typically SOAR auto-isolation, faster L1 routing, or reduced human-in-the-loop on critical alerts.
+
+## Identifying the highest-leverage containment phase
+
+Different phases produce different containment leverage:
+
+- Containment at **Initial Access** kills the chain entirely — every downstream phase is blocked.
+- Containment at **Lateral Movement** stops the actor from reaching the impact host — most of the chain is blocked.
+- Containment at **Impact** is too late — encryption / wiper has fired.
+
+The L3's containment-leverage analysis: *for each phase, if we contained at that phase, how many downstream phases would we have blocked?*
+
+| Phase | If contained here, downstream blocked |
+|---|---|
+| Initial Access | 7 / 7 phases (everything) |
+| Execution | 6 / 7 |
+| Persistence | 5 / 7 |
+| Cred Access | 4 / 7 |
+| Discovery | 3 / 7 |
+| Lateral | 2 / 7 |
+| C2 | 1 / 7 |
+| Impact | 0 / 7 (too late) |
+
+Higher number = higher leverage = better containment target. The SOC should optimise containment speed for the highest-leverage phases (Initial Access, Execution).
+
+## Worked timing from a FIN6 chain
+
+The L3 ran the FIN6 chain on 2026-04-29. Operation report + SIEM data:
+
+| Phase | Atomic ran at | Alert fired at | L1 ack at | TTR | Tier |
+|---|---|---|---|---|---|
+| Initial Access | T+0:00 | T+0:02 (2 min latency) | T+0:04 | 4 min | Tier-1 |
+| Execution | T+0:01 | T+0:03 | T+0:06 | 6 min | Tier-1 |
+| Persistence | T+0:02 | T+0:04 | T+0:09 | 7 min | Tier-1 |
+| Cred Access | T+0:08 | (no alert) | — | ∞ (Tier-2) | Tier-2 |
+| Discovery | T+0:11 | T+0:13 | T+0:13 | 13 min | Tier-1 |
+| Lateral | T+0:13 | T+0:15 | T+0:19 | 6 min from alert | Tier-1 |
+| C2 | T+0:18 | (CV detection at T+0:35, 17 min latency) | T+0:46 | 28 min | Tier-1 (slow) |
+| Impact | T+0:25 | T+0:27 | T+0:30 | 5 min | Tier-1 |
+
+Chain total wall time: **25 min**. Initial-access TTR: **4 min**. Containment was *not* triggered — SOAR not configured for auto-isolate on T1078.004.
+
+Reading: alerts fired fast (< 7 min for most phases). Cred Access was a Tier-2 gap (no rule). C2 detection latency was 17 min (within 30-min budget for stat hunts but slow). Impact fired at T+0:25 — sandboxed encryption only ran on PT-LAB-06's test directory. Containment never fired; if SOAR had been configured to auto-isolate on the initial-access alert at T+0:02, the chain would have been contained at T+0:04 — 21 minutes before impact.
+
+The L3's chain-level finding: *we have detection but not response*. TuningProposal: configure SOAR auto-isolate on T1078.004 + T1078.* alerts.
+
+## Glossary
+
+- **Per-phase TTR** — alert fire → L1 ack, per phase.
+- **End-to-end chain time** — operation start → end (Caldera report).
+- **Chain-vs-containment gap** — chain time minus containment time.
+- **Containment leverage** — downstream-phases-blocked per containment phase; highest at Initial Access.
+
+## Further reading
+
+- L1 M7 (Escalation Workflow) — TTR vocabulary.
+- Florian Roth — *Time-to-Detect vs Time-to-Respond*.
+""",
+    )
+    _add_q(session, m6l5, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="A chain ran for **25 minutes** end-to-end. The SOAR's containment action would have fired **27 minutes** after initial access alert (had it been configured). Compute the **chain-vs-containment gap** and report whether the SOC would have contained in time. Format: `gap=<minutes>, contained_in_time=<yes/no>`.",
+        options=None,
+        correct=[
+            "gap=-2, contained_in_time=no",
+            "gap=-2 min, contained_in_time=no",
+            "gap=-2 minutes, contained_in_time=no",
+            "gap = -2, contained_in_time = no",
+            "gap=-2,contained_in_time=no",
+            "gap=-2 min, contained=no",
+        ],
+        explanation_md="**gap=-2, contained_in_time=no.** Computing: gap = chain time - containment time = 25 - 27 = **-2 minutes**. Negative gap means the chain finished *before* containment would have fired — the actor reached impact pre-response. The SOC's detection was fine (alerts fired fast at 4-min TTR) but the response loop was too slow (containment 27 min from initial access). The fix isn't faster detection; it's faster *response* — typically SOAR auto-isolation on the initial-access alert, faster L1 routing, or reducing the human-in-the-loop on critical-severity alerts. The L3's TuningProposal in this case targets the response infrastructure (SOAR config) rather than detection rules.",
+        points=2,
+    )
+
+    # Lesson 6.6 — Chain-level scorecard
+    m6l6 = _add_lesson(
+        session, mod6, order=6,
+        title="The chain-level scorecard with kill-chain step columns",
+        lesson_type=LessonType.READING, duration_min=15,
+        content_md="""
+> **Learning objectives.**
+> 1. Extend the M1.7 single-TTP scorecard to **kill-chain columns**
+> 2. Capture **per-phase tier + TTR** alongside total chain time
+> 3. Document **containment-leverage analysis** in the scorecard
+> 4. Convert chain findings into **cohesive TuningProposals**
+
+## The chain scorecard format
+
+Single-TTP scorecard rows (M1.7) carry: date, technique, host, tier, latency, owner, TP id, status. Chain rows extend with per-phase columns:
+
+```
+Chain ID: CH-2026-04-001
+Date: 2026-04-29
+Adversary: FIN6 Compressed
+Hosts: PT-LAB-04, PT-LAB-05, PT-LAB-06
+Caldera operation: 5d3e170e-...
+Total wall time: 25 min
+Containment time: not configured (would have been 27 min if SOAR auto-isolate enabled)
+Chain-vs-containment gap: -2 min (chain finished pre-response)
+
+Per-phase results:
+  Initial Access (TA0001):       Tier-1     TTR  4 min   ↑ leverage 7/7
+  Execution (TA0002):            Tier-1     TTR  6 min     leverage 6/7
+  Persistence (TA0003):          Tier-1     TTR  7 min     leverage 5/7
+  Credential Access (TA0006):    Tier-2     TTR  ∞         leverage 4/7   GAP
+  Discovery (TA0007):            Tier-1     TTR 13 min     leverage 3/7
+  Lateral Movement (TA0008):     Tier-1     TTR  6 min     leverage 2/7
+  C2 (TA0011):                   Tier-1     TTR 28 min     leverage 1/7   SLOW
+  Impact (TA0040):               Tier-1     TTR  5 min     leverage 0/7
+
+Highest-leverage containment phase: Initial Access (7/7 downstream blocked)
+
+TuningProposals raised:
+  TP-2026-04-201: SOAR auto-isolate on T1078.004 + T1078.* alerts
+                  (response infrastructure; high priority — addresses chain-vs-
+                  containment gap)
+  TP-2026-04-202: Cred-access (T1003.001) Tier-2 — write detection rule
+                  (DML-2 → DML-4)
+  TP-2026-04-203: C2 detection latency 28 min — investigate why beacon-CV
+                  rule's bucket span is 15 min on a 30s beacon (M7 L7.7
+                  bucket-span tuning rule)
+```
+
+Three TPs from one chain. They're cohesive — they collectively address the chain's response gap.
+
+## What "cohesive TuningProposals" means
+
+Single-TTP exercises produce one TP per gap. Chain exercises tend to produce *related* TPs that collectively close a response gap. The L3's reflex: when authoring chain TPs, cross-reference between them.
+
+```yaml
+TP-2026-04-201:
+  related_tps: [TP-2026-04-202, TP-2026-04-203]
+  notes: |
+    Part of CH-2026-04-001 FIN6 chain findings. The full close-the-loop
+    requires all three TPs landing — auto-isolate (this TP) + cred-access
+    detection (TP-202) + C2 latency tuning (TP-203). Re-test the full chain
+    after all three close.
+```
+
+The chain re-test (next quarter or once all related TPs close) validates the *integrated* response — not just per-TP fixes.
+
+## Reporting up to leadership
+
+The chain scorecard's headline for the CISO:
+
+> "Q3 chain exercise (FIN6, 4 hosts) ran 25 min end-to-end. Detection fired in <7 min on 7/8 phases. Containment was not configured for the highest-leverage phase (initial access); the chain would have completed 2 min before SOAR isolation. Three TuningProposals raised, prioritised auto-isolate on cloud-account-abuse alerts. Q4 re-test scheduled."
+
+That's the substance: the SOC has detection, lacks response. The CISO knows what to fund (SOAR maturity), what to expect (re-test next quarter).
+
+## Glossary
+
+- **Chain scorecard** — extended scorecard with per-phase columns + chain timing.
+- **Cohesive TPs** — chain-level TuningProposals that cross-reference and re-test together.
+- **Highest-leverage phase** — the one whose containment kills the most downstream.
+- **Headline for leadership** — one paragraph; metrics + finding + planned next step.
+
+## Further reading
+
+- M1.7 — single-TTP scorecard.
+- M5.2 — TuningProposal authoring.
+""",
+    )
+    _add_q(session, m6l6, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A chain scorecard shows: chain time **25 min**, containment time **27 min**, all 8 phases fired Tier-1 except Cred Access (Tier-2). What's the **single most-load-bearing finding** to report up to the CISO?",
+        options=[
+            {"value": "tier2_cred", "label": "The Tier-2 gap on Cred Access — fix the rule"},
+            {"value": "response_gap", "label": "Detection works; **response is too slow**. Containment fires 2 min after the chain completes; the actor reaches impact pre-response. Highest-leverage fix: SOAR auto-isolate on initial-access alerts"},
+            {"value": "chain_speed", "label": "The chain ran in 25 min — that's faster than expected"},
+            {"value": "everything_fine", "label": "All 8 phases fired alerts; the SOC is healthy"},
+        ],
+        correct="response_gap",
+        explanation_md="**Detection works; response is too slow.** The headline metric is the chain-vs-containment gap: -2 min (chain completed 2 min before containment would have fired). This means the SOC has *detection* (8/8 phases produced alerts) but lacks *response*. The fix isn't more detection rules — it's response-loop infrastructure: SOAR auto-isolation on the highest-leverage phase (initial access — 7/7 downstream blocked). The Tier-2 cred-access gap is real but secondary; even fixing it doesn't close the response gap. \"Chain ran in 25 min, faster than expected\" misses the point — the actor's chain speed is the actor's speed; what matters is whether *we beat it*. \"All 8 phases fired alerts; SOC is healthy\" is exactly the trap — alerting without response is not health. The L3's reflex on chain reporting: lead with the response gap; detection coverage is downstream of it.",
+        points=2,
+    )
+
+    # Lesson 6.7 — Mid-exercise mis-engagement
+    m6l7 = _add_lesson(
+        session, mod6, order=7,
+        title="Handling mid-exercise mistaken-IR-engagement",
+        lesson_type=LessonType.READING, duration_min=14,
+        content_md="""
+> **Learning objectives.**
+> 1. Recognise the **mistaken-IR-engagement** failure mode
+> 2. Apply the five-step **recovery procedure**
+> 3. Distinguish **abort** from **resume** decisions
+> 4. Document the mis-engagement in a **learning log**
+
+## What it is
+
+Despite written authorisation and pre-briefs, sometimes IR engages on a chain mid-exercise — they see telemetry, didn't see / forgot the pre-brief, open a real case. The actor patterns *look* real because they ARE real (just sanctioned). IR can't tell from the telemetry alone.
+
+This is a recoverable failure but it has to be handled carefully. Both extremes are wrong:
+- **Ignore IR's escalation** — they keep escalating, eventually pages the CISO, the exercise is documented as an unauthorised intrusion attempt. Bad.
+- **Dismiss IR's concerns** — they later distrust your pre-briefs; future exercises are harder to coordinate. Bad.
+
+The right move: pause + verify + resume (or abort).
+
+## The five-step recovery procedure
+
+### 1. Pause the operation immediately
+
+In the Caldera UI: *Operations → <name> → Pause*. The agents stop receiving new orders. Any in-flight ability completes; no further phases start.
+
+### 2. Notify IR explicitly
+
+In the IR chat (or via direct message to the IR-on-call):
+
+> *"This is exercise EX-2026-XX-XXX (chain plan: <link>). All activity originating from sandcat agents on PT-LAB-{04,05,06} between 14:00-15:00 is sanctioned testing. Pre-brief was published at <link>; sorry it was missed. Please stand down on this case if it relates to those hosts."*
+
+Keep it factual. Reference the chain plan + pre-brief. Don't be defensive.
+
+### 3. Confirm IR has stood down
+
+Wait for explicit acknowledgement. If silence, escalate to the IR Lead directly. Don't proceed without confirmation — a half-engaged IR + a running exercise produces compounded confusion.
+
+### 4. Decide: resume or abort
+
+Two factors:
+- **Time remaining in the exercise window** — if the window is mostly used, abort.
+- **IR confidence in the pre-brief discipline** — if IR is now distrustful, abort and re-schedule with stronger pre-brief.
+
+The default for first-time mis-engagement: abort. Re-schedule with revised pre-brief approach. Resume only when:
+- IR is explicitly back on-board.
+- Significant exercise window remains.
+- The mis-engagement was clearly a process gap (e.g. wrong chat channel) rather than a fundamental disagreement.
+
+### 5. Document in the learning log
+
+The exercise log gains a *mis-engagement* entry:
+
+```yaml
+exercise: EX-2026-XX-XXX
+mis_engagement_event:
+  detected_at: 14:18 UTC
+  ir_member: J. Patel (IR shift)
+  cause: pre-brief was published in #soc-l2 chat; IR shift was watching #ir-oncall (different channel)
+  recovery: paused at 14:19; notified at 14:19; IR stood down at 14:23; resumed at 14:24
+  resume_or_abort: resumed
+  total_lost: 5 min of exercise window
+remediation: |
+  Update pre-brief checklist (M6.3 / M1.3) — pre-brief MUST be in #ir-oncall
+  for chain exercises, not just #soc-l2. Update the chain-plan template
+  to include the chat channel explicitly.
+```
+
+The learning log feeds the org's pre-brief-discipline improvement. Each mis-engagement is a teachable moment for the *whole team's* process.
+
+## Common causes of mis-engagement
+
+| Cause | Fix |
+|---|---|
+| Pre-brief in wrong chat channel | Always pre-brief in the *operational* IR channel (#ir-oncall), not just #soc-l2 |
+| Pre-brief at wrong time (T-30min isn't enough for IR shift handover) | Pre-brief at T-1h minimum; T-2h for chains |
+| Shift change at exercise time | Don't run chains during shift handover; pick a window mid-shift |
+| New team member who hadn't been briefed on purple-team norms | Onboarding checklist for new IR members |
+| IR forgot — purple-team is rare | More frequent exercises = more familiar; a quarterly chain shouldn't surprise anyone |
+
+## When to abort vs resume
+
+Default: **abort** on first mis-engagement of any kind. The cost of aborting (re-schedule, wasted effort) is much less than the cost of mis-handling a partial-IR-engagement (compounding distrust, post-mortem ambiguity).
+
+Resume only when: the cause is clearly a process gap (not a real concern), IR is explicitly back on-board, the exercise window has > 30 min remaining, and the IR Lead green-lights the resume.
+
+## Glossary
+
+- **Mistaken-IR-engagement** — IR opens a real case on the chain's telemetry mid-exercise.
+- **Five-step recovery** — pause / notify / confirm / decide / document.
+- **Default abort** — first mis-engagement → abort, re-schedule with revised process.
+- **Learning log** — exercise log entry feeding the team's process improvements.
+
+## Further reading
+
+- L1 M7 (Escalation Workflow) — IR engagement vocabulary.
+- M1.3 — single-TTP pre-brief; the chain version scales the same patterns up.
+""",
+    )
+    _add_q(session, m6l7, order=1, kind=QuestionKind.MULTI,
+        stem_md="An L3 detects that IR has engaged on the chain's telemetry mid-exercise — they've opened a real case, mistakenly thinking the activity is unauthorised. Which actions are *correct* parts of the recovery procedure?",
+        options=[
+            {"value": "pause", "label": "**Pause the operation immediately** in the Caldera UI"},
+            {"value": "notify", "label": "**Notify IR** with a factual message linking the chain plan + pre-brief"},
+            {"value": "confirm", "label": "**Confirm IR has stood down** explicitly before proceeding"},
+            {"value": "decide", "label": "**Decide whether to resume or abort** based on time remaining + IR's confidence"},
+            {"value": "document", "label": "**Document** the mis-engagement in the learning log with cause + remediation"},
+            {"value": "ignore", "label": "Ignore IR's escalation — the pre-brief was published, that's enough"},
+            {"value": "demand", "label": "Demand IR retract the case immediately and continue without confirmation"},
+        ],
+        correct=["pause", "notify", "confirm", "decide", "document"],
+        explanation_md="The five correct recovery steps are pause / notify / confirm / decide / document. Each addresses a specific failure mode: pausing prevents further telemetry adding to IR's confusion; notifying provides them context; confirming stand-down avoids running on with a half-engaged IR; deciding resume-vs-abort prevents both extremes (running on with a real concern unresolved, or aborting unnecessarily); documenting feeds team improvement. Ignoring IR's escalation makes the situation worse — they'll escalate further and the exercise gets documented as unauthorised. Demanding without confirmation is hostile and sets a bad precedent for future exercises. The L3's reflex on first mis-engagement: pause first, talk second; default to abort if any uncertainty.",
+        points=3,
+    )
+
+    # Lesson 6.8 — Capstone
+    m6l8 = _add_lesson(
+        session, mod6, order=8,
+        title="L3 M6 Capstone — chain emulation discipline",
+        lesson_type=LessonType.QUIZ, duration_min=12,
+        content_md="""
+Two-question capstone covering response-gap math + leadership reporting.
+
+Module 7 picks up: **Out-of-hours / off-shift validation** — testing the SOC's response when the on-call rota is the front line, the L1 shift is reduced or remote, and the SOAR's automation is the load-bearing infrastructure.
+""",
+    )
+    _add_q(session, m6l8, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A chain ran for **18 minutes** (T1078.004 → T1486 sandboxed). Initial-access alert fired at T+0:02 (2-min latency). SOAR auto-isolate on initial-access alerts is **configured to fire 5 min after alert** (the SOC's stated SLA). The chain reached impact at T+0:18. Compute the response leverage and report whether containment would have fired in time.",
+        options=[
+            {"value": "win", "label": "Containment time = T+0:07 (alert + 5 min). Chain time = T+0:18. Gap = +11 min → SOC contained in time, with 11 min margin"},
+            {"value": "lose", "label": "Containment time = T+0:18 (chain end). Chain time = T+0:18. Gap = 0 → too close to call"},
+            {"value": "fail", "label": "Containment time would not fire because the chain ran too fast"},
+            {"value": "depends", "label": "Depends on whether IR was on shift"},
+        ],
+        correct="win",
+        explanation_md="**SOC contains in time, +11 min margin.** Computing: containment fires at T+0:02 (initial-access alert) + 5 min (SOAR SLA) = T+0:07. Chain reaches impact at T+0:18. Gap = T+0:18 - T+0:07 = +11 min. Positive gap = SOC won the race; the actor would have been contained 11 minutes before reaching impact. The other options miss the leverage of containing at *initial access* — the entire chain downstream from there is killed. This is the M6.5 + M6.6 chain-vs-containment-gap calculation in action; the chain-level scorecard for this exercise reads *Detection works AND response works; healthy posture*. Note: this assumes the SOAR auto-isolate is actually configured for the alert class — if it isn't (M6.5 worked example), the gap collapses to negative and the chain wins.",
+        points=2,
+    )
+    _add_q(session, m6l8, order=2, kind=QuestionKind.SINGLE,
+        stem_md="An L3 reports the chain exercise scorecard up to the CISO. Which **single sentence** captures the load-bearing finding most usefully?",
+        options=[
+            {"value": "tps", "label": "*\"We raised three TuningProposals from this chain — TP-201, TP-202, TP-203.\"*"},
+            {"value": "phases", "label": "*\"Seven of eight phases fired Tier-1 alerts within 7 minutes; one phase was a Tier-2 gap.\"*"},
+            {"value": "headline", "label": "*\"Detection works (alerts fire fast); response is the gap (containment fires 2 min after the chain completes). Highest-leverage fix: SOAR auto-isolate on initial-access alerts. Re-test next quarter.\"*"},
+            {"value": "list", "label": "*\"The chain ran for 25 min. Phase 1: T1078.004, Phase 2: T1059.001, Phase 3: T1547.001, Phase 4: T1003.001, ...\"*"},
+        ],
+        correct="headline",
+        explanation_md="The third option is the right headline. It captures the load-bearing finding (detection works, response is the gap), names the highest-leverage fix (SOAR auto-isolate), and commits to next-step (re-test next quarter). The TP list (option 1) is detail without takeaway. The phase summary (option 2) is metrics without interpretation — leadership can't act on \"7/8 fired Tier-1\" without knowing whether that's good (is the 8th critical?). The phase-by-phase list (option 4) is overwhelming detail; reporters lose CISOs in the second sentence. The L3's reflex: lead with the **finding + fix + next step**, not the data. The data lives in the scorecard; the headline is the reduction.",
+        points=2,
+    )
+
+    print(f"  L3: {course.title} — 6 modules, 48 lessons (Module 6 Multi-host chains @ proper depth)")
     return course
 
 

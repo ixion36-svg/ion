@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.12.12 (2026-04-29) — curriculum
+
+### L3 Module 6 — Multi-host chain emulation
+
+L3 advances 5/8 → **6/8**. The applied module: takes M3 (Caldera) + M4 (telemetry) + M5 (DE loops) and runs an end-to-end multi-host chain. From single-TTP fidelity scoring to chain response-time measurement; per-host authorisation + pre-brief; Caldera's `look` planner with cross-agent fact propagation; per-phase TTR + end-to-end chain time; chain-vs-containment-gap arithmetic; chain-level scorecard with kill-chain step columns; mid-exercise mistaken-IR-engagement recovery procedure; cohesive TuningProposals with cross-references.
+
+#### What's authored
+
+8 lessons (7 reading + 1 quiz capstone), 9 questions, ~14k words at BTL1/SANS GCTH depth.
+
+| Lesson | Topic |
+|---|---|
+| 6.1 | Single-TTP vs chain — what each measures; rule of N (≥ 4 hosts) |
+| 6.2 | Chain design — pick adversary, map phases, host roles, chain plan document |
+| 6.3 | Per-host authorisation + pre-brief — scaling M1.3 to multi-host; operational chats |
+| 6.4 | Caldera execution — agent deploy + `look` planner + cross-agent fact verification |
+| 6.5 | Per-phase TTR + end-to-end chain time + chain-vs-containment gap |
+| 6.6 | Chain scorecard — kill-chain step columns + cohesive TuningProposals |
+| 6.7 | Mistaken-IR-engagement — five-step recovery (pause/notify/confirm/decide/document) |
+| 6.8 | Capstone — response-leverage math + leadership reporting |
+
+#### Curriculum status
+
+- **L1**: 8/8 ✅
+- **L2**: 8/8 ✅
+- **L3**: **6/8** authored at proper depth (M1-M6). M7 — Out-of-hours / off-shift validation — next.
+
+---
+
 ## v0.12.11 (2026-04-29) — curriculum
 
 ### L3 Module 5 — Detection-engineering loops
