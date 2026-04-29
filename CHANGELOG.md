@@ -1,5 +1,56 @@
 # Changelog
 
+## v0.12.6 (2026-04-29) — curriculum
+
+### L2 Module 8 — Hunt-to-Detection Capstone (L2 COMPLETE)
+
+L2 closes 7/8 → **8/8 ✅**. The capstone walks the *hunt finding → detection candidate → production rule* pipeline through five conversion gates, with a worked end-to-end example converting one of M7's six APT-chain candidates into a production Kibana Security ML rule.
+
+#### What's authored
+
+8 lessons (7 reading + 1 capstone-quiz), 8 questions, ~17k words at BTL1 / SANS GCTH depth.
+
+| Lesson | Topic |
+|---|---|
+| 8.1 | Hunt finding → candidate → rule vocabulary; the five-gate pipeline |
+| 8.2 | **G1 — Data quality**: ECS schema stability across 8.x, retention check, parser-health monitoring, schema-debt backlog |
+| 8.3 | **G2 — FP rate**: 30d backtest, predicted weekly FP rate, sample classification (TP / FP / Indeterminate), the tuning-during-backtest anti-pattern |
+| 8.4 | **G3 — ATT&CK mapping**: technique → sub-technique → tactic decision tree, common mis-mappings, version pinning |
+| 8.5 | **G4 — Kill-chain step + routing**: 14-tactic frame, response-leverage rule, playbook id vs runbook URL |
+| 8.6 | **G5 — Metadata**: severity matrix, threat block YAML, owner (team/role), lifecycle plan with KPIs and deprecation criteria |
+| 8.7 | Worked end-to-end conversion of M7's ML-population candidate through all five gates |
+| 8.8 | L2 capstone — four-question quiz |
+
+ATT&CK mapping pinned at v15.0 throughout; rule-type variations (threshold / EQL / threat_match / machine_learning) covered in §8.7.
+
+#### Curriculum status
+
+- **L1**: 8/8 ✅ (since v0.11.11)
+- **L2**: **8/8 ✅** (this ship)
+- **L3**: 1/8 stub — replacement starts v0.12.7 (next ship)
+
+#### Verifying the feature
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+docker exec ion python /app/seed_all.py --force
+```
+
+After re-seed:
+1. `/courses` → *Threat Hunting with KQL* → module count shows **8 modules**.
+2. Open Module 8 — *Hunt-to-Detection Capstone*. 8 lessons; the final is a 4-question capstone.
+3. Lesson 8.3 (G2 FP rate) covers the canonical backtest math; the L8.8 capstone Q2 tests the same arithmetic.
+
+#### Upgrade
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+---
+
 ## v0.12.5 (2026-04-29) — curriculum
 
 ### L2 Module 7 — Anomaly Hunts (statistical methods)
