@@ -43,9 +43,13 @@
       </div>
 
       <div class="flex items-center gap-5 ml-auto">
-        <!-- Service health dots -->
-        <div id="wb-services" class="flex items-center gap-4">
-          <!-- populated from snapshot -->
+        <!-- Topology summary (replaces service-health dots — same data,
+             read more clearly off the topology panel) -->
+        <div id="wb-topology-summary" class="flex items-center gap-3">
+          <span class="label-tiny text-slate-500">Estate</span>
+          <span id="wb-top-up"   class="text-[12px] text-ion-lime  tabular-nums font-semibold">— up</span>
+          <span id="wb-top-down" class="text-[12px] text-ion-coral tabular-nums font-semibold">— down</span>
+          <span id="wb-top-off"  class="text-[12px] text-slate-500 tabular-nums">— off</span>
         </div>
 
         <!-- Clock -->
@@ -154,87 +158,88 @@
         </div>
       </section>
 
-      <!-- ┌─── PANEL 4: DETECTION ───┐ -->
+      <!-- ┌─── PANEL 4: RULES (real rule posture) ───┐ -->
       <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
         <div class="flex items-baseline justify-between mb-3">
-          <span class="label-tiny text-slate-500">Detection</span>
-          <span class="label-tiny text-slate-600">posture</span>
+          <span class="label-tiny text-slate-500">Rules</span>
+          <span id="wb-rules-stamp" class="label-tiny text-slate-600">posture</span>
         </div>
 
         <div class="flex items-end justify-between gap-4 mb-2">
-          <div id="wb-detection-templates" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-ion-lime">—</div>
+          <div id="wb-rules-enabled" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-ion-lime">—</div>
           <div class="text-right">
-            <div class="label-tiny text-slate-500">prompt templates</div>
-            <div class="text-[11px] text-slate-600 mt-1">5-tier matcher</div>
+            <div class="label-tiny text-slate-500">enabled rules</div>
+            <div id="wb-rules-of-total" class="text-[11px] text-slate-500 mt-1 tabular-nums">of — total</div>
           </div>
         </div>
+        <div id="wb-rules-coverage" class="text-[13px] text-slate-400 mb-3">
+          MITRE coverage <span class="text-ion-cyan tabular-nums font-semibold">—</span>
+        </div>
 
-        <div class="grid grid-cols-3 gap-3 mt-auto pt-3 border-t border-white/5">
-          <div>
-            <div id="wb-detection-tide-healthy" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-lime">—</div>
-            <div class="label-tiny text-slate-500 mt-1.5">TIDE healthy</div>
-          </div>
-          <div>
-            <div id="wb-detection-tide-total" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-white">—</div>
-            <div class="label-tiny text-slate-500 mt-1.5">TIDE total</div>
-          </div>
-          <div>
-            <div id="wb-detection-tide-errors" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-coral">—</div>
-            <div class="label-tiny text-slate-500 mt-1.5">errors</div>
-          </div>
+        <!-- Severity distribution bars (critical / high / medium / low) -->
+        <div id="wb-rules-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-white/5">
+          <!-- bars populated from snapshot -->
         </div>
       </section>
 
-      <!-- ┌─── PANEL 5: CYAB ───┐ -->
-      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
-        <div class="flex items-baseline justify-between mb-3">
-          <span class="label-tiny text-slate-500">CyAB Onboarding</span>
-          <span class="label-tiny text-slate-600">all systems</span>
+      <!-- ┌─── PANEL 5: PLATFORM TOPOLOGY ───┐ -->
+      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-5 flex flex-col min-h-0 relative overflow-hidden">
+        <div class="flex items-baseline justify-between mb-2">
+          <span class="label-tiny text-slate-500">Platform Topology</span>
+          <span class="label-tiny text-slate-600">live</span>
         </div>
 
-        <div class="flex items-end justify-between gap-4 mb-3">
-          <div id="wb-cyab-systems" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-white">—</div>
-          <!-- Donut for avg readiness -->
-          <svg id="wb-cyab-donut" viewBox="0 0 60 60" class="w-[60px] h-[60px] shrink-0" aria-hidden="true">
-            <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6"/>
-            <circle id="wb-cyab-donut-arc" cx="30" cy="30" r="24" fill="none" stroke="currentColor" class="text-ion-cyan"
-                    stroke-width="6" stroke-linecap="round" stroke-dasharray="0 150.8" transform="rotate(-90 30 30)"/>
-            <text id="wb-cyab-donut-label" x="30" y="33" text-anchor="middle"
-                  class="fill-white" style="font-size: 13px; font-weight: 700;" font-family="ui-monospace, monospace">—</text>
+        <!-- The SVG fills the panel; coordinates are computed in JS so
+             the layout is identical regardless of font/scale. The viewBox
+             is large enough that node labels never overflow. -->
+        <div class="flex-1 grid place-items-center min-h-0">
+          <svg id="wb-topology" viewBox="0 0 460 280" preserveAspectRatio="xMidYMid meet"
+               class="w-full h-full" aria-hidden="true">
+            <defs>
+              <radialGradient id="wb-hub-glow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="rgb(109,228,255)" stop-opacity="0.55"/>
+                <stop offset="100%" stop-color="rgb(109,228,255)" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <g id="wb-topology-edges"><!-- edges drawn by JS --></g>
+            <g id="wb-topology-nodes"><!-- nodes drawn by JS --></g>
           </svg>
         </div>
-        <div id="wb-cyab-readiness" class="text-[13px] text-slate-400 mb-3">avg readiness — %</div>
 
-        <div class="mt-auto pt-3 border-t border-white/5">
-          <div class="flex items-baseline justify-between mb-2">
-            <span class="label-tiny text-slate-500">Sub-profile assignment</span>
-            <span id="wb-cyab-subprofile-num" class="text-[12px] text-slate-300 tabular-nums">— / —</span>
-          </div>
-          <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
-            <div id="wb-cyab-subprofile-fill" class="h-full rounded-full bg-gradient-to-r from-ion-cyan to-ion-lime transition-[width] duration-700" style="width:0%"></div>
-          </div>
+        <div class="flex items-center gap-4 mt-1 pt-3 border-t border-white/5 text-[11px]">
+          <div class="flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-ion-lime"></span><span class="text-slate-400">up</span></div>
+          <div class="flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-ion-coral wb-pulse-down"></span><span class="text-slate-400">down</span></div>
+          <div class="flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-slate-600"></span><span class="text-slate-400">not configured</span></div>
         </div>
       </section>
 
-      <!-- ┌─── PANEL 6: CURRICULUM ───┐ -->
-      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
-        <div class="flex items-baseline justify-between mb-3">
-          <span class="label-tiny text-slate-500">Curriculum</span>
-          <span class="label-tiny text-slate-600">all enrolments</span>
+      <!-- ┌─── PANEL 6: THREAT LANDSCAPE (AI summary) ───┐ -->
+      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-5 flex flex-col min-h-0">
+        <div class="flex items-baseline justify-between mb-2">
+          <span class="label-tiny text-slate-500 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>
+            Threat Landscape
+          </span>
+          <span id="wb-tl-mode" class="label-tiny text-slate-600">—</span>
         </div>
 
-        <div class="flex items-end justify-between gap-4 mb-2">
-          <div id="wb-curr-completed" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-ion-cyan">—</div>
-          <div class="text-right">
-            <div class="label-tiny text-slate-500">completions</div>
-            <div id="wb-curr-cert-count" class="text-[11px] text-slate-400 mt-1 tabular-nums">— certs issued</div>
+        <div id="wb-tl-summary" class="flex-1 overflow-hidden text-[14px] leading-relaxed text-slate-200">
+          <span class="text-slate-600 italic">Awaiting first refresh…</span>
+        </div>
+
+        <div id="wb-tl-stats" class="grid grid-cols-3 gap-3 mt-auto pt-3 border-t border-white/5">
+          <div>
+            <div id="wb-tl-alerts-24h" class="font-sans font-semibold tabular-nums text-[20px] leading-none text-ion-cyan">—</div>
+            <div class="label-tiny text-slate-500 mt-1.5">alerts 24h</div>
           </div>
-        </div>
-        <div id="wb-curr-totals" class="text-[13px] text-slate-400 mb-3">— enrolments</div>
-
-        <!-- Top 3 enrolled courses -->
-        <div id="wb-curr-top" class="space-y-1.5 mt-auto pt-3 border-t border-white/5">
-          <!-- top courses -->
+          <div>
+            <div id="wb-tl-tp-rate" class="font-sans font-semibold tabular-nums text-[20px] leading-none text-ion-coral">—</div>
+            <div class="label-tiny text-slate-500 mt-1.5">TP rate 7d</div>
+          </div>
+          <div>
+            <div id="wb-tl-backlog" class="font-sans font-semibold tabular-nums text-[20px] leading-none text-ion-amber">—</div>
+            <div class="label-tiny text-slate-500 mt-1.5">open backlog</div>
+          </div>
         </div>
       </section>
 
@@ -263,16 +268,6 @@
 
 <script>
 const REFRESH_MS = 5 * 60 * 1000;  // matches the server-side TTL
-
-const SERVICES = [
-  { key: 'postgres',      label: 'Postgres' },
-  { key: 'elasticsearch', label: 'ES' },
-  { key: 'kibana',        label: 'Kibana' },
-  { key: 'tide',          label: 'TIDE' },
-  { key: 'opencti',       label: 'OpenCTI' },
-  { key: 'ollama',        label: 'Ollama' },
-  { key: 'bob',           label: 'Bob' },
-];
 
 const $ = (id) => document.getElementById(id);
 const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
@@ -341,24 +336,77 @@ function drawDonut(arcId, labelId, value, max) {
   if (label) label.textContent = `${Math.round(pct)}%`;
 }
 
-// ── Service-health dots ──────────────────────────────────────
-function renderServices(health) {
-  const wrap = $('wb-services');
-  wrap.innerHTML = '';
-  SERVICES.forEach(({ key, label }) => {
-    const s = (health || {})[key];
-    const status = (s && s.status) || 'off';
-    const dotCls = status === 'up'
-      ? 'bg-ion-lime shadow-[0_0_8px_rgba(132,204,22,0.6)]'
-      : status === 'down'
-        ? 'bg-ion-coral shadow-[0_0_8px_rgba(251,113,133,0.6)] wb-pulse-down'
-        : 'bg-slate-600';
-    const div = document.createElement('div');
-    div.className = 'flex items-center gap-1.5';
-    div.title = (s && s.details) || status;
-    div.innerHTML = `<span class="h-1.5 w-1.5 rounded-full ${dotCls}"></span>
-                     <span class="label-tiny text-slate-400">${escHtml(label)}</span>`;
-    wrap.appendChild(div);
+// ── Topology — hub-and-spoke SVG ─────────────────────────────
+//
+// The hub (ION) sits at the centre; every integration is a spoke. Layout
+// is a fixed angular distribution so nodes stay put across refreshes —
+// the eye reads movement as instability on a wall display, so we want
+// the only thing that changes between snapshots to be the colour.
+function renderTopology(t) {
+  const edges = $('wb-topology-edges');
+  const nodes = $('wb-topology-nodes');
+  if (!edges || !nodes) return;
+  edges.innerHTML = ''; nodes.innerHTML = '';
+
+  const cx = 230, cy = 140;     // hub centre (matches viewBox 460x280)
+  const rx = 175, ry = 105;     // spoke ellipse radii
+
+  // Header summary counters
+  const counts = (t && t.counts) || {};
+  $('wb-top-up').textContent   = `${counts.up   ?? 0} up`;
+  $('wb-top-down').textContent = `${counts.down ?? 0} down`;
+  $('wb-top-off').textContent  = `${counts.off  ?? 0} off`;
+
+  // Hub glow + circle
+  nodes.insertAdjacentHTML('beforeend', `
+    <circle cx="${cx}" cy="${cy}" r="56" fill="url(#wb-hub-glow)"/>
+    <circle cx="${cx}" cy="${cy}" r="28" fill="#0a0e17" stroke="rgb(109,228,255)" stroke-width="1.5"/>
+    <text x="${cx}" y="${cy - 2}"  text-anchor="middle"
+          fill="white" font-family="Geist, ui-sans-serif, system-ui, sans-serif"
+          font-size="13" font-weight="700">ION</text>
+    <text x="${cx}" y="${cy + 11}" text-anchor="middle"
+          fill="rgba(255,255,255,0.5)" font-family="Geist, ui-sans-serif, system-ui, sans-serif"
+          font-size="8" letter-spacing="0.12em">HUB</text>
+  `);
+
+  const list = (t && t.nodes) || [];
+  if (!list.length) return;
+
+  const STROKE = { up: 'rgb(134,240,160)', down: 'rgb(255,108,108)', off: 'rgba(255,255,255,0.18)' };
+  const FILL   = { up: 'rgb(134,240,160)', down: 'rgb(255,108,108)', off: 'rgb(100,116,139)' };
+
+  list.forEach((n, i) => {
+    const angle = (-Math.PI / 2) + (i * 2 * Math.PI / list.length);
+    const x = cx + rx * Math.cos(angle);
+    const y = cy + ry * Math.sin(angle);
+    const stroke = STROKE[n.status] || STROKE.off;
+    const fill   = FILL[n.status]   || FILL.off;
+    const dash   = n.status === 'down' ? '4 3' : '';
+    const labelDx = x > cx ? 14 : (x < cx ? -14 : 0);
+    const anchor  = x > cx + 5 ? 'start' : (x < cx - 5 ? 'end' : 'middle');
+
+    edges.insertAdjacentHTML('beforeend', `
+      <line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
+            stroke="${stroke}" stroke-width="${n.status === 'up' ? 1.4 : 1}"
+            stroke-opacity="${n.status === 'up' ? 0.55 : 0.35}"
+            ${dash ? `stroke-dasharray="${dash}"` : ''}/>
+    `);
+
+    const pulseClass = n.status === 'down' ? 'wb-pulse-down' : '';
+    const safeLabel = escHtml(n.label);
+    const safeDetails = escHtml(n.details || n.status);
+    nodes.insertAdjacentHTML('beforeend', `
+      <g class="${pulseClass}" data-key="${escHtml(n.key)}">
+        <title>${safeLabel} — ${safeDetails}</title>
+        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9"
+                fill="#0a0e17" stroke="${stroke}" stroke-width="1.5"/>
+        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${fill}"/>
+        <text x="${(x + labelDx).toFixed(1)}" y="${(y + 4).toFixed(1)}"
+              text-anchor="${anchor}" fill="rgba(226,232,240,0.85)"
+              font-family="Geist, ui-sans-serif, system-ui, sans-serif"
+              font-size="11" font-weight="500">${safeLabel}</text>
+      </g>
+    `);
   });
 }
 
@@ -462,52 +510,107 @@ function renderBob(b) {
     : '— / —';
 }
 
-function renderDetection(d) {
-  if (d.error) { $('wb-detection-templates').textContent = '—'; return; }
-  $('wb-detection-templates').textContent = fmtN(d.alert_prompt_template_count || 0);
-  $('wb-detection-tide-healthy').textContent = fmtN(d.tide_healthy_count || 0);
-  $('wb-detection-tide-total').textContent = fmtN(d.tide_total_count || 0);
-  $('wb-detection-tide-errors').textContent = fmtN((d.tide_total_count || 0) - (d.tide_healthy_count || 0));
-}
+function renderRules(r) {
+  if (r.error || r.tide_unavailable) {
+    $('wb-rules-enabled').textContent = '—';
+    $('wb-rules-of-total').textContent = r.tide_unavailable ? 'TIDE not configured' : 'unavailable';
+    $('wb-rules-coverage').innerHTML = '';
+    $('wb-rules-bars').innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No rule posture available.</div>';
+    return;
+  }
+  $('wb-rules-enabled').textContent = fmtN(r.enabled_rules || 0);
+  $('wb-rules-of-total').textContent = `of ${fmtN(r.total_rules || 0)} total`;
 
-function renderCyab(c) {
-  if (c.error) { $('wb-cyab-systems').textContent = '—'; return; }
-  $('wb-cyab-systems').textContent = fmtN(c.system_count || 0);
-  $('wb-cyab-readiness').innerHTML =
-    `avg readiness <span class="text-ion-cyan tabular-nums font-semibold">${c.avg_readiness_score != null ? c.avg_readiness_score : '—'}%</span>`;
+  const coveredPct = r.total_techniques
+    ? Math.round((r.covered_techniques / r.total_techniques) * 100)
+    : 0;
+  const avgQ = (r.quality && r.quality.avg_quality != null) ? r.quality.avg_quality : '—';
+  $('wb-rules-coverage').innerHTML =
+    `MITRE coverage <span class="text-ion-cyan tabular-nums font-semibold">${r.covered_techniques || 0} / ${r.total_techniques || 0} (${coveredPct}%)</span> · ` +
+    `avg quality <span class="text-ion-lime tabular-nums font-semibold">${avgQ}</span>`;
 
-  // Donut: avg readiness as a percentage gauge
-  drawDonut('wb-cyab-donut-arc', 'wb-cyab-donut-label', c.avg_readiness_score || 0, 100);
-
-  const pct = c.subprofile_assignment_pct || 0;
-  $('wb-cyab-subprofile-fill').style.width = pct + '%';
-  $('wb-cyab-subprofile-num').textContent =
-    `${c.data_source_with_subprofile || 0} / ${c.data_source_total || 0} (${pct}%)`;
-}
-
-function renderCurriculum(c) {
-  if (c.error) { $('wb-curr-completed').textContent = '—'; return; }
-  $('wb-curr-completed').textContent = fmtN(c.completion_total || 0);
-  $('wb-curr-totals').innerHTML =
-    `<span class="text-slate-300 tabular-nums">${fmtN(c.enrolment_total || 0)}</span> enrolments`;
-  $('wb-curr-cert-count').textContent = `${fmtN(c.cert_issued_count || 0)} certs issued`;
-
-  const top = $('wb-curr-top');
-  top.innerHTML = '';
-  const PILL_BG = { L1: 'bg-ion-lime/15 text-ion-lime', L2: 'bg-ion-cyan/15 text-ion-cyan', L3: 'bg-ion-amber/15 text-ion-amber', L4: 'bg-ion-coral/15 text-ion-coral' };
-  (c.top_courses || []).slice(0, 3).forEach(t => {
-    const lvl = String(t.level || '').replace('CourseLevel.', '');
-    const pill = PILL_BG[lvl] || 'bg-slate-700/40 text-slate-300';
+  // Severity bars — total per severity, and the enabled fraction renders
+  // as a brighter overlay so disabled rules read as a darker stub.
+  const SEV_ORDER = [
+    { key: 'critical', cls: 'bg-ion-coral'  },
+    { key: 'high',     cls: 'bg-ion-amber'  },
+    { key: 'medium',   cls: 'bg-ion-cyan'   },
+    { key: 'low',      cls: 'bg-slate-500'  },
+  ];
+  const sev = r.severity || {};
+  const max = Math.max(1, ...SEV_ORDER.map(s => (sev[s.key] && sev[s.key].total) || 0));
+  const bars = $('wb-rules-bars');
+  bars.innerHTML = '';
+  if (Object.keys(sev).length === 0) {
+    bars.innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No severity data captured.</div>';
+    return;
+  }
+  SEV_ORDER.forEach(({ key, cls }) => {
+    const v = sev[key] || { total: 0, enabled: 0, disabled: 0 };
+    const totalPct   = Math.round((v.total / max) * 100);
+    const enabledPct = v.total ? Math.round((v.enabled / v.total) * 100) : 0;
     const row = document.createElement('div');
-    row.className = 'flex items-center gap-2.5 py-1';
+    row.className = 'grid grid-cols-[110px_1fr_44px] gap-2.5 items-center text-[12px]';
     row.innerHTML = `
-      <span class="${pill} text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">${escHtml(lvl)}</span>
-      <div class="flex-1 text-[12.5px] text-slate-200 truncate">${escHtml(t.title)}</div>
-      <div class="text-[11px] text-slate-500 tabular-nums shrink-0">${fmtN(t.enrolments || 0)}</div>`;
-    top.appendChild(row);
+      <div class="text-slate-400 capitalize">${escHtml(key)}</div>
+      <div class="h-1.5 rounded-full bg-white/5 overflow-hidden relative">
+        <div class="${cls} h-full rounded-full opacity-30" style="width:${totalPct}%"></div>
+        <div class="${cls} h-full rounded-full absolute inset-y-0 left-0" style="width:${Math.round(totalPct * enabledPct / 100)}%"></div>
+      </div>
+      <div class="text-right text-slate-200 tabular-nums font-semibold">${fmtN(v.total)}</div>`;
+    bars.appendChild(row);
   });
-  if (!(c.top_courses && c.top_courses.length)) {
-    top.innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No enrolments yet.</div>';
+}
+
+function renderThreatLandscape(t) {
+  const stats = (t && t.stats) || {};
+  // Stats trio
+  $('wb-tl-alerts-24h').textContent = fmtN(stats.alerts_24h_total || 0);
+
+  const verdict = stats.verdict_7d || {};
+  const tp = (verdict.true_positive || 0) + (verdict.malicious || 0);
+  const tot = Object.values(verdict).reduce((a, b) => a + b, 0);
+  const tpPct = tot ? Math.round((tp / tot) * 100) : 0;
+  $('wb-tl-tp-rate').textContent = tot ? (tpPct + '%') : '—';
+
+  const backlog = stats.open_backlog_sev || {};
+  const backlogTotal = Object.values(backlog).reduce((a, b) => a + b, 0);
+  $('wb-tl-backlog').textContent = fmtN(backlogTotal);
+
+  // Mode pill
+  const mode = (t && t.summary_kind) || 'stats';
+  const modeEl = $('wb-tl-mode');
+  if (mode === 'ai') {
+    modeEl.innerHTML = '<span class="text-ion-iris">AI summary</span>';
+  } else {
+    modeEl.innerHTML = '<span class="text-slate-500">stats only</span>';
+  }
+
+  // Body — render LLM text if present, otherwise compose a stats fallback.
+  const body = $('wb-tl-summary');
+  if (t && typeof t.summary === 'string' && t.summary.trim().length) {
+    // Split into paragraph + bullets if the LLM emitted "- " bullets.
+    const lines = t.summary.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const bullets = lines.filter(l => /^[-•]\s+/.test(l)).map(l => l.replace(/^[-•]\s+/, ''));
+    const paragraph = lines.filter(l => !/^[-•]\s+/.test(l)).join(' ');
+    body.innerHTML = `
+      <p class="mb-2 text-slate-200">${escHtml(paragraph)}</p>
+      ${bullets.length ? `<ul class="space-y-1 text-[12.5px] text-slate-400">${
+        bullets.map(b => `<li class="flex gap-2"><span class="text-ion-iris shrink-0">•</span><span>${escHtml(b)}</span></li>`).join('')
+      }</ul>` : ''}
+    `;
+  } else {
+    // Fallback — render a simple stats sentence.
+    const sev = stats.severity_24h || {};
+    const sevParts = Object.entries(sev).map(([k, v]) => `${v} ${k}`).join(', ') || 'no alerts';
+    const closures = (stats.top_closures_7d || []).map(c => `${c.reason} (${c.count})`).slice(0, 3).join(', ');
+    body.innerHTML = `
+      <p class="mb-2 text-slate-300">
+        Last 24h: <span class="text-white font-semibold">${stats.alerts_24h_total || 0}</span> alerts (${escHtml(sevParts)}).
+      </p>
+      ${closures ? `<p class="text-[12.5px] text-slate-500">Top closure reasons (7d): ${escHtml(closures)}.</p>` : ''}
+      <p class="text-[11px] text-slate-600 mt-2 italic">AI summary unavailable — Ollama offline or not configured.</p>
+    `;
   }
 }
 
@@ -540,13 +643,12 @@ async function refresh() {
       return;
     }
     const s = await r.json();
-    renderServices(s.service_health || {});
+    renderTopology(s.topology || {});  // also updates the header summary
     renderAlerts(s.alerts || {});
     renderCases(s.cases || {});
     renderBob(s.bob || {});
-    renderDetection(s.detection || {});
-    renderCyab(s.cyab || {});
-    renderCurriculum(s.curriculum || {});
+    renderRules(s.rules || {});
+    renderThreatLandscape(s.threat_landscape || {});
     renderTicker(s.ticker || {});
     $('wb-cache-age').textContent = 'refreshed ' + fmtAge(s.cache_age_seconds || 0);
   } catch (e) {
