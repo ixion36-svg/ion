@@ -27,6 +27,21 @@
     </div>
   </section>
 
+  <!-- ═════════════ System selector ═════════════ -->
+  <div class="rounded-2xl border border-white/10 bg-white/[0.03] p-4 mb-6 flex flex-wrap items-center gap-4 rise d-2">
+    <div class="flex items-center gap-2 text-[12px] text-slate-400 shrink-0">
+      <svg class="w-4 h-4 text-ion-iris"><use href="#i-shield"/></svg>
+      <span class="font-semibold">Onboarding scope:</span>
+    </div>
+    <select id="cs-system" class="flex-1 min-w-[260px] h-10 px-3 rounded-md bg-ink-950/60 border border-white/10 text-[13px] text-slate-200">
+      <option value="">— pick a system to onboard —</option>
+    </select>
+    <div id="cs-system-meta" class="text-[11px] text-slate-500"></div>
+    <a id="cs-system-detail-link" href="#" class="hidden inline-flex items-center gap-2 h-10 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+      Open system detail →
+    </a>
+  </div>
+
   <!-- ═════════════ Pillar pills ═════════════ -->
   <div id="cs-pillars" class="flex flex-wrap gap-2 mb-6 rise d-2">
     <!-- pills hydrated from /api/cyab/studio/pillars -->
@@ -103,13 +118,11 @@
       <footer class="rounded-2xl border border-white/10 bg-white/[0.03] p-5 flex flex-wrap items-center justify-between gap-4">
         <div class="flex items-center gap-3 text-[12px] text-slate-400">
           <svg class="w-4 h-4 text-slate-500"><use href="#i-shield"/></svg>
-          <span>Onboarding Pack bundles intake answers + detection &amp; audit coverage + sign-off.</span>
+          <span id="cs-pack-blurb">Pick a system above to enable Onboarding Pack export.</span>
         </div>
         <div class="flex items-center gap-2">
-          <input id="cs-pack-system" type="number" min="1" placeholder="System ID"
-                 class="h-10 w-32 px-3 rounded-md bg-ink-950/60 border border-white/10 text-[13px] text-slate-200 placeholder:text-slate-600">
-          <button id="cs-pack-btn"
-                  class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+          <button id="cs-pack-btn" disabled
+                  class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)] disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none disabled:cursor-not-allowed">
             Export Onboarding Pack
           </button>
         </div>
@@ -167,6 +180,14 @@
     font-size:12px; line-height:1.6; color:#93c5fd; background:rgba(8,12,20,0.6);
     padding:14px 16px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);
     white-space:pre-wrap; overflow-x:auto; }
+
+  .cs-answer-pill { display:inline-flex; align-items:center; height:32px; padding:0 14px;
+    border-radius:8px; font-size:12px; font-weight:600;
+    background:rgba(255,255,255,0.04); color:#94a3b8;
+    border:1px solid rgba(255,255,255,0.08); cursor:pointer; transition:all 0.12s; }
+  .cs-answer-pill:hover:not(:disabled) { background:rgba(255,255,255,0.08); color:#e5e7eb; }
+  .cs-answer-pill.is-active { background:rgba(109,228,255,0.18); color:#6de4ff; border-color:rgba(109,228,255,0.4); }
+  .cs-answer-pill:disabled { opacity:0.4; cursor:not-allowed; }
 </style>
 
 <script>
@@ -179,6 +200,10 @@
     tab: 'intake',
     uc_id: null,
     subprofile_full: null,
+    system_id: null,         // v0.12.1
+    systems: [],             // v0.12.1
+    answers: {},             // v0.12.1 — keyed by question key
+    saving: false,           // v0.12.1
   };
 
   // ---- URL state ---------------------------------------------------------
@@ -188,9 +213,12 @@
     state.sub_id = sp.get('sub');
     state.tab = sp.get('tab') || 'intake';
     state.uc_id = sp.get('uc');
+    const sysParam = sp.get('system');
+    state.system_id = sysParam ? parseInt(sysParam, 10) : null;
   }
   function writeUrl(replace = false) {
     const sp = new URLSearchParams();
+    if (state.system_id) sp.set('system', String(state.system_id));
     if (state.pillar_id) sp.set('pillar', state.pillar_id);
     if (state.sub_id) sp.set('sub', state.sub_id);
     if (state.tab) sp.set('tab', state.tab);
@@ -331,26 +359,257 @@
 
   function renderIntake(questions, tasks) {
     const c = $('cs-tab-intake');
+    c.classList.remove('hidden', 'grid', 'md:grid-cols-2', 'gap-4');
     if (!questions.length && !tasks.length) {
       c.innerHTML = '<div class="text-center py-12 text-slate-500 text-[13px]">No intake content yet for this sub-profile.</div>';
       return;
     }
-    let html = '';
+
+    // Header — progress + system context
+    const answered = questions.filter((q) => state.answers[q.key] !== undefined && state.answers[q.key] !== '').length;
+    const total = questions.length;
+    const sysLabel = state.system_id
+      ? (state.systems.find((s) => s.id === state.system_id) || {}).name || `system #${state.system_id}`
+      : null;
+    const sysBanner = state.system_id
+      ? `<div class="text-[12px] text-slate-400">Answers saved against <span class="text-ion-iris font-semibold">${escapeHtml(sysLabel)}</span></div>`
+      : `<div class="text-[12px] text-amber-400">Pick a system above to enable answer capture.</div>`;
+    const progressPct = total ? Math.round((answered / total) * 100) : 0;
+
+    let html = `
+      <div class="flex flex-wrap items-end justify-between gap-3 mb-6">
+        <div>
+          <h3 class="text-white text-[16px] font-semibold">Intake questions</h3>
+          ${sysBanner}
+        </div>
+        <div class="text-right">
+          <div class="text-[20px] font-bold text-white tabular-nums"><span id="cs-progress-num">${answered}</span>/${total}</div>
+          <div class="text-[10px] text-slate-500 uppercase tracking-widest">answered</div>
+        </div>
+      </div>
+      <div class="h-1.5 rounded-full bg-white/5 overflow-hidden mb-6">
+        <div id="cs-progress-bar" class="h-full bg-ion-cyan transition-all" style="width:${progressPct}%"></div>
+      </div>
+    `;
+
     if (questions.length) {
-      html += '<h3 class="text-white text-[16px] font-semibold mb-4">Intake questions</h3>';
-      html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8">';
-      questions.forEach((q, i) => {
-        html += `<div class="cs-q-card"><div class="cs-q-num">${i + 1}</div><div class="cs-q-text">${escapeHtml(q.text)}</div></div>`;
-      });
-      html += '</div>';
+      html += '<div id="cs-intake-form" class="space-y-3 mb-8"></div>';
     }
     if (tasks.length) {
-      html += '<h3 class="text-white text-[16px] font-semibold mb-4">Recommended tasks</h3>';
+      html += '<h4 class="text-white text-[14px] font-semibold mt-8 mb-3">Recommended tasks</h4>';
       html += '<ul class="space-y-2 text-[13px] text-slate-300 list-disc pl-5">';
       tasks.forEach((t) => { html += `<li>${escapeHtml(t)}</li>`; });
       html += '</ul>';
     }
+
+    // Save & continue affordance
+    if (questions.length) {
+      const continueDisabled = !state.system_id;
+      html += `
+        <div class="flex items-center justify-between gap-3 mt-8 pt-6 border-t border-white/10">
+          <div id="cs-save-status" class="text-[11px] text-slate-500"></div>
+          <div class="flex items-center gap-2">
+            <button id="cs-save-btn" ${continueDisabled ? 'disabled' : ''}
+                    class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed">
+              Save
+            </button>
+            <button id="cs-continue-btn" ${continueDisabled ? 'disabled' : ''}
+                    class="inline-flex items-center gap-2 h-9 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)] disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none disabled:cursor-not-allowed">
+              Save &amp; continue → Detection library
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
     c.innerHTML = html;
+
+    if (questions.length) renderIntakeQuestions(questions);
+
+    const saveBtn = $('cs-save-btn');
+    if (saveBtn) saveBtn.onclick = () => saveAnswers(/*explicit=*/true);
+    const continueBtn = $('cs-continue-btn');
+    if (continueBtn) continueBtn.onclick = async () => {
+      await saveAnswers(/*explicit=*/true);
+      selectTab('detection');
+    };
+  }
+
+  function renderIntakeQuestions(questions) {
+    const wrap = $('cs-intake-form');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    questions.forEach((q, i) => {
+      const card = document.createElement('div');
+      card.className = 'cs-q-card flex-col items-start gap-3';
+      card.style.flexDirection = 'column';
+
+      const head = document.createElement('div');
+      head.className = 'flex items-start gap-3 w-full';
+      const num = document.createElement('div');
+      num.className = 'cs-q-num';
+      num.textContent = String(i + 1);
+      const text = document.createElement('div');
+      text.className = 'cs-q-text flex-1';
+      text.textContent = q.text;
+      const status = document.createElement('div');
+      const isAnswered = state.answers[q.key] !== undefined && state.answers[q.key] !== '';
+      status.className = isAnswered
+        ? 'text-[10px] font-semibold uppercase tracking-widest text-emerald-400 shrink-0 mt-1.5'
+        : 'text-[10px] font-semibold uppercase tracking-widest text-slate-500 shrink-0 mt-1.5';
+      status.textContent = isAnswered ? '● answered' : '○ open';
+      status.dataset.statusFor = q.key;
+      head.appendChild(num);
+      head.appendChild(text);
+      head.appendChild(status);
+      card.appendChild(head);
+
+      const controls = document.createElement('div');
+      controls.className = 'flex flex-wrap gap-2 pl-[44px] w-full';
+      buildAnswerControls(q, controls);
+      card.appendChild(controls);
+
+      wrap.appendChild(card);
+    });
+  }
+
+  function buildAnswerControls(q, host) {
+    const disabled = !state.system_id;
+    const current = state.answers[q.key];
+    const opts = q.answer_type === 'yesno'
+      ? [
+          { value: 'yes',     label: 'Yes' },
+          { value: 'partial', label: 'Partial' },
+          { value: 'no',      label: 'No' },
+          { value: 'dont_know', label: "Don't know" },
+        ]
+      : (q.options || []);
+    if (q.answer_type === 'multi') {
+      opts.forEach((opt) => {
+        const checked = Array.isArray(current) && current.includes(opt.value);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.value = opt.value;
+        btn.dataset.qkey = q.key;
+        btn.disabled = disabled;
+        btn.className = 'cs-answer-pill' + (checked ? ' is-active' : '');
+        btn.textContent = opt.label;
+        btn.onclick = () => {
+          let arr = Array.isArray(state.answers[q.key]) ? [...state.answers[q.key]] : [];
+          if (arr.includes(opt.value)) arr = arr.filter((v) => v !== opt.value);
+          else arr.push(opt.value);
+          state.answers[q.key] = arr.length ? arr : undefined;
+          updateAnswerControl(q, host);
+          updateAnsweredStatus(q);
+          scheduleAutoSave();
+        };
+        host.appendChild(btn);
+      });
+      return;
+    }
+    // single + yesno → radio-style pills, one active at a time
+    opts.forEach((opt) => {
+      const isActive = current === opt.value;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.value = opt.value;
+      btn.dataset.qkey = q.key;
+      btn.disabled = disabled;
+      btn.className = 'cs-answer-pill' + (isActive ? ' is-active' : '');
+      btn.textContent = opt.label;
+      btn.onclick = () => {
+        if (state.answers[q.key] === opt.value) {
+          delete state.answers[q.key];
+        } else {
+          state.answers[q.key] = opt.value;
+        }
+        updateAnswerControl(q, host);
+        updateAnsweredStatus(q);
+        scheduleAutoSave();
+      };
+      host.appendChild(btn);
+    });
+  }
+
+  function updateAnswerControl(q, host) {
+    const current = state.answers[q.key];
+    host.querySelectorAll('.cs-answer-pill').forEach((b) => {
+      const v = b.dataset.value;
+      const active = q.answer_type === 'multi'
+        ? Array.isArray(current) && current.includes(v)
+        : current === v;
+      b.classList.toggle('is-active', active);
+    });
+  }
+
+  function updateAnsweredStatus(q) {
+    const status = document.querySelector(`[data-status-for="${q.key}"]`);
+    const isAnswered = state.answers[q.key] !== undefined && state.answers[q.key] !== ''
+      && !(Array.isArray(state.answers[q.key]) && state.answers[q.key].length === 0);
+    if (status) {
+      status.className = isAnswered
+        ? 'text-[10px] font-semibold uppercase tracking-widest text-emerald-400 shrink-0 mt-1.5'
+        : 'text-[10px] font-semibold uppercase tracking-widest text-slate-500 shrink-0 mt-1.5';
+      status.textContent = isAnswered ? '● answered' : '○ open';
+    }
+    // Refresh progress bar
+    const cat = (state.subprofile_full || {}).catalogue || {};
+    const qs = cat.intake_questions || [];
+    const answered = qs.filter((qq) =>
+      state.answers[qq.key] !== undefined && state.answers[qq.key] !== ''
+      && !(Array.isArray(state.answers[qq.key]) && state.answers[qq.key].length === 0)
+    ).length;
+    const numEl = $('cs-progress-num');
+    const barEl = $('cs-progress-bar');
+    if (numEl) numEl.textContent = String(answered);
+    if (barEl) barEl.style.width = (qs.length ? Math.round(answered * 100 / qs.length) : 0) + '%';
+  }
+
+  // ---- Auto-save ---------------------------------------------------------
+  let _saveTimer = null;
+  function scheduleAutoSave() {
+    if (!state.system_id) return;
+    if (_saveTimer) clearTimeout(_saveTimer);
+    setSaveStatus('saving…');
+    _saveTimer = setTimeout(() => saveAnswers(/*explicit=*/false), 600);
+  }
+  async function saveAnswers(explicit) {
+    if (!state.system_id) return;
+    if (state.saving) return;
+    state.saving = true;
+    setSaveStatus(explicit ? 'saving…' : 'auto-saving…');
+    try {
+      // Send only the keys for the currently-rendered sub-profile (avoids
+      // overwriting answers from other sub-profiles in case state.answers
+      // ever gets out of sync). The backend merges by key, so this is safe.
+      const cat = (state.subprofile_full || {}).catalogue || {};
+      const qs = cat.intake_questions || [];
+      const slice = {};
+      qs.forEach((q) => {
+        const v = state.answers[q.key];
+        slice[q.key] = (v === undefined || v === '') ? null : v;
+      });
+      const r = await fetch(`/api/cyab/studio/systems/${state.system_id}/answers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers: slice, subprofile_id: state.sub_id }),
+      });
+      if (!r.ok) {
+        setSaveStatus('save failed', /*err=*/true);
+        return;
+      }
+      setSaveStatus('saved · ' + new Date().toLocaleTimeString());
+    } catch (e) {
+      setSaveStatus('save error: ' + e.message, /*err=*/true);
+    } finally {
+      state.saving = false;
+    }
+  }
+  function setSaveStatus(msg, err) {
+    const el = $('cs-save-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'text-[11px] ' + (err ? 'text-rose-400' : 'text-slate-500');
   }
 
   function renderUseCases(kind, ucs) {
@@ -515,11 +774,93 @@
     }
   }
 
+  // ---- Systems ----------------------------------------------------------
+  async function loadSystems() {
+    try {
+      const r = await fetch('/api/cyab/studio/systems');
+      if (!r.ok) return;
+      const d = await r.json();
+      state.systems = d.systems || [];
+      const sel = $('cs-system');
+      // Clear existing options bar the placeholder
+      while (sel.options.length > 1) sel.remove(1);
+      // Group by department for readability
+      const byDept = {};
+      state.systems.forEach((s) => {
+        (byDept[s.department || '— unassigned —'] = byDept[s.department || '— unassigned —'] || []).push(s);
+      });
+      Object.keys(byDept).sort().forEach((dept) => {
+        const og = document.createElement('optgroup');
+        og.label = dept;
+        byDept[dept].forEach((s) => {
+          const o = document.createElement('option');
+          o.value = String(s.id);
+          o.textContent = `${s.name} · ${s.status || 'DRAFT'} · ${s.readiness_score || 0}%`;
+          og.appendChild(o);
+        });
+        sel.appendChild(og);
+      });
+      if (state.system_id) {
+        sel.value = String(state.system_id);
+        await loadAnswers(state.system_id);
+      }
+      updatePackButton();
+      updateSystemMeta();
+    } catch (e) {
+      console.warn('Failed to load systems:', e);
+    }
+  }
+  function updateSystemMeta() {
+    const m = $('cs-system-meta');
+    const link = $('cs-system-detail-link');
+    if (!state.system_id) {
+      m.textContent = '';
+      link.classList.add('hidden');
+      return;
+    }
+    const s = state.systems.find((x) => x.id === state.system_id);
+    if (!s) { m.textContent = ''; link.classList.add('hidden'); return; }
+    m.innerHTML = `<span class="text-slate-300 font-semibold">${escapeHtml(s.name)}</span> · ${escapeHtml(s.department || '')} · <span class="text-ion-cyan">${escapeHtml(s.status || 'DRAFT')}</span>`;
+    link.href = `/cyab#${s.id}`;
+    link.classList.remove('hidden');
+  }
+  function updatePackButton() {
+    const btn = $('cs-pack-btn');
+    const blurb = $('cs-pack-blurb');
+    if (state.system_id) {
+      btn.disabled = false;
+      const s = state.systems.find((x) => x.id === state.system_id);
+      blurb.textContent = `Onboarding Pack will bundle answers + coverage + sign-off for ${s ? s.name : 'system #' + state.system_id}.`;
+    } else {
+      btn.disabled = true;
+      blurb.textContent = 'Pick a system above to enable Onboarding Pack export.';
+    }
+  }
+  async function loadAnswers(sys_id) {
+    state.answers = {};
+    try {
+      const r = await fetch(`/api/cyab/studio/systems/${sys_id}/answers`);
+      if (!r.ok) return;
+      const d = await r.json();
+      state.answers = d.answers || {};
+    } catch (e) { /* ignore */ }
+  }
+
+  $('cs-system').addEventListener('change', async (e) => {
+    const v = e.target.value;
+    state.system_id = v ? parseInt(v, 10) : null;
+    if (state.system_id) await loadAnswers(state.system_id);
+    else state.answers = {};
+    updateSystemMeta();
+    updatePackButton();
+    writeUrl();
+    if (state.tab === 'intake') renderTabBody();
+  });
+
   // ---- Onboarding Pack ---------------------------------------------------
   $('cs-pack-btn').onclick = () => {
-    const id = parseInt($('cs-pack-system').value, 10);
-    if (!id) { alert('Enter a system ID first.'); return; }
-    window.open(`/api/cyab/studio/systems/${id}/onboarding-pack`, '_blank');
+    if (!state.system_id) return;
+    window.open(`/api/cyab/studio/systems/${state.system_id}/onboarding-pack`, '_blank');
   };
 
   // ---- Wire tab buttons --------------------------------------------------
@@ -537,6 +878,7 @@
 
   // ---- Init --------------------------------------------------------------
   readUrl();
+  loadSystems();
   loadPillars();
 
   window.addEventListener('popstate', () => {
