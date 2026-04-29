@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ion"
-version = "0.13.0"
+version = "0.13.1"
 description = "Intelligent Operating Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -70,7 +70,7 @@ ion-web = "ion.web.server:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-ion = ["web/static/**/*", "web/templates/**/*"]
+ion = ["web/static/**/*", "web/templates/**/*", "data/**/*.md", "data/**/*.yaml"]
 
 [tool.ruff]
 line-length = 100

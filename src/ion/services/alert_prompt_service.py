@@ -3240,6 +3240,22 @@ class AlertPromptService:
             if exemplars:
                 parts.append(_format_exemplars_for_prompt(exemplars))
 
+        # v0.13.1: Tier-6 — Elastic Agent Skills consumer.
+        # Loaded SKILL.md folders matched against the alert via keyword /
+        # technique / rule-group; embedding-free. See
+        # ``services/skill_loader.py``.
+        if alert is not None:
+            try:
+                from ion.services.skill_loader import (
+                    select_skills_for_alert, format_skills_for_prompt,
+                )
+                skills = select_skills_for_alert(alert)
+                skill_block = format_skills_for_prompt(skills)
+                if skill_block:
+                    parts.append(skill_block)
+            except Exception as exc:
+                logger.debug("Skill loader failed: %s", exc)
+
         # Output contract — always appended, with or without a template
         parts.append(_OUTPUT_CONTRACT)
         return "".join(parts)
