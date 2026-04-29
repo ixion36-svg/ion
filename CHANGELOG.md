@@ -1,5 +1,62 @@
 # Changelog
 
+## v0.12.7 (2026-04-29) — curriculum
+
+### L3 Module 1 — Purple-team flow expansion (2 lessons → 8 lessons, BTL1/SANS depth)
+
+L3 was a v0.11.2 stub: 1 module / 2 lessons / 4 questions. v0.12.7 expands Module 1 to the L1/L2 module bar — 8 lessons, 9 questions, ~17k words. The existing Lesson 1 (Why purple teaming beats annual pentests) and the Lesson 2 quiz are preserved; six new reading lessons are inserted between them; the quiz becomes Lesson 8 with one additional question.
+
+#### What's authored
+
+| Lesson | Topic |
+|---|---|
+| 1.1 | **Why purple teaming beats annual pentests** (existing — preserved) |
+| 1.2 | **Picking a TTP**: threat profiles, ATT&CK Navigator overlays, sector-specific TTPs, the priority decision rule |
+| 1.3 | **Authorisation, scoping, and pre-briefing**: written-auth chain, four scoping constraints, exercise-notice format, legal exposure |
+| 1.4 | **Atomic Red Team**: installation, prereq → test → cleanup phases, picking the right test number, Linux atomics, mandatory clean-up |
+| 1.5 | **MITRE Caldera**: agent-based emulation, when chained / multi-host / long-running exercises need it, agent-removal-after rule |
+| 1.6 | **Telemetry verification**: 30-minute wait, the four-tier pivot path in order, sub-channel gap classification, latency + fidelity scoring |
+| 1.7 | **Scoring + scorecards**: 8-field scorecard row, empirical detection coverage, q-over-q trending, TuningProposal acceptance criteria |
+| 1.8 | **Capstone quiz** (existing 4 questions + 1 new — TuningProposal field selection) |
+
+#### Curriculum status
+
+- **L1**: 8/8 ✅
+- **L2**: 8/8 ✅
+- **L3**: **1/8** authored at proper depth (Module 1 — Purple-team flow). M2-M8 begin in v0.12.8.
+
+L3 module backlog (per the v0.11.2 placeholder):
+- M2 — Atomic Red Team library deep-dive
+- M3 — MITRE Caldera operations
+- M4 — Telemetry quality assessment
+- M5 — Detection-engineering loops (TuningProposal lifecycle)
+- M6 — Multi-host chain emulation
+- M7 — Out-of-hours / off-shift validation
+- M8 — Capstone — full purple-team exercise across the kill chain
+
+#### Verifying the feature
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+docker exec ion python /app/seed_all.py --force
+```
+
+After re-seed:
+1. `/courses` → *Adversary Emulation Basics* → module count shows **1 module, 8 lessons**.
+2. Open Module 1 — *Purple-team flow*. 8 lessons; the final is a 5-question capstone.
+3. Lesson 1.2 (TTP-pick) — the worked decision-rule example with T1486 priority 5.0 should be present.
+4. Lesson 1.7 (scoring) — the worked Q1 scorecard with 75% empirical coverage should be present.
+
+#### Upgrade
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+---
+
 ## v0.12.6 (2026-04-29) — curriculum
 
 ### L2 Module 8 — Hunt-to-Detection Capstone (L2 COMPLETE)
