@@ -188,6 +188,17 @@
   .cs-answer-pill:hover:not(:disabled) { background:rgba(255,255,255,0.08); color:#e5e7eb; }
   .cs-answer-pill.is-active { background:rgba(109,228,255,0.18); color:#6de4ff; border-color:rgba(109,228,255,0.4); }
   .cs-answer-pill:disabled { opacity:0.4; cursor:not-allowed; }
+
+  /* v0.12.3 — use-case status pill */
+  .cs-uc-status { font-size:10px; font-weight:700; letter-spacing:0.06em;
+    padding:4px 9px; border-radius:6px; cursor:pointer; transition:all 0.12s;
+    border:1px solid transparent; white-space:nowrap; }
+  .cs-uc-status:disabled { opacity:0.4; cursor:not-allowed; }
+  .cs-uc-status:not(:disabled):hover { transform:translateY(-1px); }
+  .cs-uc-status-shipped { background:rgba(34,197,94,0.18); color:#4ade80; border-color:rgba(34,197,94,0.35); }
+  .cs-uc-status-partial { background:rgba(245,158,11,0.18); color:#fbbf24; border-color:rgba(245,158,11,0.35); }
+  .cs-uc-status-gap     { background:rgba(255,255,255,0.04); color:#64748b; border-color:rgba(255,255,255,0.08); }
+  .cs-uc-status-na      { background:rgba(255,255,255,0.04); color:#94a3b8; border-color:rgba(255,255,255,0.10); }
 </style>
 
 <script>
@@ -204,6 +215,11 @@
     systems: [],             // v0.12.1
     answers: {},             // v0.12.1 — keyed by question key
     saving: false,           // v0.12.1
+    // v0.12.3 — use-case status wiring
+    target_ds_id: null,      // resolved data source for current (system, sub) context
+    target_ds_name: null,
+    candidate_ds_count: 0,   // number of data sources matching (system, sub) — 0,1, >1
+    statuses: {},            // map use_case_id → shipped|partial|gap|n/a
   };
 
   // ---- URL state ---------------------------------------------------------
@@ -309,6 +325,7 @@
       return;
     }
     state.subprofile_full = await r.json();
+    await resolveTargetDataSource();
 
     // Re-mark rail active
     document.querySelectorAll('.cs-rail-btn').forEach((b, idx, arr) => {
@@ -619,28 +636,124 @@
       return;
     }
     c.innerHTML = '';
+
+    // v0.12.3 — coverage banner
+    if (state.system_id) {
+      const banner = document.createElement('div');
+      banner.className = 'col-span-full mb-2';
+      const shipped = ucs.filter((u) => state.statuses[u.id] === 'shipped').length;
+      const partial = ucs.filter((u) => state.statuses[u.id] === 'partial').length;
+      const total = ucs.length;
+      const pct = total ? Math.round(shipped * 100 / total) : 0;
+      let info = '';
+      if (state.candidate_ds_count === 0) {
+        info = `<span class="text-amber-400">No data source on this system is mapped to <span class="font-semibold">${escapeHtml(state.subprofile_full && state.subprofile_full.label || '')}</span> yet — assign a sub-profile in <a href="/cyab" class="underline">CyAB</a> first.</span>`;
+      } else {
+        const dsLine = state.candidate_ds_count > 1
+          ? `<span class="text-slate-500"> (across ${state.candidate_ds_count} matching data sources, status writes to first: ${escapeHtml(state.target_ds_name || '')})</span>`
+          : `<span class="text-slate-500"> · Data source: ${escapeHtml(state.target_ds_name || '')}</span>`;
+        info = `Coverage: <span class="text-emerald-400 font-semibold">${shipped}</span> shipped / <span class="text-amber-400">${partial}</span> partial / <span class="text-slate-300">${total}</span> total · <span class="text-ion-cyan font-semibold">${pct}%</span>${dsLine}`;
+      }
+      banner.innerHTML = `<div class="rounded-lg border border-white/10 bg-ink-950/40 p-3 text-[12px] text-slate-300">${info}</div>`;
+      c.appendChild(banner);
+    }
+
     ucs.forEach((uc) => {
       const card = document.createElement('div');
       const isActive = state.uc_id === uc.id;
+      const status = state.statuses[uc.id] || 'gap';
+      const cssStatus = status === 'n/a' ? 'na' : status;
       card.className = 'cs-uc-card' + (isActive ? ' is-active' : '');
       const risk = (uc.risk || 'medium').toLowerCase();
       const mitre = (uc.mitre_ids || []).slice(0, 4).map(escapeHtml).join(' · ');
       const compliance = (uc.compliance_frames || []).slice(0, 3).map(escapeHtml).join(' · ');
+      const statusBtnDisabled = !state.target_ds_id;
       card.innerHTML = `
         <div class="cs-uc-stripe risk-${escapeHtml(risk)}"></div>
         <div class="flex items-start justify-between gap-3 mb-3">
           <div class="cs-uc-title">${escapeHtml(uc.title || '')}</div>
-          <span class="cs-uc-mini-pill">${escapeHtml(risk.toUpperCase())}</span>
+          <button class="cs-uc-status cs-uc-status-${escapeHtml(cssStatus)}" data-uc-id="${escapeHtml(uc.id)}" ${statusBtnDisabled ? 'disabled' : ''} title="Click to cycle status">${escapeHtml(status.toUpperCase())}</button>
         </div>
         <div class="cs-uc-summary">${escapeHtml(uc.summary || '')}</div>
         <div class="cs-uc-pills">
+          <span class="cs-uc-mini-pill">${escapeHtml(risk.toUpperCase())}</span>
           ${mitre ? `<span class="cs-uc-mini-pill">MITRE · ${mitre}</span>` : ''}
           ${compliance ? `<span class="cs-uc-mini-pill">${compliance}</span>` : ''}
         </div>
       `;
-      card.onclick = () => selectUseCase(uc.id);
+      card.onclick = (ev) => {
+        if (ev.target && ev.target.classList && ev.target.classList.contains('cs-uc-status')) return;
+        selectUseCase(uc.id);
+      };
+      const statusBtn = card.querySelector('.cs-uc-status');
+      if (statusBtn) statusBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        cycleStatus(uc.id);
+      };
       c.appendChild(card);
     });
+  }
+
+  // ---- Use-case status (v0.12.3) ---------------------------------------
+  const STATUS_CYCLE = ['gap', 'partial', 'shipped', 'n/a'];
+  function cycleStatus(uc_id) {
+    if (!state.target_ds_id) return;
+    const cur = state.statuses[uc_id] || 'gap';
+    const idx = STATUS_CYCLE.indexOf(cur);
+    const next = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
+    state.statuses[uc_id] = next;
+    // re-render the tab body cheaply: just re-render this card via a light call
+    renderTabBody();
+    scheduleStatusSave(uc_id, next);
+  }
+
+  let _statusSaveTimer = null;
+  let _statusSavePending = {};
+  function scheduleStatusSave(uc_id, value) {
+    if (!state.target_ds_id) return;
+    _statusSavePending[uc_id] = value;
+    if (_statusSaveTimer) clearTimeout(_statusSaveTimer);
+    setSaveStatus('saving status…');
+    _statusSaveTimer = setTimeout(saveStatuses, 500);
+  }
+  async function saveStatuses() {
+    if (!state.target_ds_id) return;
+    const payload = { ..._statusSavePending };
+    _statusSavePending = {};
+    try {
+      const r = await fetch(`/api/cyab/studio/data-sources/${state.target_ds_id}/use-case-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ statuses: payload }),
+      });
+      if (!r.ok) { setSaveStatus('status save failed', /*err=*/true); return; }
+      setSaveStatus('status saved · ' + new Date().toLocaleTimeString());
+    } catch (e) {
+      setSaveStatus('status save error: ' + e.message, /*err=*/true);
+    }
+  }
+
+  async function resolveTargetDataSource() {
+    state.target_ds_id = null;
+    state.target_ds_name = null;
+    state.candidate_ds_count = 0;
+    state.statuses = {};
+    if (!state.system_id || !state.sub_id) return;
+    try {
+      const r = await fetch(`/api/cyab/studio/systems/${state.system_id}/data-sources?subprofile_id=${encodeURIComponent(state.sub_id)}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      state.candidate_ds_count = (d.data_sources || []).length;
+      if (state.candidate_ds_count > 0) {
+        state.target_ds_id = d.data_sources[0].id;
+        state.target_ds_name = d.data_sources[0].name;
+        const sr = await fetch(`/api/cyab/studio/data-sources/${state.target_ds_id}/use-case-status`);
+        if (sr.ok) {
+          const sd = await sr.json();
+          state.statuses = sd.statuses || {};
+        }
+      }
+    } catch (e) { /* ignore */ }
   }
 
   // ---- Drawer ------------------------------------------------------------
@@ -851,10 +964,11 @@
     state.system_id = v ? parseInt(v, 10) : null;
     if (state.system_id) await loadAnswers(state.system_id);
     else state.answers = {};
+    await resolveTargetDataSource();
     updateSystemMeta();
     updatePackButton();
     writeUrl();
-    if (state.tab === 'intake') renderTabBody();
+    renderTabBody();
   });
 
   // ---- Onboarding Pack ---------------------------------------------------

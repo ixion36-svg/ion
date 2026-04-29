@@ -216,6 +216,9 @@
 
                 <!-- Live ES alert rollup for this system (last 7d), populated by openSystem() -->
                 <div id="cyab-alert-rollup" class="cyab-alert-rollup" style="display:none;margin-top:1rem;"></div>
+
+                <!-- v0.12.3: Onboarding Studio sub-profile coverage rollup -->
+                <div id="cyab-coverage-rollup" class="cyab-alert-rollup" style="display:none;margin-top:1rem;"></div>
                 <div class="form-row" style="margin-top:0.75rem;">
                     <div class="form-group"><label>System Icon</label>
                         <div class="cyab-icon-picker" id="icon-picker"></div>
@@ -1869,9 +1872,60 @@ async function openSystem(id) {
         showDetail();
         // Fire-and-forget: hydrate the alert rollup widget once the page is visible
         loadAlertRollup(id);
+        // v0.12.3: hydrate Onboarding Studio sub-profile coverage rollup
+        loadCoverageRollup(id);
     } catch (e) {
         console.error(e);
         showToast('Failed to load system', 'error');
+    }
+}
+
+// v0.12.3: render the per-sub-profile readiness rollup. Hidden when no
+// data sources are tagged with a sub-profile yet.
+async function loadCoverageRollup(systemId) {
+    var box = document.getElementById('cyab-coverage-rollup');
+    if (!box) return;
+    box.style.display = 'block';
+    box.innerHTML = '<div class="cyab-rollup-loading">Loading sub-profile coverage...</div>';
+    try {
+        var data = await api.get('/api/cyab/studio/systems/' + systemId + '/coverage');
+        var subs = (data && data.subprofiles) || [];
+        if (!subs.length) {
+            box.innerHTML =
+                '<div class="cyab-rollup-empty">' +
+                    'No data source on this system is mapped to a sub-profile yet. ' +
+                    '<a href="/cyab/studio?system=' + systemId + '" style="color:var(--primary);text-decoration:underline;">Open the Onboarding Studio</a> to start.' +
+                '</div>';
+            return;
+        }
+        function bar(pct, color) {
+            return '<div style="position:relative;height:6px;border-radius:3px;background:rgba(255,255,255,0.05);overflow:hidden;">' +
+                '<div style="position:absolute;inset:0;width:' + Math.max(0, Math.min(100, pct)) + '%;background:' + color + ';"></div>' +
+            '</div>';
+        }
+        var rows = subs.map(function(sp) {
+            return '' +
+                '<div style="padding:10px 0;border-top:1px solid var(--border);">' +
+                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+                        '<strong style="font-size:13px;color:var(--text-primary);">' + escapeHtml(sp.label) + '</strong>' +
+                        '<span style="font-size:11px;color:var(--text-secondary);">' + escapeHtml(sp.pillar_id) + '</span>' +
+                    '</div>' +
+                    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;font-size:11px;color:var(--text-secondary);">' +
+                        '<div><div style="display:flex;justify-content:space-between;margin-bottom:3px;">Intake<span>' + sp.intake.answered + '/' + sp.intake.total + ' · ' + sp.intake.pct + '%</span></div>' + bar(sp.intake.pct, 'var(--primary)') + '</div>' +
+                        '<div><div style="display:flex;justify-content:space-between;margin-bottom:3px;">Detection<span>' + sp.detection.shipped + '/' + sp.detection.total + ' · ' + sp.detection.pct + '%</span></div>' + bar(sp.detection.pct, '#22c55e') + '</div>' +
+                        '<div><div style="display:flex;justify-content:space-between;margin-bottom:3px;">Audit<span>' + sp.audit.shipped + '/' + sp.audit.total + ' · ' + sp.audit.pct + '%</span></div>' + bar(sp.audit.pct, '#a78bfa') + '</div>' +
+                    '</div>' +
+                '</div>';
+        }).join('');
+        box.innerHTML =
+            '<div class="cyab-rollup-header">' +
+                '<strong>Onboarding Studio coverage</strong>' +
+                '<a class="cyab-rollup-link" href="/cyab/studio?system=' + systemId + '">Open Studio &rarr;</a>' +
+            '</div>' +
+            rows;
+    } catch (e) {
+        console.error(e);
+        box.style.display = 'none';
     }
 }
 
