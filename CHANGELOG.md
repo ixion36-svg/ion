@@ -1,5 +1,55 @@
 # Changelog
 
+## v0.12.14 (2026-04-29) — curriculum (L3 COMPLETE; FULL CURRICULUM SHIPPED)
+
+### L3 Module 8 — Capstone — Full purple-team programme review
+
+L3 closes 7/8 → **8/8 ✅**. The capstone integrates all seven prior modules into one quarterly programme cycle: planning + execution + scoring + retrospective. Mid-quarter pivot when CTI shifts; integration with the org's risk register; the quarterly board package the L3 prepares for the CISO; career-path post-L3 (IR / detection-eng / architect / CTI); the five L3 anti-patterns; programme handoff to a successor.
+
+#### What's authored
+
+8 lessons (7 reading + 1 quiz capstone), 9 questions, ~12k words at BTL1/SANS GCTH depth. (Capstone-style — heavier on integration, lighter on new material than M2-M7.)
+
+| Lesson | Topic |
+|---|---|
+| 8.1 | Five-phase quarterly cycle — plan / execute / score / action / retrospective |
+| 8.2 | Worked Q3 12-week programme plan with exercise mix |
+| 8.3 | Mid-quarter pivot triggers + two-week pivot rule |
+| 8.4 | 30-min retrospective format with systemic-vs-local pattern analysis |
+| 8.5 | Risk register integration — control-effectiveness rating contributions |
+| 8.6 | Quarterly board package — five one-page sections |
+| 8.7 | Career paths + the five L3 anti-patterns + programme handoff |
+| 8.8 | Capstone — trajectory framing + handoff package |
+
+#### Curriculum status — **L1 + L2 + L3 ALL COMPLETE**
+
+- **L1 — Alert Triage Fundamentals**: 8 modules / 59 lessons ✅
+- **L2 — Threat Hunting with KQL**: 8 modules / 64 lessons ✅
+- **L3 — Adversary Emulation Basics**: 8 modules / 64 lessons ✅
+- **Total**: 24 modules / 187 lessons / hundreds of questions / ~360k words at BTL1/SANS GCTH depth
+
+The full SOC analyst's curriculum from first-day triage (L1) through threat hunting with KQL (L2) through detection-engineering programme leadership (L3) is now shipped at proper depth.
+
+#### Verifying the feature
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+docker exec ion python /app/seed_all.py --force
+```
+
+After re-seed, the *Adversary Emulation Basics* course should show **8 modules, 64 lessons** matching the L1 + L2 cadence. The full curriculum is now ready for analyst self-paced learning.
+
+#### Post-curriculum backlog
+
+Now that the curriculum is complete, the post-curriculum work resumes:
+
+- **PDF certificate generation** on course completion.
+- **Elastic Agent Skills consumer** (Bob's 6th matcher tier).
+- **Labs** — interactive exercises that link into ION's investigation queue.
+
+---
+
 ## v0.12.13 (2026-04-29) — curriculum
 
 ### L3 Module 7 — Out-of-hours / off-shift validation
