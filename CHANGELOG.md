@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.12.11 (2026-04-29) — curriculum
+
+### L3 Module 5 — Detection-engineering loops
+
+L3 advances 4/8 → **5/8**. The post-exercise lifecycle: TuningProposal authoring with the eight required fields; the acceptance-criteria contract (specific test + outcome + evidence + time-boxed); gap-fix verification re-tests on the same atomic + scoping; regression tracking quarterly via prior-Tier-1 sampling; lifecycle KPIs (FP rate, TP rate, MTT, drift); TIDE submission and the handoff to detection-engineering (cross-link to L2 M8's five-gate framework). The discipline that turns audit findings into shipping rules and prevents the *paper-closed* failure mode.
+
+#### What's authored
+
+8 lessons (7 reading + 1 quiz capstone), 9 questions, ~14k words at BTL1/SANS GCTH depth.
+
+| Lesson | Topic |
+|---|---|
+| 5.1 | Closed-loop overview — gap → ticket → fix → re-test → close; paper-closed vs verified-closed |
+| 5.2 | TuningProposal authoring — eight required fields with worked example |
+| 5.3 | Acceptance-criteria contract — testable / reproducible / time-boxed; anti-patterns |
+| 5.4 | Re-test execution — same atomic + same scoping; four outcomes (closes / partial / no change / worse) |
+| 5.5 | Regression tracking — quarterly sampling of prior-Tier-1 techniques; five regression triggers |
+| 5.6 | Lifecycle KPIs — FP rate (50% drift threshold), TP rate (30% floor), MTT, deprecation triggers |
+| 5.7 | TIDE submission — pre-submission five-gate check; CI validation; ownership handoff |
+| 5.8 | Capstone — regression handling + paper-closed pushback |
+
+#### Curriculum status
+
+- **L1**: 8/8 ✅
+- **L2**: 8/8 ✅
+- **L3**: **5/8** authored at proper depth (M1-M5). M6 — Multi-host chain emulation — next.
+
+---
+
 ## v0.12.10 (2026-04-29) — curriculum
 
 ### L3 Module 4 — Telemetry quality assessment
