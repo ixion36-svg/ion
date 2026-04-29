@@ -1,5 +1,47 @@
 # Changelog
 
+## v0.12.8 (2026-04-29) — curriculum
+
+### L3 Module 2 — Atomic Red Team library deep-dive
+
+L3 advances 1/8 → **2/8**. Module 2 goes deep on the ART ecosystem M1 introduced lightly: repo structure, the YAML test schema, custom-atomic authoring for org-specific TTPs, dependency engineering, multi-platform tests, MITRE Engenuity CTID's Adversary Emulation Library, and the four-point safety harness.
+
+#### What's authored
+
+8 lessons (7 reading + 1 quiz capstone), 9 questions, ~17k words at BTL1/SANS GCTH depth.
+
+| Lesson | Topic |
+|---|---|
+| 2.1 | Repo structure — `atomics/` / `Indexes/` / per-platform indexes / Navigator → ART path workflow |
+| 2.2 | YAML schema — five required top-level fields, `#{var}` interpolation, executor types, multi-step executors |
+| 2.3 | Authoring custom atomics — six-step workflow, public-PR vs org-internal decision tree, ART CI requirements |
+| 2.4 | Dependency engineering — prereq blocks, CDN-cached download, runtime-fetch vs pre-staged trade-offs |
+| 2.5 | Multi-platform atomics — `supported_platforms` gating, path-separator gotchas, IART host-platform detection |
+| 2.6 | MITRE Adversary Emulation Library — full-actor plans, FIN6 worked walk, atomic-by-atomic vs Caldera-chained execution |
+| 2.7 | Safety harness — dry-run, permission audit, four-point blast-radius check, snapshot-and-revert mitigation |
+| 2.8 | Capstone quiz — `-PathToAtomicsFolder` + cleanup-failure prediction |
+
+#### Curriculum status
+
+- **L1**: 8/8 ✅
+- **L2**: 8/8 ✅
+- **L3**: **2/8** authored at proper depth (M1 Purple-team flow, M2 ART deep-dive). M3-M8 are next ships.
+
+#### Verifying the feature
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+docker exec ion python /app/seed_all.py --force
+```
+
+After re-seed:
+1. `/courses` → *Adversary Emulation Basics* → module count shows **2 modules, 16 lessons**.
+2. Open Module 2 — *Atomic Red Team library deep-dive*. 8 lessons; the final is a 2-question capstone.
+3. Lesson 2.6 (Adversary Emulation Library) — the FIN6 12-phase walkthrough should be present.
+
+---
+
 ## v0.12.7 (2026-04-29) — curriculum
 
 ### L3 Module 1 — Purple-team flow expansion (2 lessons → 8 lessons, BTL1/SANS depth)

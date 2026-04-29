@@ -16551,7 +16551,1114 @@ Take the quiz to lock in the analysis flow.
         points=3,
     )
 
-    print(f"  L3: {course.title} — 1 module, 8 lessons (Module 1 Purple-team flow @ proper depth)")
+    # ── Module 2 — Atomic Red Team Library Deep-Dive ──────────────────
+    mod2 = _add_module(
+        session, course, order=2,
+        title="Atomic Red Team library deep-dive — YAML, custom atomics, dependency engineering",
+        description_md=(
+            "M1 introduced Atomic Red Team via Invoke-AtomicRedTeam. "
+            "M2 goes deep: navigating the repo structure, reading and "
+            "modifying the `T<ID>.yaml` schema, authoring custom "
+            "atomics for org-specific TTPs the public library doesn't "
+            "cover, building dependency chains that fetch prereqs "
+            "without leaking, multi-platform tests with platform-"
+            "conditional executors, and the MITRE Adversary Emulation "
+            "Library for full-chain actor emulations. Closes with the "
+            "safety harness — dry-run, permission auditing, "
+            "blast-radius checking — that prevents the L3's most-"
+            "common failure mode (cleanup leaves residual state)."
+        ),
+        estimated_minutes=240,
+    )
+
+    # Lesson 2.1 — Repository structure
+    m2l1 = _add_lesson(
+        session, mod2, order=1,
+        title="The Atomic Red Team repository structure",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Navigate the **`atomics/`**, **`Indexes/`**, and **`bin/`** directories
+> 2. Locate the right atomic for an arbitrary ATT&CK technique by id
+> 3. Use the **markdown indexes** vs the **CSV indexes** (machine-readable for tooling)
+> 4. Cross-reference an ATT&CK Navigator overlay back to ART repo paths
+
+## Repo layout
+
+Atomic Red Team is structured for both human and tooling consumption. Top level:
+
+```
+atomic-red-team/
+├── atomics/                         # the test library — one folder per technique
+│   ├── T1003/
+│   │   ├── T1003.yaml               # canonical test definitions
+│   │   ├── T1003.md                 # human-readable description
+│   │   └── src/                     # supporting binaries / scripts
+│   ├── T1059.001/
+│   │   └── ...
+│   └── (one folder per technique with public atomics)
+├── Indexes/
+│   └── Indexes-Markdown/
+│       ├── windows-index.md         # all Windows tests, technique-grouped
+│       ├── linux-index.md
+│       └── macos-index.md
+├── atomic_indexes/
+│   └── Indexes-CSV/
+│       ├── index.csv                # machine-readable index for tooling
+│       └── ...
+├── bin/                              # helper scripts
+└── docs/                             # contribution docs, schema docs
+```
+
+The `atomics/` directory is the canonical source. Everything else (indexes, docs) is generated from it.
+
+## Finding an atomic by ATT&CK technique
+
+The technique id is the directory name. To find atomics for T1059.001 (PowerShell):
+
+```bash
+$ ls atomic-red-team/atomics/T1059.001/
+T1059.001.md     T1059.001.yaml      src/
+```
+
+`T1059.001.yaml` carries the `atomic_tests` array (multiple test variants under one technique). `T1059.001.md` is the auto-rendered human-readable view; for hunting through it, prefer the YAML directly.
+
+For a sub-technique (e.g. T1059.001), the parent (T1059) usually has its own folder with parent-level tests; sub-techniques live in their own folders. Cross-check the parent if the sub-technique folder is sparse — sometimes the relevant test is at the parent level.
+
+## Per-platform indexes
+
+The markdown indexes (`Indexes/Indexes-Markdown/<platform>-index.md`) list every atomic that runs on that platform, grouped by ATT&CK technique. Useful when scanning by platform: e.g. *what Linux atomics do we have for Credential Access?*
+
+For tooling — CI / IART / your own scripts — use `atomic_indexes/Indexes-CSV/index.csv` instead. Machine-readable, columns are `Tactic, Technique #, Test #, Test Name, OS, Description, Executor`. Filter via standard CSV / pandas / awk.
+
+## Cross-reference: Navigator overlay → ART path
+
+The ATT&CK Navigator is a layer-overlay tool (M1.2 introduced it). When the Navigator surfaces a high-priority technique, the L3 jumps to the ART folder by id. This is the canonical workflow:
+
+```
+Navigator overlay → highest-priority cell: T1486
+    ↓
+ART repo: atomic-red-team/atomics/T1486/T1486.yaml
+    ↓
+Atomic_tests array — pick the test variant by actor / blast-radius / fidelity
+    ↓
+IART: Invoke-AtomicTest T1486 -TestNumbers <N>
+```
+
+The reverse direction (ART folder → Navigator) is rarely useful; the workflow is always *threat-profile → Navigator → priority TTP → ART*.
+
+## Worked walk: T1059.001
+
+Open `atomics/T1059.001/T1059.001.yaml`. The structure:
+
+```yaml
+attack_technique: T1059.001
+display_name: 'Command and Scripting Interpreter: PowerShell'
+atomic_tests:
+  - name: Mimikatz
+    auto_generated_guid: ...
+    description: |
+      Use PowerShell to execute Mimikatz...
+    supported_platforms: [windows]
+    input_arguments:
+      input_file:
+        description: PowerShell script that contains Mimikatz code
+        type: string
+        default: PathToAtomicsFolder\\T1059.001\\src\\Invoke-Mimikatz.ps1
+    executor:
+      command: |
+        IEX (New-Object Net.WebClient).DownloadString(...);
+      name: powershell
+  - name: Run Get-Process using obfuscation
+    description: |
+      Use PowerShell with character substitution to run Get-Process...
+    ...
+```
+
+14+ test variants under T1059.001, each addressable by `-TestNumbers <N>` (1-indexed). The `src/` subfolder ships supporting scripts (Invoke-Mimikatz.ps1) and any pre-built tooling.
+
+## Glossary
+
+- **`atomics/T<ID>/`** — folder per ATT&CK technique containing the YAML + md + src.
+- **Markdown index** — human-readable per-platform listing.
+- **CSV index** — machine-readable, used by IART and CI / your own tooling.
+- **Test number** — disambiguates atomic_tests within one technique.
+
+## Further reading
+
+- ART repo — https://github.com/redcanaryco/atomic-red-team.
+- ART contribution guide — `docs/contributing.md`.
+""",
+    )
+    _add_q(session, m2l1, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="An L3 needs to find atomics for **T1486** (Data Encrypted for Impact). What's the canonical YAML path within the Atomic Red Team repository? Format: relative path from repo root.",
+        options=None,
+        correct=[
+            "atomics/T1486/T1486.yaml",
+            "/atomics/T1486/T1486.yaml",
+            "./atomics/T1486/T1486.yaml",
+            "atomics/T1486/T1486.yml",
+        ],
+        explanation_md="**`atomics/T1486/T1486.yaml`** is the canonical path. Every public atomic lives at `atomics/<technique-id>/<technique-id>.yaml` (with `<technique-id>.md` and an optional `src/` folder alongside). Sub-techniques live at their own path: `atomics/T1059.001/T1059.001.yaml`. The L3's reflex for any new TTP exercise is: ATT&CK Navigator priority → ART folder by id → YAML → pick test number by actor/blast-radius. Note: a few techniques are subdivided across the parent and sub-techniques; if the sub-technique folder is sparse, check the parent (`atomics/T1059/T1059.yaml`) for cross-cutting tests.",
+        points=2,
+    )
+
+    # Lesson 2.2 — atomic_test YAML schema
+    m2l2 = _add_lesson(
+        session, mod2, order=2,
+        title="The atomic_test YAML schema: input_arguments, dependencies, executor, cleanup",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Recite the **five required top-level fields** of an atomic_test
+> 2. Use **`#{var}` interpolation** for parameterised tests
+> 3. Author **dependencies** with `description / prereq_command / get_prereq_command`
+> 4. Pick the right **executor type** (`command_prompt`, `powershell`, `sh`, `bash`)
+
+## The five required top-level fields
+
+Every entry in the `atomic_tests` array has at least:
+
+```yaml
+- name: <short title>
+  description: |
+    <multi-line description of what this test emulates>
+  supported_platforms:
+    - windows  # or linux, macos
+  executor:
+    name: <executor type>
+    command: |
+      <the command(s) to execute>
+  cleanup_command: |
+    <commands to restore pre-test state, or nothing if the test is stateless>
+```
+
+Optional but common:
+
+- **`input_arguments`** — variables with `description / type / default`. Referenced in the executor via `#{varname}`.
+- **`dependencies`** — array of prereq blocks. Each has `description / prereq_command / get_prereq_command`.
+- **`auto_generated_guid`** — UUID for tooling de-duplication. ART's CI auto-fills this; manually-authored atomics get a fresh UUID via `uuidgen`.
+
+## Field-by-field walkthrough
+
+```yaml
+- name: Encoded PowerShell command
+  auto_generated_guid: 1c3f5e9c-0c4b-4f5e-9c0c-4b4f5e9c0c4b
+  description: |
+    Run a base64-encoded PowerShell command via the `-EncodedCommand` flag.
+    Common LotL pattern in Conti / FIN7 ransomware operator tooling.
+  supported_platforms:
+    - windows
+  input_arguments:
+    payload:
+      description: Base64-encoded PowerShell command
+      type: string
+      default: "JABwAGEAdwBjAGgAaQA="    # `pawchi` (benign placeholder)
+  dependencies:
+    - description: PowerShell available on PATH
+      prereq_command: |
+        if (Get-Command powershell.exe -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }
+      get_prereq_command: |
+        # PowerShell is built-in on Windows; recovery is a no-op.
+  executor:
+    name: command_prompt
+    command: |
+      powershell.exe -EncodedCommand #{payload}
+    cleanup_command: |
+      # No persistence; cleanup is a no-op
+```
+
+The pieces:
+
+- `name` — short title; surfaces in `Invoke-AtomicTest T<ID> -ListTests`.
+- `auto_generated_guid` — UUID; ART CI generates if missing.
+- `description` — multi-line. Tells the L3 what the test emulates and from which actor's playbook.
+- `supported_platforms` — gate: IART skips tests whose platforms don't match the host.
+- `input_arguments` — typed variables with defaults. Referenced via `#{var}` in the executor.
+- `dependencies` — array of prereq checks; each block has a description, a `prereq_command` (returns 0 if satisfied), and a `get_prereq_command` (recovers if not).
+- `executor` — one of `command_prompt`, `powershell`, `sh`, `bash`, `manual`, `aws`. The `command` field is the actual test invocation.
+- `cleanup_command` — runs in the same executor; restores pre-test state.
+
+## `#{var}` interpolation
+
+The `input_arguments` block defines variables; the executor references them inline:
+
+```yaml
+input_arguments:
+  target_user:
+    description: Target username for the test
+    type: string
+    default: "testuser"
+executor:
+  command: |
+    net user #{target_user} P@ssw0rd123 /add
+  cleanup_command: |
+    net user #{target_user} /delete
+```
+
+IART substitutes `#{target_user}` with the value at run time. CLI override:
+
+```powershell
+Invoke-AtomicTest T1136.001 -TestNumbers 1 -InputArgs @{ target_user = "alice" }
+```
+
+This is what makes atomics *parameterisable* without forking the YAML — the L3 customises blast radius by choosing input values.
+
+## Executor types
+
+| `executor.name` | What it runs in | When to pick |
+|---|---|---|
+| `command_prompt` | cmd.exe | Windows commands that need cmd context |
+| `powershell` | powershell.exe | Windows-native PowerShell scripts |
+| `sh` | /bin/sh | POSIX-portable scripts (avoids bash-specific syntax) |
+| `bash` | /bin/bash | bash-specific syntax (arrays, `[[ ]]`, etc.) |
+| `manual` | the analyst | Tests requiring manual interaction (UI, decisions) |
+| `aws` | AWS CLI | Cloud-API tests targeting AWS |
+| `azure-cli` | az CLI | Azure-API tests |
+
+Multi-line `command:` blocks with `|` are common; the executor runs the whole block as one script.
+
+## Multi-step executors
+
+When a test needs more than one command, use a multi-line `command` block:
+
+```yaml
+executor:
+  name: powershell
+  command: |
+    $tempDir = New-Item -ItemType Directory -Path "$env:TEMP\\art-test"
+    Copy-Item C:\\Windows\\System32\\notepad.exe "$tempDir\\suspicious.exe"
+    Start-Process "$tempDir\\suspicious.exe"
+    Start-Sleep -Seconds 5
+    Stop-Process -Name suspicious -ErrorAction SilentlyContinue
+  cleanup_command: |
+    Remove-Item "$env:TEMP\\art-test" -Recurse -Force -ErrorAction SilentlyContinue
+```
+
+The block is executed atomically (one shell process). State that survives between steps (variables, files) is intra-executor only.
+
+## Glossary
+
+- **atomic_tests** — array of test variants under one technique.
+- **input_arguments** — typed variables with defaults; referenced via `#{var}`.
+- **dependencies** — prereq blocks with check + recover.
+- **executor** — one of cmd / pwsh / sh / bash / manual / cloud-CLI; runs the test's commands.
+- **cleanup_command** — restores pre-test state.
+
+## Further reading
+
+- ART YAML schema — `atomic-red-team/docs/atomic-format.md`.
+- ART `bin/test-coverage.py` — validation script CI runs against new atomics.
+""",
+    )
+    _add_q(session, m2l2, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *valid top-level fields* in an `atomic_test` YAML entry?",
+        options=[
+            {"value": "name", "label": "`name` — short title"},
+            {"value": "platforms", "label": "`supported_platforms` — array of windows / linux / macos"},
+            {"value": "input_args", "label": "`input_arguments` — typed variables with defaults"},
+            {"value": "deps", "label": "`dependencies` — array of prereq blocks"},
+            {"value": "exec", "label": "`executor` — name + command + cleanup_command"},
+            {"value": "guid", "label": "`auto_generated_guid` — UUID for tooling de-dup"},
+            {"value": "alerts", "label": "`expected_alerts` — list of rules that should fire"},
+            {"value": "actor", "label": "`actor` — named threat actor this test emulates"},
+        ],
+        correct=["name", "platforms", "input_args", "deps", "exec", "guid"],
+        explanation_md="The six valid top-level fields are `name`, `supported_platforms`, `input_arguments`, `dependencies`, `executor`, and `auto_generated_guid`. The schema deliberately *doesn't* carry `expected_alerts` or `actor` — those would tie the atomic to one estate's rules / one CTI source's actor map, which would prevent atomic reuse. Detection expectations and actor mapping live in the SOC's scorecard / TIDE rule metadata, not in the atomic itself. (See L3 M1 Lesson 1.7 for scorecard fields.)",
+        points=3,
+    )
+
+    # Lesson 2.3 — Authoring custom atomics
+    m2l3 = _add_lesson(
+        session, mod2, order=3,
+        title="Authoring a custom atomic for an org-specific TTP",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Recognise when an org-specific TTP needs a *custom* atomic (vs a public one)
+> 2. Walk the **six-step authoring workflow** from technique-pick to PR
+> 3. Decide whether the custom atomic is **public-PR-able** or **org-internal**
+> 4. Apply ART's **CI requirements** to your custom atomic so it survives the contribution review
+
+## When you need a custom atomic
+
+Most ATT&CK techniques have public atomics. Custom-author when:
+
+1. The TTP is **vendor-specific** — a CVE in your edge-firewall vendor; an abuse pattern in a SaaS your sector relies on.
+2. The TTP is **sector-specific** — a regulator-mandated pattern (financial-message manipulation in SWIFT, HL7 in healthcare).
+3. The TTP is **environment-specific** — your org's bespoke service principal naming convention being abused.
+4. The public atomic exists but **doesn't fit your stack** — the YAML calls a different shell or different binary path.
+5. The TTP is **new** — not yet in ATT&CK as a technique or sub-technique.
+
+For (5), the L3 PRs the atomic upstream to ART after the org's gain. For (1)–(4), keep it org-internal.
+
+## The six-step authoring workflow
+
+### 1. Pick the technique + sub-technique
+
+Map the TTP to ATT&CK. If a sub-technique exists, use it. If the TTP is new and you can't find a sub-tech, use the closest parent and document the gap (consider also PRing to MITRE ATT&CK itself via the Engenuity CTID community process).
+
+### 2. Author `name` + `description`
+
+The name is short, the description is multi-line and tells future-you what the test emulates and from which actor's playbook.
+
+```yaml
+- name: Sector-specific SP role-grant abuse
+  description: |
+    Abuse the org-specific service-principal naming convention to
+    grant elevated permissions on a target SP. Calibrated to match
+    the FIN6 cloud-account abuse pattern observed in 2026 Q1
+    incidents (per Mandiant M-Trends 2026, page 47).
+  supported_platforms: [windows, linux]
+```
+
+### 3. Define `input_arguments`
+
+Anything that might vary per run — target user, target SP, file path, network destination. Defaults should be benign / sandboxed.
+
+```yaml
+input_arguments:
+  target_sp:
+    description: Service principal display name to abuse
+    type: string
+    default: "PT-LAB-Marketing-Bot"
+  granted_role:
+    description: Role to grant
+    type: string
+    default: "Cloud Application Administrator"
+```
+
+### 4. Author dependencies
+
+What does the test require to run? Auth tokens, CLI tools, network access.
+
+```yaml
+dependencies:
+  - description: az CLI must be available with active session
+    prereq_command: |
+      if (az account show 2>/dev/null) { exit 0 } else { exit 1 }
+    get_prereq_command: |
+      Write-Host "Run 'az login' before invoking this test"
+      exit 1
+```
+
+The `get_prereq_command` for *interactive* prereqs (like login) typically just instructs the user; the test won't auto-recover.
+
+### 5. Author the executor
+
+Run the test. Be explicit about the command shape the SOC's SIEM is meant to detect:
+
+```yaml
+executor:
+  name: powershell
+  command: |
+    $sp = Get-AzADServicePrincipal -DisplayName "#{target_sp}"
+    if (-not $sp) {
+      throw "Target SP '#{target_sp}' not found in test tenant"
+    }
+    New-AzRoleAssignment -ObjectId $sp.Id `
+      -RoleDefinitionName "#{granted_role}" `
+      -Scope "/"
+    Write-Host "Granted #{granted_role} to $($sp.DisplayName)"
+```
+
+### 6. Author the cleanup
+
+Remove the abuse you just inflicted:
+
+```yaml
+  cleanup_command: |
+    $sp = Get-AzADServicePrincipal -DisplayName "#{target_sp}"
+    if ($sp) {
+      Get-AzRoleAssignment -ObjectId $sp.Id -RoleDefinitionName "#{granted_role}" |
+        Remove-AzRoleAssignment
+      Write-Host "Revoked #{granted_role} from $($sp.DisplayName)"
+    }
+```
+
+Cleanup is *mandatory*. The org-internal atomic that doesn't restore state leaks abuse permissions across exercises — operationally dangerous and a compliance issue if the granted role enables data access.
+
+## Public PR vs org-internal
+
+Decision tree:
+
+| Signal | Public PR | Org-internal |
+|---|---|---|
+| TTP is sector-generic | yes | — |
+| TTP requires an org-specific identifier (SP name, file path, sector code) | — | yes |
+| Public release reveals defensive blind spot | — | yes (legal review) |
+| Test is reproducible by Red Canary's CI | yes | — |
+| Prereq is org's specific tooling | — | yes |
+| Test uses public CVE | yes (after disclosure window) | yes (during embargo) |
+
+When in doubt, default to org-internal. PRs to public ART can be sent later; org-internal atomics are deletable. Public atomics aren't.
+
+## ART CI requirements (for public PRs)
+
+Red Canary's CI runs against every PR:
+
+1. **Schema validation** — YAML against the ART schema.
+2. **`auto_generated_guid` uniqueness** — must be a fresh UUID.
+3. **Cross-platform syntax check** — for multi-platform tests, each platform's executor parses cleanly.
+4. **Markdown render check** — `T<ID>.md` regenerates from the YAML.
+5. **No external resources without `dependencies`** — anything downloaded at runtime must be declared.
+6. **Cleanup is non-empty (or explicitly `# No cleanup needed`)** — atomic without cleanup is rejected.
+
+The L3 runs `bin/test-coverage.py` locally before PRing.
+
+## Worked: a custom atomic for org-specific service principal abuse
+
+(Full YAML in the lesson — pulls together the six-step workflow into one shippable atomic. Supported platforms windows + linux; input_arguments target_sp + granted_role + tenant; dependencies az CLI + active session + permissions to grant; executor + cleanup.)
+
+The atomic lives at `org-internal-atomics/sp-role-abuse/T1098.003.yaml` in the SOC's private repo (separate from the public ART checkout, so a public ART pull doesn't shadow it). IART's `-PathToAtomicsFolder` flag accepts an alternative path:
+
+```powershell
+Invoke-AtomicTest T1098.003 -TestNumbers 99 `
+  -PathToAtomicsFolder "C:\\org-internal-atomics"
+```
+
+(Test number 99 is a convention for org-internal — leaves 1–N for any future public-ART tests under the same technique.)
+
+## Glossary
+
+- **Custom atomic** — org-internal YAML test for a TTP not in public ART.
+- **PR-to-public** — contribution back to redcanaryco/atomic-red-team after sector-relevance review.
+- **Org-internal-atomics path** — separate repo / directory, loaded via `-PathToAtomicsFolder`.
+- **Auto-generated GUID** — fresh UUID per atomic; ART CI rejects duplicates.
+
+## Further reading
+
+- ART contribution guide — `atomic-red-team/docs/contributing.md`.
+- ART YAML schema — `atomic-red-team/docs/atomic-format.md`.
+- The org's legal counsel — for sector-specific atomics involving CVE / vendor TTPs.
+""",
+    )
+    _add_q(session, m2l3, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="An L3 is authoring a custom atomic that requires Sysmon to be installed on the target host. What's a valid one-line `prereq_command` (PowerShell) that returns 0 if Sysmon's service is running and 1 otherwise? Format: a single PowerShell line.",
+        options=None,
+        correct=[
+            "if (Get-Service Sysmon64 -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }",
+            "if (Get-Service Sysmon -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }",
+            "if (Get-Service Sysmon* -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }",
+            "if ((Get-Service Sysmon64).Status -eq 'Running') { exit 0 } else { exit 1 }",
+        ],
+        explanation_md="Any of the variants — the load-bearing pattern is `Get-Service` with `-ErrorAction SilentlyContinue` (so missing-service doesn't throw) + `exit 0/1` mapped to satisfied/unsatisfied. Sysmon's service name is `Sysmon64` on x64 hosts (`Sysmon` on x86); the wildcard `Sysmon*` covers both. ART's `prereq_command` contract is **exit-code-driven**: 0 = prereq satisfied, non-zero = recovery via `get_prereq_command`. The L3 should think of every prereq as a *binary check*; verbose output is allowed but the exit code is what IART consumes.",
+        points=2,
+    )
+
+    # Lesson 2.4 — Dependency engineering
+    m2l4 = _add_lesson(
+        session, mod2, order=4,
+        title="Dependency engineering: prereqs, fetched artefacts, and the CDN cache",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Author **prereq blocks** that check for missing tooling
+> 2. Build **`get_prereq_command`** chains that download / install artefacts safely
+> 3. Recognise the **CDN-cached download** layer ART uses and the path it caches to
+> 4. Decide between **runtime-fetch** and **pre-staged** artefacts for exercise reproducibility
+
+## The dependency block
+
+The full structure:
+
+```yaml
+dependencies:
+  - description: Mimikatz binary must be on disk
+    prereq_command: |
+      Test-Path "C:\\AtomicRedTeam\\atomics\\T1003.001\\src\\mimikatz.exe"
+    get_prereq_command: |
+      Invoke-WebRequest \\
+        -Uri "https://github.com/redcanaryco/atomic-red-team/raw/master/atomics/T1003.001/src/mimikatz.exe" \\
+        -OutFile "C:\\AtomicRedTeam\\atomics\\T1003.001\\src\\mimikatz.exe"
+```
+
+- `description` — short, human-readable.
+- `prereq_command` — exit 0 if satisfied; non-zero if not. *Returns* a Boolean indirectly via exit code.
+- `get_prereq_command` — runs only if `prereq_command` returned non-zero. Recovers the prereq.
+
+## Common dependency patterns
+
+### Download from a stable URL
+
+The most common case. Pull from a GitHub release, the ART repo's `src/` folder via the `raw.githubusercontent.com` CDN, or a vendor's CDN.
+
+```yaml
+get_prereq_command: |
+  $url = "https://raw.githubusercontent.com/redcanaryco/atomic-red-team/master/atomics/T1003.001/src/Invoke-Mimikatz.ps1"
+  $out = "$env:TEMP\\art-cache\\Invoke-Mimikatz.ps1"
+  New-Item -ItemType Directory -Path (Split-Path $out -Parent) -Force | Out-Null
+  Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
+```
+
+### Install via package manager
+
+```yaml
+get_prereq_command: |
+  apt-get install -y nmap
+```
+
+For Windows, chocolatey:
+
+```yaml
+get_prereq_command: |
+  choco install nmap -y --no-progress
+```
+
+### Compile from source (rare)
+
+```yaml
+get_prereq_command: |
+  git clone https://github.com/example/tool /tmp/tool
+  cd /tmp/tool && make
+```
+
+Avoid where possible — compilation introduces variability across hosts. Prefer pre-compiled binaries where available.
+
+### Copy a file from the atomic's own `src/` folder
+
+```yaml
+prereq_command: |
+  Test-Path "PathToAtomicsFolder\\T1059.001\\src\\Invoke-Mimikatz.ps1"
+```
+
+The `PathToAtomicsFolder` is a special variable IART substitutes with the configured atomics root. Lets the YAML reference local files without hardcoding paths.
+
+## The CDN-cached download layer
+
+When an atomic's `get_prereq_command` downloads from `raw.githubusercontent.com`, ART relies on GitHub's CDN. Two operational notes:
+
+1. **Caching by IART** — IART caches downloaded artefacts in `%TEMP%\\atomic-red-team\\` (Windows) or `/tmp/atomic-red-team/` (Linux). Subsequent test runs check the cache first.
+2. **CDN failure** — GitHub raw-content is mostly reliable but rate-limits (anonymous users: 60 requests / hour per IP). For high-volume purple-team programs, mirror artefacts to internal storage and rewrite the `get_prereq_command` URL accordingly.
+
+The cache structure:
+```
+%TEMP%\\atomic-red-team\\
+├── T1003.001\\
+│   └── Invoke-Mimikatz.ps1
+├── T1059.001\\
+│   └── ...
+└── ...
+```
+
+## Runtime-fetch vs pre-staged artefacts
+
+Two operational patterns, each with trade-offs:
+
+| Approach | Pros | Cons |
+|---|---|---|
+| **Runtime-fetch** (the prereq downloads each run) | Always-current artefact; no manual staging; works on fresh hosts | Adds 5-30s latency; can fail if CDN unreachable; introduces external network dependency to the test run |
+| **Pre-staged** (admin pre-installs the artefact, prereq is just a `Test-Path` check) | Fast (no download); no CDN dependency; reproducible | Manual staging; staleness risk; per-host setup overhead |
+
+For *reproducibility* (running the same test repeatedly to track quarter-over-quarter coverage), pre-staged wins. For *flexibility* (running different tests ad-hoc), runtime-fetch wins.
+
+The L3's reflex: **pre-stage artefacts on the test-lab host** for the planned exercise calendar; allow runtime-fetch for ad-hoc exploration on a separate sandbox host.
+
+## Failure-mode awareness
+
+Three common dependency failures:
+
+1. **Stale URL** — the artefact moved, the URL 404s. The L3's atomic now silently fails the prereq. Detect via the L3's pre-exercise dry-run check (M2 Lesson 7).
+2. **Antivirus blocks download** — the EDR detects Mimikatz and quarantines it. Solution: run the exercise with a known EDR allowlist exception for the test path; never disable EDR estate-wide.
+3. **Network proxy authentication** — the host's environment requires proxy auth that the prereq doesn't supply. Solution: stage the artefact pre-test or wrap the download in a proxy-aware helper.
+
+## Glossary
+
+- **Prereq block** — `description / prereq_command / get_prereq_command` triple.
+- **CDN cache** — IART's local cache at `%TEMP%\\atomic-red-team\\`.
+- **Runtime-fetch** — the prereq downloads at test time.
+- **Pre-staged** — the artefact is installed before the test; prereq just verifies presence.
+- **PathToAtomicsFolder** — IART variable for the atomics root.
+
+## Further reading
+
+- ART repo — `bin/atomic-red-team-cache.ps1` for cache management helpers.
+- Red Canary blog — *Atomic Red Team prereq engineering*.
+""",
+    )
+    _add_q(session, m2l4, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L3 is authoring an atomic that requires `Invoke-Mimikatz.ps1` from the public ART `src/` folder. Which `get_prereq_command` pattern is correct?",
+        options=[
+            {"value": "iwr", "label": "Use `Invoke-WebRequest -Uri` with the `raw.githubusercontent.com` URL of the file, downloading it into IART's cache directory"},
+            {"value": "iwr_no_cache", "label": "Use `Invoke-WebRequest` and pipe the result to a temp file outside IART's cache (so each run downloads fresh)"},
+            {"value": "git_clone", "label": "Run `git clone https://github.com/redcanaryco/atomic-red-team` to fetch the whole repo each test"},
+            {"value": "bake_in", "label": "Bake the file into the atomic's YAML as a base64-encoded string"},
+        ],
+        correct="iwr",
+        explanation_md="**Use `Invoke-WebRequest` to download into IART's cache directory** (`%TEMP%\\atomic-red-team\\T1003.001\\` or wherever IART expects). This is the standard ART pattern — uses the GitHub raw CDN, caches for subsequent runs, no per-test re-download. Bypassing the cache wastes bandwidth and introduces flakiness when the CDN rate-limits. Cloning the whole repo per test is wasteful and slow. Base64-in-YAML breaks the YAML schema validation and is a maintenance nightmare. The L3's mental model: *runtime-fetch caches; the prereq is a one-time install, not a per-run download.*",
+        points=2,
+    )
+
+    # Lesson 2.5 — Multi-platform atomics
+    m2l5 = _add_lesson(
+        session, mod2, order=5,
+        title="Multi-platform atomics: platform-conditional executors and cross-OS test routing",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Recognise multi-platform atomics where one technique has Windows + Linux + macOS variants
+> 2. Use **`supported_platforms`** to gate which test runs on which host
+> 3. Map cross-platform field differences (PowerShell vs bash vs sh; path separators; user contexts)
+> 4. Predict which atomic test number IART picks for a given target host
+
+## When techniques span platforms
+
+ATT&CK is mostly platform-agnostic at the technique level. T1003 (OS Credential Dumping) covers Windows LSASS, Linux /etc/shadow, and macOS keychain dumping. The atomic library reflects this — one folder per technique, multiple `atomic_tests` entries gated by `supported_platforms`.
+
+```yaml
+attack_technique: T1003
+display_name: OS Credential Dumping
+atomic_tests:
+  - name: Windows — Mimikatz sekurlsa::logonpasswords
+    supported_platforms: [windows]
+    executor:
+      name: powershell
+      ...
+  - name: Linux — copy /etc/shadow
+    supported_platforms: [linux]
+    executor:
+      name: bash
+      ...
+  - name: macOS — dscl password dump
+    supported_platforms: [macos]
+    executor:
+      name: sh
+      ...
+```
+
+`Invoke-AtomicTest T1003 -TestNumbers 1` on a Linux host runs nothing (test 1 is windows-only); IART silently skips it. `Invoke-AtomicTest T1003 -TestNumbers 2` runs the Linux test on a Linux host. The L3 must specify the test number explicitly when running cross-platform exercises.
+
+## Path separator gotchas
+
+Windows: `C:\\AtomicRedTeam\\atomics\\T1003\\src\\` (backslash).
+Linux / macOS: `/AtomicRedTeam/atomics/T1003/src/` (forward slash).
+
+`PathToAtomicsFolder` is OS-aware — IART substitutes the right separator. But hard-coded paths in the YAML break:
+
+```yaml
+# WRONG — breaks on Linux
+executor:
+  command: |
+    cat C:\\Windows\\notepad.exe   # Linux: backslash isn't an escape, this becomes "cat C:Windowsnotepad.exe"
+
+# RIGHT — let IART substitute
+executor:
+  command: |
+    cat #{system32_dir}\\notepad.exe
+input_arguments:
+  system32_dir:
+    type: string
+    default: C:\\Windows\\System32
+```
+
+For cross-platform tests, prefer `input_arguments` for any path; the default is per-platform-correct.
+
+## User-context differences
+
+Windows: a PowerShell `$env:USERNAME` variable; admin elevation via UAC; SYSTEM context for many service tests.
+Linux: a bash `$USER` variable; root via `sudo`; `_` user / specific service users for daemons.
+macOS: similar to Linux but with `kextload` requirements for kernel-touching tests.
+
+The atomic's executor must be aware of which context it needs. Most cross-platform tests sit at user context (no elevation); tests that touch system state (event log, kernel, /etc/shadow) require elevation.
+
+```yaml
+- name: Windows — registry persistence
+  supported_platforms: [windows]
+  executor:
+    name: powershell
+    elevation_required: true
+    command: |
+      reg add HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run /v test /d notepad.exe /f
+```
+
+## IART's host-platform detection
+
+IART probes `[System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(...)` (or the equivalent on Linux PowerShell-Core) to determine the host platform. It then iterates `atomic_tests`, skipping those whose `supported_platforms` doesn't include the host's platform.
+
+To run all platform-relevant tests for a technique:
+
+```powershell
+Invoke-AtomicTest T1003 -ShowDetailsBrief    # see what would run
+Invoke-AtomicTest T1003                       # run all platform-applicable tests in sequence
+```
+
+The latter form runs every applicable test back-to-back. For exercise discipline, prefer per-test invocation (`-TestNumbers <N>`) so the L3 records each test's result individually.
+
+## Worked: cross-platform T1003
+
+The L3 is testing OS credential dumping coverage across the estate. Test plan:
+
+1. Windows host (`PT-LAB-WIN-04`): `Invoke-AtomicTest T1003 -TestNumbers 1` (Mimikatz). Score Tier-1.
+2. Linux host (`PT-LAB-LIN-04`): `Invoke-AtomicTest T1003 -TestNumbers 2` (shadow copy). Score Tier-2 — gap.
+3. macOS host (`PT-LAB-MAC-04`): `Invoke-AtomicTest T1003 -TestNumbers 3` (dscl). Score Tier-3 — parser gap on macOS audit log.
+
+Three different scorecards, three different fix-owners. The cross-platform test reveals coverage isn't uniform — Windows is well-covered, Linux has a detection gap, macOS has a logging gap. Each finding routes to a different team.
+
+## Glossary
+
+- **`supported_platforms`** — array gating which OS the test runs on.
+- **Platform-conditional executor** — one atomic_tests entry per platform, often differing in shell + paths.
+- **Path separator gotcha** — backslash on Windows, forward-slash on Linux / macOS; use `input_arguments` for paths.
+- **`elevation_required: true`** — flag indicating the test needs admin / root.
+
+## Further reading
+
+- ART YAML schema — `supported_platforms` enum.
+- IART source — `Invoke-AtomicTest.ps1` platform-detection logic.
+""",
+    )
+    _add_q(session, m2l5, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A technique T1003 has three atomic tests: test 1 (windows), test 2 (linux), test 3 (macos). The L3 invokes `Invoke-AtomicTest T1003 -TestNumbers 2` on a Linux host. What runs?",
+        options=[
+            {"value": "linux", "label": "Test 2 runs (its `supported_platforms` includes `linux`, matching the host)"},
+            {"value": "skip_all", "label": "Nothing runs — IART skips tests whose number doesn't match the host platform"},
+            {"value": "all_three", "label": "All three tests run sequentially regardless of platform"},
+            {"value": "test_1", "label": "Test 1 runs because it's listed first"},
+        ],
+        correct="linux",
+        explanation_md="**Test 2 runs.** IART's logic: filter `atomic_tests` by `supported_platforms` matching the host, then select by `-TestNumbers <N>` from the filtered list. On Linux, test 2's `supported_platforms: [linux]` matches; tests 1 and 3 don't. So `-TestNumbers 2` runs the Linux test. Note: if the L3 had run `-TestNumbers 1` on Linux, IART would silently skip — test 1's `supported_platforms: [windows]` doesn't include Linux. The L3's reflex: always specify `-TestNumbers <N>` deliberately, and verify with `-ShowDetailsBrief` first that the chosen test will actually execute on the target host.",
+        points=2,
+    )
+
+    # Lesson 2.6 — MITRE Adversary Emulation Library
+    m2l6 = _add_lesson(
+        session, mod2, order=6,
+        title="MITRE Adversary Emulation Library: full-chain plans built on ART primitives",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Recognise the **MITRE Adversary Emulation Library** as MITRE Engenuity CTID's curated full-actor emulation plans
+> 2. Read an **emulation plan structure**: phases → ATT&CK techniques → ART atomics
+> 3. Drive the plan via **IART (atomic-by-atomic)** or **Caldera (chained, agent-driven)**
+> 4. Pick the **right plan** for the org's threat profile
+
+## What it is
+
+The Adversary Emulation Library (https://github.com/center-for-threat-informed-defense/adversary_emulation_library) is a curated collection of full-actor emulation plans, hosted by MITRE Engenuity Center for Threat-Informed Defense (CTID). Each plan emulates a named adversary (FIN6, APT3, OilRig, Carbanak, Sandworm, FIN7, menuPass, BlackByte, etc.) end-to-end across a kill chain.
+
+It's complementary to Atomic Red Team:
+- **ART** — single TTPs, one atomic per test.
+- **AEL** — full-actor plans, chaining many ART atomics into the actor's kill-chain order.
+
+If ART teaches the L3 *test discipline* (one TTP at a time), AEL teaches *response discipline* (full chain at the SOC's response speed).
+
+## Structure of an emulation plan
+
+Every plan follows the same shape:
+
+```
+adversary_emulation_library/
+└── fin6/
+    ├── README.md                            # plan summary + scope
+    ├── Resources/
+    │   ├── FIN6_Adversary_Emulation_Plan.pdf  # the canonical document
+    │   ├── FIN6_Intelligence_Summary.pdf      # CTI summary
+    │   └── FIN6_Visual_Summary.png            # one-page diagram
+    ├── Emulation_Plan/
+    │   ├── Phase_1_Initial_Access/
+    │   │   ├── README.md
+    │   │   └── ...
+    │   ├── Phase_2_Execution/
+    │   │   └── ...
+    │   └── ...
+    └── ...
+```
+
+The plan's `Emulation_Plan/` folder enumerates phases. Each phase folder has:
+- A README describing the phase, the ATT&CK techniques covered, the actor's documented behaviour, and the recommended atomic tests (by ART id).
+- Sometimes shell scripts / PowerShell scripts that wrap the atomics with actor-specific tweaks.
+
+## Reading the FIN6 plan
+
+(Worked walk through 12 phases. Compressed:)
+
+| Phase | ATT&CK technique(s) | ART atomic(s) | Notes |
+|---|---|---|---|
+| 1 — Initial Access | T1566.001, T1566.002 | T1566.001-1 (spearphishing-attachment) | FIN6 favoured invoice-themed lures |
+| 2 — Execution | T1059.001, T1059.005 | T1059.001-3 (mshta encoded PS) | mshta is FIN6's signature launcher |
+| 3 — Persistence | T1547.001, T1543.003 | T1547.001-1 (registry Run key) | |
+| 4 — Privilege Escalation | T1055.012 | T1055.012-1 (process hollowing) | |
+| 5 — Defence Evasion | T1027 | T1027-3 (encoded payload) | |
+| 6 — Credential Access | T1003.001, T1003.005 | T1003.001-2 (LSASS Mini-dump) | |
+| 7 — Discovery | T1018, T1087.002 | T1018-1 (net group enumeration) | |
+| 8 — Lateral Movement | T1021.002 | T1021.002-1 (SMB admin shares) | |
+| 9 — Collection | T1005, T1119 | T1005-1 (file collection) | |
+| 10 — Command and Control | T1071.001 | T1071.001-1 (HTTPS C2) | |
+| 11 — Exfiltration | T1041 | T1041-1 (exfil over C2) | |
+| 12 — Impact | T1486 | T1486-1 (file encryption sandbox) | |
+
+The plan's PDF goes into much more detail per phase — defensive notes, expected SIEM activity, FIN6-specific operational signatures.
+
+## Driving the plan
+
+Two execution paths:
+
+### Atomic-by-atomic (IART)
+
+The L3 queues each atomic from the plan's recommended list and runs them in order, one at a time, with verification between. Each atomic produces its own scorecard row.
+
+Pros: granular fidelity scoring per technique; each result attributable; safe (cleanup between atomics).
+Cons: doesn't capture **chain timing** — real FIN6 doesn't pause for SIEM verification between phases.
+
+### Chained (Caldera)
+
+Use Caldera (M1.5) to chain atomics into one continuous campaign. Each phase's atomics run automatically in order; sandcat agent on the target host accepts orders from the Caldera server.
+
+Pros: **end-to-end timing** — the SOC's response time is measured from initial access to impact; chain-level scorecard.
+Cons: less granular per-technique fidelity; cleanup is staged at end-of-chain rather than per-atomic.
+
+For a serious FIN6 emulation, the L3 typically runs both: the atomic-by-atomic pass establishes per-technique coverage; the chained pass measures response speed under load.
+
+## Picking the right plan for your threat profile
+
+Decision tree:
+
+1. Is the actor in your sector's threat profile? (FS-ISAC for finance, H-ISAC for health, etc.)
+2. Has the actor been active in the last 12 months? (Stale plans miss recent TTP evolution.)
+3. Does your tooling support all the atomics in the plan? (Some emulations need vendor-specific lab setups.)
+
+If yes to all three — that's the next quarter's full-actor exercise.
+
+For a finance-sector org as of 2026: FIN7, FIN6, Carbanak, BlackByte, BlackCat are all strong picks. APT29 and Sandworm are also valuable but skew nation-state-centric (rare for finance).
+
+## Worked: queueing FIN6's plan via IART
+
+```powershell
+$phases = @(
+  "T1566.001-1",
+  "T1059.001-3",
+  "T1547.001-1",
+  "T1055.012-1",
+  "T1027-3",
+  "T1003.001-2",
+  "T1018-1",
+  "T1021.002-1",
+  "T1005-1",
+  "T1071.001-1",
+  "T1041-1",
+  "T1486-1"
+)
+
+foreach ($p in $phases) {
+  $tech, $test = $p -split "-"
+  Write-Host "[$(Get-Date)] Phase: $tech test $test"
+  Invoke-AtomicTest $tech -TestNumbers $test -CheckPrereqs
+  Invoke-AtomicTest $tech -TestNumbers $test
+  Read-Host "Press Enter when SOC verification of $p is complete"
+  Invoke-AtomicTest $tech -TestNumbers $test -Cleanup
+}
+```
+
+(For exercise discipline; in production purple-team programs the verification step is automated against the SIEM API rather than `Read-Host`.)
+
+## Glossary
+
+- **Adversary Emulation Library (AEL)** — MITRE Engenuity CTID's curated full-actor emulation plans.
+- **Emulation plan** — phased document mapping actor behaviour to ATT&CK + ART atomics.
+- **Chained execution** — Caldera-driven; one campaign, end-to-end timing.
+- **Atomic-by-atomic execution** — IART-driven; granular per-technique scoring.
+
+## Further reading
+
+- AEL repo — https://github.com/center-for-threat-informed-defense/adversary_emulation_library.
+- CTID's blog — https://medium.com/mitre-engenuity.
+- Mandiant M-Trends — annual; matches AEL plans to recent campaigns.
+""",
+    )
+    _add_q(session, m2l6, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L3 supporting a finance-sector org wants a **full-actor emulation** for next quarter. Which is the **most authoritative** source for a curated, phase-mapped emulation plan that ties ATT&CK techniques to ART atomic tests?",
+        options=[
+            {"value": "ael", "label": "MITRE Engenuity CTID **Adversary Emulation Library** — full-actor plans for FIN6, APT3, OilRig, Carbanak, BlackByte, FIN7, etc., with phase → ATT&CK → ART atomic mapping"},
+            {"value": "art_only", "label": "Atomic Red Team alone — pick atomics matching the actor's TTPs and chain them yourself"},
+            {"value": "blogs", "label": "Vendor blogs — chain atomics matching the latest blog post about the actor"},
+            {"value": "navigator", "label": "ATT&CK Navigator — overlay the actor's techniques and stop there"},
+        ],
+        correct="ael",
+        explanation_md="**MITRE Engenuity CTID Adversary Emulation Library** is the canonical source. It's curated (CTID review), phase-mapped (kill chain order matters for response timing), and pre-bound to ART atomics (the L3 doesn't have to invent the ATT&CK → ART mapping). Hand-picking atomics from ART (option 2) works but is error-prone and misses CTID's intelligence work on actor-specific TTPs. Vendor blogs are useful for current intel but rarely include the full mapping. Navigator overlays are the *input* to plan selection (M1.2) but stop short of the phase-mapped emulation document. For a finance-sector org as of 2026, FIN7 / FIN6 / Carbanak / BlackByte / BlackCat are all strong picks from the AEL.",
+        points=2,
+    )
+
+    # Lesson 2.7 — Safety harness
+    m2l7 = _add_lesson(
+        session, mod2, order=7,
+        title="Safety harness: dry-run, permission auditing, blast-radius checking",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Run **`-ShowDetailsBrief`** to dry-run an atomic before execution
+> 2. Audit **permission context** (user, elevation, EDR allowlist) pre-test
+> 3. Apply the **four blast-radius checks** before running any atomic
+> 4. Recognise common **cleanup failures** and how to detect them
+
+## Three habits the L3 must keep
+
+Every atomic is *executable code* on a production-mirror host. Discipline matters. Three habits, every time:
+
+### 1. Dry-run mode
+
+```powershell
+Invoke-AtomicTest T1059.001 -TestNumbers 3 -ShowDetailsBrief
+```
+
+This prints the executor command + cleanup command + dependencies *without running them*. The L3 reads the output and confirms:
+- The command is what they expected.
+- The cleanup is meaningful (not empty).
+- The dependencies don't fetch from a sketchy URL.
+
+`-ShowDetails` (without `Brief`) prints the full atomic, including descriptions and notes — useful for the first run on a new technique.
+
+### 2. Permission audit
+
+The user context for the test:
+
+```powershell
+[Security.Principal.WindowsPrincipal] `
+  ([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole("Administrators")
+```
+
+Confirm the host is running with **the minimum privilege necessary**. An atomic that needs SYSTEM should run from a SYSTEM context obtained via `psexec -s` or a service-installed pre-prepared shell — *not* from an interactive admin session.
+
+Some atomics implicitly need elevation (e.g. file writes to `C:\\Windows\\System32`). The YAML's `executor.elevation_required: true` flag declares this; IART auto-prompts. The L3 verifies the prompt matches the test's documented requirement.
+
+### 3. Blast-radius check
+
+Read the executor + cleanup before invocation. Confirm the four:
+
+1. **No data destruction outside sandbox** — encryption / deletion atomics target a sandboxed test directory. Confirm the path.
+2. **No persistence outside cleanup** — the cleanup command removes every persistence the executor created. If executor adds two reg keys but cleanup only removes one, persistence survives.
+3. **No external network calls outside authorised destinations** — C2 atomics target known-test-control infrastructure (test.example.com, Caldera lab server). Confirm.
+4. **No credential leakage** — atomics writing creds to log files or unencrypted artefacts.
+
+If any check fails: don't run. Fix the atomic (your custom-authored one) or pick a different public test.
+
+## Common cleanup failures
+
+Cleanup is the most-failed phase. Three patterns:
+
+### Failure 1 — Cleanup doesn't match executor
+
+The executor adds two reg keys; cleanup removes one. Six months later: residual key triggers EDR.
+
+**Detection**: post-cleanup, run a *full host snapshot diff* against the pre-test snapshot. Tools: PowerShell's Get-ItemProperty enumeration; Linux's `find / -newer` + `chkconfig --list`. Differences are unintended residuals.
+
+### Failure 2 — Cleanup runs but partial
+
+The executor opens 5 files; cleanup deletes 4 (the 5th was open in another process and Remove-Item failed).
+
+**Detection**: the cleanup's exit code; IART surfaces it. *Always* check the cleanup phase's exit code in the exercise log.
+
+### Failure 3 — Cleanup race
+
+The executor spawns a child process; cleanup tries to kill it but the child has already spawned grandchild; cleanup leaks the grandchild.
+
+**Detection**: process tree review post-cleanup. The host's process list should match pre-test.
+
+## Mitigation: snapshot-and-revert
+
+For high-risk atomics (encryption, persistence, credential dumping), run on a snapshot host:
+
+1. VM snapshot pre-test.
+2. Run atomic + verify SIEM captured the activity.
+3. Run cleanup.
+4. Verify host state matches pre-test.
+5. **If verification fails**: revert to snapshot.
+
+The snapshot is the L3's defence against cleanup failures. It costs (snapshot storage, revert time) but is worth it for the high-blast-radius atomics.
+
+## Worked: pre-test inspection of T1059.001-3
+
+```powershell
+PS> Invoke-AtomicTest T1059.001 -TestNumbers 3 -ShowDetailsBrief
+
+PathToAtomicsFolder = C:\\AtomicRedTeam\\atomics
+
+CommandPrompt: mshta vbscript:CreateObject(...).Run("powershell.exe -nop -w hidden -enc ...")(window.close)
+
+Cleanup Commands:
+  (none — no persistence created)
+
+Dependencies:
+  (no fetched dependencies; mshta is a built-in Windows binary)
+
+Supported Platforms: windows
+Elevation Required: false
+```
+
+Reading: command runs mshta, which spawns powershell with an encoded payload. Cleanup is empty (the test is stateless — no persistence to remove). Dependencies are empty (mshta is built-in). Elevation not required.
+
+L3 verifies:
+1. Command matches expected pattern (mshta + encoded PowerShell — yes, this is the FIN7 / Conti pattern).
+2. Cleanup is empty *because the test is stateless* (verified by reading the YAML's executor — only spawns processes, doesn't write files / regs / persistence).
+3. No suspect URL in dependencies (none).
+4. Elevation gate: false — runs as the current user; the L3 confirms they're running as a low-privilege test user, not Domain Admin.
+
+OK to execute. Run it.
+
+## Glossary
+
+- **Dry-run** — `-ShowDetailsBrief` prints the executor + cleanup without running.
+- **Permission audit** — verify the user context matches the test's documented requirement.
+- **Blast-radius check** — four-point pre-execution: data, persistence, network, credentials.
+- **Snapshot-and-revert** — VM snapshot for high-risk atomics; revert if cleanup fails.
+
+## Further reading
+
+- ART safety guide — `atomic-red-team/docs/safety.md`.
+- ART blog — *Atomic Red Team — operating safely on production-mirror hosts*.
+""",
+    )
+    _add_q(session, m2l7, order=1, kind=QuestionKind.MULTI,
+        stem_md="Pre-execution, an L3 should confirm the **blast radius** of an atomic before running it. Which checks belong in that pre-run audit?",
+        options=[
+            {"value": "data", "label": "**Data destruction** — encryption / deletion atomics target a sandboxed directory only"},
+            {"value": "persistence", "label": "**Persistence** — every persistence the executor creates is removed by the cleanup_command"},
+            {"value": "network", "label": "**Network destinations** — external calls go to authorised infrastructure only (test C2 server, Caldera lab)"},
+            {"value": "credentials", "label": "**Credential leakage** — no creds get written to log files or unencrypted artefacts"},
+            {"value": "lunchbreak", "label": "Time-of-day for the analyst's lunch break"},
+            {"value": "team_size", "label": "Number of analysts in the SOC at the moment"},
+        ],
+        correct=["data", "persistence", "network", "credentials"],
+        explanation_md="The four valid blast-radius checks are: data destruction (sandboxed paths only), persistence (cleanup matches executor), network (authorised destinations only), and credential leakage (no creds in log files or artefacts). Lunch breaks and SOC headcount are operational concerns (M1 Lesson 1 mentioned running first attempts during business hours so detection-eng is on hand) but they're separate from the blast-radius audit. The L3 reads the executor + cleanup *with the four-point check in mind* before every run; if any of the four fails, fix the atomic or pick a different test.",
+        points=3,
+    )
+
+    # Lesson 2.8 — Capstone
+    m2l8 = _add_lesson(
+        session, mod2, order=8,
+        title="L3 M2 Capstone — atomic authoring, multi-platform routing, safety harness",
+        lesson_type=LessonType.QUIZ, duration_min=15,
+        content_md="""
+Two-question capstone covering custom atomic authoring + multi-platform behaviour. Closes Module 2.
+
+Module 3 picks up: **MITRE Caldera operations** — server stand-up, plugin library, custom adversary profiles, multi-host orchestration.
+""",
+    )
+    _add_q(session, m2l8, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="An L3 wants to author a custom atomic at `org-internal-atomics/T1098.003/T1098.003.yaml` and have IART pick it up. What `Invoke-AtomicTest` flag tells IART to use that path instead of the default `C:\\AtomicRedTeam\\atomics`? Format: `-FlagName` (single token).",
+        options=None,
+        correct=[
+            "-PathToAtomicsFolder",
+            "-pathtoatomicsfolder",
+            "-PATHTOATOMICSFOLDER",
+            "PathToAtomicsFolder",
+        ],
+        explanation_md="**`-PathToAtomicsFolder`** is the IART flag. The full invocation: `Invoke-AtomicTest T1098.003 -TestNumbers 99 -PathToAtomicsFolder \"C:\\\\org-internal-atomics\"`. The L3's reflex for org-internal atomics: keep them in a separate folder from public ART, use this flag, and number org-internal tests starting from 99 (or N+1 above the public ART count for that technique) to avoid colliding with future public-ART additions. This pattern lets the SOC pull public ART updates without overwriting their custom atomics.",
+        points=2,
+    )
+    _add_q(session, m2l8, order=2, kind=QuestionKind.SINGLE,
+        stem_md="An atomic test ships a multi-line PowerShell executor that creates a registry key, a scheduled task, and writes a file. The cleanup_command removes the registry key only. The L3 runs the test on a production-mirror host. What's the **predictable failure** if the L3 doesn't add a snapshot-and-revert harness?",
+        options=[
+            {"value": "no_residual", "label": "No residual state — IART silently inserts default cleanups for missing artefacts"},
+            {"value": "scheduled_task_residual", "label": "The scheduled task and the file persist on the host past test end; six months later, EDR flags them as suspicious residuals"},
+            {"value": "test_fails", "label": "The test refuses to run because cleanup is incomplete"},
+            {"value": "art_warns", "label": "ART prints a warning but doesn't fail — the cleanup completes the registry key and IART auto-removes the rest"},
+        ],
+        correct="scheduled_task_residual",
+        explanation_md="**The scheduled task and file persist past test end.** ART's cleanup is *only* what's in `cleanup_command` — it does not auto-detect missing cleanup. If the executor creates 3 artefacts but cleanup removes 1, the other 2 stay forever. Six months later: an EDR flags them as suspicious residuals; the post-mortem reveals an old purple-team test. The L3's safeguards: (1) read the cleanup_command before running the test (M2 L7's blast-radius check 2 — *persistence matches*); (2) for any atomic with non-empty executor + non-trivial cleanup, run on a snapshot host so a full revert is available; (3) post-cleanup, run a host-state diff (PowerShell Get-ItemProperty enumeration / Linux find -newer) to surface unintended residuals. This is exactly why M2 L7's safety harness is mandatory.",
+        points=2,
+    )
+
+    print(f"  L3: {course.title} — 2 modules, 16 lessons (Module 2 ART deep-dive @ proper depth)")
     return course
 
 
