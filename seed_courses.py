@@ -19537,7 +19537,847 @@ Module 5 picks up: **Detection-engineering loops** — the post-exercise lifecyc
         points=2,
     )
 
-    print(f"  L3: {course.title} — 4 modules, 32 lessons (Module 4 Telemetry quality @ proper depth)")
+    # ── Module 5 — Detection-engineering loops ────────────────────────
+    mod5 = _add_module(
+        session, course, order=5,
+        title="Detection-engineering loops — close-the-loop from gap to shipping rule",
+        description_md=(
+            "M1-M4 produced gap findings. M5 walks the post-exercise "
+            "lifecycle that turns findings into shipping rules: "
+            "TuningProposal authoring with the eight required fields; "
+            "the acceptance-criteria contract that makes a ticket "
+            "actually closeable; gap-fix verification via re-test on "
+            "the same atomic + same scoping; regression tracking "
+            "quarterly so fixes that closed last quarter still hold "
+            "this quarter; lifecycle KPIs (FP rate, TP rate, MTT, "
+            "drift signal); TIDE submission as the handoff to "
+            "detection-engineering. The discipline that makes a "
+            "purple-team program *show progress* over years rather "
+            "than re-discovering the same gaps."
+        ),
+        estimated_minutes=200,
+    )
+
+    # Lesson 5.1 — The detection-engineering loop in 30 seconds
+    m5l1 = _add_lesson(
+        session, mod5, order=1,
+        title="The detection-engineering loop: gap → ticket → fix → re-test → close",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Recite the **five-step closed-loop**: gap → ticket → fix → re-test → close
+> 2. Identify the **closure step** that distinguishes a real fix from a paper one
+> 3. Recognise when a loop has silently broken
+> 4. Apply the loop to every gap finding from L3 M1-M4
+
+## The closed-loop control system
+
+Detection engineering is a closed-loop control system. Five steps:
+
+```
+  ┌───────────────────────────────────────────────────────────────┐
+  │                                                               │
+  ▼                                                               │
+┌─────────┐    ┌──────────┐    ┌────────────┐    ┌────────────┐    │
+│ 1 Gap   │ →  │ 2 Ticket │ →  │ 3 Engineer │ →  │ 4 Re-test  │ → 5 Close (or re-open)
+│ finding │    │ Tuning…  │    │ ing work   │    │ on same    │
+│ (M1-M4) │    │ Proposal │    │            │    │ atomic     │
+└─────────┘    └──────────┘    └────────────┘    └────────────┘
+                                                       │
+                                                       └─re-open if not matched
+```
+
+The loop's load-bearing step is **#4 — re-test**. Without it, the engineering work is unverified, and "fix shipped" doesn't mean "gap closed." Every mature purple-team program has a re-test at step 4.
+
+## Why re-test matters
+
+A surprising fraction of "fixed" gaps don't actually close. Three failure modes:
+
+1. **Fix didn't deploy.** The PR merged but the deploy pipeline hadn't propagated; the host's parser config still has the old version.
+2. **Fix wrong.** The engineer addressed a different field than the one the rule needs. The audit re-runs on the actual field and the rule still doesn't fire.
+3. **Fix introduced regression.** The new rule fires correctly on the test technique but breaks coverage on a different (untested) technique.
+
+The re-test catches all three. Without it, the team marks the ticket closed and the gap stays open. Months later, a real adversary uses the technique and the SOC misses it; the post-mortem reveals the un-closed loop.
+
+## What "closure" means
+
+A loop is *closed* when:
+1. The re-test ran on the original atomic + original host + original window length.
+2. The outcome matched the acceptance criterion (M5.3).
+3. The evidence (SIEM screenshot / Detection Engine alert id) is attached.
+4. The scorecard row updated from "open" to "resolved".
+5. The original TuningProposal ticket transitions to "verified-closed".
+
+A loop is *paper-closed* when:
+- The ticket is marked done.
+- No re-test ran.
+- The scorecard still shows the original gap.
+- The L3 doesn't know whether the fix worked.
+
+The L3's reflex: **paper-closed is the same as not-closed**. Until the re-test runs and the evidence is attached, the loop is open.
+
+## The cadence — close loops within 90 days
+
+The conventional cadence: any open TuningProposal must close (or have a documented re-open path) within 90 days of opening. Why 90 days?
+
+- Engineering capacity allows it for typical gaps.
+- ATT&CK version bumps every quarter; older tickets risk drifting into stale technique mappings.
+- Beyond 90 days, the institutional context of the original finding fades; the original L3 may not remember the test details.
+
+Tickets older than 90 days that haven't closed get escalated. Either the fix is genuinely hard (requires multi-team coordination — schema-debt + platform + detection-eng), or the team is over-committed and prioritisation needs adjusting.
+
+## Glossary
+
+- **Closed-loop** — gap → ticket → fix → re-test → close.
+- **Re-test** — the close-the-loop verification; load-bearing step.
+- **Paper-closed** — ticket done but loop not actually verified.
+- **Verified-closed** — re-test ran, evidence attached, scorecard updated.
+- **90-day cadence** — open tickets close within a quarter.
+
+## Further reading
+
+- Florian Roth — *Detection Engineering KPIs*.
+- ION TuningProposal model — `services/tuning_proposal_service.py`.
+- W. Edwards Deming — *Plan-Do-Check-Act* (the parent pattern).
+""",
+    )
+    _add_q(session, m5l1, order=1, kind=QuestionKind.SINGLE,
+        stem_md="The detection-engineering loop is gap → ticket → fix → re-test → close. Which step is the **load-bearing step that distinguishes a real fix from a paper one**?",
+        options=[
+            {"value": "gap", "label": "Gap finding — without finding the gap, nothing happens"},
+            {"value": "ticket", "label": "Ticket — it documents the work"},
+            {"value": "fix", "label": "Fix — the engineering work itself"},
+            {"value": "retest", "label": "Re-test — without it, the fix is unverified and 'fix shipped' doesn't mean 'gap closed'"},
+        ],
+        correct="retest",
+        explanation_md="**Re-test** is the load-bearing step. The other four steps are necessary but not sufficient — without the re-test, three failure modes go undetected: the fix didn't deploy (still has the old version on the host), the fix addressed the wrong field (engineering changed something but not the field the rule needs), or the fix introduced regression elsewhere. The re-test catches all three by running the original atomic on the original host with the original window and comparing to the acceptance criterion. *Paper-closed* tickets — closed without re-test — leave the gap open while reporting it as fixed; this is the most common silent failure mode in immature purple-team programs.",
+        points=2,
+    )
+
+    # Lesson 5.2 — TuningProposal authoring
+    m5l2 = _add_lesson(
+        session, mod5, order=2,
+        title="TuningProposal authoring: the eight required fields",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Recite the **eight required fields** for a TuningProposal
+> 2. Recognise why each field is mandatory
+> 3. Author a complete TuningProposal from a worked gap finding
+> 4. Use ION's TuningProposal model as the canonical schema
+
+## The eight required fields
+
+| Field | Purpose | Example |
+|---|---|---|
+| **Exercise id** | Traceback to the scorecard row | EX-2026-04-001 |
+| **Tier** | Routes to the correct backlog | Tier-2 (logged-not-alerted) |
+| **Owner-of-fix** | Named team / role; not a person | team-detection |
+| **Technique** | ATT&CK technique + sub-technique | T1059.001 |
+| **Reproducer** | Test command + host + timestamp + screenshot | `Invoke-AtomicTest T1059.001 -TestNumbers 3` on PT-LAB-04 at 14:02 |
+| **Proposed fix** | L3's first-pass suggestion | "Extend rule X to match `process.parent.name == mshta.exe AND process.command_line: -EncodedCommand`" |
+| **Acceptance criteria** | What re-test validates the fix | "Re-run T1059.001-3 on PT-LAB-04 within 7 days; expect rule X to fire within 5min, severity high" |
+| **Re-test schedule** | When the close-the-loop happens | Re-test scheduled 2026-05-08 |
+
+Eight fields. Every TuningProposal has all eight. Skipping any breaks the loop.
+
+## Why each is mandatory
+
+**Exercise id** ties the ticket to the original scorecard row. Without it, the L3 can't trace which exercise produced the gap. When the re-test happens (M5.4), the same exercise id is referenced.
+
+**Tier** routes the ticket. Detection-eng / SIEM-team / platform / schema-debt own different tiers; without the tier, the ticket lands in the wrong queue and gets re-routed (cycles wasted).
+
+**Owner-of-fix** is named. Tickets without owners rot — when ATT&CK changes or FP rate creeps, no one's accountable.
+
+**Technique** drives ATT&CK rollups. Multiple gaps under the same technique can sometimes be fixed together; without the tag, that opportunity is missed.
+
+**Reproducer** lets engineering reproduce the gap independently. Without it, the engineer asks the L3 *"how did you get this?"* — every ticket. Wasted communication.
+
+**Proposed fix** is the L3's first-pass suggestion. Engineering may ignore it (often does — they're closer to the rule code), but it sets the conversation starting point.
+
+**Acceptance criteria** is the closure contract (M5.3 covers in detail). Without it, the loop can't close cleanly.
+
+**Re-test schedule** time-boxes the loop. The 90-day cadence (M5.1) means the re-test is committed-to at ticket creation; without a date, the loop drifts indefinitely.
+
+## Worked: TuningProposal for a Tier-2 gap
+
+The L3 ran T1059.001-3 on PT-LAB-04. Result: Tier-2 — event in winlogbeat with `process.command_line` populated, but no rule fired.
+
+```yaml
+id: TP-2026-04-118
+exercise_id: EX-2026-04-001
+tier: Tier-2 (logged-not-alerted)
+owner: team-detection
+technique:
+  attack_id: T1059.001
+  parent: T1059
+  tactic: TA0002 (Execution)
+reproducer:
+  command: Invoke-AtomicTest T1059.001 -TestNumbers 3
+  host: PT-LAB-04
+  timestamp: 2026-04-27T14:02:00Z
+  evidence: SIEM-screenshot-EX-2026-04-001-no-alert.png
+  ecs_query_for_event: |
+    winlogbeat-* AND host.name: PT-LAB-04 AND process.parent.name: mshta.exe
+    AND @timestamp >= "2026-04-27T14:00:00Z" AND @timestamp <= "2026-04-27T14:30:00Z"
+proposed_fix: |
+  Extend rule "Suspicious encoded PowerShell" to match the mshta-spawned
+  variant. Current rule keys on `process.command_line: *-EncodedCommand*`
+  but excludes parent-process context. Adding `process.parent.name IN
+  (mshta.exe, wscript.exe, cscript.exe)` should catch this without raising
+  FP rate (mshta-spawned PowerShell is rare in benign use).
+acceptance_criteria: |
+  Re-run T1059.001-3 on PT-LAB-04 within 7 days of fix deployment.
+  Expected: rule "Suspicious encoded PowerShell" fires within 5 minutes,
+  severity high. SIEM screenshot of the alert attached at re-test.
+re-test_schedule: 2026-05-08 (≤ 90 days from open)
+status: open
+```
+
+This is a complete ticket. Engineering picks it up, reviews the proposed fix, ships, marks done. The L3 re-tests on 2026-05-08, attaches the new SIEM screenshot, marks the ticket verified-closed.
+
+## ION's TuningProposal model
+
+ION's `services/tuning_proposal_service.py` (since v0.10.3) implements this exact schema. The model has eight columns matching the eight fields above; the API accepts ticket creation + status transitions. The L3's UI flow surfaces the eight fields as required.
+
+## Glossary
+
+- **Eight required fields** — exercise id, tier, owner, technique, reproducer, proposed fix, acceptance criteria, re-test schedule.
+- **Reproducer** — exact test that surfaced the gap; lets engineering reproduce.
+- **Acceptance criteria** — the contract that makes the ticket closeable.
+- **Re-test schedule** — time-boxes the loop to 90-day cadence.
+
+## Further reading
+
+- ION's `services/tuning_proposal_service.py`.
+- L1 M7 (Escalation Workflow) — TuningProposal vocabulary.
+""",
+    )
+    _add_q(session, m5l2, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *required* fields on a TuningProposal ticket?",
+        options=[
+            {"value": "exercise", "label": "**Exercise id** — traceback to the scorecard"},
+            {"value": "tier", "label": "**Tier** — backlog routing"},
+            {"value": "owner", "label": "**Owner-of-fix** — named team / role"},
+            {"value": "technique", "label": "**Technique** — ATT&CK id"},
+            {"value": "reproducer", "label": "**Reproducer** — test command + host + timestamp + screenshot"},
+            {"value": "fix", "label": "**Proposed fix** — L3's first-pass suggestion"},
+            {"value": "acceptance", "label": "**Acceptance criteria** — what re-test validates"},
+            {"value": "schedule", "label": "**Re-test schedule** — date by which loop closes"},
+            {"value": "weather", "label": "Weather forecast for the test day"},
+            {"value": "favourite_color", "label": "L3's favourite colour"},
+        ],
+        correct=["exercise", "tier", "owner", "technique", "reproducer", "fix", "acceptance", "schedule"],
+        explanation_md="The eight required fields are: exercise id, tier, owner, technique, reproducer, proposed fix, acceptance criteria, re-test schedule. Each is mandatory because skipping any breaks the loop: no exercise id = lost traceback; no tier = wrong queue; no owner = ticket rots; no technique = no rollup; no reproducer = wasted comms; no proposed fix = no starting point; no acceptance criteria = can't close cleanly; no schedule = loop drifts. ION's TuningProposal model (services/tuning_proposal_service.py since v0.10.3) implements exactly these eight columns.",
+        points=3,
+    )
+
+    # Lesson 5.3 — Acceptance-criteria contract
+    m5l3 = _add_lesson(
+        session, mod5, order=3,
+        title="The acceptance-criteria contract: testable, reproducible, time-boxed",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Distinguish **testable** from **vague** acceptance criteria
+> 2. Apply the four-part contract: specific test + specific outcome + specific evidence + time-boxed
+> 3. Recognise common **anti-patterns** that produce paper-closed tickets
+> 4. Author a complete acceptance criterion for an arbitrary tier-2 gap
+
+## The four-part contract
+
+A testable acceptance criterion has all four:
+
+1. **Specific test** — atomic id + host + window. *"T1059.001 #3 on PT-LAB-04 between 14:00-14:30"*, not *"PowerShell test on a lab host sometime"*.
+2. **Specific outcome** — rule name + severity + latency. *"Rule X fires within 5 min, severity high"*, not *"detection improves"*.
+3. **Specific evidence** — what proves the outcome. *"SIEM screenshot of the alert + Detection Engine alert id"*, not *"the team confirms it works"*.
+4. **Time-boxed** — when the re-test happens. *"Within 7 days of fix deployment"*, not *"at some point in the future"*.
+
+All four make the criterion testable, reproducible, and verifiable independently. Drop any one and the criterion becomes vague enough to argue about.
+
+## Bad vs good examples
+
+### Bad: "The rule should fire."
+
+Why it fails: which rule, on which test, with what severity, in what timeframe? An engineer can mark the ticket done by claiming any rule firing in any context. The L3 has no leverage.
+
+### Bad: "Detection should improve."
+
+Why it fails: improvement is comparative without a baseline. *"Better than what?"* — the current FP rate? The current TP rate? Engineering can claim improvement without measurable evidence.
+
+### Bad: "Latency should be lower."
+
+Why it fails: lower than what? An engineer can claim the rule fires in 3 minutes (better than 5) by re-running the test under different conditions and not be technically lying.
+
+### Good (compound test)
+
+> "Re-run `Invoke-AtomicTest T1059.001 -TestNumbers 3` on host PT-LAB-04 between 2026-05-08 14:00-14:30 UTC. Expected: rule 'Suspicious encoded PowerShell' fires within 5 minutes of the mshta process spawning, severity *high*. Evidence: Kibana Security alert page screenshot showing the rule + severity + timestamp. Re-test happens within 7 days of fix deployment."
+
+This is testable, reproducible, evidenced, and time-boxed. The ticket can be marked closed only when all four match.
+
+## The L3's authoring reflex
+
+Write the acceptance criterion *first*, then the proposed fix. The criterion is the contract; the fix is the engineering work. Authoring the criterion first forces the L3 to:
+- Be specific about what the right outcome looks like.
+- Catch ambiguity in their own thinking ("is severity high or critical the right level?").
+- Build the re-test plan before the engineer starts.
+
+Engineers appreciate criteria written this way — the contract is clear, the work is bounded, the close path is obvious.
+
+## Anti-patterns that produce paper-closed tickets
+
+Three patterns the L3 should refuse:
+
+1. **Acceptance written by engineering after the fix ships.** *"The fix worked because we say it did."* The L3 should pre-commit to the criterion at ticket creation; engineering can review/edit but the L3 owns the contract.
+
+2. **Acceptance that changes post-fix to match what the fix actually does.** *"The fix fires on a different rule than expected, but it fires, so it's closed."* The L3 should refuse — the original criterion stands; if engineering shipped a different fix, the criterion should be updated to match the *intent*, not the *what shipped*.
+
+3. **Acceptance that the L3 can't verify independently.** *"The fix is closed because the engineering team confirms it works."* The L3 must run the re-test themselves; engineering's confirmation isn't sufficient evidence.
+
+## Time-boxing — why 7 days post-fix-deployment
+
+The conventional re-test window is 7 days from fix deployment. Why?
+- Allows time for parser updates / Sysmon-config rollouts to propagate fleet-wide.
+- Short enough that institutional memory is preserved.
+- Avoids drift to "we'll re-test eventually" indefinite scheduling.
+
+Some fixes need longer windows (e.g. SCCM rollouts touching every host take 14-21 days). The criterion can name a longer window if appropriate; the *default* is 7 days.
+
+## Glossary
+
+- **Acceptance criterion** — the contract that makes a ticket closeable.
+- **Four-part contract** — specific test + specific outcome + specific evidence + time-boxed.
+- **Paper-closed** — ticket marked done without verifiable evidence.
+- **L3 verifies independently** — engineering's word is not sufficient evidence.
+- **7-day default re-test window** — from fix deployment to re-test.
+
+## Further reading
+
+- *Continuous Delivery* (Humble + Farley) — acceptance-test-driven-development analogue.
+- ION TuningProposal model — `services/tuning_proposal_service.py`.
+""",
+    )
+    _add_q(session, m5l3, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Which of these is a **testable** acceptance criterion for a TuningProposal addressing a Tier-2 gap on T1059.001-3?",
+        options=[
+            {"value": "vague1", "label": "*\"The rule should fire on the test.\"*"},
+            {"value": "vague2", "label": "*\"Detection should improve.\"*"},
+            {"value": "vague3", "label": "*\"Latency should be lower than the current baseline.\"*"},
+            {"value": "specific", "label": "*\"Re-run `Invoke-AtomicTest T1059.001 -TestNumbers 3` on PT-LAB-04 between 14:00-14:30 within 7 days of fix deployment. Expected: rule 'Suspicious encoded PowerShell' fires within 5 min, severity high. Evidence: Kibana Security alert screenshot.\"*"},
+        ],
+        correct="specific",
+        explanation_md="The fourth option is the only testable criterion. It has all four parts of the contract: **specific test** (T1059.001-3 on PT-LAB-04 in the named window), **specific outcome** (named rule + severity high + 5-min latency), **specific evidence** (Kibana Security alert screenshot), and **time-boxed** (within 7 days of fix deployment). The first three options each fail at least one part: which rule? which severity? in what timeframe? what evidence? The L3 should pre-commit to the testable form at ticket creation, *before* the engineer starts. This is M5.3's load-bearing point — paper-closed tickets all stem from acceptance criteria that aren't testable.",
+        points=2,
+    )
+
+    # Lesson 5.4 — Re-test execution
+    m5l4 = _add_lesson(
+        session, mod5, order=4,
+        title="Gap-fix verification: running the re-test that closes the loop",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Pre-check before running the re-test — fix deployed? config rolled out?
+> 2. Run the re-test on the **same atomic + same host + same window**
+> 3. Pivot through the **four tiers** (M1.6) on the re-test result
+> 4. Pick the right outcome label: closes / partial / no-change / worse
+
+## Pre-re-test checklist
+
+Five things to confirm before the re-test runs:
+
+1. **Engineering ticket marked done.** The fix has shipped according to the engineering team.
+2. **Deploy propagated.** Fixes deploy at different speeds:
+   - Detection-engine rule deploys: minutes (Kibana Security API).
+   - Parser / pipeline updates: hours (Elastic config reload + ingest pipeline reload).
+   - Sysmon-config / agent rollout: days (SCCM / Intune push cycle).
+   Confirm the fix's deploy class has had enough time.
+3. **Re-test window same length** as the original. *7 days from fix deploy* is the typical re-test schedule (M5.3 covers).
+4. **Pre-brief the L1 / L2 / IR shifts** (M1.3 cross-link). Even a re-test is a sanctioned exercise; the SOC's response infrastructure shouldn't have to second-guess.
+5. **Snapshot the host** if the original test was high-blast-radius (M2.7 cross-link). The re-test introduces fresh risk if the original cleanup was buggy.
+
+## Re-test execution: same atomic, same scoping
+
+The re-test must be the *exact same* exercise. Different parameters = a different exercise:
+
+- Same ATT&CK technique id + sub-technique id.
+- Same atomic test number.
+- Same host (or a snapshot equivalent).
+- Same exercise window length.
+- Same authorisation chain (re-authorise if the original auth has expired).
+
+If you change *any* parameter, you've run a *new* exercise that doesn't validate the original gap fix. Common failure: re-running on a different host because the original is decommissioned. The right move: re-deploy the original test environment or pick a representative substitute and document the substitution explicitly.
+
+## Pivot through the four tiers
+
+After the 30-min telemetry wait (M1.6), the L3 walks the four tiers in order:
+
+1. **Tier-1 check**: did the alert fire?
+2. **Tier-2 check**: search for the expected event without the rule filter.
+3. **Tier-3 check**: confirm the field is populated.
+4. **Tier-4 check**: confirm the data source is ingested.
+
+Compare to the original tier:
+
+- Original Tier-2, re-test Tier-1 → **closes**. Loop closed; rule now fires.
+- Original Tier-2, re-test Tier-2 → **no change**. Fix didn't take. Engineering review.
+- Original Tier-2, re-test Tier-3 → **regression** introduced by the parser change. Engineering review urgent.
+- Original Tier-2, re-test Tier-1 with concerns (high latency / wrong severity) → **partial**. Loop closed but more work remains.
+
+## The four outcomes
+
+| Outcome | What it means | Action |
+|---|---|---|
+| **Closes** | Re-test result matches acceptance criterion exactly | Ticket → verified-closed; scorecard row → resolved |
+| **Partial** | Re-test result better than original but doesn't fully match | Ticket stays open with new sub-task; scorecard row → improved |
+| **No change** | Re-test result identical to original | Ticket stays open; engineering team reviews — was the fix wrong, or did the fix not deploy? |
+| **Worse** | Re-test result regressed (lower tier than original) | Engineering team reviews; rollback may be needed; new ticket for the regression |
+
+Each outcome has a clear next step. The L3 records the outcome with evidence (SIEM screenshot, Detection Engine alert id) on the ticket and on the scorecard row.
+
+## Worked: re-test for the M5.2 worked example
+
+Original ticket TP-2026-04-118: Tier-2 gap on T1059.001-3.
+
+Engineering ships the fix on 2026-05-04 (parent-process condition added to the rule).
+
+Re-test schedule: 2026-05-08 (within 7 days of fix deploy).
+
+L3 runs `Invoke-AtomicTest T1059.001 -TestNumbers 3` on PT-LAB-04 between 14:00-14:30. Waits 30 min. Checks Kibana Security: rule "Suspicious encoded PowerShell" fired at 14:04 (latency 4 min), severity high, on host PT-LAB-04.
+
+Acceptance criterion review:
+- Specific test ✓ (same atomic, same host, same window).
+- Specific outcome ✓ (rule X fired within 5 min, severity high).
+- Specific evidence ✓ (Kibana alert screenshot attached).
+- Time-boxed ✓ (within 7 days of fix deploy).
+
+**Closes.** Ticket → verified-closed. Scorecard row updates: resolved on 2026-05-08, latency 4 min, fix held.
+
+## Glossary
+
+- **Pre-re-test checklist** — five things to confirm before running.
+- **Same atomic + same scoping** — exact replication of the original exercise.
+- **Four outcomes** — closes / partial / no change / worse.
+- **Verified-closed** — ticket transitioned to closed with evidence; scorecard updated.
+
+## Further reading
+
+- M1.6 — four-tier framework, in original form.
+- M2.7 — safety harness; applies to re-tests too.
+""",
+    )
+    _add_q(session, m5l4, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L3 wants to run a re-test on a closed TuningProposal. The original test was T1059.001-3 on host PT-LAB-04 between 14:00-14:30 with rule X expected to fire. The original host has since been decommissioned. What's the **right move**?",
+        options=[
+            {"value": "different_host", "label": "Re-run on a different available host (PT-LAB-05); the technique is the same"},
+            {"value": "different_test", "label": "Re-run a different atomic test number that covers similar behaviour"},
+            {"value": "skip_retest", "label": "Skip the re-test; the original was thorough enough"},
+            {"value": "redeploy_or_substitute", "label": "Re-deploy the original test environment OR pick a documented representative substitute and **document the substitution** explicitly on the ticket"},
+        ],
+        correct="redeploy_or_substitute",
+        explanation_md="**Re-deploy the original test environment OR document the substitution explicitly.** The re-test must be the *exact same* exercise — same ATT&CK technique, same atomic test number, same host, same window length. If the original host is gone, the L3 has two options: (1) stand up a representative substitute (matching OS / EDR / Sysmon config) and document the substitution on the ticket, or (2) re-deploy the original env. Running on a different host without documentation invalidates the re-test as a closure verification — you've run a *new* exercise. Different test numbers cover different attack variants and don't validate the original gap. Skipping the re-test is the paper-close failure mode (M5.1's load-bearing concern). The correct discipline: replicate exactly, or document the substitution.",
+        points=2,
+    )
+
+    # Lesson 5.5 — Regression tracking
+    m5l5 = _add_lesson(
+        session, mod5, order=5,
+        title="Regression tracking: re-testing prior-quarter passing techniques",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Recognise **why fixes don't always hold** across releases
+> 2. Run the **quarterly regression sample** of prior-Tier-1 techniques
+> 3. Identify **regression triggers** — what causes drift
+> 4. Open fresh TuningProposals for regression findings
+
+## Why fixes don't always hold
+
+A fix that closed last quarter doesn't necessarily hold this quarter. Five common causes:
+
+1. **ECS field renames** — Elastic 8.x bumps a field name; the rule keys on the old name; rule silently breaks (M2 L8 / M4 L3 cross-links).
+2. **Parser updates** — a Beats / integration version bumps; the parser's output shape changes; the field is empty or the value is malformed; rule misfires.
+3. **Sysmon config drift** — individual hosts lose the original config (re-image, manual change, SCCM rollback); EventID 8 isn't being captured on a subset of hosts; rule fires on most but not all.
+4. **ATT&CK version bumps** — the technique mapping shifts (e.g. T1059.001 sub-technique split); rule's threat metadata becomes stale.
+5. **Vendor TTP shifts** — the actor swaps tooling; the original rule (DML-2 tool-based) doesn't catch the new tool; the original gap reopens.
+
+Without active regression tracking, these silently re-open gaps. The L3's response: re-test prior-quarter passing techniques quarterly.
+
+## The quarterly regression sample
+
+Each quarter's regression process:
+
+1. **List all prior-quarter Tier-1 results** — the closed loops that passed.
+2. **Pick a sample**:
+   - 10% of the list (large programs).
+   - All *critical* techniques (small programs).
+   - Always re-test the lowest-DML-but-Tier-1 rules — fragile rules drift fastest.
+3. **Re-run each atomic** on the same host (or representative substitute).
+4. **Compare to the prior result** (same four-tier framework).
+5. **Drift findings get fresh TuningProposals** — same eight required fields, scheduled for the next 90-day window.
+
+## Regression triggers — what to watch for
+
+The L3's monitor for these in the parser-health dashboard (M4.3) or the change-management feed:
+
+| Trigger | Risk |
+|---|---|
+| ECS major version bump (8.x → 9.x) | High — many field renames |
+| Beats / Agent integration package update | Medium — parser changes can shift field shape |
+| Sysmon config push via SCCM / Intune | High — wrong host group can lose event classes |
+| ATT&CK quarterly minor release | Low-medium — sub-technique splits change technique mapping |
+| Vendor TTP shift in CTI feed | Low — most rules are TTP-class (DML-4) and resilient |
+
+Bumps in any of these trigger an *off-cycle* regression sample (not waiting for next quarterly review). The L3 picks a focused subset — rules whose underlying telemetry the trigger touches — and re-runs.
+
+## Worked: Q3's regression sample
+
+Q2 closed 8 Tier-1 results. The L3's Q3 regression sample picks all 8 (small program). Re-running on the original hosts:
+
+| Q2 Tier-1 | Q3 re-test | Outcome |
+|---|---|---|
+| T1059.001 (PowerShell encoded) | Tier-1 | Held |
+| T1003.001 (LSASS dump) | Tier-1 | Held |
+| T1078.004 (Cloud account) | Tier-1 | Held |
+| T1110.003 (Spray) | Tier-1 with concerns | Slight latency drift; minor follow-up |
+| T1027 (Obfuscation) | Tier-1 | Held |
+| T1547.001 (Reg Run key) | Tier-1 | Held |
+| T1071.004 (DNS C2) | **Tier-2** | **Regression** — rule was deprecated by mistake during a parser refactor in Q3 W6 |
+| T1018 (Discovery) | Tier-1 | Held |
+
+7 still Tier-1, 1 regressed (T1071.004). Fresh TuningProposal for T1071.004 — restore the rule that was deprecated. Engineering ships the restoration; re-test in week N+1.
+
+## How to handle regression vs new-gap distinction
+
+A regression is a previously-passing rule that's now failing. A new gap is a previously-untested technique.
+
+The two have different priority:
+
+- **Regression**: high priority. The rule worked once; restoring is usually quick. Tickets older than 30 days indicate a deeper issue.
+- **New gap**: medium priority. Engineering work from scratch.
+
+The L3's reflex: regressions get expedited cycles. Reopening a previously-closed loop is operationally embarrassing — the program lost ground; lift it back fast.
+
+## Glossary
+
+- **Regression tracking** — quarterly re-test of prior-passing techniques.
+- **Quarterly sample** — 10% / all critical / all DML-2 (whichever applies).
+- **Regression triggers** — ECS bump / parser update / Sysmon push / ATT&CK release / vendor TTP shift.
+- **Off-cycle regression** — triggered by a known event, not waiting for quarter-end.
+
+## Further reading
+
+- L2 M8 — G1 (data quality) and G3 (ATT&CK mapping) drift.
+- M4 L3 — parser-health drift signals.
+""",
+    )
+    _add_q(session, m5l5, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are valid **regression triggers** that should prompt the L3 to run an *off-cycle regression sample* (not waiting for the quarterly review)?",
+        options=[
+            {"value": "ecs", "label": "ECS major version bump (8.x → 9.x)"},
+            {"value": "beats", "label": "Beats / Agent integration package update"},
+            {"value": "sysmon", "label": "Sysmon config push via SCCM / Intune"},
+            {"value": "attack", "label": "ATT&CK quarterly minor release"},
+            {"value": "vendor", "label": "Vendor TTP shift in CTI feed"},
+            {"value": "lunch", "label": "Lunch break"},
+            {"value": "team_size", "label": "SOC headcount change"},
+        ],
+        correct=["ecs", "beats", "sysmon", "attack", "vendor"],
+        explanation_md="The five valid regression triggers are: ECS major version bump (field renames), Beats / Agent integration update (parser shape shifts), Sysmon config push (event-class loss on wrong host group), ATT&CK release (sub-technique splits), and vendor TTP shift in CTI (actor tool-swap breaks DML-2 rules). Each can silently invalidate previously-closed loops; the L3's reflex is to fire an off-cycle regression sample touching the rules whose underlying telemetry the trigger affects. Lunch breaks and headcount changes don't correlate with rule-validity drift. Without regression tracking, these triggers silently re-open gaps; the program loses ground without anyone noticing until a real adversary uses one of those techniques.",
+        points=3,
+    )
+
+    # Lesson 5.6 — Lifecycle KPIs
+    m5l6 = _add_lesson(
+        session, mod5, order=6,
+        title="Lifecycle KPIs: FP rate, TP rate, drift, deprecation triggers",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Track per-rule **FP rate (weekly)** and **TP rate (sample, quarterly)**
+> 2. Recognise **drift signals** — > 50% delta vs backtest prediction
+> 3. Apply the **deprecation triggers** — when to retire vs tune
+> 4. Build the **per-rule lifecycle dashboard** for engineering review
+
+## Per-rule KPIs
+
+Five KPIs the L3 tracks per production rule:
+
+| KPI | How computed | Threshold |
+|---|---|---|
+| **FP rate (weekly)** | Analyst-flagged FPs / total alerts in week | Drift > 50% from backtest prediction → re-tune |
+| **TP rate (sample, quarterly)** | Sample 10 alerts; classify; TPs / 10 | < 30% → re-tune (per L2 M8 G2) |
+| **Mean time to triage (hours)** | Alert ack time minus alert fire time | > 4h on Critical → routing problem |
+| **Drift signal** | FP rate q-over-q delta | > +30% qoq → investigate root cause |
+| **Deprecation triggers** | Three signals — see below | Any → schedule deprecation review |
+
+Each KPI feeds the rule's lifecycle plan (L2 M8 G5 metadata cross-link).
+
+## FP rate drift
+
+Backtest prediction (L2 M8 G2): the rule should produce X FPs / week in steady state. Production tracking:
+
+- Week 1: 1.2 FP / week (close to backtest's 0.98 prediction). ✓
+- Week 4: 1.5 FP / week. Within 50% drift band. ✓
+- Week 12: 4.8 FP / week. **+390% drift**. Investigate.
+
+Common causes of FP-rate drift up:
+- Population growth (more hosts = more events; rule's threshold doesn't scale).
+- Vendor noise (a new vendor product matches the rule's allowlist gap).
+- Compliance / business activity change (new admin tool legitimately matches the rule's pattern).
+
+The fix is *always* tuning the rule body, never disabling the rule. Disabling means losing the technique's coverage; tuning preserves it.
+
+## TP rate sampling
+
+Quarterly, the L3 samples 10 random alerts from the rule's recent fire-list. Classifies each:
+- **TP** — true positive; analyst confirmed real malicious activity.
+- **FP** — false positive; analyst dismissed.
+- **Indeterminate** — analyst couldn't tell (insufficient context).
+
+TP rate = TP_count / 10 (indeterminates count as 0 toward TPs in conservative computation).
+
+| TP rate | Meaning | Action |
+|---|---|---|
+| ≥ 60% | Healthy rule | Monitor |
+| 30-60% | Borderline | Tune to remove FPs |
+| < 30% | Failed | Tune urgently or deprecate |
+
+The 30% floor is from L2 M8 G2 (the rule shouldn't have shipped at < 30% TP rate originally; if it's drifted below, something changed).
+
+## Mean time to triage
+
+Time from alert fire to L1 ack. Tracks routing health:
+
+| MTT | Severity expectation | Signal |
+|---|---|---|
+| < 30 min | Critical: pass; High: pass; Medium: borderline | OK |
+| 30-60 min | Critical: borderline; High: pass; Medium: pass | OK for High/Medium |
+| 1-4 h | Critical: borderline; rest pass | Investigate Critical routing |
+| > 4 h | Critical: fail; High: borderline | Routing problem |
+
+Failures usually mean: alert is in the wrong queue, on-call rota mis-configured, or analyst capacity is the bottleneck. Adjust accordingly.
+
+## Drift signal as quarterly KPI
+
+Q-over-Q FP-rate delta is the key drift number. > +30% qoq is a red flag — investigate the rule:
+- Is the underlying population growing?
+- Has the parser's output shape shifted?
+- Has a vendor product been deployed that matches the pattern?
+
+Drift findings get TuningProposals with proposed-fix targeting the specific drift cause.
+
+## Deprecation triggers
+
+A rule isn't kept forever. Three triggers signal time to deprecate:
+
+1. **TTP no longer in active threat-actor profiles** — the actor changed tooling; the technique isn't observed in current CTI.
+2. **Vendor adds first-party detection** — Defender for Cloud / Sentinel / EDR ships their own detection that covers > 90% TP cases.
+3. **Replacement rule covers superset** — a newly-shipped rule catches everything the old rule did, plus more.
+
+The deprecation review schedule kicks in when any trigger fires. The team confirms the trigger, deprecates the old rule, retains the metadata for historical reporting, and updates the scorecard.
+
+## The per-rule lifecycle dashboard
+
+The detection-engineering team's quarterly review surfaces each rule's KPIs:
+
+```
+Rule: Suspicious encoded PowerShell (T1059.001)
+  Backtest predicted: 0.98 FP/week, 75% TP rate
+  Q3 actual:           1.4  FP/week (+43% drift, OK band)
+                       82% TP rate (sample 10/12, healthy)
+  MTT:                 18 min (acceptable for High severity)
+  Drift signal:        +43% qoq (within 50% band)
+  Deprecation status:  Not triggered
+  Action:              Monitor
+```
+
+Worst-performing rules get TuningProposals; healthy rules get monitored.
+
+## Glossary
+
+- **FP rate (weekly)** — analyst-flagged FPs / total alerts.
+- **TP rate (sample, quarterly)** — TPs / 10 from random sample.
+- **Mean time to triage** — alert fire → L1 ack.
+- **Drift signal** — FP rate qoq delta.
+- **Deprecation triggers** — three signals indicating rule retirement.
+
+## Further reading
+
+- L2 M8 G5 metadata — lifecycle plan reference.
+- Florian Roth — *Detection Engineering KPIs*.
+""",
+    )
+    _add_q(session, m5l6, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A production rule's backtest predicted **0.98 FP/week**. In Q3, the rule fired **2.5 FP/week**. Per the lifecycle KPI thresholds, what's the right characterisation?",
+        options=[
+            {"value": "healthy", "label": "Healthy — within normal week-to-week variation"},
+            {"value": "borderline", "label": "Borderline — log it, watch for further drift"},
+            {"value": "drift_below", "label": "Drift below the 50% threshold (~155% delta) — investigate, possibly tune"},
+            {"value": "deprecate", "label": "Deprecate the rule — the FP rate is too high"},
+        ],
+        correct="drift_below",
+        explanation_md="**Drift above the 50% threshold (~155% delta) — investigate, possibly tune.** Computing: (2.5 - 0.98) / 0.98 = **+155% delta**, well over the 50% threshold. The rule's FP rate has drifted significantly; the L3's reflex is to investigate root cause: population growth, vendor noise, business activity change, or a parser shift. The fix is *tuning the rule body* (e.g. adding allowlist exclusions, narrowing the trigger condition) — not disabling the rule, which would lose the technique coverage entirely. Deprecation is for *deprecation triggers* (TTP gone from profile, first-party vendor coverage, replacement-rule superset) — none of which the question describes. The conservative wording for the answer phrasing is correct: \"drift\" means *deviation from backtest prediction*, with the threshold at +50% triggering the re-tune workflow.",
+        points=2,
+    )
+
+    # Lesson 5.7 — TIDE submission
+    m5l7 = _add_lesson(
+        session, mod5, order=7,
+        title="TIDE submission: from candidate to production via the five gates",
+        lesson_type=LessonType.READING, duration_min=16,
+        content_md="""
+> **Learning objectives.**
+> 1. Recite the **handoff at TIDE submission** — what L3 owns vs what detection-eng owns
+> 2. Run the **pre-submission check** confirming five-gate metadata is complete
+> 3. Recognise the **CI flow** — what TIDE's automation validates pre-deploy
+> 4. Cross-link to **L2 M8** for the five-gate detail
+
+## The handoff
+
+TIDE is the bridge between L2/L3 hunting work and production detection. The handoff has clear ownership:
+
+| Stage | Owner | Output |
+|---|---|---|
+| Hunt finding (L2) | L2 hunter | Confirmed positive in one investigation |
+| Detection candidate (L2 M8) | L2 hunter / L3 | Reusable rule body proposed for production |
+| **Five-gate check** | L3 + detection-eng | Rule body locked, metadata complete |
+| **TIDE submission** | Detection-eng | PR to TIDE rule repository |
+| **CI validation** | Automation | Schema, ATT&CK cross-check, smoke-test |
+| **Production deploy** | Detection-eng | Detection Engine API publishes the rule |
+| **Lifecycle ownership** | L3 | FP/TP tracking, drift, deprecation (M5.6) |
+
+The L3 owns the *post-submission lifecycle* — KPI tracking, regression checks, deprecation reviews. Detection-engineering owns the *rule body and CI/CD pipeline*.
+
+## Pre-submission check
+
+Before submitting to TIDE, the L3 confirms the five gates from L2 M8 are complete:
+
+| Gate | Check |
+|---|---|
+| **G1 — Data quality** | ECS schema stable; retention ≥ look-back; parser healthy in 30d; field populated on target estate |
+| **G2 — FP rate** | 30-day backtest passing (≤ 5/week findings, TP rate ≥ 30%); body locked, no last-minute tuning |
+| **G3 — MITRE mapping** | Technique + sub-technique + tactic; ATT&CK version pinned (e.g. v15.0) |
+| **G4 — Kill-chain step + routing** | Primary tactic picked via response-leverage rule; playbook id / runbook reference named |
+| **G5 — Metadata completeness** | Severity + threat block + runbook + owner + lifecycle plan with KPIs and deprecation triggers |
+
+If any gate isn't passed, fix it before submission. Submitting partially-complete rules wastes CI cycles and bounces the rule back.
+
+## TIDE's CI validation
+
+The CI runs automatically on PR:
+
+1. **Schema validation** — YAML against the Kibana Security rule schema.
+2. **ATT&CK cross-check** — every technique id + tactic id resolves against the live ATT&CK matrix; version pinning is verified.
+3. **Smoke-test** — the rule runs against a 7-day historical preview window; CI confirms it executes (regardless of whether it fires).
+4. **Lint runbook URL + playbook id** — the runbook URL resolves; the playbook id exists in the SOAR catalogue.
+5. **Lifecycle plan completeness** — all five fields (review_cadence_days, KPIs, deprecation_criteria) are populated.
+
+Any failure → CI fails the PR; rule doesn't deploy. Engineering fixes and re-pushes.
+
+## Worked: TIDE submission for the M5.2 example
+
+The L3 closes TP-2026-04-118 with a verified-closed re-test. The detection-engineering team picks up the new / extended rule and submits to TIDE:
+
+```yaml
+name: Suspicious encoded PowerShell — extended for mshta-spawned variant
+type: kql
+language: kuery
+query: |
+  process.command_line: *-EncodedCommand* AND
+  process.parent.name: ("mshta.exe" OR "wscript.exe" OR "cscript.exe")
+severity: high
+risk_score: 73
+threat:
+  - framework: MITRE ATT&CK
+    tactic: { id: TA0002, name: Execution }
+    technique:
+      - id: T1059
+        subtechnique: [{ id: T1059.001 }]
+threat_framework_version: v15.0
+runbook: https://wiki/runbooks/encoded-powershell
+playbook_id: pb_powershell_encoded
+owner: team-detection
+lifecycle:
+  review_cadence_days: 90
+  kpis: [fp_rate_weekly, tp_rate_sample_quarterly, mean_time_to_triage_hours]
+  deprecation_criteria:
+    - "TTP no longer in active threat-actor profiles"
+    - "Replacement rule covers superset"
+    - "Vendor adds first-party detection > 90% TP coverage"
+```
+
+CI runs: schema ✓, ATT&CK ✓, smoke ✓, runbook URL ✓, lifecycle ✓. PR merges, rule deploys via Detection Engine API. Status: **Enabled**.
+
+The L3 transfers ownership to lifecycle tracking from this point.
+
+## Glossary
+
+- **Pre-submission check** — confirm five gates complete before PR.
+- **CI validation** — automated schema + ATT&CK + smoke + runbook + lifecycle checks.
+- **Lifecycle ownership** — post-deploy: L3 tracks FP/TP, drift, deprecation.
+- **Handoff point** — TIDE submission marks the transfer from candidate to production.
+
+## Further reading
+
+- L2 M8 — five-gate detail.
+- Elastic Security rule reference — Kibana Security rule schema.
+""",
+    )
+    _add_q(session, m5l7, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="Before an L3 submits a detection rule to TIDE for production deployment, what's the **load-bearing pre-submission check** they should run? Format: a short phrase naming the check.",
+        options=None,
+        correct=[
+            "five-gate check",
+            "five gate check",
+            "5-gate check",
+            "five-gate metadata complete",
+            "L2 M8 five-gate check",
+            "G1-G5 gate check",
+            "five-gate metadata",
+            "five-gate completeness",
+        ],
+        explanation_md="**The five-gate check** (from L2 M8). Before TIDE submission, the L3 confirms G1 (data quality), G2 (FP rate via 30d backtest), G3 (MITRE mapping with ATT&CK version pin), G4 (kill-chain step + playbook routing), and G5 (metadata completeness — severity + threat block + runbook + owner + lifecycle plan with KPIs and deprecation triggers). Submitting a rule that fails any gate wastes CI cycles and bounces the PR back. The L3's reflex is to walk all five gates *before* PR, in order. Ownership splits at submission: detection-engineering owns the rule body and CI/CD; the L3 owns the post-deploy lifecycle (FP/TP tracking, drift, regression, deprecation).",
+        points=2,
+    )
+
+    # Lesson 5.8 — Capstone
+    m5l8 = _add_lesson(
+        session, mod5, order=8,
+        title="L3 M5 Capstone — close-the-loop discipline",
+        lesson_type=LessonType.QUIZ, duration_min=12,
+        content_md="""
+Two-question capstone covering loop closure and acceptance-criteria recognition.
+
+Module 6 picks up: **Multi-host chain emulation** — the worked end-to-end FIN6 kill-chain across 4 hosts; how the L3 designs, runs, and scores a chain exercise that exercises the SOC's response-time metrics, not just detection.
+""",
+    )
+    _add_q(session, m5l8, order=1, kind=QuestionKind.SINGLE,
+        stem_md="Six months ago, a TuningProposal closed with re-test result *Tier-1, latency 4 min, severity high — verified-closed*. Today's quarterly regression sample re-runs the same atomic on the same host. Result: *Tier-2, no rule fired*. Pick the right next action.",
+        options=[
+            {"value": "open_new_tp", "label": "Open a fresh TuningProposal flagged as **regression** (high priority); identify the trigger (parser update? ECS field rename? Sysmon config change?), schedule fix + re-test"},
+            {"value": "ignore", "label": "Ignore — six-month-old fixes are expected to drift"},
+            {"value": "reopen", "label": "Re-open the original TP-2026-XX-XXX ticket; engineering fixes again"},
+            {"value": "deprecate", "label": "Deprecate the rule; if it can't survive six months it's not a real rule"},
+        ],
+        correct="open_new_tp",
+        explanation_md="**Open a fresh TuningProposal flagged as regression.** The original ticket closed correctly six months ago — re-opening it conflates two distinct findings (the original gap + the regression). The right pattern is a *fresh* TuningProposal with all eight required fields, flagged as a regression (high-priority cycle), referencing the original ticket for context. The investigation: identify the trigger — was there an ECS bump? a parser update? a Sysmon-config push? a vendor TTP shift? — and fix the root cause, not just the symptom. Drift is *expected* but *manageable*; ignoring is the failure mode that lets coverage silently decay. Deprecating is for rules whose TTP has left the profile or that have been superseded — not for rules that need re-tuning.",
+        points=2,
+    )
+    _add_q(session, m5l8, order=2, kind=QuestionKind.SINGLE,
+        stem_md="An engineer marks a TuningProposal as *closed* but no re-test screenshot is attached and the scorecard row still shows *open*. The L3 reads the ticket and sees *\"the team confirmed the fix works in production.\"* What's the right L3 response?",
+        options=[
+            {"value": "trust", "label": "Accept the close — engineering's word is sufficient evidence"},
+            {"value": "reject", "label": "Reject the close as **paper-closed**; require the L3 to run the actual re-test independently with the original atomic + host + window, and attach the SIEM evidence"},
+            {"value": "negotiate", "label": "Negotiate — accept partial evidence (e.g. a verbal confirmation in chat) without a screenshot"},
+            {"value": "escalate", "label": "Escalate to the CISO immediately"},
+        ],
+        correct="reject",
+        explanation_md="**Reject the close as paper-closed.** The four-part acceptance contract from M5.3 explicitly requires *L3 verifies independently* — engineering's word isn't sufficient evidence. The L3 must run the re-test themselves on the original atomic + host + window, and attach the SIEM screenshot / Detection Engine alert id. *Paper-closed* tickets are the most common silent failure mode in immature purple-team programs (M5.1's load-bearing concern); the L3's job is to enforce the discipline. Negotiating partial evidence creates a precedent that erodes the contract; escalating to CISO is overkill for the routine case (escalate only if engineering systematically refuses to allow re-tests). The right move is a polite firm push-back: *'I'll re-test on Friday and update the ticket myself; the close pattern is L3-runs-it.'*",
+        points=2,
+    )
+
+    print(f"  L3: {course.title} — 5 modules, 40 lessons (Module 5 Detection-eng loops @ proper depth)")
     return course
 
 
