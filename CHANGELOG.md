@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.12.2 (2026-04-29) — feature
+
+### CyAB Onboarding Studio — catalogue fill (12 skeletons → full depth)
+
+v0.12.0 shipped 3 sub-profiles (Active Directory, Windows endpoint, Next-Gen Firewall) at full depth and 12 as skeletons. v0.12.2 fills all 12 skeletons to the same bar — intake banks, detection use cases with ES|QL logic + MITRE IDs + SOAR ids, and audit use cases with NIST / CIS / IEC compliance frames.
+
+#### Catalogue totals (15 sub-profiles)
+
+| Pillar | Sub-profile | Intake | Detection | Audit |
+|--------|-------------|:--:|:--:|:--:|
+| Identity | Active Directory | 7 | 5 | 4 |
+| Identity | Entra ID / Okta | 6 | 5 | 3 |
+| Identity | VPN / Remote access | 4 | 4 | 2 |
+| Endpoint | Windows endpoint | 5 | 6 | 4 |
+| Endpoint | Linux / Unix | 5 | 5 | 3 |
+| Endpoint | macOS endpoint | 4 | 4 | 2 |
+| Network | Next-Gen Firewall | 3 | 4 | 2 |
+| Network | DNS | 3 | 4 | 2 |
+| Network | Web proxy | 4 | 3 | 2 |
+| Cloud | Cloud audit (AWS/Azure/GCP) | 5 | 5 | 4 |
+| Cloud | Email platform (M365/Workspace) | 5 | 4 | 3 |
+| Cloud | SaaS app (generic) | 4 | 3 | 2 |
+| Data | Database | 4 | 4 | 3 |
+| Data | Web application | 5 | 4 | 2 |
+| OT | ICS / SCADA | 4 | 3 | 2 |
+| **Total** | **15** | **68** | **63** | **41** |
+
+#### What changed
+
+- `services/cyab_subprofile_catalogue.py` — the 12 stubs are replaced with fully-authored module-level dicts (ENTRA_OKTA, VPN_REMOTE, LINUX_ENDPOINT, MACOS_ENDPOINT, DNS_PROFILE, WEB_PROXY, CLOUD_AUDIT, EMAIL_PLATFORM, SAAS_GENERIC, DATABASE, WEB_APP, ICS_SCADA). The `_stub` helper and `SKELETONS` list are gone.
+- `CATALOGUE_VERSION` 1 → 2.
+- The seeder's existing idempotency contract is preserved: `is_custom=true` rows still skip the update, so any operator-edited sub-profile sticks.
+
+#### Threat / audit lens
+
+Each sub-profile maintains a similar shape: intake questions are technical-config-specific (e.g., "Is `auditd` configured for syscall tracking?"), detection use cases carry an ES|QL snippet keyed to the sub-profile's ECS anchor, and audit use cases carry compliance-frame mapping (NIST 800-53, CIS benchmarks, PCI DSS, OWASP ASVS, IEC 62443 for OT).
+
+#### Verifying the feature
+
+```bash
+docker compose pull ion seeder
+docker compose up -d
+```
+
+After boot:
+
+1. Open `/cyab/studio` → pick **Cloud & SaaS** → **Email platform (M365 / Workspace)**. Intake should now show 5 questions; Detection library should show 4 use cases (mailbox forward rule, OAuth grant, BEC pattern, bulk OWA download); Audit tab should show 3 (external delegation, audit disabled, transport rule).
+2. Sub-profile rail badges (`Nd · Ma`) should show non-zero counts for every entry.
+3. `psql -c "SELECT id, label FROM cyab_subprofiles ORDER BY pillar_id, label"` — 15 rows.
+
+No DB migration; no data-model change. Catalogue content only.
+
+---
+
 ## v0.12.1 (2026-04-29) — feature
 
 ### CyAB Onboarding Studio — answer-and-proceed (intake form + system selector + auto-save)
