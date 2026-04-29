@@ -102,6 +102,7 @@ from ion.models.analytics import (
     AnalyticsSnapshot,
 )
 from ion.models.cyab import CyabSystem, CyabDataSource, CyabSnapshot
+from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
 from ion.models.canary import Canary, CanaryHit, CanaryType, CanaryStatus
 from ion.models.log_source import LogSource, LogSourceCategory
 from ion.models.emulation import EmulationPlan, EmulationStep, EmulationPlanStatus, StepResult
@@ -277,6 +278,8 @@ __all__ = [
     "CyabSystem",
     "CyabDataSource",
     "CyabSnapshot",
+    "CyabPillar",
+    "CyabSubProfile",
     # Canary / deception
     "Canary",
     "CanaryHit",

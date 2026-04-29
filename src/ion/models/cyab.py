@@ -70,6 +70,11 @@ class CyabSystem(Base):
     stakeholder_distribution: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ir_runbook_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
 
+    # v0.12.0: containment authority paragraph captured on the
+    # Onboarding Pack approval flow. Free-text — references a runbook,
+    # names the on-call team, etc.
+    containment_authority: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # Visual
     icon: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, default="monitor")
     tags: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array
@@ -174,6 +179,13 @@ class CyabDataSource(Base):
 
     # ES alert mapping (data_stream.namespace value for this system)
     data_namespace: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+
+    # v0.12.0: Onboarding Studio sub-profile tag. Nullable so legacy
+    # rows stay valid until backfilled. The catalogue lives in
+    # cyab_subprofiles (see ion.models.cyab_subprofile).
+    subprofile_id: Mapped[Optional[str]] = mapped_column(
+        String(64), ForeignKey("cyab_subprofiles.id"), nullable=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), nullable=False

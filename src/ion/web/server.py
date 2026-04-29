@@ -44,6 +44,7 @@ from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.threat_landscape_api import router as threat_landscape_router
 from ion.web.threat_watch_gap_api import router as threat_watch_gap_router
 from ion.web.cyab_api import router as cyab_router
+from ion.web.cyab_studio_api import router as cyab_studio_router
 from ion.web.social_api import router as social_router
 from ion.web.analytics_api import router as analytics_router
 from ion.web.engineering_analytics_api import router as engineering_analytics_router
@@ -274,6 +275,7 @@ app.include_router(social_router, prefix="/api/social")
 app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(engineering_analytics_router, prefix="/api/engineering/analytics")
 app.include_router(cyab_router, prefix="/api/cyab")
+app.include_router(cyab_studio_router, prefix="/api/cyab/studio")
 app.include_router(threat_intel_router, prefix="/api/threat-intel")
 app.include_router(threat_watch_gap_router, prefix="/api/threat-intel")
 app.include_router(threat_landscape_router, prefix="/api")
@@ -427,7 +429,7 @@ async def startup_event():
         LOCK_KIBANA_BG_SYNC, LOCK_SKILLS_DAILY_SNAPSHOT,
         LOCK_SEED_ANALYTICS_JOBS, LOCK_ANALYTICS_BG_LOOP,
         LOCK_TIDE_BG_SYNC, LOCK_SCHEDULER_BG, LOCK_INVESTIGATION_BG,
-        LOCK_CASE_GROUPER_BG,
+        LOCK_CASE_GROUPER_BG, LOCK_SEED_CYAB_SUBPROFILES,
     )
     engine = get_engine(config.db_path)
     factory = get_session_factory(engine)
@@ -512,6 +514,23 @@ async def startup_event():
         finally:
             session.close()
     run_locked(engine, LOCK_SEED_CAPABILITY_KB, "seed_capability_articles", _seed_capability_articles)
+
+    # ---------------------------------------------------------------
+    # v0.12.0: Seed CyAB Onboarding Studio catalogue (6 pillars + 14
+    # sub-profiles) and backfill cyab_data_sources.subprofile_id from
+    # legacy data_source_type. Idempotent — operator-edited
+    # sub-profiles (is_custom=true) are preserved.
+    # ---------------------------------------------------------------
+    def _seed_cyab_subprofiles():
+        from ion.services.cyab_subprofile_service import (
+            seed_catalogue, backfill_subprofile_ids,
+        )
+        seed_catalogue()
+        backfill_subprofile_ids()
+    run_locked(
+        engine, LOCK_SEED_CYAB_SUBPROFILES,
+        "seed_cyab_subprofiles", _seed_cyab_subprofiles,
+    )
 
     # ---------------------------------------------------------------
     # Start Kibana bidirectional sync (hold_until_close: only one worker
@@ -871,6 +890,18 @@ async def tools_page(request: Request, user: User = Depends(require_page_permiss
 async def cyab_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the CyAB Ingestion SLA page."""
     return templates.TemplateResponse(request=request, name="cyab.html")
+
+
+@app.get("/cyab/studio", response_class=HTMLResponse)
+async def cyab_studio_page(
+    request: Request,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """Render the CyAB Onboarding Studio page (v0.12.0).
+
+    URL state: ?pillar=identity&sub=active_directory&tab=detection&uc=ad_kerberoasting
+    """
+    return templates.TemplateResponse(request=request, name="cyab_studio.html")
 
 
 @app.get("/discover", response_class=HTMLResponse)

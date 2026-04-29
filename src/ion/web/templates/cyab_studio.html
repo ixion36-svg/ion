@@ -1,0 +1,548 @@
+{% extends "base.html" %}
+{% block title %}CyAB Onboarding · ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+  <!-- ═════════════ Header ═════════════ -->
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-4 h-4 text-ion-iris"><use href="#i-shield"/></svg>
+        <span class="label-tiny text-ion-iris">CyAB · Onboarding</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">CyAB Onboarding</h1>
+      <p class="mt-3 max-w-3xl text-[15px] text-slate-400">
+        Sub-profile-driven onboarding intake, detection library, and audit
+        catalogue. Pick a pillar, drill into a sub-profile, work the three
+        tabs (Intake / Detection / Audit), then export the Onboarding Pack
+        for sign-off.
+      </p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <a href="/cyab" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[13px] font-semibold transition">
+        ← CyAB dashboard
+      </a>
+    </div>
+  </section>
+
+  <!-- ═════════════ Pillar pills ═════════════ -->
+  <div id="cs-pillars" class="flex flex-wrap gap-2 mb-6 rise d-2">
+    <!-- pills hydrated from /api/cyab/studio/pillars -->
+    <div class="text-[12px] text-slate-500">Loading pillars…</div>
+  </div>
+
+  <!-- ═════════════ Main grid ═════════════ -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 rise d-3">
+
+    <!-- Sub-profile rail -->
+    <aside class="lg:col-span-3 space-y-4">
+      <div class="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <h3 class="label-tiny text-slate-500 mb-4">Sub-profiles</h3>
+        <div id="cs-rail" class="space-y-2">
+          <div class="text-[12px] text-slate-500">Pick a pillar</div>
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <h3 class="label-tiny text-slate-500 mb-4">Library stats</h3>
+        <div id="cs-stats" class="grid grid-cols-3 gap-2">
+          <div class="rounded-lg border border-white/10 bg-ink-950/40 p-3 text-center">
+            <div class="text-lg font-bold text-ion-cyan" id="cs-stat-intake">–</div>
+            <div class="label-tiny text-slate-500">Intake</div>
+          </div>
+          <div class="rounded-lg border border-white/10 bg-ink-950/40 p-3 text-center">
+            <div class="text-lg font-bold text-ion-iris" id="cs-stat-det">–</div>
+            <div class="label-tiny text-slate-500">Detect</div>
+          </div>
+          <div class="rounded-lg border border-white/10 bg-ink-950/40 p-3 text-center">
+            <div class="text-lg font-bold text-ion-lime" id="cs-stat-audit">–</div>
+            <div class="label-tiny text-slate-500">Audit</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Workspace -->
+    <main class="lg:col-span-9 flex flex-col gap-6">
+      <div class="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden">
+
+        <!-- Tab nav -->
+        <div class="flex border-b border-white/10 bg-ink-950/30 p-2 gap-1">
+          <button data-tab="intake" class="cs-tab flex-1 py-3 text-[11px] font-semibold uppercase tracking-widest rounded-lg transition flex items-center justify-center gap-2">
+            <svg class="w-3.5 h-3.5"><use href="#i-search"/></svg>
+            Detailed intake
+          </button>
+          <button data-tab="detection" class="cs-tab flex-1 py-3 text-[11px] font-semibold uppercase tracking-widest rounded-lg transition flex items-center justify-center gap-2">
+            <svg class="w-3.5 h-3.5"><use href="#i-zap"/></svg>
+            Detection library
+          </button>
+          <button data-tab="audit" class="cs-tab flex-1 py-3 text-[11px] font-semibold uppercase tracking-widest rounded-lg transition flex items-center justify-center gap-2">
+            <svg class="w-3.5 h-3.5"><use href="#i-file-text"/></svg>
+            Audit &amp; compliance
+          </button>
+        </div>
+
+        <!-- Tab body -->
+        <div class="p-6 md:p-8 min-h-[480px]">
+          <div id="cs-empty" class="text-center py-20 text-slate-500">
+            <svg class="w-10 h-10 mx-auto mb-4 opacity-50"><use href="#i-shield"/></svg>
+            <div class="text-[13px]">Pick a pillar and a sub-profile to begin.</div>
+          </div>
+          <div id="cs-tab-intake" class="hidden"></div>
+          <div id="cs-tab-detection" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+          <div id="cs-tab-audit" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </div>
+      </div>
+
+      <!-- Use-case detail drawer -->
+      <div id="cs-drawer" class="hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 md:p-8"></div>
+
+      <!-- Footer / Onboarding Pack export -->
+      <footer class="rounded-2xl border border-white/10 bg-white/[0.03] p-5 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3 text-[12px] text-slate-400">
+          <svg class="w-4 h-4 text-slate-500"><use href="#i-shield"/></svg>
+          <span>Onboarding Pack bundles intake answers + detection &amp; audit coverage + sign-off.</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="cs-pack-system" type="number" min="1" placeholder="System ID"
+                 class="h-10 w-32 px-3 rounded-md bg-ink-950/60 border border-white/10 text-[13px] text-slate-200 placeholder:text-slate-600">
+          <button id="cs-pack-btn"
+                  class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+            Export Onboarding Pack
+          </button>
+        </div>
+      </footer>
+    </main>
+  </div>
+</div>
+</div>
+
+<style>
+  .cs-pill { display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 16px;
+    border-radius:999px; font-size:12px; font-weight:600; letter-spacing:0.02em;
+    background:rgba(255,255,255,0.04); color:#9ca3af; border:1px solid rgba(255,255,255,0.08);
+    cursor:pointer; transition:all 0.15s; }
+  .cs-pill:hover { background:rgba(255,255,255,0.08); color:#e5e7eb; }
+  .cs-pill.is-active { background:rgba(109,228,255,0.18); color:#6de4ff; border-color:rgba(109,228,255,0.4); }
+
+  .cs-rail-btn { display:flex; align-items:center; gap:10px; width:100%; padding:12px 14px;
+    border-radius:10px; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;
+    background:transparent; color:#94a3b8; border:1px solid transparent;
+    cursor:pointer; transition:all 0.15s; text-align:left; }
+  .cs-rail-btn:hover { background:rgba(255,255,255,0.04); color:#e5e7eb; }
+  .cs-rail-btn.is-active { background:rgba(255,255,255,0.06); color:#fff; border-color:rgba(109,228,255,0.25); }
+  .cs-rail-btn .cs-rail-meta { margin-left:auto; font-size:10px; color:#64748b; font-weight:500; text-transform:none; letter-spacing:0; }
+
+  .cs-tab { color:#64748b; }
+  .cs-tab:hover { color:#cbd5e1; }
+  .cs-tab.is-active { background:rgba(255,255,255,0.06); color:#fff; }
+
+  .cs-uc-card { position:relative; border-radius:16px; padding:20px; cursor:pointer;
+    background:rgba(8,12,20,0.4); border:1px solid rgba(255,255,255,0.08);
+    transition:all 0.15s; overflow:hidden; }
+  .cs-uc-card:hover { border-color:rgba(109,228,255,0.3); transform:translateY(-1px); }
+  .cs-uc-card.is-active { border-color:rgba(109,228,255,0.5); background:rgba(109,228,255,0.05); }
+  .cs-uc-stripe { position:absolute; top:0; left:0; bottom:0; width:4px; }
+  .cs-uc-stripe.risk-critical { background:#ef4444; }
+  .cs-uc-stripe.risk-high     { background:#f97316; }
+  .cs-uc-stripe.risk-medium   { background:#3b82f6; }
+  .cs-uc-stripe.risk-low      { background:#64748b; }
+  .cs-uc-title { font-size:14px; font-weight:700; color:#fff; margin-bottom:6px; }
+  .cs-uc-summary { font-size:12px; color:#9ca3af; line-height:1.55; }
+  .cs-uc-pills { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+  .cs-uc-mini-pill { font-size:10px; font-weight:600; letter-spacing:0.04em;
+    padding:3px 8px; border-radius:6px; background:rgba(255,255,255,0.06);
+    color:#94a3b8; text-transform:uppercase; }
+
+  .cs-q-card { display:flex; gap:14px; padding:18px; border-radius:14px;
+    background:rgba(8,12,20,0.4); border:1px solid rgba(255,255,255,0.08); }
+  .cs-q-num { width:30px; height:30px; flex-shrink:0; border-radius:50%;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+    color:#64748b; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .cs-q-text { font-size:13px; color:#cbd5e1; line-height:1.55; }
+
+  .cs-drawer-code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size:12px; line-height:1.6; color:#93c5fd; background:rgba(8,12,20,0.6);
+    padding:14px 16px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);
+    white-space:pre-wrap; overflow-x:auto; }
+</style>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    pillars: [],
+    pillar_id: null,
+    sub_id: null,
+    tab: 'intake',
+    uc_id: null,
+    subprofile_full: null,
+  };
+
+  // ---- URL state ---------------------------------------------------------
+  function readUrl() {
+    const sp = new URLSearchParams(window.location.search);
+    state.pillar_id = sp.get('pillar');
+    state.sub_id = sp.get('sub');
+    state.tab = sp.get('tab') || 'intake';
+    state.uc_id = sp.get('uc');
+  }
+  function writeUrl(replace = false) {
+    const sp = new URLSearchParams();
+    if (state.pillar_id) sp.set('pillar', state.pillar_id);
+    if (state.sub_id) sp.set('sub', state.sub_id);
+    if (state.tab) sp.set('tab', state.tab);
+    if (state.uc_id) sp.set('uc', state.uc_id);
+    const url = window.location.pathname + (sp.toString() ? '?' + sp.toString() : '');
+    if (replace) history.replaceState(null, '', url);
+    else history.pushState(null, '', url);
+  }
+
+  // ---- Pillars -----------------------------------------------------------
+  async function loadPillars() {
+    const r = await fetch('/api/cyab/studio/pillars');
+    if (!r.ok) {
+      $('cs-pillars').innerHTML = '<div class="text-[12px] text-rose-400">Failed to load pillars</div>';
+      return;
+    }
+    const d = await r.json();
+    state.pillars = d.pillars || [];
+    renderPillars();
+
+    if (!state.pillar_id && state.pillars.length) {
+      state.pillar_id = state.pillars[0].id;
+    }
+    if (state.pillar_id) await selectPillar(state.pillar_id, /*from_url=*/true);
+  }
+  function renderPillars() {
+    const wrap = $('cs-pillars');
+    wrap.innerHTML = '';
+    state.pillars.forEach((p) => {
+      const b = document.createElement('button');
+      b.className = 'cs-pill' + (p.id === state.pillar_id ? ' is-active' : '');
+      b.innerHTML = `<span class="opacity-70">P${p.priority}</span> ${escapeHtml(p.label)}`;
+      b.onclick = () => selectPillar(p.id);
+      b.title = p.description || '';
+      wrap.appendChild(b);
+    });
+  }
+
+  async function selectPillar(pillar_id, from_url = false) {
+    state.pillar_id = pillar_id;
+    if (!from_url) {
+      state.sub_id = null;
+      state.uc_id = null;
+    }
+    renderPillars();
+    const r = await fetch(`/api/cyab/studio/pillars/${encodeURIComponent(pillar_id)}/subprofiles`);
+    if (!r.ok) {
+      $('cs-rail').innerHTML = '<div class="text-[12px] text-rose-400">Failed to load sub-profiles</div>';
+      return;
+    }
+    const d = await r.json();
+    renderRail(d.subprofiles || []);
+
+    if (!state.sub_id && d.subprofiles && d.subprofiles.length) {
+      state.sub_id = d.subprofiles[0].id;
+    }
+    if (state.sub_id) await selectSubprofile(state.sub_id, /*from_url=*/true);
+    else writeUrl(true);
+  }
+
+  function renderRail(subs) {
+    const wrap = $('cs-rail');
+    wrap.innerHTML = '';
+    if (!subs.length) {
+      wrap.innerHTML = '<div class="text-[12px] text-slate-500">No sub-profiles in this pillar.</div>';
+      return;
+    }
+    subs.forEach((s) => {
+      const b = document.createElement('button');
+      b.className = 'cs-rail-btn' + (s.id === state.sub_id ? ' is-active' : '');
+      const detTotal = s.detection_count || 0;
+      const audTotal = s.audit_count || 0;
+      const customMark = s.is_custom ? ' <span class="text-ion-iris">●</span>' : '';
+      b.innerHTML = `${escapeHtml(s.label)}${customMark}<span class="cs-rail-meta">${detTotal}d · ${audTotal}a</span>`;
+      b.onclick = () => selectSubprofile(s.id);
+      wrap.appendChild(b);
+    });
+  }
+
+  // ---- Sub-profile -------------------------------------------------------
+  async function selectSubprofile(sub_id, from_url = false) {
+    state.sub_id = sub_id;
+    if (!from_url) state.uc_id = null;
+    document.querySelectorAll('.cs-rail-btn').forEach((b) => b.classList.remove('is-active'));
+    const r = await fetch(`/api/cyab/studio/subprofiles/${encodeURIComponent(sub_id)}`);
+    if (!r.ok) {
+      $('cs-empty').classList.remove('hidden');
+      return;
+    }
+    state.subprofile_full = await r.json();
+
+    // Re-mark rail active
+    document.querySelectorAll('.cs-rail-btn').forEach((b, idx, arr) => {
+      // We re-render rail from scratch on each pillar select; here we just match by text.
+      if (b.textContent.startsWith(state.subprofile_full.label)) b.classList.add('is-active');
+    });
+
+    // Stats
+    const cat = state.subprofile_full.catalogue || {};
+    $('cs-stat-intake').textContent = (cat.intake_questions || []).length;
+    $('cs-stat-det').textContent = (cat.detection_use_cases || []).length;
+    $('cs-stat-audit').textContent = (cat.audit_use_cases || []).length;
+
+    // Render workspace
+    $('cs-empty').classList.add('hidden');
+    renderTabs();
+    renderTabBody();
+    if (state.uc_id) renderDrawer();
+    else $('cs-drawer').classList.add('hidden');
+    writeUrl(/*replace=*/from_url);
+  }
+
+  // ---- Tabs --------------------------------------------------------------
+  function renderTabs() {
+    document.querySelectorAll('.cs-tab').forEach((t) => {
+      const isActive = t.dataset.tab === state.tab;
+      t.classList.toggle('is-active', isActive);
+    });
+  }
+  function selectTab(tab) {
+    state.tab = tab;
+    state.uc_id = null;
+    renderTabs();
+    renderTabBody();
+    $('cs-drawer').classList.add('hidden');
+    writeUrl();
+  }
+  function renderTabBody() {
+    ['intake', 'detection', 'audit'].forEach((t) => {
+      $(`cs-tab-${t}`).classList.toggle('hidden', t !== state.tab);
+    });
+    if (!state.subprofile_full) return;
+    const cat = state.subprofile_full.catalogue || {};
+    if (state.tab === 'intake') renderIntake(cat.intake_questions || [], cat.recommended_tasks || []);
+    if (state.tab === 'detection') renderUseCases('detection', cat.detection_use_cases || []);
+    if (state.tab === 'audit') renderUseCases('audit', cat.audit_use_cases || []);
+  }
+
+  function renderIntake(questions, tasks) {
+    const c = $('cs-tab-intake');
+    if (!questions.length && !tasks.length) {
+      c.innerHTML = '<div class="text-center py-12 text-slate-500 text-[13px]">No intake content yet for this sub-profile.</div>';
+      return;
+    }
+    let html = '';
+    if (questions.length) {
+      html += '<h3 class="text-white text-[16px] font-semibold mb-4">Intake questions</h3>';
+      html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8">';
+      questions.forEach((q, i) => {
+        html += `<div class="cs-q-card"><div class="cs-q-num">${i + 1}</div><div class="cs-q-text">${escapeHtml(q.text)}</div></div>`;
+      });
+      html += '</div>';
+    }
+    if (tasks.length) {
+      html += '<h3 class="text-white text-[16px] font-semibold mb-4">Recommended tasks</h3>';
+      html += '<ul class="space-y-2 text-[13px] text-slate-300 list-disc pl-5">';
+      tasks.forEach((t) => { html += `<li>${escapeHtml(t)}</li>`; });
+      html += '</ul>';
+    }
+    c.innerHTML = html;
+  }
+
+  function renderUseCases(kind, ucs) {
+    const c = $(`cs-tab-${kind}`);
+    if (!ucs.length) {
+      c.innerHTML = `<div class="col-span-full text-center py-12 text-slate-500 text-[13px]">No ${kind} use cases yet for this sub-profile.</div>`;
+      return;
+    }
+    c.innerHTML = '';
+    ucs.forEach((uc) => {
+      const card = document.createElement('div');
+      const isActive = state.uc_id === uc.id;
+      card.className = 'cs-uc-card' + (isActive ? ' is-active' : '');
+      const risk = (uc.risk || 'medium').toLowerCase();
+      const mitre = (uc.mitre_ids || []).slice(0, 4).map(escapeHtml).join(' · ');
+      const compliance = (uc.compliance_frames || []).slice(0, 3).map(escapeHtml).join(' · ');
+      card.innerHTML = `
+        <div class="cs-uc-stripe risk-${escapeHtml(risk)}"></div>
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div class="cs-uc-title">${escapeHtml(uc.title || '')}</div>
+          <span class="cs-uc-mini-pill">${escapeHtml(risk.toUpperCase())}</span>
+        </div>
+        <div class="cs-uc-summary">${escapeHtml(uc.summary || '')}</div>
+        <div class="cs-uc-pills">
+          ${mitre ? `<span class="cs-uc-mini-pill">MITRE · ${mitre}</span>` : ''}
+          ${compliance ? `<span class="cs-uc-mini-pill">${compliance}</span>` : ''}
+        </div>
+      `;
+      card.onclick = () => selectUseCase(uc.id);
+      c.appendChild(card);
+    });
+  }
+
+  // ---- Drawer ------------------------------------------------------------
+  function selectUseCase(uc_id) {
+    state.uc_id = uc_id;
+    renderDrawer();
+    document.querySelectorAll('.cs-uc-card').forEach((c) => c.classList.remove('is-active'));
+    writeUrl();
+    // Re-render the active tab body to mark the card
+    renderTabBody();
+    // Smooth-scroll to the drawer
+    setTimeout(() => $('cs-drawer').scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+  }
+  function renderDrawer() {
+    const drawer = $('cs-drawer');
+    if (!state.subprofile_full || !state.uc_id) {
+      drawer.classList.add('hidden');
+      return;
+    }
+    const cat = state.subprofile_full.catalogue || {};
+    let uc = (cat.detection_use_cases || []).find((u) => u.id === state.uc_id);
+    let kind = 'detection';
+    if (!uc) {
+      uc = (cat.audit_use_cases || []).find((u) => u.id === state.uc_id);
+      kind = 'audit';
+    }
+    if (!uc) { drawer.classList.add('hidden'); return; }
+
+    const lang = uc.logic_lang || 'esql';
+    const mitre = (uc.mitre_ids || []).map((m) =>
+      `<a href="https://attack.mitre.org/techniques/${encodeURIComponent(m.replace('.', '/'))}/" target="_blank" rel="noopener" class="cs-uc-mini-pill hover:bg-ion-iris/20 hover:text-ion-iris">${escapeHtml(m)}</a>`
+    ).join(' ');
+    const compliance = (uc.compliance_frames || []).map((c) =>
+      `<span class="cs-uc-mini-pill">${escapeHtml(c)}</span>`
+    ).join(' ');
+    const refs = (uc.references || []).map((r) =>
+      `<li><a href="${escapeHtml(r.url || '#')}" target="_blank" rel="noopener" class="text-ion-cyan hover:underline">${escapeHtml(r.title || r.url || 'reference')}</a></li>`
+    ).join('');
+    const tideRules = (uc.tide_rule_ids || []);
+    const playbookId = uc.soar_playbook_id || null;
+    const tideStubBtn = tideRules.length ? '' : `
+      <button id="cs-stub-btn" class="inline-flex items-center justify-center w-full h-9 px-3 rounded-md bg-ion-cyan/15 text-ion-cyan hover:bg-ion-cyan/25 border border-ion-cyan/30 text-[12px] font-semibold transition">
+        Generate TIDE rule stub
+      </button>`;
+
+    drawer.classList.remove('hidden');
+    drawer.innerHTML = `
+      <div class="flex items-start justify-between gap-4 mb-5">
+        <div>
+          <div class="label-tiny text-slate-500 mb-1">${kind.toUpperCase()} · ${escapeHtml((uc.risk || 'medium').toUpperCase())}</div>
+          <h3 class="text-white text-[20px] font-semibold">${escapeHtml(uc.title || '')}</h3>
+          <p class="text-[13px] text-slate-400 mt-1 max-w-3xl">${escapeHtml(uc.description || uc.summary || '')}</p>
+        </div>
+        <button onclick="window.csCloseDrawer()" class="text-slate-500 hover:text-slate-200" title="Close">
+          <svg class="w-5 h-5"><use href="#i-x"/></svg>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="lg:col-span-2">
+          <div class="label-tiny text-slate-500 mb-2">Logic &amp; thresholds (${escapeHtml(lang)})</div>
+          <pre class="cs-drawer-code">${escapeHtml(uc.logic_snippet || '— no logic snippet —')}</pre>
+        </div>
+        <div class="space-y-4">
+          <div class="rounded-lg border border-white/10 bg-ink-950/40 p-4">
+            <div class="label-tiny text-slate-500 mb-2">SOAR playbook</div>
+            ${playbookId
+              ? `<a href="/playbooks?q=${encodeURIComponent(playbookId)}" class="text-[13px] text-ion-lime hover:underline">${escapeHtml(playbookId)}</a>`
+              : `<div class="text-[12px] text-slate-500 italic">Not yet built</div>`}
+          </div>
+          <div class="rounded-lg border border-white/10 bg-ink-950/40 p-4">
+            <div class="label-tiny text-slate-500 mb-2">MITRE mapping</div>
+            <div class="flex flex-wrap gap-1.5">${mitre || '<span class="text-[12px] text-slate-500 italic">None</span>'}</div>
+          </div>
+          ${kind === 'audit' ? `
+          <div class="rounded-lg border border-white/10 bg-ink-950/40 p-4">
+            <div class="label-tiny text-slate-500 mb-2">Compliance frames</div>
+            <div class="flex flex-wrap gap-1.5">${compliance || '<span class="text-[12px] text-slate-500 italic">None</span>'}</div>
+          </div>` : ''}
+          <div class="rounded-lg border border-white/10 bg-ink-950/40 p-4">
+            <div class="label-tiny text-slate-500 mb-2">TIDE rules</div>
+            ${tideRules.length
+              ? '<ul class="space-y-1 text-[12px]">' + tideRules.map((id) => `<li><a href="/detection-engineering?q=${encodeURIComponent(id)}" class="text-ion-cyan hover:underline">${escapeHtml(id)}</a></li>`).join('') + '</ul>'
+              : tideStubBtn}
+          </div>
+        </div>
+      </div>
+
+      ${refs ? `
+        <div class="mt-6">
+          <div class="label-tiny text-slate-500 mb-2">References</div>
+          <ul class="list-disc pl-5 space-y-1 text-[12px]">${refs}</ul>
+        </div>` : ''}
+    `;
+
+    if (!tideRules.length) {
+      const btn = $('cs-stub-btn');
+      if (btn) btn.onclick = generateTideStub;
+    }
+  }
+
+  window.csCloseDrawer = function () {
+    state.uc_id = null;
+    $('cs-drawer').classList.add('hidden');
+    document.querySelectorAll('.cs-uc-card').forEach((c) => c.classList.remove('is-active'));
+    writeUrl();
+  };
+
+  // ---- TIDE stub ---------------------------------------------------------
+  async function generateTideStub() {
+    if (!state.subprofile_full || !state.uc_id) return;
+    const btn = $('cs-stub-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+    try {
+      const r = await fetch(`/api/cyab/studio/use-cases/${encodeURIComponent(state.uc_id)}/tide-stub`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subprofile_id: state.sub_id }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        alert('TIDE stub failed: ' + (err.detail || r.statusText));
+        if (btn) { btn.disabled = false; btn.textContent = 'Generate TIDE rule stub'; }
+        return;
+      }
+      // Reload the sub-profile so the new tide_rule_id is reflected
+      await selectSubprofile(state.sub_id, /*from_url=*/true);
+    } catch (e) {
+      alert('TIDE stub error: ' + e.message);
+      if (btn) { btn.disabled = false; btn.textContent = 'Generate TIDE rule stub'; }
+    }
+  }
+
+  // ---- Onboarding Pack ---------------------------------------------------
+  $('cs-pack-btn').onclick = () => {
+    const id = parseInt($('cs-pack-system').value, 10);
+    if (!id) { alert('Enter a system ID first.'); return; }
+    window.open(`/api/cyab/studio/systems/${id}/onboarding-pack`, '_blank');
+  };
+
+  // ---- Wire tab buttons --------------------------------------------------
+  document.querySelectorAll('.cs-tab').forEach((t) => {
+    t.onclick = () => selectTab(t.dataset.tab);
+  });
+
+  // ---- Helpers -----------------------------------------------------------
+  function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[c]);
+  }
+
+  // ---- Init --------------------------------------------------------------
+  readUrl();
+  loadPillars();
+
+  window.addEventListener('popstate', () => {
+    readUrl();
+    if (state.pillar_id) selectPillar(state.pillar_id, /*from_url=*/true);
+  });
+})();
+</script>
+{% endblock %}
