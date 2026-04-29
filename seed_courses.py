@@ -18677,7 +18677,867 @@ Module 4 picks up: **Telemetry quality assessment** — the engineering side of 
         points=2,
     )
 
-    print(f"  L3: {course.title} — 3 modules, 24 lessons (Module 3 Caldera operations @ proper depth)")
+    # ── Module 4 — Telemetry quality assessment ───────────────────────
+    mod4 = _add_module(
+        session, course, order=4,
+        title="Telemetry quality assessment — the engineering side of detection",
+        description_md=(
+            "M1-M3 covered *how to emulate*; M4 covers *whether the "
+            "telemetry can see it*. The technique → telemetry "
+            "contract: every ATT&CK technique has expected fingerprint "
+            "fields the L3 audits before trusting any detection. "
+            "Field-coverage audits, parser-health monitoring beyond "
+            "pass/fail, the Detection-Maturity Model (DML-0 to DML-9) "
+            "rating per-technique, and the schema-debt backlog as a "
+            "first-class queue alongside detection-eng / SIEM-team / "
+            "platform queues. Includes a Sysmon-coverage audit against "
+            "the canonical SwiftOnSecurity / Olaf Hartong baselines, "
+            "and the quarterly fleet-wide gap audit that drives "
+            "leadership reporting."
+        ),
+        estimated_minutes=240,
+    )
+
+    # Lesson 4.1 — Technique → telemetry contract
+    m4l1 = _add_lesson(
+        session, mod4, order=1,
+        title="The technique → telemetry contract: fingerprint fields per ATT&CK technique",
+        lesson_type=LessonType.READING, duration_min=22,
+        content_md="""
+> **Learning objectives.**
+> 1. Recite the **technique → telemetry contract**: every ATT&CK technique has expected fingerprint fields
+> 2. List fingerprint fields for **T1059.001 / T1003.001 / T1078.004 / T1071.004**
+> 3. Recognise **uncatchable techniques** — when fingerprint fields are missing on the estate
+> 4. Run a pre-emulation **field-readiness check** before trusting any detection result
+
+## What the contract says
+
+Every ATT&CK technique has *fingerprint fields* — specific ECS fields whose presence and value are what makes the technique detectable. The contract is implicit in detection rules but explicit in the L3's mental model:
+
+> A rule that fires on T1059.001 reads `process.command_line`. If `process.command_line` is null on this estate, T1059.001 is uncatchable here, regardless of how good the rule is.
+
+The L3's reflex: before running an emulation, list the expected fingerprint fields. After running, verify they were populated. If they weren't, the gap isn't with detection — it's with telemetry, and the right backlog is *schema-debt* (M4.5), not detection-eng.
+
+## Worked: T1059.001 (PowerShell)
+
+Fingerprint fields:
+
+| Field | Why |
+|---|---|
+| `process.name == "powershell.exe"` | The launching binary |
+| `process.parent.name` | Spawning context (mshta? explorer? Outlook?) |
+| `process.command_line` | The encoded payload — load-bearing for nearly every PowerShell rule |
+| `process.executable` | Full path; baseline against `C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe` |
+| `event.action == "process-started"` (or `winlog.event_id == "4688"` on Windows Security log, or `winlog.event_id == "1"` on Sysmon) | The event class |
+| `host.name`, `user.name` | Attribution |
+
+If `process.command_line` is null on this estate, T1059.001 is uncatchable. The atomic ran; the SIEM saw a process spawn but couldn't read the payload. Common cause: `ProcessCreationIncludeCmdLine_Enabled` registry switch isn't set; or Sysmon config doesn't include CommandLine in EventID 1.
+
+## Worked: T1003.001 (LSASS Memory Dump)
+
+Fingerprint fields:
+
+| Field | Why |
+|---|---|
+| `winlog.event_id == "10"` (Sysmon ProcessAccess) | The detection signal |
+| `process.target.name` (or `winlog.event_data.TargetImage`) — should match `lsass.exe` | Targeting LSASS specifically |
+| `process.name` (the accessor — Mimikatz, ProcDump, etc.) | Source attribution |
+| `winlog.event_data.GrantedAccess` (`0x1010`, `0x1410`, `0x143A`) | The high-leverage bitmask |
+| `process.command_line` (the accessor's args) | Disambiguator vs benign EDR |
+
+If Sysmon EventID 10 isn't enabled, T1003.001 is uncatchable. Many estates enable EventID 1 (process create) but not EventID 10 (process access) — the result is *can't see LSASS access*; M4.6 covers the Sysmon config audit that surfaces this.
+
+## Worked: T1078.004 (Cloud Account)
+
+Fingerprint fields:
+
+| Field | Why |
+|---|---|
+| `event.dataset == "azure.signinlogs"` | The data source |
+| `azure.signinlogs.properties.user_principal_name` | Who |
+| `azure.signinlogs.properties.app_display_name` | What app the auth was against |
+| `azure.signinlogs.properties.risk_level_aggregated` | Entra's risk classification |
+| `source.ip`, `source.geo.country_iso_code` | Geo context |
+| `user_agent.original` | Client fingerprint |
+
+If `azure.signinlogs.properties.risk_level_aggregated` isn't populated, the M6 / M7 rules that key on it can't fire. Common cause: Entra licence doesn't include risk-based authentication; the field is populated only when the licence supports it.
+
+## Worked: T1071.004 (DNS C2)
+
+Fingerprint fields:
+
+| Field | Why |
+|---|---|
+| `event.dataset == "zeek.dns"` (or equivalent) | The data source |
+| `dns.question.name`, `dns.question.type` | The query |
+| `dns.question.registered_domain` | Aggregation key |
+| `dns.question.registered_domain.entropy` (custom — pre-computed at ingest) | DGA signal |
+| `dns.response_code` | NXDOMAIN class |
+| `source.ip` | Aggregation key |
+
+The entropy field is the example from M7 L7.5 — it's a *runtime field* on some estates, *pre-computed at ingest* on others, *missing entirely* on third. The L3 audits this before relying on the M7 DGA hunts.
+
+## Pre-emulation field-readiness check
+
+Before running an atomic, the L3 confirms the fingerprint fields are populated on the test host:
+
+```esql
+FROM logs-windows.security-* | WHERE host.name == "PT-LAB-04" AND @timestamp > NOW() - 7d
+| STATS total = COUNT(*),
+        with_cmdline = COUNT(WHERE process.command_line IS NOT NULL),
+        with_user = COUNT(WHERE user.name IS NOT NULL),
+        with_parent = COUNT(WHERE process.parent.name IS NOT NULL)
+| EVAL cmdline_pct = with_cmdline * 100 / total,
+       user_pct = with_user * 100 / total,
+       parent_pct = with_parent * 100 / total
+```
+
+Pass/fail thresholds (M4.2 covers in detail):
+- ≥ 95% populated: pass.
+- 50-95%: parser concern; investigate before relying on the field.
+- < 50%: parser broken; ship the schema-debt entry first, then run the emulation.
+
+## Glossary
+
+- **Technique → telemetry contract** — implicit pre-condition that fingerprint fields are populated before detection can fire.
+- **Fingerprint field** — ECS field whose presence/value is load-bearing for detecting a technique.
+- **Uncatchable** — technique whose fingerprint fields aren't populated on the estate; rules can't fire regardless of authoring quality.
+- **Pre-emulation readiness check** — query the fingerprint fields on the test host before trusting any test result.
+
+## Further reading
+
+- ECS reference — https://www.elastic.co/guide/en/ecs/current/.
+- ATT&CK technique pages — *Detection* section per technique lists the canonical telemetry sources.
+""",
+    )
+    _add_q(session, m4l1, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="An L3 wants to detect T1003.001 (LSASS Memory Dump) on Windows. Beyond `process.target.name = lsass.exe`, what's the **single most-load-bearing Sysmon Event ID** the estate must be capturing? Format: a single integer.",
+        options=None,
+        correct=[
+            "10",
+            "EventID 10",
+            "Event 10",
+            "Sysmon 10",
+        ],
+        explanation_md="**Sysmon EventID 10** (ProcessAccess) is the load-bearing event. It fires when one process opens a handle to another with elevated access rights; on LSASS, the `GrantedAccess` field carries the bitmask (`0x1010`, `0x1410`, `0x143A`) that distinguishes credential-dumping access from benign queries. Many estates enable EventID 1 (ProcessCreate) — which is necessary but not sufficient — and forget EventID 10. Without it, T1003.001 is *uncatchable*: the SIEM sees Mimikatz spawn (EventID 1) but doesn't see the LSASS access; rules that key on `winlog.event_id: 10 AND process.target.name: \"lsass.exe\"` find nothing. M4.6 covers the Sysmon-config audit against the SwiftOnSecurity / Olaf Hartong baselines that surface exactly this kind of gap.",
+        points=2,
+    )
+
+    # Lesson 4.2 — Field-coverage audit
+    m4l2 = _add_lesson(
+        session, mod4, order=2,
+        title="Running a field-coverage audit: pass/fail thresholds + ES|QL",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Build a **field-coverage query** in ES&#124;QL across a population
+> 2. Apply the **three-band threshold**: ≥ 95% pass, 50-95% concern, < 50% broken
+> 3. Differentiate **field-missing** from **field-empty-but-present**
+> 4. Schedule the audit on a **rolling 7-day window** for trend signal
+
+## The audit's shape
+
+For each fingerprint field on a population:
+1. Count total events.
+2. Count events with the field non-null.
+3. Compute populated-percentage = (non-null / total) × 100.
+
+The L3's reflex: any fingerprint field below 95% population is a coverage concern.
+
+## ES|QL skeleton
+
+```esql
+FROM winlogbeat-*
+| WHERE host.name == "PT-LAB-04"
+  AND @timestamp > NOW() - 7d
+  AND winlog.event_id == "1"  // Sysmon process create
+| STATS total = COUNT(*),
+        with_cmdline = COUNT(WHERE process.command_line IS NOT NULL),
+        with_user = COUNT(WHERE user.name IS NOT NULL),
+        with_parent = COUNT(WHERE process.parent.name IS NOT NULL),
+        with_hash = COUNT(WHERE process.hash.sha256 IS NOT NULL)
+| EVAL cmdline_pct = with_cmdline * 100 / total,
+       user_pct = with_user * 100 / total,
+       parent_pct = with_parent * 100 / total,
+       hash_pct = with_hash * 100 / total
+```
+
+The output:
+
+| Total | with_cmdline | with_user | with_parent | with_hash | cmdline_pct | user_pct | parent_pct | hash_pct |
+|---|---|---|---|---|---|---|---|---|
+| 12,478 | 11,938 | 12,478 | 12,401 | 8,234 | **96** | 100 | 99 | **66** |
+
+Reading: cmdline pass (96 ≥ 95), user pass, parent pass, hash **concern** (66 ∈ 50-95).
+
+## The three-band threshold
+
+| Band | Range | Meaning | Action |
+|---|---|---|---|
+| **Pass** | ≥ 95% populated | Field is reliable | Trust rules that key on it |
+| **Concern** | 50-95% populated | Parser issue; some events missing the field | Investigate before relying on it |
+| **Broken** | < 50% populated | Parser broken or wrong source | Schema-debt backlog entry; don't trust rules |
+
+The 95% threshold isn't arbitrary — at lower populations, rules that key on the field have a non-trivial silent-miss rate. The L3 errs on the side of *raise the schema-debt entry* when in doubt.
+
+## Field-missing vs field-empty-but-present
+
+ES|QL's `IS NOT NULL` catches both *missing* and *empty string* values when the parser uses a strict-null mapping. But some parsers emit `""` for missing values; counts those as populated when they should count as missing.
+
+The fix: use `IS NOT NULL AND <field> != ""`:
+
+```esql
+| STATS with_cmdline = COUNT(WHERE process.command_line IS NOT NULL AND process.command_line != "")
+```
+
+For `keyword` ECS fields, the empty-string variant is uncommon but worth checking. The L3 inspects parser config when the audit shows >95% non-null but the SIEM rules are still failing — usually empty-string values are the cause.
+
+## Rolling 7-day window for trend
+
+A one-shot audit is a snapshot. The trend signal — is the field's population stable, dropping, or oscillating — comes from running the audit on a rolling 7-day window every day, charting the resulting percentages.
+
+ES|QL with daily buckets:
+
+```esql
+FROM winlogbeat-* | WHERE @timestamp > NOW() - 30d
+| EVAL day = DATE_TRUNC(1day, @timestamp)
+| STATS total = COUNT(*),
+        with_cmdline = COUNT(WHERE process.command_line IS NOT NULL)
+        BY day
+| EVAL pct = with_cmdline * 100 / total
+| SORT day
+```
+
+Output: 30 daily rows. Plot in Lens / Vega; eyeball drift. A drop from 95% → 70% over 3 days is a parser issue that just landed; raise on the parser-team backlog same-day.
+
+## Pre-emulation readiness vs ongoing audit
+
+Two distinct uses:
+
+- **Pre-emulation**: before running an atomic, run the audit on the *test host* for *the past week* to confirm fingerprint fields are healthy. Eliminates ambiguous test results.
+- **Ongoing**: run the audit on the *fleet* for *trend signal*. Surface drift as it appears; don't wait for an emulation to discover a 3-week-old parser regression.
+
+Both are mandatory in a mature program.
+
+## Glossary
+
+- **Field-coverage audit** — query for percentage-populated of fingerprint fields.
+- **Three-band threshold** — pass / concern / broken at 95% / 50-95% / < 50%.
+- **Field-missing vs field-empty** — distinguish via `IS NOT NULL AND != ""`.
+- **Rolling 7-day window** — daily buckets for drift detection.
+
+## Further reading
+
+- ES|QL reference — https://www.elastic.co/guide/en/elasticsearch/reference/current/esql.html.
+- ECS reference — field types and null-handling conventions.
+""",
+    )
+    _add_q(session, m4l2, order=1, kind=QuestionKind.SINGLE,
+        stem_md="An L3's field-coverage audit shows `process.command_line` populated on **70%** of Sysmon EventID 1 events for host PT-LAB-04 over the last 7 days. Where does this fall in the three-band threshold, and what's the right action?",
+        options=[
+            {"value": "pass", "label": "Pass (≥ 95%) — trust rules that key on `process.command_line`"},
+            {"value": "concern", "label": "Concern (50-95%) — investigate the parser before relying on the field; some events missing the field would cause silent rule misses"},
+            {"value": "broken", "label": "Broken (< 50%) — raise a schema-debt backlog entry immediately and don't trust any rules until fixed"},
+            {"value": "ignore", "label": "Ignore — `process.command_line` isn't required for any rules"},
+        ],
+        correct="concern",
+        explanation_md="**Concern (50-95% band).** 70% population means 30% of events are missing the field. Rules keyed on `process.command_line` have a 30% silent-miss rate on this host — a real adversary's PowerShell-encoded command might not be caught even when the rule is well-authored. The L3's right action: investigate before trusting. Likely causes: `ProcessCreationIncludeCmdLine_Enabled` registry switch isn't set on the host (Windows Security log gap); or Sysmon config doesn't include CommandLine in EventID 1; or some processes execute under a context where Sysmon doesn't capture (rare but possible). The fix lives with the SIEM-team or platform team; the L3 raises the backlog entry. The 95% threshold isn't arbitrary — at 70% the silent-miss rate is unmanageable for production rules.",
+        points=2,
+    )
+
+    # Lesson 4.3 — Parser health beyond pass/fail
+    m4l3 = _add_lesson(
+        session, mod4, order=3,
+        title="Parser health beyond pass/fail: ingest failures, drift, schema-version regressions",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Monitor **`ingest.failed_documents`** per data stream over time
+> 2. Recognise **field-population drift** as a leading indicator of parser regression
+> 3. Detect **schema-version regressions** — parser bumps that break downstream rules
+> 4. Build a **parser-health dashboard** the L3 reviews weekly
+
+## Ingest-failed-documents
+
+Elastic's ingest pipelines emit a counter when a document fails to parse — typically because the source format doesn't match the parser's expectations.
+
+KQL on the ingest-stats data:
+
+```kql
+event.dataset: "ingest_pipeline_stats"
+| stats failed_pct = sum(failed) / sum(input) by data_stream
+| where failed_pct > 0.001
+| sort failed_pct desc
+```
+
+A data stream with > 0.1% failed documents in the last 30 days fails G1 (M2-L8 cross-link to L2 M8 Hunt-to-Detection's G1 — data quality). The L3's table:
+
+| data_stream | input | failed | failed_pct |
+|---|---|---|---|
+| logs-windows.security-* | 12.4M | 8.2K | **0.066%** ← warning band |
+| logs-network.firewall-* | 84M | 124K | **0.148%** ← above threshold |
+| logs-azure.signinlogs-* | 1.2M | 980 | **0.082%** |
+
+`logs-network.firewall-*` is the failing stream — investigate the parser. Likely culprits: vendor format change, Beats version mismatch, custom-pipeline regression.
+
+## Field-population drift
+
+Per-field, per-day, plot the population percentage over 30 days. Drift signals:
+
+- **Step-cliff drop** (95% → 60% on one day) → parser regression that landed that day; correlate with deploy logs.
+- **Slow drop** (95% → 80% over a month) → cumulative drift; possibly a fleet of hosts that lost the registry / Sysmon-config setting.
+- **Oscillation** (75% ± 10%) → load-balancer / multiple-parser inconsistency; one parser path populates, another doesn't.
+
+The L3 reviews the field-population dashboard weekly. Drift signals get raised before the SIEM rules silently miss anything important.
+
+## Schema-version regressions
+
+A parser update bumps an ECS field name (or moves a value to a new path). Downstream rules that key on the old name break — silently. The detection: field-population zero-cliff after a known parser-version bump.
+
+ES|QL skeleton for detecting:
+
+```esql
+FROM winlogbeat-* | WHERE @timestamp > NOW() - 30d
+| EVAL day = DATE_TRUNC(1day, @timestamp)
+| STATS with_cmdline = COUNT(WHERE process.command_line IS NOT NULL),
+        total = COUNT(*) BY day
+| EVAL pct = with_cmdline * 100 / total
+| SORT day
+```
+
+A row showing 95% on day N-1 and 0% on day N is a schema regression. Cross-reference the deploy log; confirm what changed; either roll back or update downstream rules to the new field name.
+
+The 8.x ECS field renames are the load-bearing example (M2 L8 Lesson 2 covered the canonical breakages: `source.user.name` → `user.name`, `event.original` content shifts, etc.).
+
+## The parser-health dashboard
+
+The L3's weekly dashboard has these tiles:
+
+1. **Ingest-failed-documents heatmap** — data streams × last 30 days, with the > 0.1% band highlighted.
+2. **Field-population trend** — top 20 fingerprint fields × last 30 days, with drift signals annotated.
+3. **Recent deploys** — what parser / Beats / Agent / pipeline change landed when (manual feed from change management).
+4. **Open schema-debt items** — backlog snapshot.
+
+Reviewed weekly — typically 30-60 minutes for the L3. Drift signals get tickets same-day; chronic items get added to the backlog.
+
+## Glossary
+
+- **Ingest-failed-documents** — counter per data stream of documents that failed parser; > 0.1% is alert-class.
+- **Field-population drift** — per-field percentage trending over time; step-cliffs are regressions.
+- **Schema-version regression** — parser bump that breaks downstream rules silently.
+- **Parser-health dashboard** — weekly review surface; combines failed-docs + drift + deploy log + backlog.
+
+## Further reading
+
+- Elastic ingest pipeline docs — `_simulate` API for testing pipeline changes pre-deploy.
+- ECS CHANGELOG — every release notes field renames + value-shape changes.
+""",
+    )
+    _add_q(session, m4l3, order=1, kind=QuestionKind.MULTI,
+        stem_md="Which of the following are *valid* parser-health drift signals the L3 should review weekly?",
+        options=[
+            {"value": "cliff", "label": "**Step-cliff drop** in field-population (95% → 60% in one day)"},
+            {"value": "slow_drop", "label": "**Slow drop** in field-population over a month (95% → 80%)"},
+            {"value": "oscillation", "label": "**Oscillation** (75% ± 10%) — multiple-parser inconsistency"},
+            {"value": "failed_pct", "label": "`ingest.failed_documents` > 0.1% on a data stream"},
+            {"value": "deploy_correlation", "label": "Field-population zero after a known parser deploy"},
+            {"value": "alphabetical", "label": "Field names in alphabetical order"},
+            {"value": "name_length", "label": "Field name length increasing"},
+        ],
+        correct=["cliff", "slow_drop", "oscillation", "failed_pct", "deploy_correlation"],
+        explanation_md="The five valid signals are: step-cliff drops (regression that landed), slow drops (cumulative drift / fleet-config decay), oscillation (parser inconsistency), `ingest.failed_documents` > 0.1% (parser broken), and field-population zero post-deploy (schema-version regression). Field-name alphabetisation and name-length growth are nonsensical — neither correlates with parser health. The L3's weekly dashboard checks each of the five real signals; drift gets tickets same-day, chronic items go to the schema-debt backlog (M4.5).",
+        points=3,
+    )
+
+    # Lesson 4.4 — DML
+    m4l4 = _add_lesson(
+        session, mod4, order=4,
+        title="Detection-Maturity Levels: DML-0 to DML-9 per technique",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Recite Florian Roth's **Detection-Maturity Model** levels DML-0 through DML-9
+> 2. Rate per-technique DML for the SOC's current rule set
+> 3. Build a **DML heatmap** across the threat profile
+> 4. Use DML to drive prioritisation: which gaps matter most
+
+## The model
+
+Florian Roth's Detection-Maturity Model (DML) ranks detection capability per technique. Higher number = higher maturity = harder for adversary to evade.
+
+| Level | Detection class | Example |
+|---|---|---|
+| **DML-0** | None | No rule for this technique; adversary uses freely |
+| **DML-1** | Atomic indicator | Specific hash / IP / URL — easy to bypass (just change the indicator) |
+| **DML-2** | Tool-based | Catches a specific tool (Mimikatz binary hash); breaks when actor swaps tool |
+| **DML-3** | Procedure | Catches a specific actor's procedure (FIN6's exact mshta command) |
+| **DML-4** | TTP | Catches the technique class (any mshta launching PowerShell, regardless of payload) |
+| **DML-5** | Goals / strategy | Catches the campaign-level intent (chained sequence: spearphish → mshta → LSASS) |
+| **DML-6** | Strategy / TTP fusion | Combines TTP detection with intent / goal awareness |
+| **DML-7** | Campaign-aware | Knows which actors are active and tailors detection |
+| **DML-8** | Intent-aware | Predicts based on actor goals + observed activity |
+| **DML-9** | Predictive | Anticipates next-actor-move before it happens |
+
+Most production SOCs achieve DML-2 to DML-4 across their threat profile. DML-5+ is hard and expensive; it requires CTI integration + bespoke rule authoring per actor.
+
+## Per-technique rating
+
+The L3 rates each technique in the threat profile against the current rule set:
+
+| Technique | Profile-priority | Current rule | DML | Pillar |
+|---|---|---|---|---|
+| T1059.001 (PowerShell) | High | "Suspicious -enc PowerShell" matches base64 patterns | **DML-4** | TTP |
+| T1003.001 (LSASS dump) | High | "Mimikatz hash list" matches known hashes | **DML-2** | Tool |
+| T1078.004 (Cloud account) | High | (no rule) | **DML-0** | None |
+| T1110.003 (Spray) | High | "Multiple failed logons per source IP" threshold | **DML-4** | TTP |
+| T1071.004 (DNS C2) | Medium | "Beacon CV" rule (M7 L7.3) | **DML-4** | TTP |
+
+The pattern: DML-2 (tool-based) is fragile — when the actor swaps to a different binary, the rule misses. DML-4 (TTP) is more durable. The L3's prioritisation: lift any DML-2 to DML-4, and any DML-0 to at least DML-2.
+
+## DML heatmap across the threat profile
+
+Aggregate per-actor:
+
+| Actor | Tactic | Coverage |
+|---|---|---|
+| FIN6 | Initial Access | DML-2 |
+| FIN6 | Execution | DML-4 |
+| FIN6 | Credential Access | DML-2 |
+| FIN6 | Lateral Movement | DML-1 ← gap |
+| FIN6 | Collection | DML-0 ← gap |
+| FIN6 | Impact | DML-3 |
+
+Reading: FIN6 lateral and collection coverage is the lowest-DML class — those are the tactics where this SOC is most exposed. The next quarter's purple-team calendar should target T1021.* (lateral) and T1005 / T1213 (collection).
+
+The DML heatmap is the L3's *prioritisation tool*. It bridges the *what's covered* question (telemetry + rules) with *what matters* (threat profile).
+
+## When to rate higher than DML-4
+
+DML-5+ requires *campaign awareness*. The rule fires not on a single TTP but on a *sequence* — the M6 capstone EQL `sequence by user.target.name with maxspan=2h` covering the AiTM-to-BEC chain is exactly this. That rule, by itself, is DML-5: it catches the campaign-level intent across multiple TTPs.
+
+Few rules clear DML-5; most are at DML-2 or DML-4. The L3's heatmap should label any DML-5+ rules explicitly so leadership knows where the SOC's deepest detection lives.
+
+## Glossary
+
+- **Detection-Maturity Model (DML)** — Florian Roth's per-technique ranking from DML-0 (none) to DML-9 (predictive).
+- **DML-2 (tool-based)** — fragile; actor swap breaks it.
+- **DML-4 (TTP)** — durable; catches the technique class.
+- **DML-5+ (campaign-aware)** — bridges multiple TTPs in a sequence.
+- **DML heatmap** — per-actor × per-tactic grid of current coverage.
+
+## Further reading
+
+- Florian Roth's DML model — https://detect.fyi/.
+- *The Pyramid of Pain* (David Bianco) — adjacent framework; ranks indicator types by adversary cost.
+""",
+    )
+    _add_q(session, m4l4, order=1, kind=QuestionKind.SINGLE,
+        stem_md="A SOC has a rule keyed on `process.hash.sha256 IN (<list of 47 known Mimikatz hashes>)`. The rule fires when one of those hashes runs. Rate this rule's **Detection-Maturity Level** per Florian Roth's DML model.",
+        options=[
+            {"value": "dml0", "label": "DML-0 — None"},
+            {"value": "dml1", "label": "DML-1 — Atomic indicator (specific hash / IP / URL)"},
+            {"value": "dml2", "label": "DML-2 — Tool-based (catches a specific tool)"},
+            {"value": "dml4", "label": "DML-4 — TTP (catches the technique class)"},
+        ],
+        correct="dml2",
+        explanation_md="**DML-2 — Tool-based.** The rule catches Mimikatz the *tool* — specifically, the 47 known hashes. It would catch any of the listed Mimikatz binaries. But it breaks the moment the actor swaps to ProcDump, comsvcs.dll, custom-compiled Mimikatz, or any new credential-dumping tool. DML-1 is even narrower (atomic indicator like *one* hash); this rule covers a list, but still tool-class. DML-4 (TTP) would be a rule keyed on the *technique* — e.g. Sysmon EventID 10 with `process.target.name == lsass.exe AND GrantedAccess IN (0x1010, 0x1410)` — that catches *any process accessing LSASS with credential-dump masks*, regardless of which tool. The L3's prioritisation reflex: lift this DML-2 rule to DML-4 by switching the rule body from hash-match to access-mask match (M7 / M8 detection-engineering work).",
+        points=2,
+    )
+
+    # Lesson 4.5 — Schema-debt backlog
+    m4l5 = _add_lesson(
+        session, mod4, order=5,
+        title="The schema-debt backlog: a fourth queue alongside detection-eng / SIEM-team / platform",
+        lesson_type=LessonType.READING, duration_min=18,
+        content_md="""
+> **Learning objectives.**
+> 1. Distinguish the **four backlogs**: detection-eng, SIEM-team, platform, schema-debt
+> 2. Author **schema-debt entries** with priority, dependencies, owner
+> 3. Recognise schema-debt as **upstream of detection-eng**: rules can't ship until telemetry is present
+> 4. Track schema-debt resolution as a **leadership KPI**
+
+## The four backlogs
+
+M1.6 introduced three tiers / three backlogs:
+
+| Tier | Backlog | Owner | Fix scope |
+|---|---|---|---|
+| 2 | Detection-eng | team-detection | Write or extend a rule |
+| 3 | SIEM-team | team-siem | Fix the parser / pipeline / Sysmon config |
+| 4 | Platform | team-platform | Roll out a new data source / agent |
+
+The **fourth backlog** — *schema-debt* — captures findings about telemetry that *should exist* and would enable detection but isn't yet provided by any layer. It's distinct from Tier-3 (where the data is logged but unparsed) and Tier-4 (where it's not logged at all).
+
+| Tier | Backlog | What's missing |
+|---|---|---|
+| Schema-debt | team-data-engineering / team-platform | A *new field* / *a new index pattern* that doesn't exist yet |
+
+Examples:
+- "Need entropy on `dns.question.registered_domain` pre-computed at ingest" (M7 L7.5 cross-link). The field doesn't exist; the parser doesn't compute it. Schema-debt: build the ingest processor.
+- "Need `process.command_line` populated on Estate-B Windows hosts" (Sysmon-config gap). The field is in the schema but the upstream estate doesn't populate it. Schema-debt: roll out Sysmon-config update via SCCM.
+- "Need `email.attachments.file.hash.sha256` from email gateway integration." The vendor's integration doesn't ship the field. Schema-debt: file with vendor or build a custom enrichment.
+
+## Schema-debt entry shape
+
+```yaml
+id: SD-2026-04-001
+title: Pre-compute Shannon entropy on dns.question.registered_domain at ingest
+priority: high
+owner: team-data-engineering
+dependent_rules:
+  - high-conf-dga-detection (planned for v0.13)
+  - dns-tunneling-volume (already shipped at DML-3; lifts to DML-4 with this field)
+estimated_effort: 5 days
+status: open
+notes: |
+  Currently runtime-field-only on Estate-A; null on Estate-B.
+  Build an ingest processor that pre-computes entropy at parse time;
+  deploy across both estates.
+```
+
+The dependent_rules list is load-bearing — it's how the L3 prioritises. A schema-debt entry that unblocks two production rules is higher priority than one that unblocks none.
+
+## Why schema-debt is upstream of detection-eng
+
+Rule-authoring depends on field-presence. The L3 can't ship a rule that keys on `dns.question.registered_domain.entropy > 3.7` if the field is null fleet-wide. The detection-eng team can't make progress until schema-debt clears.
+
+This makes schema-debt a *blocking dependency* for detection-eng. The right pattern: schema-debt items get raised by L3 (the analyst running the audit) and worked by data-engineering / platform; detection-eng tracks dependencies but doesn't fix the underlying.
+
+In practice this means schema-debt items are often prioritised lower than they should be — they're "boring infrastructure work" without the user-visible payoff of a new rule. The L3 has to advocate: *every detection rule we ship at DML-4 depends on the underlying telemetry being correct*.
+
+## Tracking schema-debt as a leadership KPI
+
+Headline metric: **open schema-debt count** + **average resolution time**.
+
+A SOC with 50 open schema-debt items and 6-month average resolution is bottlenecked at the platform layer. Detection-eng's productivity is capped by upstream telemetry. Lifting that cap is more leveraged than hiring more detection engineers.
+
+The quarterly review:
+- Schema-debt opened: 8.
+- Schema-debt closed: 5.
+- Average resolution time: 47 days.
+- Top-priority open: SD-2026-04-001 (DGA entropy).
+
+Trending: closure rate < open rate over multiple quarters → backlog is growing → escalate.
+
+## Glossary
+
+- **Schema-debt backlog** — fourth backlog; missing fields / indices that aren't yet provided.
+- **Dependent rules** — rules blocked by a schema-debt item.
+- **Upstream-of-detection-eng** — schema-debt blocks rule-authoring; can't ship rules without it.
+- **Schema-debt KPI** — open count + average resolution time; leadership review.
+
+## Further reading
+
+- ION's `TuningProposal` model (services/tuning_proposal_service.py) — captures schema-debt entries alongside detection / parser / agent fixes.
+- Elastic's *Custom Ingest Processor* docs — how data-engineering ships schema-debt fixes.
+""",
+    )
+    _add_q(session, m4l5, order=1, kind=QuestionKind.MULTI,
+        stem_md="The L3 finds during a quarterly audit that **`dns.question.registered_domain.entropy`** is null on every event across the estate, blocking the M7 L7.5 DGA hunt + an upcoming high-confidence DGA rule. Which **backlogs** are involved in resolving this, and in what role?",
+        options=[
+            {"value": "schema_debt_owner", "label": "**Schema-debt** — owns the fix (build the ingest processor that pre-computes entropy at parse time)"},
+            {"value": "detection_blocked", "label": "**Detection-eng** — blocked dependent; tracks the schema-debt item but cannot fix it directly"},
+            {"value": "data_engineering", "label": "**Data-engineering / platform** — owns the schema-debt item resolution (writes the processor, ships the parser update)"},
+            {"value": "siem_team_active", "label": "**SIEM-team** — actively fixes; this is a Tier-3 parser problem"},
+            {"value": "platform_active", "label": "**Platform** — rolls out a new agent; this is Tier-4"},
+        ],
+        correct=["schema_debt_owner", "detection_blocked", "data_engineering"],
+        explanation_md="The three correct answers: **schema-debt** owns the fix (the *missing field* is a schema-debt item, not a parser-broken Tier-3 nor an agent-missing Tier-4); **detection-eng** is the blocked dependent (their rules can't ship until the entropy field exists); **data-engineering / platform** is the resolution owner (they build the ingest processor and deploy it). SIEM-team and platform aren't *active* on this — the data is being parsed correctly (no Tier-3) and the data source (DNS logs) is being ingested (no Tier-4). The missing element is a *new field that doesn't exist yet at ingest time*; that's schema-debt's distinct pillar. The L3's reflex: when an audit surfaces a *missing field* (not a wrong-value or unparsed-content situation), route to schema-debt + data-engineering, not to detection-eng or SIEM-team.",
+        points=3,
+    )
+
+    # Lesson 4.6 — Sysmon coverage audit
+    m4l6 = _add_lesson(
+        session, mod4, order=6,
+        title="Sysmon coverage audit: SwiftOnSecurity vs Olaf Hartong baselines",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Pull the **deployed Sysmon config** from a representative host
+> 2. Diff against the **SwiftOnSecurity** or **Olaf Hartong sysmon-modular** baseline
+> 3. Categorise differences: *intentional org-tune* / *legacy* / *missing event class*
+> 4. Raise schema-debt entries for missing event classes
+
+## Why Sysmon is load-bearing
+
+Sysmon is the highest-value Windows-endpoint telemetry source for ATT&CK detection. The default Windows Security event log is sparse on detection-relevant fields; Sysmon adds:
+
+- ProcessAccess (EventID 10) — LSASS access detection.
+- DriverLoad / ImageLoad (EventID 6/7) — driver / DLL injection.
+- CreateRemoteThread (EventID 8) — process injection.
+- DnsQuery (EventID 22) — DNS-level visibility from the host.
+- WmiEventFilter / Consumer / Binding (EventID 19/20/21) — WMI persistence.
+
+If Sysmon is misconfigured, none of the rules keying on these EventIDs fire. The L3's audit catches the gap before an exercise discovers it.
+
+## Two canonical baselines
+
+| Baseline | Author | Style | When |
+|---|---|---|---|
+| **SwiftOnSecurity sysmon-config** | github.com/SwiftOnSecurity/sysmon-config | Single-file, opinionated, low-FP | Most production SOCs; battle-tested |
+| **Olaf Hartong sysmon-modular** | github.com/olafhartong/sysmon-modular | Modular per-technique | Mature SOCs that want technique-mapped tuning |
+
+Olaf's modular structure is more verbose (more events captured) but more granular per-technique. SwiftOnSecurity's single-file is simpler and closer to "deploy and forget."
+
+For first-time deployments, the L3 typically picks SwiftOnSecurity's config as the *floor* and overlays Olaf's modules for high-value areas (process injection, WMI, DNS).
+
+## Pulling the deployed config
+
+On a representative Windows host, run as admin:
+
+```cmd
+sysmon -c
+```
+
+This dumps the active config to stdout. Capture for the audit:
+
+```cmd
+sysmon -c > C:\\Temp\\sysmon-current.xml
+```
+
+Some Sysmon deployments use a config-deployment tool (SCCM, Intune, GPO) that pushes the same config to every host. The L3 audits a representative sample (5-10 hosts across different OUs) to confirm consistency; outliers indicate the deployment tool isn't reaching everywhere.
+
+## Diffing against the baseline
+
+Manual diff for first-time audits:
+
+```bash
+# Pull baseline
+curl -s https://raw.githubusercontent.com/SwiftOnSecurity/sysmon-config/master/sysmonconfig-export.xml > baseline.xml
+
+# Diff (XML-aware)
+xmldiff sysmon-current.xml baseline.xml > diff.txt
+
+# Or a textual diff for a quick view
+diff sysmon-current.xml baseline.xml
+```
+
+For ongoing audits, ship a script that runs weekly and posts the diff to the schema-debt backlog when it detects drift.
+
+## Categorising differences
+
+| Category | What it means | Action |
+|---|---|---|
+| **Intentional org-tune** | Local exclusion (e.g. "EXCLUDE EDR-vendor process") | Document in `sysmon-config.org-overrides.md`; keep |
+| **Legacy** | Pre-baseline version that hasn't been updated | Plan migration to current baseline |
+| **Missing event class** | Whole EventID class absent (e.g. EventID 8 not enabled) | Schema-debt entry; high priority if it blocks rules |
+
+The third category is the load-bearing one — missing EventID 8 means *no process-injection detection on this host*, regardless of how good the rules are.
+
+## Worked: a host missing EventID 8 (CreateRemoteThread)
+
+The L3's audit shows host `PT-LAB-04`'s Sysmon config doesn't include EventID 8. Cross-reference: the SOC has 3 rules that key on EventID 8 (process injection / Mimikatz remote-thread / shellcode-loader). All three are silent on this host.
+
+Schema-debt entry:
+
+```yaml
+id: SD-2026-04-002
+title: Enable Sysmon EventID 8 (CreateRemoteThread) on Windows fleet
+priority: critical
+owner: team-platform
+dependent_rules:
+  - process-injection-rule (DML-4)
+  - mimikatz-remote-thread-rule (DML-3)
+  - shellcode-loader-rule (DML-3)
+estimated_effort: 2 days
+status: open
+notes: |
+  Current config is pre-baseline; updating to SwiftOnSecurity v85+
+  enables EventID 8 by default. Roll out via SCCM; validate on
+  10% of fleet first, then 100%.
+```
+
+Once SCCM lands the update, re-audit: confirm EventID 8 events appearing in winlogbeat-*, then run T1055 (process injection) ART atomic to validate the detection chain.
+
+## Glossary
+
+- **SwiftOnSecurity sysmon-config** — single-file canonical baseline.
+- **Olaf Hartong sysmon-modular** — modular per-technique baseline.
+- **Sysmon-config drift** — deployed config differs from baseline.
+- **Missing event class** — whole EventID class absent; blocks rules.
+- **`sysmon -c`** — command to dump deployed config.
+
+## Further reading
+
+- SwiftOnSecurity sysmon-config — https://github.com/SwiftOnSecurity/sysmon-config.
+- Olaf Hartong sysmon-modular — https://github.com/olafhartong/sysmon-modular.
+- Sysmon docs — https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon.
+""",
+    )
+    _add_q(session, m4l6, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="The L3 wants to audit a Windows host's Sysmon config against canonical baselines. Name **two** widely-used canonical Sysmon-config baselines (project name OR author name) the L3 should diff against. Format: comma-separated.",
+        options=None,
+        correct=[
+            "SwiftOnSecurity, Olaf Hartong",
+            "SwiftOnSecurity, sysmon-modular",
+            "SwiftOnSecurity sysmon-config, Olaf Hartong sysmon-modular",
+            "swiftonsecurity, olaf hartong",
+            "Swift, Olaf",
+            "sysmon-config, sysmon-modular",
+        ],
+        explanation_md="**SwiftOnSecurity sysmon-config** and **Olaf Hartong sysmon-modular** are the two canonical baselines. SwiftOnSecurity's single-file config is opinionated, low-FP, battle-tested in many production SOCs — the conventional 'floor' for first-time deployments. Olaf Hartong's `sysmon-modular` is more granular (per-technique modules) and more verbose; mature SOCs overlay parts of Olaf's modules for high-value areas (process injection, WMI, DNS). The L3's reflex: diff the deployed config against one of these baselines, categorise differences (intentional / legacy / missing event class), and raise schema-debt entries for missing event classes.",
+        points=2,
+    )
+
+    # Lesson 4.7 — Quarterly fleet-wide gap audit
+    m4l7 = _add_lesson(
+        session, mod4, order=7,
+        title="Quarterly fleet-wide gap audit: bringing the four streams together",
+        lesson_type=LessonType.READING, duration_min=20,
+        content_md="""
+> **Learning objectives.**
+> 1. Run the **five-stream quarterly audit**: coverage matrix, field population, parser health, Sysmon drift, EDR coverage
+> 2. Generate the **leadership-facing summary**: coverage %, drift count, schema-debt items
+> 3. Route findings to the **right backlog** (detection-eng / SIEM-team / platform / schema-debt)
+> 4. Set the **next-quarter purple-team calendar** based on audit gaps
+
+## The five streams
+
+The L3 runs five audits each quarter:
+
+### 1. Coverage matrix (M4.4 — DML heatmap)
+
+Per-actor × per-tactic DML rating for every actor in the threat profile. Output: 14 tactics × N actors heatmap.
+
+### 2. Field population (M4.2 — fingerprint-field audit)
+
+Top 20 fingerprint fields × per-data-stream populated-percentage. Output: pass/concern/broken count.
+
+### 3. Parser health (M4.3 — ingest failures + drift)
+
+`ingest.failed_documents` per data stream over 90d. Output: data streams in the > 0.1% failed band.
+
+### 4. Sysmon drift (M4.6 — config audit)
+
+Deployed config vs baseline; missing event classes. Output: list of hosts with config drift + missing event-class entries.
+
+### 5. EDR coverage
+
+Inventory hosts vs EDR-active hosts. Output: % covered + list of inventory-missing-EDR hosts.
+
+## The leadership summary
+
+Each quarter, the L3 produces a one-page summary:
+
+```
+QUARTERLY TELEMETRY-COVERAGE AUDIT — Q3 2026
+
+Headline: 78% empirical detection coverage (Q2: 73%, +5pp)
+
+By tactic:
+  Initial Access:   DML-4   Execution:        DML-4
+  Persistence:      DML-3   Privilege Esc:    DML-3
+  Defence Evasion:  DML-2   Credential Access: DML-3 (Q2: DML-2, +1)
+  Discovery:        DML-2   Lateral Movement: DML-2 (Q2: DML-1, +1)
+  Collection:       DML-1   ← gap; targeted next quarter
+  Command & Control: DML-4   Exfiltration:     DML-2
+
+Telemetry health:
+  Field population pass rate: 91% (Q2: 88%, +3pp)
+  Parser health:              0 broken streams; 1 in concern band (logs-network.firewall-*)
+  Sysmon drift:               12% of hosts missing EventID 8 (down from 30% in Q2)
+  EDR coverage:               99.4% (Q2: 98.1%)
+
+Schema-debt:
+  Open: 7 items
+  Closed this quarter: 4
+  Average resolution: 38 days (Q2: 47, -9)
+  Top-priority open: SD-2026-04-001 (DGA entropy at ingest)
+
+Next-quarter purple-team calendar:
+  - T1213 Data from Information Repositories (Collection — DML-1)
+  - T1567.002 Exfil to Cloud Storage (Exfil — DML-2)
+  - T1021.* Lateral Movement re-test (Q2 progress validate)
+```
+
+## Routing findings
+
+Each finding from the five streams routes to one backlog:
+
+| Finding type | Backlog |
+|---|---|
+| Tier-2 detection gap (rule missing) | Detection-eng |
+| Tier-3 parser issue (field empty / unparsed) | SIEM-team |
+| Tier-4 telemetry absent (data source missing) | Platform |
+| Schema gap (field doesn't exist yet) | Schema-debt → data-engineering |
+| Sysmon drift / missing event class | Schema-debt + platform (SCCM rollout) |
+| EDR-missing host | Platform |
+
+The L3's reflex when surfacing each finding: name the backlog explicitly. Conflating tier-3 (parser issue) with tier-2 (rule issue) sends the ticket to the wrong team and wastes everyone's time.
+
+## Setting the next-quarter calendar
+
+Audit findings drive the next-quarter purple-team exercise calendar. Pick technique exercises that:
+1. Target the lowest-DML cells in the coverage matrix.
+2. Validate fixes from the prior quarter's gaps.
+3. Cover techniques new to the threat profile (CTI bumps).
+
+The calendar's defensibility comes from the audit data — every entry traces back to either a coverage gap or a validation re-test.
+
+## Glossary
+
+- **Five-stream audit** — coverage matrix, field population, parser health, Sysmon drift, EDR coverage.
+- **Leadership summary** — one-page quarterly view; coverage % + tactic DML + telemetry health + schema-debt + next-quarter calendar.
+- **Backlog routing** — each finding has *one* backlog; conflation costs cycles.
+
+## Further reading
+
+- ION's TuningProposal model — captures audit findings with backlog routing.
+- Florian Roth — *Detection KPIs* — what to track quarterly.
+""",
+    )
+    _add_q(session, m4l7, order=1, kind=QuestionKind.SINGLE,
+        stem_md="The L3's quarterly audit surfaces this finding: *winlogbeat-* has 0.3% `ingest.failed_documents` over the last 30 days, primarily on Sysmon EventID 7 (ImageLoad) entries.* Which backlog owns the fix?",
+        options=[
+            {"value": "detection_eng", "label": "Detection-eng — write a rule that handles malformed events"},
+            {"value": "siem_team", "label": "SIEM-team — fix the parser / pipeline that's failing on the EventID 7 entries"},
+            {"value": "platform", "label": "Platform — roll out a new EDR agent"},
+            {"value": "schema_debt", "label": "Schema-debt — design a new field for ImageLoad events"},
+        ],
+        correct="siem_team",
+        explanation_md="**SIEM-team.** `ingest.failed_documents` > 0.1% means the parser / ingest pipeline is failing to parse some events. The data IS being shipped (so it's not Tier-4 / platform); the rule problem isn't the issue (the rule can't fire on events that didn't parse). The fix is at the parser layer: identify why EventID 7 entries are failing (a Sysmon config field added in a recent version that the parser doesn't recognise? a buffer overflow on long ImageLoad paths? a malformed field?), update the parser, redeploy. Detection-eng waits on this fix before any EventID 7 rule can be trusted; schema-debt is wrong because the field exists and parses for *most* events. The L3's reflex on `ingest.failed_documents` > threshold is *always* to route to SIEM-team for parser triage.",
+        points=2,
+    )
+
+    # Lesson 4.8 — Capstone
+    m4l8 = _add_lesson(
+        session, mod4, order=8,
+        title="L3 M4 Capstone — telemetry quality assessment review",
+        lesson_type=LessonType.QUIZ, duration_min=15,
+        content_md="""
+Two-question capstone covering technique → telemetry contract + DML rating.
+
+Module 5 picks up: **Detection-engineering loops** — the post-exercise lifecycle. TuningProposal authoring, gap-fix verification, regression testing, and the close-the-loop pattern that turns audit findings into shipping rules.
+""",
+    )
+    _add_q(session, m4l8, order=1, kind=QuestionKind.SHORTANSWER,
+        stem_md="An L3 wants to detect T1003.001 (LSASS Memory Dump) but finds the SIEM has no rule keyed on `winlog.event_id == \"10\"` (Sysmon ProcessAccess). The L3 audits the deployed Sysmon config across the fleet; **0% of hosts** are capturing EventID 10. Name the **two backlogs** that own the resolution and the **order** of operations. Format: `<backlog-1> first → <backlog-2> second`.",
+        options=None,
+        correct=[
+            "schema-debt first → detection-eng second",
+            "schema-debt → detection-eng",
+            "platform first → detection-eng second",
+            "Sysmon config rollout first → detection-eng second",
+            "schema-debt / platform first → detection-eng second",
+            "schema-debt first → detection-eng",
+        ],
+        explanation_md="**Schema-debt (or platform — Sysmon config rollout) first → detection-eng second.** Order matters: until EventID 10 is being captured fleet-wide, there's no telemetry for any T1003.001 rule to fire on. Detection-eng can't ship a useful rule against null data. The L3's reflex: schema-debt entry to enable EventID 10 in the standard Sysmon config (typically by adopting SwiftOnSecurity / Olaf Hartong baseline updates), platform team rolls it out via SCCM/Intune, validate via field-population audit, *then* detection-eng authors the LSASS-access rule keyed on `event_id == \"10\" AND process.target.name == \"lsass.exe\" AND winlog.event_data.GrantedAccess IN (...)`. Reversing the order — shipping the rule first — is wasted detection-eng cycles; the rule fires on nothing until the underlying telemetry is fixed. M4 L1's *technique → telemetry contract* and L4 L5's *schema-debt is upstream of detection-eng* both make this point.",
+        points=2,
+    )
+    _add_q(session, m4l8, order=2, kind=QuestionKind.SINGLE,
+        stem_md="A SOC has a rule that catches *any process accessing LSASS with credential-dump access masks (0x1010, 0x1410, 0x143A) regardless of which tool initiated the access*. Per Florian Roth's DML model, what's this rule's maturity level?",
+        options=[
+            {"value": "dml1", "label": "DML-1 — Atomic indicator"},
+            {"value": "dml2", "label": "DML-2 — Tool-based"},
+            {"value": "dml3", "label": "DML-3 — Procedure"},
+            {"value": "dml4", "label": "DML-4 — TTP"},
+        ],
+        correct="dml4",
+        explanation_md="**DML-4 — TTP.** The rule catches the *technique class* — any process performing LSASS-access-with-credential-dump-masks — regardless of which tool initiated. Mimikatz, ProcDump, comsvcs.dll, custom-compiled credential dumpers, all match. Compare DML-2 (tool-based, broken by tool-swap) and DML-1 (atomic indicator, broken by indicator-change). DML-4 is durable: an actor swapping tools doesn't evade. Lifting any DML-2 rule (hash-list match) to DML-4 (technique-class match) is the L3's standard prioritisation move; the M7 / M8 detection-engineering work is largely about doing this for the org's threat profile.",
+        points=2,
+    )
+
+    print(f"  L3: {course.title} — 4 modules, 32 lessons (Module 4 Telemetry quality @ proper depth)")
     return course
 
 

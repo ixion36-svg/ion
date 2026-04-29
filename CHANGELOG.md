@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.12.10 (2026-04-29) — curriculum
+
+### L3 Module 4 — Telemetry quality assessment
+
+L3 advances 3/8 → **4/8**. The pivot module: M1-M3 covered *how to emulate*; M4 covers *whether the telemetry can see it*. The technique → telemetry contract; field-coverage audits with the three-band threshold; parser-health monitoring beyond pass/fail (drift, schema-version regressions); Florian Roth's Detection-Maturity Model (DML-0 to DML-9) for per-technique rating; the schema-debt backlog as a fourth queue (alongside detection-eng / SIEM-team / platform); Sysmon coverage audit against SwiftOnSecurity / Olaf Hartong baselines; quarterly fleet-wide gap audit + leadership summary.
+
+#### What's authored
+
+8 lessons (7 reading + 1 quiz capstone), 9 questions, ~16k words at BTL1/SANS GCTH depth.
+
+| Lesson | Topic |
+|---|---|
+| 4.1 | Technique → telemetry contract — fingerprint fields per technique; uncatchable techniques |
+| 4.2 | Field-coverage audit — three-band threshold (95% / 50-95% / <50%); ES&#124;QL skeleton |
+| 4.3 | Parser health beyond pass/fail — `ingest.failed_documents` trends, drift signals, schema-version regressions |
+| 4.4 | DML model — DML-0 (none) to DML-9 (predictive); per-technique rating; heatmap |
+| 4.5 | Schema-debt backlog — fourth queue; upstream of detection-eng; leadership KPI |
+| 4.6 | Sysmon coverage audit — SwiftOnSecurity vs Olaf Hartong; missing event class as schema-debt |
+| 4.7 | Quarterly fleet-wide gap audit — five-stream audit; leadership summary; backlog routing |
+| 4.8 | Capstone — order-of-operations question + DML rating |
+
+#### Curriculum status
+
+- **L1**: 8/8 ✅
+- **L2**: 8/8 ✅
+- **L3**: **4/8** authored at proper depth (M1-M4). M5 — Detection-engineering loops — next.
+
+---
+
 ## v0.12.9 (2026-04-29) — curriculum
 
 ### L3 Module 3 — MITRE Caldera operations
