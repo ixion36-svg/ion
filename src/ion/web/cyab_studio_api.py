@@ -1,4 +1,4 @@
-"""CyAB Onboarding Studio API (v0.12.0).
+"""CyAB Onboarding Studio API (v0.12.0+).
 
 Mounted at ``/api/cyab/studio`` (see ``server.py``). Decorators below
 use relative paths per the FastAPI prefix convention.
@@ -11,6 +11,9 @@ Routes:
 - ``PATCH  /subprofiles/{sub_id}``                       operator overlay (flips is_custom)
 - ``GET    /subprofiles/{sub_id}/use-cases/{uc_id}``     single use case
 - ``POST   /use-cases/{uc_id}/tide-stub``                generate a TIDE rule stub
+- ``GET    /systems``                                    list CyAB systems for the dropdown (v0.12.1)
+- ``GET    /systems/{sys_id}/answers``                   merged intake answers (v0.12.1)
+- ``POST   /systems/{sys_id}/answers``                   merge new intake answers (v0.12.1)
 - ``GET    /systems/{sys_id}/coverage``                  per-sub-profile rollup
 - ``GET    /systems/{sys_id}/onboarding-pack``           render Onboarding Pack PDF
 - ``POST   /systems/{sys_id}/onboarding-pack/sign``      mark approved + persist sign-off
@@ -25,7 +28,7 @@ import re
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -75,6 +78,11 @@ class SignOffRequest(BaseModel):
     sign_dept_name: Optional[str] = None
     sign_soc_name: Optional[str] = None
     containment_authority: Optional[str] = None
+
+
+class AnswersPatch(BaseModel):
+    answers: Dict[str, Any]
+    subprofile_id: Optional[str] = None  # for telemetry / future use; not required
 
 
 # ---------------------------------------------------------------------------
@@ -235,6 +243,148 @@ def generate_tide_stub(
     patch_subprofile(session, body.subprofile_id, {"catalogue": cat})
 
     return {"tide_rule_id": new_rule_id, "use_case_id": uc_id}
+
+
+# ---------------------------------------------------------------------------
+# System list (dropdown) + per-system intake answers
+# ---------------------------------------------------------------------------
+#
+# Answers are persisted into a marker-tagged CyabSystemAssessment row
+# (notes='STUDIO_AUTOSAVE'). One such row per system; auto-save merges
+# into its responses_json. The legacy 6-step wizard continues to create
+# its own immutable rows separately — this Studio row is independent
+# and explicitly tagged.
+
+_STUDIO_NOTES_MARKER = "STUDIO_AUTOSAVE"
+
+
+def _get_or_create_studio_assessment(
+    session: Session, sys_id: int, user_id: Optional[int],
+) -> CyabSystemAssessment:
+    row = session.scalars(
+        select(CyabSystemAssessment)
+        .where(CyabSystemAssessment.system_id == sys_id)
+        .where(CyabSystemAssessment.notes == _STUDIO_NOTES_MARKER)
+        .order_by(CyabSystemAssessment.submitted_at.desc())
+        .limit(1)
+    ).first()
+    if row is not None:
+        return row
+    from ion.services.cyab_assessment_questions import SCHEMA_VERSION
+    row = CyabSystemAssessment(
+        system_id=sys_id,
+        schema_version=SCHEMA_VERSION,
+        submitted_by=user_id,
+        responses_json="{}",
+        notes=_STUDIO_NOTES_MARKER,
+    )
+    session.add(row)
+    session.flush()
+    return row
+
+
+@router.get("/systems")
+def list_studio_systems(session: Session = Depends(get_db_session)):
+    """Lightweight system list for the Studio header selector."""
+    rows = session.scalars(
+        select(CyabSystem).order_by(CyabSystem.department.asc(), CyabSystem.name.asc())
+    ).all()
+    return {
+        "systems": [
+            {
+                "id": r.id,
+                "name": r.name,
+                "department": r.department,
+                "status": r.status,
+                "readiness_score": r.readiness_score,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.get("/systems/{sys_id}/answers")
+def get_system_answers(
+    sys_id: int,
+    session: Session = Depends(get_db_session),
+):
+    """Return the merged answers blob for the system.
+
+    Merges the studio autosave row over the legacy wizard's most-recent
+    row so the operator sees both — studio edits override wizard
+    captures for shared keys.
+    """
+    sys = session.get(CyabSystem, sys_id)
+    if sys is None:
+        raise HTTPException(status_code=404, detail="Unknown system")
+    legacy = session.scalars(
+        select(CyabSystemAssessment)
+        .where(CyabSystemAssessment.system_id == sys_id)
+        .where(CyabSystemAssessment.notes != _STUDIO_NOTES_MARKER)
+        .order_by(CyabSystemAssessment.submitted_at.desc())
+        .limit(1)
+    ).first()
+    studio = session.scalars(
+        select(CyabSystemAssessment)
+        .where(CyabSystemAssessment.system_id == sys_id)
+        .where(CyabSystemAssessment.notes == _STUDIO_NOTES_MARKER)
+        .limit(1)
+    ).first()
+    merged: Dict[str, Any] = {}
+    for src in (legacy, studio):
+        if src and src.responses_json:
+            try:
+                merged.update(json.loads(src.responses_json) or {})
+            except json.JSONDecodeError:
+                pass
+    return {
+        "system_id": sys_id,
+        "answers": merged,
+        "studio_assessment_id": studio.id if studio else None,
+    }
+
+
+@router.post(
+    "/systems/{sys_id}/answers",
+    dependencies=[Depends(require_permission("case:write"))],
+)
+def patch_system_answers(
+    sys_id: int,
+    body: AnswersPatch,
+    session: Session = Depends(get_db_session),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    """Merge intake answers into the studio's autosave assessment.
+
+    Only the keys present in the request body are written; existing
+    keys not mentioned stay put. To clear a key, send it with value
+    None — the merge respects None as 'unset'.
+    """
+    sys = session.get(CyabSystem, sys_id)
+    if sys is None:
+        raise HTTPException(status_code=404, detail="Unknown system")
+    row = _get_or_create_studio_assessment(
+        session, sys_id, current_user.id if current_user else None,
+    )
+    try:
+        existing = json.loads(row.responses_json or "{}")
+    except json.JSONDecodeError:
+        existing = {}
+    for k, v in (body.answers or {}).items():
+        if v is None:
+            existing.pop(k, None)
+        else:
+            existing[k] = v
+    row.responses_json = json.dumps(existing, default=str, sort_keys=True)
+    row.submitted_at = datetime.utcnow()
+    if current_user is not None:
+        row.submitted_by = current_user.id
+    session.commit()
+    return {
+        "system_id": sys_id,
+        "studio_assessment_id": row.id,
+        "answer_count": len(existing),
+    }
 
 
 # ---------------------------------------------------------------------------

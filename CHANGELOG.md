@@ -1,5 +1,53 @@
 # Changelog
 
+## v0.12.1 (2026-04-29) — feature
+
+### CyAB Onboarding Studio — answer-and-proceed (intake form + system selector + auto-save)
+
+v0.12.0 shipped the Studio chrome but the Detailed Intake tab was display-only — questions rendered as static cards with no way to actually answer them. v0.12.1 closes that gap.
+
+#### What's new
+
+- **System selector at the top of the page.** A dropdown grouped by department lists every CyAB system; picking one wires the entire page to that system. URL state gains `?system=<id>` so deep links carry the scope.
+- **Interactive intake form.** Each question now renders as pill-style answer controls based on its `answer_type`:
+  - `yesno` → 4 pills (Yes / Partial / No / Don't know)
+  - `single` → one pill per option, single-select
+  - `multi` → toggle pills, multi-select
+- **Per-question status badge** (`● answered` vs `○ open`) and a **progress bar** (`X of Y answered`) at the top of the tab.
+- **Debounced auto-save** (600 ms) on every click — answers persist into a marker-tagged `CyabSystemAssessment` row (`notes='STUDIO_AUTOSAVE'`). The legacy 6-step wizard's immutable history rows are untouched.
+- **Save & continue → Detection library** button at the bottom of the intake tab — saves and switches to the Detection tab in one action.
+- **Footer Onboarding Pack button** is now wired to the selected system; the manual ID input is gone. The button is disabled until a system is picked.
+
+#### Persistence model
+
+Answers go into one row per system, identified by `notes='STUDIO_AUTOSAVE'`. POSTs merge by key (sending `null` clears a key). The GET endpoint merges the autosave row over the most-recent legacy wizard row, so the operator sees a single coherent answer set even if a system was first onboarded via the wizard and is now being deepened in the Studio. Crucially the legacy row is **never mutated** — its immutability and version history are preserved.
+
+#### New API
+
+- `GET /api/cyab/studio/systems` — lightweight system list for the dropdown
+- `GET /api/cyab/studio/systems/{sys_id}/answers` — merged answer blob (legacy ⊕ studio autosave)
+- `POST /api/cyab/studio/systems/{sys_id}/answers` — patch answers (send `null` to clear)
+
+#### Verifying the feature
+
+1. `docker compose pull ion && docker compose up -d`
+2. Open `/cyab/studio`. The system dropdown should populate with every CyAB system grouped by department.
+3. Pick a system → pick **Identity & Access** → **Active Directory** → **Detailed intake**. Each of the 7 questions should show pill answer controls. Click answers — auto-save status should appear at the bottom (`saving…` → `saved · HH:MM:SS`).
+4. Refresh the page; URL carries `?system=<id>&pillar=identity&sub=active_directory&tab=intake`. Answers should reload from the server.
+5. Click **Save & continue → Detection library** — saves and switches tabs.
+6. Click **Export Onboarding Pack** in the footer — should download a PDF that includes the answers under "Per-sub-profile readiness".
+
+#### Upgrade
+
+```bash
+docker compose pull ion
+docker compose up -d
+```
+
+No data-model migration in this ship — answers go into the existing `cyab_system_assessments.responses_json` column. v0.12.0's tables and columns are unchanged.
+
+---
+
 ## v0.12.0 (2026-04-29) — feature
 
 ### CyAB Onboarding Studio — sub-profile-driven onboarding intake, detection library, audit catalogue
