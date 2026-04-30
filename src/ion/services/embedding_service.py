@@ -13,6 +13,11 @@ Design:
   * Small timeout (30 s) — embedding a ~1 KB blob should be sub-second on
     `nomic-embed-text`; if it takes longer something's wrong and we'd
     rather skip the batch.
+
+Air-gapped or specific-version deployments can side-load a GGUF directly
+into Ollama via ``scripts/ollama_import_gguf.sh`` (v0.16.2). The wrapper
+itself doesn't change — set ``ION_EMBEDDING_MODEL`` to whatever name you
+gave the imported model (e.g. ``nomic-embed-text-v1.5``).
 """
 
 from __future__ import annotations

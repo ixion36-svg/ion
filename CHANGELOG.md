@@ -1,5 +1,46 @@
 # Changelog
 
+## v0.16.2 (2026-04-30) — tooling
+
+### `scripts/ollama_import_gguf.sh` — side-load a Hugging Face GGUF into the Ollama container
+
+ION's embedding service already calls Ollama; sites that want to pin to a specific Hugging Face GGUF build (e.g. `nomic-embed-text-v1.5` with longer context + task-prefix support) rather than whatever Ollama's library ships now have a one-shot helper.
+
+What the script does:
+
+1. Downloads the GGUF from `huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF` (default Q4_K_M, ~81 MiB; `--quant Q8_0` etc. for higher quality).
+2. `docker cp`s it into the running Ollama container.
+3. Writes a minimal `Modelfile` (just `FROM /tmp/import.gguf`).
+4. Runs `ollama create <name> -f Modelfile` to register the model under a name you choose (default `nomic-embed-text-v1.5`).
+5. Cleans up the temp files inside the container and prints the resulting `ollama list`.
+
+Usage:
+
+```bash
+# Default — pull v1.5 Q4_K_M, register as "nomic-embed-text-v1.5":
+./scripts/ollama_import_gguf.sh
+
+# Higher quality:
+./scripts/ollama_import_gguf.sh --quant Q8_0
+
+# Air-gapped — fetch first on a connected box, then import on the target:
+./scripts/ollama_import_gguf.sh --download-only --out /tmp/nomic.gguf
+# (copy the GGUF across the gap, then on the air-gapped host:)
+./scripts/ollama_import_gguf.sh --gguf /tmp/nomic.gguf
+
+# Then in .env:
+#   ION_EMBEDDING_ENABLED=true
+#   ION_EMBEDDING_MODEL=nomic-embed-text-v1.5
+# and:
+docker compose up -d --force-recreate ion
+```
+
+No image change, no compose change, no new Python dependency — just a bash helper. The default Ollama container name is `ion-ollama`; override with `ION_OLLAMA_CONTAINER=<name>` if your deployment uses a different name.
+
+---
+
+---
+
 ## v0.16.1 (2026-04-30) — fix + polish
 
 ### Attack Origin Map — rotating globe + geo data fix
