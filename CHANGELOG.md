@@ -1,5 +1,53 @@
 # Changelog
 
+## v0.17.0 (2026-04-30) — feature
+
+### Translator — standalone page + inline buttons + document upload
+
+A new `/translator` page plus inline Translate buttons across the alerts and cases pages. Backed by your local Ollama model (`ION_TRANSLATOR_MODEL` → `ION_OLLAMA_MODEL` → `llama3.1:8b`), so it inherits whatever you've configured for Bob.
+
+#### Standalone page (`/translator`)
+
+- Dual-pane editor: paste text in the source pane, get translation in the target pane.
+- Source language picker (Auto-detect + 14 explicit choices); target language picker. Defaults: Auto-detect → English.
+- **Document upload** — `.txt .md .csv .log .json .html .htm .eml .msg .docx .pdf` (via existing `python-docx` / `BeautifulSoup` / `email` stdlib + new `pypdf>=4.0`). Cap: 10 MB per upload.
+- Long inputs auto-chunk on paragraph/sentence boundaries (≤10k chars per LLM call) so multi-page reports translate in one click without context-window errors.
+- Copy + download buttons on the target pane. Ctrl/Cmd+Enter triggers translate from the source pane.
+- Routes:
+  - `GET  /translator` — the page
+  - `GET  /api/translator/languages` — supported language list
+  - `POST /api/translator/translate` — JSON in/out
+  - `POST /api/translator/translate-file` — multipart upload + translate
+  - `POST /api/translator/extract` — extract source text without calling the LLM (preview)
+
+#### Inline on alerts page
+
+- Translate button + target-language picker rendered alongside the alert message body. Translates in place; "show original" reverts.
+- Each comment in the Comments tab gains a Translate toggle (second click flips back to the original markdown).
+
+#### Inline on cases page
+
+- Each Investigation Note in the right-hand panel gains a Translate toggle. Same in-place toggle behaviour.
+
+#### Languages
+
+Auto-detect + en, ru, zh, ja, ko, ar, fa, es, fr, de, pt, it, tr, vi. Model selection: `ION_TRANSLATOR_MODEL` overrides `ION_OLLAMA_MODEL`; both default to `llama3.1:8b`. Llama 3.1 + qwen2.5 are both multilingual enough for the typical SOC inputs (decoded payloads, threat-actor messages, phishing content, intel reports).
+
+#### New dependency
+
+- `pypdf>=4.0` (~200 KB pure-Python) for PDF text extraction. Already present: `python-docx`, `beautifulsoup4`, stdlib `email`.
+
+#### Verifying
+
+```bash
+docker compose pull ion
+docker compose up -d --force-recreate ion
+```
+
+Open `/translator`, paste a foreign-language string, click Translate. Or upload a `.docx` / `.pdf` / `.eml` and watch the extracted text + translation populate. Open any alert with a non-English message → "Translate" button should appear under the message body.
+
+---
+
 ## v0.16.2 (2026-04-30) — tooling
 
 ### `scripts/ollama_import_gguf.sh` — side-load a Hugging Face GGUF into the Ollama container

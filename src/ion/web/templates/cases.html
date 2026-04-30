@@ -2495,12 +2495,20 @@ function renderPanelContent(c) {
             } else {
                 rendered = esc(raw);
             }
+            // v0.17.0: each note gets a Translate toggle that swaps the
+            // rendered markdown with a plain-text translation.
+            const noteId = 'cnote-' + (n.id != null ? n.id : Math.random().toString(36).slice(2,9));
             html += '<div class="cpanel-note">'
-                + '<div class="cpanel-note-header">'
+                + '<div class="cpanel-note-header" style="display:flex;align-items:center;gap:0.5rem;">'
                 +   '<span class="cpanel-note-user"><i class="icon-user" style="font-size:0.65rem;margin-right:0.2rem;"></i>' + esc(n.user || 'Unknown') + '</span>'
                 +   '<span>' + fmtDate(n.created_at) + '</span>'
+                +   '<button class="cpanel-note-translate" type="button" onclick="translateCaseNote(\'' + noteId + '\')" '
+                +     'style="margin-left:auto;font-size:0.65rem;background:none;border:1px solid rgba(255,255,255,0.1);color:#94a3b8;padding:0.1rem 0.45rem;border-radius:3px;cursor:pointer;">Translate</button>'
                 + '</div>'
-                + '<div class="cpanel-note-content cpanel-note-markdown">' + rendered + '</div>'
+                + '<div class="cpanel-note-content cpanel-note-markdown" id="' + noteId + '" '
+                +   'data-original-raw="' + esc(raw) + '" data-rendered-html="' + esc(rendered) + '">'
+                + rendered
+                + '</div>'
                 + '</div>';
         });
     }
@@ -2822,6 +2830,37 @@ async function panelUpdateField(caseId, field, value) {
 // =============================================================================
 // Add Note from Panel
 // =============================================================================
+// v0.17.0 — Translate any case note in place. Second click toggles back
+// to the original rendered markdown. Stored on the element via data-*.
+async function translateCaseNote(noteId) {
+    const el = document.getElementById(noteId);
+    if (!el) return;
+    if (el.dataset.translated === '1') {
+        // Toggle off — restore the original rendered markdown.
+        el.innerHTML = el.dataset.renderedHtml || '';
+        el.dataset.translated = '0';
+        return;
+    }
+    const original = el.dataset.originalRaw || el.textContent;
+    if (!original.trim()) return;
+    el.style.opacity = '0.6';
+    try {
+        const r = await fetch('/api/translator/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: original, source: 'auto', target: 'en' }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+        el.textContent = d.translation;
+        el.dataset.translated = '1';
+    } catch (e) {
+        el.textContent = '[translation failed: ' + (e.message || e) + ']';
+    } finally {
+        el.style.opacity = '';
+    }
+}
+
 async function addPanelNote(caseId) {
     const input = document.getElementById('panel-note-input');
     const content = input ? input.value.trim() : '';

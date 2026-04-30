@@ -100,6 +100,7 @@ from ion.web.playbook_action_api import router as playbook_action_router
 from ion.web.cyber_range_api import router as cyber_range_router
 from ion.web.webhook_api import router as webhook_router
 from ion.web.daily_standup_api import router as daily_standup_router
+from ion.web.translator_api import router as translator_router
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.logging import setup_logging, get_logger
 from ion.storage.database import init_db
@@ -278,6 +279,9 @@ app.include_router(engineering_analytics_router, prefix="/api/engineering/analyt
 app.include_router(cyab_router, prefix="/api/cyab")
 app.include_router(cyab_studio_router, prefix="/api/cyab/studio")
 app.include_router(wallboard_router, prefix="")
+# v0.17.0: translator — page route + /api/translator/* routes share the
+# same router so it owns its own prefixes internally.
+app.include_router(translator_router, prefix="")
 app.include_router(threat_intel_router, prefix="/api/threat-intel")
 app.include_router(threat_watch_gap_router, prefix="/api/threat-intel")
 app.include_router(threat_landscape_router, prefix="/api")

@@ -6345,6 +6345,76 @@ async function updateTriage(alertId, field, value) {
 }
 
 // =========================================================================
+// Inline Translate (v0.17.0) — translates the alert message in place via
+// the /api/translator endpoint. Used by the Translate button rendered
+// alongside the alert-message-box.
+// =========================================================================
+async function translateAlertMessage() {
+    const box = document.getElementById('alert-message-box');
+    const status = document.getElementById('alert-msg-translate-status');
+    const revertBtn = document.getElementById('alert-msg-translate-revert');
+    const target = document.getElementById('alert-msg-translate-target').value;
+    if (!box) return;
+    const original = box.dataset.originalMessage || box.textContent;
+    if (!original.trim()) { status.textContent = '(empty)'; return; }
+    status.textContent = 'translating…';
+    try {
+        const r = await fetch('/api/translator/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: original, source: 'auto', target }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+        box.textContent = d.translation;
+        status.textContent = `(translated → ${target})`;
+        if (revertBtn) revertBtn.style.display = '';
+    } catch (e) {
+        status.textContent = 'failed: ' + (e.message || e);
+    }
+}
+
+function revertAlertMessage() {
+    const box = document.getElementById('alert-message-box');
+    const status = document.getElementById('alert-msg-translate-status');
+    const revertBtn = document.getElementById('alert-msg-translate-revert');
+    if (!box) return;
+    box.textContent = box.dataset.originalMessage || box.textContent;
+    if (status) status.textContent = '';
+    if (revertBtn) revertBtn.style.display = 'none';
+}
+
+async function translateComment(cmtId) {
+    const el = document.getElementById(cmtId);
+    if (!el) return;
+    const original = el.dataset.originalRaw || el.textContent;
+    if (!original.trim()) return;
+    if (el.dataset.translated === '1') {
+        // Toggle back to original on second click.
+        el.innerHTML = el.dataset.renderedHtml || '';
+        el.dataset.translated = '0';
+        return;
+    }
+    el.style.opacity = '0.6';
+    try {
+        const r = await fetch('/api/translator/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: original, source: 'auto', target: 'en' }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+        // Render translated text as plain text (no markdown round-trip).
+        el.textContent = d.translation;
+        el.dataset.translated = '1';
+    } catch (e) {
+        el.textContent = '[translation failed: ' + (e.message || e) + ']';
+    } finally {
+        el.style.opacity = '';
+    }
+}
+
+// =========================================================================
 // Comments
 // =========================================================================
 function renderCommentsTab(alertId, comments) {
@@ -6371,13 +6441,17 @@ function renderCommentsTab(alertId, comments) {
             } else {
                 rendered = escapeHtml(raw);
             }
+            // v0.17.0: wrap each comment-body so it can be translated in place.
+            const cmtId = 'cmt-' + (c.id != null ? c.id : Math.random().toString(36).slice(2,9));
+            const safeOriginalRaw = escapeHtml(raw);
             html += `
-                <div class="comment-item">
+                <div class="comment-item" data-comment-id="${escapeHtml(String(c.id||''))}">
                     <div class="comment-header">
                         <span class="comment-user">${escapeHtml(c.user)}</span>
                         <span class="comment-time">${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</span>
+                        <button class="cmt-translate-btn" type="button" onclick="translateComment('${cmtId}')" style="margin-left:auto; font-size:10px; background:none; border:1px solid rgba(255,255,255,0.1); color:#94a3b8; padding:2px 8px; border-radius:3px; cursor:pointer;">Translate</button>
                     </div>
-                    <div class="comment-body cpanel-note-markdown">${rendered}</div>
+                    <div class="comment-body cpanel-note-markdown" id="${cmtId}" data-original-raw="${safeOriginalRaw}" data-rendered-html="${escapeHtml(rendered)}">${rendered}</div>
                 </div>
             `;
         });
@@ -8322,8 +8396,24 @@ async function showAlertDetail(alertId) {
         </div>
     </div>`;
 
-    // Message
-    html += `<div class="alert-message-box">${escapeHtml(alert.message)}</div>`;
+    // Message — wrap so the v0.17.0 Translate button can replace its body in place.
+    html += `<div class="alert-message-box" id="alert-message-box" data-original-message="${escapeHtml(alert.message || '')}">${escapeHtml(alert.message)}</div>`;
+    html += `<div class="alert-msg-translate-row" style="margin: -4px 0 8px; display:flex; align-items:center; gap:8px; font-size:11px; color:#94a3b8;">
+        <button class="btn btn-ghost btn-sm" type="button" onclick="translateAlertMessage()" style="font-size:11px; padding:2px 8px;">
+            Translate
+        </button>
+        <select id="alert-msg-translate-target" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#cbd5e1; font-size:11px; height:22px; padding:0 6px; border-radius:3px;">
+            <option value="en" selected>→ English</option>
+            <option value="ru">→ Russian</option>
+            <option value="zh">→ Chinese</option>
+            <option value="ar">→ Arabic</option>
+            <option value="es">→ Spanish</option>
+            <option value="fr">→ French</option>
+            <option value="de">→ German</option>
+        </select>
+        <span id="alert-msg-translate-status" style="color:#64748b;"></span>
+        <button id="alert-msg-translate-revert" type="button" onclick="revertAlertMessage()" style="display:none; background:none; border:none; color:#64748b; cursor:pointer; font-size:11px; text-decoration:underline;">show original</button>
+    </div>`;
 
     // Tags
     if (alert.tags && alert.tags.length > 0) {
