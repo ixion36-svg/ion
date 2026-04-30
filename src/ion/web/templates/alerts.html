@@ -187,7 +187,6 @@
         <div class="ad-card" style="grid-column:1/-1;">
             <div class="ad-card-header"><span class="ad-card-icon">&#127760;</span> Attack Origin Map</div>
             <div class="globe-container">
-                <img id="globe-map-img" src="/static/img/earth_night.jpg" alt="" draggable="false">
                 <canvas id="globe-canvas"></canvas>
                 <div class="globe-tooltip" id="globe-tooltip" style="display:none;"></div>
             </div>
@@ -488,6 +487,8 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- v0.16.1: topojson decoder for the rotating globe's country outlines -->
+<script src="/static/js/topojson-client.min.js"></script>
 <style>
 /* Full-width override for alerts page */
 .container:has(.alerts-grid) {
@@ -1153,26 +1154,26 @@
 .donut-legend { font-size: 11px; fill: currentColor; }
 .donut-legend-value { font-size: 11px; fill: var(--text-muted); }
 
-/* Globe */
+/* Globe (orthographic, rotating — v0.16.1) */
 .globe-container {
     position: relative;
     border-radius: var(--radius);
     overflow: hidden;
-    background: #050d1a;
-    line-height: 0;
-}
-#globe-map-img {
-    display: block;
+    /* Radial gradient gives the canvas a star-field-ish background;
+       sphere is drawn over the top by JS. */
+    background:
+        radial-gradient(ellipse at 30% 25%, rgba(109, 228, 255, 0.04) 0%, transparent 55%),
+        radial-gradient(ellipse at 70% 75%, rgba(154, 140, 255, 0.04) 0%, transparent 55%),
+        #060912;
+    aspect-ratio: 16 / 9;
     width: 100%;
-    height: auto;
-    pointer-events: none;
-    user-select: none;
+    line-height: 0;
 }
 #globe-canvas {
     position: absolute;
     top: 0; left: 0;
     width: 100%; height: 100%;
-    cursor: crosshair;
+    cursor: grab;
 }
 .globe-tooltip {
     position: absolute;
@@ -7578,65 +7579,197 @@ function renderTriageStatusDonut() {
 
 // --- Geo points extraction (cached) ---
 function extractGeoPoints() {
+    // v0.16.1: read from the flattened `a.geo_data` (always populated by
+    // ElasticsearchAlert.to_dict) first. The list endpoint sends
+    // `include_raw=False` to cut payload, so `a.raw_data` is empty for
+    // most alerts on this page; the previous code only walked raw_data
+    // and yielded zero points.
     const points = [];
     const seen = new Set();
+
+    function _addPoint(lat, lon, country, city, severity) {
+        if (lat == null || lon == null || isNaN(lat) || isNaN(lon)) return;
+        const key = `${lat.toFixed(1)},${lon.toFixed(1)}`;
+        if (!seen.has(key)) {
+            seen.add(key);
+            points.push({ lat, lon, country: country || '', city: city || '', count: 1, severity });
+        } else {
+            const existing = points.find(p => `${p.lat.toFixed(1)},${p.lon.toFixed(1)}` === key);
+            if (existing) existing.count++;
+        }
+    }
+
     allAlerts.forEach(a => {
-        if (!a.raw_data) return;
-        const geoPaths = ['source.geo', 'destination.geo', 'client.geo', 'server.geo', 'host.geo'];
-        geoPaths.forEach(path => {
-            const parts = path.split('.');
-            let obj = a.raw_data;
-            for (const p of parts) {
-                if (obj && typeof obj === 'object') obj = obj[p];
-                else { obj = null; break; }
-            }
-            if (!obj) return;
-            let lat, lon, country, city;
-            if (obj.location) {
-                if (typeof obj.location === 'object') {
-                    lat = parseFloat(obj.location.lat);
-                    lon = parseFloat(obj.location.lon);
-                } else if (typeof obj.location === 'string') {
-                    const lparts = obj.location.split(',');
-                    if (lparts.length === 2) { lat = parseFloat(lparts[0]); lon = parseFloat(lparts[1]); }
+        // Path 1 — flattened geo_data (always present in list responses)
+        const gd = a.geo_data;
+        if (gd && typeof gd === 'object') {
+            // Each prefix produces an independent point — source + destination
+            // can be different countries on the same alert.
+            ['source', 'destination', 'client', 'server', 'host'].forEach(prefix => {
+                const lat = parseFloat(gd[`${prefix}_lat`]);
+                const lon = parseFloat(gd[`${prefix}_lon`]);
+                if (isFinite(lat) && isFinite(lon)) {
+                    _addPoint(lat, lon,
+                              gd[`${prefix}_country`] || gd[`${prefix}_country_iso_code`],
+                              gd[`${prefix}_city`],
+                              a.severity);
                 }
-            }
-            country = obj.country_name || obj.country_iso_code || '';
-            city = obj.city_name || '';
-            if (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) {
-                const key = `${lat.toFixed(1)},${lon.toFixed(1)}`;
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    points.push({ lat, lon, country, city, count: 1, severity: a.severity });
-                } else {
-                    const existing = points.find(p => `${p.lat.toFixed(1)},${p.lon.toFixed(1)}` === key);
-                    if (existing) existing.count++;
+            });
+        }
+
+        // Path 2 — fallback to raw_data when included (single-alert detail
+        // view, future use cases). Reads ECS-standard geo objects.
+        if (a.raw_data && typeof a.raw_data === 'object') {
+            const geoPaths = ['source.geo', 'destination.geo', 'client.geo', 'server.geo', 'host.geo'];
+            geoPaths.forEach(path => {
+                const parts = path.split('.');
+                let obj = a.raw_data;
+                for (const p of parts) {
+                    if (obj && typeof obj === 'object') obj = obj[p];
+                    else { obj = null; break; }
                 }
-            }
-        });
+                if (!obj) return;
+                let lat, lon;
+                if (obj.location) {
+                    if (typeof obj.location === 'object') {
+                        lat = parseFloat(obj.location.lat);
+                        lon = parseFloat(obj.location.lon);
+                    } else if (typeof obj.location === 'string') {
+                        const lparts = obj.location.split(',');
+                        if (lparts.length === 2) {
+                            lat = parseFloat(lparts[0]);
+                            lon = parseFloat(lparts[1]);
+                        }
+                    }
+                }
+                _addPoint(lat, lon, obj.country_name || obj.country_iso_code, obj.city_name, a.severity);
+            });
+        }
     });
     return points;
 }
 
 // =========================================================================
-// Attack Origin Map (flat equirectangular + NASA night texture)
+// Attack Origin Map — orthographic rotating globe (v0.16.1)
+//
+// Switched from the equirectangular flat map to a pure-canvas globe with
+// auto-rotation. Lat/lon are projected via the orthographic formula
+// onto a sphere centred in the canvas; points and arcs on the far side
+// of the globe are culled (don't draw what's hidden by the planet).
+// No external libs — math + Canvas2D only.
 // =========================================================================
-function latLonToMap(lat, lon, w, h) {
-    return { x: ((lon + 180) / 360) * w, y: ((90 - lat) / 180) * h };
+
+// Slow auto-rotation: longitude offset advances over time.
+let mapLambda = 0;        // current longitude rotation (degrees, advances)
+let mapPhi = 18;          // tilt: positive = looking down at northern hem
+const MAP_ROT_DEG_PER_SEC = 6.0;  // ~one full rotation per minute
+let mapLastTs = 0;
+
+// World country outlines, lazily loaded once.
+// Stored as a list of polygons; each polygon is a list of [lon, lat] pairs.
+// Loaded from /static/data/world-countries-110m.json (topojson, ~107KB)
+// and decoded via topojson-client.min.js (~7KB).
+let mapCountryPolygons = null;
+let mapCountriesLoading = false;
+
+async function ensureCountryOutlines() {
+    if (mapCountryPolygons || mapCountriesLoading) return;
+    if (typeof topojson === 'undefined') return;
+    mapCountriesLoading = true;
+    try {
+        const r = await fetch('/static/data/world-countries-110m.json');
+        if (!r.ok) throw new Error('outline fetch ' + r.status);
+        const topo = await r.json();
+        // Convert to GeoJSON, then flatten to a list of polygons (rings).
+        const geo = topojson.feature(topo, topo.objects.countries);
+        const polys = [];
+        (geo.features || []).forEach(f => {
+            const g = f.geometry;
+            if (!g) return;
+            if (g.type === 'Polygon') {
+                g.coordinates.forEach(ring => polys.push(ring));
+            } else if (g.type === 'MultiPolygon') {
+                g.coordinates.forEach(poly => poly.forEach(ring => polys.push(ring)));
+            }
+        });
+        mapCountryPolygons = polys;
+    } catch (e) {
+        console.warn('Globe country outlines failed to load:', e);
+        mapCountryPolygons = [];  // negative cache so we don't retry forever
+    } finally {
+        mapCountriesLoading = false;
+    }
 }
 
-function quadBezierPt(x0, y0, cx, cy, x1, y1, t) {
-    const mt = 1 - t;
-    return { x: mt * mt * x0 + 2 * mt * t * cx + t * t * x1, y: mt * mt * y0 + 2 * mt * t * cy + t * t * y1 };
+// Convert lat/lon to a 3D unit vector, then orthographic-project to 2D.
+// Returns { x, y, visible } where visible=false means the point is on
+// the far hemisphere and should not be drawn / hovered.
+function latLonToScreen(lat, lon, cx, cy, R) {
+    const lambda = (lon - mapLambda) * Math.PI / 180;
+    const phi = lat * Math.PI / 180;
+    const phi0 = mapPhi * Math.PI / 180;
+    // Orthographic projection
+    const cosLat = Math.cos(phi);
+    const sinLat = Math.sin(phi);
+    const cosLon = Math.cos(lambda);
+    const sinLon = Math.sin(lambda);
+    const cosPhi0 = Math.cos(phi0);
+    const sinPhi0 = Math.sin(phi0);
+    // 3D unit vector on sphere
+    const x = cosLat * sinLon;
+    const y = sinLat * cosPhi0 - cosLat * cosLon * sinPhi0;
+    const z = sinLat * sinPhi0 + cosLat * cosLon * cosPhi0;  // +z = front
+    return {
+        x: cx + x * R,
+        y: cy - y * R,
+        visible: z > 0,
+        z,
+    };
+}
+
+// Great-circle interpolation between two lat/lon points. Returns N
+// points along the geodesic; we use this both for arc rendering and
+// for the moving pulse along the arc.
+function greatCirclePoints(lat1, lon1, lat2, lon2, n) {
+    const φ1 = lat1 * Math.PI / 180, λ1 = lon1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180, λ2 = lon2 * Math.PI / 180;
+    const Δσ = Math.acos(
+        Math.max(-1, Math.min(1,
+            Math.sin(φ1) * Math.sin(φ2) +
+            Math.cos(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1)
+        ))
+    );
+    const out = [];
+    if (Δσ === 0) return [{ lat: lat1, lon: lon1 }];
+    for (let i = 0; i <= n; i++) {
+        const f = i / n;
+        const A = Math.sin((1 - f) * Δσ) / Math.sin(Δσ);
+        const B = Math.sin(f * Δσ) / Math.sin(Δσ);
+        const x = A * Math.cos(φ1) * Math.cos(λ1) + B * Math.cos(φ2) * Math.cos(λ2);
+        const y = A * Math.cos(φ1) * Math.sin(λ1) + B * Math.cos(φ2) * Math.sin(λ2);
+        const z = A * Math.sin(φ1) + B * Math.sin(φ2);
+        const φi = Math.atan2(z, Math.sqrt(x * x + y * y));
+        const λi = Math.atan2(y, x);
+        out.push({ lat: φi * 180 / Math.PI, lon: λi * 180 / Math.PI });
+    }
+    return out;
 }
 
 function computeArcTarget() {
+    // Same logic as before but reads from the flattened geo_data with a
+    // raw_data fallback (mirrors extractGeoPoints).
     const destCounts = {};
     allAlerts.forEach(a => {
-        if (!a.raw_data?.destination?.geo?.location) return;
-        const loc = a.raw_data.destination.geo.location;
-        const lat = typeof loc === 'object' ? loc.lat : parseFloat(loc.split(',')[0]);
-        const lon = typeof loc === 'object' ? loc.lon : parseFloat(loc.split(',')[1]);
+        let lat, lon;
+        const gd = a.geo_data;
+        if (gd && (gd.destination_lat != null && gd.destination_lon != null)) {
+            lat = parseFloat(gd.destination_lat);
+            lon = parseFloat(gd.destination_lon);
+        } else if (a.raw_data?.destination?.geo?.location) {
+            const loc = a.raw_data.destination.geo.location;
+            lat = typeof loc === 'object' ? loc.lat : parseFloat(loc.split(',')[0]);
+            lon = typeof loc === 'object' ? loc.lon : parseFloat(loc.split(',')[1]);
+        }
         if (isNaN(lat) || isNaN(lon)) return;
         const key = `${lat.toFixed(0)},${lon.toFixed(0)}`;
         destCounts[key] = (destCounts[key] || 0) + 1;
@@ -7649,8 +7782,7 @@ function computeArcTarget() {
         const [lat, lon] = bestKey.split(',').map(Number);
         return { lat, lon };
     }
-    // Default: UK (London)
-    return { lat: 51.5, lon: -0.1 };
+    return { lat: 51.5, lon: -0.1 };  // Default: London
 }
 
 function buildMapArcs() {
@@ -7671,100 +7803,217 @@ function buildMapArcs() {
     });
 }
 
+// --- Globe drawing primitives ---
+
+function drawGlobeSphere(ctx, cx, cy, R) {
+    // Solid dark fill
+    const grad = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.4, R * 0.1, cx, cy, R);
+    grad.addColorStop(0, 'rgba(20, 36, 60, 1)');
+    grad.addColorStop(0.7, 'rgba(8, 14, 26, 1)');
+    grad.addColorStop(1, 'rgba(4, 6, 14, 1)');
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Atmospheric rim
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(109, 228, 255, 0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R + 2, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(109, 228, 255, 0.18)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R + 5, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(109, 228, 255, 0.06)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+}
+
+function drawCountries(ctx, cx, cy, R) {
+    if (!mapCountryPolygons || !mapCountryPolygons.length) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(109, 228, 255, 0.32)';
+    ctx.lineWidth = 0.6;
+    // Subtle land-fill so continents read clearly against the dark sphere.
+    ctx.fillStyle = 'rgba(80, 130, 200, 0.06)';
+
+    mapCountryPolygons.forEach(ring => {
+        let started = false;
+        let firstPoint = null;
+        ctx.beginPath();
+        for (let i = 0; i < ring.length; i++) {
+            const [lon, lat] = ring[i];
+            const p = latLonToScreen(lat, lon, cx, cy, R);
+            if (!p.visible) {
+                // Lift the pen — segments crossing the limb get cut.
+                started = false;
+                continue;
+            }
+            if (!started) {
+                ctx.moveTo(p.x, p.y);
+                started = true;
+                if (!firstPoint) firstPoint = p;
+            } else {
+                ctx.lineTo(p.x, p.y);
+            }
+        }
+        ctx.fill();
+        ctx.stroke();
+    });
+    ctx.restore();
+}
+
+function drawGraticule(ctx, cx, cy, R) {
+    ctx.save();
+    ctx.lineWidth = 0.5;
+
+    // Latitude rings every 20°
+    for (let lat = -80; lat <= 80; lat += 20) {
+        ctx.beginPath();
+        let first = true;
+        for (let lon = 0; lon < 360; lon += 4) {
+            const p = latLonToScreen(lat, lon - 180, cx, cy, R);
+            if (!p.visible) { first = true; continue; }
+            if (first) { ctx.moveTo(p.x, p.y); first = false; }
+            else ctx.lineTo(p.x, p.y);
+        }
+        ctx.strokeStyle = lat === 0
+            ? 'rgba(109, 228, 255, 0.18)'
+            : 'rgba(154, 140, 250, 0.10)';
+        ctx.stroke();
+    }
+
+    // Longitude meridians every 20°
+    for (let lon = -180; lon < 180; lon += 20) {
+        ctx.beginPath();
+        let first = true;
+        for (let lat = -80; lat <= 80; lat += 4) {
+            const p = latLonToScreen(lat, lon, cx, cy, R);
+            if (!p.visible) { first = true; continue; }
+            if (first) { ctx.moveTo(p.x, p.y); first = false; }
+            else ctx.lineTo(p.x, p.y);
+        }
+        ctx.strokeStyle = lon === 0
+            ? 'rgba(109, 228, 255, 0.18)'
+            : 'rgba(154, 140, 250, 0.10)';
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+function drawArcOnGlobe(ctx, arc, target, cx, cy, R, now) {
+    const pts3d = greatCirclePoints(arc.srcLat, arc.srcLon, target.lat, target.lon, 48);
+    const projected = pts3d.map(p => latLonToScreen(p.lat, p.lon, cx, cy, R));
+    const color = arc.severity === 'critical' ? '#ff6c6c'
+                : arc.severity === 'high'     ? '#f8b33a'
+                                              : '#6de4ff';
+
+    // Trail — draw only segments with both endpoints visible
+    ctx.beginPath();
+    let started = false;
+    projected.forEach(p => {
+        if (!p.visible) { started = false; return; }
+        if (!started) { ctx.moveTo(p.x, p.y); started = true; }
+        else ctx.lineTo(p.x, p.y);
+    });
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.18;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Pulse — bright dot at parameter t along the geodesic
+    const t = ((now * 0.0004 + arc.phase) % 1);
+    const idx = Math.floor(t * (projected.length - 1));
+    const p = projected[idx];
+    if (p && p.visible) {
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
 function renderMap() {
     const canvas = document.getElementById('globe-canvas');
-    const img = document.getElementById('globe-map-img');
-    if (!canvas || !img || !img.clientWidth) return;
+    if (!canvas || !canvas.parentElement) return;
 
-    const w = img.clientWidth;
-    const h = img.clientHeight;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const w = rect.width;
+    const h = rect.height;
+    if (!w || !h) return;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = w * dpr;
     canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
     const now = performance.now();
+
+    // Advance rotation based on real elapsed time (not frame count)
+    if (mapLastTs) {
+        const dt = (now - mapLastTs) / 1000;
+        mapLambda = (mapLambda + dt * MAP_ROT_DEG_PER_SEC) % 360;
+    }
+    mapLastTs = now;
+
+    const cx = w / 2;
+    const cy = h / 2;
+    const R = Math.min(w, h) * 0.42;
+
+    drawGlobeSphere(ctx, cx, cy, R);
+    drawCountries(ctx, cx, cy, R);
+    drawGraticule(ctx, cx, cy, R);
+
+    // Arcs from sources → target
     const target = mapTargetLatLon;
-
-    // Draw arcs
     if (target) {
-        const tp = latLonToMap(target.lat, target.lon, w, h);
-        mapAttackArcs.forEach(arc => {
-            const sp = latLonToMap(arc.srcLat, arc.srcLon, w, h);
-            const color = arc.severity === 'critical' ? '#f44336' : arc.severity === 'high' ? '#ff9800' : '#4fc3f7';
+        mapAttackArcs.forEach(arc => drawArcOnGlobe(ctx, arc, target, cx, cy, R, now));
 
-            // Bezier control point arched above midpoint
-            const mx = (sp.x + tp.x) / 2;
-            const my = (sp.y + tp.y) / 2;
-            const dist = Math.sqrt((sp.x - tp.x) ** 2 + (sp.y - tp.y) ** 2);
-            const cpx = mx;
-            const cpy = my - dist * 0.35;
-
-            // Arc trail (static, subtle)
-            ctx.beginPath();
-            ctx.moveTo(sp.x, sp.y);
-            ctx.quadraticCurveTo(cpx, cpy, tp.x, tp.y);
-            ctx.strokeStyle = color;
-            ctx.globalAlpha = 0.12;
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-
-            // Bright near-pulse section
-            const t = ((now * 0.0004 + arc.phase) % 1);
-            ctx.beginPath();
-            const segLen = 0.12;
-            const tStart = Math.max(0, t - segLen);
-            for (let s = tStart; s <= t; s += 0.01) {
-                const pt = quadBezierPt(sp.x, sp.y, cpx, cpy, tp.x, tp.y, s);
-                s === tStart ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y);
-            }
-            ctx.strokeStyle = color;
-            ctx.globalAlpha = 0.5;
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            // Pulse dot
-            const pp = quadBezierPt(sp.x, sp.y, cpx, cpy, tp.x, tp.y, t);
-            ctx.globalAlpha = 1;
+        // Target marker
+        const tp = latLonToScreen(target.lat, target.lon, cx, cy, R);
+        if (tp.visible) {
             ctx.save();
-            ctx.shadowColor = color;
-            ctx.shadowBlur = 6;
+            ctx.shadowColor = '#86f0a0';
+            ctx.shadowBlur = 12;
+            ctx.fillStyle = '#86f0a0';
+            const sz = 6;
             ctx.beginPath();
-            ctx.arc(pp.x, pp.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
+            ctx.moveTo(tp.x, tp.y - sz);
+            ctx.lineTo(tp.x + sz * 0.6, tp.y);
+            ctx.lineTo(tp.x, tp.y + sz);
+            ctx.lineTo(tp.x - sz * 0.6, tp.y);
+            ctx.closePath();
             ctx.fill();
             ctx.restore();
-        });
-
-        // Target marker (green diamond)
-        ctx.globalAlpha = 1;
-        ctx.save();
-        ctx.shadowColor = '#4caf50';
-        ctx.shadowBlur = 10;
-        ctx.fillStyle = '#4caf50';
-        const sz = 6;
-        ctx.beginPath();
-        ctx.moveTo(tp.x, tp.y - sz);
-        ctx.lineTo(tp.x + sz * 0.6, tp.y);
-        ctx.lineTo(tp.x, tp.y + sz);
-        ctx.lineTo(tp.x - sz * 0.6, tp.y);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-        ctx.strokeStyle = 'rgba(76,175,80,0.4)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(tp.x, tp.y, sz + 5, 0, Math.PI * 2);
-        ctx.stroke();
+            ctx.strokeStyle = 'rgba(134, 240, 160, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(tp.x, tp.y, sz + 5, 0, Math.PI * 2);
+            ctx.stroke();
+        }
     }
 
     // Source dots
     const pts = cachedGeoPoints || [];
     pts.forEach(p => {
-        const mp = latLonToMap(p.lat, p.lon, w, h);
-        const color = p.severity === 'critical' ? '#f44336' : p.severity === 'high' ? '#ff9800' : '#4fc3f7';
+        const mp = latLonToScreen(p.lat, p.lon, cx, cy, R);
+        if (!mp.visible) return;
+        const color = p.severity === 'critical' ? '#ff6c6c'
+                    : p.severity === 'high'     ? '#f8b33a'
+                                                : '#6de4ff';
         const pulse = 1 + 0.25 * Math.sin(now * 0.003 + p.lat * 3);
         const r = (2.5 + Math.min(p.count, 10) * 0.5) * pulse;
 
@@ -7782,7 +8031,7 @@ function renderMap() {
         ctx.beginPath();
         ctx.arc(mp.x, mp.y, r * 0.35, 0, Math.PI * 2);
         ctx.fillStyle = '#fff';
-        ctx.globalAlpha = 0.7;
+        ctx.globalAlpha = 0.85;
         ctx.fill();
         ctx.globalAlpha = 1;
     });
@@ -7790,9 +8039,13 @@ function renderMap() {
     // Legend (bottom-left)
     if (pts.length > 0) {
         const countries = [...new Set(pts.map(p => p.country).filter(Boolean))];
-        ctx.font = '10px monospace';
-        ctx.fillStyle = 'rgba(200,220,240,0.6)';
-        ctx.fillText(`${pts.length} sources, ${countries.length} countries`, 8, h - 6);
+        ctx.font = '10px "JetBrains Mono", ui-monospace, monospace';
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
+        ctx.fillText(`${pts.length} sources · ${countries.length} countries`, 10, h - 10);
+    } else {
+        ctx.font = '11px "Geist", ui-sans-serif, system-ui, sans-serif';
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.55)';
+        ctx.fillText('No geo data on current alerts', 10, h - 10);
     }
 }
 
@@ -7805,6 +8058,10 @@ function mapAnimLoop() {
 function startMap() {
     cachedGeoPoints = extractGeoPoints();
     buildMapArcs();
+    // v0.16.1: lazy-load country outlines once; renderMap() will pick them
+    // up as soon as they arrive — until then, the globe still renders with
+    // sphere + graticule + dots, just no continents.
+    ensureCountryOutlines();
     if (!mapAnimating) {
         mapAnimating = true;
         mapAnimLoop();
@@ -7838,18 +8095,23 @@ function handleMapHover(e) {
     const my = e.clientY - rect.top;
     const w = rect.width;
     const h = rect.height;
+    const cx = w / 2, cy = h / 2;
+    const R = Math.min(w, h) * 0.42;
 
     let closest = null, closestDist = 15;
     const pts = cachedGeoPoints || [];
     pts.forEach(p => {
-        const mp = latLonToMap(p.lat, p.lon, w, h);
+        const mp = latLonToScreen(p.lat, p.lon, cx, cy, R);
+        if (!mp.visible) return;  // hidden on far hemisphere — don't tooltip
         const dist = Math.sqrt((mp.x - mx) ** 2 + (mp.y - my) ** 2);
         if (dist < closestDist) { closestDist = dist; closest = p; }
     });
 
     if (closest) {
         const loc = closest.city ? `${closest.city}, ${closest.country}` : closest.country || 'Unknown';
-        const sevColor = closest.severity === 'critical' ? '#f44336' : closest.severity === 'high' ? '#ff9800' : '#4fc3f7';
+        const sevColor = closest.severity === 'critical' ? '#ff6c6c'
+                       : closest.severity === 'high'     ? '#f8b33a'
+                                                         : '#6de4ff';
         tooltip.innerHTML = `<strong>${escapeHtml(loc)}</strong><br>${closest.count} alert${closest.count > 1 ? 's' : ''} <span style="color:${sevColor};">${closest.severity}</span>`;
         tooltip.style.display = 'block';
         tooltip.style.left = (mx + 14) + 'px';
