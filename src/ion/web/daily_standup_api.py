@@ -225,6 +225,19 @@ async def _check_log_source_health(
 
     try:
         # Last 24 h event count per host matching pattern
+        # v0.15.1: terms.size dropped 500→100. WEF estates rarely have
+        # >100 forwarders in scope, and the 500-host fan-out (×24 hourly
+        # buckets) was the dominant cost causing timeouts on busy estates.
+        # Operators with more hosts than that can override via
+        # ION_STANDUP_TERMS_SIZE.
+        try:
+            terms_size = int(os.environ.get("ION_STANDUP_TERMS_SIZE", "100"))
+        except Exception:
+            terms_size = 100
+        # v0.15.1: heavy aggregations get a 60 s per-request timeout
+        # (vs the 30 s ION_ES_TIMEOUT default). Without this override the
+        # WEF check on a busy estate raced the global default and timed
+        # out before ES could finish the rollup.
         body_24h = {
             "size": 0,
             "query": {
@@ -238,7 +251,7 @@ async def _check_log_source_health(
             },
             "aggs": {
                 "hosts": {
-                    "terms": {"field": host_field, "size": 500},
+                    "terms": {"field": host_field, "size": terms_size},
                     "aggs": {
                         "hourly": {
                             "date_histogram": {"field": "@timestamp", "fixed_interval": "1h"}
@@ -248,7 +261,8 @@ async def _check_log_source_health(
             },
         }
         result_24h = await es._request(
-            "POST", f"/{index}/_search?ignore_unavailable=true", json=body_24h
+            "POST", f"/{index}/_search?ignore_unavailable=true",
+            json=body_24h, timeout=60.0,
         )
 
         # 7-day average for comparison
@@ -265,12 +279,13 @@ async def _check_log_source_health(
             },
             "aggs": {
                 "hosts": {
-                    "terms": {"field": host_field, "size": 500},
+                    "terms": {"field": host_field, "size": terms_size},
                 }
             },
         }
         result_7d = await es._request(
-            "POST", f"/{index}/_search?ignore_unavailable=true", json=body_7d
+            "POST", f"/{index}/_search?ignore_unavailable=true",
+            json=body_7d, timeout=60.0,
         )
 
         hosts_24h: Dict[str, Dict[str, Any]] = {}
