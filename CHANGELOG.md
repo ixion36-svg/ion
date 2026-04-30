@@ -1,5 +1,61 @@
 # Changelog
 
+## v0.18.0 (2026-04-30) — feature
+
+### CyAB Onboarding — Documentation Checklist
+
+A new "Documentation" tab in `/cyab/studio` tracks the documentation artifacts every onboarded system should have on record (HLD, LLD, network topology, runbook, threat model, …). Each item carries a status, an optional URL to wherever the doc lives (Confluence, SharePoint, git, etc.), free-text notes, and last-updated metadata.
+
+#### Default catalogue (20 items)
+
+| Architecture & Design | Operational | Security & Risk | Compliance |
+|---|---|---|---|
+| ★ HLD | Runbook / Operational SOP | Threat Model | Data Classification |
+| LLD | Asset Inventory / CMDB Entry | Risk Assessment | Compliance / Controls Mapping |
+| ★ Network Topology Diagram | ★ Owners & Escalation Matrix | Vulnerability / Pentest Report | Incident Response Plan |
+| Data Flow Diagram | Backup & Recovery Plan | Authentication & RBAC | Change Management Process |
+| Logging & Telemetry Architecture | Disaster Recovery / BCP | | Vendor / License Documentation |
+| | Decommissioning Plan | | |
+
+★ = critical. The three critical items drive a soft warning banner on the Pack export and the sign-off response — never blocks, but the analyst sees the gap.
+
+#### Per-item fields
+
+- **Status** — `Done`, `In progress`, `Missing`, `N/A`, `Unknown`
+- **URL** — link to the live document
+- **Notes** — free text
+- **Updated by / at** — auto-tracked
+
+#### Storage
+
+New table `cyab_doc_checklist` keyed on `(system_id, kind)`. Default rows are **lazy-seeded** the first time a system's checklist is fetched, so existing systems get the catalogue without a backfill migration. Sites can add custom items per-system (`is_custom=True`) and delete those custom rows; default rows can have status / URL / notes edited but the row itself stays.
+
+#### Where it surfaces
+
+1. **Studio "Documentation" tab** — table per category, status dropdowns + URL + notes inline-editable, badge on the tab shows `done/total`
+2. **Onboarding Pack PDF** — new "Documentation checklist" appendix (★ critical items marked, coverage summary at top, critical-missing warning banner)
+3. **Sign-off response** — `POST /api/cyab/studio/systems/{id}/onboarding-pack/sign` now returns `doc_checklist_coverage` so the UI can show a warning banner if critical items are open
+
+#### New routes (mounted under `/api/cyab/studio`)
+
+- `GET    /systems/{sys_id}/checklist` — list + coverage
+- `PUT    /checklist/{item_id}` — update status / URL / notes (custom items also: label, is_critical)
+- `POST   /systems/{sys_id}/checklist` — add a custom item
+- `DELETE /checklist/{item_id}` — remove a custom item (default rows return 400)
+
+All write routes gated on `case:update` (matching the rest of the Studio per v0.17.2).
+
+#### Verifying
+
+```bash
+docker compose pull ion
+docker compose up -d --force-recreate ion
+```
+
+Open `/cyab/studio`, pick a system → "Documentation" tab → 20 default rows appear with status `Unknown`. Edit a row → save is auto-persisted, badge updates. Export the Onboarding Pack → new "Documentation checklist" section near the bottom. Add a custom item via the "+ Add custom item" button.
+
+---
+
 ## v0.17.3 (2026-04-30) — fix
 
 Two related Bob investigation bugs in one ship.

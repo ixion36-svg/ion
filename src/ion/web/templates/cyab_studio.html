@@ -103,6 +103,12 @@
             <svg class="w-3.5 h-3.5"><use href="#i-file-text"/></svg>
             Audit &amp; compliance
           </button>
+          <!-- v0.18.0: Documentation checklist tab -->
+          <button data-tab="docs" class="cs-tab flex-1 py-3 text-[11px] font-semibold uppercase tracking-widest rounded-lg transition flex items-center justify-center gap-2">
+            <svg class="w-3.5 h-3.5"><use href="#i-file-text"/></svg>
+            Documentation
+            <span id="cs-docs-badge" class="hidden ml-1 px-1.5 py-0.5 rounded text-[9px] tabular-nums"></span>
+          </button>
         </div>
 
         <!-- Tab body -->
@@ -114,6 +120,7 @@
           <div id="cs-tab-intake" class="hidden"></div>
           <div id="cs-tab-detection" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4"></div>
           <div id="cs-tab-audit" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+          <div id="cs-tab-docs" class="hidden"></div>
         </div>
       </div>
 
@@ -370,9 +377,16 @@
     writeUrl();
   }
   function renderTabBody() {
-    ['intake', 'detection', 'audit'].forEach((t) => {
+    ['intake', 'detection', 'audit', 'docs'].forEach((t) => {
       $(`cs-tab-${t}`).classList.toggle('hidden', t !== state.tab);
     });
+    // v0.18.0: docs tab is system-scoped, not sub-profile-scoped — render
+    // it whenever a system is picked, even if sub-profile selection is
+    // empty. The other three tabs still need a sub-profile context.
+    if (state.tab === 'docs') {
+      renderDocsTab();
+      return;
+    }
     if (!state.subprofile_full) return;
     const cat = state.subprofile_full.catalogue || {};
     if (state.tab === 'intake') renderIntake(cat.intake_questions || [], cat.recommended_tasks || []);
@@ -642,6 +656,227 @@
     if (!el) return;
     el.textContent = msg;
     el.className = 'text-[11px] ' + (err ? 'text-rose-400' : 'text-slate-500');
+  }
+
+  // ── v0.18.0: Documentation Checklist tab ──────────────────────────────
+  const DOC_STATUSES = [
+    { v: 'unknown',     l: 'Unknown' },
+    { v: 'in_progress', l: 'In progress' },
+    { v: 'done',        l: 'Done' },
+    { v: 'missing',     l: 'Missing' },
+    { v: 'na',          l: 'N/A' },
+  ];
+  const DOC_CATEGORY_LABELS = {
+    design:      'Architecture & Design',
+    operational: 'Operational',
+    security:    'Security & Risk',
+    compliance:  'Compliance',
+  };
+  const DOC_STATUS_PILL = {
+    done:        'bg-ion-lime/15 text-ion-lime',
+    in_progress: 'bg-ion-cyan/15 text-ion-cyan',
+    missing:     'bg-ion-coral/15 text-ion-coral',
+    na:          'bg-slate-500/15 text-slate-400',
+    unknown:     'bg-slate-500/10 text-slate-500',
+  };
+  let _docState = { items: [], coverage: null };
+
+  async function loadDocChecklist() {
+    if (!state.system_id) return;
+    try {
+      const r = await fetch(`/api/cyab/studio/systems/${state.system_id}/checklist`);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      _docState = { items: d.items || [], coverage: d.coverage || null };
+      updateDocsBadge();
+    } catch (e) {
+      _docState = { items: [], coverage: null, error: String(e) };
+    }
+  }
+
+  function updateDocsBadge() {
+    const badge = $('cs-docs-badge');
+    if (!badge) return;
+    const cov = _docState.coverage;
+    if (!cov || !cov.total) { badge.classList.add('hidden'); return; }
+    badge.classList.remove('hidden');
+    const isCriticalGap = (cov.critical_missing || []).length > 0;
+    badge.textContent = `${cov.done}/${cov.total}`;
+    badge.className = 'ml-1 px-1.5 py-0.5 rounded text-[9px] tabular-nums ' +
+      (isCriticalGap ? 'bg-ion-coral/15 text-ion-coral' : 'bg-ion-lime/15 text-ion-lime');
+  }
+
+  async function renderDocsTab() {
+    const c = $('cs-tab-docs');
+    if (!state.system_id) {
+      c.classList.remove('hidden');
+      c.innerHTML = '<div class="text-center py-12 text-slate-500 text-[13px]">Pick a system to see its documentation checklist.</div>';
+      return;
+    }
+    if (!_docState.items.length) {
+      c.classList.remove('hidden');
+      c.innerHTML = '<div class="text-center py-12 text-slate-500 text-[13px]">Loading checklist…</div>';
+      await loadDocChecklist();
+    }
+    const cov = _docState.coverage || {};
+    const items = _docState.items || [];
+
+    const criticalMissing = (cov.critical_missing || []);
+    const criticalBanner = criticalMissing.length ? `
+      <div class="mb-4 px-4 py-3 rounded-md border border-ion-coral/30 bg-ion-coral/10 text-[12.5px] text-ion-coral">
+        <strong>${criticalMissing.length} critical document${criticalMissing.length > 1 ? 's' : ''} still outstanding:</strong>
+        ${criticalMissing.map(escapeHtml).join(', ')}.
+        Pack export will warn but won't block.
+      </div>` : '';
+
+    // Group by category
+    const byCat = {};
+    items.forEach(i => { (byCat[i.category] = byCat[i.category] || []).push(i); });
+
+    const sections = ['design', 'operational', 'security', 'compliance']
+      .filter(cat => byCat[cat])
+      .map(cat => {
+        const rows = byCat[cat].map(it => `
+          <tr data-item-id="${it.id}" class="border-t border-white/5">
+            <td class="px-3 py-2 align-top">
+              <div class="text-[12.5px] text-slate-200 ${it.is_critical ? 'font-semibold' : ''}">
+                ${escapeHtml(it.label)}
+                ${it.is_critical ? '<span class="ml-1 text-ion-coral" title="Critical">★</span>' : ''}
+                ${it.is_custom ? '<span class="ml-1 text-[10px] text-slate-500 italic">custom</span>' : ''}
+              </div>
+              <div class="text-[10px] text-slate-600 font-mono mt-0.5">${escapeHtml(it.kind)}</div>
+            </td>
+            <td class="px-3 py-2 align-top">
+              <select data-doc-status class="text-[12px] bg-white/5 border border-white/10 rounded px-2 py-1 text-slate-200">
+                ${DOC_STATUSES.map(s => `<option value="${s.v}" ${s.v === it.status ? 'selected' : ''}>${s.l}</option>`).join('')}
+              </select>
+            </td>
+            <td class="px-3 py-2 align-top">
+              <input type="url" data-doc-url placeholder="https://…"
+                value="${escapeHtml(it.url || '')}"
+                class="w-full text-[12px] bg-white/5 border border-white/10 rounded px-2 py-1 text-slate-200 placeholder:text-slate-600">
+            </td>
+            <td class="px-3 py-2 align-top">
+              <input type="text" data-doc-notes placeholder="—"
+                value="${escapeHtml(it.notes || '')}"
+                class="w-full text-[12px] bg-white/5 border border-white/10 rounded px-2 py-1 text-slate-200 placeholder:text-slate-600">
+            </td>
+            <td class="px-3 py-2 align-top text-right">
+              ${it.is_custom
+                ? `<button data-doc-delete class="text-[10px] text-slate-500 hover:text-ion-coral transition">Remove</button>`
+                : `<span class="text-[10px] text-slate-600">—</span>`}
+              <div data-doc-saved class="text-[10px] text-slate-600 mt-1">${it.updated_by ? 'last: ' + escapeHtml(it.updated_by) : ''}</div>
+            </td>
+          </tr>
+        `).join('');
+        return `
+          <h3 class="text-[12px] font-semibold uppercase tracking-widest text-slate-400 mt-6 mb-2">${escapeHtml(DOC_CATEGORY_LABELS[cat] || cat)}</h3>
+          <table class="w-full text-[12px] border-collapse rounded-md overflow-hidden bg-ink-900/30">
+            <thead><tr class="text-[10px] uppercase tracking-widest text-slate-500">
+              <th class="px-3 py-2 text-left w-[28%]">Item</th>
+              <th class="px-3 py-2 text-left w-[15%]">Status</th>
+              <th class="px-3 py-2 text-left w-[27%]">Link</th>
+              <th class="px-3 py-2 text-left w-[22%]">Notes</th>
+              <th class="px-3 py-2 text-right w-[8%]"></th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>`;
+      }).join('');
+
+    c.classList.remove('hidden');
+    c.innerHTML = `
+      <div class="flex flex-wrap items-end justify-between gap-3 mb-4">
+        <div>
+          <div class="text-[11px] uppercase tracking-widest text-slate-500 mb-1">Documentation status</div>
+          <div class="text-[14px] text-slate-200">
+            <strong class="tabular-nums">${cov.done || 0} / ${cov.total || 0}</strong>
+            done · <span class="text-slate-400">${cov.completion_pct || 0}%</span>
+          </div>
+          <div class="text-[11px] text-slate-500 mt-0.5">
+            Critical: <strong class="${criticalMissing.length ? 'text-ion-coral' : 'text-ion-lime'}">${cov.critical_done || 0}/${cov.critical_total || 0}</strong>
+          </div>
+        </div>
+        <button id="cs-docs-add-btn" class="h-8 px-3 rounded-md bg-white/5 border border-white/10 text-[11px] font-semibold text-slate-200 hover:bg-white/10 transition">
+          + Add custom item
+        </button>
+      </div>
+      ${criticalBanner}
+      ${sections}
+    `;
+
+    // Wire row-level handlers (delegate via the table body).
+    c.querySelectorAll('tr[data-item-id]').forEach(row => {
+      const itemId = row.dataset.itemId;
+      const sel    = row.querySelector('[data-doc-status]');
+      const urlIn  = row.querySelector('[data-doc-url]');
+      const notesIn= row.querySelector('[data-doc-notes]');
+      const delBtn = row.querySelector('[data-doc-delete]');
+      const persist = (patch) => saveDocItem(itemId, patch);
+      sel.onchange     = () => persist({ status: sel.value });
+      urlIn.onchange   = () => persist({ url: urlIn.value });
+      notesIn.onchange = () => persist({ notes: notesIn.value });
+      if (delBtn) delBtn.onclick = () => deleteDocItem(itemId);
+    });
+
+    const addBtn = $('cs-docs-add-btn');
+    if (addBtn) addBtn.onclick = () => addCustomDocItem();
+  }
+
+  async function saveDocItem(itemId, patch) {
+    try {
+      const r = await fetch(`/api/cyab/studio/checklist/${itemId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      await loadDocChecklist();
+      // Patch the row in place for status change so we keep current scroll.
+      // Cheap re-render covers it.
+      renderDocsTab();
+    } catch (e) {
+      console.warn('saveDocItem failed:', e);
+    }
+  }
+
+  async function deleteDocItem(itemId) {
+    if (!confirm('Remove this custom item?')) return;
+    try {
+      const r = await fetch(`/api/cyab/studio/checklist/${itemId}`, { method: 'DELETE' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      await loadDocChecklist();
+      renderDocsTab();
+    } catch (e) {
+      console.warn('deleteDocItem failed:', e);
+    }
+  }
+
+  async function addCustomDocItem() {
+    const label = prompt('Custom checklist item — short label (e.g. "PCI scope diagram"):');
+    if (!label || !label.trim()) return;
+    const cat = (prompt('Category — design / operational / security / compliance:', 'design') || 'design').trim().toLowerCase();
+    if (!['design','operational','security','compliance'].includes(cat)) {
+      alert('Unknown category — use one of: design, operational, security, compliance.');
+      return;
+    }
+    // Auto-derive a kind from the label.
+    const kind = 'CUSTOM_' + label.toUpperCase().replace(/[^A-Z0-9]+/g, '_').slice(0, 32);
+    try {
+      const r = await fetch(`/api/cyab/studio/systems/${state.system_id}/checklist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind, label: label.trim(), category: cat, status: 'unknown' }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        alert(err.detail || ('HTTP ' + r.status));
+        return;
+      }
+      await loadDocChecklist();
+      renderDocsTab();
+    } catch (e) {
+      console.warn('addCustomDocItem failed:', e);
+    }
   }
 
   function renderUseCases(kind, ucs) {
@@ -1162,6 +1397,7 @@
       if (state.system_id) {
         sel.value = String(state.system_id);
         await loadAnswers(state.system_id);
+        loadDocChecklist();  // v0.18.0: pre-populate badge on page load when a system is in the URL
       }
       updatePackButton();
       updateSystemMeta();
@@ -1213,6 +1449,14 @@
     await resolveTargetDataSource();
     updateSystemMeta();
     updatePackButton();
+    // v0.18.0: refresh the docs-checklist badge whenever the system changes
+    if (state.system_id) {
+      _docState = { items: [], coverage: null };
+      loadDocChecklist();
+    } else {
+      _docState = { items: [], coverage: null };
+      updateDocsBadge();
+    }
     writeUrl();
     renderTabBody();
   });

@@ -103,6 +103,7 @@ from ion.models.analytics import (
 )
 from ion.models.cyab import CyabSystem, CyabDataSource, CyabSnapshot
 from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
+from ion.models.cyab_doc_checklist import CyabDocChecklistItem
 from ion.models.canary import Canary, CanaryHit, CanaryType, CanaryStatus
 from ion.models.log_source import LogSource, LogSourceCategory
 from ion.models.emulation import EmulationPlan, EmulationStep, EmulationPlanStatus, StepResult

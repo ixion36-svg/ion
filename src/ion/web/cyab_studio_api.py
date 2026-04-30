@@ -41,6 +41,7 @@ from ion.models.cyab import (
 )
 from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
 from ion.models.user import User
+from ion.services import cyab_doc_checklist_service as _doc_svc
 from ion.services import cyab_subprofile_service as svc
 from ion.services.cyab_subprofile_service import (
     get_subprofile_full,
@@ -779,6 +780,71 @@ def _render_onboarding_pack_html(
         "<h2>Containment authority</h2><p><em>Not yet captured. Required before sign-off.</em></p>"
     )
 
+    # ---- Documentation checklist (v0.18.0) -----------------------------
+    try:
+        doc_items = _doc_svc.list_for_system(session, sys.id)
+        doc_cov = _doc_svc.coverage_summary(session, sys.id)
+    except Exception:
+        doc_items, doc_cov = [], None
+
+    if doc_items:
+        rows = []
+        # Group rows by category for readable output.
+        by_cat: Dict[str, List[Dict[str, Any]]] = {}
+        for it in doc_items:
+            by_cat.setdefault(it.get("category", "design"), []).append(it)
+        cat_labels = {
+            "design":      "Architecture & Design",
+            "operational": "Operational",
+            "security":    "Security & Risk",
+            "compliance":  "Compliance",
+        }
+        STATUS_LABEL = {
+            "done":        "Done",
+            "in_progress": "In progress",
+            "missing":     "Missing",
+            "na":          "N/A",
+            "unknown":     "Unknown",
+        }
+        for cat in ["design", "operational", "security", "compliance"]:
+            if cat not in by_cat:
+                continue
+            rows.append(f'<h3>{_h(cat_labels.get(cat, cat.title()))}</h3>')
+            rows.append(
+                "<table><tr>"
+                "<th>Item</th><th>Status</th><th>Link</th><th>Notes</th>"
+                "</tr>"
+            )
+            for it in by_cat[cat]:
+                star = " ★" if it.get("is_critical") else ""
+                status_lbl = STATUS_LABEL.get(it.get("status", "unknown"), it.get("status", ""))
+                url = it.get("url") or ""
+                url_cell = f'<a href="{_h(url)}">{_h(url)[:60]}</a>' if url else ""
+                rows.append(
+                    f"<tr><td>{_h(it.get('label', ''))}{star}</td>"
+                    f"<td>{_h(status_lbl)}</td>"
+                    f"<td>{url_cell}</td>"
+                    f"<td>{_h((it.get('notes') or '')[:160])}</td></tr>"
+                )
+            rows.append("</table>")
+        critical_block = ""
+        if doc_cov and doc_cov.get("critical_missing"):
+            missing = ", ".join(doc_cov["critical_missing"])
+            critical_block = (
+                f'<p style="color:#a40000;"><strong>Critical documents missing:</strong> '
+                f'{_h(missing)}</p>'
+            )
+        doc_section = (
+            "<h2>Documentation checklist</h2>"
+            f'<p>★ marks critical items. Coverage: '
+            f'<strong>{(doc_cov or {}).get("done", 0)}/{(doc_cov or {}).get("total", 0)}</strong> '
+            f'done · {(doc_cov or {}).get("completion_pct", 0)}%.</p>'
+            f"{critical_block}"
+            + "".join(rows)
+        )
+    else:
+        doc_section = ""
+
     # ---- Sign-off -------------------------------------------------------
     signoff = f"""
     <h2>Sign-off</h2>
@@ -813,7 +879,7 @@ def _render_onboarding_pack_html(
         .pdf-subtitle { color: #555; font-size: 10pt; margin-top: 0; }
     </style>
     """
-    return f"<!DOCTYPE html><html><head>{style}</head><body>{cover}{context}{scope}{readiness_html}{containment}{signoff}</body></html>"
+    return f"<!DOCTYPE html><html><head>{style}</head><body>{cover}{context}{scope}{readiness_html}{containment}{doc_section}{signoff}</body></html>"
 
 
 @router.get(
@@ -883,6 +949,15 @@ def sign_onboarding_pack(
     session.commit()
     session.refresh(sys)
 
+    # v0.18.0: include checklist coverage in the sign-off response so
+    # the UI can show a "critical docs missing" warning banner. Soft
+    # gate only — the sign-off proceeds either way; analyst sees the
+    # gap and can override via a comment.
+    try:
+        coverage = _doc_svc.coverage_summary(session, sys.id)
+    except Exception:
+        coverage = None
+
     return {
         "system_id": sys.id,
         "status": sys.status,
@@ -891,4 +966,127 @@ def sign_onboarding_pack(
         "sign_soc_name": sys.sign_soc_name,
         "sign_soc_date": sys.sign_soc_date.isoformat() if sys.sign_soc_date else None,
         "containment_authority": sys.containment_authority,
+        "doc_checklist_coverage": coverage,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#   v0.18.0 — Documentation Checklist
+# ═══════════════════════════════════════════════════════════════════════
+#
+# Per-system checklist of expected documentation artifacts (HLD, LLD,
+# network topology, runbook, etc.). Lazy-seeded on first access via the
+# service module's default catalogue. Three "critical" items (HLD,
+# NETWORK_TOPOLOGY, OWNERS) drive a soft warning on Pack export.
+
+from ion.models.cyab_doc_checklist import ALL_CATEGORIES, ALL_STATUSES  # _doc_svc imported at top of file
+
+
+class DocChecklistUpdate(BaseModel):
+    status: Optional[str] = None
+    url: Optional[str] = None
+    notes: Optional[str] = None
+    label: Optional[str] = None        # only honoured for is_custom rows
+    is_critical: Optional[bool] = None  # only honoured for is_custom rows
+
+
+class DocChecklistAdd(BaseModel):
+    kind: str
+    label: str
+    category: str = "design"
+    is_critical: bool = False
+    status: str = "unknown"
+    url: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@router.get("/systems/{sys_id}/checklist")
+def get_doc_checklist(
+    sys_id: int,
+    session: Session = Depends(get_db_session),
+    _user: User = Depends(get_current_user),
+):
+    """Return the documentation checklist for a system + a coverage rollup.
+    Lazy-seeds the default catalogue on first call so existing systems
+    don't need a migration."""
+    sys_row = session.get(CyabSystem, sys_id)
+    if not sys_row:
+        raise HTTPException(status_code=404, detail=f"System {sys_id} not found")
+    return {
+        "system_id": sys_id,
+        "items": _doc_svc.list_for_system(session, sys_id),
+        "coverage": _doc_svc.coverage_summary(session, sys_id),
+    }
+
+
+@router.put(
+    "/checklist/{item_id}",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def update_doc_checklist_item(
+    item_id: int,
+    body: DocChecklistUpdate,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Update one checklist item. Default-catalogue rows can have
+    status/url/notes edited; is_custom rows can also rename label /
+    flip is_critical."""
+    try:
+        out = _doc_svc.update_item(
+            session, item_id,
+            status=body.status, url=body.url, notes=body.notes,
+            label=body.label, is_critical=body.is_critical,
+            user_id=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if out is None:
+        raise HTTPException(status_code=404, detail=f"Checklist item {item_id} not found")
+    return out
+
+
+@router.post(
+    "/systems/{sys_id}/checklist",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def add_custom_doc_checklist_item(
+    sys_id: int,
+    body: DocChecklistAdd,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Add a custom (operator-defined) checklist row beyond the default catalogue."""
+    sys_row = session.get(CyabSystem, sys_id)
+    if not sys_row:
+        raise HTTPException(status_code=404, detail=f"System {sys_id} not found")
+    try:
+        out = _doc_svc.add_custom_item(
+            session, sys_id,
+            kind=body.kind, label=body.label, category=body.category,
+            is_critical=body.is_critical, status=body.status,
+            url=body.url, notes=body.notes,
+            user_id=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return out
+
+
+@router.delete(
+    "/checklist/{item_id}",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def delete_custom_doc_checklist_item(
+    item_id: int,
+    session: Session = Depends(get_db_session),
+    _user: User = Depends(get_current_user),
+):
+    """Remove a custom checklist row. Default rows return 400."""
+    ok = _doc_svc.delete_custom_item(session, item_id)
+    if not ok:
+        raise HTTPException(
+            status_code=400,
+            detail="Item not found, or it is a default-catalogue row (cannot be deleted).",
+        )
+    return {"ok": True, "deleted": item_id}
