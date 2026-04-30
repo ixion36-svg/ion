@@ -463,76 +463,65 @@ async def get_daily_checks(
 
 
 class StandupSaveRequest(BaseModel):
+    """Body for both ``/save`` and ``/pdf``.
+
+    v0.15.2: field names match the frontend canonically. Earlier the
+    frontend sent ``threat_summary`` / ``servicenow_incidents`` /
+    ``signoff_analyst`` / ``signoff_confirmed`` / ``meetings`` while the
+    backend expected different names; pydantic silently dropped the
+    unmatched fields so the AI summary, ServiceNow notes, sign-off, and
+    meetings checklist never made it to the saved doc or the PDF.
+
+    ``model_config = {"extra": "ignore"}`` is the default; we leave it
+    so any future frontend-only diagnostic fields don't 422.
+    """
+
+    # Canonical fields used by both save & PDF
     servicenow_notes: str = ""
-    meeting_notes: str = ""
     additional_notes: str = ""
     analyst_name: str = ""
     signed_off: bool = False
     checks_data: dict = Field(default_factory=dict)
     ai_summary: str = ""
     reports_of_interest: list = Field(default_factory=list)
+    meetings: dict = Field(default_factory=dict)
+    custom_meeting_item: str = ""
 
 
-@router.post("/save")
-async def save_daily_standup(
-    data: StandupSaveRequest,
-    current_user: User = Depends(require_permission("alert:read")),
-):
-    """Save the daily standup report as a document."""
-    from ion.core.config import get_config
-    from ion.storage.database import get_engine, get_session_factory
-    from ion.models.document import Document
-
-    config = get_config()
-    engine = get_engine(config.db_path)
-    factory = get_session_factory(engine)
-    session = factory()
-
-    try:
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        doc = Document(
-            name=f"Daily Standup \u2014 {today}",
-            rendered_content=json.dumps(
-                {
-                    "date": today,
-                    "analyst": data.analyst_name or current_user.display_name or current_user.username,
-                    "signed_off": data.signed_off,
-                    "servicenow_notes": data.servicenow_notes,
-                    "meeting_notes": data.meeting_notes,
-                    "additional_notes": data.additional_notes,
-                    "checks_data": data.checks_data,
-                    "ai_summary": data.ai_summary,
-                    "reports_of_interest": data.reports_of_interest,
-                },
-                default=str,
-            ),
-            status="active",
-            output_format="json",
-        )
-        session.add(doc)
-        session.commit()
-        return {"ok": True, "document_id": doc.id, "name": doc.name}
-    except Exception as e:
-        session.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        session.close()
+# ── HTML rendering (shared by /save + /pdf) ───────────────────────────────
 
 
-# ── PDF export ────────────────────────────────────────────────────────────
+# Stable label map for the meetings checklist (mirrors the data-item
+# values in daily_standup.html). New checklist items added in the
+# template should be added here too so the saved/printed report names them.
+_MEETING_LABELS = {
+    "standup":      "Morning standup attended",
+    "handover":     "Shift handover reviewed",
+    "case_review":  "Case review completed",
+    "threat_intel": "Threat intel briefing reviewed",
+    "action_items": "Action items from previous day checked",
+}
 
 
-@router.post("/pdf")
-async def export_standup_pdf(
-    data: StandupSaveRequest,
-    current_user: User = Depends(require_permission("alert:read")),
-):
-    """Export the daily standup report as a PDF (falls back to HTML without WeasyPrint)."""
+def _esc(s: Any) -> str:
+    """HTML-escape, tolerating non-str inputs."""
+    import html as _html
+    return _html.escape("" if s is None else str(s))
+
+
+def _render_standup_html(data: "StandupSaveRequest", current_user: "User") -> str:
+    """Render the standup as standalone HTML.
+
+    Used by both ``/save`` (stored as the document's ``rendered_content``
+    so the document-export-PDF flow produces a sensible report) and
+    ``/pdf`` (sent through WeasyPrint inline). v0.15.2.
+    """
     today = datetime.now(timezone.utc).strftime("%d %b %Y")
     analyst = data.analyst_name or current_user.display_name or current_user.username
     checks = data.checks_data or {}
 
-    html = (
+    out: List[str] = []
+    out.append(
         "<html><head><style>"
         "body { font-family: Helvetica, sans-serif; color: #1a1a2e; padding: 30px;"
         " font-size: 11px; line-height: 1.5; }"
@@ -554,153 +543,246 @@ async def export_standup_pdf(
         ".status-red { color: #dc2626; }"
         ".section-notes { background: #f8fafc; border: 1px solid #e2e8f0;"
         " border-radius: 4px; padding: 8px 12px; margin: 8px 0; white-space: pre-wrap; }"
+        ".meetings-list { list-style: none; padding-left: 0; margin: 6px 0; }"
+        ".meetings-list li { padding: 3px 0; }"
+        ".meetings-list .done { color: #16a34a; }"
+        ".meetings-list .skipped { color: #94a3b8; text-decoration: line-through; }"
+        ".reports-list { list-style: none; padding-left: 0; margin: 6px 0; }"
+        ".reports-list li { padding: 4px 0; border-bottom: 1px solid #f1f5f9; }"
+        ".reports-list a { color: #0ea5e9; text-decoration: none; }"
         ".signoff { margin-top: 30px; padding: 16px; border: 2px solid #e2e8f0;"
         " border-radius: 8px; }"
         ".footer { margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 8px;"
         " color: #94a3b8; font-size: 9px; text-align: center; }"
         "</style></head><body>"
     )
-
-    html += f"<h1>Daily SOC Standup Report</h1>"
+    out.append("<h1>Daily SOC Standup Report</h1>")
     signed = "Yes" if data.signed_off else "No"
-    html += (
-        f'<div class="meta">Date: {today} &nbsp;|&nbsp; '
-        f"Duty Analyst: {analyst} &nbsp;|&nbsp; Signed Off: {signed}</div>"
+    out.append(
+        f'<div class="meta">Date: {_esc(today)} &nbsp;|&nbsp; '
+        f"Duty Analyst: {_esc(analyst)} &nbsp;|&nbsp; Signed Off: {signed}</div>"
     )
 
     # -- Cluster Health --------------------------------------------------------
-    cluster = checks.get("cluster_health", {})
+    cluster = checks.get("cluster_health") or {}
     if cluster:
         status = cluster.get("status", "unknown")
         status_class = f"status-{status}" if status in ("green", "yellow", "red") else ""
-        html += "<h2>Elasticsearch Cluster Health</h2>"
-        html += (
+        out.append("<h2>Elasticsearch Cluster Health</h2>")
+        out.append(
             "<table><tr><th>Status</th><th>Nodes</th><th>Indices</th>"
             "<th>Shards</th><th>Unassigned</th></tr>"
         )
-        html += (
-            f'<tr><td class="{status_class}">{status.upper()}</td>'
-            f'<td>{cluster.get("number_of_nodes", "?")}</td>'
-            f'<td>{cluster.get("indices_count", "?")}</td>'
-            f'<td>{cluster.get("active_shards", "?")}</td>'
-            f'<td>{cluster.get("unassigned_shards", "?")}</td></tr></table>'
+        out.append(
+            f'<tr><td class="{status_class}">{_esc(status).upper()}</td>'
+            f'<td>{_esc(cluster.get("number_of_nodes", "?"))}</td>'
+            f'<td>{_esc(cluster.get("indices_count", "?"))}</td>'
+            f'<td>{_esc(cluster.get("active_shards", "?"))}</td>'
+            f'<td>{_esc(cluster.get("unassigned_shards", "?"))}</td></tr></table>'
         )
 
     # -- Critical Alerts -------------------------------------------------------
-    alerts = checks.get("critical_alerts", {})
+    alerts = checks.get("critical_alerts") or {}
     if alerts:
-        html += (
+        out.append(
             f'<h2>Critical/High Alerts (Last 24h) &mdash; '
             f'{alerts.get("critical_count", 0)} Critical, '
             f'{alerts.get("high_count", 0)} High</h2>'
         )
         alert_list = alerts.get("alerts", [])
         if alert_list:
-            html += (
+            out.append(
                 "<table><tr><th>Time</th><th>Severity</th><th>Rule</th>"
                 "<th>Host</th><th>Status</th></tr>"
             )
             for a in alert_list[:15]:
-                ts = a.get("timestamp", "")[:16].replace("T", " ")
-                html += (
-                    f'<tr><td>{ts}</td><td>{a.get("severity", "")}</td>'
-                    f'<td>{a.get("rule_name", "")[:50]}</td>'
-                    f'<td>{a.get("host", "")}</td>'
-                    f'<td>{a.get("status", "")}</td></tr>'
+                ts = str(a.get("timestamp", ""))[:16].replace("T", " ")
+                out.append(
+                    f'<tr><td>{_esc(ts)}</td><td>{_esc(a.get("severity", ""))}</td>'
+                    f'<td>{_esc(str(a.get("rule_name", ""))[:50])}</td>'
+                    f'<td>{_esc(a.get("host", ""))}</td>'
+                    f'<td>{_esc(a.get("status", ""))}</td></tr>'
                 )
-            html += "</table>"
+            out.append("</table>")
         else:
-            html += "<p>No critical/high alerts in the last 24 hours.</p>"
+            out.append("<p>No critical/high alerts in the last 24 hours.</p>")
 
     # -- Stale Cases -----------------------------------------------------------
-    stale = checks.get("stale_cases", {})
+    stale = checks.get("stale_cases") or {}
     if stale:
-        html += f'<h2>Stale Cases (Open &gt; 24h) &mdash; {stale.get("count", 0)}</h2>'
+        out.append(f'<h2>Stale Cases (Open &gt; 24h) &mdash; {stale.get("count", 0)}</h2>')
         case_list = stale.get("cases", [])
         if case_list:
-            html += (
+            out.append(
                 "<table><tr><th>Case</th><th>Title</th><th>Severity</th>"
                 "<th>Assigned</th><th>Hours Open</th></tr>"
             )
             for c in case_list:
-                html += (
-                    f'<tr><td>{c.get("case_number", "")}</td>'
-                    f'<td>{c.get("title", "")[:40]}</td>'
-                    f'<td>{c.get("severity", "")}</td>'
-                    f'<td>{c.get("assigned_to", "")}</td>'
-                    f'<td>{c.get("hours_open", 0)}</td></tr>'
+                out.append(
+                    f'<tr><td>{_esc(c.get("case_number", ""))}</td>'
+                    f'<td>{_esc(str(c.get("title", ""))[:40])}</td>'
+                    f'<td>{_esc(c.get("severity", ""))}</td>'
+                    f'<td>{_esc(c.get("assigned_to", ""))}</td>'
+                    f'<td>{_esc(c.get("hours_open", 0))}</td></tr>'
                 )
-            html += "</table>"
+            out.append("</table>")
         else:
-            html += "<p>No stale cases.</p>"
+            out.append("<p>No stale cases.</p>")
 
     # -- DC / WEF Log Health ---------------------------------------------------
     for key, title in [
         ("dc_log_health", "Domain Controller Log Health"),
         ("wef_log_health", "WEF Log Health"),
     ]:
-        lh = checks.get(key, {})
+        lh = checks.get(key) or {}
         if lh and lh.get("hosts"):
-            html += (
+            out.append(
                 f"<h2>{title} &mdash; {lh.get('total_events_24h', 0):,} events, "
                 f"{lh.get('hosts_with_gaps', 0)} hosts with gaps</h2>"
             )
-            html += (
+            out.append(
                 "<table><tr><th>Host</th><th>Events (24h)</th><th>7-Day Avg</th>"
                 "<th>Below Avg</th><th>Gap Hours</th><th>Status</th></tr>"
             )
             for h in lh.get("hosts", []):
+                hstatus = h.get("status", "ok")
                 sc = (
-                    "status-critical"
-                    if h["status"] == "critical"
-                    else "status-warning"
-                    if h["status"] == "warning"
+                    "status-critical" if hstatus == "critical"
+                    else "status-warning" if hstatus == "warning"
                     else "status-ok"
                 )
-                html += (
-                    f'<tr><td>{h["hostname"]}</td>'
-                    f'<td>{h["count_24h"]:,}</td>'
-                    f'<td>{h["avg_7d"]:,}</td>'
-                    f'<td>{"Yes" if h["below_average"] else "No"}</td>'
-                    f'<td>{h["gap_hours"]}</td>'
-                    f'<td class="{sc}">{h["status"].upper()}</td></tr>'
+                out.append(
+                    f'<tr><td>{_esc(h.get("hostname", ""))}</td>'
+                    f'<td>{int(h.get("count_24h", 0)):,}</td>'
+                    f'<td>{int(h.get("avg_7d", 0)):,}</td>'
+                    f'<td>{"Yes" if h.get("below_average") else "No"}</td>'
+                    f'<td>{_esc(h.get("gap_hours", 0))}</td>'
+                    f'<td class="{sc}">{_esc(hstatus).upper()}</td></tr>'
                 )
-            html += "</table>"
+            out.append("</table>")
 
     # -- Rule Failures ---------------------------------------------------------
-    rf = checks.get("rule_failures", {})
+    rf = checks.get("rule_failures") or {}
     if rf and rf.get("rules"):
-        html += f'<h2>Rule Failures &mdash; {rf.get("count", 0)} rules</h2>'
-        html += "<table><tr><th>Rule</th><th>Failures</th><th>Last Failure</th></tr>"
+        out.append(f'<h2>Rule Failures &mdash; {rf.get("count", 0)} rules</h2>')
+        out.append("<table><tr><th>Rule</th><th>Failures</th><th>Last Failure</th></tr>")
         for r in rf.get("rules", []):
-            html += (
-                f'<tr><td>{r.get("rule_name", "")[:50]}</td>'
-                f'<td>{r.get("failure_count", 0)}</td>'
-                f'<td>{(r.get("last_failure") or "")[:16]}</td></tr>'
+            out.append(
+                f'<tr><td>{_esc(str(r.get("rule_name", ""))[:50])}</td>'
+                f'<td>{_esc(r.get("failure_count", 0))}</td>'
+                f'<td>{_esc(str(r.get("last_failure") or "")[:16])}</td></tr>'
             )
-        html += "</table>"
+        out.append("</table>")
 
-    # -- Free-text sections ----------------------------------------------------
-    if data.servicenow_notes:
-        html += f'<h2>ServiceNow Incidents</h2><div class="section-notes">{data.servicenow_notes}</div>'
+    # -- Threat Landscape Summary (AI) -----------------------------------------
     if data.ai_summary:
-        html += f'<h2>Threat Landscape Summary</h2><div class="section-notes">{data.ai_summary}</div>'
-    if data.meeting_notes:
-        html += f'<h2>Daily Meeting Notes</h2><div class="section-notes">{data.meeting_notes}</div>'
-    if data.additional_notes:
-        html += f'<h2>Additional Notes</h2><div class="section-notes">{data.additional_notes}</div>'
+        out.append(f'<h2>Threat Landscape Summary</h2>'
+                   f'<div class="section-notes">{_esc(data.ai_summary)}</div>')
 
-    # -- Sign-off --------------------------------------------------------------
-    html += (
-        f'<div class="signoff"><strong>Duty Analyst:</strong> {analyst}<br>'
+    # -- Threat Reports of Interest --------------------------------------------
+    if data.reports_of_interest:
+        out.append('<h2>Threat Reports of Interest</h2>')
+        out.append('<ul class="reports-list">')
+        for rpt in data.reports_of_interest:
+            if not isinstance(rpt, dict):
+                continue
+            title = rpt.get("title") or rpt.get("name") or "Untitled"
+            url = rpt.get("url") or ""
+            published = rpt.get("published") or rpt.get("created_at") or ""
+            link = f'<a href="{_esc(url)}">{_esc(title)}</a>' if url else _esc(title)
+            meta = f' &mdash; <span style="color:#64748b">{_esc(str(published)[:16])}</span>' if published else ""
+            out.append(f"<li>{link}{meta}</li>")
+        out.append("</ul>")
+
+    # -- ServiceNow Notes ------------------------------------------------------
+    if data.servicenow_notes:
+        out.append(f'<h2>ServiceNow Incidents</h2>'
+                   f'<div class="section-notes">{_esc(data.servicenow_notes)}</div>')
+
+    # -- Daily Meetings checklist ----------------------------------------------
+    meetings = data.meetings or {}
+    custom_item_text = (data.custom_meeting_item or "").strip()
+    has_meeting_data = bool(meetings) or bool(custom_item_text)
+    if has_meeting_data:
+        out.append('<h2>Daily Meetings</h2><ul class="meetings-list">')
+        for key, label in _MEETING_LABELS.items():
+            done = bool(meetings.get(key))
+            mark = "[x]" if done else "[ ]"
+            cls = "done" if done else "skipped"
+            out.append(f'<li class="{cls}">{mark} {_esc(label)}</li>')
+        if custom_item_text:
+            done = bool(meetings.get("custom"))
+            mark = "[x]" if done else "[ ]"
+            cls = "done" if done else "skipped"
+            out.append(f'<li class="{cls}">{mark} {_esc(custom_item_text)}</li>')
+        out.append("</ul>")
+
+    # -- Additional notes ------------------------------------------------------
+    if data.additional_notes:
+        out.append(f'<h2>Additional Notes</h2>'
+                   f'<div class="section-notes">{_esc(data.additional_notes)}</div>')
+
+    # -- Sign-off block --------------------------------------------------------
+    out.append(
+        f'<div class="signoff"><strong>Duty Analyst:</strong> {_esc(analyst)}<br>'
         f'<strong>Signed Off:</strong> {"Yes" if data.signed_off else "No"}<br>'
-        f"<strong>Date:</strong> {today}</div>"
+        f"<strong>Date:</strong> {_esc(today)}</div>"
     )
-    html += (
+    out.append(
         f'<div class="footer">Generated by ION &middot; '
-        f"Intelligent Operating Network &middot; {today}</div>"
+        f"Intelligent Operating Network &middot; {_esc(today)}</div>"
     )
-    html += "</body></html>"
+    out.append("</body></html>")
+    return "".join(out)
+
+
+@router.post("/save")
+async def save_daily_standup(
+    data: StandupSaveRequest,
+    current_user: User = Depends(require_permission("alert:read")),
+):
+    """Save the daily standup report as a document."""
+    from ion.core.config import get_config
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.models.document import Document
+
+    config = get_config()
+    engine = get_engine(config.db_path)
+    factory = get_session_factory(engine)
+    session = factory()
+
+    try:
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        doc = Document(
+            name=f"Daily Standup \u2014 {today}",
+            rendered_content=_render_standup_html(data, current_user),
+            status="active",
+            output_format="html",
+        )
+        session.add(doc)
+        session.commit()
+        return {"ok": True, "document_id": doc.id, "name": doc.name}
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        session.close()
+
+
+# ── PDF export ────────────────────────────────────────────────────────────
+
+
+@router.post("/pdf")
+async def export_standup_pdf(
+    data: StandupSaveRequest,
+    current_user: User = Depends(require_permission("alert:read")),
+):
+    """Export the daily standup report as a PDF (falls back to HTML without WeasyPrint).
+
+    v0.15.2: HTML body comes from the shared ``_render_standup_html``
+    helper, identical to what ``/save`` writes into the document store.
+    """
+    html = _render_standup_html(data, current_user)
 
     try:
         from weasyprint import HTML as WeasyHTML
@@ -716,6 +798,7 @@ async def export_standup_pdf(
         from fastapi.responses import HTMLResponse
 
         return HTMLResponse(content=html)
+
 
 
 # ── Arkime high-risk traffic ──────────────────────────────────────────────

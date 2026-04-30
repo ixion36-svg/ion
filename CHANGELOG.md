@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.15.2 (2026-04-30) — fix
+
+### Daily standup — PDF export missed the threat summary + reports; saved docs were JSON
+
+Two related bugs on the daily standup page:
+
+1. **The PDF export was missing the AI threat-landscape summary AND the reports-of-interest list.** Frontend `collectState()` was sending `threat_summary` / `servicenow_incidents` / `signoff_analyst` / `signoff_confirmed` while the backend `StandupSaveRequest` expected `ai_summary` / `servicenow_notes` / `analyst_name` / `signed_off`. Pydantic silently dropped the unmatched fields, so the AI summary, ServiceNow notes, sign-off block, and the meetings checklist never made it into the rendered PDF. The reports-of-interest list was never sent at all.
+
+2. **Saving the standup as a document then exporting that document to PDF produced a PDF dump of raw JSON.** The save endpoint stored `rendered_content=json.dumps(...)` with `output_format="json"`, so the generic `/documents/{id}/pdf` flow rendered the JSON blob into a PDF instead of a styled report.
+
+#### Fixes
+
+- Extracted `_render_standup_html(data, current_user)` — single source of truth for the rendered standup HTML, used by both `/save` and `/pdf`.
+- Added a **"Threat Reports of Interest"** section (rendered as a linked list with publication dates).
+- Added a **"Daily Meetings"** checklist section (renders the checked / unchecked items by stable label, plus the custom meeting item if one was entered).
+- `/save` now stores `rendered_content=<rendered HTML>` with `output_format="html"` — so the document-export-PDF flow produces the same styled PDF as the inline export, instead of a raw-JSON dump.
+- Frontend `collectState()` field names aligned with the backend (`ai_summary`, `reports_of_interest`, `servicenow_notes`, `analyst_name`, `signed_off`). `loadReports()` now caches the report list on `DS.reports` so it ships with every save / export.
+- Removed `meeting_notes` from the save model (it was unused — the meetings data lives in the `meetings` dict + `custom_meeting_item`).
+
+#### Verifying
+
+```bash
+docker compose pull ion
+docker compose up -d --force-recreate ion
+```
+
+Open the daily standup, run the checks, generate the threat summary, tick a couple of meetings, then export PDF → all sections present. Save the standup, open it from `/documents`, hit "Export PDF" on that document → same styled PDF (not raw JSON).
+
+---
+
 ## v0.15.1 (2026-04-30) — fix
 
 ### Daily standup — WEF log-source-health timeouts on busy estates
