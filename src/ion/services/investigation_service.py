@@ -344,7 +344,13 @@ _FIRST_JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 # in the Integration Checklist.
 _DEFAULT_MAX_PER_SWEEP = 50
 _DEFAULT_SWEEP_INTERVAL_S = 900
-_DEFAULT_LLM_TIMEOUT_S = 120
+# v0.17.3: bumped 120 → 300. Real investigation prompts on llama3.1:8b
+# (full alert context + observables + history + MITRE chain) routinely
+# take 130-180s; the previous 120s gate was firing in the middle of a
+# legitimate response. Chat prompts are shorter and weren't affected.
+# Override per-deployment via ION_INVESTIGATION_LLM_TIMEOUT_S env or the
+# matching config attribute.
+_DEFAULT_LLM_TIMEOUT_S = 300
 
 
 # ---------------------------------------------------------------------------
@@ -1372,9 +1378,15 @@ class InvestigationService:
             "system_prompt": system_prompt,
             "context_type": "security",
             "user_id": 0,
-            # v0.10.11: deterministic sampling. Same alert+seed in = same
-            # verdict out. Accuracy can't be measured while outputs drift.
-            "temperature": 0.0,
+            # v0.10.11: deterministic-ish sampling. Same alert+seed in =
+            # roughly the same verdict out (small variance). Earlier this
+            # was temperature=0.0 + top_p=0.1 + top_k=1 + response_format=
+            # "json" — that combo over-constrained the decoder, causing
+            # the model to emit just `{}` as the simplest valid JSON
+            # completion when the prompt was at all ambiguous (v0.17.3
+            # bug report). Relaxed to 0.2 / 0.9 / 40, with `seed` still
+            # supplied per call below for cross-run reproducibility.
+            "temperature": 0.2,
             "max_tokens": 2048,
         }
         try:
@@ -1393,17 +1405,28 @@ class InvestigationService:
             if "seed" in sig.parameters:
                 kwargs["seed"] = seed
             if "top_p" in sig.parameters:
-                kwargs["top_p"] = 0.1
+                kwargs["top_p"] = 0.9
             if "top_k" in sig.parameters:
-                kwargs["top_k"] = 1
+                kwargs["top_k"] = 40
         except (TypeError, ValueError):
             pass
 
+        # Resolution order: ION_INVESTIGATION_LLM_TIMEOUT_S env (operator
+        # tuning knob, no rebuild needed) → config attr → module default.
         timeout_s = _DEFAULT_LLM_TIMEOUT_S
+        import os as _os
+        try:
+            env_v = _os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S")
+            if env_v and env_v.strip():
+                timeout_s = int(env_v.strip())
+        except Exception:
+            pass
         try:
             from ion.core.config import get_config
             cfg = get_config()
-            timeout_s = int(getattr(cfg, "investigation_llm_timeout_s", _DEFAULT_LLM_TIMEOUT_S))
+            cfg_v = getattr(cfg, "investigation_llm_timeout_s", None)
+            if cfg_v:
+                timeout_s = int(cfg_v)
         except Exception:
             pass
 
