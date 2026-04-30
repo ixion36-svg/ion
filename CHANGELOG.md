@@ -1,5 +1,46 @@
 # Changelog
 
+## v0.16.1 (2026-04-30) — fix + polish
+
+### Attack Origin Map — rotating globe + geo data fix
+
+Two related changes on the alerts page's "Attack Origin Map" tab:
+
+#### 1. Geo data now actually pulls from alerts
+
+The map's `extractGeoPoints()` only walked `a.raw_data.{source,destination,…}.geo`, but the list endpoint sends `include_raw=False` to cut payload size — so `a.raw_data` is empty for every alert in the list view, and the map yielded zero points regardless of how much geo enrichment Elasticsearch had captured. (`a.geo_data` — the flattened `source_country` / `source_lat` / `source_lon` block — IS always sent and was being ignored.)
+
+`extractGeoPoints` now reads from `a.geo_data` first, with the raw_data path retained as a fallback for single-alert detail views. `computeArcTarget()` got the same treatment.
+
+#### 2. Flat equirectangular map → orthographic rotating globe
+
+The previous map was a static `earth_night.jpg` background with a Canvas2D overlay. Replaced with a pure-canvas orthographic globe:
+
+- Dark sphere with radial gradient + atmospheric rim
+- **Country outlines** projected on the sphere (110m world-atlas topojson, ~107 KB; decoded with the 7 KB `topojson-client` lib at page load)
+- 20° lat/lon graticule (equator + prime meridian highlighted)
+- Auto-rotation: ~one full revolution per minute (`MAP_ROT_DEG_PER_SEC = 6`)
+- Lat/lon → 3D unit-vector → orthographic 2D projection
+- Backface culling: points, arc segments and country edges on the far hemisphere are not drawn
+- Arcs follow great-circle geodesics rather than 2D quadratic Béziers
+
+New static assets: `static/data/world-countries-110m.json` (Natural Earth public-domain) and `static/js/topojson-client.min.js`. The `earth_night.jpg` asset is no longer referenced.
+
+Hover tooltips updated to the new projection (skips invisible points). Empty state now reads "No geo data on current alerts".
+
+#### Verifying
+
+```bash
+docker compose pull ion
+docker compose up -d --force-recreate ion
+```
+
+Open `/alerts`, switch to the **Threat Map** tab. The globe should rotate slowly. With geo-enriched alerts in scope, source dots appear and arc to the most-targeted destination (London by default). The legend shows `N sources · M countries`.
+
+If your ES alerts don't have `source.geo` enrichment, the legend reads "No geo data on current alerts" — that's an ES pipeline matter, not an ION bug.
+
+---
+
 ## v0.16.0 (2026-04-30) — feature
 
 ### PCAP auto-analysis on case creation + alert-page comment markdown
