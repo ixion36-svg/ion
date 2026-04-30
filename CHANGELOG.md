@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.17.2 (2026-04-30) — fix
+
+### CyAB Studio — permission gates referenced a non-existent permission
+
+Six write-side routes in `cyab_studio_api.py` (sub-profile create / patch / use-case CRUD / intake answer save / onboarding-pack sign-off) were gated on `require_permission("case:write")` — but `case:write` isn't a real permission in ION's RBAC catalogue. The actual case permissions are `case:read`, `case:create`, `case:update`, `case:close`, `case:comment`, `case:link`. So `require_permission("case:write")` always rejected, regardless of role.
+
+Symptom: trying to add a sub-profile, save intake answers, or sign off an Onboarding Pack returned a permission error.
+
+Fix: all 6 routes flipped to `case:update` — a real, analyst-level permission, consistent with the existing pattern (e.g. `cyab_api.py:528` uses `case:close` for system delete).
+
+#### Verifying
+
+```bash
+docker compose pull ion
+docker compose up -d --force-recreate ion
+```
+
+Open `/cyab/studio`, pick a system, edit a sub-profile or save an intake answer — should land instead of erroring on permission.
+
+---
+
 ## v0.17.1 (2026-04-30) — feature + fix
 
 ### Daily standup — three new KPI panels

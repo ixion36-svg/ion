@@ -160,7 +160,7 @@ def get_subprofile(
 
 @router.post(
     "/subprofiles",
-    dependencies=[Depends(require_permission("case:write"))],
+    dependencies=[Depends(require_permission("case:update"))],
 )
 def create_subprofile_route(
     body: SubprofileCreate,
@@ -225,7 +225,7 @@ def _row_to_full_dict_for_api(row: CyabSubProfile) -> Dict[str, Any]:
 
 @router.patch(
     "/subprofiles/{sub_id}",
-    dependencies=[Depends(require_permission("case:write"))],
+    dependencies=[Depends(require_permission("case:update"))],
 )
 def patch_subprofile_route(
     sub_id: str,
@@ -261,7 +261,7 @@ def get_use_case_route(
 
 @router.post(
     "/use-cases/{uc_id}/tide-stub",
-    dependencies=[Depends(require_permission("case:write"))],
+    dependencies=[Depends(require_permission("case:update"))],
 )
 def generate_tide_stub(
     uc_id: str,
@@ -441,7 +441,7 @@ def get_system_answers(
 
 @router.post(
     "/systems/{sys_id}/answers",
-    dependencies=[Depends(require_permission("case:write"))],
+    dependencies=[Depends(require_permission("case:update"))],
 )
 def patch_system_answers(
     sys_id: int,
@@ -557,7 +557,7 @@ def get_data_source_uc_status(
 
 @router.post(
     "/data-sources/{ds_id}/use-case-status",
-    dependencies=[Depends(require_permission("case:write"))],
+    dependencies=[Depends(require_permission("case:update"))],
 )
 def patch_data_source_uc_status(
     ds_id: int,
@@ -855,7 +855,7 @@ def render_onboarding_pack(
 
 @router.post(
     "/systems/{sys_id}/onboarding-pack/sign",
-    dependencies=[Depends(require_permission("case:write"))],
+    dependencies=[Depends(require_permission("case:update"))],
 )
 def sign_onboarding_pack(
     sys_id: int,
