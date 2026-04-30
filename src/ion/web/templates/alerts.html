@@ -6355,13 +6355,28 @@ function renderCommentsTab(alertId, comments) {
         html += '<div class="empty-state">No comments yet</div>';
     } else {
         comments.forEach(c => {
+            // v0.16.0: render comment content as markdown (mirrors cases.html
+            // line 2491). Falls back to escaped plain text when marked or
+            // DOMPurify isn't loaded for some reason. Both are loaded by
+            // base.html so this should always hit the markdown path.
+            const raw = c.content || '';
+            let rendered;
+            if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+                try {
+                    rendered = DOMPurify.sanitize(marked.parse(raw));
+                } catch (e) {
+                    rendered = escapeHtml(raw);
+                }
+            } else {
+                rendered = escapeHtml(raw);
+            }
             html += `
                 <div class="comment-item">
                     <div class="comment-header">
                         <span class="comment-user">${escapeHtml(c.user)}</span>
                         <span class="comment-time">${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</span>
                     </div>
-                    <div class="comment-body">${escapeHtml(c.content)}</div>
+                    <div class="comment-body cpanel-note-markdown">${rendered}</div>
                 </div>
             `;
         });

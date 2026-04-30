@@ -1,5 +1,45 @@
 # Changelog
 
+## v0.16.0 (2026-04-30) — feature
+
+### PCAP auto-analysis on case creation + alert-page comment markdown
+
+Two related shipments:
+
+#### 1. PCAP auto-analysis triggered by `network.community_id`
+
+When a case is linked to alerts that carry `network.community_id` (the Zeek/Arkime flow hash), ION now fires a fire-and-forget background task that:
+
+1. Resolves each unique community_id to an Arkime session (`/api/sessions?expression=communityId == "..."`).
+2. Downloads the matching PCAP via Arkime's session-download endpoint.
+3. Parses it through the existing `pcap_service.parse_pcap()` (dpkt-based — protocols, top talkers, DNS queries, TLS SNI, HTTP hosts, findings, verdict).
+4. Posts a markdown analysis as a case Note attributed to **Bob** (the AI service-user), with a deep link back to Arkime so analysts can pivot.
+
+Best-effort throughout — if Arkime isn't configured, the session lookup fails, or the PCAP can't be parsed, the relevant fallback markdown still gets posted (metadata-only, with the failure reason attached) so the analyst can see the flow exists. Case creation never blocks waiting on Arkime.
+
+New service: `src/ion/services/pcap_analysis_service.py` (~250 LOC). Exposes `enqueue_pcap_analysis_for_case(case_id, community_ids, alert_node_hint=None)`. Mirrors the fire-and-forget pattern used by `case_grouper_service.enqueue_investigation` (running event loop preferred; daemon thread fallback).
+
+Hook point: `web/api.py` `create_case`, after observable enrichment. Scans the linked alerts' `raw_data` for `network.community_id` (and the legacy flat `community_id` key); pulls a node hint from `arkime_node` or `arkime.node` so Arkime can prefer the right capture node when a community_id matches multiple sessions.
+
+#### 2. Alert-page comment renderer now renders markdown
+
+The alert-detail Comments tab was rendering note content as plain escaped text while the Investigation Notes panel on the case page was rendering as markdown — same `Note` model, two different renderers. Now the alert-page renderer uses the same `marked.parse() + DOMPurify.sanitize()` path as `cases.html:2491`, so PCAP-analysis notes (and any other markdown-formatted comment) render identically across both pages.
+
+The `.cpanel-note-markdown` CSS block was also lifted from `cases.html` into the shared `style.css` so future templates that need markdown notes get the same look without duplicating ~90 lines of CSS.
+
+#### Verifying
+
+```bash
+docker compose pull ion
+docker compose up -d --force-recreate ion
+```
+
+Create a case from one or more alerts that carry `network.community_id`. Within a few seconds (Arkime + dpkt round-trip), a new note appears on the case from "Bob" with the PCAP analysis. Reload the alert detail panel for any of the linked alerts and you'll see the same note rendered with full markdown styling (headings, tables, code blocks).
+
+If Arkime isn't configured, the note still posts but contains only the metadata block + an "Arkime not configured" note — useful for noticing the integration is missing.
+
+---
+
 ## v0.15.3 (2026-04-30) — fix
 
 ### Case creation — observables harvested from every linked alert, not just 2-3
