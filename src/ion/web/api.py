@@ -4420,6 +4420,52 @@ async def create_case(
         new_case.observables = case_observables
         session.commit()
 
+    # ── v0.16.0: PCAP auto-analysis ─────────────────────────────────────
+    #
+    # If any of the linked alerts carry ``network.community_id`` (the
+    # Zeek/Arkime flow hash), fire a background task that:
+    #   1. resolves each community_id to an Arkime session,
+    #   2. downloads the matching PCAP,
+    #   3. parses it via ``pcap_service.parse_pcap`` (dpkt),
+    #   4. posts a markdown analysis as a case Note attributed to Bob.
+    #
+    # Best-effort: never blocks case creation, never raises into the
+    # response. The community_id list is extracted from raw_data when
+    # available; we also pull a node hint from the alert's
+    # ``arkime_node`` field so the Arkime lookup can prefer the right
+    # capture node.
+    try:
+        community_ids: List[str] = []
+        node_hint: Optional[str] = None
+        for ctx in (data.alert_contexts or []):
+            rd = ctx.raw_data or {}
+            if not isinstance(rd, dict):
+                continue
+            # ECS path: network.community_id; some pipelines flatten it.
+            net = rd.get("network") if isinstance(rd.get("network"), dict) else None
+            cid = (net or {}).get("community_id") or rd.get("community_id") or rd.get("network.community_id")
+            if cid:
+                community_ids.append(str(cid))
+            if not node_hint:
+                node_hint = (
+                    rd.get("arkime_node")
+                    or rd.get("arkime", {}).get("node") if isinstance(rd.get("arkime"), dict) else None
+                )
+
+        if community_ids:
+            from ion.services.pcap_analysis_service import enqueue_pcap_analysis_for_case
+            enqueue_pcap_analysis_for_case(
+                case_id=new_case.id,
+                community_ids=community_ids,
+                alert_node_hint=node_hint,
+            )
+            logger.info(
+                "create_case: queued PCAP auto-analysis for case %s (%d community_ids)",
+                case_number, len(set(community_ids)),
+            )
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.warning("create_case: PCAP auto-analysis enqueue failed: %s", exc)
+
     await _sync_case_to_es(new_case, session)
 
     # Resolve Kibana assignee UID for case creation.

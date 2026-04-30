@@ -4266,3 +4266,96 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--border) !important;
   color: var(--text-primary) !important;
 }
+
+/* ── Markdown rendering inside note cards (v0.16.0)
+     Used by:
+     - case Investigation Notes panel (cases.html)
+     - alert Comments tab (alerts.html)
+   Lifted from cases.html so both pages render markdown identically. */
+.cpanel-note-markdown { white-space: normal; }
+.cpanel-note-markdown > *:first-child { margin-top: 0; }
+.cpanel-note-markdown > *:last-child { margin-bottom: 0; }
+.cpanel-note-markdown h1,
+.cpanel-note-markdown h2,
+.cpanel-note-markdown h3,
+.cpanel-note-markdown h4 {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: -0.01em;
+    margin: 0.75rem 0 0.4rem;
+    line-height: 1.25;
+}
+.cpanel-note-markdown h1 { font-size: 1.05rem; }
+.cpanel-note-markdown h2 { font-size: 0.95rem; }
+.cpanel-note-markdown h3 { font-size: 0.85rem; }
+.cpanel-note-markdown h4 { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; }
+.cpanel-note-markdown p { margin: 0.4rem 0; line-height: 1.5; }
+.cpanel-note-markdown ul,
+.cpanel-note-markdown ol { margin: 0.4rem 0 0.4rem 1.25rem; padding: 0; }
+.cpanel-note-markdown li { margin: 0.15rem 0; }
+.cpanel-note-markdown code {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.75rem;
+    padding: 0.1rem 0.35rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    color: #6de4ff;
+}
+.cpanel-note-markdown pre {
+    margin: 0.5rem 0;
+    padding: 0.65rem 0.85rem;
+    background: rgba(7, 8, 12, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.72rem;
+    line-height: 1.45;
+}
+.cpanel-note-markdown pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #cbd5e1;
+}
+.cpanel-note-markdown strong { color: #fff; font-weight: 600; }
+.cpanel-note-markdown a { color: #6de4ff; text-decoration: none; border-bottom: 1px solid rgba(109, 228, 255, 0.3); }
+.cpanel-note-markdown a:hover { border-bottom-color: #6de4ff; }
+.cpanel-note-markdown blockquote {
+    margin: 0.5rem 0;
+    padding: 0.25rem 0 0.25rem 0.75rem;
+    border-left: 2px solid rgba(109, 228, 255, 0.3);
+    color: #94a3b8;
+}
+.cpanel-note-markdown hr {
+    border: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    margin: 0.75rem 0;
+}
+.cpanel-note-markdown table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.5rem 0;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+}
+.cpanel-note-markdown th,
+.cpanel-note-markdown td {
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    vertical-align: top;
+}
+.cpanel-note-markdown th {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #64748b;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+.cpanel-note-markdown td { color: #cbd5e1; }
+.cpanel-note-markdown tbody tr:last-child td { border-bottom: 0; }
