@@ -8,6 +8,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit, urlunsplit
 import logging
+import os
 import httpx
 
 from ion.core.config import get_elasticsearch_config, get_ssl_verify
@@ -236,9 +237,21 @@ class ElasticsearchService:
         self,
         method: str,
         endpoint: str,
+        *,
+        timeout: Optional[float] = None,
         **kwargs,
     ) -> Any:
-        """Make an authenticated request to Elasticsearch."""
+        """Make an authenticated request to Elasticsearch.
+
+        v0.15.1: ``timeout`` (seconds) overrides the client default for a
+        single request. Heavy aggregations (e.g. the daily-standup
+        log-source-health checks) pass a longer timeout so they do not
+        race the global default. Without this override, the WEF check on
+        a busy estate could exceed 10 s and time out.
+
+        Global default is configurable via ``ION_ES_TIMEOUT`` (seconds);
+        defaults to 30 s.
+        """
         if not self.is_configured:
             raise ElasticsearchError("Elasticsearch integration is not configured")
 
@@ -251,12 +264,19 @@ class ElasticsearchService:
             url += f"{sep}ignore_unavailable=true&allow_no_indices=true&expand_wildcards=open,hidden"
 
         try:
+            try:
+                _default_timeout = float(os.environ.get("ION_ES_TIMEOUT", "30"))
+            except Exception:
+                _default_timeout = 30.0
             client = _get_es_client(
                 self._get_headers(),
                 self._get_auth(),
                 get_ssl_verify(self.verify_ssl),
-                httpx.Timeout(10.0, connect=3.0),
+                httpx.Timeout(_default_timeout, connect=3.0),
             )
+            # Per-request timeout override — used by heavy aggregations.
+            if timeout is not None:
+                kwargs["timeout"] = httpx.Timeout(float(timeout), connect=3.0)
             response = await client.request(method, url, **kwargs)
         except httpx.ConnectError as e:
             raise ElasticsearchError(f"Failed to connect to Elasticsearch: {e}")

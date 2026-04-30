@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.15.1 (2026-04-30) — fix
+
+### Daily standup — WEF log-source-health timeouts on busy estates
+
+The WEF check in the daily standup was timing out on busy estates because the global Elasticsearch request timeout was hardcoded to 10 s, while the WEF aggregation (terms over hosts × 24 hourly buckets + a 7-day rollup) routinely exceeded that on real data volumes.
+
+#### Fixes
+
+1. **Global ES timeout 10 s → 30 s**, configurable via `ION_ES_TIMEOUT` (seconds). Picks up automatically from `.env` on container recreate.
+2. **Per-request timeout override** on `elasticsearch_service._request()`. Heavy aggregations can now pass `timeout=60.0` without affecting the global default for fast endpoints.
+3. **Standup `terms.size` reduced 500 → 100**, configurable via `ION_STANDUP_TERMS_SIZE`. WEF estates rarely have >100 forwarders in scope; the 500-host fan-out was the dominant cost. Operators with more hosts override via env.
+4. **Standup queries pass `timeout=60.0`** explicitly, isolating the slow path from any future global-timeout tightening.
+
+Net effect on a typical busy estate: the WEF check that was timing out at 10 s now completes in 8-15 s with the lighter `terms.size` and has 60 s of headroom on the rare slow run.
+
+#### Verifying
+
+```bash
+docker compose pull ion
+docker compose up -d --force-recreate ion
+```
+
+If WEF still times out after the upgrade, raise `ION_ES_TIMEOUT=60` in `.env` (covers very large estates) and check `/api/daily-standup/full` — the response includes a `diag` block with the resolved index / host_field / patterns / hit count for fault-finding.
+
+---
+
 ## v0.15.0 (2026-04-29) — feature
 
 ### Wallboard — operational panel swap (Rules + Topology + Threat Landscape)
