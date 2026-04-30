@@ -679,6 +679,7 @@ async function loadReports() {
     if (!r.ok) throw new Error('Reports fetch failed');
     const data = await r.json();
     const reports = data.reports || data || [];
+    DS.reports = reports;  // v0.15.2: cached so collectState() can ship them to /save + /pdf
     if (!reports.length) { el.textContent = 'No reports available.'; return; }
     el.innerHTML = reports.map(rpt => `<div class="flex items-center gap-2 py-1">
       <svg class="w-3 h-3 text-ion-cyan shrink-0"><use href="#i-file-text"/></svg>
@@ -699,20 +700,26 @@ async function runChecks() {
   markDirty();
 }
 
-/* ── Collect form state ── */
+/* ── Collect form state ──
+ *
+ * v0.15.2: field names match StandupSaveRequest in daily_standup_api.py
+ * exactly. The earlier shape (threat_summary / servicenow_incidents /
+ * signoff_analyst / signoff_confirmed) was silently dropped by pydantic
+ * so the AI summary, ServiceNow notes, sign-off and meetings checklist
+ * never made it into the saved doc or the PDF export. */
 function collectState() {
   const meetings = {};
   document.querySelectorAll('.ds-meeting-cb').forEach(cb => { meetings[cb.dataset.item] = cb.checked; });
   return {
     checks_data: DS.checksData,
-    threat_summary: DS.threatSummary,
-    servicenow_incidents: document.getElementById('snow-incidents').value,
+    ai_summary: DS.threatSummary || '',
+    reports_of_interest: DS.reports || [],
+    servicenow_notes: document.getElementById('snow-incidents').value,
     additional_notes: document.getElementById('additional-notes').value,
     meetings: meetings,
     custom_meeting_item: document.getElementById('custom-meeting-item').value,
-    signoff_analyst: document.getElementById('signoff-analyst').value,
-    signoff_confirmed: document.getElementById('signoff-confirm').checked,
-    signoff_time: document.getElementById('signoff-confirm').checked ? new Date().toISOString() : null
+    analyst_name: document.getElementById('signoff-analyst').value,
+    signed_off: document.getElementById('signoff-confirm').checked
   };
 }
 
