@@ -4341,26 +4341,48 @@ async def create_case(
             triage.case_id = new_case.id
             linked += 1
 
-    # Auto-populate legacy triage observables and collect raw data for enrichment
-    raw_data_list = []
-
+    # v0.15.3: harvest observables from EVERY linked AlertTriage rather
+    # than only those the client supplied alert_contexts for. The earlier
+    # path was lossy — if the frontend linked 5 alerts but only sent
+    # raw_data for 2 of them, the remaining 3 alerts contributed zero
+    # observables, even though their triage rows already had the full
+    # observable list extracted at triage time.
+    #
+    # Primary source: AlertTriage.observables (pre-extracted JSON list).
+    # Fallback: re-extract from any client-supplied raw_data — covers
+    # alerts whose triage rows are freshly created by the loop above
+    # and therefore have observables=None.
+    context_map: Dict[str, Any] = {}
     if data.alert_contexts:
         context_map = {ctx.alert_id: ctx for ctx in data.alert_contexts}
-        for alert_id in (data.alert_ids or []):
-            ctx = context_map.get(alert_id)
-            if not ctx:
-                continue
-            triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
-            if triage:
-                _populate_triage_observables(triage, ctx.host, ctx.user, ctx.raw_data)
-            if ctx.raw_data:
-                raw_data_list.append(ctx.raw_data)
-            else:
-                logger.info("create_case: alert %s has no raw_data in context", alert_id)
-    else:
-        logger.info("create_case: no alert_contexts provided")
 
-    logger.info("create_case: collected %d raw_data items for enrichment", len(raw_data_list))
+    harvested_observables: List[Dict[str, Any]] = []
+    raw_data_fallback: List[Dict[str, Any]] = []
+
+    for alert_id in (data.alert_ids or []):
+        triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+        ctx = context_map.get(alert_id)
+
+        # Top up triage.observables from raw_data when both are present —
+        # this keeps the legacy triage-side observable list current.
+        if triage and ctx:
+            _populate_triage_observables(triage, ctx.host, ctx.user, ctx.raw_data)
+
+        if triage and triage.observables:
+            for obs in triage.observables:
+                if isinstance(obs, dict) and obs.get("type") and obs.get("value"):
+                    harvested_observables.append({"type": obs["type"], "value": obs["value"]})
+        elif ctx and ctx.raw_data:
+            # Triage has no observables yet — fall back to extracting
+            # from this alert's raw_data on the spot.
+            raw_data_fallback.append(ctx.raw_data)
+        else:
+            logger.info("create_case: alert %s has neither triage observables nor raw_data", alert_id)
+
+    logger.info(
+        "create_case: harvested %d observables from triage; %d raw_data items pending fallback extraction",
+        len(harvested_observables), len(raw_data_fallback),
+    )
 
     session.commit()
     session.refresh(new_case)
@@ -4368,10 +4390,28 @@ async def create_case(
     # Extract, normalize, enrich, and link observables to case
     from ion.services.observable_service import get_observable_service
     obs_service = get_observable_service(session)
-    enriched_observables = await obs_service.extract_enrich_for_case(
+
+    # Primary path — pre-extracted observables from every linked triage.
+    enriched_observables = await obs_service.enrich_and_link_observables_for_case(
         case_id=new_case.id,
-        raw_data_list=raw_data_list,
+        observables=harvested_observables,
     )
+
+    # Fallback path — extract from raw_data for alerts whose triage rows
+    # are empty. This still hits OpenCTI for enrichment and links the
+    # observables to the case; results are merged into the same list.
+    if raw_data_fallback:
+        fallback_results = await obs_service.extract_enrich_for_case(
+            case_id=new_case.id,
+            raw_data_list=raw_data_fallback,
+        )
+        # De-dup by (type, value) so the same observable isn't double-counted
+        # if it shows up in both the harvest and the fallback.
+        seen_keys = {(r.get("type"), r.get("value")) for r in (enriched_observables or [])}
+        for r in (fallback_results or []):
+            if (r.get("type"), r.get("value")) not in seen_keys:
+                enriched_observables.append(r)
+                seen_keys.add((r.get("type"), r.get("value")))
 
     # Store enriched observables on the case (for display and Kibana sync)
     case_observables = enriched_observables or []
