@@ -677,6 +677,115 @@ class ObservableService:
         self.session.flush()
         return results
 
+    async def enrich_and_link_observables_for_case(
+        self,
+        case_id: int,
+        observables: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Enrich + link a pre-extracted observable list to a case.
+
+        Skips the raw-data extraction step (used when observables come
+        from ``AlertTriage.observables`` — pre-extracted at triage time
+        — rather than client-supplied raw ES alert documents). v0.15.3.
+
+        ``observables`` is a list of ``{"type": str, "value": str}`` dicts.
+        Dedups by (type, value), normalises, runs OpenCTI enrichment per
+        observable, and links each one to the case.
+
+        Mirrors the back half of ``extract_enrich_for_case`` so the two
+        paths produce structurally identical results — the only
+        difference is the input.
+        """
+        from ion.services.observable_extractor import ENRICHABLE_TYPES
+
+        seen: set = set()
+        deduped: List[Dict[str, str]] = []
+        for obs in observables or []:
+            obs_type = (obs.get("type") or "").strip()
+            obs_value = (obs.get("value") or "").strip()
+            if not obs_type or not obs_value:
+                continue
+            key = (obs_type, obs_value)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append({"type": obs_type, "value": obs_value})
+
+        logger.info("enrich_and_link_observables_for_case: %d unique observables for case %s",
+                    len(deduped), case_id)
+        if not deduped:
+            return []
+
+        results: List[Dict[str, Any]] = []
+        for obs_data in deduped:
+            obs_type_str = obs_data["type"]
+            obs_value = obs_data["value"]
+
+            if obs_type_str not in ENRICHABLE_TYPES:
+                continue
+
+            if obs_type_str in _DISPLAY_ONLY_TYPES:
+                results.append({
+                    "type": obs_type_str,
+                    "value": obs_value,
+                    "observable_id": None,
+                    "threat_level": "unknown",
+                    "enrichment": None,
+                })
+                continue
+
+            try:
+                obs_type = self._resolve_type(obs_type_str)
+            except ValueError:
+                logger.warning("Skipping unknown observable type: %s", obs_type_str)
+                results.append({
+                    "type": obs_type_str,
+                    "value": obs_value,
+                    "observable_id": None,
+                    "threat_level": "unknown",
+                    "enrichment": None,
+                })
+                continue
+
+            try:
+                observable, _ = self.get_or_create(obs_type, obs_value)
+            except Exception as e:
+                logger.warning("Failed to create observable %s=%s: %s", obs_type_str, obs_value, e)
+                continue
+
+            try:
+                self.link_to_case(observable.id, case_id, context=obs_type_str)
+            except Exception as e:
+                logger.warning("Failed to link observable %s to case %s: %s", observable.id, case_id, e)
+
+            enrichment_data = None
+            try:
+                enrichment = await self.enrich(observable.id, source="opencti")
+                if enrichment:
+                    enrichment_data = {
+                        "source":         enrichment.source,
+                        "is_malicious":   enrichment.is_malicious,
+                        "score":          enrichment.score,
+                        "labels":         enrichment.labels or [],
+                        "threat_actors":  enrichment.threat_actors or [],
+                        "threat_level":   observable.threat_level.value if observable.threat_level else "unknown",
+                    }
+            except Exception as e:
+                logger.warning("Enrichment failed for %s=%s: %s", obs_type_str, obs_value, e)
+
+            results.append({
+                "type":           obs_type_str,
+                "value":          obs_value,
+                "observable_id":  observable.id,
+                "threat_level":   observable.threat_level.value if observable.threat_level else "unknown",
+                "enrichment":     enrichment_data,
+            })
+
+        logger.info("enrich_and_link_observables_for_case: returning %d observables for case %s",
+                    len(results), case_id)
+        self.session.flush()
+        return results
+
     def migrate_json_observables(self) -> Dict[str, int]:
         """One-time migration of all JSON observables to normalized table.
 

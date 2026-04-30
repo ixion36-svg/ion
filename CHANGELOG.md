@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.15.3 (2026-04-30) — fix
+
+### Case creation — observables harvested from every linked alert, not just 2-3
+
+When a case was created from multiple linked alerts, only 2-3 observables ended up on the case even when the linked alerts collectively had many more. The bug was in the case-creation flow's data source: it relied entirely on **client-supplied** `alert_contexts.raw_data`, then ran extraction from that. If the frontend linked five alerts but only included `raw_data` for two of them, the remaining three contributed zero observables — even though their `AlertTriage.observables` JSON column was already populated from the original triage.
+
+#### Fix
+
+- `create_case` now **harvests observables directly from `AlertTriage.observables`** for every alert in `alert_ids`. The triage rows are linked to the case anyway (line 4341 sets `triage.case_id`), and their observable lists were already extracted at triage time — no need to re-extract from raw ES docs.
+- Falls back to re-extracting from `raw_data` only for alerts whose triage row is freshly created during the same call (those have `observables=None`).
+- Results from both paths are merged and deduped by `(type, value)`.
+
+New service method: `ObservableService.enrich_and_link_observables_for_case(case_id, observables)` — same enrich-and-link logic as `extract_enrich_for_case`, but takes a pre-extracted `[{type, value}, …]` list instead of raw alert documents.
+
+#### Net effect
+
+A case linking five alerts that each had ten observables at triage time now lands all 50 (deduped) on the case, with OpenCTI enrichment, instead of dropping 80%+ of them on the floor.
+
+#### Verifying
+
+```bash
+docker compose pull ion
+docker compose up -d --force-recreate ion
+```
+
+Pick five existing triaged alerts, link them into a single new case, then check `/cases/{id}` → "Observables" tab. The list should reflect all observables across every linked alert.
+
+---
+
 ## v0.15.2 (2026-04-30) — fix
 
 ### Daily standup — PDF export missed the threat summary + reports; saved docs were JSON
