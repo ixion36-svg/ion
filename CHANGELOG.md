@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.17.1 (2026-04-30) — feature + fix
+
+### Daily standup — three new KPI panels
+
+A new "Section 2b · KPIs" row on the daily standup page surfaces three operational metrics that were previously buried or missing:
+
+1. **Alert backlog · 30d** — total alerts ION has seen in the last 30 days, broken down by current status (open / acknowledged / closed) plus a "still open %" headline. Reads from the local `AlertTriage` table so it's honest about analyst workload even when ES rotates older alerts out of hot indices.
+2. **Cases** — open / in-progress / closed counts (all-time) plus a "7d: N opened / M closed" flow line. Status mapping: `acknowledged` displays as "in progress" since that's how ION's case lifecycle uses it.
+3. **Triage · 24h** — count of alerts triaged in the last 24h plus avg / p50 / p90 mean-time-to-acknowledge in minutes. Computed from `AlertTriage.updated_at − created_at` for rows that moved out of `OPEN` in the window.
+
+Each panel is also rendered in the standup PDF / saved-document HTML so the report carries the same KPIs.
+
+New backend collectors (in `daily_standup_api.py`): `_check_open_alerts_30d`, `_check_case_status_counts`, `_check_triage_throughput_24h`. Three new keys on `GET /api/daily-standup/checks`: `open_alerts_30d`, `case_status_counts`, `triage_throughput`.
+
+### Arkime panels — `'ArkimeService' object has no attribute '_auth'`
+
+The Arkime traffic + node-stats panels on the daily standup were calling `svc._auth()`, but `ArkimeService` carries auth in the `Authorization` header (built by `_headers()`), not via httpx's `auth=` kwarg — there is no `_auth` method to call. All four call sites cleaned (`/api/stats`, `/api/sessions`, `/api/eshealth`); auth still travels via the headers as before.
+
+#### Verifying
+
+```bash
+docker compose pull ion
+docker compose up -d --force-recreate ion
+```
+
+Open `/daily-standup`. The three new KPI cards should populate within a second of the page loading. Arkime panels (Section 5) should resolve to data instead of "AttributeError".
+
+---
+
 ## v0.17.0 (2026-04-30) — feature
 
 ### Translator — standalone page + inline buttons + document upload

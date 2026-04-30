@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
@@ -175,6 +176,175 @@ async def _check_stale_cases() -> Dict[str, Any]:
                 for c in stale
             ],
         }
+    finally:
+        session.close()
+
+
+async def _check_open_alerts_30d() -> Dict[str, Any]:
+    """Volume of alerts and the share still open across the last 30 days.
+
+    Reads from ION's local AlertTriage table (where every alert ION has
+    seen gets a triage row), so this is honest about analyst workload
+    even when ES is rotating older alerts out of its hot indices.
+    """
+    from ion.core.config import get_config
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.models.alert_triage import AlertTriage, AlertTriageStatus
+
+    config = get_config()
+    engine = get_engine(config.db_path)
+    factory = get_session_factory(engine)
+    session = factory()
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).replace(tzinfo=None)
+        total = (
+            session.query(AlertTriage)
+            .filter(AlertTriage.created_at >= cutoff)
+            .count()
+        )
+        open_count = (
+            session.query(AlertTriage)
+            .filter(
+                AlertTriage.created_at >= cutoff,
+                AlertTriage.status == AlertTriageStatus.OPEN,
+            )
+            .count()
+        )
+        ack_count = (
+            session.query(AlertTriage)
+            .filter(
+                AlertTriage.created_at >= cutoff,
+                AlertTriage.status == AlertTriageStatus.ACKNOWLEDGED,
+            )
+            .count()
+        )
+        closed_count = (
+            session.query(AlertTriage)
+            .filter(
+                AlertTriage.created_at >= cutoff,
+                AlertTriage.status == AlertTriageStatus.CLOSED,
+            )
+            .count()
+        )
+        return {
+            "window_days": 30,
+            "total": int(total),
+            "open": int(open_count),
+            "acknowledged": int(ack_count),
+            "closed": int(closed_count),
+            "still_open_pct": round(open_count * 100 / total) if total else 0,
+        }
+    except Exception as e:
+        return {"window_days": 30, "total": 0, "error": str(e)[:120]}
+    finally:
+        session.close()
+
+
+async def _check_case_status_counts() -> Dict[str, Any]:
+    """Open / in-progress / closed case counts (all-time + last 7d delta)."""
+    from ion.core.config import get_config
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.models.alert_triage import AlertCase, AlertCaseStatus
+
+    config = get_config()
+    engine = get_engine(config.db_path)
+    factory = get_session_factory(engine)
+    session = factory()
+    try:
+        # All-time totals by status — cheap, cases table is small.
+        rows = (
+            session.query(AlertCase.status, func.count(AlertCase.id))
+            .group_by(AlertCase.status)
+            .all()
+        )
+        by_status: Dict[str, int] = {
+            (s.value if hasattr(s, "value") else str(s)): int(n) for s, n in rows
+        }
+        # Status names ION uses: OPEN, ACKNOWLEDGED (≈ in-progress), CLOSED.
+        opened_7d = (
+            session.query(AlertCase)
+            .filter(AlertCase.created_at >= (datetime.utcnow() - timedelta(days=7)))
+            .count()
+        )
+        closed_7d = (
+            session.query(AlertCase)
+            .filter(AlertCase.closed_at.isnot(None))
+            .filter(AlertCase.closed_at >= (datetime.utcnow() - timedelta(days=7)))
+            .count()
+        )
+        return {
+            "open":         int(by_status.get("open", 0)),
+            "acknowledged": int(by_status.get("acknowledged", 0)),
+            "closed":       int(by_status.get("closed", 0)),
+            "total":        int(sum(by_status.values())),
+            "opened_last_7d": int(opened_7d),
+            "closed_last_7d": int(closed_7d),
+        }
+    except Exception as e:
+        return {"error": str(e)[:120]}
+    finally:
+        session.close()
+
+
+async def _check_triage_throughput_24h() -> Dict[str, Any]:
+    """Alerts triaged in the last 24h + average time-to-acknowledge.
+
+    "Triaged" = an AlertTriage row that has moved out of OPEN (i.e.
+    status is ACKNOWLEDGED or CLOSED) AND was acknowledged within the
+    last 24h. We use ``updated_at`` as the proxy for "first analyst
+    touch" since AlertTriage doesn't carry a separate ack timestamp.
+    Mean time-to-acknowledge = mean(updated_at − created_at) across
+    those rows; reported in minutes.
+    """
+    from ion.core.config import get_config
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.models.alert_triage import AlertTriage, AlertTriageStatus
+
+    config = get_config()
+    engine = get_engine(config.db_path)
+    factory = get_session_factory(engine)
+    session = factory()
+    try:
+        cutoff = datetime.utcnow() - timedelta(hours=24)
+        triaged = (
+            session.query(AlertTriage)
+            .filter(
+                AlertTriage.status.in_([AlertTriageStatus.ACKNOWLEDGED, AlertTriageStatus.CLOSED]),
+                AlertTriage.updated_at >= cutoff,
+            )
+            .all()
+        )
+        if not triaged:
+            return {
+                "triaged_24h": 0,
+                "avg_mtta_minutes": None,
+                "p50_mtta_minutes": None,
+                "p90_mtta_minutes": None,
+            }
+        deltas: List[float] = []
+        for t in triaged:
+            if t.created_at and t.updated_at and t.updated_at >= t.created_at:
+                deltas.append((t.updated_at - t.created_at).total_seconds() / 60.0)
+        if not deltas:
+            return {
+                "triaged_24h": len(triaged),
+                "avg_mtta_minutes": None,
+                "p50_mtta_minutes": None,
+                "p90_mtta_minutes": None,
+            }
+        deltas_sorted = sorted(deltas)
+        n = len(deltas_sorted)
+        avg = sum(deltas_sorted) / n
+        p50 = deltas_sorted[n // 2]
+        p90 = deltas_sorted[min(n - 1, int(n * 0.9))]
+        return {
+            "triaged_24h":      len(triaged),
+            "avg_mtta_minutes": round(avg, 1),
+            "p50_mtta_minutes": round(p50, 1),
+            "p90_mtta_minutes": round(p90, 1),
+        }
+    except Exception as e:
+        return {"triaged_24h": 0, "error": str(e)[:120]}
     finally:
         session.close()
 
@@ -433,13 +603,20 @@ async def get_daily_checks(
     current_user: User = Depends(require_permission("alert:read")),
 ):
     """Aggregate all daily SOC duty checks in a single call."""
-    cluster, alerts, cases, dc_health, wef_health, rule_failures = await asyncio.gather(
+    (
+        cluster, alerts, cases,
+        dc_health, wef_health, rule_failures,
+        alerts_30d, case_status, triage_throughput,
+    ) = await asyncio.gather(
         _check_cluster_health(),
         _check_critical_alerts(),
         _check_stale_cases(),
         _check_log_source_health(_standup_dcs_patterns(), "Domain Controllers"),
         _check_log_source_health(_standup_wef_patterns(), "Windows Event Forwarding"),
         _check_rule_failures(),
+        _check_open_alerts_30d(),
+        _check_case_status_counts(),
+        _check_triage_throughput_24h(),
         return_exceptions=True,
     )
 
@@ -450,12 +627,16 @@ async def get_daily_checks(
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "cluster_health": _safe(cluster),
-        "critical_alerts": _safe(alerts),
-        "stale_cases": _safe(cases),
-        "dc_log_health": _safe(dc_health),
-        "wef_log_health": _safe(wef_health),
-        "rule_failures": _safe(rule_failures),
+        "cluster_health":     _safe(cluster),
+        "critical_alerts":    _safe(alerts),
+        "stale_cases":        _safe(cases),
+        "dc_log_health":      _safe(dc_health),
+        "wef_log_health":     _safe(wef_health),
+        "rule_failures":      _safe(rule_failures),
+        # v0.17.1 additions
+        "open_alerts_30d":    _safe(alerts_30d),
+        "case_status_counts": _safe(case_status),
+        "triage_throughput":  _safe(triage_throughput),
     }
 
 
@@ -606,6 +787,53 @@ def _render_standup_html(data: "StandupSaveRequest", current_user: "User") -> st
             out.append("</table>")
         else:
             out.append("<p>No critical/high alerts in the last 24 hours.</p>")
+
+    # -- Open alerts (last 30 days) — v0.17.1 ---------------------------------
+    a30 = checks.get("open_alerts_30d") or {}
+    if a30 and a30.get("total") is not None:
+        out.append(
+            f'<h2>Alert Backlog (Last 30 days) &mdash; {a30.get("total", 0)} alerts, '
+            f'{a30.get("open", 0)} still open ({a30.get("still_open_pct", 0)}%)</h2>'
+        )
+        out.append(
+            '<table><tr><th>Total</th><th>Open</th><th>Acknowledged</th><th>Closed</th></tr>'
+            f'<tr><td>{a30.get("total", 0):,}</td>'
+            f'<td class="status-warning">{a30.get("open", 0):,}</td>'
+            f'<td>{a30.get("acknowledged", 0):,}</td>'
+            f'<td class="status-ok">{a30.get("closed", 0):,}</td></tr></table>'
+        )
+
+    # -- Case status counts — v0.17.1 ----------------------------------------
+    cs = checks.get("case_status_counts") or {}
+    if cs and "open" in cs:
+        out.append(f'<h2>Cases &mdash; {cs.get("total", 0)} total</h2>')
+        out.append(
+            '<table><tr><th>Open</th><th>In Progress (acknowledged)</th><th>Closed</th>'
+            '<th>Opened (last 7d)</th><th>Closed (last 7d)</th></tr>'
+            f'<tr><td class="status-warning">{cs.get("open", 0):,}</td>'
+            f'<td>{cs.get("acknowledged", 0):,}</td>'
+            f'<td class="status-ok">{cs.get("closed", 0):,}</td>'
+            f'<td>{cs.get("opened_last_7d", 0):,}</td>'
+            f'<td>{cs.get("closed_last_7d", 0):,}</td></tr></table>'
+        )
+
+    # -- Triage throughput (last 24h) + MTTA — v0.17.1 -----------------------
+    tt = checks.get("triage_throughput") or {}
+    if tt and tt.get("triaged_24h") is not None:
+        avg = tt.get("avg_mtta_minutes")
+        p50 = tt.get("p50_mtta_minutes")
+        p90 = tt.get("p90_mtta_minutes")
+        out.append(
+            f'<h2>Triage Throughput (Last 24h) &mdash; {tt.get("triaged_24h", 0)} alerts triaged</h2>'
+        )
+        out.append(
+            '<table><tr><th>Triaged (24h)</th><th>Avg MTTA (min)</th>'
+            '<th>p50 MTTA (min)</th><th>p90 MTTA (min)</th></tr>'
+            f'<tr><td>{tt.get("triaged_24h", 0):,}</td>'
+            f'<td>{("—" if avg is None else f"{avg:.1f}")}</td>'
+            f'<td>{("—" if p50 is None else f"{p50:.1f}")}</td>'
+            f'<td>{("—" if p90 is None else f"{p90:.1f}")}</td></tr></table>'
+        )
 
     # -- Stale Cases -----------------------------------------------------------
     stale = checks.get("stale_cases") or {}
@@ -829,7 +1057,7 @@ async def check_arkime_high_risk(
     nodes = []
     try:
         stats_resp = await client.get(
-            f"{svc.url}/api/stats", auth=svc._auth(), headers=headers,
+            f"{svc.url}/api/stats", headers=headers,
         )
         if stats_resp.status_code == 200:
             content_type = stats_resp.headers.get("content-type", "")
@@ -857,7 +1085,6 @@ async def check_arkime_high_risk(
             try:
                 resp = await client.get(
                     f"{svc.url}/api/sessions",
-                    auth=svc._auth(),
                     headers=headers,
                     params={
                         "expression": f'country == {code} && node == "{node_name}"',
@@ -917,7 +1144,6 @@ async def arkime_node_stats(
         # Node stats
         resp = await client.get(
             f"{svc.url}/api/stats",
-            auth=svc._auth(),
             headers=headers,
         )
         if resp.status_code != 200:
@@ -955,7 +1181,6 @@ async def arkime_node_stats(
         try:
             es_resp = await client.get(
                 f"{svc.url}/api/eshealth",
-                auth=svc._auth(),
                 headers=headers,
             )
             if es_resp.status_code == 200 and "json" in es_resp.headers.get("content-type", ""):

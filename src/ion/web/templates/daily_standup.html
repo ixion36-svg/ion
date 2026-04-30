@@ -76,6 +76,65 @@
       </div>
     </div>
 
+    <!-- S2b: KPI strip — Open alerts 30d / case status / triage MTTA (v0.17.1) -->
+    <div class="mb-6">
+      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 2b · KPIs</div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        <!-- Open Alerts (Last 30d) -->
+        <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+          <div class="flex items-baseline justify-between mb-3">
+            <span class="text-[11px] uppercase tracking-wider text-slate-500">Alert backlog · 30d</span>
+            <span id="ds-a30-pct" class="text-[11px] text-slate-500 tabular-nums">— %</span>
+          </div>
+          <div class="flex items-end gap-3 mb-3">
+            <div id="ds-a30-total" class="font-sans font-semibold tabular-nums tracking-tight text-[36px] leading-none text-white">—</div>
+            <div class="text-[11px] text-slate-500 leading-tight pb-1">total alerts<br><span class="text-slate-600">last 30 days</span></div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
+            <div><div id="ds-a30-open" class="text-[18px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">open</div></div>
+            <div><div id="ds-a30-ack"  class="text-[18px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">ack</div></div>
+            <div><div id="ds-a30-closed" class="text-[18px] font-semibold tabular-nums text-ion-lime  leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">closed</div></div>
+          </div>
+        </div>
+
+        <!-- Case status counts -->
+        <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+          <div class="flex items-baseline justify-between mb-3">
+            <span class="text-[11px] uppercase tracking-wider text-slate-500">Cases</span>
+            <span id="ds-cs-flow" class="text-[11px] text-slate-500 tabular-nums">7d: — open / — closed</span>
+          </div>
+          <div class="flex items-end gap-3 mb-3">
+            <div id="ds-cs-total" class="font-sans font-semibold tabular-nums tracking-tight text-[36px] leading-none text-white">—</div>
+            <div class="text-[11px] text-slate-500 leading-tight pb-1">cases total</div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
+            <div><div id="ds-cs-open" class="text-[18px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">open</div></div>
+            <div><div id="ds-cs-ack"  class="text-[18px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">in&nbsp;progress</div></div>
+            <div><div id="ds-cs-closed" class="text-[18px] font-semibold tabular-nums text-ion-lime leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">closed</div></div>
+          </div>
+        </div>
+
+        <!-- Triage throughput (last 24h) -->
+        <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+          <div class="flex items-baseline justify-between mb-3">
+            <span class="text-[11px] uppercase tracking-wider text-slate-500">Triage · 24h</span>
+            <span class="text-[11px] text-slate-500">avg MTTA</span>
+          </div>
+          <div class="flex items-end gap-3 mb-3">
+            <div id="ds-tt-count" class="font-sans font-semibold tabular-nums tracking-tight text-[36px] leading-none text-ion-cyan">—</div>
+            <div class="text-[11px] text-slate-500 leading-tight pb-1">alerts triaged<br><span class="text-slate-600">last 24h</span></div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
+            <div><div id="ds-tt-avg"  class="text-[18px] font-semibold tabular-nums text-white leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">avg&nbsp;min</div></div>
+            <div><div id="ds-tt-p50"  class="text-[18px] font-semibold tabular-nums text-slate-300 leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">p50</div></div>
+            <div><div id="ds-tt-p90"  class="text-[18px] font-semibold tabular-nums text-slate-300 leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">p90</div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
     <!-- S3: Stale Cases -->
     <div class="mb-6"><div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 3</div>
       <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
@@ -612,6 +671,39 @@ function renderRuleFailures(data) {
   </tr>`).join('');
 }
 
+/* ── v0.17.1 KPI renderers ── */
+function fmtN(n) {
+  if (n == null || isNaN(n)) return '—';
+  if (n >= 10000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return Number(n).toLocaleString();
+}
+function renderOpenAlerts30d(d) {
+  d = d || {};
+  document.getElementById('ds-a30-total').textContent  = fmtN(d.total);
+  document.getElementById('ds-a30-open').textContent   = fmtN(d.open);
+  document.getElementById('ds-a30-ack').textContent    = fmtN(d.acknowledged);
+  document.getElementById('ds-a30-closed').textContent = fmtN(d.closed);
+  document.getElementById('ds-a30-pct').textContent =
+    (d.still_open_pct != null ? d.still_open_pct + '% open' : '— %');
+}
+function renderCaseStatusCounts(d) {
+  d = d || {};
+  document.getElementById('ds-cs-total').textContent  = fmtN(d.total);
+  document.getElementById('ds-cs-open').textContent   = fmtN(d.open);
+  document.getElementById('ds-cs-ack').textContent    = fmtN(d.acknowledged);
+  document.getElementById('ds-cs-closed').textContent = fmtN(d.closed);
+  document.getElementById('ds-cs-flow').textContent =
+    `7d: ${fmtN(d.opened_last_7d)} opened / ${fmtN(d.closed_last_7d)} closed`;
+}
+function renderTriageThroughput(d) {
+  d = d || {};
+  document.getElementById('ds-tt-count').textContent = fmtN(d.triaged_24h);
+  const fmtMin = v => (v == null ? '—' : Number(v).toFixed(1));
+  document.getElementById('ds-tt-avg').textContent = fmtMin(d.avg_mtta_minutes);
+  document.getElementById('ds-tt-p50').textContent = fmtMin(d.p50_mtta_minutes);
+  document.getElementById('ds-tt-p90').textContent = fmtMin(d.p90_mtta_minutes);
+}
+
 /* ── Load all checks ── */
 async function loadChecks() {
   // Show spinners. dc-tbody / wef-tbody were replaced with RAG traffic-light
@@ -631,6 +723,10 @@ async function loadChecks() {
     if (data.dc_log_health) renderLogHealth('dc', data.dc_log_health);
     if (data.wef_log_health) renderLogHealth('wef', data.wef_log_health);
     renderRuleFailures(data.rule_failures);
+    // v0.17.1 additions
+    renderOpenAlerts30d(data.open_alerts_30d);
+    renderCaseStatusCounts(data.case_status_counts);
+    renderTriageThroughput(data.triage_throughput);
   } catch (e) {
     console.error('loadChecks error:', e);
   }
