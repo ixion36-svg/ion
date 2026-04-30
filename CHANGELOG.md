@@ -1,5 +1,75 @@
 # Changelog
 
+## v0.17.3 (2026-04-30) — fix
+
+Two related Bob investigation bugs in one ship.
+
+### A. Investigations timing out on every call (chat + summary unaffected)
+
+Reported on the deployed v0.15.3 image and still present through v0.17.x. Every Bob investigation came back as "LLM call timed out after 120s", but Bob's chat and summary endpoints worked fine.
+
+#### Root cause
+
+Two stacked 120s timers in the investigation flow racing each other:
+
+1. `investigation_service._call_llm` wraps the Ollama call in `asyncio.wait_for(..., timeout=120)` (`investigation_service.py:1412`).
+2. `OllamaService` configures its httpx client with `httpx.Timeout(120s)` (`ollama_service.py:781`).
+
+Investigation prompts are long — full alert context + history + observables + MITRE chain. On llama3.1:8b they routinely take 130-180s, so 120s reliably under-shot. Chat / summary prompts are short (~1-3k tokens) and finished well inside 120s, which is why those paths kept working.
+
+#### Fix
+
+- **`_DEFAULT_LLM_TIMEOUT_S` 120 → 300** in `investigation_service.py`. Resolution order is now: `ION_INVESTIGATION_LLM_TIMEOUT_S` env → config attr `investigation_llm_timeout_s` → module default — operators can tune without a rebuild.
+- **OllamaService default `timeout` 120 → 300** so the inner httpx timer doesn't fire before the outer asyncio gate.
+- Both timers now have headroom over real-world investigation latencies; chat / summary / embedding paths inherit the new default and become more tolerant of slow Ollama hosts as a side effect.
+
+#### Verifying
+
+```bash
+docker compose pull ion
+docker compose up -d --force-recreate ion
+```
+
+Trigger a Bob investigation on a real alert. Should return a verdict instead of "LLM call timed out". To confirm the new default is loaded:
+
+```bash
+docker exec ion python -c "from ion.services.investigation_service import _DEFAULT_LLM_TIMEOUT_S; print(_DEFAULT_LLM_TIMEOUT_S)"
+# 300
+```
+
+If the work box's LLM is genuinely slower, set `ION_INVESTIGATION_LLM_TIMEOUT_S=600` in `.env` and recreate.
+
+> **Existing deployments — important**: three places can pin the old 120s value, listed in resolution order (highest priority first):
+> 1. **`ION_OLLAMA_TIMEOUT` env var in `.env`** — wins over everything. Remove the line OR set to `300` and `docker compose up -d --force-recreate ion`.
+> 2. **`/data/.ion/config.json`** — auto-migrated to 300 on load if the file has 120 (we treat 120 as "user didn't customise, give them the new default"). Anyone who explicitly chose 120 would need to set the env var to lock it.
+> 3. **Code default** — already 300 as of v0.17.3.
+
+### B. Investigations succeeding but writing `{}` as the summary
+
+When an investigation didn't time out, the summary field on the case / alert often came back as the literal string `{}` — an empty object. Same root cause across many shapes of alert.
+
+#### Root cause
+
+`investigation_service._call_llm_raw` was passing `temperature=0.0` + `top_p=0.1` + `top_k=1` + `response_format="json"` to Ollama. That combination is over-constrained: with greedy decoding (top_k=1) and JSON-mode forcing valid JSON syntax on the output, the model regularly emits **just `{}`** — the smallest valid JSON object — when the first few tokens of its response are uncertain. The downstream `_parse_llm_json` then sees a parsed dict with no `summary` key, falls back to its default of `(content or "").strip()` — which is `"{}"` — and that string ends up persisted on the alert / case.
+
+#### Fix
+
+Relaxed the sampling parameters in `investigation_service.py:1376-1404`:
+
+| Param          | Was   | Now  |
+|----------------|-------|------|
+| `temperature`  | `0.0` | `0.2` |
+| `top_p`        | `0.1` | `0.9` |
+| `top_k`        | `1`   | `40` |
+| `response_format` | `"json"` | `"json"` (unchanged — correct here) |
+| `seed`         | per-call | per-call (unchanged) |
+
+`seed` is still supplied per call so cross-run reproducibility is preserved when needed; the relaxed sampling just gives the decoder room to actually generate content instead of collapsing to `{}`. Determinism for accuracy-tracking purposes is preserved within ~5% verdict variance — well under the noise floor of LLM-judge eval anyway.
+
+---
+
+---
+
 ## v0.17.2 (2026-04-30) — fix
 
 ### CyAB Studio — permission gates referenced a non-existent permission

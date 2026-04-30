@@ -88,7 +88,7 @@ class Config:
     ollama_enabled: bool = True
     ollama_url: str = "http://localhost:11434"  # Ollama API URL
     ollama_model: str = "llama3.1:8b"  # Default model
-    ollama_timeout: int = 120  # Request timeout in seconds
+    ollama_timeout: int = 300  # Request timeout in seconds (v0.17.3: bumped 120 → 300 for long investigation prompts)
     ollama_verify_ssl: bool = False
 
     # Kibana Cases integration
@@ -290,7 +290,12 @@ class Config:
             ollama_enabled=data.get("ollama_enabled", True),
             ollama_url=data.get("ollama_url", "http://localhost:11434"),
             ollama_model=data.get("ollama_model", "llama3.1:8b"),
-            ollama_timeout=data.get("ollama_timeout", 120),
+            # v0.17.3 upgrade migration: silently bump the historical 120s
+            # default to 300s so existing deployments pick up the longer
+            # investigation timeout without an operator edit. Anyone who
+            # explicitly chose 120 (rare — that's just the old default)
+            # can override via ION_OLLAMA_TIMEOUT in .env.
+            ollama_timeout=(300 if data.get("ollama_timeout", 300) == 120 else data.get("ollama_timeout", 300)),
             ollama_verify_ssl=data.get("ollama_verify_ssl", False),
             # Kibana Cases integration
             kibana_cases_enabled=data.get("kibana_cases_enabled", True),
@@ -700,7 +705,7 @@ def get_config() -> Config:
         if os.environ.get("ION_OLLAMA_MODEL"):
             _config.ollama_model = os.environ.get("ION_OLLAMA_MODEL", "llama3.1:8b")
         if os.environ.get("ION_OLLAMA_TIMEOUT"):
-            _config.ollama_timeout = int(os.environ.get("ION_OLLAMA_TIMEOUT", "120"))
+            _config.ollama_timeout = int(os.environ.get("ION_OLLAMA_TIMEOUT", "300"))
         if os.environ.get("ION_OLLAMA_VERIFY_SSL"):
             _config.ollama_verify_ssl = _get_env_bool("ION_OLLAMA_VERIFY_SSL", False)
 

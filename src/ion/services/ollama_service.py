@@ -778,7 +778,11 @@ def get_ollama_service() -> OllamaService:
         _ollama_service = OllamaService(
             base_url=getattr(config, 'ollama_url', 'http://localhost:11434'),
             default_model=getattr(config, 'ollama_model', 'llama3.1:8b'),
-            timeout=float(getattr(config, 'ollama_timeout', 120)),
+            # v0.17.3: bumped default 120 → 300 to match the investigation
+            # gate. Long prompts on llama3.1:8b regularly need 130-180s;
+            # the inner httpx timeout firing first cancelled responses
+            # mid-stream. Override via `ollama_timeout` in config.
+            timeout=float(getattr(config, 'ollama_timeout', 300)),
             verify_ssl=getattr(config, 'ollama_verify_ssl', True),
             enabled=getattr(config, 'ollama_enabled', True),
         )
