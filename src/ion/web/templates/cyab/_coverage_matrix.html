@@ -10,42 +10,42 @@
   "signed_off":         "Sign-off",
 } %}
 {% set status_dot = {
-  "green":   "tw-text-emerald-400",
-  "amber":   "tw-text-amber-400",
-  "red":     "tw-text-rose-400",
-  "unknown": "tw-text-slate-600",
+  "green":   "text-emerald-400",
+  "amber":   "text-amber-400",
+  "red":     "text-rose-400",
+  "unknown": "text-slate-600",
 } %}
 
-<table class="tw-w-full tw-text-[12px] tw-border-collapse">
+<table class="w-full text-[12px] border-collapse">
   <thead>
-    <tr class="tw-text-slate-500 tw-text-[10.5px] tw-uppercase tw-tracking-wider">
-      <th class="tw-text-left tw-py-2 tw-pr-3">System</th>
-      <th class="tw-text-left tw-pr-3">Owner</th>
+    <tr class="text-slate-500 text-[10.5px] uppercase tracking-wider">
+      <th class="text-left py-2 pr-3">System</th>
+      <th class="text-left pr-3">Owner</th>
       {% for dim in matrix.dimensions %}
-        <th class="tw-text-center tw-px-1">{{ dim_labels[dim] }}</th>
+        <th class="text-center px-1">{{ dim_labels[dim] }}</th>
       {% endfor %}
     </tr>
   </thead>
   <tbody>
     {% for row in matrix.rows %}
-      <tr class="tw-border-t tw-border-slate-800 hover:tw-bg-slate-900/40">
-        <td class="tw-py-2 tw-pr-3 tw-text-cyan-300 tw-font-mono">
-          <a href="/cyab/systems/{{ row.system_id }}" class="hover:tw-underline">{{ row.name }}</a>
+      <tr class="border-t border-slate-800 hover:bg-slate-900/40">
+        <td class="py-2 pr-3 text-cyan-300 font-mono">
+          <a href="/cyab/systems/{{ row.system_id }}" class="hover:underline">{{ row.name }}</a>
         </td>
-        <td class="tw-text-slate-400">{{ row.owner or '—' }}</td>
+        <td class="text-slate-400">{{ row.owner or '—' }}</td>
         {% for dim in matrix.dimensions %}
           {% set cell = row.cells[dim] %}
-          <td class="tw-text-center">
+          <td class="text-center">
             <a href="/cyab/systems/{{ row.system_id }}/tab/{{ cell.tab }}"
                title="{{ dim }}: {{ cell.status }}"
-               class="tw-inline-block tw-px-1">
-              <span class="{{ status_dot[cell.status] }} tw-text-[16px]">●</span>
+               class="inline-block px-1">
+              <span class="{{ status_dot[cell.status] }} text-[16px]">●</span>
             </a>
           </td>
         {% endfor %}
       </tr>
     {% else %}
-      <tr><td colspan="9" class="tw-py-6 tw-text-center tw-text-slate-500">No systems match the current filters.</td></tr>
+      <tr><td colspan="9" class="py-6 text-center text-slate-500">No systems match the current filters.</td></tr>
     {% endfor %}
   </tbody>
 </table>

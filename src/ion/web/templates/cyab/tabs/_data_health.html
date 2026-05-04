@@ -1,23 +1,23 @@
-<header class="tw-mb-4" data-tab="data-health">
-  <h3 class="tw-text-white tw-text-[14px] tw-font-semibold">Data Health</h3>
-  <p class="tw-text-slate-500 tw-text-[11px]">Live signals about the data feeding this system. Phase-1: ingestion freshness, field mapping, coverage. Phase-2: reconciliation.</p>
+<header class="mb-4" data-tab="data-health">
+  <h3 class="text-white text-[14px] font-semibold">Data Health</h3>
+  <p class="text-slate-500 text-[11px]">Live signals about the data feeding this system. Phase-1: ingestion freshness, field mapping, coverage. Phase-2: reconciliation.</p>
 </header>
 
-<div class="tw-grid tw-grid-cols-2 tw-gap-3">
+<div class="grid grid-cols-2 gap-3">
 
   {# Panel 1: Ingestion freshness #}
-  <section class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-    <h4 class="tw-text-slate-300 tw-text-[12px] tw-mb-2">Ingestion freshness</h4>
+  <section class="bg-slate-900/40 border border-slate-800 rounded p-3">
+    <h4 class="text-slate-300 text-[12px] mb-2">Ingestion freshness</h4>
     {% if not ingestion %}
-      <p class="tw-text-slate-500 tw-text-[11px]">No data sources configured.</p>
+      <p class="text-slate-500 text-[11px]">No data sources configured.</p>
     {% else %}
-      <table class="tw-w-full tw-text-[12px]">
+      <table class="w-full text-[12px]">
         <tbody>
           {% for r in ingestion %}
             {% set color = {'fresh':'emerald-400','amber':'amber-400','red':'rose-400','unknown':'slate-500'}[r.sla_status] %}
             <tr>
-              <td class="tw-py-1"><span class="tw-text-{{ color }}">&#9679;</span> {{ r.source_name }}</td>
-              <td class="tw-text-slate-500 tw-text-[11px] tw-py-1 tw-text-right">
+              <td class="py-1"><span class="text-{{ color }}">&#9679;</span> {{ r.source_name }}</td>
+              <td class="text-slate-500 text-[11px] py-1 text-right">
                 {{ r.last_event_at.strftime('%Y-%m-%d %H:%M') if r.last_event_at else 'no events seen' }}
               </td>
             </tr>
@@ -28,52 +28,52 @@
   </section>
 
   {# Panel 2: Field mapping completeness #}
-  <section class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-    <h4 class="tw-text-slate-300 tw-text-[12px] tw-mb-2">Field mapping</h4>
+  <section class="bg-slate-900/40 border border-slate-800 rounded p-3">
+    <h4 class="text-slate-300 text-[12px] mb-2">Field mapping</h4>
     {% if not mapping %}
-      <p class="tw-text-slate-500 tw-text-[11px]">No data sources configured.</p>
+      <p class="text-slate-500 text-[11px]">No data sources configured.</p>
     {% else %}
       {% for r in mapping %}
-        <div class="tw-flex tw-items-center tw-gap-2 tw-py-1 tw-text-[12px]">
-          <span class="tw-flex-1 tw-text-slate-300">{{ r.source_name }}</span>
+        <div class="flex items-center gap-2 py-1 text-[12px]">
+          <span class="flex-1 text-slate-300">{{ r.source_name }}</span>
           {% if r.completeness is none %}
-            <span class="tw-text-slate-500 tw-text-[11px]">no profile</span>
+            <span class="text-slate-500 text-[11px]">no profile</span>
           {% else %}
             {% set pct = (r.completeness * 100) | round(0) | int %}
-            <div class="tw-h-1 tw-w-20 tw-bg-slate-800 tw-rounded">
-              <div class="tw-h-full tw-bg-cyan-400 tw-rounded" style="width: {{ pct }}%"></div>
+            <div class="h-1 w-20 bg-slate-800 rounded">
+              <div class="h-full bg-cyan-400 rounded" style="width: {{ pct }}%"></div>
             </div>
-            <span class="tw-text-cyan-300 tw-text-[11px]">{{ pct }}%</span>
+            <span class="text-cyan-300 text-[11px]">{{ pct }}%</span>
           {% endif %}
         </div>
         {% if r.missing_fields %}
-          <p class="tw-text-rose-400 tw-text-[10px] tw-pl-2 tw-pb-1">missing: {{ r.missing_fields | join(', ') }}</p>
+          <p class="text-rose-400 text-[10px] pl-2 pb-1">missing: {{ r.missing_fields | join(', ') }}</p>
         {% endif %}
       {% endfor %}
     {% endif %}
   </section>
 
   {# Panel 3: Coverage rollup #}
-  <section class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-    <h4 class="tw-text-slate-300 tw-text-[12px] tw-mb-2">Coverage rollup</h4>
-    <div class="tw-space-y-2 tw-text-[12px]">
+  <section class="bg-slate-900/40 border border-slate-800 rounded p-3">
+    <h4 class="text-slate-300 text-[12px] mb-2">Coverage rollup</h4>
+    <div class="space-y-2 text-[12px]">
       {% for k, label in [('intake_pct','Intake'),('detection_pct','Detection'),('audit_pct','Audit')] %}
         {% set pct = (coverage.get(k, 0) * 100) | round(0) | int if coverage.get(k) is not none else 0 %}
-        <div class="tw-flex tw-items-center tw-gap-2">
-          <span class="tw-flex-1 tw-text-slate-300">{{ label }}</span>
-          <div class="tw-h-1 tw-w-20 tw-bg-slate-800 tw-rounded">
-            <div class="tw-h-full tw-bg-emerald-400 tw-rounded" style="width: {{ pct }}%"></div>
+        <div class="flex items-center gap-2">
+          <span class="flex-1 text-slate-300">{{ label }}</span>
+          <div class="h-1 w-20 bg-slate-800 rounded">
+            <div class="h-full bg-emerald-400 rounded" style="width: {{ pct }}%"></div>
           </div>
-          <span class="tw-text-emerald-300 tw-text-[11px]">{{ pct }}%</span>
+          <span class="text-emerald-300 text-[11px]">{{ pct }}%</span>
         </div>
       {% endfor %}
     </div>
   </section>
 
   {# Panel 4: Reconciliation (Phase 2 stub) #}
-  <section class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3 tw-opacity-50">
-    <h4 class="tw-text-slate-300 tw-text-[12px] tw-mb-2">Reconciliation</h4>
-    <p class="tw-text-slate-500 tw-text-[11px]">{{ reconciliation.reason }}</p>
+  <section class="bg-slate-900/40 border border-slate-800 rounded p-3 opacity-50">
+    <h4 class="text-slate-300 text-[12px] mb-2">Reconciliation</h4>
+    <p class="text-slate-500 text-[11px]">{{ reconciliation.reason }}</p>
   </section>
 
 </div>

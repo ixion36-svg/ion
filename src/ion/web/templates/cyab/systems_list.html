@@ -4,50 +4,50 @@
 <div class="cyab-systems-list">
   {% include "cyab/_section_nav.html" %}
 
-  <header class="tw-flex tw-items-baseline tw-justify-between tw-mb-4">
-    <h1 class="tw-text-[24px] tw-text-white tw-font-semibold">Systems</h1>
+  <header class="flex items-baseline justify-between mb-4">
+    <h1 class="text-[24px] text-white font-semibold">Systems</h1>
     <a href="/cyab/onboard"
-       class="tw-px-3 tw-py-1.5 tw-bg-cyan-700 tw-text-white tw-text-[12.5px] tw-rounded">+ Onboard</a>
+       class="px-3 py-1.5 bg-cyan-700 text-white text-[12.5px] rounded">+ Onboard</a>
   </header>
 
   {# Hidden column-header reference so the page shell advertises the table
      schema even before the HTMX swap completes. The real table is rendered
      by the partial. #}
-  <div class="tw-sr-only" aria-hidden="true">
+  <div class="sr-only" aria-hidden="true">
     Columns: Name, Pillar, Sub-profile, Owner, Progress, Critical-missing, Last edited, Status
   </div>
 
   {# Filter bar — HTMX swaps the table partial on every change #}
-  <form class="filters tw-flex tw-flex-wrap tw-gap-2 tw-mb-3 tw-text-[12px]"
+  <form class="filters flex flex-wrap gap-2 mb-3 text-[12px]"
         hx-get="/cyab/systems/_table"
         hx-target="#systems-table"
         hx-trigger="change, keyup[target.tagName=='INPUT'] delay:300ms"
         hx-swap="innerHTML">
     <input name="q" placeholder="Search name / hostname / owner"
-           class="tw-flex-1 tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
-    <select name="pillar" class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+           class="flex-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+    <select name="pillar" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
       <option value="">all pillars</option>
       {% for p in pillars %}<option value="{{ p.id }}">{{ p.label }}</option>{% endfor %}
     </select>
-    <select name="subprofile" class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+    <select name="subprofile" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
       <option value="">all sub-profiles</option>
       {% for s in subprofiles %}<option value="{{ s.id }}">{{ s.label }}</option>{% endfor %}
     </select>
-    <select name="status" class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+    <select name="status" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
       <option value="">any status</option>
       <option value="DRAFT">DRAFT</option>
       <option value="ACTIVE">ACTIVE</option>
       <option value="RETIRED">RETIRED</option>
     </select>
     <input name="owner" placeholder="owner"
-           class="tw-w-32 tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
-    <select name="missing" class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+           class="w-32 px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+    <select name="missing" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
       <option value="">missing: any</option>
       <option value="HLD">missing HLD</option>
       <option value="NETWORK_TOPOLOGY">missing topology</option>
       <option value="OWNERS">missing owners</option>
     </select>
-    <label class="tw-flex tw-items-center tw-gap-1 tw-text-slate-400">
+    <label class="flex items-center gap-1 text-slate-400">
       <input type="checkbox" name="stale" value="1"> stale data (&gt;24h)
     </label>
   </form>
@@ -57,7 +57,7 @@
        hx-trigger="load"
        hx-swap="innerHTML">
     {# initial load — replaced by HTMX after page renders #}
-    <p class="tw-text-slate-500 tw-text-[12px]">Loading…</p>
+    <p class="text-slate-500 text-[12px]">Loading…</p>
   </div>
 </div>
 {% endblock %}

@@ -1,6 +1,6 @@
-<header class="tw-mb-4">
-  <h2 class="tw-text-white tw-text-[16px] tw-font-semibold">First data source</h2>
-  <p class="tw-text-slate-400 tw-text-[12px]">
+<header class="mb-4">
+  <h2 class="text-white text-[16px] font-semibold">First data source</h2>
+  <p class="text-slate-400 text-[12px]">
     One source to start. Add more later from the Sources tab.
   </p>
 </header>
@@ -10,18 +10,18 @@
       hx-swap="innerHTML"
       method="post"
       action="/api/cyab/onboard/{{ wid }}/step/3"
-      class="tw-grid tw-grid-cols-2 tw-gap-4 tw-text-[12.5px]">
+      class="grid grid-cols-2 gap-4 text-[12.5px]">
 
-  <label class="tw-flex tw-flex-col tw-gap-1">
-    <span class="tw-text-slate-400">Source name <span class="tw-text-rose-400">*</span></span>
+  <label class="flex flex-col gap-1">
+    <span class="text-slate-400">Source name <span class="text-rose-400">*</span></span>
     <input name="name" type="text" required
            value="{{ state.source.name or state.identity.hostname or '' }}"
-           class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+           class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
   </label>
 
-  <label class="tw-flex tw-flex-col tw-gap-1">
-    <span class="tw-text-slate-400">Source type</span>
-    <select name="data_source_type" class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+  <label class="flex flex-col gap-1">
+    <span class="text-slate-400">Source type</span>
+    <select name="data_source_type" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
       {% for opt in ['windows-evtx', 'generic-syslog', 'linux-auditd', 'aws-cloudtrail',
                      'office365', 'okta', 'azure-ad', 'edr-generic'] %}
         <option value="{{ opt }}" {% if state.source.data_source_type == opt %}selected{% endif %}>{{ opt }}</option>
@@ -29,9 +29,9 @@
     </select>
   </label>
 
-  <label class="tw-col-span-2 tw-flex tw-flex-col tw-gap-1">
-    <span class="tw-text-slate-400">Sub-profile</span>
-    <select name="subprofile_id" class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+  <label class="col-span-2 flex flex-col gap-1">
+    <span class="text-slate-400">Sub-profile</span>
+    <select name="subprofile_id" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
       <option value="">— pick a sub-profile —</option>
       {% for s in (subprofiles or []) %}
         <option value="{{ s.id }}"
@@ -42,11 +42,11 @@
     </select>
   </label>
 
-  <div class="tw-col-span-2 tw-flex tw-justify-between tw-items-center tw-mt-2">
-    <a href="/cyab/onboard?wid={{ wid }}&step=2" class="tw-text-slate-500 tw-text-[11px]">← Back</a>
-    <div class="tw-flex tw-gap-2">
-      <a href="/cyab/systems" class="tw-text-slate-500 tw-text-[11px] tw-py-1">Save & exit</a>
-      <button type="submit" class="tw-px-4 tw-py-1.5 tw-bg-cyan-700 tw-text-white tw-text-[12.5px] tw-rounded">
+  <div class="col-span-2 flex justify-between items-center mt-2">
+    <a href="/cyab/onboard?wid={{ wid }}&step=2" class="text-slate-500 text-[11px]">← Back</a>
+    <div class="flex gap-2">
+      <a href="/cyab/systems" class="text-slate-500 text-[11px] py-1">Save & exit</a>
+      <button type="submit" class="px-4 py-1.5 bg-cyan-700 text-white text-[12.5px] rounded">
         Continue → Doc placeholders
       </button>
     </div>

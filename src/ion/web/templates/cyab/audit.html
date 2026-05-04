@@ -5,52 +5,52 @@
 <div class="cyab-audit">
   {% include "cyab/_section_nav.html" %}
 
-  <header class="tw-mb-4">
-    <nav class="breadcrumb tw-text-sm tw-text-slate-400 tw-mb-2">
-      <a href="/cyab" class="hover:tw-text-white">CyAB</a>
-      <span class="tw-mx-2">·</span>
-      <span class="tw-text-white">Audit trail</span>
+  <header class="mb-4">
+    <nav class="breadcrumb text-sm text-slate-400 mb-2">
+      <a href="/cyab" class="hover:text-white">CyAB</a>
+      <span class="mx-2">·</span>
+      <span class="text-white">Audit trail</span>
     </nav>
-    <h1 class="tw-text-[28px] tw-font-semibold tw-text-white">Audit trail</h1>
-    <p class="tw-text-slate-400 tw-text-[12.5px]">
+    <h1 class="text-[28px] font-semibold text-white">Audit trail</h1>
+    <p class="text-slate-400 text-[12.5px]">
       Sign-offs, checklist updates, containment-authority changes, and system lifecycle events.
     </p>
   </header>
 
   {# Filters — all five forwarded as GET query params and echoed back below. #}
-  <form method="get" action="/cyab/audit" class="tw-grid tw-grid-cols-6 tw-gap-2 tw-mb-4 tw-text-[12px]">
-    <label class="tw-flex tw-flex-col tw-gap-1">
-      <span class="tw-text-slate-400 tw-text-[10.5px]">System ID</span>
+  <form method="get" action="/cyab/audit" class="grid grid-cols-6 gap-2 mb-4 text-[12px]">
+    <label class="flex flex-col gap-1">
+      <span class="text-slate-400 text-[10.5px]">System ID</span>
       <input name="system_id" value="{{ filters.system_id }}"
-             class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+             class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
     </label>
-    <label class="tw-flex tw-flex-col tw-gap-1">
-      <span class="tw-text-slate-400 tw-text-[10.5px]">User</span>
+    <label class="flex flex-col gap-1">
+      <span class="text-slate-400 text-[10.5px]">User</span>
       <input name="user" value="{{ filters.user }}"
-             class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+             class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
     </label>
-    <label class="tw-flex tw-flex-col tw-gap-1">
-      <span class="tw-text-slate-400 tw-text-[10.5px]">Action</span>
+    <label class="flex flex-col gap-1">
+      <span class="text-slate-400 text-[10.5px]">Action</span>
       <select name="action_type"
-              class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+              class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
         <option value="">— any —</option>
         {% for opt in ['create', 'signoff', 'checklist_update', 'containment_change', 'archive', 'snapshot'] %}
           <option value="{{ opt }}" {% if filters.action_type == opt %}selected{% endif %}>{{ opt }}</option>
         {% endfor %}
       </select>
     </label>
-    <label class="tw-flex tw-flex-col tw-gap-1">
-      <span class="tw-text-slate-400 tw-text-[10.5px]">Since</span>
+    <label class="flex flex-col gap-1">
+      <span class="text-slate-400 text-[10.5px]">Since</span>
       <input type="date" name="since" value="{{ filters.since }}"
-             class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+             class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
     </label>
-    <label class="tw-flex tw-flex-col tw-gap-1">
-      <span class="tw-text-slate-400 tw-text-[10.5px]">Until</span>
+    <label class="flex flex-col gap-1">
+      <span class="text-slate-400 text-[10.5px]">Until</span>
       <input type="date" name="until" value="{{ filters.until }}"
-             class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+             class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
     </label>
     <button type="submit"
-            class="tw-self-end tw-px-3 tw-py-1 tw-bg-cyan-700 tw-text-white tw-rounded">
+            class="self-end px-3 py-1 bg-cyan-700 text-white rounded">
       Apply
     </button>
   </form>

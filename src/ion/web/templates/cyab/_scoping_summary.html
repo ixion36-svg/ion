@@ -1,34 +1,34 @@
-<section class="scoping-summary tw-bg-slate-900/60 tw-border tw-border-cyan-900/40 tw-rounded tw-p-4">
-  <h2 class="tw-text-cyan-300 tw-text-[14px] tw-font-semibold tw-mb-2">
+<section class="scoping-summary bg-slate-900/60 border border-cyan-900/40 rounded p-4">
+  <h2 class="text-cyan-300 text-[14px] font-semibold mb-2">
     Recommended for your stack
   </h2>
-  <p class="tw-text-slate-300 tw-text-[12.5px] tw-mb-3">{{ summary_text }}</p>
+  <p class="text-slate-300 text-[12.5px] mb-3">{{ summary_text }}</p>
 
-  <div class="tw-grid tw-grid-cols-3 tw-gap-3 tw-mb-4">
-    <div class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-2">
-      <div class="tw-text-cyan-300 tw-text-[20px] tw-font-semibold">{{ scores.use_case_count }}</div>
-      <div class="tw-text-slate-500 tw-text-[10.5px]">detection &amp; audit use cases</div>
+  <div class="grid grid-cols-3 gap-3 mb-4">
+    <div class="bg-slate-900/40 border border-slate-800 rounded p-2">
+      <div class="text-cyan-300 text-[20px] font-semibold">{{ scores.use_case_count }}</div>
+      <div class="text-slate-500 text-[10.5px]">detection &amp; audit use cases</div>
     </div>
-    <div class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-2">
-      <div class="tw-text-amber-300 tw-text-[20px] tw-font-semibold">{{ scores.threat_actor_matches }}</div>
-      <div class="tw-text-slate-500 tw-text-[10.5px]">threat-actor profiles</div>
+    <div class="bg-slate-900/40 border border-slate-800 rounded p-2">
+      <div class="text-amber-300 text-[20px] font-semibold">{{ scores.threat_actor_matches }}</div>
+      <div class="text-slate-500 text-[10.5px]">threat-actor profiles</div>
     </div>
-    <div class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-2">
-      <div class="tw-text-emerald-300 tw-text-[20px] tw-font-semibold">{{ scores.mitre_coverage_pct }}%</div>
-      <div class="tw-text-slate-500 tw-text-[10.5px]">MITRE Initial Access coverage</div>
+    <div class="bg-slate-900/40 border border-slate-800 rounded p-2">
+      <div class="text-emerald-300 text-[20px] font-semibold">{{ scores.mitre_coverage_pct }}%</div>
+      <div class="text-slate-500 text-[10.5px]">MITRE Initial Access coverage</div>
     </div>
   </div>
 
   {% if scores.recommended_use_cases %}
-  <details class="tw-mb-3">
-    <summary class="tw-text-cyan-400 tw-text-[12px] tw-cursor-pointer">
+  <details class="mb-3">
+    <summary class="text-cyan-400 text-[12px] cursor-pointer">
       Top {{ scores.recommended_use_cases | length }} ranked use cases
     </summary>
-    <ul class="tw-mt-2 tw-space-y-1 tw-text-[11.5px]">
+    <ul class="mt-2 space-y-1 text-[11.5px]">
       {% for uc in scores.recommended_use_cases %}
-        <li class="tw-flex tw-justify-between tw-text-slate-300">
+        <li class="flex justify-between text-slate-300">
           <span>{{ uc.name }}</span>
-          <span class="tw-text-slate-500 tw-font-mono">{{ uc.score }}</span>
+          <span class="text-slate-500 font-mono">{{ uc.score }}</span>
         </li>
       {% endfor %}
     </ul>
@@ -36,36 +36,36 @@
   {% endif %}
 
   {% if scores.recommended_threat_actors %}
-  <details class="tw-mb-3">
-    <summary class="tw-text-amber-400 tw-text-[12px] tw-cursor-pointer">
+  <details class="mb-3">
+    <summary class="text-amber-400 text-[12px] cursor-pointer">
       Top {{ scores.recommended_threat_actors | length }} threat-actor categories
     </summary>
-    <ul class="tw-mt-2 tw-space-y-1 tw-text-[11.5px]">
+    <ul class="mt-2 space-y-1 text-[11.5px]">
       {% for a in scores.recommended_threat_actors %}
-        <li class="tw-text-slate-300">
-          <strong class="tw-text-amber-200">{{ a.name }}</strong>
-          <span class="tw-text-slate-500"> &mdash; {{ a.why }}</span>
+        <li class="text-slate-300">
+          <strong class="text-amber-200">{{ a.name }}</strong>
+          <span class="text-slate-500"> &mdash; {{ a.why }}</span>
         </li>
       {% endfor %}
     </ul>
   </details>
   {% endif %}
 
-  <div class="tw-flex tw-items-center tw-gap-3 tw-pt-3 tw-border-t tw-border-slate-800">
+  <div class="flex items-center gap-3 pt-3 border-t border-slate-800">
     <form hx-post="/api/cyab/scoping/pdf"
           hx-include="#scoping-form"
           hx-swap="none"
           hx-on::after-request="if (event.detail.successful) { window.location = event.detail.xhr.getResponseHeader('Location') || event.detail.xhr.responseURL; }"
-          class="tw-inline">
-      <button type="submit" class="tw-px-3 tw-py-1.5 tw-bg-slate-700 tw-text-white tw-text-[12px] tw-rounded">
+          class="inline">
+      <button type="submit" class="px-3 py-1.5 bg-slate-700 text-white text-[12px] rounded">
         Download PDF
       </button>
     </form>
     <form hx-post="/api/cyab/scoping/convert"
           hx-include="#scoping-form"
-          class="tw-inline">
+          class="inline">
       <button type="submit"
-              class="tw-px-3 tw-py-1.5 tw-bg-cyan-700 tw-text-white tw-text-[12px] tw-rounded">
+              class="px-3 py-1.5 bg-cyan-700 text-white text-[12px] rounded">
         Convert to system &rarr;
       </button>
     </form>

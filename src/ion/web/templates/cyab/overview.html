@@ -4,16 +4,16 @@
 <div class="cyab-overview">
   {% include "cyab/_section_nav.html" %}
 
-  <header class="tw-flex tw-items-baseline tw-justify-between tw-mb-4">
-    <h1 class="tw-text-[24px] tw-text-white tw-font-semibold">CyAB Overview</h1>
-    <div class="tw-flex tw-gap-2">
+  <header class="flex items-baseline justify-between mb-4">
+    <h1 class="text-[24px] text-white font-semibold">CyAB Overview</h1>
+    <div class="flex gap-2">
       <a href="/cyab/onboard"
-         class="tw-px-3 tw-py-1.5 tw-bg-cyan-700 tw-text-white tw-text-[12.5px] tw-rounded">+ Onboard</a>
+         class="px-3 py-1.5 bg-cyan-700 text-white text-[12.5px] rounded">+ Onboard</a>
       <a href="/cyab/systems"
-         class="tw-px-3 tw-py-1.5 tw-bg-slate-800 tw-text-slate-200 tw-text-[12.5px] tw-rounded">View systems</a>
+         class="px-3 py-1.5 bg-slate-800 text-slate-200 text-[12.5px] rounded">View systems</a>
       <button hx-post="/api/cyab/coverage/rollup-now"
               hx-swap="none"
-              class="tw-px-3 tw-py-1.5 tw-bg-slate-800 tw-text-slate-200 tw-text-[12.5px] tw-rounded">
+              class="px-3 py-1.5 bg-slate-800 text-slate-200 text-[12.5px] rounded">
         Run coverage rollup
       </button>
     </div>
@@ -22,40 +22,40 @@
   {# === KPI strip === #}
   {% set onb_pct = (kpis.sal_compliance_pass / kpis.total_systems * 100) | round(0) | int if kpis.total_systems else 0 %}
   {% set crit_pct = (needs_attention | length) / kpis.total_systems * 100 if kpis.total_systems else 0 %}
-  <section class="kpi-strip tw-grid tw-grid-cols-4 tw-gap-3 tw-mb-6">
-    <div class="kpi-card tw-bg-slate-900/60 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-      <div class="tw-text-slate-500 tw-text-[10px] tw-uppercase tw-tracking-wider">Total systems</div>
-      <div class="tw-text-cyan-300 tw-text-[24px] tw-font-semibold">{{ kpis.total_systems }}</div>
+  <section class="kpi-strip grid grid-cols-4 gap-3 mb-6">
+    <div class="kpi-card bg-slate-900/60 border border-slate-800 rounded p-3">
+      <div class="text-slate-500 text-[10px] uppercase tracking-wider">Total systems</div>
+      <div class="text-cyan-300 text-[24px] font-semibold">{{ kpis.total_systems }}</div>
     </div>
-    <div class="kpi-card tw-bg-slate-900/60 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-      <div class="tw-text-slate-500 tw-text-[10px] tw-uppercase tw-tracking-wider">% onboarded</div>
-      <div class="tw-text-emerald-300 tw-text-[24px] tw-font-semibold">{{ onb_pct }}%</div>
+    <div class="kpi-card bg-slate-900/60 border border-slate-800 rounded p-3">
+      <div class="text-slate-500 text-[10px] uppercase tracking-wider">% onboarded</div>
+      <div class="text-emerald-300 text-[24px] font-semibold">{{ onb_pct }}%</div>
     </div>
-    <div class="kpi-card tw-bg-slate-900/60 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-      <div class="tw-text-slate-500 tw-text-[10px] tw-uppercase tw-tracking-wider">% critical-missing</div>
-      <div class="tw-text-rose-400 tw-text-[24px] tw-font-semibold">{{ crit_pct | round(0) | int }}%</div>
+    <div class="kpi-card bg-slate-900/60 border border-slate-800 rounded p-3">
+      <div class="text-slate-500 text-[10px] uppercase tracking-wider">% critical-missing</div>
+      <div class="text-rose-400 text-[24px] font-semibold">{{ crit_pct | round(0) | int }}%</div>
     </div>
-    <div class="kpi-card tw-bg-slate-900/60 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-      <div class="tw-text-slate-500 tw-text-[10px] tw-uppercase tw-tracking-wider">Sign-offs this week</div>
-      <div class="tw-text-amber-300 tw-text-[24px] tw-font-semibold">{{ kpis.signoffs_this_week }}</div>
+    <div class="kpi-card bg-slate-900/60 border border-slate-800 rounded p-3">
+      <div class="text-slate-500 text-[10px] uppercase tracking-wider">Sign-offs this week</div>
+      <div class="text-amber-300 text-[24px] font-semibold">{{ kpis.signoffs_this_week }}</div>
     </div>
   </section>
 
-  <div class="tw-grid tw-grid-cols-2 tw-gap-4">
+  <div class="grid grid-cols-2 gap-4">
     {# === In progress feed === #}
-    <section class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-      <header class="tw-flex tw-items-baseline tw-justify-between tw-mb-2">
-        <h3 class="tw-text-slate-300 tw-text-[12.5px]">In progress</h3>
-        <span class="tw-text-slate-500 tw-text-[10.5px]">5 most recent</span>
+    <section class="bg-slate-900/40 border border-slate-800 rounded p-3">
+      <header class="flex items-baseline justify-between mb-2">
+        <h3 class="text-slate-300 text-[12.5px]">In progress</h3>
+        <span class="text-slate-500 text-[10.5px]">5 most recent</span>
       </header>
       {% if not in_progress %}
-        <p class="tw-text-slate-500 tw-text-[11px]">Nothing in progress. <a href="/cyab/onboard" class="tw-text-cyan-400">+ Onboard a system</a>.</p>
+        <p class="text-slate-500 text-[11px]">Nothing in progress. <a href="/cyab/onboard" class="text-cyan-400">+ Onboard a system</a>.</p>
       {% else %}
-        <ul class="tw-divide-y tw-divide-slate-800 tw-text-[12px]">
+        <ul class="divide-y divide-slate-800 text-[12px]">
           {% for s in in_progress %}
-            <li class="tw-py-2 tw-flex tw-justify-between">
-              <a href="/cyab/systems/{{ s.id }}" class="tw-text-cyan-400 hover:tw-underline">{{ s.name }}</a>
-              <span class="tw-text-slate-500 tw-text-[11px]">{{ s.updated_at.strftime('%Y-%m-%d %H:%M') if s.updated_at else '' }}</span>
+            <li class="py-2 flex justify-between">
+              <a href="/cyab/systems/{{ s.id }}" class="text-cyan-400 hover:underline">{{ s.name }}</a>
+              <span class="text-slate-500 text-[11px]">{{ s.updated_at.strftime('%Y-%m-%d %H:%M') if s.updated_at else '' }}</span>
             </li>
           {% endfor %}
         </ul>
@@ -63,19 +63,19 @@
     </section>
 
     {# === Needs attention feed === #}
-    <section class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-      <header class="tw-flex tw-items-baseline tw-justify-between tw-mb-2">
-        <h3 class="tw-text-rose-400 tw-text-[12.5px]">Needs attention</h3>
-        <span class="tw-text-slate-500 tw-text-[10.5px]">critical-missing or stale data</span>
+    <section class="bg-slate-900/40 border border-slate-800 rounded p-3">
+      <header class="flex items-baseline justify-between mb-2">
+        <h3 class="text-rose-400 text-[12.5px]">Needs attention</h3>
+        <span class="text-slate-500 text-[10.5px]">critical-missing or stale data</span>
       </header>
       {% if not needs_attention %}
-        <p class="tw-text-emerald-400 tw-text-[11px]">All clear — no critical gaps right now.</p>
+        <p class="text-emerald-400 text-[11px]">All clear — no critical gaps right now.</p>
       {% else %}
-        <ul class="tw-divide-y tw-divide-slate-800 tw-text-[12px]">
+        <ul class="divide-y divide-slate-800 text-[12px]">
           {% for s in needs_attention %}
-            <li class="tw-py-2 tw-flex tw-justify-between">
-              <a href="/cyab/systems/{{ s.id }}" class="tw-text-rose-300 hover:tw-underline">{{ s.name }}</a>
-              <span class="tw-text-slate-500 tw-text-[11px]">{{ s.reason }}</span>
+            <li class="py-2 flex justify-between">
+              <a href="/cyab/systems/{{ s.id }}" class="text-rose-300 hover:underline">{{ s.name }}</a>
+              <span class="text-slate-500 text-[11px]">{{ s.reason }}</span>
             </li>
           {% endfor %}
         </ul>

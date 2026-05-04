@@ -12,14 +12,14 @@
    CyabSystemAssessment row.
 #}
 {% if not subprofile %}
-  <div class="tw-py-6 tw-text-slate-400">
+  <div class="py-6 text-slate-400">
     <p>No sub-profile selected for this system. Choose one to load intake questions.</p>
-    <p class="tw-text-[11px] tw-text-slate-500 tw-mt-2">
+    <p class="text-[11px] text-slate-500 mt-2">
       Set <code>subprofile_id</code> via
       <code>/api/cyab/systems/{{ system.id }}</code>.
     </p>
     {# Still emit the progress count so the tab has a stable shape. #}
-    <p class="tw-text-cyan-300 tw-text-[12px] tw-mt-3">0 / 0 answered</p>
+    <p class="text-cyan-300 text-[12px] mt-3">0 / 0 answered</p>
   </div>
 {% else %}
   {% set questions = (subprofile.catalogue or {}).get('intake_questions') or [] %}
@@ -33,21 +33,21 @@
   {% set answered = answered_keys | length %}
   {% set total = questions | length %}
 
-  <header class="tw-flex tw-items-baseline tw-justify-between tw-mb-4">
-    <h3 class="tw-text-white tw-text-[14px] tw-font-semibold">
+  <header class="flex items-baseline justify-between mb-4">
+    <h3 class="text-white text-[14px] font-semibold">
       Intake — {{ subprofile.label }}
     </h3>
-    <span class="tw-text-cyan-300 tw-text-[12px]">{{ answered }} / {{ total }} answered</span>
+    <span class="text-cyan-300 text-[12px]">{{ answered }} / {{ total }} answered</span>
   </header>
 
   <form hx-post="/api/cyab/studio/systems/{{ system.id }}/answers"
         hx-target="#tab-content" hx-swap="innerHTML"
         hx-ext="json-enc"
-        class="tw-space-y-4">
+        class="space-y-4">
     {% for q in questions %}
-      <div class="intake-question tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3"
+      <div class="intake-question bg-slate-900/40 border border-slate-800 rounded p-3"
            data-intake-q="{{ q.key }}">
-        <label class="tw-block tw-text-slate-200 tw-text-[12.5px] tw-mb-2">{{ q.text }}</label>
+        <label class="block text-slate-200 text-[12.5px] mb-2">{{ q.text }}</label>
         {% if q.answer_type == 'yesno' %}
           {% set yesno_opts = [
               {'value': 'yes', 'label': 'Yes'},
@@ -56,7 +56,7 @@
               {'value': 'dont_know', 'label': "Don't know"},
           ] %}
           <select name="answers[{{ q.key }}]"
-                  class="tw-w-full tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-text-[12px] tw-rounded">
+                  class="w-full px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
             <option value="">— select —</option>
             {% for opt in yesno_opts %}
               <option value="{{ opt.value }}"
@@ -67,7 +67,7 @@
           </select>
         {% elif q.answer_type == 'single' %}
           <select name="answers[{{ q.key }}]"
-                  class="tw-w-full tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-text-[12px] tw-rounded">
+                  class="w-full px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
             <option value="">— select —</option>
             {% for opt in (q.options or []) %}
               <option value="{{ opt.value }}"
@@ -77,10 +77,10 @@
             {% endfor %}
           </select>
         {% elif q.answer_type == 'multi' %}
-          <div class="tw-flex tw-flex-wrap tw-gap-2">
+          <div class="flex flex-wrap gap-2">
             {% set current = answers.get(q.key) or [] %}
             {% for opt in (q.options or []) %}
-              <label class="tw-flex tw-items-center tw-gap-1 tw-text-slate-300 tw-text-[12px]">
+              <label class="flex items-center gap-1 text-slate-300 text-[12px]">
                 <input type="checkbox" name="answers[{{ q.key }}][]" value="{{ opt.value }}"
                        {% if opt.value in current %}checked{% endif %}>
                 {{ opt.label }}
@@ -90,13 +90,13 @@
         {% else %}
           <input type="text" name="answers[{{ q.key }}]"
                  value="{{ answers.get(q.key, '') }}"
-                 class="tw-w-full tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-text-[12px] tw-rounded">
+                 class="w-full px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
         {% endif %}
       </div>
     {% endfor %}
-    <div class="tw-flex tw-justify-end">
+    <div class="flex justify-end">
       <button type="submit"
-              class="tw-px-3 tw-py-1 tw-bg-cyan-700 tw-text-white tw-text-[12px] tw-rounded">
+              class="px-3 py-1 bg-cyan-700 text-white text-[12px] rounded">
         Save
       </button>
     </div>
