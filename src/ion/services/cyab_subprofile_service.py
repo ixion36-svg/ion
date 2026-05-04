@@ -24,17 +24,16 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ion.models.cyab import CyabDataSource, CyabSystemAssessment
 from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
-from ion.models.cyab import CyabDataSource, CyabSystem, CyabSystemAssessment
 from ion.services.cyab_subprofile_catalogue import (
     CATALOGUE_VERSION,
     DATA_SOURCE_TYPE_MIGRATION,
     PILLARS,
     SUBPROFILES,
-    get_subprofile,
 )
 from ion.storage.database import get_session_factory
 

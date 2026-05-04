@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -26,10 +26,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import (
-    get_current_user, require_permission, require_page_auth,
+    require_page_auth,
+    require_permission,
 )
-from ion.models.user import User
 from ion.models.story import Story, StoryRun
+from ion.models.user import User
 from ion.services import story_executor
 from ion.web.api import get_db_session
 

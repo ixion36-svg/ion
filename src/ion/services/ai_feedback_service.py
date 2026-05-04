@@ -31,9 +31,10 @@ def record_case_close_feedback(
     Returns count of rows written. Silent no-op on error.
     """
     try:
+        from sqlalchemy import select
+
         from ion.models.ai_feedback import AIFeedback
         from ion.models.investigation import Investigation
-        from sqlalchemy import select
     except Exception as exc:
         logger.debug("AIFeedback imports failed: %s", exc)
         return 0

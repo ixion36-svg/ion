@@ -9,11 +9,11 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_db_session, require_permission
-from ion.models.user import User
-from ion.services.opencti_service import get_opencti_service, OpenCTIError
-from ion.services.threat_intel_service import ThreatIntelService
-from ion.services.country_mapper import get_country_code, get_country_name, country_code_to_flag
 from ion.core.safe_errors import safe_error
+from ion.models.user import User
+from ion.services.country_mapper import country_code_to_flag, get_country_code, get_country_name
+from ion.services.opencti_service import OpenCTIError, get_opencti_service
+from ion.services.threat_intel_service import ThreatIntelService
 
 logger = logging.getLogger(__name__)
 

@@ -199,7 +199,7 @@ def get_sync_status(session: Session) -> dict:
 
 async def _background_sync_loop(engine):
     """Run sync_all every SYNC_INTERVAL seconds in a background task."""
-    from sqlalchemy.orm import Session as SyncSession, sessionmaker
+    from sqlalchemy.orm import sessionmaker
 
     SessionLocal = sessionmaker(bind=engine)
 

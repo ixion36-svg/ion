@@ -1,23 +1,22 @@
 """Forensic Investigation API endpoints."""
 
 from typing import Optional
-from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ion.auth.dependencies import require_permission, get_current_user, get_db_session
-from ion.models.user import User
+from ion.auth.dependencies import get_db_session, require_permission
 from ion.models.forensics import (
-    ForensicCaseStatus,
-    ForensicCasePriority,
-    InvestigationType,
-    EvidenceType,
-    EvidenceStatus,
     CustodyAction,
+    EvidenceStatus,
+    EvidenceType,
+    ForensicCasePriority,
+    ForensicCaseStatus,
+    InvestigationType,
 )
-from ion.storage.forensic_repository import ForensicRepository, DEFAULT_SLA_PROFILES
+from ion.models.user import User
+from ion.storage.forensic_repository import DEFAULT_SLA_PROFILES, ForensicRepository
 
 router = APIRouter(tags=["forensics"])
 
@@ -692,7 +691,7 @@ async def extract_iocs_endpoint(
     Returns categorized IOCs: ipv4, ipv6, md5, sha1, sha256, domains,
     urls, emails, cves, mac_addresses, hostnames.
     """
-    from ion.services.ioc_text_extractor import extract_iocs, extract_from_file
+    from ion.services.ioc_text_extractor import extract_from_file, extract_iocs
 
     if file and file.filename:
         ext = ("." + file.filename.rsplit(".", 1)[-1].lower()) if "." in file.filename else ""

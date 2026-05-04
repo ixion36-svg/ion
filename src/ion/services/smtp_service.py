@@ -10,13 +10,12 @@ The service degrades gracefully when SMTP is disabled or misconfigured:
 so callers can treat email notification as best-effort.
 """
 
+import logging
+import ssl
 from dataclasses import dataclass
 from email.message import EmailMessage
 from email.utils import formataddr, make_msgid
-from typing import List, Optional, Sequence, Tuple, Dict, Any
-import logging
-import ssl
-from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 try:
     import aiosmtplib  # type: ignore
@@ -24,7 +23,6 @@ except ImportError:  # pragma: no cover - optional at import time
     aiosmtplib = None  # type: ignore
 
 from ion.core.config import get_config, get_ssl_verify
-
 
 logger = logging.getLogger(__name__)
 

@@ -3,8 +3,8 @@
 Provides a singleton registry for registering and retrieving connectors.
 """
 
-from typing import Dict, Type, Optional, List
 import logging
+from typing import Dict, List, Optional, Type
 
 from ion.services.connectors.base import BaseConnector, HealthCheckResult
 

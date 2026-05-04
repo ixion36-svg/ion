@@ -8,9 +8,9 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from ion.services.ollama_service import get_ollama_service, OllamaError
+from ion.services.ollama_service import OllamaError, get_ollama_service
 
 logger = logging.getLogger(__name__)
 

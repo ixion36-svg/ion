@@ -11,7 +11,6 @@ All sync operations are idempotent. Re-running with the same data is a no-op
 import logging
 import os
 import threading
-import time
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -32,7 +31,7 @@ async def sync_once(lookback_minutes: int = _LOOKBACK_MINUTES) -> dict[str, int]
 
     Returns {"hosts_processed": N, "ips_upserted": N, "macs_upserted": N}.
     """
-    from ion.services.elasticsearch_service import ElasticsearchService, ElasticsearchError
+    from ion.services.elasticsearch_service import ElasticsearchService
 
     es = ElasticsearchService()
     if not es.is_configured:

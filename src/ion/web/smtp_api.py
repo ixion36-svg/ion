@@ -10,7 +10,6 @@ The router is mounted at ``/api/smtp`` by ``ion.web.server`` (see
 Integration Checklist).
 """
 
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
@@ -18,7 +17,6 @@ from pydantic import BaseModel, EmailStr
 from ion.auth.dependencies import require_permission
 from ion.models.user import User
 from ion.services.smtp_service import get_smtp_service, reset_smtp_service
-
 
 router = APIRouter()
 

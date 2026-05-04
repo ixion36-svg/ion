@@ -11,7 +11,6 @@ shared instance.
 
 from __future__ import annotations
 
-import json
 import logging
 from contextlib import contextmanager
 from typing import Any, Iterator, Optional
@@ -20,8 +19,8 @@ from sqlalchemy.orm import Session
 
 from ion.models.investigation import (
     FalsePositiveSignature,
-    IOCSighting,
     Investigation,
+    IOCSighting,
 )
 from ion.storage import investigation_memory_repository as repo
 from ion.storage.database import get_engine, get_session_factory

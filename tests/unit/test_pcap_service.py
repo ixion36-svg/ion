@@ -880,12 +880,14 @@ class TestDetectDga:
         # "abcdef" entropy ≈ 2.58, under 3.5 threshold
         assert len(findings) == 0
 
-    def test_single_high_entropy_domain_medium(self):
-        """1-3 high entropy domains = medium per-domain findings."""
+    def test_single_high_entropy_domain_low(self):
+        """1-3 high entropy domains = low per-domain findings (severity dropped from
+        medium to low so a single CDN/ad-tech subdomain doesn't push benign PCAPs
+        over the verdict threshold)."""
         dns = collections.Counter({"xk4m9qzr2bv7np.com": 1})
         findings = _detect_dga(dns)
         if findings:
-            assert findings[0].severity == "medium"
+            assert findings[0].severity == "low"
 
     def test_many_high_entropy_domains_high(self):
         """4+ high entropy domains = single high severity finding."""

@@ -1,16 +1,16 @@
 """Bulk alert and case operations for SOC workflow acceleration."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from ion.models.alert_triage import (
-    AlertTriage,
     AlertCase,
-    AlertTriageStatus,
     AlertCaseStatus,
+    AlertTriage,
+    AlertTriageStatus,
 )
 
 logger = logging.getLogger(__name__)

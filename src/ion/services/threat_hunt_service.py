@@ -2,13 +2,12 @@
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ion.models.sla import ThreatHunt
-from ion.models.user import User
 
 logger = logging.getLogger(__name__)
 

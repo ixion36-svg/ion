@@ -11,16 +11,16 @@ Logs are output to stdout in JSON format and optionally shipped to Elasticsearch
 """
 
 import logging
-import sys
 import os
+import queue
+import sys
+import threading
 import time
 import uuid
-import queue
-import threading
 from contextvars import ContextVar
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
 from functools import wraps
+from typing import Any, Dict, List, Optional
 
 # Try to import ecs_logging, fall back to basic JSON if not available
 try:

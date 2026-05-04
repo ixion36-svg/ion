@@ -1,18 +1,17 @@
 """Threat Landscape API — high-level threat overview from OpenCTI."""
 
-import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
-from ion.models.user import User
-from ion.services.opencti_service import get_opencti_service, OpenCTIError
-from ion.services.ollama_service import get_ollama_service, OllamaError
-from ion.core.safe_errors import safe_error
-from ion.storage.database import get_engine, get_session_factory
 from ion.core.config import get_config
+from ion.core.safe_errors import safe_error
+from ion.models.user import User
+from ion.services.ollama_service import OllamaError, get_ollama_service
+from ion.services.opencti_service import OpenCTIError, get_opencti_service
+from ion.storage.database import get_engine, get_session_factory
 
 
 def get_db_session():

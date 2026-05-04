@@ -3,13 +3,13 @@
 Wraps the GitLabService to provide a unified connector interface.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 from ion.services.connectors.base import BaseConnector
 from ion.services.gitlab_service import (
+    GitLabService,
     get_gitlab_service,
     reset_gitlab_service,
-    GitLabService,
 )
 
 

@@ -209,7 +209,7 @@ async def _analyze_one(
         "arkime_url_root": None, "pcap_error": None,
     }
     try:
-        from ion.services.arkime_service import get_arkime_service, ArkimeError
+        from ion.services.arkime_service import get_arkime_service
     except Exception as exc:
         out["pcap_error"] = f"Arkime service unavailable: {exc}"
         return out
@@ -262,9 +262,9 @@ def _post_case_note(case_id: int, content: str) -> None:
     """
     try:
         from ion.core.config import get_config
-        from ion.storage.database import get_engine, get_session_factory
         from ion.models.alert_triage import Note, NoteEntityType
         from ion.services.ai_user import get_bob_user_id
+        from ion.storage.database import get_engine, get_session_factory
     except Exception as exc:
         logger.warning("pcap_analysis: cannot import deps for note write: %s", exc)
         return

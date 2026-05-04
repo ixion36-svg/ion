@@ -3,12 +3,13 @@
 Provides functionality to fetch alerts and security events from Elasticsearch.
 """
 
-from dataclasses import dataclass
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
-from urllib.parse import urlsplit, urlunsplit
 import logging
 import os
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit, urlunsplit
+
 import httpx
 
 from ion.core.config import get_elasticsearch_config, get_ssl_verify
@@ -607,31 +608,6 @@ class ElasticsearchService:
             }
             for b in buckets
         ]
-
-    async def get_alerts_by_ids(self, alert_ids: List[str]) -> List[ElasticsearchAlert]:
-        """Fetch multiple alerts by their document IDs."""
-        if not alert_ids:
-            return []
-
-        query = {
-            "size": len(alert_ids),
-            "query": {"ids": {"values": alert_ids}},
-        }
-        try:
-            result = await self._request(
-                "POST",
-                f"/{self.alert_index}/_search",
-                json=query,
-            )
-        except ElasticsearchError:
-            return []
-
-        alerts = []
-        for hit in result.get("hits", {}).get("hits", []):
-            alert = self._parse_alert(hit["_id"], hit.get("_source", {}))
-            if alert:
-                alerts.append(alert)
-        return alerts
 
     @staticmethod
     def _get_field(source: Dict[str, Any], dotted_path: str, default=None):
@@ -2446,7 +2422,6 @@ class ElasticsearchService:
         if not self.is_configured:
             return {"error": "Elasticsearch is not configured", "hits": [], "total": 0}
 
-        import re
 
         # Auto-detect IOC type if not provided
         if not ioc_type:

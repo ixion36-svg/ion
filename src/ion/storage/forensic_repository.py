@@ -2,24 +2,24 @@
 
 import json
 from datetime import datetime, timedelta
-from typing import Optional, List
-from sqlalchemy import select, func
+from typing import List, Optional
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ion.models.forensics import (
-    ForensicCase,
-    ForensicCaseStatus,
-    ForensicCasePriority,
+    CustodyAction,
+    CustodyLogEntry,
     EvidenceItem,
     EvidenceStatus,
-    CustodyLogEntry,
-    CustodyAction,
+    ForensicCase,
+    ForensicCasePriority,
+    ForensicCaseStatus,
+    ForensicCaseStep,
     ForensicPlaybook,
     ForensicPlaybookStep,
-    ForensicCaseStep,
     ForensicTimelineEntry,
 )
-
 
 # Default SLA profiles per investigation type (hours for each milestone)
 DEFAULT_SLA_PROFILES = {

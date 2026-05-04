@@ -3,7 +3,7 @@
 Wraps KibanaCasesService and KibanaSyncService to provide a unified connector interface.
 """
 
-from typing import Dict, Any, Optional
+from typing import Any, Dict
 
 from ion.services.connectors.base import BaseConnector
 from ion.services.connectors.version_compat import KIBANA_VERSIONS

@@ -7,14 +7,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
+from ion.core.logging import get_structured_logger
 from ion.models.security import SecurityEvent, SecurityEventSeverity
 from ion.storage.security_repository import SecurityEventRepository
-from ion.core.logging import get_structured_logger
-
 
 logger = get_structured_logger(__name__)
 

@@ -3031,6 +3031,7 @@ class AlertPromptService:
 
         try:
             from sqlalchemy import exists
+
             from ion.models.ai_feedback import AIFeedback
             from ion.models.alert_triage import AlertCase
             from ion.models.case_embedding import CaseEmbedding
@@ -3247,7 +3248,8 @@ class AlertPromptService:
         if alert is not None:
             try:
                 from ion.services.skill_loader import (
-                    select_skills_for_alert, format_skills_for_prompt,
+                    format_skills_for_prompt,
+                    select_skills_for_alert,
                 )
                 skills = select_skills_for_alert(alert)
                 skill_block = format_skills_for_prompt(skills)

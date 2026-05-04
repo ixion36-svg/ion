@@ -1,11 +1,16 @@
 """SLA targets, threat hunting, dashboard widgets, reporting schedule, playbook actions."""
 
-from datetime import datetime, date
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
-    Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text,
-    UniqueConstraint, Index,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

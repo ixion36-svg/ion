@@ -11,14 +11,14 @@ Pulls events from:
 import json
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any
 
-from sqlalchemy import select, or_, and_, desc, func
+from sqlalchemy import and_, desc, or_, select
 from sqlalchemy.orm import Session
 
-from ion.models.alert_triage import AlertTriage, AlertCase
-from ion.models.user import AuditLog, User
+from ion.models.alert_triage import AlertCase, AlertTriage
 from ion.models.observable import Observable, ObservableEnrichment
+from ion.models.user import AuditLog, User
 
 logger = logging.getLogger(__name__)
 
@@ -143,10 +143,10 @@ def _search_cases(session: Session, entity: str, cutoff: datetime) -> list[dict]
         users = c.affected_users or []
         if isinstance(hosts, str):
             try: hosts = json.loads(hosts)
-            except: hosts = []
+            except Exception: hosts = []
         if isinstance(users, str):
             try: users = json.loads(users)
-            except: users = []
+            except Exception: users = []
 
         entity_lower = entity.lower()
         matched = any(entity_lower in str(h).lower() for h in hosts) or \

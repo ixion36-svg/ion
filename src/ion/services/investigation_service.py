@@ -187,9 +187,12 @@ def _write_bob_outputs(
     when an investigation is re-run (force=True, manual retrigger, etc.).
     """
     from ion.models.alert_triage import (
-        AlertCase, AlertCaseStatus,
-        AlertTriage, AlertTriageStatus,
-        Note, NoteEntityType,
+        AlertCase,
+        AlertCaseStatus,
+        AlertTriage,
+        AlertTriageStatus,
+        Note,
+        NoteEntityType,
     )
     from ion.models.observable import Observable, ObservableType
     from ion.services.ai_user import get_bob_user_id
@@ -894,8 +897,12 @@ class InvestigationService:
         """
         try:
             from ion.models.alert_triage import (
-                AlertCase, AlertCaseStatus, AlertTriage, AlertTriageStatus,
-                Note, NoteEntityType,
+                AlertCase,
+                AlertCaseStatus,
+                AlertTriage,
+                AlertTriageStatus,
+                Note,
+                NoteEntityType,
             )
             from ion.storage.database import get_session_factory
 
@@ -1981,6 +1988,9 @@ class InvestigationService:
         # Memory context — use the first alert as representative
         rep_alert = alerts[0] if alerts else seed_alert
         try:
+            from ion.services.investigation_memory_service import (
+                get_investigation_memory_service,
+            )
             memory = get_investigation_memory_service()
             memory_ctx_md = memory.build_context_block_for_alert(rep_alert) if memory else ""
         except Exception as exc:

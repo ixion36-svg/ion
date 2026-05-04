@@ -14,13 +14,13 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional, Tuple
 
-from sqlalchemy import and_, desc, select
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from ion.models.investigation import (
     FalsePositiveSignature,
-    IOCSighting,
     Investigation,
+    IOCSighting,
 )
 
 logger = logging.getLogger(__name__)

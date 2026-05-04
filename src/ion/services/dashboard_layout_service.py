@@ -7,9 +7,8 @@ widgets are filtered by the user's active roles.
 
 import json
 import logging
-from datetime import datetime, timezone
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ion.models.sla import DashboardLayout

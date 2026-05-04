@@ -4,13 +4,13 @@ from typing import Optional
 
 import typer
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
 from ion.core.config import get_config
 from ion.core.exceptions import ValidationError
-from ion.storage.database import get_session, get_engine
-from ion.services.template_service import TemplateService, CollectionNotFoundError
+from ion.services.template_service import CollectionNotFoundError, TemplateService
+from ion.storage.database import get_engine, get_session
 
 collection_app = typer.Typer(help="Collection management commands")
 console = Console()

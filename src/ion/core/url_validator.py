@@ -2,9 +2,8 @@
 
 import ipaddress
 import re
+from typing import Optional, Tuple
 from urllib.parse import urlparse
-from typing import Tuple, Optional
-
 
 # Private/internal IP ranges that should be blocked
 PRIVATE_IP_RANGES = [

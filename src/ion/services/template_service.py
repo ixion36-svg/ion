@@ -1,15 +1,16 @@
 """Business logic for template operations."""
 
 import json
-from typing import Optional, List
+from typing import List, Optional
+
 from sqlalchemy.orm import Session
 
-from ion.models.template import Template, Tag, Variable, Collection
+from ion.core.exceptions import TemplateNotFoundError, ValidationError
+from ion.models.template import Collection, Tag, Template, Variable
+from ion.services.section_types import assemble_jinja2
+from ion.storage.collection_repository import CollectionRepository
 from ion.storage.template_repository import TemplateRepository
 from ion.storage.version_repository import VersionRepository
-from ion.storage.collection_repository import CollectionRepository
-from ion.core.exceptions import TemplateNotFoundError, ValidationError
-from ion.services.section_types import assemble_jinja2
 
 
 class CollectionNotFoundError(Exception):

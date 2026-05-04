@@ -13,7 +13,7 @@ scored 1-5. The overall maturity level maps to the SOC-CMM scale:
 from __future__ import annotations
 
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session

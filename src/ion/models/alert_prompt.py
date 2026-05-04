@@ -4,16 +4,15 @@ Lets SOC analysts define custom investigation prompts per Elastic Security
 rule/rule-group that the AI analyst auto-selects during triage.
 """
 
-from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import (
+    Boolean,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
-    Boolean,
-    Index,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

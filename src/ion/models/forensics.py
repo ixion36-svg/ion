@@ -2,16 +2,17 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
+
 from sqlalchemy import (
-    ForeignKey,
-    Integer,
-    String,
-    Text,
     Boolean,
     DateTime,
     Float,
+    ForeignKey,
     Index,
+    Integer,
+    String,
+    Text,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -20,8 +21,8 @@ from sqlalchemy.types import JSON
 from ion.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from ion.models.user import User
     from ion.models.alert_triage import AlertCase
+    from ion.models.user import User
 
 
 # =============================================================================

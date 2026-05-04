@@ -5,7 +5,7 @@ Provides logging and health check recording for all integrations.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 from ion.models.integration import (
     IntegrationEvent,
     IntegrationEventType,
-    IntegrationType,
     IntegrationStatus,
+    IntegrationType,
     LogLevel,
 )
 from ion.storage.database import get_session

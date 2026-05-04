@@ -1,7 +1,7 @@
 """Data loading utilities for template rendering."""
 
-import json
 import csv
+import json
 from pathlib import Path
 from typing import Any
 

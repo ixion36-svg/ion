@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
@@ -32,8 +32,8 @@ from pydantic import BaseModel, Field
 from ion.auth.dependencies import require_page_permission, require_permission
 from ion.models.user import User
 from ion.services.translation_service import (
-    SUPPORTED_LANGUAGES,
     MAX_FILE_BYTES,
+    SUPPORTED_LANGUAGES,
     TranslationError,
     extract_text_from_upload,
     supported_extensions,

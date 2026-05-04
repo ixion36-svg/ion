@@ -27,8 +27,9 @@ class MarkdownPlugin:
         """Convert content from another format to Markdown."""
         if from_format == "html":
             # Convert HTML to Markdown (basic conversion)
-            from bs4 import BeautifulSoup
             import re
+
+            from bs4 import BeautifulSoup
 
             soup = BeautifulSoup(content, "html.parser")
 

@@ -1,19 +1,17 @@
 """FastAPI logging middleware for ECS-compliant request logging."""
 
 import time
-import uuid
 from typing import Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from ion.core.logging import (
-    set_request_context,
     clear_request_context,
-    get_structured_logger,
     generate_request_id,
+    get_structured_logger,
+    set_request_context,
 )
-
 
 logger = get_structured_logger(__name__)
 

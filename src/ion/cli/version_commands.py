@@ -4,15 +4,15 @@ from typing import Optional
 
 import typer
 from rich.console import Console
-from rich.table import Table
-from rich.syntax import Syntax
 from rich.panel import Panel
+from rich.syntax import Syntax
+from rich.table import Table
 
 from ion.core.config import get_config
-from ion.core.exceptions import TemplateNotFoundError, VersionNotFoundError, ValidationError
-from ion.storage.database import get_session, get_engine
-from ion.services.version_service import VersionService
+from ion.core.exceptions import TemplateNotFoundError, ValidationError, VersionNotFoundError
 from ion.services.template_service import TemplateService
+from ion.services.version_service import VersionService
+from ion.storage.database import get_engine, get_session
 
 version_app = typer.Typer(help="Version control commands")
 console = Console()

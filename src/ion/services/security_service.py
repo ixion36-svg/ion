@@ -2,14 +2,12 @@
 
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
 from ion.models.security import (
     BlockedIP,
-    SecurityAlertRule,
     SecurityEvent,
     SecurityEventSeverity,
     SecurityEventStatus,
@@ -20,7 +18,6 @@ from ion.storage.security_repository import (
     SecurityAlertRuleRepository,
     SecurityEventRepository,
 )
-
 
 # =============================================================================
 # Attack Detection Patterns
@@ -88,7 +85,7 @@ SCANNER_SIGNATURES = [
 SUSPICIOUS_USER_AGENTS = [
     r"^$",  # Empty user agent
     r"^-$",
-    r"(curl|wget|python-requests|httpx|axios|node-fetch)\/",
+    r"(curl|wget)\/",
     r"(bot|crawler|spider|scraper)",
     r"(nikto|sqlmap|nmap|masscan)",
 ]

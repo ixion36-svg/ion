@@ -27,7 +27,6 @@ from typing import Any, Awaitable, Callable, Dict, Optional
 from sqlalchemy.orm import Session
 
 from ion.core.config import get_config
-from ion.models.scheduler import ScheduledJob
 from ion.storage.database import get_engine, get_session_factory, run_locked
 from ion.storage.scheduler_repository import SchedulerRepository
 

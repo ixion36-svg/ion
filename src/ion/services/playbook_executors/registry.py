@@ -14,8 +14,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Awaitable, Callable
 
-from ion.services.playbook_executors import ExecutorResult
 from ion.services.playbook_executors import (
+    ExecutorResult,
     active_directory_ldap,
     dns_sinkhole,
     edr_webhook,

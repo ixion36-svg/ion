@@ -321,6 +321,7 @@ def _integration_health() -> dict[str, Any]:
         if es_configured:
             # Lightweight check: try HEAD request to ES
             import httpx
+
             from ion.core.config import get_ssl_verify
             verify = get_ssl_verify()
             resp = httpx.get(
@@ -346,6 +347,7 @@ def _integration_health() -> dict[str, Any]:
         details["opencti"]["configured"] = octi_configured
         if octi_configured:
             import httpx
+
             from ion.core.config import get_ssl_verify
             verify = get_ssl_verify() if octi.get("verify_ssl", True) else False
             resp = httpx.post(

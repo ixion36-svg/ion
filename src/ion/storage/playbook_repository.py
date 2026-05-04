@@ -1,15 +1,16 @@
 """Repository for Playbook operations."""
 
 from datetime import datetime
-from typing import Optional, List
-from sqlalchemy import select, or_, and_, func
+from typing import List, Optional
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ion.models.playbook import (
-    Playbook,
-    PlaybookStep,
-    PlaybookExecution,
     ExecutionStatus,
+    Playbook,
+    PlaybookExecution,
+    PlaybookStep,
     StepType,
 )
 

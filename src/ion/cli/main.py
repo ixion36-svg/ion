@@ -3,11 +3,11 @@
 import typer
 from rich.console import Console
 
+from ion.cli.collection_commands import collection_app
+from ion.cli.document_commands import document_app
+from ion.cli.render_commands import render_app
 from ion.cli.template_commands import template_app
 from ion.cli.version_commands import version_app
-from ion.cli.render_commands import render_app
-from ion.cli.document_commands import document_app
-from ion.cli.collection_commands import collection_app
 
 app = typer.Typer(
     name="ion",
@@ -33,8 +33,9 @@ def init(
 ) -> None:
     """Initialize ION database in the current or specified directory."""
     from pathlib import Path
-    from ion.storage.database import init_db
+
     from ion.core.config import Config
+    from ion.storage.database import init_db
 
     target_path = Path(path).resolve()
     ion_dir = target_path / ".ion"
@@ -79,11 +80,10 @@ def web(
 @app.command()
 def status() -> None:
     """Show ION status and statistics."""
-    from pathlib import Path
     from ion.core.config import get_config
-    from ion.storage.database import get_session, get_engine
-    from ion.storage.template_repository import TemplateRepository
+    from ion.storage.database import get_engine, get_session
     from ion.storage.document_repository import DocumentRepository
+    from ion.storage.template_repository import TemplateRepository
 
     config = get_config()
 
@@ -119,9 +119,10 @@ def status() -> None:
 @app.command()
 def upgrade() -> None:
     """Upgrade the database schema to the latest version."""
-    from sqlalchemy import text, inspect
+    from sqlalchemy import inspect, text
+
     from ion.core.config import get_config
-    from ion.storage.database import get_engine, init_db
+    from ion.storage.database import get_engine
 
     config = get_config()
 
@@ -605,9 +606,9 @@ def seed_users(
     ),
 ) -> None:
     """Seed default roles, permissions, and admin user."""
+    from ion.auth.service import AuthService
     from ion.core.config import get_config
     from ion.storage.database import get_engine, get_session_factory
-    from ion.auth.service import AuthService
 
     config = get_config()
 

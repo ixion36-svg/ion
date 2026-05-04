@@ -1,8 +1,10 @@
 """IOC Staleness Tracker API."""
 
 import logging
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+
 from ion.auth.dependencies import require_permission
 from ion.web.api import get_db_session
 

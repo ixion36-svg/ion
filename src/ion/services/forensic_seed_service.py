@@ -4,7 +4,6 @@ Creates 8 forensic playbooks with structured fields covering all investigation
 types. Idempotent — checks for existing playbooks before creating.
 """
 
-import json
 import logging
 
 logger = logging.getLogger(__name__)

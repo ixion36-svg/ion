@@ -20,7 +20,6 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -33,7 +32,6 @@ from ion.models.ticker import (
     TickerSourceType,
 )
 from ion.storage.database import (
-    advisory_lock,
     get_engine,
     get_session_factory,
     run_locked,

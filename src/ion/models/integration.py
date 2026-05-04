@@ -3,25 +3,25 @@
 Provides models for webhooks, webhook logs, integration logs, and health checks.
 """
 
+import secrets
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List
-import secrets
+from typing import List, Optional
 
 from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
     Integer,
     String,
     Text,
-    Boolean,
-    DateTime,
-    ForeignKey,
-    Index,
-    Float,
     func,
 )
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import JSON
 
 from ion.models.base import Base, TimestampMixin
 
@@ -276,5 +276,6 @@ IntegrationHealthCheck = IntegrationEvent
 
 # Type hint for User relationship (avoid circular import)
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from ion.models.user import User

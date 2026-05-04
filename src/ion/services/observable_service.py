@@ -4,14 +4,15 @@ Provides CRUD operations, linking to alerts/cases, correlation queries,
 enrichment via OpenCTI, and migration from legacy JSON observables.
 """
 
-import json
 import logging
+from collections import defaultdict
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import func, and_, or_, desc
+from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session, selectinload
 
+from ion.models.alert_triage import AlertCase, AlertTriage
 from ion.models.observable import (
     Observable,
     ObservableEnrichment,
@@ -22,8 +23,7 @@ from ion.models.observable import (
     WatchlistAlert,
     WatchlistAlertType,
 )
-from ion.models.alert_triage import AlertTriage, AlertCase
-from ion.services.opencti_service import get_opencti_service, OpenCTIError
+from ion.services.opencti_service import OpenCTIError, get_opencti_service
 
 logger = logging.getLogger(__name__)
 
@@ -574,7 +574,7 @@ class ObservableService:
         Returns:
             List of observable dicts with enrichment data for case display
         """
-        from ion.services.observable_extractor import extract_observables_from_raw, ENRICHABLE_TYPES
+        from ion.services.observable_extractor import ENRICHABLE_TYPES, extract_observables_from_raw
 
         seen: set = set()
         extracted: List[Dict[str, str]] = []
@@ -1394,7 +1394,7 @@ class ObservableService:
             List of pattern dicts with observables and occurrence info
         """
         from collections import defaultdict
-        from sqlalchemy import text
+
 
         # Find alert pairs within time window that share observables
         # This query finds observables that appear in alerts close in time
@@ -2256,7 +2256,6 @@ class ObservableService:
 
         # Skip if already enriched recently (within 24 hours)
         if observable.last_auto_enriched:
-            from datetime import timedelta
             hours_since = (datetime.utcnow() - observable.last_auto_enriched).total_seconds() / 3600
             if hours_since < 24:
                 return None

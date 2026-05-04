@@ -29,8 +29,18 @@ from enum import Enum
 from typing import List, Optional
 
 from sqlalchemy import (
-    Boolean, DateTime, Enum as SQLEnum, ForeignKey, Index, Integer,
-    String, Text, UniqueConstraint, func,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy import (
+    Enum as SQLEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

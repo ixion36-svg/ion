@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, case
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)

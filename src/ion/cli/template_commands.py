@@ -1,19 +1,18 @@
 """Template management CLI commands."""
 
-import json
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
 import typer
 from rich.console import Console
-from rich.table import Table
-from rich.syntax import Syntax
 from rich.panel import Panel
+from rich.syntax import Syntax
+from rich.table import Table
 
 from ion.core.config import get_config
 from ion.core.exceptions import TemplateNotFoundError, ValidationError
-from ion.storage.database import get_session, get_engine
 from ion.services.template_service import TemplateService
+from ion.storage.database import get_engine, get_session
 
 template_app = typer.Typer(help="Template management commands")
 console = Console()

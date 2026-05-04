@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
-from ion.models.user import User
 from ion.services.entity_timeline_service import get_entity_timeline
 from ion.web.api import get_db_session
 

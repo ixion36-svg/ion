@@ -6,6 +6,7 @@ frontend/tailwindcss-*
 # Local scratch / prototype artifacts (not for the production image)
 dashboard_prototype.html
 dashboard_static/
+tmp/
 
 # Local-only Docker Compose overrides (e.g., bigger memory for dev boxes)
 docker-compose.override.yml

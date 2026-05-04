@@ -29,7 +29,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from ion.models.skills import KnowledgeArticle, RoleAssessment, UserCareerGoal
@@ -1050,7 +1050,7 @@ async def _generate_ai_summary(role: Dict[str, Any], scores: Dict[str, Any], gap
     if not gaps:
         return None
     try:
-        from ion.services.ollama_service import get_ollama_service, OllamaError
+        from ion.services.ollama_service import get_ollama_service
         svc = get_ollama_service()
         prompt = _build_ai_prompt(role, scores, gaps)
         result = await svc.chat(

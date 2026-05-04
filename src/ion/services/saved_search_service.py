@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import select, func, and_, desc
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from ion.models.oncall import UserBookmark as SavedSearch

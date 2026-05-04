@@ -9,8 +9,8 @@ from typing import Any, Optional
 
 import httpx
 
-from ion.core.config import get_tide_config, get_ssl_verify
 from ion.core.circuit_breaker import tide_breaker
+from ion.core.config import get_ssl_verify, get_tide_config
 
 logger = logging.getLogger(__name__)
 

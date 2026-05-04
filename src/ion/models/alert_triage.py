@@ -2,19 +2,21 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List
+from typing import List, Optional
 
 from sqlalchemy import (
+    JSON,
     DateTime,
-    Enum as SQLEnum,
     ForeignKey,
     Index,
     Integer,
-    JSON,
     String,
     Text,
     and_,
     func,
+)
+from sqlalchemy import (
+    Enum as SQLEnum,
 )
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 

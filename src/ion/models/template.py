@@ -1,22 +1,19 @@
 """Template, Tag, Variable, and Collection models."""
 
-from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
 from sqlalchemy import (
+    Boolean,
     Column,
     ForeignKey,
     Integer,
     String,
-    Text,
-    Boolean,
     Table,
-    DateTime,
-    func,
+    Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ion.models.base import Base, TimestampMixin
-
 
 # Many-to-many association table for Template <-> Tag
 template_tags = Table(
@@ -162,5 +159,5 @@ class Variable(Base):
 
 
 # Forward reference imports for type hints
-from ion.models.version import TemplateVersion
 from ion.models.document import Document
+from ion.models.version import TemplateVersion

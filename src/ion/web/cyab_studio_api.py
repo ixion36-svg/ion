@@ -36,13 +36,14 @@ from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.cyab import (
-    CyabAssessment, CyabDataSource, CyabSnapshot, CyabSystem,
+    CyabAssessment,
+    CyabDataSource,
+    CyabSystem,
     CyabSystemAssessment,
 )
 from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
 from ion.models.user import User
 from ion.services import cyab_doc_checklist_service as _doc_svc
-from ion.services import cyab_subprofile_service as svc
 from ion.services.cyab_subprofile_service import (
     get_subprofile_full,
     get_use_case,
@@ -979,7 +980,6 @@ def sign_onboarding_pack(
 # service module's default catalogue. Three "critical" items (HLD,
 # NETWORK_TOPOLOGY, OWNERS) drive a soft warning on Pack export.
 
-from ion.models.cyab_doc_checklist import ALL_CATEGORIES, ALL_STATUSES  # _doc_svc imported at top of file
 
 
 class DocChecklistUpdate(BaseModel):

@@ -15,7 +15,6 @@ context string is preserved on ObservableLink.context for display.
 import re
 from typing import Any, Dict, List
 
-
 _IP_PATTERN = re.compile(
     r"^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$"
 )

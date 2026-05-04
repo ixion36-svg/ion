@@ -6,14 +6,14 @@ from typing import Optional
 
 import typer
 from rich.console import Console
-from rich.table import Table
-from rich.syntax import Syntax
 from rich.panel import Panel
+from rich.syntax import Syntax
+from rich.table import Table
 
 from ion.core.config import get_config
 from ion.core.exceptions import RenderError
-from ion.storage.database import get_session, get_engine
 from ion.services.render_service import RenderService
+from ion.storage.database import get_engine, get_session
 
 document_app = typer.Typer(help="Document management commands")
 console = Console()

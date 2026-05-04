@@ -4,10 +4,11 @@ import asyncio
 import logging
 import os
 import time
-from typing import AsyncGenerator, Dict, List, Optional, Any, Tuple
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+
 import httpx
 
 from ion.services.pii_anon_service import TokenMap, get_pii_anon_service

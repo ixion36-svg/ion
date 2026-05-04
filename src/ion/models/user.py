@@ -1,23 +1,23 @@
 """User, Role, Permission, Session, and AuditLog models for RBAC."""
 
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
 from sqlalchemy import (
+    Boolean,
     Column,
+    DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
-    Text,
-    Boolean,
     Table,
-    DateTime,
-    Index,
+    Text,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ion.models.base import Base, TimestampMixin
-
 
 # Many-to-many association table for User <-> Role
 user_roles = Table(

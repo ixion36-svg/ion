@@ -1,6 +1,7 @@
 """MITRE D3FEND defensive coverage API."""
 
 import logging
+
 from fastapi import APIRouter, Depends
 
 from ion.auth.dependencies import require_permission

@@ -17,16 +17,18 @@ from pydantic import BaseModel, Field
 
 from ion.auth.dependencies import require_page_auth
 from ion.models.user import User
-from ion.services.virustotal_service import (
-    VirusTotalService,
-    VirusTotalError,
-    RateLimitedError as VirusTotalRateLimitedError,
-    get_virustotal_service,
-)
 from ion.services.shodan_service import (
-    ShodanService,
     ShodanError,
+    ShodanService,
     get_shodan_service,
+)
+from ion.services.virustotal_service import (
+    RateLimitedError as VirusTotalRateLimitedError,
+)
+from ion.services.virustotal_service import (
+    VirusTotalError,
+    VirusTotalService,
+    get_virustotal_service,
 )
 
 logger = logging.getLogger(__name__)

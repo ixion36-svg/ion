@@ -1,22 +1,22 @@
 """Admin API endpoints for system configuration and management."""
 
-from pathlib import Path
-from typing import Optional
-from datetime import datetime
 import os
 import platform
 import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-
-from ion.web.api import limiter, get_db_session
 from sqlalchemy.orm import Session
-from ion.auth.dependencies import require_admin, require_permission, get_current_user
-from ion.models.user import User
-from ion.core.config import get_config, set_config, Config
-from ion.core.url_validator import validate_integration_url
+
+from ion.auth.dependencies import get_current_user, require_admin, require_permission
+from ion.core.config import Config, get_config, set_config
 from ion.core.safe_errors import safe_error
+from ion.core.url_validator import validate_integration_url
+from ion.models.user import User
+from ion.web.api import get_db_session
 
 router = APIRouter()
 
@@ -712,6 +712,7 @@ async def test_integration_connection(
             return {"success": False, "error": "DFIR-IRIS URL and API key are required"}
         try:
             import httpx
+
             from ion.core.config import get_ssl_verify
             async with httpx.AsyncClient(
                 headers={"Authorization": f"Bearer {config.dfir_iris_api_key}"},
@@ -854,10 +855,10 @@ async def get_environment_variables(current_user: User = Depends(require_admin))
 @router.get("/sessions")
 async def get_active_sessions(current_user: User = Depends(require_admin)):
     """Get all active user sessions."""
-    from ion.storage.database import get_engine, get_session
+
+
     from ion.models.user import User as UserModel
-    from sqlalchemy import text
-    from datetime import datetime, timedelta
+    from ion.storage.database import get_engine, get_session
 
     config = get_config()
     engine = get_engine(config.db_path)
@@ -894,8 +895,8 @@ async def revoke_user_session(
     if user_id == current_user.id:
         raise HTTPException(400, "Cannot revoke your own session")
 
-    from ion.storage.database import get_engine, get_session
     from ion.models.user import User as UserModel
+    from ion.storage.database import get_engine, get_session
 
     config = get_config()
     engine = get_engine(config.db_path)
@@ -938,8 +939,9 @@ async def revoke_user_session(
 @router.get("/database/stats")
 async def get_database_stats(current_user: User = Depends(require_admin)):
     """Get database statistics."""
+    from sqlalchemy import inspect, text
+
     from ion.storage.database import get_engine, get_session
-    from sqlalchemy import text, inspect
 
     config = get_config()
     engine = get_engine(config.db_path)
@@ -1127,9 +1129,11 @@ async def cleanup_old_data(
     current_user: User = Depends(require_admin),
 ):
     """Clean up old logs and temporary data."""
-    from ion.storage.database import get_engine, get_session
-    from sqlalchemy import text
     from datetime import datetime, timedelta
+
+    from sqlalchemy import text
+
+    from ion.storage.database import get_engine, get_session
 
     if days_to_keep < 1:
         raise HTTPException(400, "days_to_keep must be at least 1")
@@ -1615,7 +1619,7 @@ async def test_wizard_integration(
             from ion.core.config import get_ssl_verify
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(10.0, connect=5.0),
-                verify=get_ssl_verify(config.ollama_verify_ssl),
+                verify=get_ssl_verify(config_data.verify_ssl if config_data.verify_ssl is not None else True),
             ) as client:
                 response = await client.get(f"{url}/api/tags")
                 response.raise_for_status()
@@ -1628,7 +1632,7 @@ async def test_wizard_integration(
                         "model_count": len(models),
                     }
                 }
-        except httpx.ConnectError as e:
+        except httpx.ConnectError:
             return {"success": False, "error": f"Connection failed: Is Ollama running at {url}?"}
         except Exception as e:
             return {"success": False, "error": safe_error(e)}
@@ -1752,7 +1756,7 @@ async def diagnose_integration_error(
             "message": "AI diagnosis requires Ollama to be enabled",
         }
 
-    from ion.services.ollama_service import get_ollama_service, OllamaError
+    from ion.services.ollama_service import OllamaError, get_ollama_service
 
     try:
         ollama = get_ollama_service()
@@ -2143,6 +2147,7 @@ async def get_ollama_models(current_user: User = Depends(require_permission("int
         return {"available": False, "models": [], "error": "Ollama URL not configured"}
 
     import httpx
+
     from ion.core.config import get_ssl_verify
 
     try:

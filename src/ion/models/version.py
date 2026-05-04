@@ -1,8 +1,9 @@
 """TemplateVersion model for version control."""
 
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
-from sqlalchemy import Column, ForeignKey, Integer, String, Text, Boolean, DateTime, func
+from typing import TYPE_CHECKING, Optional
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ion.models.base import Base

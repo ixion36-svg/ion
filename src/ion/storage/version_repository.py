@@ -1,7 +1,8 @@
 """Repository for TemplateVersion operations."""
 
-from typing import Optional, List
-from sqlalchemy import select, desc
+from typing import List, Optional
+
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from ion.models.version import TemplateVersion

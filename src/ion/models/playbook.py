@@ -2,17 +2,16 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
+
 from sqlalchemy import (
-    Column,
+    Boolean,
+    DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
-    Boolean,
-    DateTime,
-    Index,
-    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.attributes import flag_modified
@@ -21,9 +20,9 @@ from sqlalchemy.types import JSON
 from ion.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from ion.models.user import User
     from ion.models.alert_triage import AlertCase
     from ion.models.document import Document
+    from ion.models.user import User
 
 
 class StepType(str, Enum):

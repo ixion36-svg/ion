@@ -4,22 +4,22 @@ This package provides a unified interface for managing integrations with
 external services like GitLab, OpenCTI, and Elasticsearch.
 """
 
+from ion.services.connectors.arkime_connector import ArkimeConnector
 from ion.services.connectors.base import (
     BaseConnector,
     ConnectorStatus,
     HealthCheckResult,
 )
+from ion.services.connectors.elasticsearch_connector import ElasticsearchConnector
+from ion.services.connectors.gitlab_connector import GitLabConnector
+from ion.services.connectors.kibana_cases_connector import KibanaCasesConnector
+from ion.services.connectors.opencti_connector import OpenCTIConnector
 from ion.services.connectors.registry import (
     ConnectorRegistry,
     get_connector_registry,
     reset_connector_registry,
 )
-from ion.services.connectors.gitlab_connector import GitLabConnector
-from ion.services.connectors.opencti_connector import OpenCTIConnector
-from ion.services.connectors.elasticsearch_connector import ElasticsearchConnector
-from ion.services.connectors.kibana_cases_connector import KibanaCasesConnector
 from ion.services.connectors.tide_connector import TIDEConnector
-from ion.services.connectors.arkime_connector import ArkimeConnector
 
 
 def register_default_connectors() -> None:

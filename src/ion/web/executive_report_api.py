@@ -1,9 +1,11 @@
 """Executive Weekly Report API — PDF/HTML/JSON."""
 
 import logging
+
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
+
 from ion.auth.dependencies import require_permission
 from ion.web.api import get_db_session
 
@@ -36,7 +38,10 @@ def get_executive_html(
     session: Session = Depends(get_db_session),
 ):
     """Get executive report as standalone HTML."""
-    from ion.services.executive_report_service import generate_executive_report, generate_executive_html
+    from ion.services.executive_report_service import (
+        generate_executive_html,
+        generate_executive_report,
+    )
     report = generate_executive_report(session, days=days)
     return HTMLResponse(content=generate_executive_html(report), headers=_REPORT_SECURITY_HEADERS)
 
@@ -47,7 +52,11 @@ def get_executive_pdf(
     session: Session = Depends(get_db_session),
 ):
     """Get executive report as PDF (Docker only — WeasyPrint required)."""
-    from ion.services.executive_report_service import generate_executive_report, generate_executive_pdf, generate_executive_html
+    from ion.services.executive_report_service import (
+        generate_executive_html,
+        generate_executive_pdf,
+        generate_executive_report,
+    )
     report = generate_executive_report(session, days=days)
     pdf_bytes = generate_executive_pdf(report)
     if pdf_bytes:

@@ -3,18 +3,18 @@
 All /api/kibana/* endpoints live here, extracted from api.py.
 """
 
-from typing import Optional, List
+from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ion.auth.dependencies import get_current_user
 from ion.core.config import get_kibana_config
+from ion.models.alert_triage import AlertCase
+from ion.models.user import User
 from ion.services.kibana_cases_service import get_kibana_cases_service
 from ion.services.kibana_sync_service import get_kibana_sync_service
-from ion.models.user import User
-from ion.models.alert_triage import AlertCase
-from ion.auth.dependencies import get_current_user
 
 # Import get_db_session from api to reuse the same dependency
 from ion.web.api import get_db_session

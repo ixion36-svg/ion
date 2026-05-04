@@ -1,11 +1,13 @@
 """Change Log API — change management tracking."""
 
 import logging
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from typing import Optional
 from sqlalchemy.orm import Session
-from ion.auth.dependencies import require_permission, get_current_user
+
+from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.user import User
 from ion.web.api import get_db_session
 
@@ -44,6 +46,7 @@ def create_change(
     session: Session = Depends(get_db_session),
 ):
     import json
+
     from ion.services.change_log_service import create_change
     return create_change(
         session, changed_by_id=current_user.id, change_type=data.change_type,

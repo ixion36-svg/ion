@@ -1,10 +1,12 @@
 """SLA Management API."""
 
 import logging
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from typing import Optional
 from sqlalchemy.orm import Session
+
 from ion.auth.dependencies import require_permission
 from ion.web.api import get_db_session
 

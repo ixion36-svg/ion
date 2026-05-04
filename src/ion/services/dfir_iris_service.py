@@ -1,8 +1,9 @@
 """DFIR-IRIS API integration service."""
 
-import httpx
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
+
+import httpx
 
 from ion.core.config import get_dfir_iris_config, get_ssl_verify
 

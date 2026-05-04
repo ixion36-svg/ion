@@ -1,16 +1,15 @@
 """FastAPI dependencies for authentication and authorization."""
 
 import logging
-from typing import Optional, Callable, List, Generator
+from typing import Callable, Generator, List, Optional
 
-from fastapi import Depends, HTTPException, status, Request, Cookie
-from fastapi.responses import RedirectResponse
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from ion.models.user import User
-from ion.core.config import get_config, get_oidc_config
-from ion.storage.database import get_engine, get_session_factory
 from ion.auth.service import AuthService
+from ion.core.config import get_config, get_oidc_config
+from ion.models.user import User
+from ion.storage.database import get_engine, get_session_factory
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +128,7 @@ def get_current_user_hybrid(
     oidc_config = get_oidc_config()
     if oidc_config.enabled and oidc_config.is_valid():
         try:
-            from ion.auth.oidc import OIDCValidator, OIDCUserSync, OIDCValidationError
+            from ion.auth.oidc import OIDCUserSync, OIDCValidationError, OIDCValidator
             from ion.storage.auth_repository import AuditLogRepository
 
             validator = OIDCValidator(oidc_config)

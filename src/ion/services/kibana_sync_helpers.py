@@ -5,10 +5,10 @@ clean, reusable function calls.
 """
 
 import logging
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
 
-from ion.services.kibana_cases_service import get_kibana_cases_service
 from ion.services.case_description import build_case_description
+from ion.services.kibana_cases_service import get_kibana_cases_service
 
 logger = logging.getLogger(__name__)
 

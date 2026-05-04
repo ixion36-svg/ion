@@ -15,13 +15,19 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey, Index, Integer, String, Text,
-    UniqueConstraint, func,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ion.models.base import Base
-
 
 # Status string constants used both in the model and the service. Stored
 # as plain strings (not an enum) so operators can extend without a

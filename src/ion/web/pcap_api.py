@@ -1,12 +1,12 @@
 """PCAP file upload and analysis API."""
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy.orm import Session
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from ion.auth.dependencies import require_permission
-from ion.models.user import User
 from ion.core.safe_errors import safe_error
+from ion.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ async def analyze_pcap(
 
     # Parse
     try:
-        from ion.services.pcap_service import parse_pcap, _is_private
+        from ion.services.pcap_service import _is_private, parse_pcap
         result = parse_pcap(content, filename)
     except ValueError as e:
         # Validation errors carry user-meaningful messages — return a class label.
@@ -64,10 +64,10 @@ async def analyze_pcap(
 
 async def _enrich_pcap_observables(result, is_private_fn) -> dict:
     """Extract external IPs and domains from PCAP results, create observables, enrich via OpenCTI."""
-    from ion.services.observable_service import ObservableService
-    from ion.models.observable import ObservableType
-    from ion.storage.database import get_engine, get_session_factory
     from ion.core.config import get_config
+    from ion.models.observable import ObservableType
+    from ion.services.observable_service import ObservableService
+    from ion.storage.database import get_engine, get_session_factory
 
     config = get_config()
     engine = get_engine(config.db_path)
@@ -160,7 +160,7 @@ async def _enrich_pcap_observables(result, is_private_fn) -> dict:
             "observables": enriched,
         }
 
-    except Exception as e:
+    except Exception:
         session.rollback()
         raise
     finally:

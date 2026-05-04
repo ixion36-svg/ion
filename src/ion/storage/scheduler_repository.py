@@ -3,10 +3,10 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
-from ion.models.scheduler import ScheduledJob, JobExecution
+from ion.models.scheduler import JobExecution, ScheduledJob
 
 
 class SchedulerRepository:

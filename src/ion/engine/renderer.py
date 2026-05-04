@@ -2,7 +2,8 @@
 
 import re
 from typing import Any, Set
-from jinja2 import TemplateSyntaxError, UndefinedError, Undefined
+
+from jinja2 import TemplateSyntaxError, Undefined, UndefinedError
 from jinja2.sandbox import SandboxedEnvironment, SecurityError
 
 from ion.core.exceptions import RenderError

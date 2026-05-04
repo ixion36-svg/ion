@@ -3,11 +3,11 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
-from ion.models.sla import SLAPolicy, SLABreachLog
-from ion.models.alert_triage import AlertCase, AlertTriage, AlertCaseStatus, AlertTriageStatus
+from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage, AlertTriageStatus
+from ion.models.sla import SLABreachLog, SLAPolicy
 
 logger = logging.getLogger(__name__)
 

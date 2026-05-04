@@ -12,7 +12,6 @@ Separate table from ``alert_cases`` by design:
 """
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
     DateTime,
