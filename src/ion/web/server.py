@@ -1049,6 +1049,31 @@ async def cyab_system_tab(
             ctx["mapping"] = dh.field_mapping_completeness(session, system_id)
             ctx["coverage"] = dh.coverage_rollup(session, system_id)
             ctx["reconciliation"] = dh.reconciliation_panel(session, system_id)
+        elif tab_name == "signoff":
+            from ion.services import cyab_doc_checklist_service
+            ctx["progress"] = cyab_doc_checklist_service.coverage_summary(session, system_id)
+            # Existing sign-off history lives on CyabSystem itself
+            # (sign_dept_*/sign_soc_* — populated by the existing
+            # POST /api/cyab/studio/systems/{id}/onboarding-pack/sign
+            # endpoint). The CyabSnapshot model has no ``kind`` or
+            # ``signed_by`` columns, so the de-duped history is read
+            # directly from the canonical fields on the system row.
+            signoffs = []
+            if system.sign_dept_name and system.sign_dept_date:
+                signoffs.append({
+                    "role": "Department",
+                    "signed_by": system.sign_dept_name,
+                    "signed_on": system.sign_dept_date,
+                })
+            if system.sign_soc_name and system.sign_soc_date:
+                signoffs.append({
+                    "role": "SOC",
+                    "signed_by": system.sign_soc_name,
+                    "signed_on": system.sign_soc_date,
+                })
+            # Newest first (the two are typically same-day; tie-break by role)
+            signoffs.sort(key=lambda x: (x["signed_on"], x["role"]), reverse=True)
+            ctx["signoffs"] = signoffs
         elif tab_name in ("detection", "audit-use-cases"):
             from ion.services.cyab_subprofile_service import get_subprofile_full
             # Per Task 5 finding, subprofile_id lives on CyabDataSource (not
