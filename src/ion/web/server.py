@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import uvicorn
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
@@ -922,6 +922,34 @@ async def cyab_studio_page(
     URL state: ?pillar=identity&sub=active_directory&tab=detection&uc=ad_kerberoasting
     """
     return templates.TemplateResponse(request=request, name="cyab_studio.html")
+
+
+@app.get("/cyab/systems/{system_id}", response_class=HTMLResponse)
+async def cyab_system_detail_page(
+    system_id: int,
+    request: Request,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """Per-system CyAB page (replaces /cyab/studio for a given system)."""
+    from ion.models.cyab import CyabSystem
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.core.config import get_config
+
+    config = get_config()
+    engine = get_engine(config.db_path)
+    Session = get_session_factory(engine)
+    session = Session()
+    try:
+        system = session.get(CyabSystem, system_id)
+        if not system:
+            raise HTTPException(status_code=404, detail="System not found")
+        return templates.TemplateResponse(
+            request=request,
+            name="cyab/system_detail.html",
+            context={"system": system, "user": user},
+        )
+    finally:
+        session.close()
 
 
 @app.get("/discover", response_class=HTMLResponse)
