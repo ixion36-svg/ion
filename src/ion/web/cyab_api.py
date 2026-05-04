@@ -295,6 +295,13 @@ async def list_systems(
 async def dashboard_metrics(
     session: Session = Depends(get_db_session),
 ):
+    # signoffs_this_week — count CyabSnapshot rows in the last 7 days.
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    signoffs_this_week = session.execute(
+        select(func.count(CyabSnapshot.id))
+        .where(CyabSnapshot.created_at >= week_ago)
+    ).scalar() or 0
+
     systems = session.execute(select(CyabSystem)).scalars().all()
     total = len(systems)
     if total == 0:
@@ -305,6 +312,7 @@ async def dashboard_metrics(
             "risk_high": 0, "risk_medium": 0, "risk_low": 0,
             "due_for_review": 0, "overdue": 0,
             "by_department": [], "by_sal_tier": {}, "by_status": {},
+            "signoffs_this_week": int(signoffs_this_week),
         }
 
     today = date.today()
@@ -354,6 +362,7 @@ async def dashboard_metrics(
         "risk_high": risk_counts["HIGH"], "risk_medium": risk_counts["MEDIUM"], "risk_low": risk_counts["LOW"],
         "due_for_review": due, "overdue": overdue,
         "by_department": dept_list, "by_sal_tier": sal_counts, "by_status": status_counts,
+        "signoffs_this_week": int(signoffs_this_week),
     }
 
 

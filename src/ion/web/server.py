@@ -907,9 +907,65 @@ async def tools_page(request: Request, user: User = Depends(require_page_permiss
 
 
 @app.get("/cyab", response_class=HTMLResponse)
-async def cyab_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the CyAB Ingestion SLA page."""
-    return templates.TemplateResponse(request=request, name="cyab.html")
+async def cyab_overview_page(
+    request: Request,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """CyAB Overview landing — KPIs + in-progress + needs-attention.
+
+    Replaces the legacy 3,500-line cyab.html dashboard. Per-system
+    content moved to /cyab/systems/{id} (Sub-plan A); fleet table moved
+    to /cyab/systems (next task).
+    """
+    from ion.models.cyab import CyabSystem
+    from ion.services import cyab_doc_checklist_service
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.core.config import get_config
+    from ion.web.cyab_api import dashboard_metrics
+    from sqlalchemy import select
+
+    config = get_config()
+    Session = get_session_factory(get_engine(config.db_path))
+    session = Session()
+    try:
+        # Reuse the existing /api/cyab/dashboard endpoint internally rather
+        # than duplicating the math. Call the function directly to avoid
+        # the HTTP round-trip.
+        kpis = await dashboard_metrics(session=session)
+
+        # In-progress = 5 most-recently-updated systems
+        in_progress = session.execute(
+            select(CyabSystem).order_by(CyabSystem.updated_at.desc()).limit(5)
+        ).scalars().all()
+
+        # Needs-attention = systems with any critical checklist item not done.
+        # Stale-data check (last_event_at > 24h) is a Sub-plan C live signal;
+        # for Sub-plan B we approximate using the doc-checklist
+        # critical-missing flag.
+        all_systems = session.execute(select(CyabSystem)).scalars().all()
+        needs_attention = []
+        for s in all_systems:
+            summary = cyab_doc_checklist_service.coverage_summary(session, s.id)
+            crit_missing = summary.get("critical_missing") or []
+            if crit_missing:
+                needs_attention.append(type("Row", (), {
+                    "id": s.id, "name": s.name,
+                    "reason": f"{len(crit_missing)} critical doc(s) missing",
+                })())
+
+        return templates.TemplateResponse(
+            request=request,
+            name="cyab/overview.html",
+            context={
+                "kpis": kpis,
+                "in_progress": in_progress,
+                "needs_attention": needs_attention[:10],
+                "active_tab": "overview",
+                "user": user,
+            },
+        )
+    finally:
+        session.close()
 
 
 @app.get("/cyab/studio")
