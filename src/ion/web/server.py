@@ -1358,15 +1358,35 @@ async def cyab_system_tab(
 
 
 @app.get("/cyab/coverage", response_class=HTMLResponse)
-async def cyab_coverage_placeholder(
+async def cyab_coverage_page(
     request: Request,
     user: User = Depends(require_page_permission("alert:read")),
 ):
-    """Sub-plan C placeholder. Returns the section nav + a 'coming soon' card."""
+    """Fleet data-health matrix: systems x dimensions.
+
+    Calls into the matrix builder helper directly (rather than HTTP-calling
+    our own /api endpoint) so the request stays in-process. Filters mirror
+    the API: ``pillar``, ``owner``, ``any_red``.
+    """
+    from ion.web.cyab_api import _build_coverage_matrix
+    matrix = _build_coverage_matrix(
+        pillar=request.query_params.get("pillar") or None,
+        owner=request.query_params.get("owner") or None,
+        any_red=int(request.query_params.get("any_red") or 0),
+    )
     return templates.TemplateResponse(
         request=request,
-        name="cyab/coverage_placeholder.html",
-        context={"active_tab": "coverage", "user": user},
+        name="cyab/coverage.html",
+        context={
+            "matrix": matrix,
+            "user": user,
+            "active_tab": "coverage",
+            "filters": {
+                "pillar":  request.query_params.get("pillar") or "",
+                "owner":   request.query_params.get("owner") or "",
+                "any_red": request.query_params.get("any_red") or "",
+            },
+        },
     )
 
 

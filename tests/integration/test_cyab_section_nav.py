@@ -3,12 +3,14 @@
 import pytest
 
 
-def test_coverage_placeholder_route_responds(client):
+def test_coverage_route_responds(client):
+    """Sub-plan C Task 9 replaced the 'coming soon' placeholder with the
+    real fleet matrix; just assert the page returns 200 with coverage chrome.
+    """
     r = client.get("/cyab/coverage")
     assert r.status_code == 200
     body = r.text.lower()
     assert "coverage" in body
-    assert "sub-plan c" in body or "coming soon" in body
 
 
 def test_audit_placeholder_route_responds(client):

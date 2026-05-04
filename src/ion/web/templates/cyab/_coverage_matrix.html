@@ -1,0 +1,51 @@
+{# Fleet coverage matrix partial — rendered inside cyab/coverage.html.
+   Expects ``matrix`` (the /api/cyab/coverage/matrix payload) in context. #}
+{% set dim_labels = {
+  "ingestion_fresh":    "Ingestion",
+  "fields_mapped":      "Fields",
+  "intake_done":        "Intake",
+  "detections_shipped": "Detections",
+  "audit_shipped":      "Audit",
+  "checklist_done":     "Checklist",
+  "signed_off":         "Sign-off",
+} %}
+{% set status_dot = {
+  "green":   "tw-text-emerald-400",
+  "amber":   "tw-text-amber-400",
+  "red":     "tw-text-rose-400",
+  "unknown": "tw-text-slate-600",
+} %}
+
+<table class="tw-w-full tw-text-[12px] tw-border-collapse">
+  <thead>
+    <tr class="tw-text-slate-500 tw-text-[10.5px] tw-uppercase tw-tracking-wider">
+      <th class="tw-text-left tw-py-2 tw-pr-3">System</th>
+      <th class="tw-text-left tw-pr-3">Owner</th>
+      {% for dim in matrix.dimensions %}
+        <th class="tw-text-center tw-px-1">{{ dim_labels[dim] }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in matrix.rows %}
+      <tr class="tw-border-t tw-border-slate-800 hover:tw-bg-slate-900/40">
+        <td class="tw-py-2 tw-pr-3 tw-text-cyan-300 tw-font-mono">
+          <a href="/cyab/systems/{{ row.system_id }}" class="hover:tw-underline">{{ row.name }}</a>
+        </td>
+        <td class="tw-text-slate-400">{{ row.owner or '—' }}</td>
+        {% for dim in matrix.dimensions %}
+          {% set cell = row.cells[dim] %}
+          <td class="tw-text-center">
+            <a href="/cyab/systems/{{ row.system_id }}/tab/{{ cell.tab }}"
+               title="{{ dim }}: {{ cell.status }}"
+               class="tw-inline-block tw-px-1">
+              <span class="{{ status_dot[cell.status] }} tw-text-[16px]">●</span>
+            </a>
+          </td>
+        {% endfor %}
+      </tr>
+    {% else %}
+      <tr><td colspan="9" class="tw-py-6 tw-text-center tw-text-slate-500">No systems match the current filters.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
