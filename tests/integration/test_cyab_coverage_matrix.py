@@ -99,3 +99,40 @@ def test_matrix_filter_any_red(client, three_systems):
     # Only systems with at least one red cell should appear
     for row in data["rows"]:
         assert any(c["status"] == "red" for c in row["cells"].values())
+
+
+# ----------------------------------------------------------------------
+# Task 9 — /cyab/coverage page (matrix UI + filters + deep-link cells)
+# ----------------------------------------------------------------------
+
+
+def test_coverage_page_renders(client, three_systems):
+    r = client.get("/cyab/coverage")
+    assert r.status_code == 200
+    body = r.text
+    for sys_name in ("prod-healthy", "prod-amber", "prod-red"):
+        assert sys_name in body
+
+
+def test_coverage_page_shows_aggregate_strip(client, three_systems):
+    r = client.get("/cyab/coverage")
+    body = r.text.lower()
+    assert "% systems healthy" in body or "systems healthy" in body
+    assert "critical-missing" in body or "critical missing" in body
+    assert "stale-ingestion" in body or "stale ingestion" in body
+
+
+def test_coverage_page_cells_link_to_per_system_tabs(client, three_systems):
+    r = client.get("/cyab/coverage")
+    body = r.text
+    sid = three_systems["healthy"]
+    # Each row's cells deep-link into the relevant tab on the per-system page
+    assert f"/cyab/systems/{sid}/" in body or f"/cyab/systems/{sid}#" in body
+
+
+def test_coverage_filter_form_present(client, three_systems):
+    r = client.get("/cyab/coverage")
+    body = r.text
+    assert 'name="owner"' in body
+    assert 'name="pillar"' in body
+    assert 'name="any_red"' in body
