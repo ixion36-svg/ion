@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.19.0-rc.1 — 2026-05-04
+
+### CyAB IA — Foundation + per-system page (Sub-plan A of 3)
+
+- New per-system page at `/cyab/systems/{id}` with sticky onboarding-progress
+  header and 7 tabs: Overview, Intake, Sources, Data Health, Detection Use
+  Cases, Audit Use Cases, Sign-off.
+- New `cyab_data_health_service` aggregates ingestion freshness, field
+  mapping completeness, and coverage rollup. Reconciliation panel stubbed
+  for Phase 2 (needs CMDB).
+- `/cyab/studio` 301 redirects to `/cyab/systems/{id}` (deprecated; drop in
+  v0.20.0).
+- Section consolidation: `demarcation`, `field-mapping`, `sal-tiers` from
+  the legacy `/cyab` page now live in the **Sources** tab. `governance`
+  consolidated into the **Sign-off** tab (was previously duplicated).
+
+### Coming in Sub-plan B (v0.19.0-rc.2)
+Onboarding wizard at `/cyab/onboard`; portfolio list at `/cyab/systems`;
+new `/cyab` Overview landing page.
+
+### Coming in Sub-plan C (v0.19.0-rc.3)
+Stack-to-use-cases scoping at `/cyab/scoping`; fleet `/cyab/coverage`
+matrix; `/cyab/audit` trail.
+
 ## v0.18.0 (2026-04-30) — feature
 
 ### CyAB Onboarding — Documentation Checklist
