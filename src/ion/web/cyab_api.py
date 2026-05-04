@@ -2,9 +2,11 @@
 
 import json
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -34,6 +36,10 @@ from ion.services.tide_service import get_tide_service
 from ion.web.api import get_db_session
 
 router = APIRouter()
+
+# Reuse the same templates dir — importing server.templates would loop.
+_TEMPLATES_DIR = Path(__file__).parent / "templates"
+templates = Jinja2Templates(directory=_TEMPLATES_DIR)
 
 
 # ---------------------------------------------------------------------------
@@ -2744,3 +2750,48 @@ def onboarding_create(
         "ranked_use_cases": scoring_result["ranked_use_cases"],
         "ranked_actors": scoring_result["ranked_actors"],
     }
+
+
+# ---------------------------------------------------------------------------
+# Scoping live-counter endpoint
+# ---------------------------------------------------------------------------
+
+@router.post("/scoping/score")
+async def scoping_score(request: Request):
+    """Compute scoping scores from form-encoded answers, return HTMX partial.
+
+    `?summary=1` returns the full summary view; otherwise just the counter.
+    Anonymous endpoint (matches the page).
+    """
+    from ion.services import cyab_scoping_engine
+
+    raw = await request.form()
+    answers: dict = {}
+    for key in raw.keys():
+        vals = raw.getlist(key)
+        if not vals:
+            continue
+        # Drop empty placeholder selections
+        vals = [v for v in vals if v != ""]
+        if not vals:
+            continue
+        # Single-select questions arrive as a one-item list; flatten unless
+        # multiple values were posted (multi-select).
+        answers[key] = vals if len(vals) > 1 else vals[0]
+
+    scores = cyab_scoping_engine.score_answers(answers)
+    summary_mode = request.query_params.get("summary") == "1"
+
+    template_name = (
+        "cyab/_scoping_summary.html" if summary_mode
+        else "cyab/_scoping_counter.html"
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name=template_name,
+        context={
+            "scores": scores,
+            "answers": answers,
+            "summary_text": cyab_scoping_engine.summary_text(scores),
+        },
+    )

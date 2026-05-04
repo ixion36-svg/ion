@@ -39,3 +39,40 @@ def test_scoping_page_progressive_disclosure_class(client):
     r = client.get("/cyab/scoping")
     body = r.text
     assert "scoping-question" in body
+
+
+def test_score_endpoint_returns_counter_partial(client):
+    """POST /api/cyab/scoping/score returns the counter partial (HTMX swap)."""
+    r = client.post(
+        "/api/cyab/scoping/score",
+        data={"org_sector": "finance", "concern_top": "ransomware"},
+    )
+    assert r.status_code == 200
+    body = r.text
+    # Counter partial markup
+    assert "use cases" in body
+    assert "threat-actor matches" in body
+    assert "MITRE Initial Access coverage" in body
+
+
+def test_score_endpoint_summary_mode_returns_summary_partial(client):
+    """?summary=1 query param swaps to the full summary view, not the counter."""
+    r = client.post(
+        "/api/cyab/scoping/score?summary=1",
+        data={"org_sector": "tech", "concern_top": "supply_chain"},
+    )
+    assert r.status_code == 200
+    body = r.text.lower()
+    # Summary view headlines
+    assert "recommended for your stack" in body
+    assert "detection rules" in body or "use cases" in body
+
+
+def test_score_endpoint_handles_multi_value(client):
+    """`stack_endpoint_os` is a multi-select — multiple form values must
+    coalesce into a list before scoring (so compute_profile sees a list)."""
+    r = client.post(
+        "/api/cyab/scoping/score",
+        data=[("stack_endpoint_os", "windows"), ("stack_endpoint_os", "macos")],
+    )
+    assert r.status_code == 200
