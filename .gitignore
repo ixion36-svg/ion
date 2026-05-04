@@ -91,3 +91,6 @@ docker-compose.local.yml
 # OS
 .DS_Store
 Thumbs.db
+
+# Brainstorming companion mockups (per-session)
+.superpowers/
