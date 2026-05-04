@@ -1043,6 +1043,12 @@ async def cyab_system_tab(
                         pass
             ctx["sources"] = sources
             ctx["source_mappings"] = mappings
+        elif tab_name == "data-health":
+            from ion.services import cyab_data_health_service as dh
+            ctx["ingestion"] = dh.ingestion_freshness(session, system_id)
+            ctx["mapping"] = dh.field_mapping_completeness(session, system_id)
+            ctx["coverage"] = dh.coverage_rollup(session, system_id)
+            ctx["reconciliation"] = dh.reconciliation_panel(session, system_id)
 
         # Fall back to the placeholder template if the tab template doesn't exist yet.
         from jinja2 import TemplateNotFound

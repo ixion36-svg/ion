@@ -416,6 +416,19 @@ async def get_system(system_id: int, session: Session = Depends(get_db_session))
     return _system_to_dict(sys, include_sources=True)
 
 
+@router.get("/systems/{system_id}/data-health", dependencies=[Depends(require_permission("alert:read"))])
+async def get_data_health(system_id: int, session: Session = Depends(get_db_session)):
+    """Aggregate Data Health signals for a system."""
+    from ion.services import cyab_data_health_service as dh
+    return {
+        "system_id":                  system_id,
+        "ingestion_freshness":        dh.ingestion_freshness(session, system_id),
+        "field_mapping_completeness": dh.field_mapping_completeness(session, system_id),
+        "coverage_rollup":            dh.coverage_rollup(session, system_id),
+        "reconciliation":             dh.reconciliation_panel(session, system_id),
+    }
+
+
 @router.get("/systems/{system_id}/alert-rollup", dependencies=[Depends(require_permission("alert:read"))])
 async def get_system_alert_rollup(
     system_id: int,
