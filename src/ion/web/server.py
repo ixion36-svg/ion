@@ -1195,6 +1195,17 @@ async def cyab_onboard_page(
             "active_tab": "onboard",
             "user": user,
         }
+
+        # Step 4 needs the seeded checklist so a refresh on ?step=4 works.
+        if step == 4 and state.get("system_id"):
+            from ion.services import cyab_doc_checklist_service
+            cyab_doc_checklist_service.seed_for_system(
+                session, state["system_id"]
+            )
+            ctx["checklist"] = cyab_doc_checklist_service.list_for_system(
+                session, state["system_id"]
+            )
+
         return templates.TemplateResponse(
             request=request, name="cyab/onboard.html", context=ctx
         )
@@ -1259,6 +1270,153 @@ async def cyab_onboard_step_1(
                 pass
         return RedirectResponse(
             url=f"/cyab/onboard?wid={wid}&step=2", status_code=303
+        )
+    finally:
+        session.close()
+
+
+@app.post("/api/cyab/onboard/{wid}/step/2", response_class=HTMLResponse)
+async def cyab_onboard_step_2(
+    wid: str,
+    request: Request,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """Step 2 — Intake. Persists the snapshot of answers in the wizard
+    blob (real autosave goes via the Studio answers endpoint). Returns
+    Step 3 partial for HTMX or 303 redirects to the Step 3 URL."""
+    from ion.services import cyab_wizard_service
+    from ion.services.cyab_subprofile_service import (
+        list_pillars,
+        list_subprofiles_for_pillar,
+    )
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.core.config import get_config
+
+    form = await request.form()
+    answers = {
+        k.split("[", 1)[1].rstrip("]"): v
+        for k, v in form.items() if k.startswith("answers[")
+    }
+
+    Session = get_session_factory(get_engine(get_config().db_path))
+    session = Session()
+    try:
+        try:
+            cyab_wizard_service.save_intake(session, wid, answers=answers)
+        except LookupError:
+            raise HTTPException(status_code=404, detail="Wizard session not found")
+
+        if request.headers.get("hx-request") == "true":
+            state = cyab_wizard_service.load_state(session, wid)
+            # Aggregate sub-profiles across all pillars (same shape the
+            # GET handler builds) so the Step 3 partial dropdown renders.
+            subprofiles: list = []
+            for p in list_pillars(session):
+                subprofiles.extend(list_subprofiles_for_pillar(session, p["id"]))
+            return templates.TemplateResponse(
+                request=request, name="cyab/_wizard_step_3_source.html",
+                context={
+                    "wid": wid, "step": 3, "state": state,
+                    "subprofiles": subprofiles,
+                },
+            )
+        return RedirectResponse(
+            url=f"/cyab/onboard?wid={wid}&step=3", status_code=303
+        )
+    finally:
+        session.close()
+
+
+@app.post("/api/cyab/onboard/{wid}/step/3", response_class=HTMLResponse)
+async def cyab_onboard_step_3(
+    wid: str,
+    request: Request,
+    name: str = Form(...),
+    data_source_type: str = Form(""),
+    subprofile_id: str = Form(""),
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """Step 3 — First data source. Persists a CyabDataSource on the
+    backing system, lazy-seeds the doc checklist so Step 4 has rows to
+    render, and either returns the Step 4 partial (HTMX) or redirects."""
+    from ion.services import cyab_wizard_service, cyab_doc_checklist_service
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.core.config import get_config
+
+    Session = get_session_factory(get_engine(get_config().db_path))
+    session = Session()
+    try:
+        try:
+            state = cyab_wizard_service.save_source(
+                session, wid,
+                source={
+                    "name": name,
+                    "data_source_type": data_source_type or None,
+                    "subprofile_id": subprofile_id or None,
+                },
+            )
+        except LookupError:
+            raise HTTPException(status_code=404, detail="Wizard session not found")
+
+        # Lazy-seed the checklist now so Step 4 has rows to render.
+        cyab_doc_checklist_service.seed_for_system(session, state["system_id"])
+        checklist = cyab_doc_checklist_service.list_for_system(
+            session, state["system_id"]
+        )
+
+        if request.headers.get("hx-request") == "true":
+            return templates.TemplateResponse(
+                request=request, name="cyab/_wizard_step_4_docs.html",
+                context={
+                    "wid": wid, "step": 4, "state": state,
+                    "checklist": checklist,
+                },
+            )
+        return RedirectResponse(
+            url=f"/cyab/onboard?wid={wid}&step=4", status_code=303
+        )
+    finally:
+        session.close()
+
+
+@app.post("/api/cyab/onboard/{wid}/finish")
+async def cyab_onboard_finish(
+    wid: str,
+    request: Request,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """Apply doc-placeholder overrides, mark wizard complete, redirect to
+    the per-system page."""
+    from ion.services import cyab_wizard_service
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.core.config import get_config
+
+    form = await request.form()
+    # Parse docs[<kind>][<field>] = value
+    overrides: dict[str, dict] = {}
+    for k, v in form.items():
+        if not k.startswith("docs["):
+            continue
+        # docs[HLD][url] -> ('HLD', 'url')
+        rest = k[len("docs["):]
+        try:
+            kind, field = rest.split("][", 1)
+        except ValueError:
+            continue
+        field = field.rstrip("]")
+        overrides.setdefault(kind, {})[field] = v
+
+    Session = get_session_factory(get_engine(get_config().db_path))
+    session = Session()
+    try:
+        try:
+            sys_id = cyab_wizard_service.finish(
+                session, wid, doc_overrides=overrides
+            )
+        except LookupError:
+            raise HTTPException(status_code=404, detail="Wizard session not found")
+        return RedirectResponse(
+            url=f"/cyab/systems/{sys_id}", status_code=303
         )
     finally:
         session.close()
