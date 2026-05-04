@@ -32,3 +32,22 @@ def test_per_system_page_renders_with_system_name(admin_session, seeded_system):
 def test_per_system_page_404_for_unknown_id(admin_session):
     r = admin_session.get("/cyab/systems/999999")
     assert r.status_code == 404
+
+
+def test_progress_header_shows_completion_count(client, make_system):
+    """Sticky header should show progress like '0 / 20' for a fresh system."""
+    sys_id = make_system(name="ph-test")
+    r = client.get(f"/cyab/systems/{sys_id}")
+    assert r.status_code == 200
+    # Default checklist is lazy-seeded with 20 items, all 'unknown'
+    assert "0 / 20" in r.text or "0/20" in r.text
+    assert "onboarding-progress" in r.text  # class on the partial
+
+
+def test_progress_header_marks_critical_missing(client, make_system):
+    """Critical-missing pill appears when critical items aren't done."""
+    sys_id = make_system(name="ph-test-2")
+    r = client.get(f"/cyab/systems/{sys_id}")
+    assert r.status_code == 200
+    # Default checklist has 3 critical items: HLD, NETWORK_TOPOLOGY, OWNERS
+    assert "critical missing" in r.text.lower()

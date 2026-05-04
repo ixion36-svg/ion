@@ -1,0 +1,25 @@
+<div class="onboarding-progress tw-sticky tw-top-0 tw-z-20 tw-bg-slate-900/95 tw-backdrop-blur tw-border-b tw-border-slate-800 tw-py-2 tw-px-4 tw-flex tw-items-center tw-gap-3 tw-text-[12.5px]">
+  <span class="tw-text-slate-400 tw-uppercase tw-tracking-wider tw-text-[10px]">Onboarding</span>
+
+  <div class="tw-flex tw-items-center tw-gap-2 tw-flex-1 tw-max-w-md">
+    <div class="tw-h-1.5 tw-flex-1 tw-bg-slate-800 tw-rounded-full tw-overflow-hidden">
+      <div class="tw-h-full tw-bg-gradient-to-r tw-from-cyan-400 tw-to-emerald-500"
+           style="width: {{ progress.completion_pct }}%"></div>
+    </div>
+    <span class="tw-text-cyan-300 tw-font-medium">{{ progress.done }} / {{ progress.total }}</span>
+  </div>
+
+  {% if progress.critical_missing %}
+    <span class="tw-text-rose-400 tw-bg-rose-950/40 tw-px-2 tw-py-0.5 tw-rounded">
+      {{ progress.critical_missing|length }} critical missing
+    </span>
+  {% else %}
+    <span class="tw-text-emerald-400 tw-text-[11px]">all critical items done</span>
+  {% endif %}
+
+  {% if system.updated_at %}
+    <span class="tw-text-slate-500 tw-ml-auto tw-text-[11px]">
+      last edited {{ system.updated_at.strftime('%Y-%m-%d %H:%M') }}
+    </span>
+  {% endif %}
+</div>

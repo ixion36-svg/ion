@@ -932,6 +932,7 @@ async def cyab_system_detail_page(
 ):
     """Per-system CyAB page (replaces /cyab/studio for a given system)."""
     from ion.models.cyab import CyabSystem
+    from ion.services import cyab_doc_checklist_service
     from ion.storage.database import get_engine, get_session_factory
     from ion.core.config import get_config
 
@@ -943,10 +944,15 @@ async def cyab_system_detail_page(
         system = session.get(CyabSystem, system_id)
         if not system:
             raise HTTPException(status_code=404, detail="System not found")
+
+        # Lazy-seed checklist on first access (idempotent)
+        cyab_doc_checklist_service.seed_for_system(session, system_id)
+        progress = cyab_doc_checklist_service.coverage_summary(session, system_id)
+
         return templates.TemplateResponse(
             request=request,
             name="cyab/system_detail.html",
-            context={"system": system, "user": user},
+            context={"system": system, "user": user, "progress": progress},
         )
     finally:
         session.close()

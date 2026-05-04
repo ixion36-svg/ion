@@ -65,6 +65,7 @@ def make_system(temp_db):
 
     def _make(**kw):
         kw.setdefault("name", "test-system")
+        kw.setdefault("department", "TestDept")
         sys = CyabSystem(**kw)
         s.add(sys)
         s.commit()
