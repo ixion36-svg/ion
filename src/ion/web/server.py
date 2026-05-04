@@ -906,6 +906,24 @@ async def tools_page(request: Request, user: User = Depends(require_page_permiss
     return templates.TemplateResponse(request=request, name="tools.html")
 
 
+@app.get("/cyab/scoping", response_class=HTMLResponse)
+async def cyab_scoping_page(request: Request):
+    """Anonymous scoping questionnaire — no system created.
+
+    Intentionally has no auth dependency: this is the stakeholder-facing
+    surface for "given your stack, here's what coverage you'd get". The
+    convert-to-system CTA does require auth (handled in /api/cyab/scoping/convert).
+    """
+    from ion.services import cyab_scoping_engine
+    questions = cyab_scoping_engine.load_questions()
+    initial = cyab_scoping_engine.score_answers({})
+    return templates.TemplateResponse(
+        request=request,
+        name="cyab/scoping.html",
+        context={"questions": questions, "initial_scores": initial},
+    )
+
+
 @app.get("/cyab", response_class=HTMLResponse)
 async def cyab_overview_page(
     request: Request,
