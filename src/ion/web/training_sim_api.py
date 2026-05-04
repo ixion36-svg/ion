@@ -1,10 +1,12 @@
 """Training Simulation API — interactive scenario-based training."""
 
 import logging
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+
 from ion.auth.dependencies import require_page_auth
-from ion.services.training_sim_service import get_scenario_list, get_scenario, score_answers
+from ion.services.training_sim_service import get_scenario, get_scenario_list, score_answers
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/training-sim", tags=["training-sim"])

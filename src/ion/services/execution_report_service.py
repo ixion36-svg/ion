@@ -3,14 +3,13 @@
 import json
 import logging
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from ion.engine.renderer import TemplateRenderer
 from ion.models.playbook import PlaybookExecution
-from ion.storage.document_repository import DocumentRepository
 from ion.storage.collection_repository import CollectionRepository
+from ion.storage.document_repository import DocumentRepository
 
 logger = logging.getLogger(__name__)
 

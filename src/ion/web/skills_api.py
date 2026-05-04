@@ -9,13 +9,20 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ion.auth.dependencies import get_current_user, get_db_session, require_permission
+from ion.auth.dependencies import get_db_session, require_permission
 from ion.models.skills import (
-    AssessmentReviewCycle, AssessmentSnapshot, KnowledgeArticle,
-    SOCCMMAssessment, SkillAssessment, TeamCertification,
-    TeamScheduleEntry, TrainingPlan, TrainingPlanItem, UserCareerGoal,
+    AssessmentReviewCycle,
+    AssessmentSnapshot,
+    KnowledgeArticle,
+    SkillAssessment,
+    SOCCMMAssessment,
+    TeamCertification,
+    TeamScheduleEntry,
+    TrainingPlan,
+    TrainingPlanItem,
+    UserCareerGoal,
 )
-from ion.models.user import Role, User
+from ion.models.user import User
 
 router = APIRouter(tags=["skills"])
 logger = logging.getLogger(__name__)

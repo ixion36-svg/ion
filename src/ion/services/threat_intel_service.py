@@ -3,18 +3,18 @@
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import func, desc
+from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from ion.models.threat_intel import ThreatIntelWatch
 from ion.models.observable import (
     Observable,
     ObservableEnrichment,
     WatchlistAlert,
     WatchlistAlertType,
 )
+from ion.models.threat_intel import ThreatIntelWatch
 
 logger = logging.getLogger(__name__)
 

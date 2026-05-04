@@ -7,7 +7,7 @@ playbooks when patterns are detected.
 
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from ion.services.elasticsearch_service import ElasticsearchAlert
@@ -331,12 +331,12 @@ class PatternDetectionService:
 
     @staticmethod
     def _group_alerts_by(
-        alerts: List[ElasticsearchAlert], field: str
+        alerts: List[ElasticsearchAlert], group_field: str
     ) -> Dict[str, List[ElasticsearchAlert]]:
         """Group alerts by the specified field (host or user)."""
         groups: Dict[str, List[ElasticsearchAlert]] = {}
         for alert in alerts:
-            key = getattr(alert, field, None)
+            key = getattr(alert, group_field, None)
             if key:
                 groups.setdefault(key, []).append(alert)
         return groups
@@ -409,11 +409,11 @@ def seed_default_playbooks() -> None:
 
     Idempotent - checks by name before creating.
     """
+    from ion.auth.service import AuthService
+    from ion.models.playbook import StepType
     from ion.storage.database import get_engine, get_session_factory
     from ion.storage.playbook_repository import PlaybookRepository
-    from ion.models.playbook import StepType
     from ion.storage.user_repository import UserRepository
-    from ion.auth.service import AuthService
 
     engine = get_engine()
     factory = get_session_factory(engine)

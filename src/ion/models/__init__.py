@@ -1,146 +1,14 @@
 """SQLAlchemy models for ION."""
 
-from ion.models.base import Base
-from ion.models.template import Template, Tag, Variable, Collection, template_tags
-from ion.models.version import TemplateVersion
-from ion.models.document import Document, DocumentVersion
-from ion.models.user import (
-    User,
-    Role,
-    Permission,
-    UserSession,
-    AuditLog,
-    user_roles,
-    role_permissions,
-)
-from ion.models.security import (
-    SecurityEvent,
-    SecurityEventType,
-    SecurityEventSeverity,
-    SecurityEventStatus,
-    SecurityAlertRule,
-    BlockedIP,
-)
-from ion.models.alert_triage import (
-    AlertTriage,
-    AlertTriageStatus,
-    AlertCase,
-    AlertCaseStatus,
-    Note,
-    NoteEntityType,
-    AlertComment,  # Backward compatibility alias for Note
-    CaseNote,  # Backward compatibility alias for Note
-)
-from ion.models.integration import (
-    IntegrationType,
-    IntegrationStatus,
-    LogLevel,
-    WebhookStatus,
-    IntegrationEventType,
-    Webhook,
-    IntegrationEvent,
-    WebhookLog,  # Backward compatibility alias for IntegrationEvent
-    IntegrationLog,  # Backward compatibility alias for IntegrationEvent
-    IntegrationHealthCheck,  # Backward compatibility alias for IntegrationEvent
-)
-from ion.models.observable import (
-    Observable,
-    ObservableType,
-    ThreatLevel,
-    ObservableEnrichment,
-    ObservableLink,
-    ObservableLinkType,
-    ObservableAlertLink,  # Backward compatibility alias for ObservableLink
-    ObservableCaseLink,  # Backward compatibility alias for ObservableLink
-    ObservableSighting,  # Backward compatibility alias for ObservableLink
-    WatchlistAlert,
-    WatchlistAlertType,
-)
 from ion.models.ai_chat import (
-    AIChatSession,
     AIChatMessage,
+    AIChatSession,
     AIContextType,
 )
+from ion.models.ai_feedback import AIFeedback  # noqa: F401
 from ion.models.ai_preferences import (
-    AIUserPreference,
     AIResponseFeedback,
-)
-from ion.models.saved_search import (
-    SavedSearch,
-    SearchType,
-)
-from ion.models.playbook import (
-    Playbook,
-    PlaybookStep,
-    PlaybookExecution,
-    StepType,
-    ExecutionStatus,
-)
-from ion.models.skills import (
-    AssessmentReviewCycle,
-    SkillAssessment,
-    UserCareerGoal,
-    AssessmentSnapshot,
-    TeamScheduleEntry,
-    TeamCertification,
-    SOCCMMAssessment,
-    KnowledgeArticle,
-    TrainingPlan,
-    TrainingPlanItem,
-    RoleAssessment,
-)
-from ion.models.analyst_note import AnalystNote
-from ion.models.note_folder import NoteFolder
-from ion.models.social import (
-    SocialPost,
-    SocialComment,
-    SocialReaction,
-)
-from ion.models.analytics import (
-    AnalyticsJob,
-    AnalyticsJobType,
-    AnalyticsSnapshot,
-)
-from ion.models.cyab import CyabSystem, CyabDataSource, CyabSnapshot
-from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
-from ion.models.cyab_doc_checklist import CyabDocChecklistItem
-from ion.models.canary import Canary, CanaryHit, CanaryType, CanaryStatus
-from ion.models.log_source import LogSource, LogSourceCategory
-from ion.models.emulation import EmulationPlan, EmulationStep, EmulationPlanStatus, StepResult
-from ion.models.vulnerability import Vulnerability, VulnerabilityAsset, VulnSeverity, VulnStatus
-from ion.models.tide_snapshot import TideSnapshot
-from ion.models.maturity import MaturityAssessment
-from ion.models.threat_intel import ThreatIntelWatch
-from ion.models.forensics import (
-    ForensicCase,
-    ForensicCaseStatus,
-    ForensicCasePriority,
-    InvestigationType,
-    EvidenceItem,
-    EvidenceType,
-    EvidenceStatus,
-    CustodyLogEntry,
-    CustodyAction,
-    ForensicPlaybook,
-    ForensicPlaybookStep,
-    ForensicCaseStep,
-    ForensicTimelineEntry,
-)
-from ion.models.oncall import (
-    ServiceAccount,
-    UserBookmark,
-    CommTemplate,
-    ChangeLogEntry,
-)
-
-from ion.models.sla import (
-    SLAPolicy,
-    SLABreachLog,
-    ThreatHunt,
-    DashboardLayout,
-    ScheduledReport,
-    PlaybookAction,
-    PlaybookActionLog,
+    AIUserPreference,
 )
 
 # v0.10.3: alert_prompt, ticker, tuning proposals, AI feedback ledger.
@@ -149,26 +17,171 @@ from ion.models.sla import (
 # Order matters: alert_prompt MUST come before tuning_proposal and
 # ai_feedback because they FK to alert_prompt_templates.
 from ion.models.alert_prompt import AlertPromptTemplate  # noqa: F401
-from ion.models.investigation import Investigation  # noqa: F401
-from ion.models.ticker import Ticker, TickerDismissal, TickerKind, TickerSeverity, TickerSourceType  # noqa: F401
-from ion.models.tuning_proposal import TuningProposal, TuningProposalStatus  # noqa: F401
-from ion.models.ai_feedback import AIFeedback  # noqa: F401
+from ion.models.alert_triage import (
+    AlertCase,
+    AlertCaseStatus,
+    AlertComment,  # Backward compatibility alias for Note
+    AlertTriage,
+    AlertTriageStatus,
+    CaseNote,  # Backward compatibility alias for Note
+    Note,
+    NoteEntityType,
+)
+from ion.models.analyst_note import AnalystNote
+from ion.models.analytics import (
+    AnalyticsJob,
+    AnalyticsJobType,
+    AnalyticsSnapshot,
+)
+from ion.models.base import Base
+from ion.models.canary import Canary, CanaryHit, CanaryStatus, CanaryType
 
 # v0.10.4: case-similarity embeddings (pgvector-backed).
 from ion.models.case_embedding import CaseEmbedding  # noqa: F401
 
+# v0.11.2: L1/L2/L3/L4 SOC analyst training course subsystem.
+from ion.models.course import (  # noqa: F401
+    Course,
+    CourseLevel,
+    CourseModule,
+    Lesson,
+    LessonProgressStatus,
+    LessonType,
+    Question,
+    QuestionKind,
+    UserAnswer,
+    UserEnrolment,
+    UserLessonProgress,
+)
+from ion.models.cyab import CyabDataSource, CyabSnapshot, CyabSystem
+from ion.models.cyab_doc_checklist import CyabDocChecklistItem
+from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
+from ion.models.document import Document, DocumentVersion
+from ion.models.emulation import EmulationPlan, EmulationPlanStatus, EmulationStep, StepResult
+from ion.models.forensics import (
+    CustodyAction,
+    CustodyLogEntry,
+    EvidenceItem,
+    EvidenceStatus,
+    EvidenceType,
+    ForensicCase,
+    ForensicCasePriority,
+    ForensicCaseStatus,
+    ForensicCaseStep,
+    ForensicPlaybook,
+    ForensicPlaybookStep,
+    ForensicTimelineEntry,
+    InvestigationType,
+)
+from ion.models.integration import (
+    IntegrationEvent,
+    IntegrationEventType,
+    IntegrationHealthCheck,  # Backward compatibility alias for IntegrationEvent
+    IntegrationLog,  # Backward compatibility alias for IntegrationEvent
+    IntegrationStatus,
+    IntegrationType,
+    LogLevel,
+    Webhook,
+    WebhookLog,  # Backward compatibility alias for IntegrationEvent
+    WebhookStatus,
+)
+from ion.models.investigation import Investigation  # noqa: F401
+
 # v0.10.6: KB article embeddings for Bob's RAG grounding.
 from ion.models.kb_document_embedding import KBDocumentEmbedding  # noqa: F401
+from ion.models.log_source import LogSource, LogSourceCategory
+from ion.models.maturity import MaturityAssessment
+from ion.models.note_folder import NoteFolder
+from ion.models.observable import (
+    Observable,
+    ObservableAlertLink,  # Backward compatibility alias for ObservableLink
+    ObservableCaseLink,  # Backward compatibility alias for ObservableLink
+    ObservableEnrichment,
+    ObservableLink,
+    ObservableLinkType,
+    ObservableSighting,  # Backward compatibility alias for ObservableLink
+    ObservableType,
+    ThreatLevel,
+    WatchlistAlert,
+    WatchlistAlertType,
+)
+from ion.models.oncall import (
+    ChangeLogEntry,
+    CommTemplate,
+    ServiceAccount,
+    UserBookmark,
+)
+from ion.models.playbook import (
+    ExecutionStatus,
+    Playbook,
+    PlaybookExecution,
+    PlaybookStep,
+    StepType,
+)
+from ion.models.saved_search import (
+    SavedSearch,
+    SearchType,
+)
+from ion.models.security import (
+    BlockedIP,
+    SecurityAlertRule,
+    SecurityEvent,
+    SecurityEventSeverity,
+    SecurityEventStatus,
+    SecurityEventType,
+)
+from ion.models.skills import (
+    AssessmentReviewCycle,
+    AssessmentSnapshot,
+    KnowledgeArticle,
+    RoleAssessment,
+    SkillAssessment,
+    SOCCMMAssessment,
+    TeamCertification,
+    TeamScheduleEntry,
+    TrainingPlan,
+    TrainingPlanItem,
+    UserCareerGoal,
+)
+from ion.models.sla import (
+    DashboardLayout,
+    PlaybookAction,
+    PlaybookActionLog,
+    ScheduledReport,
+    SLABreachLog,
+    SLAPolicy,
+    ThreatHunt,
+)
+from ion.models.social import (
+    SocialComment,
+    SocialPost,
+    SocialReaction,
+)
 
 # v0.11.0: JSON-DAG playbook automation (Tines-inspired).
 from ion.models.story import Story, StoryRun  # noqa: F401
-
-# v0.11.2: L1/L2/L3/L4 SOC analyst training course subsystem.
-from ion.models.course import (  # noqa: F401
-    Course, CourseModule, Lesson, Question,
-    UserEnrolment, UserLessonProgress, UserAnswer,
-    CourseLevel, LessonType, QuestionKind, LessonProgressStatus,
+from ion.models.template import Collection, Tag, Template, Variable, template_tags
+from ion.models.threat_intel import ThreatIntelWatch
+from ion.models.ticker import (  # noqa: F401
+    Ticker,
+    TickerDismissal,
+    TickerKind,
+    TickerSeverity,
+    TickerSourceType,
 )
+from ion.models.tide_snapshot import TideSnapshot
+from ion.models.tuning_proposal import TuningProposal, TuningProposalStatus  # noqa: F401
+from ion.models.user import (
+    AuditLog,
+    Permission,
+    Role,
+    User,
+    UserSession,
+    role_permissions,
+    user_roles,
+)
+from ion.models.version import TemplateVersion
+from ion.models.vulnerability import Vulnerability, VulnerabilityAsset, VulnSeverity, VulnStatus
 
 __all__ = [
     "Base",

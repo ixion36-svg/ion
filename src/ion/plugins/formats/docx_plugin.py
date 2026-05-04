@@ -1,7 +1,6 @@
 """DOCX format plugin using python-docx."""
 
 from pathlib import Path
-from typing import Optional
 
 from ion.core.exceptions import PluginError
 

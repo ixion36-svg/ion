@@ -1,16 +1,16 @@
 """AI context service — RAG retrieval from KB, notes, and playbooks."""
 
-import re
 import logging
+import re
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List
 
-from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
 from ion.models.ai_preferences import AIUserPreference
-from ion.models.document import Document
 from ion.models.analyst_note import AnalystNote
+from ion.models.document import Document
 from ion.models.playbook import Playbook
 
 logger = logging.getLogger(__name__)

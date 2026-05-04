@@ -3,13 +3,13 @@
 Wraps the OpenCTIService to provide a unified connector interface.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 from ion.services.connectors.base import BaseConnector
 from ion.services.opencti_service import (
+    OpenCTIService,
     get_opencti_service,
     reset_opencti_service,
-    OpenCTIService,
 )
 
 

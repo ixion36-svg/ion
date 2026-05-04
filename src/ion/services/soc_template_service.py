@@ -5,7 +5,6 @@ aligned with NIST 800-61, NIST CSF 2.0, ISO 27035, SANS IR, SOC-CMM, MITRE ATT&C
 """
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -3562,11 +3561,10 @@ def seed_soc_templates() -> None:
 
     Idempotent - checks by name before creating.
     """
+    from ion.storage.collection_repository import CollectionRepository
     from ion.storage.database import get_engine, get_session_factory
     from ion.storage.template_repository import TemplateRepository
     from ion.storage.version_repository import VersionRepository
-    from ion.storage.collection_repository import CollectionRepository
-    from ion.models.template import Collection
 
     engine = get_engine()
     factory = get_session_factory(engine)

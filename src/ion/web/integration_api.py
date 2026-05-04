@@ -3,14 +3,18 @@
 Provides endpoints for the integration dashboard, webhooks, and integration logs.
 """
 
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ion.auth.dependencies import get_db_session, require_admin, get_current_user, get_client_ip, require_permission
+from ion.auth.dependencies import (
+    get_client_ip,
+    get_current_user,
+    get_db_session,
+)
 from ion.models.user import User
 
 
@@ -27,17 +31,16 @@ def require_integration_access(user: User = Depends(get_current_user)) -> User:
     if user.has_permission("integration:read") or user.has_permission("alert:read"):
         return user
     raise HTTPException(status_code=403, detail="Integration or alert read access required")
+from ion.core.safe_errors import safe_error
 from ion.models.integration import (
-    IntegrationType,
     IntegrationStatus,
+    IntegrationType,
     LogLevel,
     WebhookStatus,
 )
-from ion.services.connectors import get_connector_registry, ConnectorStatus
-from ion.services.webhook_service import get_webhook_service
-from ion.web.api import limiter
+from ion.services.connectors import ConnectorStatus, get_connector_registry
 from ion.services.integration_log_service import get_integration_log_service
-from ion.core.safe_errors import safe_error
+from ion.services.webhook_service import get_webhook_service
 
 router = APIRouter(tags=["integrations"])
 
@@ -639,9 +642,9 @@ async def get_server_metrics(
     current_user: User = Depends(require_integration_access),
 ):
     """Get server health metrics."""
-    import psutil
     import os
-    from datetime import datetime
+
+    import psutil
 
     try:
         # CPU usage
@@ -727,6 +730,7 @@ async def get_server_log_metrics(
         }
 
         import httpx
+
         from ion.core.config import get_elasticsearch_config
         config = get_elasticsearch_config()
 

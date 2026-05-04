@@ -1,11 +1,12 @@
 """Repository for Collection operations."""
 
-from typing import Optional, List
-from sqlalchemy import select, and_
+from typing import List, Optional
+
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session, selectinload
 
-from ion.models.template import Collection, Template
 from ion.models.document import Document
+from ion.models.template import Collection, Template
 
 
 class CollectionRepository:

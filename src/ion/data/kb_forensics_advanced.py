@@ -4,7 +4,7 @@ MALWARE_FUNDAMENTALS = [
     {
         "title": "Static Analysis Workflow — PE Headers, Strings, Imports, Hashing",
         "tags": ["malware-analysis", "static-analysis", "pe-format", "strings", "hashing", "dfir"],
-        "content": """# Static Analysis Workflow
+        "content": r"""# Static Analysis Workflow
 
 ## Step 1 — Hashing
 
@@ -101,7 +101,7 @@ Also check for overlays: data appended after the last section (common config/pay
     {
         "title": "Dynamic Analysis — Sandbox Setup, Behavioral Indicators, API Monitoring",
         "tags": ["malware-analysis", "dynamic-analysis", "sandbox", "behavioral", "api-monitoring"],
-        "content": """# Dynamic Analysis — Sandbox Setup and Behavioral Indicators
+        "content": r"""# Dynamic Analysis — Sandbox Setup and Behavioral Indicators
 
 ## VM Environment
 
@@ -226,7 +226,7 @@ VERDICT: RAT with HTTP C2. Persistence via Run key.
     {
         "title": "Malware Types — Ransomware, RATs, Wipers, Cryptominers, Rootkits",
         "tags": ["ransomware", "rat", "wiper", "cryptominer", "rootkit", "malware-types"],
-        "content": """# Malware Types Reference
+        "content": r"""# Malware Types Reference
 
 ## Ransomware
 
@@ -317,7 +317,7 @@ vol.py -f mem.raw windows.psscan   # Pool-tag scan (bypasses DKOM)
     {
         "title": "PE File Format Deep Dive — Sections, IAT, Resources",
         "tags": ["pe-format", "sections", "iat", "static-analysis", "malware-analysis"],
-        "content": """# PE File Format Deep Dive
+        "content": r"""# PE File Format Deep Dive
 
 ## File Layout
 
@@ -455,7 +455,7 @@ if ov:
     {
         "title": "ELF Binary Analysis for Linux Malware",
         "tags": ["elf", "linux-malware", "static-analysis", "malware-analysis", "reverse-engineering"],
-        "content": """# ELF Binary Analysis for Linux Malware
+        "content": r"""# ELF Binary Analysis for Linux Malware
 
 ## ELF Identification
 
@@ -575,7 +575,7 @@ rule Suspicious_ELF_Dropper {
     {
         "title": "Document Malware — Macro Analysis, OLE Streams, VBA Stomping",
         "tags": ["document-malware", "macro-analysis", "ole", "vba", "maldoc"],
-        "content": """# Document Malware Analysis
+        "content": r"""# Document Malware Analysis
 
 ## File Type Identification
 
@@ -685,7 +685,7 @@ rule Maldoc_AutoExec_Shell {
     {
         "title": "Packing and Obfuscation — UPX, Custom Packers, Entropy Analysis",
         "tags": ["packing", "upx", "entropy", "obfuscation", "malware-analysis"],
-        "content": """# Packing and Obfuscation
+        "content": r"""# Packing and Obfuscation
 
 ## Detecting Packed Samples
 
@@ -810,7 +810,7 @@ python3 -c "import base64,sys; print(base64.b64decode(sys.argv[1]).decode('utf-1
     {
         "title": "YARA Rules — Writing, Testing, and Deploying Detection Signatures",
         "tags": ["yara", "detection", "signatures", "malware-analysis", "threat-hunting"],
-        "content": """# YARA Rules — Writing, Testing, and Deploying
+        "content": r"""# YARA Rules — Writing, Testing, and Deploying
 
 ## Rule Structure
 
@@ -975,7 +975,7 @@ meta:
     {
         "title": "Malware C2 Communication Patterns — HTTP, DNS, Custom Protocols",
         "tags": ["c2", "command-and-control", "http", "dns", "malware-analysis"],
-        "content": """# Malware C2 Communication Patterns
+        "content": r"""# Malware C2 Communication Patterns
 
 ## HTTP/HTTPS C2
 
@@ -1110,7 +1110,7 @@ REVERSE_ENGINEERING = [
     {
         "title": "x86/x64 Assembly for Reverse Engineers — Essential Instructions",
         "tags": ["assembly", "x86", "x64", "reverse-engineering", "malware-analysis"],
-        "content": """# x86/x64 Assembly for Reverse Engineers
+        "content": r"""# x86/x64 Assembly for Reverse Engineers
 
 ## Register Reference
 
@@ -1280,7 +1280,7 @@ call eax
     {
         "title": "Ghidra Fundamentals — Navigation, Decompilation, Scripting",
         "tags": ["ghidra", "reverse-engineering", "decompilation", "malware-analysis"],
-        "content": """# Ghidra Fundamentals
+        "content": r"""# Ghidra Fundamentals
 
 ## Installation
 
@@ -1418,7 +1418,7 @@ $GHIDRA_HOME/support/analyzeHeadless /tmp/projects MyProj \
     {
         "title": "Debugging with x64dbg and WinDbg — Breakpoints, Tracing, Memory",
         "tags": ["x64dbg", "windbg", "debugging", "reverse-engineering", "malware-analysis"],
-        "content": """# Debugging with x64dbg and WinDbg
+        "content": r"""# Debugging with x64dbg and WinDbg
 
 ## x64dbg Setup
 
@@ -1547,7 +1547,7 @@ lm m ntoskrnl         ; get range to compare against
     {
         "title": "Anti-Reversing Techniques — Anti-Debug, VM Detection, Obfuscation",
         "tags": ["anti-debug", "anti-reversing", "vm-detection", "obfuscation", "malware-analysis"],
-        "content": """# Anti-Reversing Techniques
+        "content": r"""# Anti-Reversing Techniques
 
 ## Anti-Debug Techniques
 
@@ -1702,7 +1702,7 @@ mov  [ebp-8], eax  ; REAL
     {
         "title": "Identifying Crypto in Binaries — AES, RC4, XOR, Custom Ciphers",
         "tags": ["cryptography", "aes", "rc4", "xor", "reverse-engineering", "malware-analysis"],
-        "content": """# Identifying Crypto in Binaries
+        "content": r"""# Identifying Crypto in Binaries
 
 ## XOR
 
@@ -1820,7 +1820,7 @@ PS:   From Base64 > Decode text (UTF-16LE)
     {
         "title": "Firmware Analysis — Extraction, Filesystem, QEMU Emulation",
         "tags": ["firmware", "iot", "embedded", "binwalk", "qemu", "reverse-engineering"],
-        "content": """# Firmware Analysis
+        "content": r"""# Firmware Analysis
 
 ## Acquisition
 
@@ -1936,7 +1936,7 @@ done
     {
         "title": "Reverse Engineering Network Protocols from Binary Traffic",
         "tags": ["network-protocols", "reverse-engineering", "wireshark", "scapy", "malware-analysis"],
-        "content": """# Reverse Engineering Network Protocols
+        "content": r"""# Reverse Engineering Network Protocols
 
 ## Traffic Capture
 
@@ -2063,7 +2063,7 @@ MEMORY_FORENSICS = [
     {
         "title": "Volatility 3 Framework — Installation, Plugins, Profiles",
         "tags": ["volatility", "memory-forensics", "dfir", "incident-response"],
-        "content": """# Volatility 3 Framework
+        "content": r"""# Volatility 3 Framework
 
 ## Installation
 
@@ -2140,7 +2140,7 @@ done
     {
         "title": "Process Analysis — pslist, pstree, Process Hollowing Detection",
         "tags": ["volatility", "process-analysis", "process-hollowing", "memory-forensics", "dfir"],
-        "content": """# Process Analysis in Memory
+        "content": r"""# Process Analysis in Memory
 
 ## Process Listing Commands
 
@@ -2246,7 +2246,7 @@ yara -r rules/ procdump.1234.exe
     {
         "title": "Detecting Code Injection — malfind, VAD Analysis, Hollowed Processes",
         "tags": ["code-injection", "malfind", "vad", "memory-forensics", "volatility"],
-        "content": """# Detecting Code Injection
+        "content": r"""# Detecting Code Injection
 
 ## Injection Technique Reference
 
@@ -2352,7 +2352,7 @@ Conclusion: Process hollowing with CS beacon in svchost.exe
     {
         "title": "Extracting Credentials from Memory — LSASS Analysis, Mimikatz Artifacts",
         "tags": ["credentials", "lsass", "mimikatz", "memory-forensics", "volatility"],
-        "content": """# Credential Extraction from Memory
+        "content": r"""# Credential Extraction from Memory
 
 ## LSASS Process
 
@@ -2450,7 +2450,7 @@ vol.py -f memory.raw windows.registry.printkey \
     {
         "title": "Rootkit Detection — SSDT Hooks, DKOM, Hidden Processes",
         "tags": ["rootkit", "ssdt", "dkom", "memory-forensics", "volatility", "dfir"],
-        "content": """# Rootkit Detection in Memory
+        "content": r"""# Rootkit Detection in Memory
 
 ## Rootkit Types
 
@@ -2566,7 +2566,7 @@ vol.py -f memory.raw windows.netscan   # Hidden network connections
     {
         "title": "Memory Acquisition — WinPmem, LiME, DumpIt",
         "tags": ["memory-acquisition", "winpmem", "lime", "dumpit", "dfir"],
-        "content": """# Memory Acquisition
+        "content": r"""# Memory Acquisition
 
 ## Why Memory Acquisition Matters
 
@@ -2674,7 +2674,7 @@ vim-cmd vmsvc/snapshot.create <vmid> "ForensicSnap" "" true true
     {
         "title": "Volatility Registry Analysis and Network Connection Forensics",
         "tags": ["volatility", "registry", "network-forensics", "memory-forensics"],
-        "content": """# Registry and Network Forensics from Memory
+        "content": r"""# Registry and Network Forensics from Memory
 
 ## Registry Analysis
 
@@ -2790,7 +2790,7 @@ ACTIONS:
     {
         "title": "Windows Kernel Forensics — Pool Tags, Object Headers, Driver Analysis",
         "tags": ["kernel-forensics", "pool-tags", "drivers", "windbg", "memory-forensics"],
-        "content": """# Windows Kernel Forensics
+        "content": r"""# Windows Kernel Forensics
 
 ## Pool Memory and Tags
 
@@ -2903,7 +2903,7 @@ DISK_FORENSICS = [
     {
         "title": "NTFS Forensics — MFT, $LogFile, $UsnJrnl, Alternate Data Streams",
         "tags": ["ntfs", "mft", "usnjrnl", "ads", "disk-forensics", "dfir"],
-        "content": """# NTFS Forensics
+        "content": r"""# NTFS Forensics
 
 ## NTFS Key Metadata Files
 
@@ -3058,7 +3058,7 @@ Get-Content downloaded_malware.exe:Zone.Identifier
     {
         "title": "Windows Artifact Analysis — Prefetch, Amcache, ShimCache, SRUM",
         "tags": ["prefetch", "amcache", "shimcache", "srum", "windows-artifacts", "disk-forensics"],
-        "content": """# Windows Execution Artifacts
+        "content": r"""# Windows Execution Artifacts
 
 ## Prefetch
 
@@ -3205,7 +3205,7 @@ LECmd.exe -d "C:\Users\user\AppData\Roaming\Microsoft\Windows\Recent\" --csv out
     {
         "title": "Windows Registry Forensics — SAM, SYSTEM, SOFTWARE, NTUSER.DAT",
         "tags": ["registry", "sam", "ntuser-dat", "windows-forensics", "disk-forensics"],
-        "content": """# Windows Registry Forensics
+        "content": r"""# Windows Registry Forensics
 
 ## Registry Hive Files
 
@@ -3336,7 +3336,7 @@ python secretsdump.py -security SECURITY -system SYSTEM LOCAL
     {
         "title": "File Carving — Recovering Deleted Files, Magic Bytes, PhotoRec/Scalpel",
         "tags": ["file-carving", "deleted-files", "photoRec", "scalpel", "disk-forensics"],
-        "content": """# File Carving — Recovering Deleted Files
+        "content": r"""# File Carving — Recovering Deleted Files
 
 ## How File Deletion Works
 
@@ -3495,7 +3495,7 @@ carve_pe("disk_image.dd", "carved_pes/")
     {
         "title": "Timeline Analysis — Super Timelines with Plaso/log2timeline",
         "tags": ["timeline", "plaso", "log2timeline", "super-timeline", "disk-forensics", "dfir"],
-        "content": """# Timeline Analysis with Plaso/log2timeline
+        "content": r"""# Timeline Analysis with Plaso/log2timeline
 
 ## Concept
 
@@ -3628,7 +3628,7 @@ grep -E "prefetch|userassist|muicache|amcache" timeline.csv | \
     {
         "title": "Browser Forensics — Chrome, Firefox, Edge History/Cache/Downloads",
         "tags": ["browser-forensics", "chrome", "firefox", "edge", "disk-forensics", "dfir"],
-        "content": """# Browser Forensics
+        "content": r"""# Browser Forensics
 
 ## Chrome/Chromium Artifact Locations
 
@@ -3766,7 +3766,7 @@ Incognito mode does NOT write to disk history files. However:
     {
         "title": "USB Device Forensics — Windows USB Artifacts, SetupAPI, Registry",
         "tags": ["usb-forensics", "setupapi", "registry", "disk-forensics", "dfir"],
-        "content": """# USB Device Forensics
+        "content": r"""# USB Device Forensics
 
 ## USB Artifact Sources
 
@@ -3826,7 +3826,7 @@ grep -A5 "USBSTOR" "C:\Windows\inf\setupapi.dev.log"
 import subprocess, csv, json
 
 def parse_usbstor(system_hive_path):
-    """Extract USBSTOR device history."""
+    '''Extract USBSTOR device history.'''
     result = subprocess.run([
         "RECmd.exe",
         "-f", system_hive_path,
@@ -3906,7 +3906,7 @@ RECmd.exe -f NTUSER.DAT --kn "Software\Microsoft\Windows\Shell" --csv output\
     {
         "title": "Linux Filesystem Forensics — ext4, Inodes, Journal Analysis",
         "tags": ["linux-forensics", "ext4", "inode", "journal", "disk-forensics", "dfir"],
-        "content": """# Linux Filesystem Forensics — ext4
+        "content": r"""# Linux Filesystem Forensics — ext4
 
 ## ext4 Structure Overview
 
@@ -4062,7 +4062,7 @@ IR_FORENSICS = [
     {
         "title": "Evidence Collection and Chain of Custody Best Practices",
         "tags": ["chain-of-custody", "evidence-collection", "dfir", "incident-response"],
-        "content": """# Evidence Collection and Chain of Custody
+        "content": r"""# Evidence Collection and Chain of Custody
 
 ## Legal Principles
 
@@ -4190,7 +4190,7 @@ ip route show > ip_route.txt                    # Linux
     {
         "title": "Windows Triage Collection — KAPE, Velociraptor, CyLR",
         "tags": ["kape", "velociraptor", "cylr", "triage", "windows-forensics", "dfir"],
-        "content": """# Windows Triage Collection
+        "content": r"""# Windows Triage Collection
 
 ## KAPE (Kroll Artifact Parser and Extractor)
 
@@ -4365,7 +4365,7 @@ Get-Process | Where-Object {$_.Path} |
     {
         "title": "Ransomware Investigation Playbook — Scoping, Containment, Recovery",
         "tags": ["ransomware", "incident-response", "playbook", "containment", "dfir"],
-        "content": """# Ransomware Investigation Playbook
+        "content": r"""# Ransomware Investigation Playbook
 
 ## Initial Detection and Scoping (0-30 minutes)
 
@@ -4524,7 +4524,7 @@ Get-EventLog Security -InstanceId 4625 | Group-Object -Property MachineName | So
     {
         "title": "Cloud Forensics — AWS CloudTrail, Azure Activity Logs, GCP Audit",
         "tags": ["cloud-forensics", "aws", "azure", "gcp", "dfir", "incident-response"],
-        "content": """# Cloud Forensics
+        "content": r"""# Cloud Forensics
 
 ## AWS CloudTrail
 
@@ -4699,7 +4699,7 @@ for pod in pods:
     {
         "title": "Forensic Report Writing — Structure, Evidence Presentation, Court-Ready",
         "tags": ["forensic-reporting", "dfir", "incident-response", "court-ready"],
-        "content": """# Forensic Report Writing
+        "content": r"""# Forensic Report Writing
 
 ## Report Types
 
@@ -4836,7 +4836,7 @@ print(defanged)
     {
         "title": "Network Forensics in IR — PCAP Collection, NetFlow, Zeek Logs",
         "tags": ["network-forensics", "pcap", "netflow", "zeek", "dfir", "incident-response"],
-        "content": """# Network Forensics in Incident Response
+        "content": r"""# Network Forensics in Incident Response
 
 ## Traffic Capture
 
@@ -4968,7 +4968,7 @@ sha256sum capture_*.pcap.gz > checksums.txt
     {
         "title": "Insider Threat Investigation — User Activity Reconstruction",
         "tags": ["insider-threat", "user-activity", "dfir", "incident-response"],
-        "content": """# Insider Threat Investigation
+        "content": r"""# Insider Threat Investigation
 
 ## Investigation Principles
 
@@ -5102,7 +5102,7 @@ psort.py -w user_activity.csv -o l2tcsv user_timeline.plaso \
     {
         "title": "Business Email Compromise — Investigation Methodology",
         "tags": ["bec", "email-forensics", "incident-response", "dfir"],
-        "content": """# Business Email Compromise (BEC) Investigation
+        "content": r"""# Business Email Compromise (BEC) Investigation
 
 ## BEC Overview
 
@@ -5227,4 +5227,16 @@ Search-UnifiedAuditLog -StartDate "2025-03-01" -EndDate "2025-03-16" \
 ```
 """,
     },
+]
+
+# ============================================================
+# COLLECTIONS MANIFEST
+# ============================================================
+
+COLLECTIONS = [
+    ("Advanced Malware Analysis", "Static and dynamic analysis workflows, PE deep dives, sandboxing, anti-analysis, and document/script malware techniques.", MALWARE_FUNDAMENTALS),
+    ("Reverse Engineering", "Disassembly, decompilation, debugger usage, anti-RE techniques, and unpacking workflows for malware research.", REVERSE_ENGINEERING),
+    ("Advanced Memory Forensics", "Volatility 3 deep dives, process and DLL analysis, code-injection detection, rootkit hunting, kernel forensics, and credential extraction from RAM.", MEMORY_FORENSICS),
+    ("Advanced Disk Forensics", "NTFS internals, registry forensics, file carving, timeline analysis (Plaso), browser/USB artifact recovery, and cross-platform filesystem forensics.", DISK_FORENSICS),
+    ("Advanced Incident Response Forensics", "Evidence collection, chain of custody, triage workflows, ransomware playbooks, cloud forensics, network forensics, BEC investigation, and forensic report writing.", IR_FORENSICS),
 ]

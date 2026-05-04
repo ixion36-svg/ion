@@ -75,8 +75,21 @@ where = ["src"]
 ion = ["web/static/**/*", "web/templates/**/*", "data/**/*.md", "data/**/*.yaml"]
 
 [tool.ruff]
-line-length = 100
+# Practical limit reflecting actual codebase style; was 100 but >7k lines exceeded.
+# Lines beyond 120 are rare and usually long URLs / SQL strings worth flagging.
+line-length = 120
 target-version = "py311"
+
+# Content-heavy data/seed modules — long single-line dict entries are intentional.
+[tool.ruff.lint.per-file-ignores]
+"src/ion/data/kb_*.py" = ["E501"]
+"src/ion/services/cyab_subprofile_catalogue.py" = ["E501"]
+"src/ion/services/cyab_assessment_questions.py" = ["E501"]
+"src/ion/services/soc_template_service.py" = ["E501"]
+"src/ion/services/training_sim_service.py" = ["E501"]
+"src/ion/services/forensic_seed_service.py" = ["E501"]
+"src/ion/services/cyber_range_service.py" = ["E501"]
+"src/ion/services/soc_maturity_seed.py" = ["E501"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]

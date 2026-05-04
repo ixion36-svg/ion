@@ -1,19 +1,20 @@
 """Business logic for version control operations."""
 
-from typing import Optional, List
+from typing import List, Optional
+
 from sqlalchemy.orm import Session
 
+from ion.core.config import get_config
+from ion.core.exceptions import (
+    TemplateNotFoundError,
+    ValidationError,
+    VersionNotFoundError,
+)
+from ion.diff.differ import VersionDiffer
 from ion.models.template import Template
 from ion.models.version import TemplateVersion
 from ion.storage.template_repository import TemplateRepository
 from ion.storage.version_repository import VersionRepository
-from ion.diff.differ import VersionDiffer
-from ion.core.exceptions import (
-    TemplateNotFoundError,
-    VersionNotFoundError,
-    ValidationError,
-)
-from ion.core.config import get_config
 
 
 class VersionService:

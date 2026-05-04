@@ -18,8 +18,8 @@ from ion.auth.dependencies import (
     require_page_auth,
 )
 from ion.models.user import User
-from ion.storage.alert_prompt_repository import AlertPromptRepository
 from ion.services.alert_prompt_service import AlertPromptService
+from ion.storage.alert_prompt_repository import AlertPromptRepository
 from ion.web.api import get_db_session
 
 logger = logging.getLogger(__name__)
@@ -126,7 +126,7 @@ def get_all_scorecards(
     tuning_needed = agreement_pct < 60 AND sample_size >= 10.
     """
     from datetime import datetime, timedelta, timezone
-    from sqlalchemy import func
+
 
     try:
         from ion.models.ai_feedback import AIFeedback

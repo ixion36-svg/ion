@@ -1,6 +1,7 @@
 """SOC Maturity Assessment API."""
 
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session

@@ -1,32 +1,30 @@
 """AI/LLM API endpoints."""
 
+import json
 import logging
-import os
 import re
 import uuid
-import shutil
+from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Request
+from typing import Dict, List, Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from datetime import datetime
-import json
 
-from ion.services.ollama_service import (
-    get_ollama_service,
-    OllamaError,
-    RECOMMENDED_MODELS,
-    SYSTEM_PROMPTS,
-)
+from ion.auth.dependencies import get_current_user
+from ion.core.safe_errors import safe_error
+from ion.models.ai_preferences import AIResponseFeedback
+from ion.models.user import User
 from ion.services.ai_chat_service import AIChatService
 from ion.services.ai_context_service import AIContextService
-from ion.web.api import limiter
-from ion.auth.dependencies import get_current_user
-from ion.models.user import User
-from ion.models.ai_preferences import AIResponseFeedback
+from ion.services.ollama_service import (
+    RECOMMENDED_MODELS,
+    SYSTEM_PROMPTS,
+    OllamaError,
+    get_ollama_service,
+)
 from ion.storage.database import get_session
-from ion.core.safe_errors import safe_error
 
 logger = logging.getLogger(__name__)
 

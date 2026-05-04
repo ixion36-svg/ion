@@ -1,19 +1,20 @@
 """NoteFolder model for organizing analyst notes into folders."""
 
-from typing import Optional, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
+
 from sqlalchemy import (
     ForeignKey,
+    Index,
     Integer,
     String,
-    Index,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ion.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from ion.models.user import User
     from ion.models.analyst_note import AnalystNote
+    from ion.models.user import User
 
 
 class NoteFolder(Base, TimestampMixin):

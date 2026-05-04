@@ -6,13 +6,13 @@ from typing import Generator, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func, or_, String
+from sqlalchemy import String, func, or_
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
 from ion.core.config import get_config
 from ion.core.safe_errors import safe_error
-from ion.models.network_asset import NetworkAsset, NetworkAssetIP, NetworkAssetMAC
+from ion.models.network_asset import NetworkAsset, NetworkAssetIP
 from ion.models.user import User
 from ion.storage.database import get_engine, get_session_factory
 
@@ -117,8 +117,8 @@ def list_subnets(
     session: Session = Depends(get_db_session),
 ):
     """Aggregate assets by /24 subnet for topology view."""
-    from collections import defaultdict
     import ipaddress
+    from collections import defaultdict
 
     assets = session.query(NetworkAsset).filter(
         NetworkAsset.archived_at.is_(None)

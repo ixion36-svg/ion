@@ -5,11 +5,11 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ion.auth.dependencies import get_current_user
-from ion.models.social import SocialPost, SocialComment, SocialReaction, CATEGORIES
+from ion.models.social import CATEGORIES, SocialComment, SocialPost, SocialReaction
 from ion.models.user import User
 from ion.web.api import get_db_session as _get_db_session
 

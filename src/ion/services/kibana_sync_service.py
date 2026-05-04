@@ -2,19 +2,19 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Optional, Dict, List, Any
+from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import or_, and_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
 
-from ion.services.kibana_cases_service import get_kibana_cases_service
-from ion.services.elasticsearch_service import ElasticsearchService
-from ion.services.case_description import build_case_description
-from ion.services.observable_extractor import extract_observables_from_raw
 from ion.models.alert_triage import AlertCase, AlertTriage, AlertTriageStatus, Note, NoteEntityType
 from ion.models.user import User
-from ion.storage.database import get_session_factory, get_engine
+from ion.services.case_description import build_case_description
+from ion.services.elasticsearch_service import ElasticsearchService
+from ion.services.kibana_cases_service import get_kibana_cases_service
+from ion.services.observable_extractor import extract_observables_from_raw
+from ion.storage.database import get_engine, get_session_factory
 
 logger = logging.getLogger(__name__)
 
@@ -196,7 +196,6 @@ class KibanaSyncService:
                         from ion.services.elasticsearch_service import ElasticsearchService
                         es = ElasticsearchService()
                         if es.is_configured:
-                            import asyncio
                             await es.update_alert_workflow_status(synced_alert_ids, ion_status)
                             logger.info(
                                 f"Synced workflow_status for {len(synced_alert_ids)} alerts "

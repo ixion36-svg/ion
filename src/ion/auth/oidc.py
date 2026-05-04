@@ -1,18 +1,18 @@
 """OIDC/Keycloak token validation and user synchronization."""
 
-import time
 import logging
+import time
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
 
 import httpx
-from jose import jwt, JWTError, ExpiredSignatureError
+from jose import ExpiredSignatureError, JWTError, jwt
 from sqlalchemy.orm import Session
 
 from ion.auth.oidc_config import OIDCConfig
 from ion.core.config import get_ssl_verify
-from ion.models.user import User, Role
-from ion.storage.user_repository import UserRepository, RoleRepository
+from ion.models.user import Role, User
+from ion.storage.user_repository import RoleRepository, UserRepository
 
 logger = logging.getLogger(__name__)
 

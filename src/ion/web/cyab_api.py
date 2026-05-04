@@ -6,27 +6,32 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_permission
+from ion.core.config import get_elasticsearch_config
+from ion.core.safe_errors import safe_error
 from ion.models.cyab import (
-    CyabSystem, CyabDataSource, CyabSnapshot,
-    CyabAssessment, CyabSystemAssessment,
     SYSTEM_ICONS,
+    CyabAssessment,
+    CyabDataSource,
+    CyabSnapshot,
+    CyabSystem,
+    CyabSystemAssessment,
 )
-from ion.models.user import User, Role, user_roles
-from ion.web.api import get_db_session
-from ion.services.tide_service import get_tide_service, reset_tide_service
-from ion.services.elasticsearch_service import ElasticsearchService
+from ion.models.user import User
+from ion.services import cyab_assessment_service
 from ion.services.cyab_assessment_questions import (
     SCHEMA_VERSION as ASSESSMENT_SCHEMA_VERSION,
+)
+from ion.services.cyab_assessment_questions import (
     get_org_questions,
     get_system_questions,
 )
-from ion.services import cyab_assessment_service
-from ion.core.config import get_elasticsearch_config
-from ion.core.safe_errors import safe_error
+from ion.services.elasticsearch_service import ElasticsearchService
+from ion.services.tide_service import get_tide_service
+from ion.web.api import get_db_session
 
 router = APIRouter()
 
@@ -1090,9 +1095,10 @@ def tide_de_navigator_layer():
     annotated with the number of enabled / total TIDE rules and a heat-map
     colour. Auditors and red teams can drop the file straight into Navigator.
     """
-    from fastapi.responses import Response
     import json
     from datetime import datetime
+
+    from fastapi.responses import Response
 
     svc = get_tide_service()
     if not svc.enabled:
@@ -1398,8 +1404,9 @@ async def tide_de_system_readiness(req: ReadinessReportRequest, session: Session
 @router.post("/tide/de/readiness-pdf", dependencies=[Depends(require_permission("alert:read"))])
 async def tide_de_readiness_pdf(req: ReadinessReportRequest, session: Session = Depends(get_db_session)):
     """Generate a professional PDF report for threat actor detection readiness."""
-    from fastapi.responses import Response
     import html as html_mod
+
+    from fastapi.responses import Response
 
     # Reuse the readiness computation
     req.generate_ai = True  # Always generate AI content for PDF
@@ -1553,8 +1560,9 @@ async def tide_de_readiness_pdf(req: ReadinessReportRequest, session: Session = 
 
     # Try PDF first, fall back to HTML
     try:
-        from weasyprint import HTML as WpHTML
         import re as _re
+
+        from weasyprint import HTML as WpHTML
         pdf_bytes = WpHTML(string=full_html).write_pdf()
         # Strict ASCII slug for the filename so an attacker-controlled actor
         # name can't inject CRLF / quotes into the Content-Disposition header.

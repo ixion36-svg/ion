@@ -3,24 +3,22 @@
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ion.auth.dependencies import get_current_user, require_permission
-from ion.models.user import User
+from ion.auth.dependencies import get_db_session, require_permission
+from ion.core.logging import get_structured_logger
 from ion.models.security import (
     SecurityEventSeverity,
     SecurityEventStatus,
     SecurityEventType,
 )
+from ion.models.user import User
 from ion.services.security_service import (
     SecurityDetectionService,
     SIEMExportService,
 )
-from ion.auth.dependencies import get_db_session
-from ion.core.logging import get_structured_logger
-
 
 router = APIRouter(tags=["security"])
 logger = get_structured_logger(__name__)
@@ -391,10 +389,11 @@ async def download_events(
     current_user: User = Depends(require_permission("security:read")),
 ):
     """Download security events as a file."""
-    from fastapi.responses import Response
-    import json
     import csv
     import io
+    import json
+
+    from fastapi.responses import Response
 
     security_service = SecurityDetectionService(session)
     events = security_service.get_recent_events(hours=hours, limit=10000)

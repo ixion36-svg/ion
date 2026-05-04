@@ -6,11 +6,11 @@ from typing import Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from ion.models.user import User, UserSession, Role, Permission
-from ion.storage.user_repository import UserRepository, RoleRepository, PermissionRepository
-from ion.storage.auth_repository import SessionRepository, AuditLogRepository
 from ion.auth.password import password_hasher
 from ion.core.config import get_config
+from ion.models.user import Permission, Role, User
+from ion.storage.auth_repository import AuditLogRepository, SessionRepository
+from ion.storage.user_repository import PermissionRepository, RoleRepository, UserRepository
 
 
 class AuthService:

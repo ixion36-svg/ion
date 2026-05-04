@@ -13,15 +13,15 @@ import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Generator, Iterator, Optional
-from sqlalchemy import create_engine, Engine, inspect, text
-from sqlalchemy.orm import Session, sessionmaker
 
-from ion.models.base import Base
-from ion.core.config import get_config
+from sqlalchemy import Engine, create_engine, inspect, text
+from sqlalchemy.orm import Session, sessionmaker
 
 # Import all models to ensure they are registered with Base.metadata
 # This is required for create_all() to create all tables
 import ion.models  # noqa: F401
+from ion.core.config import get_config
+from ion.models.base import Base
 
 logger = logging.getLogger(__name__)
 

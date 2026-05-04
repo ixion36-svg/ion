@@ -1,14 +1,15 @@
 """Automated Playbook Actions API."""
 
 import logging
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional
 from sqlalchemy.orm import Session
-from ion.auth.dependencies import require_permission, get_current_user
+
+from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.user import User
 from ion.web.api import get_db_session
-from ion.core.safe_errors import safe_error
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/playbook-actions", tags=["playbook-actions"])

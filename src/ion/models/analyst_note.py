@@ -1,24 +1,22 @@
 """AnalystNote model for personal note-taking."""
 
-from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
+
 from sqlalchemy import (
+    Boolean,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
-    Boolean,
-    DateTime,
-    Index,
-    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ion.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from ion.models.user import User
     from ion.models.note_folder import NoteFolder
+    from ion.models.user import User
 
 
 class AnalystNote(Base, TimestampMixin):

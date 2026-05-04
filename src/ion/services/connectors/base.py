@@ -5,8 +5,8 @@ Defines the abstract interface that all integration connectors must implement.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, TYPE_CHECKING
 from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 if TYPE_CHECKING:
     from ion.services.connectors.version_compat import VersionRange

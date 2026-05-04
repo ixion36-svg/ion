@@ -6,7 +6,6 @@ Trainees can play attacker, defender, or both sides simultaneously.
 """
 
 import logging
-from typing import Any
 
 logger = logging.getLogger(__name__)
 

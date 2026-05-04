@@ -122,6 +122,7 @@ def _step_bob_investigate_alert(config: Dict[str, Any], context: Dict[str, Any],
     once branching exists.
     """
     import asyncio
+
     from ion.services.investigation_service import InvestigationService
 
     alert_id = config.get("alert_id") or ""

@@ -17,7 +17,6 @@ Honours ``ION_EMBEDDING_ENABLED`` and ``ION_CASE_EMBEDDING_INTERVAL_S``.
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import os
 import threading

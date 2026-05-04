@@ -1,9 +1,9 @@
 """TIDE connector for integration management."""
 
-from typing import Dict, Any
+from typing import Any, Dict
 
 from ion.services.connectors.base import BaseConnector
-from ion.services.tide_service import get_tide_service, reset_tide_service, TideService
+from ion.services.tide_service import TideService, get_tide_service, reset_tide_service
 
 
 class TIDEConnector(BaseConnector):

@@ -1,13 +1,14 @@
 """FastAPI web server for ION - Intelligent Operating Network."""
 
-import uvicorn
 from pathlib import Path
-from fastapi import FastAPI, Request, Depends
-from ion.models.user import User
-from ion.auth.dependencies import require_page_auth, require_page_permission
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+
+import uvicorn
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
+
+from ion.auth.dependencies import require_page_auth, require_page_permission
+from ion.models.user import User
 
 # Use orjson for JSON serialisation if available (5-10x faster than stdlib).
 try:
@@ -21,94 +22,93 @@ try:
     _default_response_class = ORJSONResponse
 except ImportError:
     _default_response_class = JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
+# Initialize logging with Elasticsearch if configured
+import os
+
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
 
 import ion
-from ion.web.api import router as api_router, limiter
+from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.config import get_config as get_app_config
-from ion.web.security_api import router as security_router
-from ion.web.integration_api import router as integration_router
+from ion.core.logging import get_logger, setup_logging
+from ion.storage.database import init_db
 from ion.web.admin_api import router as admin_router
-from ion.web.observable_api import router as observable_router
 from ion.web.ai_api import router as ai_router
-from ion.web.kibana_api import router as kibana_router
-from ion.web.skills_api import router as skills_router
-from ion.web.role_skills_api import router as role_skills_router
-from ion.web.notes_api import router as notes_router
-from ion.web.pcap_api import router as pcap_router
+from ion.web.alert_pattern_api import router as alert_pattern_router
+from ion.web.alert_prompt_api import router as alert_prompt_router
+from ion.web.analyst_efficiency_api import router as analyst_efficiency_router
+from ion.web.analytics_api import router as analytics_router
+from ion.web.api import limiter
+from ion.web.api import router as api_router
 from ion.web.arkime_api import router as arkime_router
+from ion.web.attack_story_api import router as attack_story_router
+from ion.web.briefing_api import router as briefing_router
+from ion.web.bulk_ops_api import router as bulk_ops_router
+from ion.web.canary_api import router as canary_router
+from ion.web.case_grouper_api import router as case_grouper_router
+from ion.web.case_similarity_api import router as case_similarity_router
+from ion.web.change_log_api import router as change_log_router
+from ion.web.comm_template_api import router as comm_template_router
+from ion.web.compliance_api import router as compliance_router
+from ion.web.course_api import router as course_router
+from ion.web.cyab_api import router as cyab_router
+from ion.web.cyab_studio_api import router as cyab_studio_router
+from ion.web.cyber_range_api import router as cyber_range_router
+from ion.web.d3fend_api import router as d3fend_router
+from ion.web.daily_standup_api import router as daily_standup_router
+from ion.web.dashboard_layout_api import router as dashboard_layout_router
+from ion.web.emulation_api import router as emulation_router
+from ion.web.engineering_analytics_api import router as engineering_analytics_router
+from ion.web.enrichment_api import router as enrichment_router
+from ion.web.entity_timeline_api import router as entity_timeline_router
+from ion.web.executive_report_api import router as executive_report_router
 from ion.web.forensics_api import router as forensics_router
+from ion.web.incident_cost_api import router as incident_cost_router
+from ion.web.integration_api import router as integration_router
+from ion.web.investigation_api import router as investigation_router
+from ion.web.investigation_memory_api import router as investigation_memory_router
+from ion.web.ioc_staleness_api import router as ioc_staleness_router
+from ion.web.kibana_api import router as kibana_router
+from ion.web.knowledge_graph_api import router as knowledge_graph_router
+from ion.web.log_source_api import router as log_source_router
+from ion.web.logging_middleware import RequestLoggingMiddleware
+from ion.web.maturity_api import router as maturity_router
+from ion.web.mitre_navigator_api import router as mitre_navigator_router
+from ion.web.network_map_api import router as network_map_router
+from ion.web.notes_api import router as notes_router
+from ion.web.observable_api import router as observable_router
+from ion.web.pcap_api import router as pcap_router
+from ion.web.playbook_action_api import router as playbook_action_router
+from ion.web.playbook_analytics_api import router as playbook_analytics_router
+from ion.web.report_scheduler_api import router as report_scheduler_router
+from ion.web.role_skills_api import router as role_skills_router
+from ion.web.saved_search_api import router as saved_search_router
+from ion.web.scheduler_api import router as scheduler_router
+from ion.web.security_api import router as security_router
+from ion.web.security_middleware import RateLimitSecurityMiddleware, SecurityMonitoringMiddleware
+from ion.web.service_account_api import router as service_account_router
+from ion.web.shift_handover_api import router as shift_handover_router
+from ion.web.skills_api import router as skills_router
+from ion.web.sla_api import router as sla_router
+from ion.web.smtp_api import router as smtp_router
+from ion.web.soc_health_api import router as soc_health_router
+from ion.web.social_api import router as social_router
+from ion.web.story_api import router as story_router
+from ion.web.threat_hunt_api import router as threat_hunt_router
 from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.threat_landscape_api import router as threat_landscape_router
 from ion.web.threat_watch_gap_api import router as threat_watch_gap_router
-from ion.web.cyab_api import router as cyab_router
-from ion.web.cyab_studio_api import router as cyab_studio_router
-from ion.web.wallboard_api import router as wallboard_router
-from ion.web.social_api import router as social_router
-from ion.web.analytics_api import router as analytics_router
-from ion.web.engineering_analytics_api import router as engineering_analytics_router
-from ion.web.shift_handover_api import router as shift_handover_router
-
-from ion.web.entity_timeline_api import router as entity_timeline_router
-from ion.web.analyst_efficiency_api import router as analyst_efficiency_router
-from ion.web.soc_health_api import router as soc_health_router
-from ion.web.attack_story_api import router as attack_story_router
-from ion.web.case_similarity_api import router as case_similarity_router
-from ion.web.triage_suggestion_api import router as triage_suggestion_router
-from ion.web.smtp_api import router as smtp_router
-from ion.web.enrichment_api import router as enrichment_router
-from ion.web.alert_prompt_api import router as alert_prompt_router
-from ion.web.story_api import router as story_router
-from ion.web.course_api import router as course_router
-from ion.web.tuning_proposal_api import router as tuning_proposal_router
 from ion.web.ticker_api import router as ticker_router
-from ion.web.investigation_memory_api import router as investigation_memory_router
-from ion.web.scheduler_api import router as scheduler_router
-from ion.web.investigation_api import router as investigation_router
-from ion.web.case_grouper_api import router as case_grouper_router
-from ion.web.mitre_navigator_api import router as mitre_navigator_router
-from ion.web.playbook_analytics_api import router as playbook_analytics_router
-from ion.web.alert_pattern_api import router as alert_pattern_router
-from ion.web.d3fend_api import router as d3fend_router
-from ion.web.canary_api import router as canary_router
-from ion.web.log_source_api import router as log_source_router
-from ion.web.briefing_api import router as briefing_router
-from ion.web.knowledge_graph_api import router as knowledge_graph_router
-
-from ion.web.emulation_api import router as emulation_router
-from ion.web.vulnerability_api import router as vulnerability_router
-from ion.web.maturity_api import router as maturity_router
-from ion.web.executive_report_api import router as executive_report_router
-from ion.web.ioc_staleness_api import router as ioc_staleness_router
 from ion.web.training_sim_api import router as training_sim_router
-from ion.web.service_account_api import router as service_account_router
-from ion.web.incident_cost_api import router as incident_cost_router
-from ion.web.network_map_api import router as network_map_router
-from ion.web.compliance_api import router as compliance_router
-from ion.web.comm_template_api import router as comm_template_router
-from ion.web.change_log_api import router as change_log_router
-from ion.web.saved_search_api import router as saved_search_router
-
-from ion.web.sla_api import router as sla_router
-from ion.web.bulk_ops_api import router as bulk_ops_router
-from ion.web.threat_hunt_api import router as threat_hunt_router
-from ion.web.dashboard_layout_api import router as dashboard_layout_router
-from ion.web.report_scheduler_api import router as report_scheduler_router
-from ion.web.playbook_action_api import router as playbook_action_router
-from ion.web.cyber_range_api import router as cyber_range_router
-from ion.web.webhook_api import router as webhook_router
-from ion.web.daily_standup_api import router as daily_standup_router
 from ion.web.translator_api import router as translator_router
-from ion.core.config import get_config, get_elasticsearch_config
-from ion.core.logging import setup_logging, get_logger
-from ion.storage.database import init_db
-from ion.web.logging_middleware import RequestLoggingMiddleware
-from ion.web.security_middleware import SecurityMonitoringMiddleware, RateLimitSecurityMiddleware
+from ion.web.triage_suggestion_api import router as triage_suggestion_router
+from ion.web.tuning_proposal_api import router as tuning_proposal_router
+from ion.web.vulnerability_api import router as vulnerability_router
+from ion.web.wallboard_api import router as wallboard_router
+from ion.web.webhook_api import router as webhook_router
 
-# Initialize logging with Elasticsearch if configured
-import os
 es_config = get_elasticsearch_config()
 if es_config.get("url"):
     os.environ.setdefault("ION_ES_LOG_URL", es_config.get("url", ""))
@@ -212,6 +212,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 # Add GZip compression — compresses all responses > 500 bytes.
 # Typically 60-80% smaller for HTML/JSON/CSS/JS, major bandwidth + perceived speed win.
 from starlette.middleware.gzip import GZipMiddleware
+
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Add security headers middleware
@@ -233,8 +234,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Mount static files with cache-control headers for browser caching.
 # CSS/JS/fonts don't change between deploys, so 24h cache is safe.
 # Cache is busted by the version in the URL (ion_version in templates).
-from starlette.staticfiles import StaticFiles as _StaticFiles
 from starlette.responses import Response as _StaticResponse
+from starlette.staticfiles import StaticFiles as _StaticFiles
 
 
 class CachedStaticFiles(_StaticFiles):
@@ -251,6 +252,7 @@ app.mount("/static", CachedStaticFiles(directory=BASE_DIR / "static"), name="sta
 
 # Setup templates with bytecode cache (compiled once, not per-request)
 from jinja2 import FileSystemBytecodeCache as _J2Cache
+
 _bytecode_cache_dir = Path("/tmp/ion-jinja2-cache")
 _bytecode_cache_dir.mkdir(exist_ok=True)
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -428,14 +430,24 @@ async def startup_event():
     init_db(config.db_path)
 
     from ion.storage.database import (
-        advisory_lock, run_locked, get_engine, get_session_factory,
-        LOCK_SEED_PERMISSIONS, LOCK_SEED_DEFAULT_PLAYBOOKS,
-        LOCK_SEED_SOC_TEMPLATES, LOCK_SEED_KNOWLEDGE_BASE,
-        LOCK_SEED_FORENSIC_PB, LOCK_SEED_CAPABILITY_KB,
-        LOCK_KIBANA_BG_SYNC, LOCK_SKILLS_DAILY_SNAPSHOT,
-        LOCK_SEED_ANALYTICS_JOBS, LOCK_ANALYTICS_BG_LOOP,
-        LOCK_TIDE_BG_SYNC, LOCK_SCHEDULER_BG, LOCK_INVESTIGATION_BG,
-        LOCK_CASE_GROUPER_BG, LOCK_SEED_CYAB_SUBPROFILES,
+        LOCK_ANALYTICS_BG_LOOP,
+        LOCK_CASE_GROUPER_BG,
+        LOCK_INVESTIGATION_BG,
+        LOCK_KIBANA_BG_SYNC,
+        LOCK_SCHEDULER_BG,
+        LOCK_SEED_ANALYTICS_JOBS,
+        LOCK_SEED_CAPABILITY_KB,
+        LOCK_SEED_CYAB_SUBPROFILES,
+        LOCK_SEED_DEFAULT_PLAYBOOKS,
+        LOCK_SEED_FORENSIC_PB,
+        LOCK_SEED_KNOWLEDGE_BASE,
+        LOCK_SEED_PERMISSIONS,
+        LOCK_SEED_SOC_TEMPLATES,
+        LOCK_SKILLS_DAILY_SNAPSHOT,
+        LOCK_TIDE_BG_SYNC,
+        get_engine,
+        get_session_factory,
+        run_locked,
     )
     engine = get_engine(config.db_path)
     factory = get_session_factory(engine)
@@ -444,8 +456,9 @@ async def startup_event():
     # Seed roles, permissions, admin user
     # ---------------------------------------------------------------
     def _seed_auth():
-        from ion.auth.service import AuthService
         import os
+
+        from ion.auth.service import AuthService
         session = factory()
         try:
             auth_service = AuthService(session)
@@ -529,7 +542,8 @@ async def startup_event():
     # ---------------------------------------------------------------
     def _seed_cyab_subprofiles():
         from ion.services.cyab_subprofile_service import (
-            seed_catalogue, backfill_subprofile_ids,
+            backfill_subprofile_ids,
+            seed_catalogue,
         )
         seed_catalogue()
         backfill_subprofile_ids()
@@ -1141,6 +1155,7 @@ async def network_map_page(request: Request, user: User = Depends(require_page_a
 def main():
     """Run the web server."""
     import argparse
+
     from ion.core.config import get_config
 
     parser = argparse.ArgumentParser(description="ION Web Server")

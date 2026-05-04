@@ -1,11 +1,13 @@
 """Service Account Tracker API."""
 
 import logging
-from fastapi import APIRouter, Depends, Query, HTTPException
-from pydantic import BaseModel
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from ion.auth.dependencies import require_permission, get_current_user
+
+from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.user import User
 from ion.web.api import get_db_session
 
@@ -66,8 +68,9 @@ def get_account(account_id: int, session: Session = Depends(get_db_session)):
 
 @router.post("", dependencies=[Depends(require_permission("system:settings"))])
 def create_account(data: ServiceAccountCreate, session: Session = Depends(get_db_session)):
-    from ion.services.service_account_service import create_service_account
     import json
+
+    from ion.services.service_account_service import create_service_account
     return create_service_account(
         session,
         account_name=data.account_name, display_name=data.display_name,

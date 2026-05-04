@@ -1,8 +1,9 @@
 """Repository for AnalystNote and NoteFolder operations."""
 
-from typing import Optional, List
-from sqlalchemy import select, or_
-from sqlalchemy.orm import Session, joinedload, selectinload
+from typing import List, Optional
+
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session, selectinload
 
 from ion.models.analyst_note import AnalystNote
 from ion.models.note_folder import NoteFolder

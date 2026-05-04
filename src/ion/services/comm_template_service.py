@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ion.models.oncall import CommTemplate

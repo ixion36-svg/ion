@@ -1,10 +1,11 @@
 """Repository for Template operations."""
 
-from typing import Optional, List
-from sqlalchemy import select, or_, func
-from sqlalchemy.orm import Session, joinedload, selectinload
+from typing import List, Optional
 
-from ion.models.template import Template, Tag, Variable
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session, selectinload
+
+from ion.models.template import Tag, Template, Variable
 
 
 class TemplateRepository:

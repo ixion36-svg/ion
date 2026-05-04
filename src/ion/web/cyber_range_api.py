@@ -1,7 +1,9 @@
 """Cyber Range API — red team vs blue team training scenarios."""
 
 import logging
+
 from fastapi import APIRouter, Depends
+
 from ion.auth.dependencies import require_page_auth
 
 logger = logging.getLogger(__name__)

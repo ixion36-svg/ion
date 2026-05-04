@@ -1,10 +1,12 @@
 """Attack Story API — alert correlation into attack narratives."""
 
 import logging
+
 from fastapi import APIRouter, Depends, Query
+
 from ion.auth.dependencies import require_permission
-from ion.services.elasticsearch_service import ElasticsearchService
 from ion.core.safe_errors import safe_error
+from ion.services.elasticsearch_service import ElasticsearchService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/attack-stories", tags=["attack-stories"])

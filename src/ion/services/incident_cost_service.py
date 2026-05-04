@@ -4,11 +4,10 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from ion.models.alert_triage import AlertCase, AlertCaseStatus
-from ion.models.user import User
 
 logger = logging.getLogger(__name__)
 

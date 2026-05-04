@@ -15,7 +15,7 @@ A source is in one of these states:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy import select

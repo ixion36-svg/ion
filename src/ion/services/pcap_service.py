@@ -1,15 +1,15 @@
 """PCAP file parser and network traffic analyzer."""
 
+import collections
 import hashlib
 import io
 import math
 import re
 import socket
 import struct
-import collections
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from dataclasses import dataclass, field, asdict
-from typing import Optional, Any
+from typing import Any, Optional
 
 import dpkt
 
@@ -379,12 +379,26 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     )
 
     # Add findings from enhanced analyzers
-    if result.extracted_files:
+    # Filter out common web assets — every web page transfers dozens of these
+    # legitimately, so flagging them as "files extracted from traffic" is noise.
+    # Real interest: executables, archives, scripts, office docs.
+    _WEB_ASSET_EXTS = {
+        "html", "htm", "css", "js", "mjs", "json", "xml", "svg",
+        "png", "jpg", "jpeg", "gif", "webp", "ico", "bmp",
+        "woff", "woff2", "ttf", "otf", "eot",
+        "mp4", "webm", "mp3", "wav",
+    }
+    notable_files = [
+        f for f in result.extracted_files
+        if (f.get("filename", "").rsplit(".", 1)[-1].lower() if "." in f.get("filename", "") else "")
+        not in _WEB_ASSET_EXTS
+    ]
+    if notable_files:
         findings.append(Finding(
             category="file_extraction",
             severity="medium",
-            title=f"{len(result.extracted_files)} file(s) extracted from traffic",
-            detail=", ".join(f.get("filename", "?") for f in result.extracted_files[:5]),
+            title=f"{len(notable_files)} non-web file(s) extracted from traffic",
+            detail=", ".join(f.get("filename", "?") for f in notable_files[:5]),
         ))
     if any(j.get("known_malware") for j in result.ja3_fingerprints):
         bad = [j for j in result.ja3_fingerprints if j.get("known_malware")]
@@ -1899,8 +1913,13 @@ def _detect_port_scan(conn_times: dict) -> list[Finding]:
                        f"Ports include: {', '.join(str(p) for p in sorted(ports)[:10])}...",
             ))
 
+    # Web/DNS ports: visiting many web hosts is normal browsing — but a real
+    # scanner sweeping for vulnerable web servers will hit hundreds of hosts.
+    # Use a higher threshold for these ports rather than skipping entirely.
+    WEB_FANOUT_PORTS = {53, 80, 123, 443, 8080, 8443}
     for (src, port), dsts in src_port_dsts.items():
-        if len(dsts) > 10:
+        threshold = 50 if port in WEB_FANOUT_PORTS else 10
+        if len(dsts) > threshold:
             findings.append(Finding(
                 category="Reconnaissance",
                 severity="medium",
@@ -1933,10 +1952,13 @@ def _detect_dga(dns_counter: collections.Counter) -> list[Finding]:
                    f"Algorithm activity. Examples: {', '.join(f'{d} (H={e})' for d, e in examples)}",
         ))
     elif high_entropy_domains:
+        # Drop per-domain severity from medium (10) → low (3): a single CDN/ad-tech
+        # subdomain (e.g. `amch.questionmarket.com` H=3.52) shouldn't push a benign
+        # PCAP over the 50-point threshold, but we still flag for visibility.
         for domain, entropy in high_entropy_domains:
             findings.append(Finding(
                 category="DGA Detection",
-                severity="medium",
+                severity="low",
                 title=f"High-entropy domain: {domain} (H={entropy})",
                 detail=f"Domain name has unusually high randomness (Shannon entropy {entropy}), "
                        f"which may indicate DGA or algorithmically generated malware C2.",

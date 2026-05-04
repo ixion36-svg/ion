@@ -1,19 +1,18 @@
 """Analytics Engine API router for ION."""
 
+from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ion.auth.dependencies import get_current_user
+from ion.core.safe_errors import safe_error
 from ion.models.analytics import AnalyticsJob, AnalyticsSnapshot
 from ion.models.user import User
-from ion.auth.dependencies import get_current_user, require_permission
 from ion.services.analytics_engine import get_analytics_engine
 from ion.web.api import get_db_session
-from ion.core.safe_errors import safe_error
-
-from datetime import datetime, timedelta
 
 router = APIRouter(tags=["analytics"])
 
@@ -208,8 +207,8 @@ async def get_system_overview(
     for systems that have CyAB data source mappings.
     """
     from ion.core.config import get_elasticsearch_config
-    from ion.services.elasticsearch_service import ElasticsearchService
     from ion.models.cyab import CyabDataSource, CyabSystem
+    from ion.services.elasticsearch_service import ElasticsearchService
     from ion.services.tide_service import get_tide_service
 
     # 1. Load ES system analytics

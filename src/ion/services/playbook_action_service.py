@@ -9,9 +9,9 @@ firewall / EDR / Active Directory APIs.
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ion.models.sla import PlaybookAction, PlaybookActionLog
@@ -269,6 +269,7 @@ def execute_action(session: Session, log_id: int) -> dict:
     try:
         # --- Real execution via adapter layer ---
         import asyncio
+
         from ion.services.playbook_executor_service import get_playbook_executor_service
 
         executor_service = get_playbook_executor_service()

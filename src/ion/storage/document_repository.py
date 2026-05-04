@@ -1,7 +1,8 @@
 """Repository for Document operations."""
 
-from typing import Optional, List
-from sqlalchemy import select, func
+from typing import List, Optional
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ion.models.document import Document, DocumentVersion

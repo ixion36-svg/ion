@@ -1,10 +1,11 @@
 """AI Chat history models."""
 
-from datetime import datetime
-from typing import Optional, List
-from sqlalchemy import Column, Index, Integer, String, Text, DateTime, ForeignKey, Enum as SQLEnum
-from sqlalchemy.orm import relationship
 import enum
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.orm import relationship
 
 from ion.models.base import Base
 

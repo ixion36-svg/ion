@@ -1,12 +1,13 @@
 """Repository for authentication and audit operations."""
 
-from datetime import datetime
-from typing import Optional, List
 import json
-from sqlalchemy import select, delete
-from sqlalchemy.orm import Session, joinedload, selectinload
+from datetime import datetime
+from typing import List, Optional
 
-from ion.models.user import UserSession, AuditLog, User, Role
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session, joinedload
+
+from ion.models.user import AuditLog, Role, User, UserSession
 
 
 class SessionRepository:

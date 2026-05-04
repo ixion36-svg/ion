@@ -4,8 +4,9 @@ Provides functionality to interact with GitLab issues and projects.
 """
 
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import httpx
 
 from ion.core.config import get_gitlab_config

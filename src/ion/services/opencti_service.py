@@ -4,14 +4,15 @@ Provides IOC enrichment by querying OpenCTI's GraphQL API for observables,
 indicators, and threat actors associated with given IOC values.
 """
 
-from typing import Optional, Dict, Any, List
 import asyncio
 import logging
+from typing import Any, Dict, List, Optional
+
 import httpx
 
-from ion.core.config import get_opencti_config, get_ssl_verify
 from ion.core.circuit_breaker import opencti_breaker
-from ion.services.country_mapper import get_country_code, get_country_name, country_code_to_flag
+from ion.core.config import get_opencti_config, get_ssl_verify
+from ion.services.country_mapper import country_code_to_flag, get_country_code, get_country_name
 
 logger = logging.getLogger(__name__)
 

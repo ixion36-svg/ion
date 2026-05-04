@@ -1,8 +1,10 @@
 """MITRE ATT&CK Navigator Export API."""
 
 import logging
+
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
+
 from ion.auth.dependencies import require_permission
 from ion.services.tide_service import get_tide_service
 

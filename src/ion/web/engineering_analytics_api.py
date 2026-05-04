@@ -6,16 +6,16 @@ and index name patterns, enriched with TIDE system metadata.
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ion.models.user import User
 from ion.auth.dependencies import get_current_user
 from ion.core.config import get_elasticsearch_config
-from ion.services.elasticsearch_service import ElasticsearchService, ElasticsearchError
+from ion.core.safe_errors import safe_error
+from ion.models.user import User
+from ion.services.elasticsearch_service import ElasticsearchError, ElasticsearchService
 from ion.services.tide_sync_service import get_snapshot
 from ion.web.api import get_db_session
-from ion.core.safe_errors import safe_error
 
 router = APIRouter(tags=["engineering-analytics"])
 

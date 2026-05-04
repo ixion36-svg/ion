@@ -8,12 +8,12 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
-from sqlalchemy import select, func, and_, desc
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session
 
-from ion.models.alert_triage import AlertTriage, AlertCase, AlertTriageStatus, AlertCaseStatus
-from ion.models.user import User, AuditLog
+from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage, AlertTriageStatus
 from ion.models.threat_intel import ThreatIntelWatch
+from ion.models.user import AuditLog, User
 
 logger = logging.getLogger(__name__)
 

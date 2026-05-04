@@ -9,7 +9,6 @@ import io
 import re
 from typing import Optional
 
-
 # ── Regex Patterns ──────────────────────────────────────────────────────
 
 _IPV4 = re.compile(

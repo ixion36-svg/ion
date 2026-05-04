@@ -39,10 +39,10 @@ from ion.models.cyab_doc_checklist import (
     CATEGORY_DESIGN,
     CATEGORY_OPERATIONAL,
     CATEGORY_SECURITY,
-    CyabDocChecklistItem,
     STATUS_DONE,
     STATUS_NA,
     STATUS_UNKNOWN,
+    CyabDocChecklistItem,
 )
 
 logger = logging.getLogger(__name__)

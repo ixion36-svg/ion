@@ -38,8 +38,15 @@ from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_page_auth, require_permission
 from ion.models.course import (
-    Course, CourseLevel, CourseModule, Lesson, LessonProgressStatus,
-    LessonType, Question, QuestionKind, UserAnswer, UserEnrolment,
+    Course,
+    CourseModule,
+    Lesson,
+    LessonProgressStatus,
+    LessonType,
+    Question,
+    QuestionKind,
+    UserAnswer,
+    UserEnrolment,
     UserLessonProgress,
 )
 from ion.models.user import User

@@ -11,12 +11,19 @@ import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import func, text
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ion.models.alert_triage import (
+    AlertCase,
+    AlertCaseStatus,
+    AlertTriage,
+    AlertTriageStatus,
+    Note,
+    NoteEntityType,
+)
 from ion.models.analytics import AnalyticsJob, AnalyticsJobType, AnalyticsSnapshot
-from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage, AlertTriageStatus, Note, NoteEntityType
-from ion.models.observable import Observable, ObservableLink, ThreatLevel
+from ion.models.observable import Observable, ObservableLink
 from ion.storage.database import get_engine, get_session_factory
 
 logger = logging.getLogger(__name__)

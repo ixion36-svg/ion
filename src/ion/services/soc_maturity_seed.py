@@ -10,11 +10,9 @@ Creates:
 """
 
 import logging
-from datetime import datetime
-from typing import Optional
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
 
 logger = logging.getLogger(__name__)
 

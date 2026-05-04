@@ -1,11 +1,13 @@
 """Reporting Scheduler API."""
 
 import logging
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
 from sqlalchemy.orm import Session
-from ion.auth.dependencies import require_permission, get_current_user
+
+from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.user import User
 from ion.web.api import get_db_session
 
@@ -33,6 +35,7 @@ def list_reports(session: Session = Depends(get_db_session)):
 @router.post("", dependencies=[Depends(require_permission("system:settings"))])
 def create_report(data: ReportCreate, current_user: User = Depends(get_current_user), session: Session = Depends(get_db_session)):
     import json
+
     from ion.services.report_scheduler_service import create_scheduled_report
     return create_scheduled_report(
         session, name=data.name, report_type=data.report_type,

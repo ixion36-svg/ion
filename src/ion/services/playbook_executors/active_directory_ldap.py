@@ -94,9 +94,10 @@ def _perform_ldap_action(
     # Import lazily so the module loads even if ldap3 isn't installed
     # (dry-run mode should still work).
     try:
-        import ldap3
-        from ldap3 import Server, Connection, MODIFY_REPLACE, Tls, ALL
         import ssl as _ssl
+
+        import ldap3
+        from ldap3 import ALL, MODIFY_REPLACE, Connection, Server, Tls
     except ImportError as exc:
         return (
             False,

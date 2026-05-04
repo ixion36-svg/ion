@@ -8,7 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ion.models.base import Base
 
-
 # ---------------------------------------------------------------------------
 # System icon choices (mapped to Lucide icon names in the UI)
 # ---------------------------------------------------------------------------

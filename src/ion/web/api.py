@@ -6,38 +6,54 @@ import logging
 import re
 
 logger = logging.getLogger(__name__)
-import secrets
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from typing import Optional, List, Dict, Generator
-from dataclasses import dataclass
-from urllib.parse import quote as url_quote
-from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File, Form, Depends, Request, Response, Cookie
-from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
-from sqlalchemy import text
-from sqlalchemy.orm import Session, selectinload
-import httpx
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
-from ion.core.config import get_config, get_oidc_config, get_gitlab_config, get_dfir_iris_config, get_ssl_verify
-from ion.core.safe_errors import safe_error
-from ion.services.dfir_iris_service import get_dfir_iris_service
-from ion.services.case_description import build_case_description
-from ion.services.kibana_cases_service import get_kibana_cases_service
-from ion.services.kibana_sync_helpers import (
-    sync_new_case_to_kibana,
-    sync_note_to_kibana,
-    sync_case_update_to_kibana,
-    get_kibana_case_url,
-)
-from ion.services.observable_extractor import extract_observables_from_raw
-
 # Rate limiter - uses IP address as key
 # Global default: 120 requests/minute per IP. Individual endpoints can override.
 # Disable with ION_RATE_LIMIT_ENABLED=false in .env
 import os as _os
+import secrets
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Dict, Generator, List, Optional
+from urllib.parse import quote as url_quote
+
+import httpx
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Cookie,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from sqlalchemy.orm import Session, selectinload
+
+from ion.core.config import (
+    get_config,
+    get_dfir_iris_config,
+    get_gitlab_config,
+    get_oidc_config,
+    get_ssl_verify,
+)
+from ion.core.safe_errors import safe_error
+from ion.services.dfir_iris_service import get_dfir_iris_service
+from ion.services.kibana_cases_service import get_kibana_cases_service
+from ion.services.kibana_sync_helpers import (
+    get_kibana_case_url,
+    sync_case_update_to_kibana,
+    sync_new_case_to_kibana,
+    sync_note_to_kibana,
+)
+from ion.services.observable_extractor import extract_observables_from_raw
+
 _rate_limit_enabled = _os.environ.get("ION_RATE_LIMIT_ENABLED", "true").lower() not in ("false", "0", "no")
 limiter = Limiter(
     key_func=get_remote_address,
@@ -47,31 +63,30 @@ limiter = Limiter(
 
 # OIDC state cookie name for CSRF protection
 OIDC_STATE_COOKIE_NAME = "oidc_state"
-from ion.core.exceptions import (
-    TemplateNotFoundError,
-    VersionNotFoundError,
-    ValidationError,
-    RenderError,
+from ion.auth.dependencies import (
+    SESSION_COOKIE_NAME,
+    get_auth_service,
+    get_client_ip,
+    get_current_user,
+    get_session_token,
+    require_admin,
+    require_permission,
 )
-from ion.storage.database import get_session_factory, get_engine
+from ion.auth.service import AuthService
+from ion.core.exceptions import (
+    RenderError,
+    TemplateNotFoundError,
+    ValidationError,
+    VersionNotFoundError,
+)
+from ion.models.user import User
+from ion.services.render_service import RenderService
 from ion.services.template_service import TemplateService
 from ion.services.version_service import VersionService
-from ion.services.render_service import RenderService
-from ion.storage.document_repository import DocumentRepository
-from ion.models.user import User
-from ion.auth.service import AuthService
-from ion.auth.dependencies import (
-    get_current_user,
-    get_current_user_optional,
-    get_session_token,
-    require_permission,
-    require_admin,
-    get_client_ip,
-    get_auth_service,
-    SESSION_COOKIE_NAME,
-)
 from ion.storage.auth_repository import AuditLogRepository
-from ion.storage.user_repository import UserRepository, RoleRepository
+from ion.storage.database import get_engine, get_session_factory
+from ion.storage.document_repository import DocumentRepository
+from ion.storage.user_repository import RoleRepository, UserRepository
 
 router = APIRouter()
 
@@ -351,7 +366,6 @@ async def set_focus_mode(
     session: Session = Depends(get_db_session),
 ):
     """Switch focus mode to a specific role. Pass null to show all roles."""
-    from ion.models.user import UserSession
     from ion.storage.auth_repository import SessionRepository
 
     if not session_token:
@@ -732,7 +746,7 @@ async def oidc_callback(
             logger.info("OIDC callback: token exchange successful")
 
         # Validate the access token and extract user info
-        from ion.auth.oidc import OIDCValidator, OIDCUserSync, OIDCValidationError
+        from ion.auth.oidc import OIDCUserSync, OIDCValidationError, OIDCValidator
         from ion.storage.auth_repository import AuditLogRepository
 
         validator = OIDCValidator(oidc_config)
@@ -1722,7 +1736,7 @@ async def render_template_pdf(
     title = template.name if template else "Document"
 
     try:
-        from ion.services.pdf_export_service import generate_pdf, _content_to_html
+        from ion.services.pdf_export_service import _content_to_html, generate_pdf
         body_html = _content_to_html(result, fmt)
         metadata = {
             "Template": title,
@@ -1873,7 +1887,7 @@ async def upload_document(
     content = await file.read()
     if len(content) > 50 * 1024 * 1024:  # 50 MB
         raise HTTPException(status_code=400, detail="File too large (max 50 MB)")
-    text = content.decode("utf-8", errors="ignore")
+    text_content = content.decode("utf-8", errors="ignore")
 
     # Determine document name
     doc_name = name or (file.filename or "Untitled Document")
@@ -1887,7 +1901,7 @@ async def upload_document(
 
     document = services.document_repo.create(
         name=doc_name,
-        rendered_content=text,
+        rendered_content=text_content,
         output_format=output_format,
     )
 
@@ -2241,8 +2255,8 @@ async def revert_document_to_version(
 @router.get("/health")
 async def health_check():
     """Health check for Docker/load balancers. Returns basic status."""
-    from ion.storage.database import get_engine
     from ion import __version__
+    from ion.storage.database import get_engine
     engine = get_engine()
     db_type = engine.dialect.name
     return {"status": "ok", "database": db_type, "version": __version__}
@@ -2252,9 +2266,9 @@ async def health_check():
 async def deep_health_check():
     """Deep health check — probes all integrations. Not for load balancers
     (too slow), but useful for dashboards and monitoring."""
-    from ion.storage.database import get_engine
     from ion import __version__
     from ion.core.config import get_config
+    from ion.storage.database import get_engine
 
     config = get_config()
     engine = get_engine()
@@ -2514,7 +2528,13 @@ async def get_team_metrics(
     # aggregations, per-assignee lookups) that would block the loop.
     def _compute_team_metrics():
         from sqlalchemy import func as sqlfunc
-        from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage, AlertTriageStatus
+
+        from ion.models.alert_triage import (
+            AlertCase,
+            AlertCaseStatus,
+            AlertTriage,
+            AlertTriageStatus,
+        )
 
         now = datetime.utcnow()
 
@@ -2741,7 +2761,7 @@ async def create_sample_templates(services: Services = Depends(get_services)):
             t = services.template.create_template(**soi_template)
             services.session.commit()
             created.append({"id": t.id, "name": t.name})
-        except Exception as e:
+        except Exception:
             pass
 
     # Incident Report Template
@@ -2928,7 +2948,6 @@ async def create_sample_templates(services: Services = Depends(get_services)):
 # =============================================================================
 
 from ion.services.gitlab_service import (
-    GitLabService,
     GitLabError,
     get_gitlab_service,
     reset_gitlab_service,
@@ -3004,8 +3023,9 @@ async def update_gitlab_config_endpoint(
 
     Note: This saves to the config file and resets the service.
     """
-    from ion.core.config import get_config, set_config
     import os
+
+    from ion.core.config import get_config
 
     # Get current config
     config = get_config()
@@ -3045,8 +3065,9 @@ async def disable_gitlab_config_endpoint(
     current_user: User = Depends(require_admin),
 ):
     """Disable GitLab integration (admin only)."""
-    from ion.core.config import get_config
     import os
+
+    from ion.core.config import get_config
 
     config = get_config()
     config.gitlab_enabled = False
@@ -3396,8 +3417,8 @@ async def list_gitlab_members(
 # Elasticsearch Alerts Endpoints
 # ============================================================================
 
-from ion.services.elasticsearch_service import ElasticsearchService, ElasticsearchError
 from ion.core.config import get_elasticsearch_config
+from ion.services.elasticsearch_service import ElasticsearchError, ElasticsearchService
 
 
 def get_elasticsearch_service() -> ElasticsearchService:
@@ -3719,16 +3740,15 @@ async def diagnostic_alert_fields(
 # ============================================================================
 
 from ion.models.alert_triage import (
-    AlertTriage,
-    AlertTriageStatus,
     AlertCase,
     AlertCaseStatus,
+    AlertTriage,
+    AlertTriageStatus,
     CaseClosureReason,
     KnownFalsePositive,
     Note,
     NoteEntityType,
 )
-
 
 OBSERVABLE_TYPES = {"hostname", "source_ip", "destination_ip", "url", "domain", "user_account"}
 
@@ -4227,8 +4247,8 @@ def _create_kfp_document(session: Session, kfp, username: str) -> int | None:
     Returns the document ID, or None on failure.
     """
     try:
-        from ion.models.template import Collection
         from ion.models.document import Document
+        from ion.models.template import Collection
 
         category = _classify_rule_category(kfp.match_rules)
         collection_name = f"Known False Positives — {category}"
@@ -4688,9 +4708,8 @@ async def get_case_timeline(
     Heavy lifting is small: every source already stamps timestamps; this
     just unions them and sorts.
     """
-    from ion.models.observable import ObservableLink, ObservableLinkType, Observable
     from ion.models.investigation import Investigation
-    from ion.models.playbook import PlaybookExecution
+    from ion.models.observable import Observable, ObservableLink, ObservableLinkType
 
     case: Optional[AlertCase] = session.get(AlertCase, case_id)
     if not case:
@@ -5022,8 +5041,8 @@ async def get_case_detail(
     kibana_assignees: list[dict] = []
     if case.kibana_case_id and not kibana_sync_pending:
         try:
-            from ion.services.kibana_cases_service import get_kibana_cases_service
             from ion.services.elasticsearch_service import ElasticsearchService
+            from ion.services.kibana_cases_service import get_kibana_cases_service
             kb = get_kibana_cases_service()
             if kb.enabled:
                 kb_case = kb.get_case(case.kibana_case_id)
@@ -5278,7 +5297,9 @@ async def update_case(
 
                     # Also record in investigation memory for future FP detection
                     try:
-                        from ion.services.investigation_memory_service import get_investigation_memory_service
+                        from ion.services.investigation_memory_service import (
+                            get_investigation_memory_service,
+                        )
                         _mem = get_investigation_memory_service()
                         for _rn in (_fp_rule_names or []):
                             _mem.record_fp(
@@ -5523,7 +5544,13 @@ async def escalate_case_to_dfir_iris(
 ):
     """Escalate an ION case to DFIR-IRIS for incident response."""
     from datetime import datetime, timezone
-    from ion.models.integration import IntegrationType, IntegrationEventType, LogLevel, IntegrationEvent
+
+    from ion.models.integration import (
+        IntegrationEvent,
+        IntegrationEventType,
+        IntegrationType,
+        LogLevel,
+    )
 
     case = session.query(AlertCase).filter_by(id=case_id).first()
     if not case:
@@ -6719,8 +6746,8 @@ async def _background_enrich_triage_observables(triage_id: int, observables: lis
 
         # Persist enriched observables back to triage
         from ion.core.config import get_config
-        from ion.storage.database import get_engine, get_session_factory
         from ion.models.alert_triage import AlertTriage
+        from ion.storage.database import get_engine, get_session_factory
         engine = get_engine(get_config().db_path)
         session = get_session_factory(engine)()
         try:
@@ -7212,13 +7239,11 @@ async def ioc_hunt_bulk(
 # OpenCTI Integration Endpoints
 # ============================================================================
 
+from ion.core.config import get_opencti_config
 from ion.services.opencti_service import (
-    OpenCTIService,
-    OpenCTIError,
     get_opencti_service,
     reset_opencti_service,
 )
-from ion.core.config import get_opencti_config
 
 
 class OpenCTIConfigUpdate(BaseModel):
@@ -7385,7 +7410,7 @@ async def enrich_observable(
 # Saved Searches Endpoints
 # ============================================================================
 
-from ion.models.saved_search import SavedSearch, SearchType
+from ion.models.saved_search import SearchType
 from ion.storage.saved_search_repository import SavedSearchRepository
 
 
@@ -7583,8 +7608,6 @@ async def execute_saved_search(
 
     elif saved_search.search_type == SearchType.IOC_HUNT.value:
         # Execute IOC hunt
-        from ion.services.elasticsearch_service import get_elasticsearch_service
-
         config = get_elasticsearch_config()
         if not config.get("enabled"):
             raise HTTPException(status_code=400, detail="Elasticsearch is not enabled")
@@ -7642,7 +7665,7 @@ async def toggle_saved_search_favorite(
 # Playbooks Endpoints
 # ============================================================================
 
-from ion.models.playbook import Playbook, PlaybookStep, PlaybookExecution, StepType, ExecutionStatus
+from ion.models.playbook import ExecutionStatus, PlaybookExecution
 from ion.storage.playbook_repository import PlaybookRepository
 
 
@@ -8298,7 +8321,7 @@ async def get_case_playbook_executions(
     session: Session = Depends(get_db_session),
 ):
     """Get playbook executions linked to a case, auto-backfilling from alert triage."""
-    from ion.models.alert_triage import AlertTriage, AlertCase
+    from ion.models.alert_triage import AlertCase, AlertTriage
 
     # Verify case exists
     case = session.query(AlertCase).filter_by(id=case_id).first()
@@ -8356,7 +8379,7 @@ async def start_playbook_from_case(
     session: Session = Depends(get_db_session),
 ):
     """Start a playbook execution from a case context."""
-    from ion.models.alert_triage import AlertTriage, AlertCase
+    from ion.models.alert_triage import AlertCase, AlertTriage
 
     # Verify case exists
     case = session.query(AlertCase).filter_by(id=case_id).first()
@@ -8631,9 +8654,11 @@ async def test_iris_connection(
     current_user: User = Depends(get_current_user),
 ):
     """Test the DFIR-IRIS connection."""
-    from ion.services.dfir_iris_service import get_dfir_iris_service
-    from ion.core.config import get_config as _get_config, get_ssl_verify
     import httpx as _httpx
+
+    from ion.core.config import get_config as _get_config
+    from ion.core.config import get_ssl_verify
+    from ion.services.dfir_iris_service import get_dfir_iris_service
     service = get_dfir_iris_service()
     if not service.is_configured:
         return {"connected": False, "error": "DFIR-IRIS is not configured"}

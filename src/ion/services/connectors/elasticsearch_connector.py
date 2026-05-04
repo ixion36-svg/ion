@@ -3,12 +3,11 @@
 Wraps the ElasticsearchService to provide a unified connector interface.
 """
 
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from ion.services.connectors.base import BaseConnector
 from ion.services.connectors.version_compat import ELASTICSEARCH_VERSIONS
 from ion.services.elasticsearch_service import ElasticsearchService
-
 
 # Singleton for elasticsearch service
 _elasticsearch_service: Optional[ElasticsearchService] = None

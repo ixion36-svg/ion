@@ -5,11 +5,10 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from ion.models.oncall import ServiceAccount
-from ion.models.user import User
 
 logger = logging.getLogger(__name__)
 

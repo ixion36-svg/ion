@@ -1,8 +1,9 @@
 """Repository for SavedSearch operations."""
 
 from datetime import datetime
-from typing import Optional, List
-from sqlalchemy import select, or_, func
+from typing import List, Optional
+
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from ion.models.saved_search import SavedSearch, SearchType

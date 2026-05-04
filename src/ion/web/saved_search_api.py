@@ -1,10 +1,12 @@
 """Saved Searches / Personal Workspace API."""
 
 import logging
-from fastapi import APIRouter, Depends, Query, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from ion.auth.dependencies import require_permission, get_current_user
+
+from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.user import User
 from ion.web.api import get_db_session
 

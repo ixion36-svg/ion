@@ -2,16 +2,14 @@
 
 import asyncio
 import logging
-import json
 import os
-from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, Any, List
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func
-from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
 from ion.models.user import User
@@ -69,8 +67,8 @@ def _standup_wef_patterns() -> List[str]:
 
 async def _check_cluster_health() -> Dict[str, Any]:
     """ES cluster health + stats."""
+
     from ion.services.elasticsearch_service import ElasticsearchService
-    import httpx
 
     es = ElasticsearchService()
     if not es.is_configured:
@@ -131,8 +129,8 @@ async def _check_critical_alerts() -> Dict[str, Any]:
 async def _check_stale_cases() -> Dict[str, Any]:
     """Open / acknowledged cases older than 24 h."""
     from ion.core.config import get_config
-    from ion.storage.database import get_engine, get_session_factory
     from ion.models.alert_triage import AlertCase, AlertCaseStatus
+    from ion.storage.database import get_engine, get_session_factory
 
     config = get_config()
     engine = get_engine(config.db_path)
@@ -188,8 +186,8 @@ async def _check_open_alerts_30d() -> Dict[str, Any]:
     even when ES is rotating older alerts out of its hot indices.
     """
     from ion.core.config import get_config
-    from ion.storage.database import get_engine, get_session_factory
     from ion.models.alert_triage import AlertTriage, AlertTriageStatus
+    from ion.storage.database import get_engine, get_session_factory
 
     config = get_config()
     engine = get_engine(config.db_path)
@@ -243,8 +241,8 @@ async def _check_open_alerts_30d() -> Dict[str, Any]:
 async def _check_case_status_counts() -> Dict[str, Any]:
     """Open / in-progress / closed case counts (all-time + last 7d delta)."""
     from ion.core.config import get_config
+    from ion.models.alert_triage import AlertCase
     from ion.storage.database import get_engine, get_session_factory
-    from ion.models.alert_triage import AlertCase, AlertCaseStatus
 
     config = get_config()
     engine = get_engine(config.db_path)
@@ -297,8 +295,8 @@ async def _check_triage_throughput_24h() -> Dict[str, Any]:
     those rows; reported in minutes.
     """
     from ion.core.config import get_config
-    from ion.storage.database import get_engine, get_session_factory
     from ion.models.alert_triage import AlertTriage, AlertTriageStatus
+    from ion.storage.database import get_engine, get_session_factory
 
     config = get_config()
     engine = get_engine(config.db_path)
@@ -971,8 +969,8 @@ async def save_daily_standup(
 ):
     """Save the daily standup report as a document."""
     from ion.core.config import get_config
-    from ion.storage.database import get_engine, get_session_factory
     from ion.models.document import Document
+    from ion.storage.database import get_engine, get_session_factory
 
     config = get_config()
     engine = get_engine(config.db_path)

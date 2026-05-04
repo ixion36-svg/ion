@@ -10,12 +10,11 @@ return ``False`` so callers (background jobs, SLA workers, report
 schedulers) can treat notifications as advisory.
 """
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
-from datetime import datetime, timezone
 import logging
 import re
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -25,7 +24,6 @@ from ion.services.smtp_service import (
     SMTPService,
     get_smtp_service,
 )
-
 
 logger = logging.getLogger(__name__)
 

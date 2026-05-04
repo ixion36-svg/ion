@@ -1,14 +1,15 @@
 """Document model for rendered documents."""
 
 from datetime import datetime
-from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import Column, ForeignKey, Integer, String, Text, DateTime, Boolean, func
+from typing import TYPE_CHECKING, List, Optional
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ion.models.base import Base
 
 if TYPE_CHECKING:
-    from ion.models.template import Template, Collection, Tag
+    from ion.models.template import Collection, Tag, Template
 
 
 class Document(Base):

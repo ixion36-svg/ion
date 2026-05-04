@@ -2,11 +2,12 @@
 
 import logging
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from ion.models.ai_chat import AIChatSession, AIChatMessage, AIContextType
+from ion.models.ai_chat import AIChatMessage, AIChatSession, AIContextType
 
 logger = logging.getLogger(__name__)
 

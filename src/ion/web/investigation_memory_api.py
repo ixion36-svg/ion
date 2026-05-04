@@ -16,12 +16,12 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -32,8 +32,8 @@ from ion.auth.dependencies import (
 )
 from ion.models.investigation import (
     FalsePositiveSignature,
-    IOCSighting,
     Investigation,
+    IOCSighting,
 )
 from ion.models.user import User
 from ion.storage import investigation_memory_repository as repo

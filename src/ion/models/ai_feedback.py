@@ -7,12 +7,10 @@ verdict and (b) a human-set closure reason. No UI feedback loop needed —
 the scorecard reads straight out of this ledger.
 """
 
-from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
     Boolean,
-    DateTime,
     ForeignKey,
     Index,
     Integer,

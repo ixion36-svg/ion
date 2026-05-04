@@ -17,16 +17,17 @@ Routes:
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import (
-    get_current_user, require_page_permission,
+    get_current_user,
+    require_page_permission,
 )
 from ion.models.user import User
 from ion.services.wallboard_service import get_snapshot

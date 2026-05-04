@@ -1,9 +1,9 @@
 """Kibana Cases API integration service."""
 
-import httpx
 import logging
-from typing import Optional, List, Dict, Any
-from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import httpx
 
 from ion.core.config import get_kibana_config
 

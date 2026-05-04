@@ -4,17 +4,16 @@ Provides endpoints for searching, viewing, correlating, and enriching observable
 """
 
 from typing import List, Optional
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ion.auth.dependencies import get_db_session, get_current_user, require_permission
-from ion.models.user import User
-from ion.models.observable import Observable, ObservableType, ThreatLevel
-from ion.services.observable_service import ObservableService
+from ion.auth.dependencies import get_db_session, require_permission
 from ion.core.safe_errors import safe_error
+from ion.models.observable import Observable, ObservableType
+from ion.models.user import User
+from ion.services.observable_service import ObservableService
 
 router = APIRouter(tags=["observables"])
 

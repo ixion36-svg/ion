@@ -3,16 +3,16 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
-from ion.models.user import User
 from ion.models.threat_intel import ThreatIntelWatch
-from ion.services.tide_service import get_tide_service
+from ion.models.user import User
 from ion.services.opencti_service import get_opencti_service
+from ion.services.tide_service import get_tide_service
 from ion.web.api import get_db_session
 
 logger = logging.getLogger(__name__)

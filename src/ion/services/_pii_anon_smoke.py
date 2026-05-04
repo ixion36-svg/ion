@@ -10,7 +10,6 @@ import json
 
 from ion.services.pii_anon_service import PIIAnonService
 
-
 SAMPLE_EVENT = {
     "event": {
         "action": "process_started",

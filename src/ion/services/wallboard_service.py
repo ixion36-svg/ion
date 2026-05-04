@@ -27,7 +27,6 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -179,8 +178,8 @@ def _collect_cases(session: Session) -> Dict[str, Any]:
 
 def _collect_bob(session: Session) -> Dict[str, Any]:
     """Investigations + AI-feedback agreement rate."""
-    from ion.models.investigation import Investigation
     from ion.models.ai_feedback import AIFeedback
+    from ion.models.investigation import Investigation
 
     cutoff_24h = datetime.utcnow() - timedelta(hours=24)
     investigations_24h = int(session.scalar(
@@ -324,7 +323,7 @@ def _gather_threat_stats(session: Session) -> Dict[str, Any]:
     falls back to a "stats only" view if the LLM-produced paragraph is
     missing.
     """
-    from ion.models.alert_triage import AlertTriage, AlertCase, AlertCaseStatus
+    from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage
 
     cutoff_24h = datetime.utcnow() - timedelta(hours=24)
     cutoff_7d = datetime.utcnow() - timedelta(days=7)
@@ -471,7 +470,7 @@ def _collect_threat_landscape(session: Session) -> Dict[str, Any]:
 
 def _collect_ticker(session: Session) -> Dict[str, Any]:
     """Most-recent active Ticker entries (announcements + critical alerts)."""
-    from ion.models.ticker import Ticker, TickerSeverity, TickerKind
+    from ion.models.ticker import Ticker
 
     rows = session.execute(
         select(
