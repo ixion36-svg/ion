@@ -1049,6 +1049,27 @@ async def cyab_system_tab(
             ctx["mapping"] = dh.field_mapping_completeness(session, system_id)
             ctx["coverage"] = dh.coverage_rollup(session, system_id)
             ctx["reconciliation"] = dh.reconciliation_panel(session, system_id)
+        elif tab_name in ("detection", "audit-use-cases"):
+            from ion.services.cyab_subprofile_service import get_subprofile_full
+            # Per Task 5 finding, subprofile_id lives on CyabDataSource (not
+            # CyabSystem). Resolve the system's primary sub-profile from the
+            # first tagged data source.
+            sub_id = next(
+                (ds.subprofile_id for ds in system.data_sources if ds.subprofile_id),
+                None,
+            )
+            sub = get_subprofile_full(session, sub_id) if sub_id else None
+            cat = (sub or {}).get("catalogue") if sub else {}
+            key = "detection_use_cases" if tab_name == "detection" else "audit_use_cases"
+            ctx["use_cases"] = (cat or {}).get(key, []) if cat else []
+            ctx["subprofile"] = sub
+            # Per-source status (existing studio JS cycles via the existing
+            # use-case-status endpoint, keyed by source id + uc id).
+            from sqlalchemy import select
+            from ion.models.cyab import CyabDataSource
+            ctx["sources"] = session.execute(
+                select(CyabDataSource).where(CyabDataSource.system_id == system_id)
+            ).scalars().all()
 
         # Fall back to the placeholder template if the tab template doesn't exist yet.
         from jinja2 import TemplateNotFound
