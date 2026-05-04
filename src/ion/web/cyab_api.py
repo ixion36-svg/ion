@@ -2795,3 +2795,11 @@ async def scoping_score(request: Request):
             "summary_text": cyab_scoping_engine.summary_text(scores),
         },
     )
+
+
+@router.post("/scoping/pdf")
+async def scoping_pdf_proxy(request: Request):
+    """Pass-through to the studio_api implementation so the URL lives under
+    /api/cyab/scoping/pdf as the spec requires."""
+    from ion.web.cyab_studio_api import render_scoping_pack
+    return await render_scoping_pack(request)

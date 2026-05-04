@@ -26,9 +26,10 @@ import json
 import logging
 import re
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -1090,3 +1091,68 @@ def delete_custom_doc_checklist_item(
             detail="Item not found, or it is a default-catalogue row (cannot be deleted).",
         )
     return {"ok": True, "deleted": item_id}
+
+
+# ── Scoping pack PDF (Sub-plan C) ─────────────────────────────────────────
+
+def _render_scoping_pack_pdf_html(scores: dict, answers: dict) -> str:
+    """Render the scoping pack body via the dedicated Jinja template.
+
+    Distinct from `_render_onboarding_pack_html` — different audience, no
+    system FK, no sign-off sections.
+    """
+    from datetime import datetime as _dt
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+    template_dir = Path(__file__).parent / "templates"
+    env = Environment(
+        loader=FileSystemLoader(str(template_dir)),
+        autoescape=select_autoescape(["html"]),
+    )
+    tmpl = env.get_template("cyab/_scoping_pack_pdf.html")
+    return tmpl.render(
+        scores=scores,
+        answers=answers,
+        generated_at=_dt.now().strftime("%Y-%m-%d %H:%M"),
+    )
+
+
+@router.post("/scoping/pdf")
+async def render_scoping_pack(request: Request):
+    """Render the scoping summary as a PDF (HTML fallback if WeasyPrint missing).
+
+    Anonymous endpoint — matches /cyab/scoping page accessibility.
+    """
+    from ion.services import cyab_scoping_engine
+
+    raw = await request.form()
+    answers: dict = {}
+    for key in raw.keys():
+        vals = [v for v in raw.getlist(key) if v != ""]
+        if not vals:
+            continue
+        answers[key] = vals if len(vals) > 1 else vals[0]
+
+    scores = cyab_scoping_engine.score_answers(answers)
+    full_html = _render_scoping_pack_pdf_html(scores, answers)
+
+    try:
+        from weasyprint import HTML as WpHTML
+        pdf_bytes = WpHTML(string=full_html).write_pdf()
+        filename = f"scoping_pack_{date.today().isoformat()}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+    except (ImportError, OSError):
+        return Response(
+            content=full_html,
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
