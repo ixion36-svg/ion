@@ -1,0 +1,72 @@
+{% if not rows %}
+  <p class="tw-text-slate-500 tw-text-[12px] tw-py-8 tw-text-center">
+    No systems match these filters.
+  </p>
+{% else %}
+<form hx-post="/api/cyab/systems/bulk" hx-trigger="submit" hx-swap="none">
+  <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2 tw-text-[11.5px]">
+    <span class="tw-text-slate-500">{{ rows | length }} systems</span>
+    <span class="tw-flex-1"></span>
+    <select name="action" class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+      <option value="mark-reviewed">Mark reviewed</option>
+      <option value="export-csv">Export CSV</option>
+      <option value="rerun-health">Re-run health checks</option>
+    </select>
+    <button type="submit" class="tw-px-2 tw-py-1 tw-bg-slate-800 tw-text-slate-200 tw-rounded">Apply</button>
+  </div>
+
+  <table class="systems-table tw-w-full tw-text-[12px]">
+    <thead class="tw-text-slate-500 tw-text-[10.5px] tw-uppercase">
+      <tr>
+        <th class="tw-text-left tw-py-1"><input type="checkbox" id="select-all"></th>
+        <th class="tw-text-left">Name</th>
+        <th class="tw-text-left">Pillar</th>
+        <th class="tw-text-left">Sub-profile</th>
+        <th class="tw-text-left">Owner</th>
+        <th class="tw-text-left">Progress</th>
+        <th class="tw-text-left">Critical-missing</th>
+        <th class="tw-text-left">Last edited</th>
+        <th class="tw-text-left">Status</th>
+      </tr>
+    </thead>
+    <tbody class="tw-divide-y tw-divide-slate-800">
+      {% for r in rows %}
+        <tr class="hover:tw-bg-slate-800/30">
+          <td class="tw-py-1.5"><input type="checkbox" name="system_ids" value="{{ r.id }}"></td>
+          <td><a href="/cyab/systems/{{ r.id }}" class="tw-text-cyan-400 hover:tw-underline">{{ r.name }}</a></td>
+          <td class="tw-text-slate-400">{{ r.pillar or '—' }}</td>
+          <td class="tw-text-slate-400">{{ r.subprofile or '—' }}</td>
+          <td class="tw-text-slate-400">{{ r.owner or '—' }}</td>
+          <td>
+            {% set pct = (r.progress.done / r.progress.total * 100) | round(0) | int if r.progress.total else 0 %}
+            <div class="tw-flex tw-items-center tw-gap-1">
+              <div class="tw-h-1 tw-w-16 tw-bg-slate-800 tw-rounded">
+                <div class="tw-h-full tw-bg-cyan-400 tw-rounded" style="width: {{ pct }}%"></div>
+              </div>
+              <span class="tw-text-cyan-300 tw-text-[10.5px]">{{ r.progress.done }}/{{ r.progress.total }}</span>
+            </div>
+          </td>
+          <td>
+            {% if r.critical_missing %}
+              <span class="tw-text-rose-400 tw-text-[10.5px]">{{ r.critical_missing }} missing</span>
+            {% else %}
+              <span class="tw-text-emerald-400 tw-text-[10.5px]">ok</span>
+            {% endif %}
+          </td>
+          <td class="tw-text-slate-500 tw-text-[10.5px]">
+            {{ r.updated_at.strftime('%Y-%m-%d %H:%M') if r.updated_at else '—' }}
+          </td>
+          <td>
+            <span class="tw-px-1.5 tw-py-0.5 tw-text-[10.5px] tw-rounded
+                         {% if r.status == 'ACTIVE' %}tw-bg-emerald-900/40 tw-text-emerald-300
+                         {% elif r.status == 'DRAFT' %}tw-bg-slate-800 tw-text-slate-300
+                         {% else %}tw-bg-slate-800 tw-text-slate-500{% endif %}">
+              {{ r.status }}
+            </span>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</form>
+{% endif %}
