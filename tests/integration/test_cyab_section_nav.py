@@ -14,11 +14,13 @@ def test_coverage_route_responds(client):
 
 
 def test_audit_placeholder_route_responds(client):
+    """Sub-plan C Task 11 replaced the 'coming soon' placeholder with the
+    real audit-trail page; just assert the page returns 200 with audit chrome.
+    """
     r = client.get("/cyab/audit")
     assert r.status_code == 200
     body = r.text.lower()
     assert "audit" in body
-    assert "sub-plan c" in body or "coming soon" in body
 
 
 def test_coverage_page_includes_section_nav(client):

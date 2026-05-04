@@ -1391,15 +1391,55 @@ async def cyab_coverage_page(
 
 
 @app.get("/cyab/audit", response_class=HTMLResponse)
-async def cyab_audit_placeholder(
+async def cyab_audit_page(
     request: Request,
     user: User = Depends(require_page_permission("alert:read")),
 ):
-    """Sub-plan C placeholder. Returns the section nav + a 'coming soon' card."""
+    """Compliance audit trail.
+
+    Chronological union of sign-offs, checklist deltas, system lifecycle
+    events, and containment-authority changes. Calls the audit_feed
+    helper directly (rather than HTTP-calling our own /api endpoint) so
+    the request stays in-process — same pattern as /cyab/coverage.
+    """
+    from ion.core.config import get_config
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.web.cyab_api import audit_feed
+
+    Session = get_session_factory(get_engine(get_config().db_path))
+    session = Session()
+    try:
+        sid_raw = request.query_params.get("system_id") or ""
+        try:
+            sid = int(sid_raw) if sid_raw else None
+        except ValueError:
+            sid = None
+        feed = await audit_feed(
+            system_id=sid,
+            user=request.query_params.get("user") or None,
+            action_type=request.query_params.get("action_type") or None,
+            since=request.query_params.get("since") or None,
+            until=request.query_params.get("until") or None,
+            session=session,
+        )
+    finally:
+        session.close()
+
     return templates.TemplateResponse(
         request=request,
-        name="cyab/audit_placeholder.html",
-        context={"active_tab": "audit", "user": user},
+        name="cyab/audit.html",
+        context={
+            "feed": feed,
+            "user": user,
+            "active_tab": "audit",
+            "filters": {
+                "system_id":   request.query_params.get("system_id") or "",
+                "user":        request.query_params.get("user") or "",
+                "action_type": request.query_params.get("action_type") or "",
+                "since":       request.query_params.get("since") or "",
+                "until":       request.query_params.get("until") or "",
+            },
+        },
     )
 
 
