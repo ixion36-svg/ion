@@ -3106,3 +3106,183 @@ def _coverage_matrix_impl(*, session, pillar, owner, any_red, dh, ck) -> dict:
             "pct_stale_ingestion":  int(round(100 * stale / total)),
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Audit feed (Sub-plan C / Task 10)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/audit/feed",
+    dependencies=[Depends(require_permission("alert:read"))],
+)
+async def audit_feed(
+    system_id: Optional[int] = None,
+    user: Optional[str] = None,
+    action_type: Optional[str] = None,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
+    limit: int = 200,
+    session: Session = Depends(get_db_session),
+):
+    """Chronological feed of CyAB compliance events.
+
+    Unions four sources:
+      - ``CyabSystem.created_at`` / ``archived_at`` (system lifecycle)
+      - ``CyabSnapshot`` rows (sign-offs surfaced when ``notes`` mentions
+        a sign-off, otherwise ``snapshot``)
+      - ``CyabDocChecklistItem.updated_at`` deltas (status changes)
+      - ``change_log_service`` entries with field=``containment_authority``
+        — best-effort; the service does not yet expose ``list_events`` so
+        a missing API is silently skipped rather than raising.
+
+    Query params:
+      - ``system_id`` filter to one system
+      - ``user`` filter by the ``who`` field
+      - ``action_type`` filter by category
+      - ``since`` / ``until`` ISO-8601 date or datetime cutoffs (inclusive)
+      - ``limit`` cap on returned events (default 200)
+    """
+    from ion.models.cyab import CyabSystem, CyabSnapshot
+    from ion.models.cyab_doc_checklist import CyabDocChecklistItem
+
+    events: list = []
+
+    # 1. System creates + archives. CyabSystem in this codebase has
+    # created_at + created_by (user FK); archived_at is optional and
+    # not yet on the model — getattr keeps this forward-compatible.
+    sys_q = select(CyabSystem)
+    if system_id:
+        sys_q = sys_q.where(CyabSystem.id == system_id)
+    for sys_row in session.execute(sys_q).scalars().all():
+        if sys_row.created_at:
+            who = "system"
+            creator = getattr(sys_row, "creator", None)
+            if creator is not None:
+                who = creator.display_name or creator.username or "system"
+            events.append({
+                "when":        sys_row.created_at.isoformat(),
+                "who":         who,
+                "what":        f"System '{sys_row.name}' created",
+                "system_id":   sys_row.id,
+                "system_name": sys_row.name,
+                "action_type": "create",
+                "link":        f"/cyab/systems/{sys_row.id}",
+            })
+        archived_at = getattr(sys_row, "archived_at", None)
+        if archived_at:
+            events.append({
+                "when":        archived_at.isoformat(),
+                "who":         getattr(sys_row, "archived_by", None) or "system",
+                "what":        f"System '{sys_row.name}' archived",
+                "system_id":   sys_row.id,
+                "system_name": sys_row.name,
+                "action_type": "archive",
+                "link":        f"/cyab/systems/{sys_row.id}",
+            })
+
+    # 2. Snapshots — treat as sign-offs when the notes contain that
+    # phrasing, otherwise emit as ``snapshot``. CyabSnapshot has no
+    # ``kind`` or ``signed_by`` column in this codebase; getattr keeps
+    # the code forward-compatible if either gets added later.
+    snap_q = select(CyabSnapshot)
+    if system_id:
+        snap_q = snap_q.where(CyabSnapshot.system_id == system_id)
+    for snap in session.execute(snap_q).scalars().all():
+        kind = getattr(snap, "kind", None)
+        notes_lower = (snap.notes or "").lower()
+        if kind in ("signoff", "checklist_update", "snapshot"):
+            atype = kind
+        elif "sign" in notes_lower and "off" in notes_lower:
+            atype = "signoff"
+        else:
+            atype = "snapshot"
+        when_dt = snap.created_at or datetime.combine(snap.snapshot_date, datetime.min.time())
+        events.append({
+            "when":          when_dt.isoformat(),
+            "who":           getattr(snap, "signed_by", None) or "system",
+            "what":          snap.notes or f"Snapshot recorded ({atype})",
+            "system_id":     snap.system_id,
+            "system_name":   snap.system.name if snap.system else None,
+            "action_type":   atype,
+            "snapshot_id":   snap.id,
+            "snapshot_date": snap.snapshot_date.isoformat(),
+            "link":          f"/cyab/systems/{snap.system_id}#snapshot={snap.id}",
+            "pdf_link":      f"/api/cyab/studio/systems/{snap.system_id}/onboarding-pack?as_of={snap.snapshot_date.isoformat()}",
+        })
+
+    # 3. Checklist updates. The model exposes the user FK as
+    # ``updated_by_id`` and the relationship as ``updated_by``.
+    ck_q = select(CyabDocChecklistItem)
+    if system_id:
+        ck_q = ck_q.where(CyabDocChecklistItem.system_id == system_id)
+    for item in session.execute(ck_q).scalars().all():
+        ts = getattr(item, "updated_at", None) or getattr(item, "created_at", None)
+        if not ts:
+            continue
+        who = "system"
+        ub = getattr(item, "updated_by", None)
+        if ub is not None:
+            who = ub.display_name or ub.username or "system"
+        events.append({
+            "when":        ts.isoformat(),
+            "who":         who,
+            "what":        f"Checklist item '{item.label}' → {item.status}",
+            "system_id":   item.system_id,
+            "system_name": None,
+            "action_type": "checklist_update",
+            "link":        f"/cyab/systems/{item.system_id}#tab=overview",
+        })
+
+    # 4. Containment-authority changes via change_log_service. The
+    # service does not currently expose a ``list_events`` query API;
+    # the try/except keeps this forward-compatible without failing.
+    try:
+        from ion.services import change_log_service as cls
+        if hasattr(cls, "list_events"):
+            cls_events = cls.list_events(
+                session,
+                entity_type="cyab.system",
+                field="containment_authority",
+                system_id=system_id,
+                limit=200,
+            )
+            for ev in cls_events:
+                when_v = ev["when"]
+                events.append({
+                    "when":        when_v.isoformat() if hasattr(when_v, "isoformat") else str(when_v),
+                    "who":         ev.get("who") or "unknown",
+                    "what":        f"Containment authority: {ev.get('old_value')} → {ev.get('new_value')}",
+                    "system_id":   ev.get("entity_id"),
+                    "system_name": None,
+                    "action_type": "containment_change",
+                    "link":        f"/cyab/systems/{ev.get('entity_id')}#tab=signoff",
+                })
+    except Exception:
+        # Best-effort union — never let an aux source break the feed.
+        pass
+
+    # Filter by user / action_type
+    if user:
+        events = [e for e in events if e["who"] == user]
+    if action_type:
+        events = [e for e in events if e["action_type"] == action_type]
+
+    # Date filters — accept either YYYY-MM-DD or full ISO datetime.
+    def _parse(s: str):
+        try:
+            return datetime.fromisoformat(s)
+        except Exception:
+            return None
+
+    if since:
+        cutoff = _parse(since)
+        if cutoff:
+            events = [e for e in events if datetime.fromisoformat(e["when"]) >= cutoff]
+    if until:
+        cutoff = _parse(until)
+        if cutoff:
+            events = [e for e in events if datetime.fromisoformat(e["when"]) <= cutoff]
+
+    events.sort(key=lambda e: e["when"], reverse=True)
+    return {"events": events[:limit], "total": len(events)}
