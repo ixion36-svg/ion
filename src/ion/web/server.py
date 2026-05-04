@@ -1021,6 +1021,28 @@ async def cyab_system_tab(
             )
             ctx["coverage"] = system_coverage(session, system_id)
             ctx["answers"] = load_answers(session, system_id) or {}
+        elif tab_name == "sources":
+            import json as _json
+            from sqlalchemy import select
+            from ion.models.cyab import CyabDataSource
+            sources = session.execute(
+                select(CyabDataSource)
+                .where(CyabDataSource.system_id == system_id)
+                .order_by(CyabDataSource.name)
+            ).scalars().all()
+            # field_mapping is JSON-as-text on the model; parse once per
+            # source so the template can iterate without a custom filter.
+            mappings = {}
+            for ds in sources:
+                if ds.field_mapping:
+                    try:
+                        parsed = _json.loads(ds.field_mapping)
+                        if isinstance(parsed, dict):
+                            mappings[ds.id] = parsed
+                    except (ValueError, TypeError):
+                        pass
+            ctx["sources"] = sources
+            ctx["source_mappings"] = mappings
 
         # Fall back to the placeholder template if the tab template doesn't exist yet.
         from jinja2 import TemplateNotFound
