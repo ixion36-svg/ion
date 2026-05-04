@@ -4,7 +4,7 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from ion.auth.dependencies import require_page_auth, require_page_permission
@@ -912,16 +912,14 @@ async def cyab_page(request: Request, user: User = Depends(require_page_permissi
     return templates.TemplateResponse(request=request, name="cyab.html")
 
 
-@app.get("/cyab/studio", response_class=HTMLResponse)
-async def cyab_studio_page(
-    request: Request,
-    user: User = Depends(require_page_permission("alert:read")),
-):
-    """Render the CyAB Onboarding Studio page (v0.12.0).
+@app.get("/cyab/studio")
+async def cyab_studio_redirect(system: int | None = None):
+    """301 redirect — /cyab/studio is replaced by /cyab/systems/{id}.
 
-    URL state: ?pillar=identity&sub=active_directory&tab=detection&uc=ad_kerberoasting
+    Kept for one minor version (v0.19.x). Drop in v0.20.0.
     """
-    return templates.TemplateResponse(request=request, name="cyab_studio.html")
+    target = f"/cyab/systems/{system}" if system else "/cyab/systems"
+    return RedirectResponse(url=target, status_code=301)
 
 
 @app.get("/cyab/systems/{system_id}", response_class=HTMLResponse)
