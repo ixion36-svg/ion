@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.19.0 — 2026-05-04
+
+### CyAB IA — Scoping + Coverage + Audit (Sub-plan C of 3) — completes the v0.19.0 series
+
+- New `/cyab/scoping` page — anonymous stack-to-coverage questionnaire
+  (~14 progressive questions) with live counter widget
+  ("47 use cases · 12 threat-actor matches · 64% MITRE Initial Access
+  coverage") and downloadable scoping-pack PDF.
+- New shared scoring engine `cyab_scoping_engine.py` extends
+  `cyab_assessment_service`. Single engine drives both `/cyab/scoping`
+  and the wizard's Step 2 live counter — the spec's "scope for all"
+  architecture.
+- New `/cyab/coverage` matrix page — every system × seven data-health
+  dimensions (ingestion, fields, intake, detections, audit, checklist,
+  sign-off). Cells deep-link into the relevant per-system tab. Aggregates
+  strip + filters by pillar / owner / "any red".
+- New `/cyab/audit` page — chronological feed unioning sign-offs,
+  checklist deltas, containment-authority changes, and system lifecycle
+  events. Each sign-off row includes an "as-of-date" link to the
+  onboarding pack PDF.
+- "Convert to system" CTA on /cyab/scoping — stashes scoping answers in
+  session and 303-redirects to the wizard with `?from_scoping=1`.
+
+### v0.19.0 series — full picture (A + B + C)
+
+- 7 top-level CyAB pages: `/cyab`, `/cyab/systems`, `/cyab/scoping`,
+  `/cyab/onboard`, `/cyab/coverage`, `/cyab/audit`, `/cyab/systems/{id}`.
+- 7-tab per-system page with sticky onboarding-progress header.
+- 4-step onboarding wizard with autosave + scope-for-all live counter.
+- New backend services: `cyab_data_health_service`, `cyab_scoping_engine`.
+- `/cyab/studio` 301 redirected (drop in v0.20.0).
+
+### Phase-2 deferrals (separate plans)
+
+- Reconciliation drift Data Health panel (needs CMDB integration)
+- Per-system Recommendations tab (live re-scoping as intake changes)
+- Bulk operations on /cyab/coverage
+- DB-backed scoping question editor (engine API is already swap-ready)
+
 ## v0.19.0-rc.2 — 2026-05-04
 
 ### CyAB IA — Onboarding wizard + landing pages (Sub-plan B of 3)
