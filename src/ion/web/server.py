@@ -997,6 +997,12 @@ async def cyab_system_tab(
 
         ctx = {"system": system, "user": user, "tab_name": tab_name, "tab_label": label}
 
+        if tab_name == "overview":
+            from ion.services import cyab_doc_checklist_service
+            cyab_doc_checklist_service.seed_for_system(session, system_id)  # idempotent
+            ctx["checklist"] = cyab_doc_checklist_service.list_for_system(session, system_id)
+            ctx["progress"] = cyab_doc_checklist_service.coverage_summary(session, system_id)
+
         # Fall back to the placeholder template if the tab template doesn't exist yet.
         from jinja2 import TemplateNotFound
         try:
