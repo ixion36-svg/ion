@@ -3116,6 +3116,27 @@ def _coverage_matrix_impl(*, session, pillar, owner, any_red, dh, ck) -> dict:
     "/audit/feed",
     dependencies=[Depends(require_permission("alert:read"))],
 )
+async def audit_feed_endpoint(
+    system_id: Optional[int] = None,
+    user: Optional[str] = None,
+    action_type: Optional[str] = None,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
+    limit: int = 200,
+):
+    """Chronological feed of CyAB compliance events.
+
+    Thin router shim — opens a session via the standard dynamic-import
+    pattern (so test monkeypatches of ``ion.storage.database.get_engine``
+    are honoured) and delegates to :func:`audit_feed`. Same pattern as
+    :func:`coverage_matrix` / :func:`_build_coverage_matrix`.
+    """
+    return await audit_feed(
+        system_id=system_id, user=user, action_type=action_type,
+        since=since, until=until, limit=limit, session=None,
+    )
+
+
 async def audit_feed(
     system_id: Optional[int] = None,
     user: Optional[str] = None,
@@ -3123,9 +3144,9 @@ async def audit_feed(
     since: Optional[str] = None,
     until: Optional[str] = None,
     limit: int = 200,
-    session: Session = Depends(get_db_session),
-):
-    """Chronological feed of CyAB compliance events.
+    session: Optional[Session] = None,
+) -> dict:
+    """Build the chronological feed payload.
 
     Unions four sources:
       - ``CyabSystem.created_at`` / ``archived_at`` (system lifecycle)
@@ -3136,12 +3157,51 @@ async def audit_feed(
         — best-effort; the service does not yet expose ``list_events`` so
         a missing API is silently skipped rather than raising.
 
-    Query params:
+    Args:
       - ``system_id`` filter to one system
       - ``user`` filter by the ``who`` field
       - ``action_type`` filter by category
       - ``since`` / ``until`` ISO-8601 date or datetime cutoffs (inclusive)
       - ``limit`` cap on returned events (default 200)
+      - ``session`` optional caller-supplied session (e.g. from the page
+        handler in ``server.py``); when ``None`` we open one ourselves.
+
+    The session is opened via dynamic imports rather than
+    ``Depends(get_db_session)`` so the test harness's monkeypatch of
+    ``ion.storage.database.get_engine`` is observed regardless of import
+    order across the suite — same pattern as ``_build_coverage_matrix``.
+    """
+    own_session = False
+    if session is None:
+        from ion.core.config import get_config
+        from ion.storage.database import get_engine, get_session_factory
+        Session_ = get_session_factory(get_engine(get_config().db_path))
+        session = Session_()
+        own_session = True
+
+    try:
+        return _build_audit_feed(
+            session=session,
+            system_id=system_id, user=user, action_type=action_type,
+            since=since, until=until, limit=limit,
+        )
+    finally:
+        if own_session:
+            session.close()
+
+
+def _build_audit_feed(
+    *,
+    session: Session,
+    system_id: Optional[int],
+    user: Optional[str],
+    action_type: Optional[str],
+    since: Optional[str],
+    until: Optional[str],
+    limit: int,
+) -> dict:
+    """Inner builder kept separate so the endpoint stays small. Pure helper
+    that takes a live session and returns the feed payload — no I/O setup.
     """
     from ion.models.cyab import CyabSystem, CyabSnapshot
     from ion.models.cyab_doc_checklist import CyabDocChecklistItem

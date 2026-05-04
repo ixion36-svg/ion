@@ -90,3 +90,29 @@ def test_audit_feed_filter_by_action_type(client, seeded_audit_events):
     assert len(events) >= 1
     for ev in events:
         assert ev["action_type"] == "signoff"
+
+
+# ---------------------------------------------------------------------------
+# Page tests (Task 11)
+# ---------------------------------------------------------------------------
+
+def test_audit_page_renders(client, seeded_audit_events):
+    r = client.get("/cyab/audit")
+    assert r.status_code == 200
+    body = r.text
+    assert "audit-test" in body  # the seeded system shows up
+
+
+def test_audit_page_rows_have_pdf_link(client, seeded_audit_events):
+    r = client.get("/cyab/audit")
+    body = r.text
+    # Sign-off rows expose a "View onboarding pack PDF as of this date" link
+    assert "onboarding-pack" in body
+    assert "as_of=" in body or "snapshot=" in body
+
+
+def test_audit_page_filter_inputs_present(client, seeded_audit_events):
+    r = client.get("/cyab/audit")
+    body = r.text
+    for name in ("system_id", "user", "action_type", "since", "until"):
+        assert f'name="{name}"' in body
