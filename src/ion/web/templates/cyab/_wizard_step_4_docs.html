@@ -2,9 +2,9 @@
    first arrival here. The user can flag is_critical, paste a URL, or
    click "I'll do this later" to leave the row in 'unknown' state. #}
 
-<header class="tw-mb-4">
-  <h2 class="tw-text-white tw-text-[16px] tw-font-semibold">Doc placeholders</h2>
-  <p class="tw-text-slate-400 tw-text-[12px]">
+<header class="mb-4">
+  <h2 class="text-white text-[16px] font-semibold">Doc placeholders</h2>
+  <p class="text-slate-400 text-[12px]">
     20 default checklist items will be created. Add URLs now or skip — every row stays editable from the Overview tab.
   </p>
 </header>
@@ -13,20 +13,20 @@
       hx-target="this" hx-swap="outerHTML"
       method="post"
       action="/api/cyab/onboard/{{ wid }}/finish"
-      class="tw-space-y-2">
-  <table class="tw-w-full tw-text-[12px]">
+      class="space-y-2">
+  <table class="w-full text-[12px]">
     <thead>
-      <tr class="tw-text-slate-500 tw-text-[10px] tw-uppercase">
-        <th class="tw-text-left tw-py-1">Item</th>
-        <th class="tw-text-left">Critical?</th>
-        <th class="tw-text-left">URL (optional)</th>
-        <th class="tw-text-right">I'll do later</th>
+      <tr class="text-slate-500 text-[10px] uppercase">
+        <th class="text-left py-1">Item</th>
+        <th class="text-left">Critical?</th>
+        <th class="text-left">URL (optional)</th>
+        <th class="text-right">I'll do later</th>
       </tr>
     </thead>
     <tbody>
       {% for item in (checklist or []) %}
-        <tr class="hover:tw-bg-slate-800/40">
-          <td class="tw-py-1 tw-text-slate-200">{{ item.label }}</td>
+        <tr class="hover:bg-slate-800/40">
+          <td class="py-1 text-slate-200">{{ item.label }}</td>
           <td>
             <input type="checkbox" name="docs[{{ item.kind }}][is_critical]" value="1"
                    {% if item.is_critical %}checked{% endif %}>
@@ -35,9 +35,9 @@
             <input type="url" name="docs[{{ item.kind }}][url]"
                    value="{{ item.url or '' }}"
                    placeholder="https://..."
-                   class="tw-w-full tw-px-1 tw-py-0.5 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+                   class="w-full px-1 py-0.5 bg-slate-900 border border-slate-700 rounded">
           </td>
-          <td class="tw-text-right">
+          <td class="text-right">
             <input type="checkbox" name="docs[{{ item.kind }}][mark_later]" value="1">
           </td>
         </tr>
@@ -45,9 +45,9 @@
     </tbody>
   </table>
 
-  <div class="tw-flex tw-justify-between tw-items-center tw-mt-4">
-    <a href="/cyab/onboard?wid={{ wid }}&step=3" class="tw-text-slate-500 tw-text-[11px]">← Back</a>
-    <button type="submit" class="tw-px-4 tw-py-1.5 tw-bg-emerald-700 tw-text-white tw-text-[12.5px] tw-rounded">
+  <div class="flex justify-between items-center mt-4">
+    <a href="/cyab/onboard?wid={{ wid }}&step=3" class="text-slate-500 text-[11px]">← Back</a>
+    <button type="submit" class="px-4 py-1.5 bg-emerald-700 text-white text-[12.5px] rounded">
       Finish — open system page
     </button>
   </div>

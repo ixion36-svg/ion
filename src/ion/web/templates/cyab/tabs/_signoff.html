@@ -1,67 +1,67 @@
-<header class="tw-mb-4">
-  <h3 class="tw-text-white tw-text-[14px] tw-font-semibold">Sign-off</h3>
-  <p class="tw-text-slate-500 tw-text-[11px]">Final approval for this system to enter operational status.</p>
+<header class="mb-4">
+  <h3 class="text-white text-[14px] font-semibold">Sign-off</h3>
+  <p class="text-slate-500 text-[11px]">Final approval for this system to enter operational status.</p>
 </header>
 
 {# === Governance: containment authority === #}
-<section class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3 tw-mb-4">
-  <h4 class="tw-text-slate-300 tw-text-[12px] tw-mb-2">Governance</h4>
-  <div class="tw-grid tw-grid-cols-2 tw-gap-3 tw-text-[12px]">
-    <label class="tw-flex tw-flex-col tw-gap-1">
-      <span class="tw-text-slate-400">Containment authority</span>
+<section class="bg-slate-900/40 border border-slate-800 rounded p-3 mb-4">
+  <h4 class="text-slate-300 text-[12px] mb-2">Governance</h4>
+  <div class="grid grid-cols-2 gap-3 text-[12px]">
+    <label class="flex flex-col gap-1">
+      <span class="text-slate-400">Containment authority</span>
       <input type="text" name="containment_authority" value="{{ system.containment_authority or '' }}"
-             class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded"
+             class="px-2 py-1 bg-slate-900 border border-slate-700 rounded"
              hx-put="/api/cyab/systems/{{ system.id }}" hx-trigger="change">
     </label>
-    <label class="tw-flex tw-flex-col tw-gap-1">
-      <span class="tw-text-slate-400">Department lead</span>
+    <label class="flex flex-col gap-1">
+      <span class="text-slate-400">Department lead</span>
       <input type="text" name="department_lead" value="{{ system.department_lead or '' }}"
-             class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded"
+             class="px-2 py-1 bg-slate-900 border border-slate-700 rounded"
              hx-put="/api/cyab/systems/{{ system.id }}" hx-trigger="change">
     </label>
   </div>
 </section>
 
 {# === Onboarding Pack preview & sign === #}
-<section class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3 tw-mb-4">
-  <header class="tw-flex tw-items-center tw-justify-between tw-mb-2">
-    <h4 class="tw-text-slate-300 tw-text-[12px]">Onboarding Pack</h4>
+<section class="bg-slate-900/40 border border-slate-800 rounded p-3 mb-4">
+  <header class="flex items-center justify-between mb-2">
+    <h4 class="text-slate-300 text-[12px]">Onboarding Pack</h4>
     <a href="/api/cyab/studio/systems/{{ system.id }}/onboarding-pack" target="_blank"
-       class="tw-text-cyan-400 tw-text-[11.5px] hover:tw-underline">Open PDF &rarr;</a>
+       class="text-cyan-400 text-[11.5px] hover:underline">Open PDF &rarr;</a>
   </header>
 
   {% if progress %}
-  <div class="tw-text-[12px] tw-text-slate-400 tw-mb-3">
-    Onboarding progress: <span class="tw-text-cyan-300">{{ progress.done }} / {{ progress.total }}</span>
+  <div class="text-[12px] text-slate-400 mb-3">
+    Onboarding progress: <span class="text-cyan-300">{{ progress.done }} / {{ progress.total }}</span>
     {% if progress.critical_missing %}
-      &middot; <span class="tw-text-rose-400">{{ progress.critical_missing | length }} critical items still missing</span>
+      &middot; <span class="text-rose-400">{{ progress.critical_missing | length }} critical items still missing</span>
     {% endif %}
   </div>
   {% endif %}
 
   <form hx-post="/api/cyab/studio/systems/{{ system.id }}/onboarding-pack/sign"
         hx-target="#tab-content" hx-swap="innerHTML"
-        class="tw-flex tw-items-center tw-gap-2">
+        class="flex items-center gap-2">
     <input name="sign_soc_name" placeholder="Your name" required
-           class="tw-flex-1 tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-text-[12px] tw-rounded">
+           class="flex-1 px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
     <button type="submit"
-            class="tw-px-3 tw-py-1 tw-bg-emerald-700 tw-text-white tw-text-[12px] tw-rounded">
+            class="px-3 py-1 bg-emerald-700 text-white text-[12px] rounded">
       Sign Onboarding Pack
     </button>
   </form>
 </section>
 
 {# === Prior sign-offs === #}
-<section class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-  <h4 class="tw-text-slate-300 tw-text-[12px] tw-mb-2">Prior sign-offs</h4>
+<section class="bg-slate-900/40 border border-slate-800 rounded p-3">
+  <h4 class="text-slate-300 text-[12px] mb-2">Prior sign-offs</h4>
   {% if not signoffs %}
-    <p class="tw-text-slate-500 tw-text-[11px]">No sign-offs yet.</p>
+    <p class="text-slate-500 text-[11px]">No sign-offs yet.</p>
   {% else %}
-    <ul class="tw-text-[12px] tw-space-y-1">
+    <ul class="text-[12px] space-y-1">
       {% for so in signoffs %}
-        <li class="tw-flex tw-justify-between tw-text-slate-300">
-          <span><span class="tw-text-slate-500">[{{ so.role }}]</span> {{ so.signed_by or 'unknown' }}</span>
-          <span class="tw-text-slate-500 tw-text-[11px]">{{ so.signed_on.strftime('%Y-%m-%d') }}</span>
+        <li class="flex justify-between text-slate-300">
+          <span><span class="text-slate-500">[{{ so.role }}]</span> {{ so.signed_by or 'unknown' }}</span>
+          <span class="text-slate-500 text-[11px]">{{ so.signed_on.strftime('%Y-%m-%d') }}</span>
         </li>
       {% endfor %}
     </ul>

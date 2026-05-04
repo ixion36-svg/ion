@@ -1,54 +1,54 @@
 {# Chronological feed table — included by audit.html and reusable for HTMX swaps. #}
 {% if not feed.events %}
-  <p class="tw-text-slate-500 tw-text-[12px] tw-py-6 tw-text-center">
+  <p class="text-slate-500 text-[12px] py-6 text-center">
     No events match the current filters.
   </p>
 {% else %}
-<table class="tw-w-full tw-text-[12px] tw-border-collapse">
+<table class="w-full text-[12px] border-collapse">
   <thead>
-    <tr class="tw-text-slate-500 tw-text-[10.5px] tw-uppercase tw-tracking-wider">
-      <th class="tw-text-left tw-py-2 tw-pr-3">When</th>
-      <th class="tw-text-left tw-pr-3">Who</th>
-      <th class="tw-text-left tw-pr-3">Action</th>
-      <th class="tw-text-left tw-pr-3">What</th>
-      <th class="tw-text-left tw-pr-3">System</th>
-      <th class="tw-text-left">Links</th>
+    <tr class="text-slate-500 text-[10.5px] uppercase tracking-wider">
+      <th class="text-left py-2 pr-3">When</th>
+      <th class="text-left pr-3">Who</th>
+      <th class="text-left pr-3">Action</th>
+      <th class="text-left pr-3">What</th>
+      <th class="text-left pr-3">System</th>
+      <th class="text-left">Links</th>
     </tr>
   </thead>
   <tbody>
     {% for ev in feed.events %}
-      <tr class="tw-border-t tw-border-slate-800 hover:tw-bg-slate-900/40">
-        <td class="tw-py-1.5 tw-pr-3 tw-text-slate-400 tw-font-mono tw-text-[11px]">
+      <tr class="border-t border-slate-800 hover:bg-slate-900/40">
+        <td class="py-1.5 pr-3 text-slate-400 font-mono text-[11px]">
           {{ ev.when[:19].replace('T', ' ') }}
         </td>
-        <td class="tw-pr-3 tw-text-slate-300">{{ ev.who }}</td>
-        <td class="tw-pr-3">
+        <td class="pr-3 text-slate-300">{{ ev.who }}</td>
+        <td class="pr-3">
           {% set badge_class = {
-            'create':             'tw-bg-cyan-900/40 tw-text-cyan-300',
-            'signoff':            'tw-bg-emerald-900/40 tw-text-emerald-300',
-            'snapshot':           'tw-bg-slate-800 tw-text-slate-300',
-            'checklist_update':   'tw-bg-slate-800 tw-text-slate-300',
-            'containment_change': 'tw-bg-amber-900/40 tw-text-amber-300',
-            'archive':            'tw-bg-rose-900/40 tw-text-rose-300',
-          }.get(ev.action_type, 'tw-bg-slate-800 tw-text-slate-400') %}
-          <span class="{{ badge_class }} tw-px-2 tw-py-0.5 tw-rounded tw-text-[10.5px] tw-font-mono">
+            'create':             'bg-cyan-900/40 text-cyan-300',
+            'signoff':            'bg-emerald-900/40 text-emerald-300',
+            'snapshot':           'bg-slate-800 text-slate-300',
+            'checklist_update':   'bg-slate-800 text-slate-300',
+            'containment_change': 'bg-amber-900/40 text-amber-300',
+            'archive':            'bg-rose-900/40 text-rose-300',
+          }.get(ev.action_type, 'bg-slate-800 text-slate-400') %}
+          <span class="{{ badge_class }} px-2 py-0.5 rounded text-[10.5px] font-mono">
             {{ ev.action_type }}
           </span>
         </td>
-        <td class="tw-pr-3 tw-text-slate-300">{{ ev.what }}</td>
-        <td class="tw-pr-3 tw-text-cyan-400">
+        <td class="pr-3 text-slate-300">{{ ev.what }}</td>
+        <td class="pr-3 text-cyan-400">
           {% if ev.system_id %}
-            <a href="/cyab/systems/{{ ev.system_id }}" class="hover:tw-underline">
+            <a href="/cyab/systems/{{ ev.system_id }}" class="hover:underline">
               {{ ev.system_name or '#' ~ ev.system_id }}
             </a>
           {% endif %}
         </td>
         <td>
-          <a href="{{ ev.link }}" class="tw-text-cyan-400 tw-text-[11px] hover:tw-underline">view</a>
+          <a href="{{ ev.link }}" class="text-cyan-400 text-[11px] hover:underline">view</a>
           {% if ev.pdf_link %}
-            <span class="tw-text-slate-600 tw-px-1">·</span>
+            <span class="text-slate-600 px-1">·</span>
             <a href="{{ ev.pdf_link }}" target="_blank"
-               class="tw-text-cyan-400 tw-text-[11px] hover:tw-underline"
+               class="text-cyan-400 text-[11px] hover:underline"
                title="View onboarding pack PDF as of {{ ev.snapshot_date }}">
               pack@{{ ev.snapshot_date }}
             </a>
@@ -58,7 +58,7 @@
     {% endfor %}
   </tbody>
 </table>
-<p class="tw-text-slate-500 tw-text-[10.5px] tw-mt-3">
+<p class="text-slate-500 text-[10.5px] mt-3">
   Showing {{ feed.events | length }} of {{ feed.total }} events.
 </p>
 {% endif %}

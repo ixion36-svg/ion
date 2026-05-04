@@ -4,24 +4,24 @@
 
 {% block content %}
 <div class="system-detail" data-system-id="{{ system.id }}">
-  <nav class="breadcrumb tw-text-sm tw-text-slate-400 tw-mb-3">
-    <a href="/cyab" class="hover:tw-text-white">CyAB</a>
-    <span class="tw-mx-2">·</span>
-    <a href="/cyab/systems" class="hover:tw-text-white">Systems</a>
-    <span class="tw-mx-2">·</span>
-    <span class="tw-text-white">{{ system.name }}</span>
+  <nav class="breadcrumb text-sm text-slate-400 mb-3">
+    <a href="/cyab" class="hover:text-white">CyAB</a>
+    <span class="mx-2">·</span>
+    <a href="/cyab/systems" class="hover:text-white">Systems</a>
+    <span class="mx-2">·</span>
+    <span class="text-white">{{ system.name }}</span>
   </nav>
 
-  <header class="tw-flex tw-items-baseline tw-gap-4 tw-mb-4">
-    <h1 class="tw-text-[28px] tw-font-semibold tw-text-white">{{ system.name }}</h1>
-    {% if system.department %}<span class="tw-text-slate-400">{{ system.department }}</span>{% endif %}
+  <header class="flex items-baseline gap-4 mb-4">
+    <h1 class="text-[28px] font-semibold text-white">{{ system.name }}</h1>
+    {% if system.department %}<span class="text-slate-400">{{ system.department }}</span>{% endif %}
   </header>
 
   {# Sticky progress header — implemented in Task 2 #}
   {% include "cyab/_progress_header.html" %}
 
   {# Tab nav + content slot — implemented in Task 3 #}
-  <nav class="tab-strip tw-flex tw-gap-1 tw-mt-4 tw-border-b tw-border-slate-800">
+  <nav class="tab-strip flex gap-1 mt-4 border-b border-slate-800">
     {% set tabs = [
       ('overview', 'Overview'),
       ('intake', 'Intake'),
@@ -32,7 +32,7 @@
       ('signoff', 'Sign-off'),
     ] %}
     {% for slug, label in tabs %}
-      <button class="tab-btn tw-px-3 tw-py-2 tw-text-[12.5px] tw-text-slate-400 hover:tw-text-cyan-300 tw-border-b-2 tw-border-transparent {% if slug == 'overview' %}tw-text-cyan-300 tw-border-cyan-400{% endif %}"
+      <button class="tab-btn px-3 py-2 text-[12.5px] text-slate-400 hover:text-cyan-300 border-b-2 border-transparent {% if slug == 'overview' %}text-cyan-300 border-cyan-400{% endif %}"
               hx-get="/cyab/systems/{{ system.id }}/tab/{{ slug }}"
               hx-target="#tab-content"
               hx-swap="innerHTML"
@@ -42,11 +42,11 @@
     {% endfor %}
   </nav>
 
-  <div id="tab-content" class="tw-mt-4"
+  <div id="tab-content" class="mt-4"
        hx-get="/cyab/systems/{{ system.id }}/tab/overview"
        hx-trigger="load"
        hx-swap="innerHTML">
-    <p class="tw-text-slate-500 tw-text-[12px]">Loading…</p>
+    <p class="text-slate-500 text-[12px]">Loading…</p>
   </div>
 </div>
 {% endblock %}

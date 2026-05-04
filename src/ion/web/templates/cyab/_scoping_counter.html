@@ -1,23 +1,23 @@
 {% set scores = scores | default(initial_scores) %}
 <div class="scoping-counter-body">
-  <h3 class="tw-text-slate-300 tw-text-[11px] tw-uppercase tw-tracking-wider tw-mb-3">Live scope</h3>
+  <h3 class="text-slate-300 text-[11px] uppercase tracking-wider mb-3">Live scope</h3>
 
-  <div class="tw-mb-3">
-    <div class="tw-text-cyan-300 tw-text-[24px] tw-font-semibold tw-leading-none">{{ scores.use_case_count }}</div>
-    <div class="tw-text-slate-400 tw-text-[11px]">use cases</div>
+  <div class="mb-3">
+    <div class="text-cyan-300 text-[24px] font-semibold leading-none">{{ scores.use_case_count }}</div>
+    <div class="text-slate-400 text-[11px]">use cases</div>
   </div>
 
-  <div class="tw-mb-3">
-    <div class="tw-text-amber-300 tw-text-[24px] tw-font-semibold tw-leading-none">{{ scores.threat_actor_matches }}</div>
-    <div class="tw-text-slate-400 tw-text-[11px]">threat-actor matches</div>
+  <div class="mb-3">
+    <div class="text-amber-300 text-[24px] font-semibold leading-none">{{ scores.threat_actor_matches }}</div>
+    <div class="text-slate-400 text-[11px]">threat-actor matches</div>
   </div>
 
-  <div class="tw-mb-3">
-    <div class="tw-text-emerald-300 tw-text-[24px] tw-font-semibold tw-leading-none">{{ scores.mitre_coverage_pct }}%</div>
-    <div class="tw-text-slate-400 tw-text-[11px]">MITRE Initial Access coverage</div>
+  <div class="mb-3">
+    <div class="text-emerald-300 text-[24px] font-semibold leading-none">{{ scores.mitre_coverage_pct }}%</div>
+    <div class="text-slate-400 text-[11px]">MITRE Initial Access coverage</div>
   </div>
 
-  <p class="tw-text-slate-500 tw-text-[10.5px] tw-mt-3 tw-pt-3 tw-border-t tw-border-slate-800">
+  <p class="text-slate-500 text-[10.5px] mt-3 pt-3 border-t border-slate-800">
     Updates as you answer.
   </p>
 </div>

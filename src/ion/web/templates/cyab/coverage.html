@@ -5,52 +5,52 @@
 <div class="cyab-coverage">
   {% include "cyab/_section_nav.html" %}
 
-  <header class="tw-mb-4">
-    <nav class="breadcrumb tw-text-sm tw-text-slate-400 tw-mb-2">
-      <a href="/cyab" class="hover:tw-text-white">CyAB</a>
-      <span class="tw-mx-2">·</span>
-      <span class="tw-text-white">Coverage</span>
+  <header class="mb-4">
+    <nav class="breadcrumb text-sm text-slate-400 mb-2">
+      <a href="/cyab" class="hover:text-white">CyAB</a>
+      <span class="mx-2">·</span>
+      <span class="text-white">Coverage</span>
     </nav>
-    <h1 class="tw-text-[28px] tw-font-semibold tw-text-white">Fleet data-health matrix</h1>
-    <p class="tw-text-slate-400 tw-text-[12.5px]">
+    <h1 class="text-[28px] font-semibold text-white">Fleet data-health matrix</h1>
+    <p class="text-slate-400 text-[12.5px]">
       Every system × every signal. Click any cell to drill into the relevant tab on the per-system page.
     </p>
   </header>
 
   {# Aggregates strip — three pills computed against the unfiltered fleet
      so the strip stays stable as the user filters rows. #}
-  <div class="tw-grid tw-grid-cols-3 tw-gap-3 tw-mb-4">
-    <div class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-      <div class="tw-text-emerald-300 tw-text-[24px] tw-font-semibold">{{ matrix.aggregates.pct_systems_healthy }}%</div>
-      <div class="tw-text-slate-400 tw-text-[11px]">systems healthy</div>
+  <div class="grid grid-cols-3 gap-3 mb-4">
+    <div class="bg-slate-900/40 border border-slate-800 rounded p-3">
+      <div class="text-emerald-300 text-[24px] font-semibold">{{ matrix.aggregates.pct_systems_healthy }}%</div>
+      <div class="text-slate-400 text-[11px]">systems healthy</div>
     </div>
-    <div class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-      <div class="tw-text-rose-300 tw-text-[24px] tw-font-semibold">{{ matrix.aggregates.pct_critical_missing }}%</div>
-      <div class="tw-text-slate-400 tw-text-[11px]">critical-missing items</div>
+    <div class="bg-slate-900/40 border border-slate-800 rounded p-3">
+      <div class="text-rose-300 text-[24px] font-semibold">{{ matrix.aggregates.pct_critical_missing }}%</div>
+      <div class="text-slate-400 text-[11px]">critical-missing items</div>
     </div>
-    <div class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3">
-      <div class="tw-text-amber-300 tw-text-[24px] tw-font-semibold">{{ matrix.aggregates.pct_stale_ingestion }}%</div>
-      <div class="tw-text-slate-400 tw-text-[11px]">stale-ingestion systems</div>
+    <div class="bg-slate-900/40 border border-slate-800 rounded p-3">
+      <div class="text-amber-300 text-[24px] font-semibold">{{ matrix.aggregates.pct_stale_ingestion }}%</div>
+      <div class="text-slate-400 text-[11px]">stale-ingestion systems</div>
     </div>
   </div>
 
   {# Filters #}
-  <form method="get" action="/cyab/coverage" class="tw-flex tw-items-end tw-gap-3 tw-mb-4">
-    <label class="tw-flex tw-flex-col tw-gap-1 tw-text-[11px] tw-text-slate-400">
+  <form method="get" action="/cyab/coverage" class="flex items-end gap-3 mb-4">
+    <label class="flex flex-col gap-1 text-[11px] text-slate-400">
       Pillar
       <input name="pillar" value="{{ filters.pillar }}"
-             class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-text-[12px] tw-rounded">
+             class="px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
     </label>
-    <label class="tw-flex tw-flex-col tw-gap-1 tw-text-[11px] tw-text-slate-400">
+    <label class="flex flex-col gap-1 text-[11px] text-slate-400">
       Owner
       <input name="owner" value="{{ filters.owner }}"
-             class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-text-[12px] tw-rounded">
+             class="px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
     </label>
-    <label class="tw-flex tw-items-center tw-gap-2 tw-text-[12px] tw-text-slate-300 tw-mb-1">
+    <label class="flex items-center gap-2 text-[12px] text-slate-300 mb-1">
       <input type="checkbox" name="any_red" value="1" {% if filters.any_red %}checked{% endif %}>
       Any red
     </label>
-    <button type="submit" class="tw-px-3 tw-py-1 tw-bg-cyan-700 tw-text-white tw-text-[12px] tw-rounded">
+    <button type="submit" class="px-3 py-1 bg-cyan-700 text-white text-[12px] rounded">
       Apply
     </button>
   </form>
