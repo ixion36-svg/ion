@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Onboard — CyAB · ION{% endblock %}
+{% block content %}
+<div class="cyab-onboard" data-wid="{{ wid }}" data-step="{{ step }}">
+  {% include "cyab/_section_nav.html" %}
+
+  <header class="tw-mb-4">
+    <h1 class="tw-text-[24px] tw-text-white tw-font-semibold">Onboard a system</h1>
+    <p class="tw-text-slate-400 tw-text-[12.5px]">
+      4 steps. You can exit at any point and resume from this same URL — nothing blocks.
+    </p>
+  </header>
+
+  {# Step rail #}
+  <ol class="wizard-rail tw-flex tw-gap-2 tw-mb-6 tw-text-[12px]">
+    {% for n, label in [(1, 'Identity'), (2, 'Intake'), (3, 'First data source'), (4, 'Doc placeholders')] %}
+      <li class="tw-flex tw-items-center tw-gap-2 tw-px-3 tw-py-1 tw-rounded {% if n == step %}tw-bg-cyan-700/30 tw-text-cyan-200{% elif n < step %}tw-text-emerald-400{% else %}tw-text-slate-500{% endif %}">
+        <span class="tw-font-mono">{{ n }}</span>
+        <span>{{ label }}</span>
+      </li>
+    {% endfor %}
+  </ol>
+
+  <section id="wizard-step-content" class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-4">
+    {% if step == 1 %}{% include "cyab/_wizard_step_1_identity.html" %}{% endif %}
+    {% if step == 2 %}{% include "cyab/_wizard_step_2_intake.html" ignore missing %}{% endif %}
+    {% if step == 3 %}{% include "cyab/_wizard_step_3_source.html" ignore missing %}{% endif %}
+    {% if step == 4 %}{% include "cyab/_wizard_step_4_docs.html" ignore missing %}{% endif %}
+  </section>
+</div>
+{% endblock %}
