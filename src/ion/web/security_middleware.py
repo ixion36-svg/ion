@@ -1,37 +1,89 @@
 """Security monitoring middleware for FastAPI."""
 
-from typing import Callable, Optional
+import ipaddress
+import os
+from typing import Callable, List, Union
 
-from fastapi import Request, Response, HTTPException
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
 
+from ion.core.config import get_config
 from ion.core.logging import get_structured_logger
 from ion.services.security_service import (
-    SecurityDetectionService,
     RequestContext,
+    SecurityDetectionService,
 )
 from ion.storage.database import get_engine, get_session_factory
-from ion.core.config import get_config
-
 
 logger = get_structured_logger(__name__)
 
 
+_IPNet = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
+
+
+def _parse_trusted_proxies() -> List[_IPNet]:
+    """Parse ION_TRUSTED_PROXIES env var (comma-separated CIDRs/IPs)."""
+    raw = os.environ.get("ION_TRUSTED_PROXIES", "")
+    nets: List[_IPNet] = []
+    for s in raw.split(","):
+        s = s.strip()
+        if not s:
+            continue
+        try:
+            nets.append(ipaddress.ip_network(s, strict=False))
+        except ValueError:
+            logger.warning("Ignoring invalid CIDR in ION_TRUSTED_PROXIES: %s", s)
+    return nets
+
+
+_TRUSTED_PROXIES = _parse_trusted_proxies()
+
+
+def _peer_ip(request: Request) -> str:
+    """Actual TCP peer IP — never spoofable via headers."""
+    return request.client.host if request.client else "unknown"
+
+
+def _is_trusted_proxy(ip: str) -> bool:
+    """Is the given IP a configured trusted reverse proxy?"""
+    if not _TRUSTED_PROXIES:
+        return False
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return any(addr in net for net in _TRUSTED_PROXIES)
+
+
 def get_client_ip(request: Request) -> str:
-    """Extract client IP from request, handling proxies."""
-    forwarded = request.headers.get("X-Forwarded-For")
+    """Extract client IP from request.
+
+    Honors X-Forwarded-For / X-Real-IP ONLY when the immediate TCP peer is
+    in ION_TRUSTED_PROXIES (CIDR allowlist). Otherwise returns the peer IP
+    directly, since forwarded headers from untrusted clients are attacker-
+    controlled (any external client can send `X-Forwarded-For: 127.0.0.1`).
+
+    For trusted peers, walks XFF right-to-left and returns the first
+    non-trusted entry — i.e. the original client behind any chain of
+    trusted proxies.
+    """
+    peer = _peer_ip(request)
+
+    # Untrusted peer: ignore any forwarded headers.
+    if not _is_trusted_proxy(peer):
+        return peer
+
+    forwarded = request.headers.get("X-Forwarded-For", "")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        for entry in reversed([s.strip() for s in forwarded.split(",")]):
+            if entry and not _is_trusted_proxy(entry):
+                return entry
 
     real_ip = request.headers.get("X-Real-IP")
     if real_ip:
         return real_ip
 
-    if request.client:
-        return request.client.host
-
-    return "unknown"
+    return peer
 
 
 class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
@@ -97,10 +149,15 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
         if not self.enabled or not self.session_factory:
             return await call_next(request)
 
-        client_ip = get_client_ip(request)
+        # CRITICAL: trust check uses the actual TCP peer, NOT the result of
+        # get_client_ip() — the latter can be derived from X-Forwarded-For
+        # which is attacker-controlled. Without this, an external attacker
+        # could send `X-Forwarded-For: 127.0.0.1` to bypass all detection.
+        peer_ip = _peer_ip(request)
+        client_ip = get_client_ip(request)  # used for logging/recording only
 
         # Skip all security checks for trusted IPs (localhost)
-        if self._is_trusted_ip(client_ip):
+        if self._is_trusted_ip(peer_ip):
             return await call_next(request)
 
         session = self.session_factory()

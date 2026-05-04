@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -33,15 +33,25 @@ async def receive_alert_webhook(
 
     Validates the webhook secret (ION_WEBHOOK_SECRET env var) and
     creates an AlertTriage record.
+
+    Fail-closed: if the secret is not configured, the endpoint is disabled.
+    Previously the check was bypassed when the env var was empty, allowing
+    unauthenticated alert injection.
     """
     import os
+    import hmac
     expected_secret = os.environ.get("ION_WEBHOOK_SECRET", "")
-    if expected_secret and x_webhook_secret != expected_secret:
+    if not expected_secret:
+        raise HTTPException(
+            status_code=503,
+            detail="Webhook receiver disabled: set ION_WEBHOOK_SECRET to enable.",
+        )
+    if not x_webhook_secret or not hmac.compare_digest(x_webhook_secret, expected_secret):
         raise HTTPException(status_code=401, detail="Invalid webhook secret")
 
     from ion.core.config import get_config
-    from ion.storage.database import get_engine, get_session_factory
     from ion.models.alert_triage import AlertTriage, AlertTriageStatus
+    from ion.storage.database import get_engine, get_session_factory
 
     config = get_config()
     engine = get_engine(config.db_path)
