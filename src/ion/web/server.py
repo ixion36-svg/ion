@@ -968,6 +968,181 @@ async def cyab_overview_page(
         session.close()
 
 
+@app.get("/cyab/systems", response_class=HTMLResponse)
+async def cyab_systems_list_page(
+    request: Request,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """Portfolio list — table loads via HTMX from /cyab/systems/_table."""
+    from ion.core.config import get_config
+    from ion.services.cyab_subprofile_service import (
+        list_pillars,
+        list_subprofiles_for_pillar,
+    )
+    from ion.storage.database import get_engine, get_session_factory
+
+    Session = get_session_factory(get_engine(get_config().db_path))
+    session = Session()
+    try:
+        pillars = list_pillars(session)
+        # Flatten sub-profiles across all pillars for the global filter.
+        subprofiles = []
+        for p in pillars:
+            subprofiles.extend(list_subprofiles_for_pillar(session, p["id"]))
+        return templates.TemplateResponse(
+            request=request,
+            name="cyab/systems_list.html",
+            context={
+                "active_tab": "systems",
+                "user": user,
+                "pillars": pillars,
+                "subprofiles": subprofiles,
+            },
+        )
+    finally:
+        session.close()
+
+
+@app.get("/cyab/systems/_table", response_class=HTMLResponse)
+async def cyab_systems_table_partial(
+    request: Request,
+    q: str = "",
+    pillar: str = "",
+    subprofile: str = "",
+    status: str = "",
+    owner: str = "",
+    missing: str = "",
+    stale: int = 0,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """HTMX partial — filtered + searched portfolio table.
+
+    Reuses the same data set as /api/cyab/systems but filters server-side
+    so HTMX swaps stay fast.
+    """
+    from sqlalchemy import select
+
+    from ion.core.config import get_config
+    from ion.models.cyab import CyabSystem
+    from ion.services import cyab_doc_checklist_service
+    from ion.storage.database import get_engine, get_session_factory
+
+    Session = get_session_factory(get_engine(get_config().db_path))
+    session = Session()
+    try:
+        stmt = select(CyabSystem)
+        if q:
+            like = f"%{q}%"
+            stmt = stmt.where(
+                (CyabSystem.name.ilike(like))
+                | (CyabSystem.soc_analyst_owner.ilike(like))
+            )
+        if status:
+            stmt = stmt.where(CyabSystem.status == status)
+        if owner:
+            stmt = stmt.where(CyabSystem.soc_analyst_owner.ilike(f"%{owner}%"))
+        # pillar / subprofile filters work on the data-source level — for
+        # simplicity in this sub-plan filter post-fetch (Sub-plan C will
+        # join CyabDataSource.subprofile_id → pillar).
+
+        systems = session.execute(
+            stmt.order_by(CyabSystem.updated_at.desc().nulls_last())
+        ).scalars().all()
+
+        rows = []
+        for s in systems:
+            summary = cyab_doc_checklist_service.coverage_summary(session, s.id)
+            crit = summary.get("critical_missing") or []
+            if missing and missing not in crit:
+                continue
+            rows.append(type("Row", (), {
+                "id": s.id,
+                "name": s.name,
+                "pillar": None,        # joined in via subprofile in Sub-plan C
+                "subprofile": None,
+                "owner": s.soc_analyst_owner,
+                "progress": summary,
+                "critical_missing": len(crit),
+                "updated_at": s.updated_at,
+                "status": s.status,
+            })())
+
+        return templates.TemplateResponse(
+            request=request,
+            name="cyab/_systems_table.html",
+            context={"rows": rows},
+        )
+    finally:
+        session.close()
+
+
+@app.post("/api/cyab/systems/bulk")
+async def cyab_systems_bulk(
+    payload: dict,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """{action, system_ids} — mark-reviewed | export-csv | rerun-health.
+
+    The rerun-health action is a stub for Sub-plan C; the response shape
+    matches the other actions so the UI flow stays uniform.
+    """
+    import csv
+    import io
+    from datetime import date
+
+    from fastapi.responses import Response
+    from sqlalchemy import select
+
+    from ion.core.config import get_config
+    from ion.models.cyab import CyabSystem
+    from ion.storage.database import get_engine, get_session_factory
+
+    action = payload.get("action")
+    ids = payload.get("system_ids") or []
+    Session = get_session_factory(get_engine(get_config().db_path))
+    session = Session()
+    try:
+        rows = session.execute(
+            select(CyabSystem).where(CyabSystem.id.in_(ids))
+        ).scalars().all()
+
+        if action == "mark-reviewed":
+            today = date.today()
+            for s in rows:
+                s.last_reviewed_date = today
+            session.commit()
+            return {"affected": len(rows)}
+
+        if action == "export-csv":
+            buf = io.StringIO()
+            w = csv.writer(buf)
+            w.writerow(["id", "name", "department", "owner", "status", "readiness"])
+            for s in rows:
+                w.writerow([
+                    s.id, s.name, s.department, s.soc_analyst_owner or "",
+                    s.status, s.readiness_score,
+                ])
+            return Response(
+                content=buf.getvalue(),
+                media_type="text/csv",
+                headers={"content-disposition": "attachment; filename=cyab-systems.csv"},
+            )
+
+        if action == "rerun-health":
+            # Stub — Sub-plan C wires the live data-health service into a job.
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "affected": len(rows),
+                    "note": "queued (stub)",
+                },
+            )
+
+        raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
+    finally:
+        session.close()
+
+
 @app.get("/cyab/studio")
 async def cyab_studio_redirect(system: int | None = None):
     """301 redirect — /cyab/studio is replaced by /cyab/systems/{id}.
