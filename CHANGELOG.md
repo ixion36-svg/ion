@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.19.1 — 2026-05-04
+
+### Fix-pack for v0.19.0 CyAB UI
+
+- **Tailwind classes**: stripped non-existent `tw-` prefix from 516 classes
+  across 23 new CyAB templates. Project doesn't configure a Tailwind
+  prefix; `tw-bg-slate-900` etc. produced no styling. Now use plain
+  `bg-slate-900`. Rebuilt `tailwind.css` (70K → 76K) so the `@source`
+  scan picks up the corrected classes.
+- **HTMX**: vendored `htmx.min.js` (1.9.10) and loaded it from `base.html`.
+  Every `hx-*` attribute across the new CyAB UI was previously dead
+  (tab swaps, wizard step transitions, scoping live counter, scoping
+  summary swap, systems-list filters, bulk ops, audit/coverage filter
+  forms). Now functional.
+
 ## v0.19.0 — 2026-05-04
 
 ### CyAB IA — Scoping + Coverage + Audit (Sub-plan C of 3) — completes the v0.19.0 series
