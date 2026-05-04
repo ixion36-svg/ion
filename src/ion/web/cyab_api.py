@@ -2803,3 +2803,42 @@ async def scoping_pdf_proxy(request: Request):
     /api/cyab/scoping/pdf as the spec requires."""
     from ion.web.cyab_studio_api import render_scoping_pack
     return await render_scoping_pack(request)
+
+
+# ---------------------------------------------------------------------------
+# Convert-to-system: stash scoping answers in session, redirect to wizard
+# ---------------------------------------------------------------------------
+
+from fastapi.responses import RedirectResponse
+
+
+@router.post(
+    "/scoping/convert",
+    dependencies=[Depends(require_permission("alert:read"))],
+)
+async def scoping_convert(request: Request):
+    """Stash the scoping answers in session, then 303-redirect to the wizard.
+
+    The wizard's Step 1 handler (Sub-plan B) reads `request.session.get(
+    'scoping_prefill')` and prefills its form fields. If session middleware
+    isn't wired yet, falls back to query-string encoding.
+    """
+    raw = await request.form()
+    answers: dict = {}
+    for key in raw.keys():
+        vals = [v for v in raw.getlist(key) if v != ""]
+        if not vals:
+            continue
+        answers[key] = vals if len(vals) > 1 else vals[0]
+
+    try:
+        request.session["scoping_prefill"] = answers
+        target = "/cyab/onboard?from_scoping=1"
+    except (AssertionError, AttributeError):
+        # No SessionMiddleware mounted — fall back to query string. URL-encode
+        # the answers as a JSON blob inside one query param to avoid expanding
+        # multi-value lists into the URL surface.
+        from urllib.parse import quote
+        target = "/cyab/onboard?from_scoping=1&answers=" + quote(json.dumps(answers))
+
+    return RedirectResponse(url=target, status_code=303)
