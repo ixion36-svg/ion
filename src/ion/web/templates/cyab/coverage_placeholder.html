@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Coverage — CyAB · ION{% endblock %}
+{% block content %}
+<div class="cyab-coverage-placeholder">
+  {% include "cyab/_section_nav.html" %}
+  <header class="tw-mb-4">
+    <h1 class="tw-text-[24px] tw-text-white tw-font-semibold">Fleet coverage matrix</h1>
+    <p class="tw-text-slate-400 tw-text-[12.5px]">Systems × data-health dimensions. Lands in Sub-plan C.</p>
+  </header>
+  <div class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-8 tw-text-center tw-text-slate-500">
+    <p class="tw-text-[13px]">Coming soon — Sub-plan C will fill this matrix.</p>
+    <p class="tw-text-[11px] tw-mt-2">For per-system data health today, open any system from <a href="/cyab/systems" class="tw-text-cyan-400">Systems</a>.</p>
+  </div>
+</div>
+{% endblock %}

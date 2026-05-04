@@ -1,0 +1,19 @@
+{# Secondary tab strip rendered inside every CyAB page.
+   Caller passes `active_tab` (string) to highlight one entry. #}
+{% set _tabs = [
+  ('overview',  'Overview',  '/cyab'),
+  ('systems',   'Systems',   '/cyab/systems'),
+  ('scoping',   'Scoping',   '/cyab/scoping'),
+  ('onboard',   'Onboard',   '/cyab/onboard'),
+  ('coverage',  'Coverage',  '/cyab/coverage'),
+  ('audit',     'Audit',     '/cyab/audit'),
+] %}
+<nav class="cyab-section-nav tw-flex tw-gap-1 tw-border-b tw-border-slate-800 tw-mb-4"
+     data-active="{{ active_tab }}">
+  {% for slug, label, href in _tabs %}
+    <a href="{{ href }}"
+       class="tw-px-3 tw-py-2 tw-text-[12.5px] tw-text-slate-400 hover:tw-text-cyan-300 tw-border-b-2 tw-border-transparent {% if slug == active_tab %}tw-text-cyan-300 tw-border-cyan-400 is-active{% endif %}">
+      {{ label }}
+    </a>
+  {% endfor %}
+</nav>

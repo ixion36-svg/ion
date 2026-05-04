@@ -1108,6 +1108,32 @@ async def cyab_system_tab(
         session.close()
 
 
+@app.get("/cyab/coverage", response_class=HTMLResponse)
+async def cyab_coverage_placeholder(
+    request: Request,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """Sub-plan C placeholder. Returns the section nav + a 'coming soon' card."""
+    return templates.TemplateResponse(
+        request=request,
+        name="cyab/coverage_placeholder.html",
+        context={"active_tab": "coverage", "user": user},
+    )
+
+
+@app.get("/cyab/audit", response_class=HTMLResponse)
+async def cyab_audit_placeholder(
+    request: Request,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """Sub-plan C placeholder. Returns the section nav + a 'coming soon' card."""
+    return templates.TemplateResponse(
+        request=request,
+        name="cyab/audit_placeholder.html",
+        context={"active_tab": "audit", "user": user},
+    )
+
+
 @app.get("/discover", response_class=HTMLResponse)
 async def discover_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the discover and hunt page for analysts."""
