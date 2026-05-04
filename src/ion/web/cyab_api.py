@@ -2806,6 +2806,53 @@ async def scoping_pdf_proxy(request: Request):
 
 
 # ---------------------------------------------------------------------------
+# Onboarding wizard — Step 2 live counter (shared engine)
+# ---------------------------------------------------------------------------
+#
+# `POST /api/cyab/onboard/score` is the wizard counterpart of
+# `/api/cyab/scoping/score`. It deliberately reuses the SAME
+# ``cyab_scoping_engine.score_answers`` and renders the SAME
+# ``cyab/_scoping_counter.html`` partial so the live counter (use cases /
+# threat-actor matches / MITRE coverage) is identical on both surfaces —
+# the spec calls this "engine architecture: scope for all".
+#
+# Kept anonymous (no auth dependency) to match the scoping page; the
+# wizard's own page handler enforces ``alert:read``, so reaching this
+# endpoint from the form already implies the user is authenticated.
+
+
+@router.post("/onboard/score")
+async def onboard_score(request: Request):
+    """Live-counter endpoint for the wizard's Step 2 (intake).
+
+    Reuses the same ``cyab_scoping_engine.score_answers`` as
+    /cyab/scoping. Returns the counter partial as HTML for HTMX swap.
+    """
+    from ion.services import cyab_scoping_engine
+
+    raw = await request.form()
+    answers: dict = {}
+    for key in raw.keys():
+        vals = [v for v in raw.getlist(key) if v != ""]
+        if not vals:
+            continue
+        # Single-select arrives as a one-item list; flatten unless this
+        # is a multi-select with multiple values (matches /scoping/score).
+        answers[key] = vals if len(vals) > 1 else vals[0]
+
+    scores = cyab_scoping_engine.score_answers(answers)
+    return templates.TemplateResponse(
+        request=request,
+        name="cyab/_scoping_counter.html",
+        context={
+            "scores": scores,
+            "answers": answers,
+            "summary_text": cyab_scoping_engine.summary_text(scores),
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
 # Convert-to-system: stash scoping answers in session, redirect to wizard
 # ---------------------------------------------------------------------------
 
