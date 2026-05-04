@@ -1,0 +1,76 @@
+{# Step 1: Identity. Captures name, hostname, pillar, sub-profile, owner,
+   department, containment_authority. Sub-profile is per-source, so we
+   show it here as a hint that gets carried through to Step 3. #}
+
+<header class="tw-mb-4">
+  <h2 class="tw-text-white tw-text-[16px] tw-font-semibold">Identity</h2>
+  <p class="tw-text-slate-400 tw-text-[12px]">
+    Tell us what we're onboarding. None of these fields block — fill in what you know.
+  </p>
+</header>
+
+<form hx-post="/api/cyab/onboard/{{ wid }}/step/1"
+      hx-target="#wizard-step-content"
+      hx-swap="innerHTML"
+      method="post"
+      action="/api/cyab/onboard/{{ wid }}/step/1"
+      class="tw-grid tw-grid-cols-2 tw-gap-4 tw-text-[12.5px]">
+
+  <label class="tw-flex tw-flex-col tw-gap-1">
+    <span class="tw-text-slate-400">Name <span class="tw-text-rose-400">*</span></span>
+    <input name="name" type="text" required value="{{ state.identity.get('name', '') }}"
+           class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+  </label>
+
+  <label class="tw-flex tw-flex-col tw-gap-1">
+    <span class="tw-text-slate-400">Hostname (primary)</span>
+    <input name="hostname" type="text" value="{{ state.identity.get('hostname', '') }}"
+           placeholder="e.g. sso01.corp"
+           class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+  </label>
+
+  <label class="tw-flex tw-flex-col tw-gap-1">
+    <span class="tw-text-slate-400">Pillar</span>
+    <select name="pillar" class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+      <option value="">— select —</option>
+      {% for p in (pillars or []) %}
+        <option value="{{ p.id }}" {% if state.identity.get('pillar') == p.id %}selected{% endif %}>{{ p.label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="tw-flex tw-flex-col tw-gap-1">
+    <span class="tw-text-slate-400">Sub-profile (assigned at Step 3)</span>
+    <select name="subprofile_id" class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+      <option value="">— select after pillar —</option>
+      {% for s in (subprofiles or []) %}
+        <option value="{{ s.id }}" {% if state.identity.get('subprofile_id') == s.id %}selected{% endif %}>{{ s.label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="tw-flex tw-flex-col tw-gap-1">
+    <span class="tw-text-slate-400">Owner</span>
+    <input name="owner" type="text" value="{{ state.identity.get('owner', '') }}"
+           class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+  </label>
+
+  <label class="tw-flex tw-flex-col tw-gap-1">
+    <span class="tw-text-slate-400">Department <span class="tw-text-rose-400">*</span></span>
+    <input name="department" type="text" required value="{{ state.identity.get('department', '') }}"
+           class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">
+  </label>
+
+  <label class="tw-col-span-2 tw-flex tw-flex-col tw-gap-1">
+    <span class="tw-text-slate-400">Containment authority (free text — runbook URL or on-call team)</span>
+    <textarea name="containment_authority" rows="2"
+              class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded">{{ state.identity.get('containment_authority', '') }}</textarea>
+  </label>
+
+  <div class="tw-col-span-2 tw-flex tw-justify-between tw-items-center tw-mt-2">
+    <a href="/cyab/systems" class="tw-text-slate-500 tw-text-[11px]">← Save & exit</a>
+    <button type="submit" class="tw-px-4 tw-py-1.5 tw-bg-cyan-700 tw-text-white tw-text-[12.5px] tw-rounded">
+      Continue → Intake
+    </button>
+  </div>
+</form>

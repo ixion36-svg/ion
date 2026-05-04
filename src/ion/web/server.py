@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -1132,6 +1132,136 @@ async def cyab_audit_placeholder(
         name="cyab/audit_placeholder.html",
         context={"active_tab": "audit", "user": user},
     )
+
+
+# ---------------------------------------------------------------------------
+# CyAB Onboarding Wizard (Sub-plan B / Task 3)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/cyab/onboard", response_class=HTMLResponse)
+async def cyab_onboard_page(
+    request: Request,
+    wid: str | None = None,
+    step: int = 1,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """4-step wizard. Without ``wid``, starts a new session and 302s with
+    the wid baked in so refresh/back work.
+
+    Each step is a separate URL so back/forward navigation works. POST
+    /api/cyab/onboard/{wid}/step/{n} advances state and returns an
+    HTMX-replaceable partial.
+    """
+    from ion.services import cyab_wizard_service
+    from ion.services.cyab_subprofile_service import (
+        list_pillars,
+        list_subprofiles_for_pillar,
+    )
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.core.config import get_config
+
+    config = get_config()
+    Session = get_session_factory(get_engine(config.db_path))
+    session = Session()
+    try:
+        if not wid:
+            new_wid = cyab_wizard_service.start_wizard(
+                session, user_id=getattr(user, "id", None)
+            )
+            return RedirectResponse(
+                url=f"/cyab/onboard?wid={new_wid}&step=1", status_code=302
+            )
+
+        try:
+            state = cyab_wizard_service.load_state(session, wid)
+        except LookupError:
+            raise HTTPException(status_code=404, detail="Wizard session not found")
+
+        # Aggregate sub-profiles across all pillars (the catalogue helper
+        # is per-pillar; the wizard form needs a flat list for the
+        # combined dropdown).
+        pillars = list_pillars(session)
+        subprofiles: list = []
+        for p in pillars:
+            subprofiles.extend(list_subprofiles_for_pillar(session, p["id"]))
+
+        ctx = {
+            "wid": wid,
+            "step": step,
+            "state": state,
+            "pillars": pillars,
+            "subprofiles": subprofiles,
+            "active_tab": "onboard",
+            "user": user,
+        }
+        return templates.TemplateResponse(
+            request=request, name="cyab/onboard.html", context=ctx
+        )
+    finally:
+        session.close()
+
+
+@app.post("/api/cyab/onboard/{wid}/step/1", response_class=HTMLResponse)
+async def cyab_onboard_step_1(
+    wid: str,
+    request: Request,
+    name: str = Form(...),
+    department: str = Form(...),
+    hostname: str = Form(""),
+    pillar: str = Form(""),
+    subprofile_id: str = Form(""),
+    owner: str = Form(""),
+    containment_authority: str = Form(""),
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """Step 1 — Identity. Persists fields and creates the backing
+    CyabSystem row via ``cyab_wizard_service.save_identity``. Returns
+    the Step 2 partial for HTMX clients, or a 303 redirect for plain
+    browsers."""
+    from ion.services import cyab_wizard_service
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.core.config import get_config
+
+    config = get_config()
+    Session = get_session_factory(get_engine(config.db_path))
+    session = Session()
+    try:
+        try:
+            state = cyab_wizard_service.save_identity(
+                session,
+                wid,
+                identity={
+                    "name": name,
+                    "hostname": hostname,
+                    "pillar": pillar,
+                    "subprofile_id": subprofile_id,
+                    "owner": owner,
+                    "department": department,
+                    "containment_authority": containment_authority,
+                },
+            )
+        except LookupError:
+            raise HTTPException(status_code=404, detail="Wizard session not found")
+
+        # Render Step 2 partial inline (HTMX swap), or 303 for non-HTMX clients.
+        if request.headers.get("hx-request") == "true":
+            from jinja2 import TemplateNotFound
+            try:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="cyab/_wizard_step_2_intake.html",
+                    context={"wid": wid, "step": 2, "state": state},
+                )
+            except TemplateNotFound:
+                # Step 2 partial lands in Task 4 — fall through to redirect
+                # so HTMX clients still progress in the meantime.
+                pass
+        return RedirectResponse(
+            url=f"/cyab/onboard?wid={wid}&step=2", status_code=303
+        )
+    finally:
+        session.close()
 
 
 @app.get("/discover", response_class=HTMLResponse)
