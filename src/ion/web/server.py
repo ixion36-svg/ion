@@ -1455,6 +1455,16 @@ async def cyab_onboard_page(
                 session, state["system_id"]
             )
 
+        # Step 2 needs the live counter pre-rendered with the current
+        # answer set so a hard refresh shows the right numbers (HTMX
+        # then takes over for subsequent updates). Same engine as the
+        # /cyab/scoping page — shared backend per the spec.
+        if step == 2:
+            from ion.services import cyab_scoping_engine
+            ctx["scoping_initial"] = cyab_scoping_engine.score_answers(
+                state.get("intake", {}) or {}
+            )
+
         return templates.TemplateResponse(
             request=request, name="cyab/onboard.html", context=ctx
         )

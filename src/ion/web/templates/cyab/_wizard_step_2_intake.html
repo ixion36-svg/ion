@@ -2,55 +2,85 @@
    /api/cyab/studio/systems/{sys_id}/answers for autosave so the SAME
    intake form is used here and on the per-system Intake tab.
 
-   The "live recommendation counter" from the spec (47 use cases / 12
-   actor matches / 64% coverage) hooks into the shared scoring engine
-   landing in Sub-plan C — placeholder div left in place. #}
+   The "live recommendation counter" (use cases / threat-actor matches /
+   MITRE coverage) is wired to the SHARED scoping engine via
+   POST /api/cyab/onboard/score — the same engine that drives
+   /cyab/scoping. The counter partial (cyab/_scoping_counter.html) is
+   reused verbatim so the two surfaces stay byte-identical. #}
 
-<header class="tw-mb-4 tw-flex tw-items-baseline tw-justify-between">
-  <div>
-    <h2 class="tw-text-white tw-text-[16px] tw-font-semibold">Intake</h2>
-    <p class="tw-text-slate-400 tw-text-[12px]">Sub-profile-driven questions. Auto-saves as you type.</p>
-  </div>
-  <div id="wizard-recommendation-counter" class="tw-text-slate-500 tw-text-[11px]">
-    {# Sub-plan C wires the live counter here. #}
-    recommendations panel — Sub-plan C
-  </div>
+<header class="tw-mb-4">
+  <h2 class="tw-text-white tw-text-[16px] tw-font-semibold">Intake</h2>
+  <p class="tw-text-slate-400 tw-text-[12px]">Sub-profile-driven questions. Auto-saves as you type.</p>
 </header>
 
-<form hx-post="/api/cyab/onboard/{{ wid }}/step/2"
-      hx-target="#wizard-step-content"
-      hx-swap="innerHTML"
-      method="post"
-      action="/api/cyab/onboard/{{ wid }}/step/2"
-      class="tw-space-y-3">
-  {% if not state.identity.subprofile_id %}
-    <p class="tw-text-amber-400 tw-text-[12px]">
-      No sub-profile yet — questions will load after Step 3 picks one. You can skip ahead.
-    </p>
-  {% else %}
-    {# Sub-profile catalogue questions. The full renderer lives in the
-       per-system Intake tab from Sub-plan A — keep this minimal so the
-       wizard never blocks. #}
-    {% for q in (questions or []) %}
-      <label class="tw-block tw-text-[12.5px]">
-        <span class="tw-text-slate-300">{{ q.text }}</span>
-        <input type="text" name="answers[{{ q.id }}]" value="{{ state.intake.get(q.id, '') }}"
-               class="tw-w-full tw-mt-1 tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded"
-               hx-post="/api/cyab/studio/systems/{{ state.system_id }}/answers"
-               hx-trigger="change delay:600ms"
-               hx-vals='js:{ answers: { "{{ q.id }}": this.value } }'
-               hx-swap="none">
-      </label>
-    {% endfor %}
-  {% endif %}
+{# === Two-column layout: form on the left, sticky live counter on the right.
+     The counter swaps via HTMX on every form change; same engine as
+     /cyab/scoping (see /api/cyab/onboard/score). === #}
+<div class="tw-grid tw-grid-cols-3 tw-gap-4">
 
-  <div class="tw-flex tw-justify-between tw-items-center tw-mt-4">
-    <a href="/cyab/onboard?wid={{ wid }}&step=1" class="tw-text-slate-500 tw-text-[11px]">← Back</a>
-    <div class="tw-flex tw-gap-2">
-      <a href="/cyab/systems" class="tw-text-slate-500 tw-text-[11px] tw-py-1">Save & exit</a>
-      <button type="submit" class="tw-px-4 tw-py-1.5 tw-bg-cyan-700 tw-text-white tw-text-[12.5px] tw-rounded">
-        Continue → Source
-      </button>
-    </div>
+  <div class="tw-col-span-2">
+    <form id="wizard-intake-form"
+          hx-post="/api/cyab/onboard/{{ wid }}/step/2"
+          hx-target="#wizard-step-content"
+          hx-swap="innerHTML"
+          method="post"
+          action="/api/cyab/onboard/{{ wid }}/step/2"
+          class="tw-space-y-3">
+
+      {# Live-counter trigger: every change posts the form to the shared
+         scoring endpoint and swaps the counter region. Kept on the form
+         itself (not per-input) so a single HTMX call per change covers
+         every answer. #}
+      <div hx-post="/api/cyab/onboard/score"
+           hx-trigger="change from:#wizard-intake-form"
+           hx-target="#wizard-counter"
+           hx-swap="innerHTML"
+           hx-include="#wizard-intake-form"></div>
+
+      {% if not state.identity.subprofile_id %}
+        <p class="tw-text-amber-400 tw-text-[12px]">
+          No sub-profile yet — questions will load after Step 3 picks one. You can skip ahead.
+        </p>
+      {% else %}
+        {# Sub-profile catalogue questions. The full renderer lives in the
+           per-system Intake tab from Sub-plan A — keep this minimal so the
+           wizard never blocks. #}
+        {% for q in (questions or []) %}
+          <label class="tw-block tw-text-[12.5px]">
+            <span class="tw-text-slate-300">{{ q.text }}</span>
+            <input type="text" name="answers[{{ q.id }}]" value="{{ state.intake.get(q.id, '') }}"
+                   class="tw-w-full tw-mt-1 tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded"
+                   hx-post="/api/cyab/studio/systems/{{ state.system_id }}/answers"
+                   hx-trigger="change delay:600ms"
+                   hx-vals='js:{ answers: { "{{ q.id }}": this.value } }'
+                   hx-swap="none">
+          </label>
+        {% endfor %}
+      {% endif %}
+
+      <div class="tw-flex tw-justify-between tw-items-center tw-mt-4">
+        <a href="/cyab/onboard?wid={{ wid }}&step=1" class="tw-text-slate-500 tw-text-[11px]">← Back</a>
+        <div class="tw-flex tw-gap-2">
+          <a href="/cyab/systems" class="tw-text-slate-500 tw-text-[11px] tw-py-1">Save & exit</a>
+          <button type="submit" class="tw-px-4 tw-py-1.5 tw-bg-cyan-700 tw-text-white tw-text-[12.5px] tw-rounded">
+            Continue → Source
+          </button>
+        </div>
+      </div>
+    </form>
   </div>
-</form>
+
+  <aside class="tw-col-span-1">
+    <div id="wizard-counter"
+         class="tw-sticky tw-top-4 tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-4">
+      {# Initial render: zero state from the server. The wizard page
+         handler may pre-populate `scoping_initial` from any answers
+         already saved against this session. #}
+      {% set scores = scoping_initial | default({"use_case_count": 0,
+                                                 "threat_actor_matches": 0,
+                                                 "mitre_coverage_pct": 0}) %}
+      {% include "cyab/_scoping_counter.html" %}
+    </div>
+  </aside>
+
+</div>
