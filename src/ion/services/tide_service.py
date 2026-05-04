@@ -1117,3 +1117,14 @@ def reset_tide_service():
     # Drop the per-process query cache too — config may have changed.
     with _CACHE_LOCK:
         _QUERY_CACHE.clear()
+
+
+def get_playbooks_with_kill_chains() -> list[dict]:
+    """Module-level convenience wrapper around
+    ``get_tide_service().get_playbooks_with_kill_chains()``.
+
+    Lets callers (e.g. ``cyab_scoping_engine``) reach the playbook catalogue
+    without having to construct a service instance themselves, and gives
+    tests a single attribute to monkeypatch.
+    """
+    return get_tide_service().get_playbooks_with_kill_chains()
