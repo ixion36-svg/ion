@@ -1,5 +1,47 @@
 # Changelog
 
+## v0.19.0-rc.2 — 2026-05-04
+
+### CyAB IA — Onboarding wizard + landing pages (Sub-plan B of 3)
+
+- **New `/cyab/onboard` 4-step wizard** — Identity, Intake, First data
+  source, Doc placeholders. Wizard never blocks: every step accepts
+  partial data and the user can exit and resume from the same wid URL.
+  Finish drops the user into `/cyab/systems/{id}` with the doc checklist
+  lazy-seeded (20 default items).
+- **New `/cyab` Overview landing** — KPI strip (total systems, %
+  onboarded, % critical-missing, sign-offs this week), "In progress"
+  feed (5 most recent), "Needs attention" feed (critical-missing rows),
+  CTAs to + Onboard / View systems / Run coverage rollup.
+- **New `/cyab/systems` portfolio list** — table with name / pillar /
+  sub-profile / owner / progress / critical-missing / last-edited /
+  status; HTMX-filtered search by name/owner; filters for pillar /
+  sub-profile / status / owner / "missing X" / stale data; bulk ops
+  (mark reviewed, export CSV, re-run health checks).
+- **Secondary tab strip** added to every CyAB page: Overview · Systems ·
+  Scoping · Onboard · Coverage · Audit. Coverage and Audit are
+  placeholder pages that ship the nav strip + "coming soon" card; both
+  are filled in by Sub-plan C.
+- **New `cyab_wizard_sessions` table + `cyab_wizard_service`** — manages
+  in-progress wizard state server-side so users can resume across page
+  reloads.
+- `/api/cyab/dashboard` now returns `signoffs_this_week`.
+- New `/api/cyab/systems/_table` HTMX partial endpoint.
+- New `/api/cyab/systems/bulk` endpoint — `mark-reviewed`,
+  `export-csv`, `rerun-health` (last is a stub pending Sub-plan C).
+
+### Removed
+
+- Legacy `src/ion/web/templates/cyab.html` template (3,543 lines) —
+  replaced by the new Overview page. Per-system content already moved
+  to `/cyab/systems/{id}` tabs in v0.19.0-rc.1.
+
+### Coming in Sub-plan C (v0.19.0-rc.3)
+
+Stack-to-use-cases scoping at `/cyab/scoping`; fleet `/cyab/coverage`
+matrix; `/cyab/audit` trail. Live recommendation counter wired into
+wizard Step 2.
+
 ## v0.19.0-rc.1 — 2026-05-04
 
 ### CyAB IA — Foundation + per-system page (Sub-plan A of 3)
