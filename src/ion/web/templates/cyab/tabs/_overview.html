@@ -1,0 +1,70 @@
+{# Overview tab — checklist grouped by category, critical first.
+   Each item links to where to fix it (other tabs). #}
+
+{% set critical_items = checklist | selectattr('is_critical', 'equalto', true) | list %}
+{% set non_critical = checklist | rejectattr('is_critical', 'equalto', true) | list %}
+
+{% macro item_row(item) %}
+  {% set status_icon = {
+    'done': '✓', 'in_progress': '◐', 'missing': '✗', 'na': '—', 'unknown': '○'
+  }.get(item.status, '○') %}
+  {% set status_color = {
+    'done': 'emerald-400', 'in_progress': 'amber-400',
+    'missing': 'rose-400', 'na': 'slate-500', 'unknown': 'slate-500'
+  }.get(item.status, 'slate-500') %}
+  <div class="checklist-item tw-flex tw-items-center tw-gap-3 tw-py-1.5 tw-px-2 hover:tw-bg-slate-800/40 tw-rounded" data-kind="{{ item.kind }}">
+    <span class="tw-text-{{ status_color }} tw-text-[14px] tw-w-4">{{ status_icon }}</span>
+    <span class="tw-flex-1 tw-text-[13px] tw-text-slate-200">{{ item.label }}</span>
+    <span class="tw-text-slate-600 tw-text-[10px] tw-font-mono tw-uppercase">{{ item.kind }}</span>
+    {% if item.url %}
+      <a href="{{ item.url }}" class="tw-text-cyan-400 tw-text-[11px] hover:tw-underline" target="_blank" rel="noopener">link</a>
+    {% endif %}
+    <span class="tw-text-slate-500 tw-text-[11px] tw-w-20 tw-text-right">{{ item.status }}</span>
+  </div>
+{% endmacro %}
+
+{% if critical_items %}
+<section class="tw-mb-6">
+  <h3 class="tw-text-rose-400 tw-text-[11px] tw-uppercase tw-tracking-wider tw-mb-2">Critical (must complete to ship)</h3>
+  <div class="tw-bg-slate-900/40 tw-border tw-border-rose-900/30 tw-rounded-md tw-p-2">
+    {% for item in critical_items %}{{ item_row(item) }}{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% set categories = ['design', 'operational', 'security', 'compliance'] %}
+{% for cat in categories %}
+  {% set rows = non_critical | selectattr('category', 'equalto', cat) | list %}
+  {% if rows %}
+    <section class="tw-mb-5">
+      <h3 class="tw-text-slate-400 tw-text-[11px] tw-uppercase tw-tracking-wider tw-mb-2">
+        {{ cat | capitalize }}
+        ({{ rows | selectattr('status', 'equalto', 'done') | list | length }} / {{ rows | length }})
+      </h3>
+      <div class="tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded-md tw-p-2">
+        {% for item in rows %}{{ item_row(item) }}{% endfor %}
+      </div>
+    </section>
+  {% endif %}
+{% endfor %}
+
+{# "Add custom item" form — POSTs to existing /api/cyab/studio/systems/{id}/checklist #}
+<section class="tw-mt-6 tw-pt-4 tw-border-t tw-border-slate-800">
+  <details>
+    <summary class="tw-text-cyan-400 tw-text-[12px] tw-cursor-pointer">+ Add custom checklist item</summary>
+    <form hx-post="/api/cyab/studio/systems/{{ system.id }}/checklist"
+          hx-target="#tab-content"
+          hx-swap="innerHTML"
+          class="tw-mt-3 tw-flex tw-gap-2 tw-items-center">
+      <input name="label" placeholder="e.g. Quarterly access review" required
+             class="tw-flex-1 tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-text-[12px] tw-rounded">
+      <select name="category" class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-text-[12px] tw-rounded">
+        <option value="design">Design</option>
+        <option value="operational">Operational</option>
+        <option value="security">Security</option>
+        <option value="compliance">Compliance</option>
+      </select>
+      <button type="submit" class="tw-px-3 tw-py-1 tw-bg-cyan-700 tw-text-white tw-text-[12px] tw-rounded">Add</button>
+    </form>
+  </details>
+</section>

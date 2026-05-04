@@ -14,6 +14,10 @@ def client(temp_db, monkeypatch):
     monkeypatch.setattr(
         "ion.storage.database.get_engine", lambda *_a, **_k: temp_db
     )
+    # The session-factory module-level cache binds to the first engine it
+    # sees; reset it before each test so the per-test temp_db is actually used.
+    from ion.storage.database import reset_engine
+    reset_engine()
     from ion.models.user import User
     from ion.web.server import app
 
@@ -48,6 +52,7 @@ def client(temp_db, monkeypatch):
 
     yield TestClient(app)
     app.dependency_overrides.clear()
+    reset_engine()
 
 
 @pytest.fixture
