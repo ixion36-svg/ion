@@ -2889,3 +2889,220 @@ async def scoping_convert(request: Request):
         target = "/cyab/onboard?from_scoping=1&answers=" + quote(json.dumps(answers))
 
     return RedirectResponse(url=target, status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Sub-plan C / Task 8 — Fleet coverage matrix
+# ---------------------------------------------------------------------------
+
+def _worst_sla(statuses: list) -> str:
+    """Reduce per-source SLA pills into one cell colour for the system row."""
+    order = {"red": 3, "amber": 2, "fresh": 1, "unknown": 0}
+    if not statuses:
+        return "unknown"
+    worst = max(statuses, key=lambda s: order.get(s, 0))
+    return {"red": "red", "amber": "amber", "fresh": "green", "unknown": "unknown"}[worst]
+
+
+def _pct_to_status(pct, green_at: float, amber_at: float) -> str:
+    """Map a 0..1 ratio to a green/amber/red/unknown pill."""
+    if pct is None:
+        return "unknown"
+    if pct >= green_at:
+        return "green"
+    if pct >= amber_at:
+        return "amber"
+    return "red"
+
+
+def _coverage_pcts(coverage_rollup_result: dict) -> dict:
+    """Average intake/detection/audit pct across a system's sub-profiles.
+
+    ``cyab_subprofile_service.system_coverage`` returns a list of sub-profile
+    dicts; for the fleet matrix we need a single intake/detection/audit
+    figure per system. Returns None for any dimension with no sub-profiles
+    so the cell can render as 'unknown' rather than a misleading 0%.
+    """
+    subs = (coverage_rollup_result or {}).get("subprofiles") or []
+    if not subs:
+        return {"intake_pct": None, "detection_pct": None, "audit_pct": None}
+    intake = sum(s["intake"]["pct"] for s in subs) / len(subs) / 100.0
+    det = sum(s["detection"]["pct"] for s in subs) / len(subs) / 100.0
+    aud = sum(s["audit"]["pct"] for s in subs) / len(subs) / 100.0
+    return {"intake_pct": intake, "detection_pct": det, "audit_pct": aud}
+
+
+@router.get(
+    "/coverage/matrix",
+    dependencies=[Depends(require_permission("alert:read"))],
+)
+async def coverage_matrix(
+    pillar: Optional[str] = None,
+    owner: Optional[str] = None,
+    any_red: int = 0,
+):
+    """Fleet x dimensions matrix.
+
+    Rows = CyabSystem rows (filtered by pillar/owner). Columns = the 7
+    data-health dimensions. Each cell carries a status pill the UI colours
+    green/amber/red/unknown plus a deep-link tab target for the per-system
+    page. The aggregates strip is computed once per request.
+
+    The CyabSystem model exposes the system owner via
+    ``soc_analyst_owner``; the response uses ``owner`` as the public alias.
+    ``business_unit`` doubles as the pillar proxy on the wire.
+
+    The session is built inside the function (dynamic import) rather than
+    via ``Depends(get_db_session)`` so the test harness's monkeypatch of
+    ``ion.storage.database.get_engine`` is observed regardless of import
+    order across the suite — same pattern as other CyAB page handlers.
+    """
+    return _build_coverage_matrix(pillar=pillar, owner=owner, any_red=any_red)
+
+
+def _build_coverage_matrix(
+    pillar: Optional[str] = None,
+    owner: Optional[str] = None,
+    any_red: int = 0,
+    session: Optional[Session] = None,
+) -> dict:
+    """Pure helper that builds the matrix payload.
+
+    Accepts an optional ``session`` so callers (the page handler in
+    server.py) can pass their own session. When None, opens one via the
+    project's standard pattern using a dynamic import to honour test
+    monkeypatches.
+    """
+    from ion.core.config import get_config
+    from ion.services import cyab_data_health_service as dh
+    from ion.services import cyab_doc_checklist_service as ck
+    from ion.storage.database import get_engine, get_session_factory
+
+    own_session = False
+    if session is None:
+        Session = get_session_factory(get_engine(get_config().db_path))
+        session = Session()
+        own_session = True
+    try:
+        return _coverage_matrix_impl(
+            session=session, pillar=pillar, owner=owner, any_red=any_red,
+            dh=dh, ck=ck,
+        )
+    finally:
+        if own_session:
+            session.close()
+
+
+def _coverage_matrix_impl(*, session, pillar, owner, any_red, dh, ck) -> dict:
+    """Inner builder kept separate so the helper above stays small."""
+    q = select(CyabSystem)
+    if pillar:
+        q = q.where(CyabSystem.business_unit == pillar)
+    if owner:
+        q = q.where(CyabSystem.soc_analyst_owner == owner)
+    systems = session.execute(q).scalars().all()
+
+    rows = []
+    for sys in systems:
+        sid = sys.id
+
+        ing = dh.ingestion_freshness(session, sid)
+        ing_status = _worst_sla([r["sla_status"] for r in ing]) if ing else "unknown"
+
+        fm = dh.field_mapping_completeness(session, sid)
+        # Average completeness across sources that report a numeric value;
+        # sources with no expected-field profile carry None and are excluded.
+        scored = [r["completeness"] for r in fm if r.get("completeness") is not None]
+        fm_pct = (sum(scored) / len(scored)) if scored else None
+        fm_status = _pct_to_status(fm_pct, green_at=0.9, amber_at=0.6)
+
+        cov = _coverage_pcts(dh.coverage_rollup(session, sid))
+        intake_status = _pct_to_status(cov["intake_pct"], green_at=0.9, amber_at=0.5)
+        det_status = _pct_to_status(cov["detection_pct"], green_at=0.8, amber_at=0.4)
+        aud_status = _pct_to_status(cov["audit_pct"], green_at=0.8, amber_at=0.4)
+
+        checklist = ck.coverage_summary(session, sid)
+        ck_pct = (checklist["done"] / checklist["total"]) if checklist["total"] else 0
+        ck_status = _pct_to_status(ck_pct, green_at=1.0, amber_at=0.5)
+
+        signed_status = "green" if (sys.sign_dept_name and sys.sign_soc_name) else "red"
+
+        cells = {
+            "ingestion_fresh":    {"status": ing_status,    "tab": "data-health"},
+            "fields_mapped":      {"status": fm_status,     "tab": "sources"},
+            "intake_done":        {"status": intake_status, "tab": "intake"},
+            "detections_shipped": {"status": det_status,    "tab": "detection"},
+            "audit_shipped":      {"status": aud_status,    "tab": "audit-use-cases"},
+            "checklist_done":     {"status": ck_status,     "tab": "overview"},
+            "signed_off":         {"status": signed_status, "tab": "signoff"},
+        }
+
+        if any_red and not any(c["status"] == "red" for c in cells.values()):
+            continue
+
+        rows.append({
+            "system_id":  sid,
+            "name":       sys.name,
+            "pillar":     sys.business_unit,
+            "owner":      sys.soc_analyst_owner,
+            "department": sys.department,
+            "cells":      cells,
+        })
+
+    # Aggregates: computed against the unfiltered fleet so the strip stays
+    # stable as the user filters rows. When no filter is active, reuse the
+    # rows we already built; otherwise re-fetch the full set.
+    all_systems_for_agg = systems if not (pillar or owner or any_red) else (
+        session.execute(select(CyabSystem)).scalars().all()
+    )
+    total = len(all_systems_for_agg) or 1
+
+    healthy = 0
+    for sys in all_systems_for_agg:
+        sid = sys.id
+        ing = dh.ingestion_freshness(session, sid)
+        ing_status = _worst_sla([r["sla_status"] for r in ing]) if ing else "unknown"
+        fm = dh.field_mapping_completeness(session, sid)
+        scored = [r["completeness"] for r in fm if r.get("completeness") is not None]
+        fm_pct = (sum(scored) / len(scored)) if scored else None
+        fm_status = _pct_to_status(fm_pct, green_at=0.9, amber_at=0.6)
+        cov = _coverage_pcts(dh.coverage_rollup(session, sid))
+        intake_status = _pct_to_status(cov["intake_pct"], green_at=0.9, amber_at=0.5)
+        det_status = _pct_to_status(cov["detection_pct"], green_at=0.8, amber_at=0.4)
+        aud_status = _pct_to_status(cov["audit_pct"], green_at=0.8, amber_at=0.4)
+        checklist = ck.coverage_summary(session, sid)
+        ck_pct = (checklist["done"] / checklist["total"]) if checklist["total"] else 0
+        ck_status = _pct_to_status(ck_pct, green_at=1.0, amber_at=0.5)
+        signed_status = "green" if (sys.sign_dept_name and sys.sign_soc_name) else "red"
+        all_green = all(s == "green" for s in (
+            ing_status, fm_status, intake_status, det_status,
+            aud_status, ck_status, signed_status,
+        ))
+        if all_green:
+            healthy += 1
+
+    crit = sum(
+        1 for sys in all_systems_for_agg
+        if ck.coverage_summary(session, sys.id).get("critical_missing")
+    )
+    stale = sum(
+        1 for sys in all_systems_for_agg
+        if any(
+            r["sla_status"] == "red"
+            for r in dh.ingestion_freshness(session, sys.id)
+        )
+    )
+
+    return {
+        "dimensions": [
+            "ingestion_fresh", "fields_mapped", "intake_done",
+            "detections_shipped", "audit_shipped", "checklist_done",
+            "signed_off",
+        ],
+        "rows": rows,
+        "aggregates": {
+            "pct_systems_healthy":  int(round(100 * healthy / total)),
+            "pct_critical_missing": int(round(100 * crit / total)),
+            "pct_stale_ingestion":  int(round(100 * stale / total)),
+        },
+    }
