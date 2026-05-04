@@ -1,0 +1,104 @@
+{# Intake tab — sub-profile-driven questions, lifted from cyab_studio.html.
+
+   The catalogue schema (see cyab_subprofile_catalogue.py) uses:
+     - q.key          (stable string id; matches answers dict keys)
+     - q.text         (prompt)
+     - q.answer_type  ('yesno' | 'single' | 'multi')
+     - q.options      (list of {value,label} for single/multi)
+
+   Existing answers are persisted by /api/cyab/studio/systems/{id}/answers
+   (POST). We render a plain HTML form here; HTMX wiring matches the
+   studio's auto-save endpoint so submitted edits go back to the same
+   CyabSystemAssessment row.
+#}
+{% if not subprofile %}
+  <div class="tw-py-6 tw-text-slate-400">
+    <p>No sub-profile selected for this system. Choose one to load intake questions.</p>
+    <p class="tw-text-[11px] tw-text-slate-500 tw-mt-2">
+      Set <code>subprofile_id</code> via
+      <code>/api/cyab/systems/{{ system.id }}</code>.
+    </p>
+    {# Still emit the progress count so the tab has a stable shape. #}
+    <p class="tw-text-cyan-300 tw-text-[12px] tw-mt-3">0 / 0 answered</p>
+  </div>
+{% else %}
+  {% set questions = (subprofile.catalogue or {}).get('intake_questions') or [] %}
+  {% set answered_keys = [] %}
+  {% for q in questions %}
+    {% set v = answers.get(q.key) %}
+    {% if v is not none and v != '' and not (v is iterable and v is not string and (v | length) == 0) %}
+      {% set _ = answered_keys.append(q.key) %}
+    {% endif %}
+  {% endfor %}
+  {% set answered = answered_keys | length %}
+  {% set total = questions | length %}
+
+  <header class="tw-flex tw-items-baseline tw-justify-between tw-mb-4">
+    <h3 class="tw-text-white tw-text-[14px] tw-font-semibold">
+      Intake — {{ subprofile.label }}
+    </h3>
+    <span class="tw-text-cyan-300 tw-text-[12px]">{{ answered }} / {{ total }} answered</span>
+  </header>
+
+  <form hx-post="/api/cyab/studio/systems/{{ system.id }}/answers"
+        hx-target="#tab-content" hx-swap="innerHTML"
+        hx-ext="json-enc"
+        class="tw-space-y-4">
+    {% for q in questions %}
+      <div class="intake-question tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3"
+           data-intake-q="{{ q.key }}">
+        <label class="tw-block tw-text-slate-200 tw-text-[12.5px] tw-mb-2">{{ q.text }}</label>
+        {% if q.answer_type == 'yesno' %}
+          {% set yesno_opts = [
+              {'value': 'yes', 'label': 'Yes'},
+              {'value': 'partial', 'label': 'Partial'},
+              {'value': 'no', 'label': 'No'},
+              {'value': 'dont_know', 'label': "Don't know"},
+          ] %}
+          <select name="answers[{{ q.key }}]"
+                  class="tw-w-full tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-text-[12px] tw-rounded">
+            <option value="">— select —</option>
+            {% for opt in yesno_opts %}
+              <option value="{{ opt.value }}"
+                      {% if answers.get(q.key) == opt.value %}selected{% endif %}>
+                {{ opt.label }}
+              </option>
+            {% endfor %}
+          </select>
+        {% elif q.answer_type == 'single' %}
+          <select name="answers[{{ q.key }}]"
+                  class="tw-w-full tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-text-[12px] tw-rounded">
+            <option value="">— select —</option>
+            {% for opt in (q.options or []) %}
+              <option value="{{ opt.value }}"
+                      {% if answers.get(q.key) == opt.value %}selected{% endif %}>
+                {{ opt.label }}
+              </option>
+            {% endfor %}
+          </select>
+        {% elif q.answer_type == 'multi' %}
+          <div class="tw-flex tw-flex-wrap tw-gap-2">
+            {% set current = answers.get(q.key) or [] %}
+            {% for opt in (q.options or []) %}
+              <label class="tw-flex tw-items-center tw-gap-1 tw-text-slate-300 tw-text-[12px]">
+                <input type="checkbox" name="answers[{{ q.key }}][]" value="{{ opt.value }}"
+                       {% if opt.value in current %}checked{% endif %}>
+                {{ opt.label }}
+              </label>
+            {% endfor %}
+          </div>
+        {% else %}
+          <input type="text" name="answers[{{ q.key }}]"
+                 value="{{ answers.get(q.key, '') }}"
+                 class="tw-w-full tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-text-[12px] tw-rounded">
+        {% endif %}
+      </div>
+    {% endfor %}
+    <div class="tw-flex tw-justify-end">
+      <button type="submit"
+              class="tw-px-3 tw-py-1 tw-bg-cyan-700 tw-text-white tw-text-[12px] tw-rounded">
+        Save
+      </button>
+    </div>
+  </form>
+{% endif %}

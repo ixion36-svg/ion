@@ -1002,6 +1002,25 @@ async def cyab_system_tab(
             cyab_doc_checklist_service.seed_for_system(session, system_id)  # idempotent
             ctx["checklist"] = cyab_doc_checklist_service.list_for_system(session, system_id)
             ctx["progress"] = cyab_doc_checklist_service.coverage_summary(session, system_id)
+        elif tab_name == "intake":
+            from ion.services.cyab_subprofile_service import (
+                get_subprofile_full,
+                system_coverage,
+            )
+            from ion.services.cyab_assessment_service import load_answers
+            # The sub-profile tag lives on data sources (see
+            # CyabDataSource.subprofile_id). For the per-system intake
+            # view, pick the first tagged source's sub-profile as the
+            # primary one. Future: per-source intake tabs.
+            sub_id = next(
+                (ds.subprofile_id for ds in system.data_sources if ds.subprofile_id),
+                None,
+            )
+            ctx["subprofile"] = (
+                get_subprofile_full(session, sub_id) if sub_id else None
+            )
+            ctx["coverage"] = system_coverage(session, system_id)
+            ctx["answers"] = load_answers(session, system_id) or {}
 
         # Fall back to the placeholder template if the tab template doesn't exist yet.
         from jinja2 import TemplateNotFound

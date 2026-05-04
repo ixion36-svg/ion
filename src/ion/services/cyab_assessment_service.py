@@ -497,3 +497,42 @@ def parse_json_field(val: Optional[str]) -> Any:
         return json.loads(val)
     except (TypeError, ValueError):
         return None
+
+
+# Marker matches cyab_studio_api._STUDIO_NOTES_MARKER. Duplicated here so
+# the service layer doesn't depend on the web layer.
+_STUDIO_NOTES_MARKER = "STUDIO_AUTOSAVE"
+
+
+def load_answers(session, system_id: int) -> Dict[str, Any]:
+    """Return the merged intake answers blob for a system.
+
+    Mirrors ``cyab_studio_api.get_system_answers`` — merges the studio
+    autosave row over the most-recent legacy wizard row so studio edits
+    win on shared keys. Returns ``{}`` when no rows exist or both blobs
+    are empty.
+    """
+    from sqlalchemy import select  # local import to keep top of file lean
+    from ion.models.cyab import CyabSystemAssessment
+
+    legacy = session.scalars(
+        select(CyabSystemAssessment)
+        .where(CyabSystemAssessment.system_id == system_id)
+        .where(CyabSystemAssessment.notes != _STUDIO_NOTES_MARKER)
+        .order_by(CyabSystemAssessment.submitted_at.desc())
+        .limit(1)
+    ).first()
+    studio = session.scalars(
+        select(CyabSystemAssessment)
+        .where(CyabSystemAssessment.system_id == system_id)
+        .where(CyabSystemAssessment.notes == _STUDIO_NOTES_MARKER)
+        .limit(1)
+    ).first()
+    merged: Dict[str, Any] = {}
+    for src in (legacy, studio):
+        if src and src.responses_json:
+            try:
+                merged.update(json.loads(src.responses_json) or {})
+            except (TypeError, ValueError, json.JSONDecodeError):
+                pass
+    return merged
