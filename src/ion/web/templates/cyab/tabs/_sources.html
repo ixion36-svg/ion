@@ -1,0 +1,118 @@
+{# Sources tab — data sources + demarcation + SAL + field mapping.
+
+   Lifts three legacy sections from cyab.html:
+     - section#demarcation     (System Source / SIEM dropdowns)
+     - section#sal-tiers       (SAL declaration radios)
+     - section#field-mapping   (per-source field-map editor)
+
+   All three are per-source attributes; one collapsible block per source.
+
+   Notes:
+     - `system_source` and `siem` are not currently model fields on
+       CyabDataSource; the inputs are rendered for UI continuity. The
+       PUT /api/cyab/sources/{id} endpoint silently drops unknown
+       fields, so the change handler is harmless until the schema
+       gains those columns.
+     - `field_mapping` is JSON-as-text on the model — the handler
+       parses it into `source_mappings[ds.id]` for template iteration.
+#}
+
+<header class="tw-flex tw-items-baseline tw-justify-between tw-mb-4">
+  <h3 class="tw-text-white tw-text-[14px] tw-font-semibold">Data Sources</h3>
+  <button type="button"
+          class="tw-px-2 tw-py-1 tw-bg-cyan-700 tw-text-white tw-text-[11.5px] tw-rounded hover:tw-bg-cyan-600"
+          onclick="window.openDsPicker && window.openDsPicker()">+ Add source</button>
+</header>
+
+{% if not sources %}
+  <p class="tw-text-slate-500 tw-text-[12px]">No data sources configured. Add one to start ingesting events.</p>
+{% endif %}
+
+{% for src in sources %}
+  {% set mapping = (source_mappings or {}).get(src.id, {}) %}
+  <article class="data-source-row tw-bg-slate-900/40 tw-border tw-border-slate-800 tw-rounded tw-p-3 tw-mb-3"
+           data-source-id="{{ src.id }}">
+    <header class="tw-flex tw-items-center tw-justify-between tw-mb-2">
+      <h4 class="tw-text-cyan-300 tw-font-mono tw-text-[13px]">{{ src.name }}</h4>
+      <span class="tw-text-slate-500 tw-text-[11px]">{{ src.data_source_type or 'unknown type' }}</span>
+    </header>
+
+    {# === Demarcation: System Source / SIEM === #}
+    <details open>
+      <summary class="tw-text-slate-400 tw-text-[11px] tw-uppercase tw-tracking-wider tw-cursor-pointer">
+        System Source / SIEM
+      </summary>
+      <div class="tw-grid tw-grid-cols-2 tw-gap-3 tw-mt-2 tw-text-[12px]">
+        <label class="tw-flex tw-flex-col tw-gap-1">
+          <span class="tw-text-slate-400">System Source</span>
+          <input type="text" name="system_source"
+                 placeholder="e.g. Windows agent, syslog forwarder"
+                 class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded tw-text-slate-200"
+                 hx-put="/api/cyab/sources/{{ src.id }}"
+                 hx-trigger="change"
+                 hx-include="closest article">
+        </label>
+        <label class="tw-flex tw-flex-col tw-gap-1">
+          <span class="tw-text-slate-400">SIEM / Data Lake</span>
+          <input type="text" name="siem"
+                 placeholder="e.g. Elastic, Splunk, Sentinel"
+                 class="tw-px-2 tw-py-1 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded tw-text-slate-200"
+                 hx-put="/api/cyab/sources/{{ src.id }}"
+                 hx-trigger="change"
+                 hx-include="closest article">
+        </label>
+      </div>
+    </details>
+
+    {# === Source Assurance Level === #}
+    <details class="tw-mt-2" open>
+      <summary class="tw-text-slate-400 tw-text-[11px] tw-uppercase tw-tracking-wider tw-cursor-pointer">
+        Source Assurance Level
+      </summary>
+      <div class="tw-flex tw-gap-3 tw-mt-2">
+        {% for tier in ['SAL-1', 'SAL-2', 'SAL-3'] %}
+          <label class="tw-flex tw-items-center tw-gap-1.5 tw-text-[12px] tw-cursor-pointer">
+            <input type="radio" name="sal_tier" value="{{ tier }}"
+                   {% if src.sal_tier == tier %}checked{% endif %}
+                   hx-put="/api/cyab/sources/{{ src.id }}"
+                   hx-trigger="change"
+                   hx-include="closest article">
+            <span class="tw-text-slate-300">{{ tier }}</span>
+          </label>
+        {% endfor %}
+      </div>
+    </details>
+
+    {# === Field mapping === #}
+    <details class="tw-mt-2" id="field-mapping-{{ src.id }}">
+      <summary class="tw-text-slate-400 tw-text-[11px] tw-uppercase tw-tracking-wider tw-cursor-pointer">
+        Field mapping
+      </summary>
+      <div class="tw-mt-2 field-mapping-editor" data-source-id="{{ src.id }}">
+        <table class="tw-w-full tw-text-[12px]">
+          <thead>
+            <tr class="tw-text-slate-500 tw-text-[10px] tw-uppercase">
+              <th class="tw-text-left tw-py-1">ECS field</th>
+              <th class="tw-text-left">Maps to (raw)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ecs, raw in mapping.items() %}
+              <tr>
+                <td class="tw-py-1 tw-text-slate-300 tw-font-mono">{{ ecs }}</td>
+                <td>
+                  <input type="text" value="{{ raw }}"
+                         class="tw-w-full tw-px-1 tw-py-0.5 tw-bg-slate-900 tw-border tw-border-slate-700 tw-rounded tw-text-slate-200 tw-font-mono">
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="2" class="tw-text-slate-500 tw-py-2">No mapping defined.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </article>
+{% endfor %}
