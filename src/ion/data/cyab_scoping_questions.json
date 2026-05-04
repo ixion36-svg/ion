@@ -1,0 +1,205 @@
+{
+  "version": 1,
+  "updated_at": "2026-05-04",
+  "notes": "Scoping questionnaire — drives use-case + threat-actor recommendations on /cyab/scoping and the wizard's Step 2 counter. Keys map onto cyab_assessment_service.compute_profile() inputs where possible (stack_*, ctl_*, org_sector, org_geo) so the existing scoring code can be reused without translation.",
+  "questions": [
+    {
+      "id": "org_sector",
+      "text": "Which sector best describes the organisation?",
+      "type": "choice",
+      "category": "context",
+      "options": [
+        {"value": "finance", "label": "Finance / Banking"},
+        {"value": "healthcare", "label": "Healthcare"},
+        {"value": "government", "label": "Government"},
+        {"value": "defence", "label": "Defence"},
+        {"value": "energy", "label": "Energy / Utilities"},
+        {"value": "critical_infra", "label": "Critical infrastructure (other)"},
+        {"value": "retail", "label": "Retail / e-commerce"},
+        {"value": "manufacturing", "label": "Manufacturing"},
+        {"value": "tech", "label": "Technology / SaaS"},
+        {"value": "education", "label": "Education"},
+        {"value": "legal", "label": "Legal"},
+        {"value": "media", "label": "Media"},
+        {"value": "non_profit", "label": "Non-profit"},
+        {"value": "other", "label": "Other"}
+      ]
+    },
+    {
+      "id": "org_geo",
+      "text": "Where is the org primarily based?",
+      "type": "multi",
+      "category": "context",
+      "options": [
+        {"value": "uk", "label": "United Kingdom"},
+        {"value": "eu", "label": "European Union"},
+        {"value": "us", "label": "United States"},
+        {"value": "apac", "label": "Asia-Pacific"},
+        {"value": "mena", "label": "Middle East / North Africa"},
+        {"value": "global", "label": "Global"}
+      ]
+    },
+    {
+      "id": "stack_identity",
+      "text": "What's your primary identity provider?",
+      "type": "choice",
+      "category": "stack",
+      "options": [
+        {"value": "entra", "label": "Microsoft Entra ID (Azure AD)"},
+        {"value": "okta", "label": "Okta"},
+        {"value": "google", "label": "Google Workspace"},
+        {"value": "ad_onprem", "label": "Active Directory (on-prem)"},
+        {"value": "ping", "label": "Ping Identity"},
+        {"value": "other", "label": "Other / mixed"}
+      ]
+    },
+    {
+      "id": "stack_endpoint_os",
+      "text": "Which endpoint operating systems do you run? (select all)",
+      "type": "multi",
+      "category": "stack",
+      "options": [
+        {"value": "windows", "label": "Windows"},
+        {"value": "macos", "label": "macOS"},
+        {"value": "linux", "label": "Linux"},
+        {"value": "chromeos", "label": "ChromeOS"},
+        {"value": "ios", "label": "iOS / iPadOS"},
+        {"value": "android", "label": "Android"}
+      ]
+    },
+    {
+      "id": "stack_cloud",
+      "text": "Which clouds host your workloads? (select all)",
+      "type": "multi",
+      "category": "stack",
+      "options": [
+        {"value": "aws", "label": "AWS"},
+        {"value": "azure", "label": "Microsoft Azure"},
+        {"value": "gcp", "label": "Google Cloud"},
+        {"value": "onprem", "label": "On-prem only"},
+        {"value": "oracle", "label": "Oracle Cloud"}
+      ]
+    },
+    {
+      "id": "stack_email",
+      "text": "Which email / collaboration suite is in use?",
+      "type": "choice",
+      "category": "stack",
+      "options": [
+        {"value": "m365", "label": "Microsoft 365"},
+        {"value": "google", "label": "Google Workspace"},
+        {"value": "exchange_onprem", "label": "Exchange on-prem"},
+        {"value": "other", "label": "Other"}
+      ]
+    },
+    {
+      "id": "stack_network_edge",
+      "text": "Which network-edge controls are deployed? (select all)",
+      "type": "multi",
+      "category": "stack",
+      "options": [
+        {"value": "ngfw", "label": "Next-gen firewall"},
+        {"value": "swg", "label": "Secure web gateway / proxy"},
+        {"value": "ztna", "label": "ZTNA / SSE"},
+        {"value": "vpn", "label": "Traditional VPN"},
+        {"value": "waf", "label": "Web application firewall"},
+        {"value": "none", "label": "None / unsure"}
+      ]
+    },
+    {
+      "id": "stack_edr",
+      "text": "Do you run an EDR product on most endpoints?",
+      "type": "choice",
+      "category": "stack",
+      "options": [
+        {"value": "yes", "label": "Yes — full coverage"},
+        {"value": "some", "label": "Partial coverage"},
+        {"value": "no", "label": "No EDR"},
+        {"value": "dont_know", "label": "Don't know"}
+      ]
+    },
+    {
+      "id": "ctl_mfa",
+      "text": "How widely is MFA enforced?",
+      "type": "choice",
+      "category": "controls",
+      "options": [
+        {"value": "all", "label": "All users + privileged accounts"},
+        {"value": "partial", "label": "Some users / inconsistent"},
+        {"value": "no", "label": "Not enforced"},
+        {"value": "dont_know", "label": "Don't know"}
+      ]
+    },
+    {
+      "id": "ctl_backup",
+      "text": "When was your last verified backup-restore drill?",
+      "type": "choice",
+      "category": "controls",
+      "options": [
+        {"value": "lt_3m", "label": "Within the last 3 months"},
+        {"value": "lt_1y", "label": "Within the last year"},
+        {"value": "gt_1y", "label": "More than a year ago"},
+        {"value": "never", "label": "Never"},
+        {"value": "dont_know", "label": "Don't know"}
+      ]
+    },
+    {
+      "id": "ctl_awareness",
+      "text": "How often is security-awareness training delivered?",
+      "type": "choice",
+      "category": "controls",
+      "options": [
+        {"value": "monthly", "label": "Monthly micro-content"},
+        {"value": "quarterly", "label": "Quarterly"},
+        {"value": "annual", "label": "Annual"},
+        {"value": "onboarding", "label": "Only at onboarding"},
+        {"value": "never", "label": "Never"}
+      ]
+    },
+    {
+      "id": "compliance_regime",
+      "text": "Which compliance regimes apply? (select all)",
+      "type": "multi",
+      "category": "compliance",
+      "options": [
+        {"value": "pci_dss", "label": "PCI DSS"},
+        {"value": "hipaa", "label": "HIPAA"},
+        {"value": "gdpr", "label": "GDPR"},
+        {"value": "iso27001", "label": "ISO 27001"},
+        {"value": "soc2", "label": "SOC 2"},
+        {"value": "nis2", "label": "NIS 2"},
+        {"value": "dora", "label": "DORA"},
+        {"value": "fedramp", "label": "FedRAMP"},
+        {"value": "none", "label": "None"}
+      ]
+    },
+    {
+      "id": "concern_top",
+      "text": "Top concerns for this conversation? (select up to 3)",
+      "type": "multi",
+      "category": "concerns",
+      "options": [
+        {"value": "ransomware", "label": "Ransomware"},
+        {"value": "bec", "label": "Business email compromise"},
+        {"value": "data_theft", "label": "Data theft / exfiltration"},
+        {"value": "insider", "label": "Insider risk"},
+        {"value": "nation_state", "label": "Nation-state APT"},
+        {"value": "supply_chain", "label": "Supply chain"},
+        {"value": "ddos", "label": "DDoS / availability"},
+        {"value": "phishing", "label": "Phishing"}
+      ]
+    },
+    {
+      "id": "external_exposure",
+      "text": "How many internet-facing services do you publish?",
+      "type": "choice",
+      "category": "context",
+      "options": [
+        {"value": "lt_5", "label": "Fewer than 5"},
+        {"value": "5_50", "label": "5–50"},
+        {"value": "gt_50", "label": "More than 50"},
+        {"value": "dont_know", "label": "Don't know"}
+      ]
+    }
+  ]
+}
