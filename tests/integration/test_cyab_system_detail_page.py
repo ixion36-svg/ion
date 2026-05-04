@@ -51,3 +51,22 @@ def test_progress_header_marks_critical_missing(client, make_system):
     assert r.status_code == 200
     # Default checklist has 3 critical items: HLD, NETWORK_TOPOLOGY, OWNERS
     assert "critical missing" in r.text.lower()
+
+
+@pytest.mark.parametrize("tab", [
+    "overview", "intake", "sources", "data-health",
+    "detection", "audit-use-cases", "signoff",
+])
+def test_each_tab_endpoint_returns_partial(client, make_system, tab):
+    """HTMX tab endpoint returns the partial HTML (no full page chrome)."""
+    sys_id = make_system(name=f"tab-{tab}")
+    r = client.get(f"/cyab/systems/{sys_id}/tab/{tab}")
+    assert r.status_code == 200
+    assert "<html" not in r.text  # partial, not full doc
+    assert tab in r.text.lower() or "placeholder" in r.text.lower()
+
+
+def test_unknown_tab_returns_404(client, make_system):
+    sys_id = make_system(name="unknown-tab")
+    r = client.get(f"/cyab/systems/{sys_id}/tab/bogus")
+    assert r.status_code == 404

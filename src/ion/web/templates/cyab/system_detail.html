@@ -21,8 +21,32 @@
   {% include "cyab/_progress_header.html" %}
 
   {# Tab nav + content slot — implemented in Task 3 #}
-  <div class="tab-content tw-mt-6">
-    <p class="tw-text-slate-400">Per-system page skeleton — tabs land in Task 3.</p>
+  <nav class="tab-strip tw-flex tw-gap-1 tw-mt-4 tw-border-b tw-border-slate-800">
+    {% set tabs = [
+      ('overview', 'Overview'),
+      ('intake', 'Intake'),
+      ('sources', 'Sources'),
+      ('data-health', 'Data Health'),
+      ('detection', 'Detection Use Cases'),
+      ('audit-use-cases', 'Audit Use Cases'),
+      ('signoff', 'Sign-off'),
+    ] %}
+    {% for slug, label in tabs %}
+      <button class="tab-btn tw-px-3 tw-py-2 tw-text-[12.5px] tw-text-slate-400 hover:tw-text-cyan-300 tw-border-b-2 tw-border-transparent {% if slug == 'overview' %}tw-text-cyan-300 tw-border-cyan-400{% endif %}"
+              hx-get="/cyab/systems/{{ system.id }}/tab/{{ slug }}"
+              hx-target="#tab-content"
+              hx-swap="innerHTML"
+              data-tab="{{ slug }}">
+        {{ label }}
+      </button>
+    {% endfor %}
+  </nav>
+
+  <div id="tab-content" class="tw-mt-4"
+       hx-get="/cyab/systems/{{ system.id }}/tab/overview"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <p class="tw-text-slate-500 tw-text-[12px]">Loading…</p>
   </div>
 </div>
 {% endblock %}

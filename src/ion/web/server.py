@@ -958,6 +958,59 @@ async def cyab_system_detail_page(
         session.close()
 
 
+_CYAB_TABS = {
+    "overview": ("Overview", "cyab/tabs/_overview.html"),
+    "intake": ("Intake", "cyab/tabs/_intake.html"),
+    "sources": ("Sources", "cyab/tabs/_sources.html"),
+    "data-health": ("Data Health", "cyab/tabs/_data_health.html"),
+    "detection": ("Detection Use Cases", "cyab/tabs/_detection.html"),
+    "audit-use-cases": ("Audit Use Cases", "cyab/tabs/_audit_use_cases.html"),
+    "signoff": ("Sign-off", "cyab/tabs/_signoff.html"),
+}
+
+
+@app.get("/cyab/systems/{system_id}/tab/{tab_name}", response_class=HTMLResponse)
+async def cyab_system_tab(
+    system_id: int,
+    tab_name: str,
+    request: Request,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """HTMX endpoint returning a single tab's content (no page chrome)."""
+    if tab_name not in _CYAB_TABS:
+        raise HTTPException(status_code=404, detail="Unknown tab")
+
+    label, template_name = _CYAB_TABS[tab_name]
+
+    from ion.models.cyab import CyabSystem
+    from ion.storage.database import get_engine, get_session_factory
+    from ion.core.config import get_config
+
+    config = get_config()
+    engine = get_engine(config.db_path)
+    Session = get_session_factory(engine)
+    session = Session()
+    try:
+        system = session.get(CyabSystem, system_id)
+        if not system:
+            raise HTTPException(status_code=404, detail="System not found")
+
+        ctx = {"system": system, "user": user, "tab_name": tab_name, "tab_label": label}
+
+        # Fall back to the placeholder template if the tab template doesn't exist yet.
+        from jinja2 import TemplateNotFound
+        try:
+            return templates.TemplateResponse(request=request, name=template_name, context=ctx)
+        except TemplateNotFound:
+            return templates.TemplateResponse(
+                request=request,
+                name="cyab/tabs/_placeholder.html",
+                context={"tab_name": tab_name, "tab_label": label},
+            )
+    finally:
+        session.close()
+
+
 @app.get("/discover", response_class=HTMLResponse)
 async def discover_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the discover and hunt page for analysts."""
