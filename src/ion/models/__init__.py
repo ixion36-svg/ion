@@ -56,6 +56,7 @@ from ion.models.course import (  # noqa: F401
 from ion.models.cyab import CyabDataSource, CyabSnapshot, CyabSystem
 from ion.models.cyab_doc_checklist import CyabDocChecklistItem
 from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
+from ion.models.cyab_wizard import CyabWizardSession  # noqa: F401
 from ion.models.document import Document, DocumentVersion
 from ion.models.emulation import EmulationPlan, EmulationPlanStatus, EmulationStep, StepResult
 from ion.models.forensics import (
@@ -294,6 +295,7 @@ __all__ = [
     "CyabSnapshot",
     "CyabPillar",
     "CyabSubProfile",
+    "CyabWizardSession",
     # Canary / deception
     "Canary",
     "CanaryHit",
