@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}{{ system.name }} — CyAB · ION{% endblock %}
+
+{% block content %}
+<div class="system-detail" data-system-id="{{ system.id }}">
+  <nav class="breadcrumb tw-text-sm tw-text-slate-400 tw-mb-3">
+    <a href="/cyab" class="hover:tw-text-white">CyAB</a>
+    <span class="tw-mx-2">·</span>
+    <a href="/cyab/systems" class="hover:tw-text-white">Systems</a>
+    <span class="tw-mx-2">·</span>
+    <span class="tw-text-white">{{ system.name }}</span>
+  </nav>
+
+  <header class="tw-flex tw-items-baseline tw-gap-4 tw-mb-4">
+    <h1 class="tw-text-[28px] tw-font-semibold tw-text-white">{{ system.name }}</h1>
+    {% if system.department %}<span class="tw-text-slate-400">{{ system.department }}</span>{% endif %}
+  </header>
+
+  {# Sticky progress header — implemented in Task 2 #}
+  {# {% include "cyab/_progress_header.html" %} #}
+
+  {# Tab nav + content slot — implemented in Task 3 #}
+  <div class="tab-content tw-mt-6">
+    <p class="tw-text-slate-400">Per-system page skeleton — tabs land in Task 3.</p>
+  </div>
+</div>
+{% endblock %}
