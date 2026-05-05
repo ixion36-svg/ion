@@ -2434,6 +2434,12 @@ function renderPanelContent(c) {
     if (alerts.length) {
         alerts.forEach(a => {
             const alertId = a.es_alert_id || 'unknown';
+            // v0.19.3: prefer human-readable rule_name when available;
+            // fall back to a 24-char prefix of the opaque ES id for
+            // legacy rows where rule_name is null.
+            const displayName = a.rule_name && a.rule_name.trim()
+                ? a.rule_name
+                : String(alertId).substring(0, 24);
             const st = a.status || 'open';
             const pr = a.priority || '';
             const sc = statusColors[st] || statusColors.open;
@@ -2443,7 +2449,7 @@ function renderPanelContent(c) {
 
             html += '<div class="cpanel-alert-card">'
                 + '<div class="cpanel-alert-card-header">'
-                +   '<a class="cpanel-alert-id" href="/alerts" title="View in Alerts page">' + esc(String(alertId).substring(0, 24)) + '</a>'
+                +   '<a class="cpanel-alert-id" href="/alerts" title="' + esc(alertId) + '">' + esc(displayName) + '</a>'
                 +   '<div class="cpanel-alert-badges">'
                 +     '<span class="cpanel-alert-badge" style="background:' + sc.bg + ';color:' + sc.color + ';">' + esc(st) + '</span>';
             if (pc) {

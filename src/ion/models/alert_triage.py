@@ -183,6 +183,12 @@ class AlertTriage(Base, TimestampMixin):
     # rotation. Sourced from data_stream.namespace when the triage is
     # created/updated.
     source_system: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    # v0.19.3: human-readable rule name snapshot — denormalized from the
+    # source alert's rule.name so case detail pages can list "Suspicious
+    # PowerShell Execution" instead of an opaque ES alert id. Populated at
+    # triage create time when the alert payload is available; nullable so
+    # legacy rows and ES-less paths still render (with id-substring fallback).
+    rule_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     # Relationships
     assigned_to: Mapped[Optional["User"]] = relationship(

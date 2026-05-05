@@ -66,9 +66,16 @@ def _alert_is_critical(es_service, alert_id: str) -> bool:
             es_service, "fetch_alert", None
         )
         if fetch is None:
+            # v0.19.3: was silent; now WARN once-per-tick so a missing
+            # method (rename, refactor) doesn't become an invisible
+            # zero-ticker outage.
+            logger.warning(
+                "Ticker: ES service has neither get_alert_by_id nor fetch_alert — no critical tickers will fire"
+            )
             return False
         alert = fetch(alert_id)
-    except Exception:
+    except Exception as exc:
+        logger.debug("Ticker: ES fetch for %s failed: %s", alert_id, exc)
         return False
     if not alert:
         return False
@@ -106,14 +113,26 @@ def run_ticker_once(session: Session) -> Dict[str, Any]:
         es_service = None
 
     # ------------- Create / refresh critical-alert tickers -----------------
+    # v0.19.3: was status == OPEN, but in practice nearly every triage-row
+    # creator (kibana_sync, case_grouper, bulk_ack, create_case) sets the
+    # row to ACKNOWLEDGED on insertion — only the SQLAlchemy default leaves
+    # it OPEN, and almost no path relies on that default. The producer was
+    # therefore filtering for a state that's vanishingly rare in real data,
+    # silently producing zero tickers regardless of how many critical
+    # uncased alerts existed. Filter for "anything that isn't closed" so
+    # the ticker fires for the actual queue the analyst sees.
     stuck = (
         session.query(AlertTriage)
         .filter(
-            AlertTriage.status == AlertTriageStatus.OPEN,
+            AlertTriage.status != AlertTriageStatus.CLOSED,
             AlertTriage.case_id.is_(None),
             AlertTriage.created_at < cutoff,
         )
         .all()
+    )
+    logger.info(
+        "Ticker tick: %d uncased non-closed triage rows older than %dm",
+        len(stuck), threshold_min,
     )
 
     created = 0
@@ -174,11 +193,18 @@ def run_ticker_once(session: Session) -> Dict[str, Any]:
         )
         if triage is None:
             continue
-        if triage.case_id is not None or triage.status != AlertTriageStatus.OPEN:
+        # v0.19.3: mirror the create-side filter — resolve when the alert
+        # is cased OR closed. Was checking != OPEN, which prematurely
+        # resolved tickers the moment a user clicked "acknowledge".
+        if triage.case_id is not None or triage.status == AlertTriageStatus.CLOSED:
             ticker.resolved_at = datetime.now(timezone.utc)
             resolved += 1
 
     session.commit()
+    logger.info(
+        "Ticker tick result: created=%d resolved=%d active_after=%d",
+        created, resolved, len(active_critical) - resolved,
+    )
     return {"created": created, "resolved": resolved}
 
 

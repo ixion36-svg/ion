@@ -363,6 +363,13 @@ def _run_migrations(engine: Engine) -> None:
                     text("ALTER TABLE alert_triage ADD COLUMN suggested_verdict_confidence VARCHAR(20)")
                 )
                 logger.info("Migrated: alert_triage.suggested_verdict_confidence")
+        # v0.19.3: rule_name denormalized for case detail rendering
+        if "rule_name" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE alert_triage ADD COLUMN rule_name VARCHAR(500)")
+                )
+                logger.info("Migrated: alert_triage.rule_name")
 
     # v0.10.3: users.is_service_account for Bob + other service users
     if insp.has_table("users"):
