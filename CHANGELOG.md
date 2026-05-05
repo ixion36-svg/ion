@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.19.2 — 2026-05-05
+
+### Fix-pack 2 for v0.19.0 CyAB rollout
+
+- **Packaging gap — `cyab_scoping_questions.json` not shipped**: the
+  setuptools `package-data` glob in `pyproject.toml` only included
+  `data/**/*.md` and `data/**/*.yaml`. The new
+  `src/ion/data/cyab_scoping_questions.json` (added in v0.19.0,
+  commit a086a81) was silently dropped from every wheel — so the
+  Docker image ran fine until you opened `/cyab/scoping`, which then
+  500'd with `FileNotFoundError: ion/data/cyab_scoping_questions.json`.
+  Added `data/**/*.json` to the glob so the scoping engine can read it.
+- **Cache-bust on `tailwind.css`**: `base.html` was serving the stylesheet
+  with `?v=0.9.80-lightmode`, so browsers that had cached the old file
+  during the v0.19.0/v0.19.1 window kept serving the stale, unstyled
+  CSS even after the v0.19.1 image rolled out. Bumped the query string
+  to `?v=0.19.2` so every browser refetches.
+- **Rebuilt `tailwind.css`** from `frontend/tailwind.input.css` against
+  the current template tree (76,082 → 77,957 bytes) to guarantee the
+  on-disk asset matches the post-fix templates, not whatever was
+  bundled into a pre-existing image.
+
 ## v0.19.1 — 2026-05-04
 
 ### Fix-pack for v0.19.0 CyAB UI
