@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import threading
 import time
@@ -355,6 +356,16 @@ _DEFAULT_SWEEP_INTERVAL_S = 900
 # matching config attribute.
 _DEFAULT_LLM_TIMEOUT_S = 300
 
+# v0.19.3: memory-context guards. The v0.18.1 sanity sweep rescued a
+# silent NameError that had been zeroing memory_ctx_md since v0.10.x;
+# once the fix landed, accumulated investigation history started bloating
+# the prompt. On 7-8B models that bloat tipped the balance and the model
+# either timed out mid-inference or surrendered with `{}`. These two
+# knobs bound the damage:
+#   ION_INVESTIGATION_MEMORY_ENABLED — kill switch (default true)
+#   ION_INVESTIGATION_MEMORY_MAX_CHARS — hard cap (default 1500)
+_DEFAULT_MEMORY_MAX_CHARS = 1500
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -363,6 +374,34 @@ _DEFAULT_LLM_TIMEOUT_S = 300
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _build_memory_ctx(memory, alert: dict) -> str:
+    """Build memory context for an alert with env-flag + length-bound guards.
+
+    Returns "" when memory is None, when the env flag is false, when the
+    builder raises, or when the output is empty. Otherwise truncates to
+    ``ION_INVESTIGATION_MEMORY_MAX_CHARS`` (default 1500) so large
+    accumulated histories don't blow past small-model context budgets.
+    """
+    enabled = os.environ.get("ION_INVESTIGATION_MEMORY_ENABLED", "true").lower()
+    if enabled in ("false", "0", "no"):
+        return ""
+    if memory is None:
+        return ""
+    try:
+        raw = memory.build_context_block_for_alert(alert) or ""
+    except Exception as exc:
+        logger.debug("memory context build failed: %s", exc)
+        return ""
+    try:
+        max_chars = int(os.environ.get("ION_INVESTIGATION_MEMORY_MAX_CHARS",
+                                       str(_DEFAULT_MEMORY_MAX_CHARS)))
+    except ValueError:
+        max_chars = _DEFAULT_MEMORY_MAX_CHARS
+    if len(raw) > max_chars:
+        return raw[:max_chars].rstrip() + "\n\n…(memory truncated for prompt budget)"
+    return raw
 
 
 def _get(alert: dict, *keys: str) -> Any:
@@ -1394,7 +1433,12 @@ class InvestigationService:
             # bug report). Relaxed to 0.2 / 0.9 / 40, with `seed` still
             # supplied per call below for cross-run reproducibility.
             "temperature": 0.2,
-            "max_tokens": 2048,
+            # v0.19.3: 2048 -> 4096. With memory context now actually
+            # populated (v0.18.1 fixed the silent NameError that had been
+            # zeroing it out), the prompt is bigger and 7-8B models were
+            # running out of generation budget mid-JSON, leaving the parser
+            # to fall back to `{}`. 4096 gives the envelope room to close.
+            "max_tokens": 4096,
         }
         try:
             import inspect
@@ -1660,14 +1704,7 @@ class InvestigationService:
             mitre_tags = _extract_mitre_tags(alert)
 
             # 8) Memory context
-            if memory is not None:
-                try:
-                    memory_ctx_md = memory.build_context_block_for_alert(alert)
-                except Exception as exc:
-                    logger.debug("memory context build failed: %s", exc)
-                    memory_ctx_md = ""
-            else:
-                memory_ctx_md = ""
+            memory_ctx_md = _build_memory_ctx(memory, alert)
 
             # 9) Prompt selection + system prompt render
             template = None
@@ -1992,10 +2029,10 @@ class InvestigationService:
                 get_investigation_memory_service,
             )
             memory = get_investigation_memory_service()
-            memory_ctx_md = memory.build_context_block_for_alert(rep_alert) if memory else ""
         except Exception as exc:
-            logger.debug("memory context build failed: %s", exc)
-            memory_ctx_md = ""
+            logger.debug("memory service init failed: %s", exc)
+            memory = None
+        memory_ctx_md = _build_memory_ctx(memory, rep_alert)
 
         # Prompt template match (first alert)
         prompt_template_id: Optional[int] = None

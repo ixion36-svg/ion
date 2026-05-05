@@ -1,5 +1,68 @@
 # Changelog
 
+## v0.19.3 — 2026-05-05
+
+### Bob investigation reliability — regression from v0.18.1
+
+- **Memory context bound + kill switch.** v0.18.1's "sanity sweep"
+  (`9a262d0`) added the late-import for `get_investigation_memory_service`
+  that the v0.10.x prompt path had been calling without importing.
+  Pre-v0.18.1, `memory_ctx_md` was always `""` because the missing
+  import raised `NameError` and was silently caught by `except Exception`.
+  Once the sweep landed, memory context populated correctly — and started
+  growing every time a new investigation completed (FP signatures + up
+  to 5 prior investigation snippets + IOC history + host sightings).
+  Within a few weeks of running, that bloat tipped 7-8B-class models
+  past their effective reasoning budget: `format: "json"` strict mode
+  forced the cheapest valid output, which is `{}`.
+  Two new env knobs:
+  - `ION_INVESTIGATION_MEMORY_ENABLED` (default `true`) — kill switch
+  - `ION_INVESTIGATION_MEMORY_MAX_CHARS` (default `1500`) — hard cap
+  with a single helper `_build_memory_ctx()` covering both single-alert
+  (`investigate_alert`) and cluster (`investigate_open_alerts_sweep`)
+  paths.
+- **`max_tokens` 2048 → 4096.** With the bigger prompt, 7-8B models
+  were spending their generation budget on the analyst_explanation
+  field and never reaching the closing brace, so the JSON parser fell
+  back to extracting the first balanced `{}` block — often an empty
+  inner object. 4096 gives the envelope room to close cleanly.
+
+### Linked-alerts on case page now show rule names
+
+- New denormalised `alert_triage.rule_name` column (idempotent
+  `ALTER TABLE` migration, nullable). Populated at triage-create time
+  in `create_case` from the supplied `alert_contexts[*].raw_data`
+  (`rule.name` / `kibana.alert.rule.name` / `_source.rule.name`).
+- `GET /elasticsearch/alerts/cases/{id}` now exposes `rule_name` on
+  each linked alert; `cases.html` prefers it for the card header
+  (`"Suspicious PowerShell Execution"` instead of a 24-char ES id
+  prefix). Legacy rows fall through to the existing id-substring.
+
+### Rare alert↔case-link inconsistency
+
+- When an alert was reassigned to a new case, the previous case's
+  `source_alert_ids` JSON list still referenced it, while the
+  `AlertTriage.case_id` FK pointed to the new case. The "linked cases"
+  panel and the case detail panel read different sources, so they
+  could disagree silently. `create_case` now strips the alert from
+  the old case's `source_alert_ids` and logs a `WARNING` so the
+  reassignment is auditable.
+
+### Ticker producer was filtering on a state nothing sets
+
+- The producer queried `AlertTriage.status == OPEN`, but every
+  triage-row creator (`kibana_sync_service`, `case_grouper_service`,
+  `bulk_operations_service.bulk_acknowledge_alerts`, `api.create_case`)
+  inserts rows as `ACKNOWLEDGED`. Only the SQLAlchemy column default
+  ever produced `OPEN`, and almost no path relies on it. Net result:
+  enabled or not, the producer found zero candidates and zero tickers
+  fired.
+  Filter changed to `status != CLOSED`. Resolver mirrored. Plus
+  per-tick INFO logging (`Ticker tick: N uncased ... created=X
+  resolved=Y`) and a `WARNING` if the ES service exposes neither
+  `get_alert_by_id` nor `fetch_alert` (so a future rename doesn't
+  silently kill the ticker again).
+
 ## v0.19.2 — 2026-05-05
 
 ### Fix-pack 2 for v0.19.0 CyAB rollout

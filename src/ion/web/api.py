@@ -4349,15 +4349,57 @@ async def create_case(
     # Link alert IDs if provided
     linked = 0
     if data.alert_ids:
+        # v0.19.3 (Bug 2): build a lookup of alert_id -> rule_name from
+        # the supplied raw_data so newly-created triage rows carry a
+        # human-readable name. Falls through to None where raw_data
+        # wasn't sent or doesn't expose rule.name.
+        rule_name_by_alert: Dict[str, Optional[str]] = {}
+        if data.alert_contexts:
+            for ctx in data.alert_contexts:
+                rd = ctx.raw_data or {}
+                rule_name_by_alert[ctx.alert_id] = (
+                    (rd.get("rule") or {}).get("name")
+                    or rd.get("kibana.alert.rule.name")
+                    or (rd.get("_source", {}).get("rule") or {}).get("name")
+                    if isinstance(rd, dict) else None
+                )
+
         for alert_id in data.alert_ids:
             triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
             if not triage:
                 triage = AlertTriage(
                     es_alert_id=alert_id,
                     status=AlertTriageStatus.ACKNOWLEDGED,
+                    rule_name=rule_name_by_alert.get(alert_id),
                 )
                 session.add(triage)
                 session.flush()
+            else:
+                # v0.19.3 (Bug 3): if the alert was already linked to a
+                # different case, the previous case's source_alert_ids
+                # JSON still references it. That divergence is what made
+                # "linked cases" displays disagree with the FK-driven
+                # truth. Strip this alert from the prior case's JSON so
+                # the two views stay consistent.
+                if triage.case_id is not None and triage.case_id != new_case.id:
+                    old_case = session.query(AlertCase).filter_by(id=triage.case_id).first()
+                    if old_case is not None and old_case.source_alert_ids:
+                        try:
+                            old_ids = list(old_case.source_alert_ids)
+                            if alert_id in old_ids:
+                                old_case.source_alert_ids = [x for x in old_ids if x != alert_id]
+                                logger.warning(
+                                    "create_case: alert %s reassigned %s -> %s; pruned old source_alert_ids",
+                                    alert_id, old_case.case_number, case_number,
+                                )
+                        except Exception as exc:
+                            logger.warning(
+                                "create_case: failed to prune old source_alert_ids on %s: %s",
+                                old_case.case_number, exc,
+                            )
+                # Backfill rule_name on legacy rows if we now have it.
+                if not triage.rule_name and rule_name_by_alert.get(alert_id):
+                    triage.rule_name = rule_name_by_alert[alert_id]
             triage.case_id = new_case.id
             linked += 1
 
@@ -5141,6 +5183,11 @@ async def get_case_detail(
         "alerts": [
             {
                 "es_alert_id": t.es_alert_id,
+                # v0.19.3 (Bug 2): rule_name surfaced so the case detail
+                # card shows "Suspicious PowerShell Execution" instead
+                # of an opaque ES alert id. Falls back null on legacy
+                # rows; template handles by showing id-substring.
+                "rule_name": t.rule_name,
                 "status": t.status.value if hasattr(t.status, "value") else t.status,
                 "priority": t.priority,
                 "observables": t.observables or [],
