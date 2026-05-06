@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.19.14 — 2026-05-06
+
+### Standup — 24h-scoped case view, no stale-case cap, rule names in slides
+
+Three operator-driven tweaks to the daily standup payload + UI:
+
+- **Case status — last 24 hours.** `_check_case_status_counts` was
+  returning **all-time** totals (open / acknowledged / closed across
+  the whole DB), so the standup panel grew without ever shrinking and
+  didn't reflect today's workload. Reframed as a 24h snapshot:
+  - `open` → cases created in last 24h, currently open
+  - `in_progress` → cases created in last 24h, currently acknowledged
+    (was `acknowledged` — renamed to match SOC vocabulary)
+  - `closed_24h` → cases closed in last 24h (regardless of when
+    created — captures backlog throughput)
+  - `intake_24h` → total cases created in last 24h
+  All-time totals + 7-day deltas dropped; if you need them, hit the
+  `/api/cases` dashboard endpoint directly.
+- **Stale cases — show all, not just 20.** `_check_stale_cases` had
+  `.limit(20)` so on busy weeks anything older than the worst 20
+  silently dropped off the panel. Cap removed (DB cost is trivial,
+  the table is small and the filter is FK-indexed). Slide deck +
+  live page now wrap the rendered table in a scrollable container so
+  50+ rows don't blow out the slide.
+- **Triggered rule names on stale cases.** Each stale-case payload
+  now carries `triggered_rules` (sourced from the existing
+  `AlertCase.triggered_rules` JSON list — no schema change). Live
+  page table gained a "Triggered Rules" column; slide deck gained
+  the same; PPTX deck mirrors. Falls back to `—` for legacy rows
+  with no rules recorded.
+
+### Live page bindings
+
+`renderCaseStatusCounts` and `renderStaleCases` updated for the new
+field shapes. Existing element IDs (`ds-cs-open` / `-ack` / `-closed`
+/ `-total` / `-flow`, `stale-tbody`) kept — text content swaps to
+the 24h values + the new flow line reads "Last 24h · X new / Y
+closed" instead of the old 7-day variant.
+
 ## v0.19.13 — 2026-05-06
 
 ### Tickers — analysts can finally clear the strip

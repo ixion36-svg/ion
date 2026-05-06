@@ -157,8 +157,8 @@
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-[12px]">
-            <thead><tr><th class="dth">Case #</th><th class="dth">Title</th><th class="dth">Severity</th><th class="dth">Assigned To</th><th class="dth">Hours Open</th></tr></thead>
-            <tbody id="stale-tbody"><tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
+            <thead><tr><th class="dth">Case #</th><th class="dth">Title</th><th class="dth">Triggered Rules</th><th class="dth">Severity</th><th class="dth">Assigned To</th><th class="dth">Hours Open</th></tr></thead>
+            <tbody id="stale-tbody"><tr><td colspan="6" class="px-3 py-8 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -478,16 +478,24 @@ function renderAlerts(data) {
 
 /* ── S3: Stale Cases ── */
 function renderStaleCases(data) {
+  // v0.19.14: API now returns ALL stale cases (no .limit(20)) and
+  // each row carries a triggered_rules JSON list. New column added.
   const caseData = data || {};
   const cases = caseData.cases || [];
   document.getElementById('kpi-stale').textContent = caseData.count ?? cases.length;
   const tbody = document.getElementById('stale-tbody');
-  if (!cases.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No stale cases</td></tr>'; return; }
+  if (!cases.length) { tbody.innerHTML = '<tr><td colspan="6" class="px-3 py-8 text-center text-slate-500">No stale cases</td></tr>'; return; }
+  const fmtRules = (rules) => {
+    if (!rules || !rules.length) return '<span class="text-slate-600">—</span>';
+    const head = rules.slice(0, 2).map(esc).join(', ');
+    return head + (rules.length > 2 ? ` <span class="text-slate-500">+${rules.length - 2}</span>` : '');
+  };
   tbody.innerHTML = cases.map(c => {
     const h = c.hours_open ?? 0;
     return `<tr class="border-b border-white/5 hover:bg-white/[.02]">
       <td class="px-3 py-2 text-white font-mono">${esc(c.case_number)}</td>
-      <td class="px-3 py-2 text-slate-300 truncate max-w-[260px]">${esc(c.title)}</td>
+      <td class="px-3 py-2 text-slate-300 truncate max-w-[220px]">${esc(c.title)}</td>
+      <td class="px-3 py-2 text-slate-300 truncate max-w-[220px]">${fmtRules(c.triggered_rules)}</td>
       <td class="px-3 py-2">${sevPill(c.severity)}</td>
       <td class="px-3 py-2 text-slate-400">${esc(c.assigned_to)}</td>
       <td class="px-3 py-2 font-mono ${hoursClass(h)}">${h.toFixed(1)}</td>
@@ -698,13 +706,20 @@ function renderOpenAlerts30d(d) {
     (d.still_open_pct != null ? d.still_open_pct + '% open' : '— %');
 }
 function renderCaseStatusCounts(d) {
+  // v0.19.14: API switched to a 24h-scoped view. Field rename:
+  //   total            -> intake_24h
+  //   open             -> open    (now: created in 24h, currently open)
+  //   acknowledged     -> in_progress
+  //   closed           -> closed_24h
+  //   opened_last_7d / closed_last_7d -> dropped
   d = d || {};
-  document.getElementById('ds-cs-total').textContent  = fmtN(d.total);
-  document.getElementById('ds-cs-open').textContent   = fmtN(d.open);
-  document.getElementById('ds-cs-ack').textContent    = fmtN(d.acknowledged);
-  document.getElementById('ds-cs-closed').textContent = fmtN(d.closed);
-  document.getElementById('ds-cs-flow').textContent =
-    `7d: ${fmtN(d.opened_last_7d)} opened / ${fmtN(d.closed_last_7d)} closed`;
+  const setIf = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = fmtN(val); };
+  setIf('ds-cs-total',  d.intake_24h);
+  setIf('ds-cs-open',   d.open);
+  setIf('ds-cs-ack',    d.in_progress);
+  setIf('ds-cs-closed', d.closed_24h);
+  const flow = document.getElementById('ds-cs-flow');
+  if (flow) flow.textContent = `Last 24h · ${fmtN(d.intake_24h)} new / ${fmtN(d.closed_24h)} closed`;
 }
 function renderTriageThroughput(d) {
   d = d || {};

@@ -420,20 +420,33 @@
     if (!list.length) {
       body = `<div class="deck-empty">✓ No stale cases.</div>`;
     } else {
-      const rows = list.slice(0, 10).map(r => `<tr>
-        <td class="mono">${esc(r.case_number || '')}</td>
-        <td class="truncate">${esc(r.title || '')}</td>
-        <td>${sevPill(r.severity)}</td>
-        <td class="mono">${esc(r.hours_open ?? 0)}h</td>
-      </tr>`).join('');
-      body = `<table class="deck-table"><thead><tr>
-        <th>Case</th><th>Title</th><th>Severity</th><th>Open</th>
-      </tr></thead><tbody>${rows}</tbody></table>`;
+      // v0.19.14: render every stale case (no .slice cap) and wrap
+      // the table in a scrollable container so 50+ rows don't blow
+      // out the slide. Added a Triggered Rules column so analysts
+      // can see which detection rules backed each case.
+      const rows = list.map(r => {
+        const rules = (r.triggered_rules && r.triggered_rules.length)
+          ? r.triggered_rules.slice(0, 3).map(esc).join(', ')
+            + (r.triggered_rules.length > 3 ? ` +${r.triggered_rules.length - 3}` : '')
+          : '<span style="color:var(--deck-faint);">—</span>';
+        return `<tr>
+          <td class="mono">${esc(r.case_number || '')}</td>
+          <td class="truncate">${esc(r.title || '')}</td>
+          <td class="truncate" style="max-width: 22vw;">${rules}</td>
+          <td>${sevPill(r.severity)}</td>
+          <td class="mono">${esc(r.hours_open ?? 0)}h</td>
+        </tr>`;
+      }).join('');
+      body = `<div style="max-height: 56vh; overflow-y: auto; border-radius: 12px;">
+        <table class="deck-table"><thead><tr>
+          <th>Case</th><th>Title</th><th>Triggered Rules</th><th>Severity</th><th>Open</th>
+        </tr></thead><tbody>${rows}</tbody></table>
+      </div>`;
     }
     return {
       name: 'Stale Cases',
       html: `<div class="deck-slide" data-slide="stale-cases">
-        <div class="deck-eyebrow">Section 3 · Stale Cases</div>
+        <div class="deck-eyebrow">Section 3 · Stale Cases (Open &gt; 24h, all)</div>
         <div class="deck-title">Stale Cases</div>
         <div class="deck-kpi-row" style="grid-template-columns: minmax(220px, 320px);">
           <div class="deck-kpi"><div class="deck-kpi-label">Open beyond threshold</div>
@@ -480,18 +493,23 @@
 
   function slideCaseStatus(d) {
     const cs = d.case_status_counts || {};
+    // v0.19.14: API field names changed in v0.19.14 — open/in_progress
+    // are now "created in last 24h, currently in this state",
+    // closed_24h is "closed in last 24h regardless of created date".
     return {
       name: 'Case Status',
       html: `<div class="deck-slide" data-slide="case-status">
-        <div class="deck-eyebrow">Section 5 · Cases at a Glance</div>
-        <div class="deck-title">Case Status</div>
+        <div class="deck-eyebrow">Section 5 · Cases (Last 24h)</div>
+        <div class="deck-title">Case Status — Today</div>
         <div class="deck-kpi-row">
-          <div class="deck-kpi"><div class="deck-kpi-label">Open</div>
+          <div class="deck-kpi"><div class="deck-kpi-label">Opened (24h, still open)</div>
             <div class="deck-kpi-value warn">${esc(cs.open ?? 0)}</div></div>
-          <div class="deck-kpi"><div class="deck-kpi-label">Investigating</div>
-            <div class="deck-kpi-value muted">${esc(cs.investigating ?? 0)}</div></div>
-          <div class="deck-kpi"><div class="deck-kpi-label">Closed (24h)</div>
+          <div class="deck-kpi"><div class="deck-kpi-label">In progress</div>
+            <div class="deck-kpi-value muted">${esc(cs.in_progress ?? 0)}</div></div>
+          <div class="deck-kpi"><div class="deck-kpi-label">Closed in 24h</div>
             <div class="deck-kpi-value ok">${esc(cs.closed_24h ?? 0)}</div></div>
+          <div class="deck-kpi"><div class="deck-kpi-label">Intake (24h)</div>
+            <div class="deck-kpi-value brand">${esc(cs.intake_24h ?? 0)}</div></div>
         </div>
       </div>`
     };
