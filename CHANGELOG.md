@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.19.8 — 2026-05-06
+
+### Default Ollama model bumped to qwen2.5:7b
+
+Documentation/template-only change — no code touched. Bob's behaviour
+hasn't shifted; the recommended model has.
+
+`.env.deploy` now suggests `qwen2.5:7b` instead of `llama3.1:8b`.
+Same hardware footprint (~5 GB RAM Q4), but qwen2.5 has materially
+stronger native JSON envelope adherence under `format: "json"` — the
+exact discipline that decided whether Bob produced a real verdict or
+the empty `{}` we tracked down in v0.19.3. The timeout default in the
+template also moves 120 -> 300 to match the asyncio wait we already
+ship (the old 120s was killing investigations mid-inference on cold
+starts before reaching the asyncio guard).
+
+Existing deployments are unaffected — operator's live `.env` wins.
+The template only changes what a fresh deploy starts with.
+
 ## v0.19.7 — 2026-05-06
 
 ### CyAB systems are now deletable
