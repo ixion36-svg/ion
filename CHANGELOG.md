@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.19.11 — 2026-05-06
+
+### Standup deck — AI Threat Summary + AOB slides
+
+The slide deck and .pptx export now include the two narrative
+sections the live `/daily-standup` page surfaces but the
+machine-only `/checks` payload doesn't carry: the AI Threat
+Landscape Summary and the analyst's Additional Notes (AOB).
+
+The two values are user-input/LLM-generated, so the slide deck (a
+separate page) and the PPTX (a separate process) can't see them
+directly. Bridged via `localStorage`:
+
+- Live page now persists into `localStorage`:
+  - `ion.standup.ai_summary` — written when the analyst clicks
+    "Generate Summary" on the threat-landscape panel.
+  - `ion.standup.aob` — debounced write (400 ms) on every keystroke
+    in the Additional Notes textarea. Restored from localStorage on
+    page load if a value is <12 hours old.
+- `/daily-standup/slides` reads both keys, renders one slide each
+  with a card-shell layout matching the rest of the deck. Stale (>
+  12 h) and missing values fall through to a "fill it in on
+  /daily-standup, then refresh this deck" placeholder.
+- `/api/daily-standup/pptx` learnt a `POST` form that accepts
+  `{ai_summary, aob}` in the JSON body and includes the matching
+  slides. The existing `GET` form is unchanged (omits both, since
+  it has no client state to draw on).
+- Both `.pptx` buttons (live page header, slide-deck footer) now
+  use a JS handler that POSTs the localStorage values + triggers
+  the file download via blob — no more bare `<a href>` GET link.
+
 ## v0.19.10 — 2026-05-06
 
 ### Standup slide deck — proper ION branding

@@ -1239,6 +1239,48 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
         _table_block(s, [[(r.get("name") or "")[:80], r.get("last_status", "")]
                          for r in rules[:8]], ["Rule", "Last Status"])
 
+    # --- AI Threat Summary (v0.19.11) ---
+    ai_summary = checks.get("_ai_summary") or ""
+    if ai_summary:
+        s = prs.slides.add_slide(blank)
+        _eyebrow(s, "Section 8 · Threat Landscape")
+        _title(s, "AI Threat Summary")
+        # Long-form prose — wrap as a single paragraph in a wide text box.
+        tf = _box(s, 0.6, 2.4, 12.1, 4.4)
+        tf.word_wrap = True
+        # Truncate to the first ~1800 chars so it fits one slide; longer
+        # output just gets a "(truncated)" suffix. Multi-slide overflow
+        # is intentional follow-up work.
+        body = ai_summary if len(ai_summary) <= 1800 else ai_summary[:1800].rstrip() + "\n\n…(truncated)"
+        for line in body.split("\n"):
+            p = tf.paragraphs[0] if not tf.text else tf.add_paragraph()
+            if not p.runs:
+                p.text = line
+            r = p.runs[0]
+            r.text = line
+            r.font.size = Pt(16)
+            r.font.color.rgb = SLATE_900
+
+    # --- Any Other Business (v0.19.11) ---
+    aob = checks.get("_aob") or ""
+    s = prs.slides.add_slide(blank)
+    _eyebrow(s, "Section 9 · Any Other Business")
+    _title(s, "AOB")
+    if aob:
+        tf = _box(s, 0.6, 2.4, 12.1, 4.4)
+        tf.word_wrap = True
+        for line in aob.split("\n"):
+            p = tf.paragraphs[0] if not tf.text else tf.add_paragraph()
+            if not p.runs:
+                p.text = line
+            r = p.runs[0]
+            r.text = line
+            r.font.size = Pt(18)
+            r.font.color.rgb = SLATE_900
+    else:
+        tf = _box(s, 0.6, 3.5, 12.1, 1.0)
+        _line(tf, "No AOB items recorded.", size=20, color=SLATE_500)
+
     # --- Closing slide ---
     s = prs.slides.add_slide(blank)
     _eyebrow(s, "End of Standup")
@@ -1249,18 +1291,16 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
     return out.getvalue()
 
 
-@router.get("/pptx")
-async def export_standup_pptx(
-    current_user: User = Depends(require_permission("alert:read")),
-):
-    """v0.19.9: Download the daily standup as a PowerPoint deck.
+class StandupPptxRequest(BaseModel):
+    """v0.19.11: optional AI threat summary + AOB notes for the .pptx
+    deck. The slide-deck and live-page download buttons supply these
+    from localStorage; server-only callers can omit them and the
+    corresponding slides degrade to placeholders."""
+    ai_summary: str = ""
+    aob: str = ""
 
-    Server-side gathers the same checks payload the live page consumes,
-    then builds a one-slide-per-panel deck via python-pptx. No client-
-    side rendering — file lands as an attachment ready to attach to
-    email or open in PowerPoint/Keynote/LibreOffice.
-    """
-    # Reuse the existing aggregator
+
+async def _gather_standup_checks_for_pptx(extras: Optional[dict] = None) -> Dict[str, Any]:
     cluster, alerts, cases, dc_health, wef_health, rule_failures, alerts_30d, case_status, _ = (
         await asyncio.gather(
             _check_cluster_health(),
@@ -1279,7 +1319,7 @@ async def export_standup_pptx(
     def _safe(val: Any) -> Any:
         return {"error": str(val)[:100]} if isinstance(val, Exception) else val
 
-    checks = {
+    out = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "cluster_health":     _safe(cluster),
         "critical_alerts":    _safe(alerts),
@@ -1290,15 +1330,63 @@ async def export_standup_pptx(
         "open_alerts_30d":    _safe(alerts_30d),
         "case_status_counts": _safe(case_status),
     }
+    if extras:
+        out["_ai_summary"] = extras.get("ai_summary") or ""
+        out["_aob"] = extras.get("aob") or ""
+    return out
 
+
+@router.post("/pptx")
+async def export_standup_pptx_post(
+    body: StandupPptxRequest,
+    current_user: User = Depends(require_permission("alert:read")),
+):
+    """v0.19.11: enriched PPTX — caller supplies the AI threat summary
+    and AOB notes (typically from localStorage on /daily-standup or
+    /daily-standup/slides). The same data the live page uses, just
+    sealed into a downloadable deck.
+    """
+    checks = await _gather_standup_checks_for_pptx(
+        extras={"ai_summary": body.ai_summary, "aob": body.aob}
+    )
     try:
         pptx_bytes = _build_standup_pptx(checks)
     except ImportError:
         raise HTTPException(
             status_code=501,
-            detail="python-pptx is not installed in this image; rebuild with the v0.19.9 dependency manifest.",
+            detail="python-pptx is not installed in this image; rebuild with the v0.19.9+ dependency manifest.",
         )
+    filename = f"Daily-Standup-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.pptx"
+    return Response(
+        content=pptx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
+
+@router.get("/pptx")
+async def export_standup_pptx(
+    current_user: User = Depends(require_permission("alert:read")),
+):
+    """v0.19.9: Download the daily standup as a PowerPoint deck.
+
+    Server-side gathers the same checks payload the live page consumes
+    and builds a one-slide-per-panel deck via python-pptx. No client-
+    side rendering — file lands as an attachment ready for email,
+    PowerPoint, Keynote, LibreOffice.
+
+    The GET form omits the AI threat summary + AOB sections (no client
+    state to draw on). The POST form (added in v0.19.11) accepts both
+    in the body and includes them as their own slides.
+    """
+    checks = await _gather_standup_checks_for_pptx()
+    try:
+        pptx_bytes = _build_standup_pptx(checks)
+    except ImportError:
+        raise HTTPException(
+            status_code=501,
+            detail="python-pptx is not installed in this image; rebuild with the v0.19.9+ dependency manifest.",
+        )
     filename = f"Daily-Standup-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.pptx"
     return Response(
         content=pptx_bytes,
