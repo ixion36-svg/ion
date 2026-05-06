@@ -1899,6 +1899,19 @@ async def daily_standup_page(request: Request, user: User = Depends(require_page
     return templates.TemplateResponse(request=request, name="daily_standup.html")
 
 
+@app.get("/daily-standup/slides", response_class=HTMLResponse)
+async def daily_standup_slides_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """v0.19.9: presentation-mode slide deck of the daily standup.
+
+    Pulls the same /api/daily-standup/checks payload as the live page
+    and renders one panel per slide. Keyboard-navigable (← / → / Esc /
+    F for fullscreen). Shareable URL — useful for screen-sharing the
+    standup without overwhelming participants with the full data table
+    view.
+    """
+    return templates.TemplateResponse(request=request, name="daily_standup_slides.html")
+
+
 
 
 @app.get("/entity-timeline", response_class=HTMLResponse)

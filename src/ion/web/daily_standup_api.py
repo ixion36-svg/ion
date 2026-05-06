@@ -1029,6 +1029,284 @@ async def export_standup_pdf(
 
 
 
+# ── PPTX export (v0.19.9) ────────────────────────────────────────────────
+
+
+def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
+    """Build a presentation-mode PowerPoint deck from a /checks payload.
+
+    One slide per panel — mirrors the HTML deck served at
+    /daily-standup/slides. Uses dark-on-light defaults so the file
+    looks acceptable when projected from a stock PowerPoint installation
+    (the live deck uses dark theme; printed/exported decks usually need
+    light backgrounds to print legibly).
+    """
+    from io import BytesIO
+    from pptx import Presentation
+    from pptx.util import Inches, Pt
+    from pptx.dml.color import RGBColor
+    from pptx.enum.text import PP_ALIGN
+
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+    blank = prs.slide_layouts[6]
+
+    SLATE_900 = RGBColor(0x0F, 0x17, 0x2A)
+    SLATE_500 = RGBColor(0x64, 0x74, 0x8B)
+    SLATE_200 = RGBColor(0xE2, 0xE8, 0xF0)
+    CORAL = RGBColor(0xF8, 0x71, 0x71)
+    AMBER = RGBColor(0xFB, 0xBF, 0x24)
+    EMERALD = RGBColor(0x4A, 0xDE, 0x80)
+    CYAN = RGBColor(0x38, 0xBD, 0xF8)
+
+    def _box(slide, x, y, w, h):
+        tb = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
+        tb.text_frame.word_wrap = True
+        return tb.text_frame
+
+    def _line(tf, text, *, size=18, bold=False, color=SLATE_200, align=None):
+        p = tf.add_paragraph()
+        p.text = str(text)
+        run = p.runs[0] if p.runs else p.add_run()
+        if not p.runs:
+            run.text = str(text)
+        run.font.size = Pt(size)
+        run.font.bold = bold
+        run.font.color.rgb = color
+        if align is not None:
+            p.alignment = align
+
+    def _eyebrow(slide, label):
+        tf = _box(slide, 0.6, 0.4, 12.5, 0.5)
+        tf.text = label.upper()
+        run = tf.paragraphs[0].runs[0]
+        run.font.size = Pt(11)
+        run.font.color.rgb = SLATE_500
+        run.font.bold = True
+
+    def _title(slide, title, *, color=SLATE_900):
+        tf = _box(slide, 0.6, 0.95, 12.5, 1.2)
+        tf.text = title
+        run = tf.paragraphs[0].runs[0]
+        run.font.size = Pt(40)
+        run.font.bold = True
+        run.font.color.rgb = color
+
+    def _kpi(slide, x, label, value, *, color=SLATE_900, value_size=64):
+        tf = _box(slide, x, 2.6, 3.0, 1.6)
+        tf.text = label.upper()
+        tf.paragraphs[0].runs[0].font.size = Pt(11)
+        tf.paragraphs[0].runs[0].font.color.rgb = SLATE_500
+        tf.paragraphs[0].runs[0].font.bold = True
+        p2 = tf.add_paragraph()
+        p2.text = str(value)
+        p2.runs[0].font.size = Pt(value_size)
+        p2.runs[0].font.bold = True
+        p2.runs[0].font.color.rgb = color
+
+    def _table_block(slide, rows, headers, top=4.4, height=2.6):
+        if not rows:
+            return
+        tbl = slide.shapes.add_table(
+            rows=len(rows) + 1, cols=len(headers),
+            left=Inches(0.6), top=Inches(top),
+            width=Inches(12.1), height=Inches(height),
+        ).table
+        for j, h in enumerate(headers):
+            cell = tbl.cell(0, j)
+            cell.text = h
+            for r in cell.text_frame.paragraphs[0].runs:
+                r.font.size = Pt(11)
+                r.font.bold = True
+                r.font.color.rgb = SLATE_500
+        for i, row in enumerate(rows, start=1):
+            for j, val in enumerate(row):
+                cell = tbl.cell(i, j)
+                cell.text = "" if val is None else str(val)
+                for r in cell.text_frame.paragraphs[0].runs:
+                    r.font.size = Pt(12)
+                    r.font.color.rgb = SLATE_900
+
+    # --- Title slide ---
+    s = prs.slides.add_slide(blank)
+    _eyebrow(s, "Daily SOC Standup")
+    ts_raw = checks.get("timestamp", "")
+    date_str = ts_raw.split("T")[0] if ts_raw else datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    _title(s, date_str)
+    tf = _box(s, 0.6, 2.3, 12.5, 0.7)
+    _line(tf, f"Generated {ts_raw}", size=16, color=SLATE_500)
+
+    # --- Cluster ---
+    c = checks.get("cluster_health") or {}
+    s = prs.slides.add_slide(blank)
+    _eyebrow(s, "Section 1 · Elasticsearch Health")
+    _title(s, f"Cluster {c.get('cluster_name', '—')}")
+    status = str(c.get("status", "unknown")).lower()
+    cluster_color = EMERALD if status == "green" else AMBER if status == "yellow" else CORAL
+    _kpi(s, 0.6, "Status", c.get("status", "—"), color=cluster_color, value_size=56)
+    _kpi(s, 4.0, "Indices", c.get("indices_count", "—"))
+    _kpi(s, 7.4, "Storage", c.get("store_size", "—"), value_size=44)
+    _kpi(s, 10.4, "Unassigned", c.get("unassigned_shards", 0),
+         color=CORAL if (c.get("unassigned_shards") or 0) > 0 else EMERALD)
+
+    # --- Critical alerts ---
+    a = checks.get("critical_alerts") or {}
+    s = prs.slides.add_slide(blank)
+    _eyebrow(s, "Section 2 · Critical Alerts (Last 24h)")
+    _title(s, "Critical Alerts", color=CORAL)
+    _kpi(s, 0.6, "Critical", a.get("critical_count", 0), color=CORAL, value_size=80)
+    rows = [
+        [
+            (r.get("timestamp", "") or "")[:16].replace("T", " "),
+            r.get("severity", ""),
+            (r.get("rule_name", "") or "")[:60],
+            r.get("host", ""),
+        ]
+        for r in (a.get("alerts") or [])[:8]
+    ]
+    if rows:
+        _table_block(s, rows, ["Time", "Severity", "Rule", "Host"])
+
+    # --- Stale cases ---
+    sc = checks.get("stale_cases") or {}
+    s = prs.slides.add_slide(blank)
+    _eyebrow(s, "Section 3 · Stale Cases")
+    _title(s, "Stale Cases")
+    cases = sc.get("cases") or []
+    _kpi(s, 0.6, "Open > Threshold", sc.get("count", len(cases)),
+         color=AMBER if cases else EMERALD, value_size=64)
+    rows = [
+        [
+            r.get("case_number", ""),
+            (r.get("title", "") or "")[:60],
+            r.get("severity", ""),
+            f"{r.get('hours_open', 0)}h",
+        ]
+        for r in cases[:8]
+    ]
+    if rows:
+        _table_block(s, rows, ["Case", "Title", "Severity", "Open"])
+
+    # --- Backlog ---
+    b = checks.get("open_alerts_30d") or {}
+    if b.get("total") is not None:
+        s = prs.slides.add_slide(blank)
+        _eyebrow(s, "Section 4 · Alert Backlog (30 days)")
+        _title(s, "Alert Backlog")
+        still_open = b.get("still_open_pct", 0)
+        backlog_color = CORAL if still_open >= 30 else AMBER if still_open >= 15 else EMERALD
+        _kpi(s, 0.6, "Total", f"{b.get('total', 0):,}", value_size=48)
+        _kpi(s, 4.0, "Still Open", f"{b.get('open', 0):,}", color=backlog_color, value_size=48)
+        _kpi(s, 7.4, "Acknowledged", f"{b.get('acknowledged', 0):,}", color=AMBER, value_size=48)
+        _kpi(s, 10.4, "Closed", f"{b.get('closed', 0):,}", color=EMERALD, value_size=48)
+        tf = _box(s, 0.6, 5.0, 12.5, 1.0)
+        _line(tf, f"{still_open}% of 30-day alerts still open.", size=20, color=SLATE_500)
+
+    # --- Case status ---
+    cs = checks.get("case_status_counts") or {}
+    s = prs.slides.add_slide(blank)
+    _eyebrow(s, "Section 5 · Case Status")
+    _title(s, "Cases at a Glance")
+    _kpi(s, 0.6, "Open", cs.get("open", 0), color=AMBER, value_size=72)
+    _kpi(s, 4.6, "Investigating", cs.get("investigating", 0), value_size=72)
+    _kpi(s, 8.8, "Closed (24h)", cs.get("closed_24h", 0), color=EMERALD, value_size=72)
+
+    # --- Log health ---
+    dc = checks.get("dc_log_health") or {}
+    wef = checks.get("wef_log_health") or {}
+    s = prs.slides.add_slide(blank)
+    _eyebrow(s, "Section 6 · Log-Source Health")
+    _title(s, "Log Sources")
+    _kpi(s, 0.6, "Domain Controllers (silent / total)",
+         f"{dc.get('silent_count', 0)} / {dc.get('total', 0)}",
+         color=CORAL if (dc.get("silent_count") or 0) > 0 else EMERALD,
+         value_size=56)
+    _kpi(s, 6.6, "WEF (silent / total)",
+         f"{wef.get('silent_count', 0)} / {wef.get('total', 0)}",
+         color=CORAL if (wef.get("silent_count") or 0) > 0 else EMERALD,
+         value_size=56)
+
+    # --- Rule failures ---
+    rf = checks.get("rule_failures") or {}
+    rules = rf.get("rules") or []
+    s = prs.slides.add_slide(blank)
+    _eyebrow(s, "Section 7 · Detection Rule Failures")
+    _title(s, "Failing Rules")
+    _kpi(s, 0.6, "Failing rules", rf.get("count", len(rules)),
+         color=CORAL if rules else EMERALD, value_size=72)
+    if rules:
+        _table_block(s, [[(r.get("name") or "")[:80], r.get("last_status", "")]
+                         for r in rules[:8]], ["Rule", "Last Status"])
+
+    # --- Closing slide ---
+    s = prs.slides.add_slide(blank)
+    _eyebrow(s, "End of Standup")
+    _title(s, "Questions? Action items?")
+
+    out = BytesIO()
+    prs.save(out)
+    return out.getvalue()
+
+
+@router.get("/pptx")
+async def export_standup_pptx(
+    current_user: User = Depends(require_permission("alert:read")),
+):
+    """v0.19.9: Download the daily standup as a PowerPoint deck.
+
+    Server-side gathers the same checks payload the live page consumes,
+    then builds a one-slide-per-panel deck via python-pptx. No client-
+    side rendering — file lands as an attachment ready to attach to
+    email or open in PowerPoint/Keynote/LibreOffice.
+    """
+    # Reuse the existing aggregator
+    cluster, alerts, cases, dc_health, wef_health, rule_failures, alerts_30d, case_status, _ = (
+        await asyncio.gather(
+            _check_cluster_health(),
+            _check_critical_alerts(),
+            _check_stale_cases(),
+            _check_log_source_health(_standup_dcs_patterns(), "Domain Controllers"),
+            _check_log_source_health(_standup_wef_patterns(), "Windows Event Forwarding"),
+            _check_rule_failures(),
+            _check_open_alerts_30d(),
+            _check_case_status_counts(),
+            _check_triage_throughput_24h(),
+            return_exceptions=True,
+        )
+    )
+
+    def _safe(val: Any) -> Any:
+        return {"error": str(val)[:100]} if isinstance(val, Exception) else val
+
+    checks = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "cluster_health":     _safe(cluster),
+        "critical_alerts":    _safe(alerts),
+        "stale_cases":        _safe(cases),
+        "dc_log_health":      _safe(dc_health),
+        "wef_log_health":     _safe(wef_health),
+        "rule_failures":      _safe(rule_failures),
+        "open_alerts_30d":    _safe(alerts_30d),
+        "case_status_counts": _safe(case_status),
+    }
+
+    try:
+        pptx_bytes = _build_standup_pptx(checks)
+    except ImportError:
+        raise HTTPException(
+            status_code=501,
+            detail="python-pptx is not installed in this image; rebuild with the v0.19.9 dependency manifest.",
+        )
+
+    filename = f"Daily-Standup-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.pptx"
+    return Response(
+        content=pptx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 # ── Arkime high-risk traffic ──────────────────────────────────────────────
 
 

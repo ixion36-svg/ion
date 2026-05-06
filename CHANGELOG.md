@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.19.9 — 2026-05-06
+
+### Daily SOC standup — slide deck (HTML + PPTX)
+
+Two presentation modes for people who don't want to read the full
+data table view during the morning briefing:
+
+- **`/daily-standup/slides`** — vanilla HTML slide deck. One
+  full-screen panel per section (cluster, criticals, stale cases,
+  30-day backlog, case status, log health, rule failures), keyboard-
+  navigable (← / → / Space / PgUp / PgDn / Home / End / Esc / F for
+  fullscreen). Pulls the same `/api/daily-standup/checks` payload
+  as the live page so the deck is always live, never stale. Click
+  anywhere also advances. URL-shareable.
+- **`/api/daily-standup/pptx`** — server-side `python-pptx` export
+  of the same data as a downloadable `.pptx` file. New dependency:
+  `python-pptx>=0.6.21`. Light-on-dark colours that survive
+  projector/print. Returns 501 if the dependency is missing
+  (graceful degrade).
+
+### Bob investigation timeout — finishing the v0.17.3 fix
+
+`config.investigation_llm_timeout_s` defaulted to **120**, but the
+v0.17.3 fix-pack had bumped the **module default** in
+`investigation_service.py` to **300**. The resolution order in
+`_single_llm_call` is `env → config → module-default`, so the
+config field was silently overriding the module default with the
+old broken value. The env-override path (`ION_INVESTIGATION_LLM_TIMEOUT_S`)
+worked, but operators who didn't set it kept hitting 120s timeouts
+mid-inference even on v0.17.3+.
+
+Bumped the dataclass default + the `.env`/JSON loader fallback +
+the env-fallback constant from `120` → `300`. Three lines, all in
+`core/config.py`. Existing live config files override as before.
+
 ## v0.19.8 — 2026-05-06
 
 ### Default Ollama model bumped to qwen2.5:7b

@@ -166,7 +166,13 @@ class Config:
     investigation_loop_enabled: bool = True
     investigation_sweep_interval_s: int = 900
     investigation_max_per_sweep: int = 50
-    investigation_llm_timeout_s: int = 120
+    # v0.19.9: was 120; the v0.17.3 fix-pack bumped the module default
+    # in investigation_service to 300 (real prompts on llama3.1:8b take
+    # 130-180s) but missed this config-dataclass copy. Resolution order
+    # in _single_llm_call is env -> config -> module-default, so
+    # config=120 was overriding the 300 default that v0.17.3 actually
+    # shipped. Brought into line.
+    investigation_llm_timeout_s: int = 300
 
     # --- Active response executors ---
     exec_dry_run: bool = True          # Safety: default TRUE; no real calls made
@@ -354,7 +360,7 @@ class Config:
             investigation_loop_enabled=data.get("investigation_loop_enabled", True),
             investigation_sweep_interval_s=data.get("investigation_sweep_interval_s", 900),
             investigation_max_per_sweep=data.get("investigation_max_per_sweep", 50),
-            investigation_llm_timeout_s=data.get("investigation_llm_timeout_s", 120),
+            investigation_llm_timeout_s=data.get("investigation_llm_timeout_s", 300),
             # Active response executors
             exec_dry_run=data.get("exec_dry_run", True),
             exec_default_timeout_s=data.get("exec_default_timeout_s", 20),
@@ -841,7 +847,7 @@ def get_config() -> Config:
         if os.environ.get("ION_INVESTIGATION_MAX_PER_SWEEP"):
             _config.investigation_max_per_sweep = int(os.environ.get("ION_INVESTIGATION_MAX_PER_SWEEP", "50"))
         if os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S"):
-            _config.investigation_llm_timeout_s = int(os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S", "120"))
+            _config.investigation_llm_timeout_s = int(os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S", "300"))
 
         # Active response executor overrides
         if os.environ.get("ION_EXEC_DRY_RUN"):
