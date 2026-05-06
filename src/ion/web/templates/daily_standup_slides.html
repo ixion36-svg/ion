@@ -528,11 +528,15 @@
   }
 
   function slideLogHealth(d) {
+    // v0.19.16: was reading silent_count/total but the API actually
+    // returns hosts_with_gaps/host_count. The slide quietly showed
+    // 0 / 0 to everyone since v0.19.10 — caught in the v0.19.4..HEAD
+    // review. Aligned to the API.
     const dc = d.dc_log_health || {};
     const wef = d.wef_log_health || {};
     const block = (label, x) => {
-      const silent = x.silent_count ?? 0;
-      const total = x.total ?? 0;
+      const silent = x.hosts_with_gaps ?? 0;
+      const total = x.host_count ?? 0;
       const cls = silent > 0 ? 'crit' : 'ok';
       return `<div class="deck-kpi">
         <div class="deck-kpi-label">${esc(label)}</div>

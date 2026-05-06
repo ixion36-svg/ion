@@ -1159,13 +1159,41 @@ async def cyab_systems_bulk(
         # v0.19.7: bulk delete. Reuses _delete_system_row from
         # cyab_studio_api so the manual data_sources / snapshots
         # cascade is identical to the single-row endpoint.
+        # v0.19.16: privilege gate. The enclosing endpoint is
+        # require_page_permission("alert:read") because the read-ish
+        # actions (mark-reviewed/export-csv/rerun-health) are fine for
+        # any analyst. delete-selected is destructive and must match
+        # the case:update gate the per-row DELETE /api/cyab/studio/
+        # systems/{id} endpoint already enforces.
+        # v0.19.16: also catches IntegrityError per-row so a single
+        # FK-violation doesn't poison the shared session for the rest
+        # of the user's selection.
         if action == "delete-selected":
+            if not user.has_permission("case:update"):
+                raise HTTPException(
+                    status_code=403,
+                    detail="case:update permission required for bulk delete",
+                )
+            from sqlalchemy.exc import IntegrityError
             from ion.web.cyab_studio_api import _delete_system_row
             deleted = 0
+            failed: list[int] = []
             for s in rows:
-                if _delete_system_row(session, s.id):
-                    deleted += 1
-            return {"affected": deleted}
+                try:
+                    if _delete_system_row(session, s.id):
+                        deleted += 1
+                except IntegrityError as exc:
+                    session.rollback()
+                    failed.append(s.id)
+                    logger.warning(
+                        "bulk delete: FK violation deleting CyAB system %s: %s",
+                        s.id, str(exc)[:120],
+                    )
+                    continue
+            out: dict = {"affected": deleted}
+            if failed:
+                out["failed_ids"] = failed
+            return out
 
         raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
     finally:

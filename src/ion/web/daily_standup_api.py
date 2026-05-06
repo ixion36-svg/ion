@@ -900,16 +900,21 @@ def _render_standup_html(data: "StandupSaveRequest", current_user: "User") -> st
 
     # -- Case status counts — v0.17.1 ----------------------------------------
     cs = checks.get("case_status_counts") or {}
+    # v0.19.16: was reading {total, acknowledged, closed,
+    # opened_last_7d, closed_last_7d} — the v0.19.14 rewrite of
+    # _check_case_status_counts dropped or renamed all of those.
+    # The slide deck and PPTX builder were updated in v0.19.14;
+    # this PDF/HTML save path was missed. Aligned now to the new
+    # 24h-scoped shape: open / in_progress / closed_24h / intake_24h.
     if cs and "open" in cs:
-        out.append(f'<h2>Cases &mdash; {cs.get("total", 0)} total</h2>')
+        out.append(f'<h2>Cases &mdash; {cs.get("intake_24h", 0)} created in last 24h</h2>')
         out.append(
-            '<table><tr><th>Open</th><th>In Progress (acknowledged)</th><th>Closed</th>'
-            '<th>Opened (last 7d)</th><th>Closed (last 7d)</th></tr>'
+            '<table><tr><th>Open (24h)</th><th>In Progress</th><th>Closed (24h)</th>'
+            '<th>Intake (24h)</th></tr>'
             f'<tr><td class="status-warning">{cs.get("open", 0):,}</td>'
-            f'<td>{cs.get("acknowledged", 0):,}</td>'
-            f'<td class="status-ok">{cs.get("closed", 0):,}</td>'
-            f'<td>{cs.get("opened_last_7d", 0):,}</td>'
-            f'<td>{cs.get("closed_last_7d", 0):,}</td></tr></table>'
+            f'<td>{cs.get("in_progress", 0):,}</td>'
+            f'<td class="status-ok">{cs.get("closed_24h", 0):,}</td>'
+            f'<td>{cs.get("intake_24h", 0):,}</td></tr></table>'
         )
 
     # -- Triage throughput (last 24h) + MTTA — v0.17.1 -----------------------
@@ -991,8 +996,12 @@ def _render_standup_html(data: "StandupSaveRequest", current_user: "User") -> st
         out.append("<table><tr><th>Rule</th><th>Failures</th><th>Last Failure</th></tr>")
         for r in rf.get("rules", []):
             out.append(
-                f'<tr><td>{_esc(str(r.get("rule_name", ""))[:50])}</td>'
-                f'<td>{_esc(r.get("failure_count", 0))}</td>'
+                # v0.19.16: was reading rule_name/failure_count —
+                # both renamed in v0.19.14's follow-up fix. Slide and
+                # PPTX got the rename; this saved-doc renderer was
+                # missed. Dual-read for rolling-deploy compat.
+                f'<tr><td>{_esc(str(r.get("name") or r.get("rule_name") or "")[:50])}</td>'
+                f'<td>{_esc(r.get("failures") or r.get("failure_count") or 0)}</td>'
                 f'<td>{_esc(str(r.get("last_failure") or "")[:16])}</td></tr>'
             )
         out.append("</table>")
@@ -1329,18 +1338,21 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
     _kpi(s, 10.2, "Intake (24h)", cs.get("intake_24h", 0), value_size=64)
 
     # --- Log health ---
+    # v0.19.16: was reading silent_count/total but the API returns
+    # hosts_with_gaps/host_count. The slide quietly showed 0 / 0 to
+    # everyone since v0.19.10 — caught in the v0.19.4..HEAD review.
     dc = checks.get("dc_log_health") or {}
     wef = checks.get("wef_log_health") or {}
     s = prs.slides.add_slide(blank)
     _eyebrow(s, "Section 6 · Log-Source Health")
     _title(s, "Log Sources")
     _kpi(s, 0.6, "Domain Controllers (silent / total)",
-         f"{dc.get('silent_count', 0)} / {dc.get('total', 0)}",
-         color=CORAL if (dc.get("silent_count") or 0) > 0 else EMERALD,
+         f"{dc.get('hosts_with_gaps', 0)} / {dc.get('host_count', 0)}",
+         color=CORAL if (dc.get("hosts_with_gaps") or 0) > 0 else EMERALD,
          value_size=56)
     _kpi(s, 6.6, "WEF (silent / total)",
-         f"{wef.get('silent_count', 0)} / {wef.get('total', 0)}",
-         color=CORAL if (wef.get("silent_count") or 0) > 0 else EMERALD,
+         f"{wef.get('hosts_with_gaps', 0)} / {wef.get('host_count', 0)}",
+         color=CORAL if (wef.get("hosts_with_gaps") or 0) > 0 else EMERALD,
          value_size=56)
 
     # --- Rule failures ---

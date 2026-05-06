@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.19.16 — 2026-05-06
+
+### Code-review fixes (`v0.19.4..v0.19.15`)
+
+Five issues caught by a parallel-agent review of the session's diff:
+
+- **AuthZ regression — bulk CyAB delete**. The `delete-selected`
+  action added in v0.19.7 lived inside the existing
+  `cyab_systems_bulk` endpoint (gated on `alert:read`), but the
+  per-row `DELETE /api/cyab/studio/systems/{id}` correctly
+  required `case:update`. Net: any read-only analyst could
+  hard-delete CyAB systems via the bulk path. Now does an
+  imperative `user.has_permission("case:update")` check inside
+  the action branch and returns 403 if missing.
+- **Bulk delete session poisoning on FK violation**. The bulk
+  loop shared one SQLAlchemy session across all `_delete_system_row`
+  calls. A FK constraint failure on row N would invalidate the
+  session for rows N+1..M and leave the connection dirty in the
+  pool. Now wraps each row in `try/except IntegrityError` with
+  per-row rollback + a `failed_ids` list in the response.
+- **Log-Source Health slide + PPTX showing 0 / 0**. The PPTX
+  builder and `slideLogHealth` read `silent_count` / `total` —
+  fields the API has never returned. The actual response keys
+  are `hosts_with_gaps` and `host_count` (correctly used by the
+  printable HTML path). Result: Section 6 has been silently
+  reading zero on every standup deck since v0.19.10. Renamed in
+  both consumers.
+- **`_render_standup_html` case-status block reading ghost
+  fields**. v0.19.14's rewrite of `_check_case_status_counts`
+  renamed `acknowledged` → `in_progress`, `closed` → `closed_24h`,
+  `total` → `intake_24h`, and dropped the 7-day deltas. Slide
+  deck + PPTX were updated. The PDF / HTML save renderer was
+  missed and continued to read all the old keys, displaying zeros
+  for every Cases column on the saved standup. Now reads the new
+  shape.
+- **`_render_standup_html` rule-failures block reading ghost
+  fields**. Same pattern as above for v0.19.14's follow-up commit
+  that renamed `rule_name` → `name` and `failure_count` →
+  `failures`. Slide + PPTX got the rename; the saved-doc renderer
+  was missed. Dual-read pattern (`r.get("name") or
+  r.get("rule_name")`) so a rolling deploy doesn't blank the
+  saved standup mid-rollout.
+
 ## v0.19.15 — 2026-05-06
 
 ### Standup critical-alerts — ION-local fallback when ES returns empty
