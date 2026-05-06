@@ -1095,8 +1095,12 @@ async def save_daily_standup(
         session.commit()
         return {"ok": True, "document_id": doc.id, "name": doc.name}
     except Exception as e:
+        # v0.19.17: was raising with detail=str(e), which leaked
+        # SQLAlchemy table/column names + stack frames in the response.
+        # Internal trace stays in the application log.
         session.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        from ion.core.safe_errors import safe_error
+        raise HTTPException(status_code=500, detail=f"Save failed: {safe_error(e, 'standup_save')}")
     finally:
         session.close()
 

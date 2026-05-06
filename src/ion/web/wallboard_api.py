@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 from ion.auth.dependencies import (
     get_current_user,
     require_page_permission,
+    require_permission,
 )
 from ion.models.user import User
 from ion.services.wallboard_service import get_snapshot
@@ -52,7 +53,12 @@ def wallboard_page(
     )
 
 
-@router.get("/api/wallboard/snapshot")
+# v0.19.17: gated on alert:read to match the wallboard page route. The
+# JSON endpoints previously only required get_current_user, so a user
+# whose role had been revoked (but session still valid) could still
+# pull the wall data via the API.
+@router.get("/api/wallboard/snapshot",
+            dependencies=[Depends(require_permission("alert:read"))])
 def wallboard_snapshot(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
@@ -61,7 +67,8 @@ def wallboard_snapshot(
     return get_snapshot(session)
 
 
-@router.post("/api/wallboard/refresh")
+@router.post("/api/wallboard/refresh",
+             dependencies=[Depends(require_permission("alert:read"))])
 def wallboard_refresh(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),

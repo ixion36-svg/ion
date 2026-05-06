@@ -1290,8 +1290,11 @@ async def upload_course_image(
     except HTTPException:
         raise
     except Exception as exc:
+        # v0.19.17: was f"Upload failed: {exc}", which could leak
+        # filesystem paths from PermissionError / FileNotFoundError.
+        from ion.core.safe_errors import safe_error
         target.unlink(missing_ok=True)
-        raise HTTPException(status_code=500, detail=f"Upload failed: {exc}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {safe_error(exc, 'course_image_upload')}")
 
     public_url = f"/static/img/courses/{_safe_slug(course.slug)}/{fname}"
     return {

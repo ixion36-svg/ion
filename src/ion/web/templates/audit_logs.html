@@ -113,10 +113,15 @@ async function loadLogs() {
             <tr>
                 <td>${new Date(log.timestamp).toLocaleString()}</td>
                 <td>${log.username ? escapeHtml(log.username) : '<em>System</em>'}</td>
-                <td><span class="action-badge action-${log.action.replace(/_/g, '-')}">${formatAction(log.action)}</span></td>
-                <td>${log.resource_type ? `${log.resource_type}${log.resource_id ? ' #' + log.resource_id : ''}` : '-'}</td>
+                <!-- v0.19.17: action and resource fields are normally
+                     internal strings, but a future audit producer that
+                     stores user-supplied resource names (case titles,
+                     custom checklist items, etc.) could land attacker-
+                     controlled content here. Escape defensively. -->
+                <td><span class="action-badge action-${escapeHtml(String(log.action || '').replace(/_/g, '-'))}">${escapeHtml(formatAction(log.action))}</span></td>
+                <td>${log.resource_type ? `${escapeHtml(String(log.resource_type))}${log.resource_id ? ' #' + escapeHtml(String(log.resource_id)) : ''}` : '-'}</td>
                 <td class="details-cell">${formatDetails(log.details)}</td>
-                <td>${log.ip_address || '-'}</td>
+                <td>${escapeHtml(String(log.ip_address || '-'))}</td>
             </tr>
         `).join('');
 

@@ -751,7 +751,12 @@ async def oidc_callback(
 
         validator = OIDCValidator(oidc_config)
         token_data = await validator.validate_token_async(tokens["access_token"])
-        logger.info(f"OIDC callback: token validated for {token_data.preferred_username} ({token_data.email})")
+        # v0.19.17: scrubbed email out of the INFO message — every login
+        # was emitting the user's email to the log index, which under ECS
+        # log shipping ends up in long-term storage. Username alone is
+        # enough for trace correlation; email is logged at DEBUG only.
+        logger.info(f"OIDC callback: token validated for {token_data.preferred_username}")
+        logger.debug(f"OIDC callback: token email = {token_data.email}")
 
         # Sync user to ION database
         sync = OIDCUserSync(session, oidc_config)
@@ -1161,12 +1166,19 @@ async def reset_user_password(
 # Roles endpoint
 # =============================================================================
 
-@router.get("/roles")
+@router.get("/roles", dependencies=[Depends(require_permission("user:read"))])
 async def list_roles(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
-    """List all roles."""
+    """List all roles.
+
+    v0.19.17: gated on user:read (matches /users). The endpoint
+    returns the full role-to-permission map, useful for an
+    authenticated attacker planning privilege escalation. Most
+    analysts have no legitimate reason to enumerate roles; admins
+    and team leads who do will already have user:read.
+    """
     role_repo = RoleRepository(session)
     roles = role_repo.list_all()
 
@@ -2263,9 +2275,18 @@ async def health_check():
 
 
 @router.get("/health/deep")
-async def deep_health_check():
+async def deep_health_check(
+    current_user: User = Depends(get_current_user),
+):
     """Deep health check — probes all integrations. Not for load balancers
-    (too slow), but useful for dashboards and monitoring."""
+    (too slow), but useful for dashboards and monitoring.
+
+    v0.19.17: now requires authentication. The endpoint enumerates
+    every configured integration (ES, Kibana, OpenCTI, TIDE, etc.)
+    plus their connectivity error strings — useful pre-auth recon
+    for an attacker mapping the deployment topology. /health (the
+    shallow check used by load balancers) stays public.
+    """
     from ion import __version__
     from ion.core.config import get_config
     from ion.storage.database import get_engine
