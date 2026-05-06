@@ -23,8 +23,20 @@
         <button onclick="runChecks()" id="btn-run-checks" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
           <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg> Run Checks
         </button>
+        {# v0.19.9: presentation-mode + pptx download — same data the
+           live page shows, but stripped down for a meeting screen. #}
+        <a href="/daily-standup/slides" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"
+           title="Open the slide-deck view in a new tab (keyboard navigable, fullscreen-friendly)">
+          <svg class="w-3.5 h-3.5"><use href="#i-external-link"/></svg> Present
+        </a>
+        <a href="/api/daily-standup/pptx"
+           class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"
+           title="Download the standup as a PowerPoint deck (.pptx)">
+          <svg class="w-3.5 h-3.5"><use href="#i-download"/></svg> .pptx
+        </a>
         <button onclick="exportPDF()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
-          <svg class="w-3.5 h-3.5"><use href="#i-download"/></svg> Export PDF
+          <svg class="w-3.5 h-3.5"><use href="#i-download"/></svg> PDF
         </button>
         <button onclick="saveStandup()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
           <svg class="w-3.5 h-3.5"><use href="#i-check-circle"/></svg> Save &amp; Sign Off
