@@ -128,7 +128,14 @@ async def translate_file(
     _user: User = Depends(require_permission("alert:read")),
 ) -> Dict[str, Any]:
     """Upload a document, extract its text, translate, return both."""
-    content = await file.read()
+    # v0.19.18: was `await file.read()` then post-hoc size check inside
+    # extract_text_from_upload, which buffered the whole upload into
+    # memory first. Stream-read with a running cap so oversize uploads
+    # are rejected before allocation. MAX_FILE_BYTES is the same value
+    # the extractor enforces internally — sharing keeps the limits
+    # consistent.
+    from ion.core.uploads import read_upload_capped
+    content = await read_upload_capped(file, MAX_FILE_BYTES)
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="Empty file")
     try:

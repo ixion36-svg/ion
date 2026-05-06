@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.19.18 — 2026-05-06
+
+### Security hardening — SSRF guards + upload size caps
+
+Two of the four MEDIUM findings deferred from the v0.19.16
+assessment now closed. PII default and prompt sanitisation remain
+on the design backlog (separate conversation).
+
+**SSRF on `PUT /api/admin/config/*` + `/api/admin/wizard/save*`:**
+
+The wizard "test connection" path (`admin_api.py:~1429-1703`) has
+always called `validate_integration_url()` before issuing the
+outbound request — that call rejects RFC-1918, loopback,
+link-local (169.254.x.x AWS metadata), decimal/hex IP obfuscation,
+null bytes, and CRLF. The matching **save** paths (per-integration
+PUTs at lines 318+ and the wizard `/save/{integration}` and
+`/save-all` endpoints at 1873+ and 2021+) historically just
+called `.rstrip("/")` and trusted the value. Any operator with
+`system:settings` or `integration:manage` could persist a
+malicious URL — for example, `opencti_url=http://169.254.169.254/`
+— and the next OpenCTI poll would fetch the AWS metadata
+endpoint.
+
+Centralised gate added: `_ssrf_safe_url(url, integration_type)`
+in `admin_api.py` (top of file). It calls
+`validate_integration_url()` and raises `HTTPException(400)` on
+rejection, returning the rstripped URL on accept. All 14
+URL-assignment sites across both the per-integration PUT
+handlers and the two wizard save endpoints now go through the
+helper. The Docker-hostname carve-out (`http://postgres/`,
+`http://ollama/`) inherited from `url_validator.py` keeps working
+unchanged.
+
+**Upload size caps — translator + PCAP:**
+
+Both endpoints used `await file.read()` followed by a post-hoc
+`len(content) > MAX_*` check. That meant the entire request body
+(potentially multi-GB) was buffered into RAM before the cap was
+even consulted — an authenticated user could OOM the worker by
+posting a large file repeatedly.
+
+New helper `ion/core/uploads.py::read_upload_capped(file,
+max_bytes)` reads in 64 KiB chunks and raises
+`HTTPException(413)` the moment the running total exceeds the
+cap. No completed allocation, no full-file buffer.
+
+- `pcap_api.py` (`POST /api/pcap/analyze`): 100 MB cap (was
+  enforced only after the full read).
+- `translator_api.py` (`POST /api/translator/translate-file`,
+  `POST /api/translator/extract`): inherits the existing
+  `MAX_FILE_BYTES` from the extractor module.
+- `course_api.py` already used a streaming approach via
+  `chunk` writes — left as-is.
+
 ## v0.19.17 — 2026-05-06
 
 ### Security hardening — quick-wins from v0.19.16 assessment
