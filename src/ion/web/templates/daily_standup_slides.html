@@ -548,18 +548,25 @@
     if (!list.length) {
       body = `<div class="deck-empty">✓ No detection-rule execution failures.</div>`;
     } else {
-      const rows = list.slice(0, 8).map(x => `<tr>
-        <td class="truncate">${esc(x.name || '')}</td>
-        <td>${sevPill(x.last_status || '')}</td>
+      // v0.19.14: was reading x.name + x.last_status but API was
+      // emitting rule_name + failure_count, so every row rendered
+      // blank. Aligned now — name + failures + last_failure shown.
+      const rows = list.map(x => `<tr>
+        <td class="truncate">${esc(x.name || x.rule_name || '(unnamed)')}</td>
+        <td class="mono">${esc(x.failures ?? x.failure_count ?? 0)}</td>
+        <td class="mono">${esc((x.last_failure || '').slice(0, 16).replace('T', ' '))}</td>
+        <td>${sevPill(x.last_status || 'failure')}</td>
       </tr>`).join('');
-      body = `<table class="deck-table"><thead><tr>
-        <th>Rule</th><th>Last Status</th>
-      </tr></thead><tbody>${rows}</tbody></table>`;
+      body = `<div style="max-height: 56vh; overflow-y: auto; border-radius: 12px;">
+        <table class="deck-table"><thead><tr>
+          <th>Rule</th><th>Failures (24h)</th><th>Last failure</th><th>Status</th>
+        </tr></thead><tbody>${rows}</tbody></table>
+      </div>`;
     }
     return {
       name: 'Rule Failures',
       html: `<div class="deck-slide" data-slide="rule-failures">
-        <div class="deck-eyebrow">Section 7 · Detection Rule Failures</div>
+        <div class="deck-eyebrow">Section 7 · Detection Rule Failures (Last 24h)</div>
         <div class="deck-title">Rule Failures</div>
         <div class="deck-kpi-row" style="grid-template-columns: minmax(220px, 320px);">
           <div class="deck-kpi"><div class="deck-kpi-label">Failing rules</div>

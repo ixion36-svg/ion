@@ -608,10 +608,19 @@ async def _check_rule_failures() -> Dict[str, Any]:
                     "POST", f"/{index}/_search?ignore_unavailable=true", json=body
                 )
                 for bucket in result.get("aggregations", {}).get("rules", {}).get("buckets", []):
+                    # v0.19.14: was emitting {rule_name, failure_count,
+                    # last_failure} but the slide deck + PPTX reader
+                    # expected {name, last_status, ...}, so the
+                    # rule-failures slide showed blank rows. Renamed
+                    # to a single canonical shape and added last_status
+                    # (we know it's a failure, so the value is fixed —
+                    # but the field is in the response so the slide can
+                    # render a Status column without falsy-undefined).
                     rules.append({
-                        "rule_name": bucket["key"],
-                        "failure_count": bucket["doc_count"],
+                        "name":         bucket["key"],
+                        "failures":     bucket["doc_count"],
                         "last_failure": bucket.get("last_failure", {}).get("value_as_string"),
+                        "last_status":  "failure",
                     })
             except Exception:
                 continue
@@ -1272,16 +1281,31 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
          value_size=56)
 
     # --- Rule failures ---
+    # v0.19.14: API renamed rule_name→name, failure_count→failures.
+    # Old code only showed name+last_status (and last_status was
+    # never emitted, so columns rendered blank). Now: name +
+    # failure count + last failure timestamp + status.
     rf = checks.get("rule_failures") or {}
     rules = rf.get("rules") or []
     s = prs.slides.add_slide(blank)
-    _eyebrow(s, "Section 7 · Detection Rule Failures")
+    _eyebrow(s, "Section 7 · Detection Rule Failures (Last 24h)")
     _title(s, "Failing Rules")
     _kpi(s, 0.6, "Failing rules", rf.get("count", len(rules)),
          color=CORAL if rules else EMERALD, value_size=72)
     if rules:
-        _table_block(s, [[(r.get("name") or "")[:80], r.get("last_status", "")]
-                         for r in rules[:8]], ["Rule", "Last Status"])
+        _table_block(
+            s,
+            [
+                [
+                    (r.get("name") or r.get("rule_name") or "(unnamed)")[:80],
+                    str(r.get("failures") or r.get("failure_count") or 0),
+                    (r.get("last_failure") or "")[:16].replace("T", " "),
+                    r.get("last_status", "failure"),
+                ]
+                for r in rules[:12]
+            ],
+            ["Rule", "Failures (24h)", "Last failure", "Status"],
+        )
 
     # --- AI Threat Summary (v0.19.11) ---
     ai_summary = checks.get("_ai_summary") or ""

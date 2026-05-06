@@ -677,15 +677,18 @@ function renderArkimeNodes(data) {
   el.innerHTML = html;
 }
 
-/* ── S6: Rule Failures ── */
+/* ── S6: Rule Failures ──
+   v0.19.14: API renamed rule_name→name, failure_count→failures.
+   Reading both shapes for backwards compat (cached payloads, older
+   API images during a rolling deploy). */
 function renderRuleFailures(data) {
   const failData = data || {};
   const failures = failData.rules || (Array.isArray(data) ? data : []);
   const tbody = document.getElementById('rules-tbody');
   if (!failures.length) { tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-8 text-center text-slate-500">No rule failures detected</td></tr>'; return; }
   tbody.innerHTML = failures.map(f => `<tr class="border-b border-white/5 hover:bg-white/[.02]">
-    <td class="px-3 py-2 text-white">${esc(f.rule_name)}</td>
-    <td class="px-3 py-2 text-ion-amber font-mono">${f.failure_count ?? 0}</td>
+    <td class="px-3 py-2 text-white">${esc(f.name || f.rule_name || '(unnamed)')}</td>
+    <td class="px-3 py-2 text-ion-amber font-mono">${f.failures ?? f.failure_count ?? 0}</td>
     <td class="px-3 py-2 text-slate-400 font-mono">${fmtTime(f.last_failure)}</td>
   </tr>`).join('');
 }

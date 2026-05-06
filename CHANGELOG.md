@@ -30,6 +30,16 @@ Three operator-driven tweaks to the daily standup payload + UI:
   page table gained a "Triggered Rules" column; slide deck gained
   the same; PPTX deck mirrors. Falls back to `—` for legacy rows
   with no rules recorded.
+- **Rule-failures slide was rendering blank rows.** Field-name
+  mismatch between `_check_rule_failures` and the slide template:
+  API was emitting `{rule_name, failure_count, last_failure}`,
+  slide read `{name, last_status}` — every row got `undefined` for
+  the rule name and the status pill. Aligned to a single canonical
+  shape `{name, failures, last_failure, last_status}`. Slide and
+  PPTX now show four columns (Rule / Failures / Last failure /
+  Status) with the data populated; live-page renderer reads both
+  field names so a rolling deploy doesn't blank the table during
+  the gap.
 
 ### Live page bindings
 
