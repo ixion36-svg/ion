@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.19.13 — 2026-05-06
+
+### Tickers — analysts can finally clear the strip
+
+Post-v0.19.6 the ticker producer correctly fires for every uncased
+non-closed alert older than the threshold, but three layered "you
+shall not dismiss" rules left analysts with stuck strips on busy
+days and no path to clear them:
+
+1. `Ticker.is_dismissable` returned `False` for severity == CRITICAL
+2. `POST /api/ticker/{id}/dismiss` returned 403 for critical rows
+3. `base.html` ticker strip rendered no Dismiss button on critical
+4. **The producer's create pass actively un-resolved any existing
+   ticker** — so even a successful `POST /api/ticker/{id}/resolve`
+   from `/tickers` got reverted on the next 60-second tick, making
+   the management page's Resolve button futile.
+
+Fixed all four:
+
+- `Ticker.is_dismissable` always returns True now. Per-user dismiss
+  hides the ticker only from THIS user's strip — the row stays in
+  the DB and peer analysts still see it, so the original "critical
+  events shouldn't be ignorable" intent is preserved at the
+  organisational level. Critical tickers also still auto-resolve
+  when the underlying alert is cased.
+- The `/dismiss` endpoint dropped its 403 for critical.
+- The strip in `base.html` now renders the Dismiss button for every
+  severity.
+- The producer's create pass no longer un-resolves matching tickers.
+  Whatever state the operator (or auto-resolver) put a ticker in
+  sticks. New genuinely-new alerts still produce new ticker rows.
+- Bonus: a "Resolve all critical-alert" button on `/tickers` for
+  admins to wipe the auto-generated backlog after a known-FP cluster.
+  Iterates the existing per-row resolve endpoint client-side, so the
+  permission story is unchanged (`ticker:manage` required).
+
 ## v0.19.12 — 2026-05-06
 
 ### Bob investigations — verdict-vocabulary regression

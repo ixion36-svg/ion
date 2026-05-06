@@ -161,9 +161,14 @@ def run_ticker_once(session: Session) -> Dict[str, Any]:
             .one_or_none()
         )
         if existing is not None:
-            # Already tracked — leave as-is (and make sure it isn't resolved).
-            if existing.resolved_at is not None:
-                existing.resolved_at = None
+            # v0.19.13: was un-resolving any matching ticker on every
+            # tick, which made manual /api/ticker/{id}/resolve and the
+            # bulk "Resolve all critical-alert" button futile — operators
+            # would clear the strip, the producer would re-flip them
+            # active 60s later. Leave whatever state the operator (or
+            # the auto-resolver) put the ticker in. New genuinely-new
+            # alerts produce new ticker rows; this branch only runs for
+            # an existing source_ref match.
             continue
         ticker = Ticker(
             kind=TickerKind.CRITICAL_ALERT,

@@ -13,11 +13,18 @@
       <span class="label-tiny text-ion-iris">Announcements & critical alerts</span>
     </div>
     <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Tickers</h1>
-    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Manage the strip visible to all users. Critical-alert entries are auto-generated and auto-resolve.</p>
+    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Manage the strip visible to all users. Auto-generated critical-alert entries also auto-resolve when the underlying alert is cased; analysts can per-user dismiss any entry.</p>
   </div>
-  <button onclick="showCreateModal()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
-    + New Ticker
-  </button>
+  <div class="flex items-center gap-2">
+    <button onclick="bulkResolveCriticalAlerts()"
+            class="inline-flex items-center gap-2 h-10 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"
+            title="Resolve every active auto-generated critical-alert ticker. Use to clear the backlog after a known-FP cluster.">
+      Resolve all critical-alert
+    </button>
+    <button onclick="showCreateModal()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+      + New Ticker
+    </button>
+  </div>
 </section>
 
 <section class="section">
@@ -219,6 +226,30 @@ async function deleteTicker(id) {
 async function resolveTicker(id) {
     const resp = await fetch(`/api/ticker/${id}/resolve`, { method: 'POST', credentials: 'same-origin' });
     if (!resp.ok) { alert(`Failed: ${resp.status}`); return; }
+    loadTickers();
+}
+
+// v0.19.13: bulk-clear the existing pile of auto-generated
+// critical-alert tickers in one click. Uses the existing per-ticker
+// resolve endpoint so the permission story is unchanged
+// (ticker:manage required).
+async function bulkResolveCriticalAlerts() {
+    const resp = await fetch(`/api/ticker?include_resolved=false`, { credentials: 'same-origin' });
+    if (!resp.ok) { alert(`Could not load tickers: ${resp.status}`); return; }
+    const data = await resp.json();
+    const targets = (data.tickers || []).filter(t =>
+        t.kind === 'critical_alert' && t.source_type === 'auto' && !t.resolved_at
+    );
+    if (!targets.length) { alert('No active auto-generated critical-alert tickers.'); return; }
+    if (!confirm(`Resolve ${targets.length} critical-alert ticker(s)? They will reappear if the underlying alerts are still uncased after the next producer tick.`)) return;
+    let ok = 0, fail = 0;
+    for (const t of targets) {
+        try {
+            const r = await fetch(`/api/ticker/${t.id}/resolve`, { method: 'POST', credentials: 'same-origin' });
+            if (r.ok) ok++; else fail++;
+        } catch { fail++; }
+    }
+    alert(`Resolved ${ok}${fail ? ` · ${fail} failed` : ''}.`);
     loadTickers();
 }
 
