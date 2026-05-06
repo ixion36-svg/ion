@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.19.10 — 2026-05-06
+
+### Standup slide deck — proper ION branding
+
+The v0.19.9 deck shipped functional but plain (black background, bare
+text). Polished to match the rest of the ION UI:
+
+- **Brand mark** top-left on every slide — the cyan→iris gradient
+  square + "ION" wordmark + slide section name. Mirrors the
+  navbar's logo treatment.
+- **Title slide** redesigned with a 96 px gradient mark, gradient-
+  clipped headline, and the date written long-form.
+- **Background** is now a subtle radial-gradient + grid texture
+  (same vibe as the dashboard) instead of a flat black fill.
+- **KPI cards** have borders + glassy backdrop + gradient hover
+  border, replacing free-floating numbers.
+- **Severity pills** replace plain text — coral/amber/emerald/muted
+  matching ION's brand palette.
+- **Tables** wrapped in card surfaces with proper striping +
+  hover state; uppercase headers; mono columns for ids/timestamps.
+- **Footer** rebuilt: progress bars (not dots), `01 / 09` slide
+  counter in mono, `<kbd>` chips showing the F/Esc shortcuts, and
+  a `.pptx` download link.
+- **Section name** in the brand chrome updates per slide so the
+  audience always knows where they are.
+
+No data changes; all pre-existing keyboard bindings (← → Space PgUp
+PgDn Home End Esc F) still work.
+
 ## v0.19.9 — 2026-05-06
 
 ### Daily SOC standup — slide deck (HTML + PPTX)
