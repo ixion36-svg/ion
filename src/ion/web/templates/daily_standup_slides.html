@@ -382,6 +382,17 @@
   function slideCriticals(d) {
     const a = d.critical_alerts || {};
     const list = a.alerts || [];
+    // v0.19.15: surface the ION-local fallback so analysts know
+    // the source has degraded — different from a clean empty state.
+    const isFallback = a.source === 'ion_fallback';
+    const fallback = isFallback
+      ? `<div style="margin-bottom: 2vh; padding: 10px 16px; background: rgba(251,191,36,0.08);
+                     border-left: 3px solid var(--ion-amber); border-radius: 4px;
+                     font-size: 12px; color: var(--ion-amber);">
+           <strong>ION-local fallback active</strong> ·
+           ${esc(a.fallback_reason || 'ES returned no critical-severity matches')}
+         </div>`
+      : '';
     let body;
     if (a.error) {
       body = `<div class="deck-empty">Critical-alert check failed: ${esc(a.error)}</div>`;
@@ -391,7 +402,7 @@
       const rows = list.slice(0, 10).map(r => `<tr>
         <td class="mono">${esc(fmtTime(r.timestamp).slice(0,16))}</td>
         <td>${sevPill(r.severity)}</td>
-        <td class="truncate">${esc(r.rule_name || '')}</td>
+        <td class="truncate">${esc(r.rule_name || r.title || '')}</td>
         <td class="mono">${esc(r.host || '')}</td>
       </tr>`).join('');
       body = `<table class="deck-table"><thead><tr>
@@ -401,13 +412,14 @@
     return {
       name: 'Critical Alerts',
       html: `<div class="deck-slide" data-slide="criticals">
-        <div class="deck-eyebrow">Section 2 · Critical Alerts (Last 24h)</div>
-        <div class="deck-title">Critical Alerts</div>
+        <div class="deck-eyebrow">Section 2 · ${isFallback ? 'ION-Tracked Alerts' : 'Critical Alerts'} (Last 24h)</div>
+        <div class="deck-title">${isFallback ? 'Recent Alerts' : 'Critical Alerts'}</div>
         <div class="deck-kpi-row" style="grid-template-columns: minmax(220px, 320px);">
-          <div class="deck-kpi"><div class="deck-kpi-label">Critical</div>
+          <div class="deck-kpi"><div class="deck-kpi-label">${isFallback ? 'Open (ION)' : 'Critical'}</div>
             <div class="deck-kpi-value crit">${esc(a.critical_count ?? 0)}</div>
             <div class="deck-kpi-sub">in last 24 hours</div></div>
         </div>
+        ${fallback}
         ${body}
       </div>`
     };

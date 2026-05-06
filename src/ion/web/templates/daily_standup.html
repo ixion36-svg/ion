@@ -73,6 +73,8 @@
             <span class="text-ion-coral font-semibold">Critical: <span id="kpi-critical">--</span></span>
           </div>
         </div>
+        <!-- v0.19.15: shown only when the API falls back to ION-local data -->
+        <div id="alerts-fallback-banner" class="mb-3 px-3 py-2 rounded-md text-[11px] bg-ion-amber/8 text-ion-amber border-l-2 border-ion-amber" style="display:none;"></div>
         <div id="alerts-table-wrap" class="overflow-x-auto">
           <table class="w-full text-[12px]">
             <thead><tr><th class="dth">Time</th><th class="dth">Severity</th><th class="dth">Rule Name</th><th class="dth">Host</th><th class="dth">Status</th></tr></thead>
@@ -457,13 +459,26 @@ function renderCluster(es) {
   document.getElementById('es-store').textContent   = es.store_size ?? '--';
 }
 
-/* ── S2: Critical Alerts ── */
+/* ── S2: Critical Alerts ──
+   v0.19.5: data is {critical_count, total, alerts: [...]} — high
+   dropped from the standup; analysts see High via /alerts.
+   v0.19.15: data may include source='ion_fallback' + fallback_reason
+   when ES returned no matches — surface a small banner so analysts
+   know the source is degraded. */
 function renderAlerts(data) {
-  // v0.19.5: data is {critical_count, total, alerts: [...]} — high
-  // dropped from the standup; analysts see High via /alerts.
   const alertData = data || {};
   const alerts = alertData.alerts || [];
   document.getElementById('kpi-critical').textContent = alertData.critical_count ?? 0;
+  // Toggle fallback banner if present.
+  const banner = document.getElementById('alerts-fallback-banner');
+  if (banner) {
+    if (alertData.source === 'ion_fallback') {
+      banner.textContent = 'ION-local fallback · ' + (alertData.fallback_reason || 'ES returned no critical-severity matches');
+      banner.style.display = 'block';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
   const tbody = document.getElementById('alerts-tbody');
   if (!alerts.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No critical alerts in last 24h</td></tr>'; return; }
   const rows = alerts.slice(0, 15);
