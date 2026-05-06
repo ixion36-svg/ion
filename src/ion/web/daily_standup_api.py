@@ -130,7 +130,15 @@ async def _check_critical_alerts() -> Dict[str, Any]:
 
 
 async def _check_stale_cases() -> Dict[str, Any]:
-    """Open / acknowledged cases older than 24 h."""
+    """All open / acknowledged cases older than 24 h.
+
+    v0.19.14: was capped to 20 rows, which on busy weeks meant the
+    standup panel quietly hid backlog older than the worst 20. Cap
+    removed — DB-side cost is trivial since the table is small and
+    the filter is FK-indexed. Also added ``triggered_rules`` so the
+    slide deck and pptx export can show the underlying rule names
+    instead of just case titles.
+    """
     from ion.core.config import get_config
     from ion.models.alert_triage import AlertCase, AlertCaseStatus
     from ion.storage.database import get_engine, get_session_factory
@@ -150,7 +158,6 @@ async def _check_stale_cases() -> Dict[str, Any]:
                 AlertCase.created_at < cutoff_naive,
             )
             .order_by(AlertCase.created_at.asc())
-            .limit(20)
             .all()
         )
         return {
@@ -162,6 +169,11 @@ async def _check_stale_cases() -> Dict[str, Any]:
                     "title": c.title,
                     "severity": c.severity,
                     "status": c.status.value if hasattr(c.status, "value") else str(c.status),
+                    # v0.19.14: surface the rules the case was built from
+                    # so analysts can see "what fired" at a glance,
+                    # without opening each case. Falls back to [] for
+                    # legacy rows that pre-date the field.
+                    "triggered_rules": list(c.triggered_rules or []),
                     "created_at": c.created_at.isoformat() if c.created_at else None,
                     "assigned_to": (
                         (c.assigned_to.display_name or c.assigned_to.username)
@@ -242,7 +254,21 @@ async def _check_open_alerts_30d() -> Dict[str, Any]:
 
 
 async def _check_case_status_counts() -> Dict[str, Any]:
-    """Open / in-progress / closed case counts (all-time + last 7d delta)."""
+    """Case status snapshot — last 24 hours.
+
+    v0.19.14: was returning all-time totals (open/acknowledged/closed
+    across the whole DB) which made the standup panel grow without
+    ever shrinking. Reframed to a 24-hour view that answers "what
+    came in today and where is it now":
+
+    - ``open``         — cases created in the last 24h, currently OPEN
+    - ``in_progress``  — cases created in the last 24h, currently ACKNOWLEDGED
+    - ``closed_24h``   — cases that were closed in the last 24h (regardless of when created — covers backlog throughput)
+    - ``intake_24h``   — total cases created in the last 24h (sum of above-by-current-state)
+
+    All-time totals + 7-day deltas removed; if you want them back, hit
+    /api/cases or the dashboard.
+    """
     from ion.core.config import get_config
     from ion.models.alert_triage import AlertCase
     from ion.storage.database import get_engine, get_session_factory
@@ -252,34 +278,31 @@ async def _check_case_status_counts() -> Dict[str, Any]:
     factory = get_session_factory(engine)
     session = factory()
     try:
-        # All-time totals by status — cheap, cases table is small.
-        rows = (
+        cutoff = datetime.utcnow() - timedelta(hours=24)
+        # Cases created in the last 24h, grouped by their CURRENT status.
+        intake_rows = (
             session.query(AlertCase.status, func.count(AlertCase.id))
+            .filter(AlertCase.created_at >= cutoff)
             .group_by(AlertCase.status)
             .all()
         )
-        by_status: Dict[str, int] = {
-            (s.value if hasattr(s, "value") else str(s)): int(n) for s, n in rows
+        by_status_24h: Dict[str, int] = {
+            (s.value if hasattr(s, "value") else str(s)): int(n)
+            for s, n in intake_rows
         }
-        # Status names ION uses: OPEN, ACKNOWLEDGED (≈ in-progress), CLOSED.
-        opened_7d = (
-            session.query(AlertCase)
-            .filter(AlertCase.created_at >= (datetime.utcnow() - timedelta(days=7)))
-            .count()
-        )
-        closed_7d = (
+        # Throughput — cases CLOSED in the last 24h, even if created
+        # earlier. This is the more useful "what got finished today".
+        closed_24h = (
             session.query(AlertCase)
             .filter(AlertCase.closed_at.isnot(None))
-            .filter(AlertCase.closed_at >= (datetime.utcnow() - timedelta(days=7)))
+            .filter(AlertCase.closed_at >= cutoff)
             .count()
         )
         return {
-            "open":         int(by_status.get("open", 0)),
-            "acknowledged": int(by_status.get("acknowledged", 0)),
-            "closed":       int(by_status.get("closed", 0)),
-            "total":        int(sum(by_status.values())),
-            "opened_last_7d": int(opened_7d),
-            "closed_last_7d": int(closed_7d),
+            "open":         int(by_status_24h.get("open", 0)),
+            "in_progress":  int(by_status_24h.get("acknowledged", 0)),
+            "closed_24h":   int(closed_24h),
+            "intake_24h":   int(sum(by_status_24h.values())),
         }
     except Exception as e:
         return {"error": str(e)[:120]}
@@ -1169,24 +1192,42 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
         _table_block(s, rows, ["Time", "Severity", "Rule", "Host"])
 
     # --- Stale cases ---
+    # v0.19.14: shows top 12 stale (most-stale-first per the API
+    # ORDER BY created_at ASC), plus a "+N more" line if there are
+    # additional cases that wouldn't fit on a single slide.
     sc = checks.get("stale_cases") or {}
     s = prs.slides.add_slide(blank)
-    _eyebrow(s, "Section 3 · Stale Cases")
+    _eyebrow(s, "Section 3 · Stale Cases (>24h, all)")
     _title(s, "Stale Cases")
     cases = sc.get("cases") or []
     _kpi(s, 0.6, "Open > Threshold", sc.get("count", len(cases)),
          color=AMBER if cases else EMERALD, value_size=64)
+
+    def _fmt_rules(r):
+        rules = r.get("triggered_rules") or []
+        if not rules:
+            return "—"
+        head = ", ".join(str(x) for x in rules[:2])
+        return head + (f" +{len(rules) - 2}" if len(rules) > 2 else "")
+
+    visible = cases[:12]
     rows = [
         [
             r.get("case_number", ""),
-            (r.get("title", "") or "")[:60],
+            (r.get("title", "") or "")[:50],
+            _fmt_rules(r)[:60],
             r.get("severity", ""),
             f"{r.get('hours_open', 0)}h",
         ]
-        for r in cases[:8]
+        for r in visible
     ]
     if rows:
-        _table_block(s, rows, ["Case", "Title", "Severity", "Open"])
+        _table_block(s, rows, ["Case", "Title", "Triggered Rules", "Severity", "Open"])
+    if len(cases) > len(visible):
+        # Anchor a small "+N more" footer beneath the table
+        tf = _box(s, 0.6, 6.7, 12.1, 0.5)
+        _line(tf, f"… +{len(cases) - len(visible)} more stale cases (see /daily-standup)",
+              size=12, color=SLATE_500)
 
     # --- Backlog ---
     b = checks.get("open_alerts_30d") or {}
@@ -1203,14 +1244,17 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
         tf = _box(s, 0.6, 5.0, 12.5, 1.0)
         _line(tf, f"{still_open}% of 30-day alerts still open.", size=20, color=SLATE_500)
 
-    # --- Case status ---
+    # --- Case status (v0.19.14: 24h-scoped) ---
+    # API field names changed: "investigating" → "in_progress",
+    # "open" now means "created in 24h, currently open".
     cs = checks.get("case_status_counts") or {}
     s = prs.slides.add_slide(blank)
-    _eyebrow(s, "Section 5 · Case Status")
-    _title(s, "Cases at a Glance")
-    _kpi(s, 0.6, "Open", cs.get("open", 0), color=AMBER, value_size=72)
-    _kpi(s, 4.6, "Investigating", cs.get("investigating", 0), value_size=72)
-    _kpi(s, 8.8, "Closed (24h)", cs.get("closed_24h", 0), color=EMERALD, value_size=72)
+    _eyebrow(s, "Section 5 · Cases (Last 24h)")
+    _title(s, "Case Status — Today")
+    _kpi(s, 0.6, "Opened (still open)", cs.get("open", 0), color=AMBER, value_size=64)
+    _kpi(s, 3.8, "In progress", cs.get("in_progress", 0), value_size=64)
+    _kpi(s, 7.0, "Closed in 24h", cs.get("closed_24h", 0), color=EMERALD, value_size=64)
+    _kpi(s, 10.2, "Intake (24h)", cs.get("intake_24h", 0), value_size=64)
 
     # --- Log health ---
     dc = checks.get("dc_log_health") or {}
