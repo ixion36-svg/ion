@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% block title %}Daily Standup — Slides{% endblock %}
+
+{% block content %}
+{# v0.19.9: presentation-mode standup deck.
+
+   Pulls /api/daily-standup/checks (the same endpoint the live
+   page hits), renders one panel per slide. Vanilla CSS+JS — no
+   reveal.js dependency. Keyboard:
+
+     ← / Up    → previous slide
+     → / Down  → next slide
+     Space     → next slide
+     Esc       → exit (back to /daily-standup)
+     F         → toggle browser fullscreen
+     Home/End  → first / last slide
+#}
+
+<style>
+  /* Hide chrome — this is meant to fill a screen during the standup */
+  body { background: #0a0e14; }
+  .deck-host { position: fixed; inset: 0; display: flex; flex-direction: column;
+               background: #0a0e14; color: #e2e8f0; font-family: system-ui, sans-serif; z-index: 50; }
+  .deck-slide { flex: 1; display: flex; flex-direction: column;
+                padding: 4vh 6vw; overflow: hidden; }
+  .deck-slide.hidden { display: none; }
+  .deck-eyebrow { color: #64748b; font-size: 14px; letter-spacing: 0.18em;
+                  text-transform: uppercase; margin-bottom: 2vh; }
+  .deck-title { font-size: clamp(28px, 4.5vw, 56px); font-weight: 600;
+                color: #f1f5f9; margin-bottom: 4vh; line-height: 1.1; }
+  .deck-kpi-row { display: flex; gap: 4vw; margin-bottom: 4vh; flex-wrap: wrap; }
+  .deck-kpi { display: flex; flex-direction: column; gap: 8px; }
+  .deck-kpi-label { color: #64748b; font-size: 13px; text-transform: uppercase;
+                    letter-spacing: 0.12em; }
+  .deck-kpi-value { font-size: clamp(48px, 7vw, 96px); font-weight: 700;
+                    line-height: 1; font-variant-numeric: tabular-nums; }
+  .deck-kpi-value.crit { color: #f87171; }
+  .deck-kpi-value.warn { color: #fbbf24; }
+  .deck-kpi-value.ok   { color: #4ade80; }
+  .deck-kpi-value.muted { color: #94a3b8; }
+  .deck-list { font-size: clamp(15px, 1.5vw, 22px); line-height: 1.5;
+               max-height: 50vh; overflow-y: auto; }
+  .deck-list li { margin-bottom: 1vh; }
+  .deck-table { width: 100%; font-size: clamp(13px, 1.2vw, 18px);
+                border-collapse: collapse; }
+  .deck-table th { text-align: left; color: #64748b; font-weight: 500;
+                   padding: 8px 12px; text-transform: uppercase;
+                   font-size: 11px; letter-spacing: 0.1em;
+                   border-bottom: 1px solid #1e293b; }
+  .deck-table td { padding: 10px 12px; border-bottom: 1px solid #1e293b; }
+  .deck-table .truncate { max-width: 30vw; overflow: hidden;
+                          text-overflow: ellipsis; white-space: nowrap; }
+  .deck-empty { color: #64748b; font-size: clamp(20px, 2.5vw, 32px);
+                margin-top: 6vh; }
+  .deck-footer { position: absolute; bottom: 2vh; right: 4vw; left: 4vw;
+                 display: flex; justify-content: space-between;
+                 color: #475569; font-size: 12px; }
+  .deck-footer button { background: transparent; border: 1px solid #334155;
+                        color: #94a3b8; padding: 6px 12px; border-radius: 4px;
+                        cursor: pointer; font-size: 12px; }
+  .deck-footer button:hover { color: #e2e8f0; border-color: #64748b; }
+  .deck-progress { display: flex; gap: 4px; }
+  .deck-progress-dot { width: 8px; height: 8px; border-radius: 50%;
+                       background: #1e293b; transition: background 0.2s; }
+  .deck-progress-dot.active { background: #38bdf8; }
+  .deck-progress-dot.passed { background: #475569; }
+  .deck-loading { display: flex; align-items: center; justify-content: center;
+                  flex: 1; color: #64748b; font-size: 18px; }
+  /* Hide site nav while presenting */
+  body.presenting nav, body.presenting header { display: none !important; }
+</style>
+
+<div class="deck-host" id="deck-host">
+  <div class="deck-loading" id="deck-loading">Loading checks…</div>
+  <div id="deck-content"></div>
+  <div class="deck-footer">
+    <div class="deck-progress" id="deck-progress"></div>
+    <div>
+      <span id="deck-counter">—</span>
+      <span style="margin: 0 12px; color: #334155;">|</span>
+      <a href="/daily-standup/pptx" class="text-cyan-400" style="color: #38bdf8; text-decoration: none;">Download .pptx</a>
+      <span style="margin: 0 12px; color: #334155;">|</span>
+      <a href="/daily-standup" style="color: #94a3b8; text-decoration: none;">Exit</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const host = document.getElementById('deck-host');
+  const loading = document.getElementById('deck-loading');
+  const content = document.getElementById('deck-content');
+  const progress = document.getElementById('deck-progress');
+  const counter = document.getElementById('deck-counter');
+  document.body.classList.add('presenting');
+
+  let slides = [];
+  let idx = 0;
+
+  // --- helpers ---------------------------------------------------
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+  const fmtTime = (ts) => {
+    if (!ts) return '—';
+    try { return new Date(ts).toLocaleString(); } catch { return ts; }
+  };
+  const sevClass = (s) => {
+    const sev = String(s || '').toLowerCase();
+    if (sev === 'critical') return 'crit';
+    if (sev === 'high') return 'warn';
+    if (sev === 'medium') return 'muted';
+    return 'muted';
+  };
+
+  // --- slide builders --------------------------------------------
+  function slideTitle(data) {
+    const ts = fmtTime(data.timestamp || new Date().toISOString());
+    return `<div class="deck-slide" data-slide="title">
+      <div class="deck-eyebrow">Daily SOC Standup</div>
+      <div class="deck-title" style="font-size: clamp(40px, 7vw, 96px);">
+        ${ts.split(',')[0]}
+      </div>
+      <div style="font-size: clamp(18px, 2vw, 28px); color: #94a3b8;">
+        Generated ${esc(ts)}
+      </div>
+    </div>`;
+  }
+
+  function slideCluster(d) {
+    const c = d.cluster_health || {};
+    const status = (c.status || 'unknown').toLowerCase();
+    const cls = status === 'green' ? 'ok' : status === 'yellow' ? 'warn' : 'crit';
+    return `<div class="deck-slide" data-slide="cluster">
+      <div class="deck-eyebrow">Section 1 · Elasticsearch Health</div>
+      <div class="deck-title">Cluster ${esc(c.cluster_name || '—')}</div>
+      <div class="deck-kpi-row">
+        <div class="deck-kpi"><div class="deck-kpi-label">Status</div>
+          <div class="deck-kpi-value ${cls}">${esc(c.status || '—')}</div></div>
+        <div class="deck-kpi"><div class="deck-kpi-label">Indices</div>
+          <div class="deck-kpi-value muted">${esc(c.indices_count ?? '—')}</div></div>
+        <div class="deck-kpi"><div class="deck-kpi-label">Storage</div>
+          <div class="deck-kpi-value muted">${esc(c.store_size || '—')}</div></div>
+        <div class="deck-kpi"><div class="deck-kpi-label">Unassigned</div>
+          <div class="deck-kpi-value ${(c.unassigned_shards || 0) > 0 ? 'crit' : 'ok'}">${esc(c.unassigned_shards ?? '—')}</div></div>
+      </div>
+    </div>`;
+  }
+
+  function slideCriticals(d) {
+    const a = d.critical_alerts || {};
+    const list = a.alerts || [];
+    let body;
+    if (a.error) {
+      body = `<div class="deck-empty">Critical-alert check failed: ${esc(a.error)}</div>`;
+    } else if (!list.length) {
+      body = `<div class="deck-empty">No critical alerts in the last 24 hours.</div>`;
+    } else {
+      const rows = list.slice(0, 10).map(r => `<tr>
+        <td style="color:#64748b;">${esc(fmtTime(r.timestamp).slice(0,16))}</td>
+        <td><span style="color:#f87171;">${esc(r.severity || '')}</span></td>
+        <td class="truncate">${esc(r.rule_name || '')}</td>
+        <td>${esc(r.host || '')}</td>
+      </tr>`).join('');
+      body = `<table class="deck-table"><thead><tr>
+        <th>Time</th><th>Severity</th><th>Rule</th><th>Host</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    return `<div class="deck-slide" data-slide="criticals">
+      <div class="deck-eyebrow">Section 2 · Critical Alerts (Last 24h)</div>
+      <div class="deck-kpi-row">
+        <div class="deck-kpi"><div class="deck-kpi-label">Critical</div>
+          <div class="deck-kpi-value crit">${esc(a.critical_count ?? 0)}</div></div>
+      </div>
+      ${body}
+    </div>`;
+  }
+
+  function slideStaleCases(d) {
+    const c = d.stale_cases || {};
+    const list = c.cases || [];
+    let body;
+    if (!list.length) {
+      body = `<div class="deck-empty">No stale cases.</div>`;
+    } else {
+      const rows = list.slice(0, 10).map(r => `<tr>
+        <td style="font-family:monospace;">${esc(r.case_number || '')}</td>
+        <td class="truncate">${esc(r.title || '')}</td>
+        <td><span class="${sevClass(r.severity)}" style="color: ${(r.severity||'').toLowerCase()==='critical'?'#f87171':(r.severity||'').toLowerCase()==='high'?'#fbbf24':'#94a3b8'};">${esc(r.severity || '')}</span></td>
+        <td>${esc((r.hours_open ?? 0))}h</td>
+      </tr>`).join('');
+      body = `<table class="deck-table"><thead><tr>
+        <th>Case</th><th>Title</th><th>Severity</th><th>Open</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    return `<div class="deck-slide" data-slide="stale-cases">
+      <div class="deck-eyebrow">Section 3 · Stale Cases</div>
+      <div class="deck-kpi-row">
+        <div class="deck-kpi"><div class="deck-kpi-label">Open &gt; threshold</div>
+          <div class="deck-kpi-value ${list.length ? 'warn' : 'ok'}">${esc(c.count ?? list.length)}</div></div>
+      </div>
+      ${body}
+    </div>`;
+  }
+
+  function slideBacklog(d) {
+    const a = d.open_alerts_30d || {};
+    if (a.total == null) {
+      return `<div class="deck-slide" data-slide="backlog">
+        <div class="deck-eyebrow">Section 4 · Alert Backlog (30 days)</div>
+        <div class="deck-empty">No data.</div></div>`;
+    }
+    const stillOpen = a.still_open_pct ?? 0;
+    const cls = stillOpen >= 30 ? 'crit' : stillOpen >= 15 ? 'warn' : 'ok';
+    return `<div class="deck-slide" data-slide="backlog">
+      <div class="deck-eyebrow">Section 4 · Alert Backlog (30 days)</div>
+      <div class="deck-kpi-row">
+        <div class="deck-kpi"><div class="deck-kpi-label">Total</div>
+          <div class="deck-kpi-value muted">${(a.total ?? 0).toLocaleString()}</div></div>
+        <div class="deck-kpi"><div class="deck-kpi-label">Still Open</div>
+          <div class="deck-kpi-value ${cls}">${(a.open ?? 0).toLocaleString()}</div></div>
+        <div class="deck-kpi"><div class="deck-kpi-label">Acknowledged</div>
+          <div class="deck-kpi-value warn">${(a.acknowledged ?? 0).toLocaleString()}</div></div>
+        <div class="deck-kpi"><div class="deck-kpi-label">Closed</div>
+          <div class="deck-kpi-value ok">${(a.closed ?? 0).toLocaleString()}</div></div>
+      </div>
+      <div style="font-size: clamp(20px,2.5vw,32px); color: #94a3b8;">
+        ${esc(stillOpen)}% of 30-day alerts still open.
+      </div>
+    </div>`;
+  }
+
+  function slideCaseStatus(d) {
+    const cs = d.case_status_counts || {};
+    return `<div class="deck-slide" data-slide="case-status">
+      <div class="deck-eyebrow">Section 5 · Case Status</div>
+      <div class="deck-kpi-row">
+        <div class="deck-kpi"><div class="deck-kpi-label">Open</div>
+          <div class="deck-kpi-value warn">${esc(cs.open ?? 0)}</div></div>
+        <div class="deck-kpi"><div class="deck-kpi-label">Investigating</div>
+          <div class="deck-kpi-value muted">${esc(cs.investigating ?? 0)}</div></div>
+        <div class="deck-kpi"><div class="deck-kpi-label">Closed (24h)</div>
+          <div class="deck-kpi-value ok">${esc(cs.closed_24h ?? 0)}</div></div>
+      </div>
+    </div>`;
+  }
+
+  function slideLogHealth(d) {
+    const dc = d.dc_log_health || {};
+    const wef = d.wef_log_health || {};
+    const fmtBlock = (label, x) => `
+      <div class="deck-kpi"><div class="deck-kpi-label">${esc(label)}</div>
+        <div class="deck-kpi-value ${(x.silent_count ?? 0) > 0 ? 'crit' : 'ok'}">
+          ${esc(x.silent_count ?? 0)}/${esc(x.total ?? 0)}
+        </div>
+        <div style="color:#64748b;font-size:13px;">silent / total</div>
+      </div>`;
+    return `<div class="deck-slide" data-slide="log-health">
+      <div class="deck-eyebrow">Section 6 · Log-Source Health</div>
+      <div class="deck-kpi-row">
+        ${fmtBlock('Domain Controllers', dc)}
+        ${fmtBlock('WEF', wef)}
+      </div>
+    </div>`;
+  }
+
+  function slideRuleFailures(d) {
+    const r = d.rule_failures || {};
+    const list = r.rules || [];
+    let body;
+    if (!list.length) {
+      body = `<div class="deck-empty">No detection-rule execution failures in the last hour.</div>`;
+    } else {
+      const rows = list.slice(0, 8).map(x => `<tr>
+        <td class="truncate">${esc(x.name || '')}</td>
+        <td>${esc(x.last_status || '')}</td>
+      </tr>`).join('');
+      body = `<table class="deck-table"><thead><tr>
+        <th>Rule</th><th>Last Status</th>
+      </tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    return `<div class="deck-slide" data-slide="rule-failures">
+      <div class="deck-eyebrow">Section 7 · Detection Rule Failures</div>
+      <div class="deck-kpi-row">
+        <div class="deck-kpi"><div class="deck-kpi-label">Failing rules</div>
+          <div class="deck-kpi-value ${list.length ? 'crit' : 'ok'}">${esc(r.count ?? list.length)}</div></div>
+      </div>
+      ${body}
+    </div>`;
+  }
+
+  function slideClose(d) {
+    return `<div class="deck-slide" data-slide="close">
+      <div class="deck-eyebrow">End of Standup</div>
+      <div class="deck-title">Questions? Action items?</div>
+      <div style="font-size: clamp(18px, 2vw, 28px); color: #94a3b8;">
+        Press Esc to exit · F for fullscreen · ← / → to flip slides.
+      </div>
+    </div>`;
+  }
+
+  // --- render ----------------------------------------------------
+  function show(i) {
+    idx = Math.max(0, Math.min(slides.length - 1, i));
+    [...content.querySelectorAll('.deck-slide')].forEach((el, k) => {
+      el.classList.toggle('hidden', k !== idx);
+    });
+    [...progress.children].forEach((dot, k) => {
+      dot.classList.toggle('active', k === idx);
+      dot.classList.toggle('passed', k < idx);
+    });
+    counter.textContent = `${idx + 1} / ${slides.length}`;
+  }
+
+  function render(data) {
+    slides = [
+      slideTitle(data),
+      slideCluster(data),
+      slideCriticals(data),
+      slideStaleCases(data),
+      slideBacklog(data),
+      slideCaseStatus(data),
+      slideLogHealth(data),
+      slideRuleFailures(data),
+      slideClose(data),
+    ];
+    content.innerHTML = slides.join('');
+    progress.innerHTML = slides.map(() => '<span class="deck-progress-dot"></span>').join('');
+    loading.style.display = 'none';
+    show(0);
+  }
+
+  // --- input -----------------------------------------------------
+  document.addEventListener('keydown', (ev) => {
+    if (!slides.length) return;
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown' || ev.key === ' ' || ev.key === 'PageDown') {
+      ev.preventDefault();
+      show(idx + 1);
+    } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp' || ev.key === 'PageUp') {
+      ev.preventDefault();
+      show(idx - 1);
+    } else if (ev.key === 'Home') {
+      show(0);
+    } else if (ev.key === 'End') {
+      show(slides.length - 1);
+    } else if (ev.key === 'Escape') {
+      window.location.href = '/daily-standup';
+    } else if (ev.key === 'f' || ev.key === 'F') {
+      ev.preventDefault();
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    }
+  });
+
+  host.addEventListener('click', (ev) => {
+    if (ev.target.closest('a,button')) return;
+    show(idx + 1);
+  });
+
+  // --- fetch -----------------------------------------------------
+  fetch('/api/daily-standup/checks', { credentials: 'same-origin' })
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+    .then(render)
+    .catch(err => {
+      loading.textContent = 'Failed to load: ' + err.message;
+      loading.style.color = '#f87171';
+    });
+})();
+</script>
+{% endblock %}

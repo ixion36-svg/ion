@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ion"
-version = "0.19.8"
+version = "0.19.9"
 description = "Intelligent Operating Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -54,6 +54,8 @@ dependencies = [
     "email-validator>=2.0.0",
     # v0.17.0: PDF text extraction for the Translator (~200 KB pure-Python)
     "pypdf>=4.0",
+    # v0.19.9: PowerPoint export of the daily SOC standup
+    "python-pptx>=0.6.21",
 ]
 
 [project.optional-dependencies]
