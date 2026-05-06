@@ -1,5 +1,36 @@
 # Changelog
 
+## v0.19.6 — 2026-05-06
+
+### Ticker producer was calling a method ES service has never had
+
+Caught by the v0.19.5 WARN log on first boot of the new image:
+
+```
+Ticker: ES service has neither get_alert_by_id nor fetch_alert
+  — no critical tickers will fire
+```
+
+`ticker_service._alert_is_critical` was looking up
+`get_alert_by_id` / `fetch_alert` via `getattr`, but
+`ElasticsearchService` exposes `get_alerts_by_ids` (plural, async,
+batched) and never had either of the singular sync names. So
+even after v0.19.3 fixed the `status == OPEN` filter, every
+candidate triage row went through `_alert_is_critical` → method
+lookup miss → return False → 0 tickers created.
+
+- Replaced per-row sync `_alert_is_critical` with batched async
+  `_critical_alert_ids_batch(es_service, ids)` — one
+  `get_alerts_by_ids` call per tick instead of N. Severity check
+  walks the dataclass `severity` field plus `raw_data` shapes
+  (`raw_data.severity`, `raw_data.rule.severity`,
+  `raw_data.kibana.alert.severity`, `raw_data.event.severity`)
+  for parser-miss cases.
+- Asyncio-from-thread: ticker tick runs on a worker thread, so
+  `asyncio.run()` is safe (no ambient event loop to clash with).
+- New per-tick log line `Ticker tick: M of N are critical` so the
+  classifier outcome is visible alongside the candidate count.
+
 ## v0.19.5 — 2026-05-06
 
 ### Daily SOC standup — alerts panel was dropping criticals + showed high
