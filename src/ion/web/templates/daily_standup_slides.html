@@ -298,7 +298,7 @@
     <div class="deck-progress" id="deck-progress"></div>
     <div class="deck-counter" id="deck-counter">—</div>
     <div class="deck-footer-actions">
-      <a href="/api/daily-standup/pptx" title="Download as PowerPoint">.pptx</a>
+      <a href="#" onclick="dsDownloadPptx(event)" title="Download as PowerPoint">.pptx</a>
       <span class="sep">·</span>
       <span><kbd>F</kbd> fullscreen</span>
       <span class="sep">·</span>
@@ -552,6 +552,67 @@
     };
   }
 
+  // v0.19.11: load AI threat summary + AOB notes from localStorage,
+  // populated by the live /daily-standup page. Both stale after 12 h.
+  function _readLS(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const {text, ts} = JSON.parse(raw);
+      if (!text || !text.trim()) return null;
+      if (Date.now() - (ts || 0) > 12 * 60 * 60 * 1000) return null;
+      return text;
+    } catch (_) { return null; }
+  }
+
+  function slideThreatSummary() {
+    const text = _readLS('ion.standup.ai_summary');
+    const body = text
+      ? `<div style="font-size: clamp(15px, 1.4vw, 20px); color: var(--deck-text);
+                     line-height: 1.6; white-space: pre-wrap;
+                     background: var(--deck-card); border: 1px solid var(--deck-line);
+                     border-radius: 12px; padding: 28px 32px;
+                     max-height: 56vh; overflow-y: auto; backdrop-filter: blur(6px);">${esc(text)}</div>`
+      : `<div class="deck-empty">
+           No AI threat summary available.<br>
+           <span style="font-size:0.6em;color:var(--deck-faint);">
+             Click <strong>Generate Summary</strong> on /daily-standup, then refresh this deck.
+           </span>
+         </div>`;
+    return {
+      name: 'AI Threat Summary',
+      html: `<div class="deck-slide" data-slide="threat-summary">
+        <div class="deck-eyebrow">Section 8 · Threat Landscape</div>
+        <div class="deck-title">AI Threat Summary</div>
+        ${body}
+      </div>`
+    };
+  }
+
+  function slideAOB() {
+    const text = _readLS('ion.standup.aob');
+    const body = text
+      ? `<div style="font-size: clamp(16px, 1.6vw, 24px); color: var(--deck-text);
+                     line-height: 1.6; white-space: pre-wrap;
+                     background: var(--deck-card); border: 1px solid var(--deck-line);
+                     border-radius: 12px; padding: 32px 36px;
+                     max-height: 56vh; overflow-y: auto; backdrop-filter: blur(6px);">${esc(text)}</div>`
+      : `<div class="deck-empty">
+           No AOB items recorded.<br>
+           <span style="font-size:0.6em;color:var(--deck-faint);">
+             Add notes via the <strong>Additional Notes</strong> field on /daily-standup, then refresh this deck.
+           </span>
+         </div>`;
+    return {
+      name: 'Any Other Business',
+      html: `<div class="deck-slide" data-slide="aob">
+        <div class="deck-eyebrow">Section 9 · Any Other Business</div>
+        <div class="deck-title">AOB</div>
+        ${body}
+      </div>`
+    };
+  }
+
   function slideClose() {
     return {
       name: 'Close',
@@ -568,6 +629,36 @@
       </div>`
     };
   }
+
+  // v0.19.11: .pptx button now POSTs localStorage values so the
+  // download includes the AI summary + AOB. Falls back to the GET
+  // endpoint behaviour (no AI/AOB) if both keys are empty.
+  window.dsDownloadPptx = async function (ev) {
+    if (ev) ev.preventDefault();
+    const ai = _readLS('ion.standup.ai_summary') || '';
+    const aob = _readLS('ion.standup.aob') || '';
+    try {
+      const r = await fetch('/api/daily-standup/pptx', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify({ai_summary: ai, aob}),
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const blob = await r.blob();
+      const cd = r.headers.get('Content-Disposition') || '';
+      const m = cd.match(/filename="([^"]+)"/);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = m ? m[1] : 'Daily-Standup.pptx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      alert('Download failed: ' + e.message);
+    }
+  };
 
   // --- render ----------------------------------------------------
   function show(i) {
@@ -596,6 +687,8 @@
       slideCaseStatus(data),
       slideLogHealth(data),
       slideRuleFailures(data),
+      slideThreatSummary(),
+      slideAOB(),
       slideClose(),
     ];
     content.innerHTML = slides.map(s => s.html).join('');

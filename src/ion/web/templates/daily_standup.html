@@ -30,9 +30,9 @@
            title="Open the slide-deck view in a new tab (keyboard navigable, fullscreen-friendly)">
           <svg class="w-3.5 h-3.5"><use href="#i-external-link"/></svg> Present
         </a>
-        <a href="/api/daily-standup/pptx"
+        <a href="#" onclick="dsDownloadPptx(event)"
            class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"
-           title="Download the standup as a PowerPoint deck (.pptx)">
+           title="Download the standup as a PowerPoint deck (.pptx) — includes AI summary + AOB if present">
           <svg class="w-3.5 h-3.5"><use href="#i-download"/></svg> .pptx
         </a>
         <button onclick="exportPDF()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
@@ -763,7 +763,21 @@ async function loadArkimeTraffic() {
   }
 }
 
-/* ── Threat summary ── */
+/* ── Threat summary ──
+   v0.19.11: persist generated summary + AOB notes into localStorage so
+   /daily-standup/slides (a separate page) can include them in the
+   slide deck and the .pptx download. Stale-after 12 h. */
+const _DS_LS_KEY_AI = 'ion.standup.ai_summary';
+const _DS_LS_KEY_AOB = 'ion.standup.aob';
+function _dsSaveLS(key, text) {
+  try {
+    if (text && text.trim()) {
+      localStorage.setItem(key, JSON.stringify({text, ts: Date.now()}));
+    } else {
+      localStorage.removeItem(key);
+    }
+  } catch (_) { /* private mode / quota */ }
+}
 async function generateThreatSummary() {
   const el = document.getElementById('threat-summary');
   el.innerHTML = '<span class="ds-spinner"></span> Generating AI summary...';
@@ -773,8 +787,75 @@ async function generateThreatSummary() {
     const data = await r.json();
     DS.threatSummary = data.summary || data.content || '';
     el.innerHTML = `<div class="whitespace-pre-wrap">${esc(DS.threatSummary)}</div>`;
+    _dsSaveLS(_DS_LS_KEY_AI, DS.threatSummary);
   } catch (e) {
     el.innerHTML = `<span class="text-ion-amber">${esc(e.message)}</span>`;
+  }
+}
+
+/* AOB notes — debounce-save to localStorage as the analyst types so the
+   slides page and pptx download can pick them up without a full save. */
+(function () {
+  let aobDebounce;
+  document.addEventListener('DOMContentLoaded', () => {
+    const ta = document.getElementById('additional-notes');
+    if (!ta) return;
+    // Restore if a recent value exists.
+    try {
+      const raw = localStorage.getItem(_DS_LS_KEY_AOB);
+      if (raw) {
+        const {text, ts} = JSON.parse(raw);
+        if (text && Date.now() - (ts || 0) < 12 * 60 * 60 * 1000) {
+          ta.value = text;
+        }
+      }
+    } catch (_) {}
+    ta.addEventListener('input', () => {
+      clearTimeout(aobDebounce);
+      aobDebounce = setTimeout(() => _dsSaveLS(_DS_LS_KEY_AOB, ta.value), 400);
+    });
+  });
+})();
+
+/* .pptx download — POST localStorage AI summary + AOB so the deck
+   includes them. v0.19.11. */
+function _dsReadLS(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return '';
+    const {text, ts} = JSON.parse(raw);
+    if (!text) return '';
+    if (Date.now() - (ts || 0) > 12 * 60 * 60 * 1000) return '';
+    return text;
+  } catch (_) { return ''; }
+}
+async function dsDownloadPptx(ev) {
+  if (ev) ev.preventDefault();
+  // Prefer the live textarea contents over what's been debounced into
+  // localStorage — operator may have just typed it without yet pausing.
+  const ta = document.getElementById('additional-notes');
+  const aob = (ta && ta.value && ta.value.trim()) || _dsReadLS(_DS_LS_KEY_AOB);
+  const ai = (DS && DS.threatSummary) || _dsReadLS(_DS_LS_KEY_AI);
+  try {
+    const r = await fetch('/api/daily-standup/pptx', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({ai_summary: ai || '', aob: aob || ''}),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const blob = await r.blob();
+    const cd = r.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="([^"]+)"/);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = m ? m[1] : 'Daily-Standup.pptx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  } catch (e) {
+    alert('Download failed: ' + e.message);
   }
 }
 
