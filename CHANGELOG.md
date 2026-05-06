@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.19.15 — 2026-05-06
+
+### Standup critical-alerts — ION-local fallback when ES returns empty
+
+Operator on v0.19.12 reported the standup's Section 2 was rendering
+empty even though they had critical alerts. The v0.19.5 case-tolerant
+severity filter (`Critical|critical|CRITICAL`) didn't reach the issue,
+which suggests the alerts use a non-standard severity field path
+(numeric Wazuh severity, custom rule output, etc.) that the existing
+four field paths don't catch.
+
+Rather than chase the field path on every deploy variant, added a
+local fallback:
+
+- `_check_critical_alerts` now tries Elasticsearch first.
+- If ES is unconfigured, errors, or returns zero critical-severity
+  matches, falls back to ION's `AlertTriage` table — pulls every
+  triage row from the last 24h that isn't `CLOSED`, sorted newest
+  first, capped at 20.
+- Response payload carries `source` (`elasticsearch` or
+  `ion_fallback`) plus `fallback_reason` so the UI can label the
+  difference. Live page shows an amber banner above the alerts table
+  when fallback is active; slide deck does the same. Title swaps
+  from "Critical Alerts" to "Recent Alerts" so analysts aren't
+  misled into thinking the count is severity-filtered.
+
+Limitation: AlertTriage doesn't store severity natively, so fallback
+rows show `severity = "(unknown)"`. A later release will denormalise
+severity onto the triage row (mirroring v0.19.3's `rule_name` pattern)
+to make the fallback strictly "criticals from ION" — for now it's
+"things ION has tracked and the analyst hasn't closed", which is the
+useful operational signal even if it's coarser than the ES path.
+
 ## v0.19.14 — 2026-05-06
 
 ### Standup — 24h-scoped case view, no stale-case cap, rule names in slides
