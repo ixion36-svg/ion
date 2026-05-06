@@ -1156,6 +1156,17 @@ async def cyab_systems_bulk(
                 },
             )
 
+        # v0.19.7: bulk delete. Reuses _delete_system_row from
+        # cyab_studio_api so the manual data_sources / snapshots
+        # cascade is identical to the single-row endpoint.
+        if action == "delete-selected":
+            from ion.web.cyab_studio_api import _delete_system_row
+            deleted = 0
+            for s in rows:
+                if _delete_system_row(session, s.id):
+                    deleted += 1
+            return {"affected": deleted}
+
         raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
     finally:
         session.close()

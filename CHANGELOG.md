@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.19.7 — 2026-05-06
+
+### CyAB systems are now deletable
+
+Until now operators could create a CyAB system but never remove one
+through the UI — wrong-name typos, abandoned drafts, and decommissioned
+services all stayed forever in `/cyab/systems`, polluting the list and
+the readiness rollups.
+
+- New `DELETE /api/cyab/studio/systems/{sys_id}` (gated on
+  `case:update` for parity with the other CyAB mutations). Wraps a
+  shared `_delete_system_row` helper that wipes the FK-blocking
+  child tables explicitly (`cyab_data_sources`, `cyab_snapshots`)
+  before the parent delete; cascading children (checklist items,
+  per-system assessments) clean themselves via existing
+  `ondelete=CASCADE`; SET-NULL children (wizard sessions,
+  vulnerability links) just unlink. Idempotent 404 on missing id.
+- New `delete-selected` action on the existing
+  `POST /api/cyab/systems/bulk` endpoint, reusing the same helper
+  so the cascade behaviour is identical.
+- `/cyab/systems` table now has:
+  - A per-row `Delete` button with a `confirm()` prompt that names
+    the system, fires the single-row DELETE, then re-triggers the
+    HTMX load of the table on success.
+  - A `Delete selected` option in the bulk action dropdown, with a
+    second `confirm()` step that quotes the selection size.
+
 ## v0.19.6 — 2026-05-06
 
 ### Ticker producer was calling a method ES service has never had

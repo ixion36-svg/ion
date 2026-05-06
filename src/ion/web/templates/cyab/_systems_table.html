@@ -1,16 +1,25 @@
+{# v0.19.7: per-row + bulk system delete. Bulk goes through the
+   existing /api/cyab/systems/bulk action=delete-selected path; the
+   per-row trash button uses DELETE /api/cyab/studio/systems/{id}. #}
 {% if not rows %}
   <p class="text-slate-500 text-[12px] py-8 text-center">
     No systems match these filters.
   </p>
 {% else %}
-<form hx-post="/api/cyab/systems/bulk" hx-trigger="submit" hx-swap="none">
+<form id="cyab-systems-bulk-form"
+      hx-post="/api/cyab/systems/bulk"
+      hx-trigger="submit"
+      hx-swap="none"
+      onsubmit="return cyabBulkSystemsConfirm(event)">
   <div class="flex items-center gap-2 mb-2 text-[11.5px]">
     <span class="text-slate-500">{{ rows | length }} systems</span>
     <span class="flex-1"></span>
-    <select name="action" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+    <select name="action" id="cyab-systems-bulk-action"
+            class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
       <option value="mark-reviewed">Mark reviewed</option>
       <option value="export-csv">Export CSV</option>
       <option value="rerun-health">Re-run health checks</option>
+      <option value="delete-selected" class="text-rose-300">Delete selected</option>
     </select>
     <button type="submit" class="px-2 py-1 bg-slate-800 text-slate-200 rounded">Apply</button>
   </div>
@@ -27,11 +36,12 @@
         <th class="text-left">Critical-missing</th>
         <th class="text-left">Last edited</th>
         <th class="text-left">Status</th>
+        <th class="text-right">Actions</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-slate-800">
       {% for r in rows %}
-        <tr class="hover:bg-slate-800/30">
+        <tr class="hover:bg-slate-800/30" data-system-id="{{ r.id }}">
           <td class="py-1.5"><input type="checkbox" name="system_ids" value="{{ r.id }}"></td>
           <td><a href="/cyab/systems/{{ r.id }}" class="text-cyan-400 hover:underline">{{ r.name }}</a></td>
           <td class="text-slate-400">{{ r.pillar or '—' }}</td>
@@ -64,9 +74,72 @@
               {{ r.status }}
             </span>
           </td>
+          <td class="text-right">
+            <button type="button"
+                    class="cyab-system-del px-1.5 py-0.5 text-[10.5px] rounded text-rose-300 hover:text-white hover:bg-rose-900/40 transition"
+                    data-system-id="{{ r.id }}"
+                    data-system-name="{{ r.name }}"
+                    title="Delete this system permanently">Delete</button>
+          </td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
 </form>
+
+<script>
+(function () {
+  // ── Bulk action confirm — only intercept the destructive one ──
+  window.cyabBulkSystemsConfirm = function (ev) {
+    const form = ev.target;
+    const action = form.querySelector('[name="action"]').value;
+    if (action !== 'delete-selected') return true;
+    const checked = form.querySelectorAll('input[name="system_ids"]:checked');
+    if (!checked.length) {
+      alert('Pick at least one system to delete.');
+      ev.preventDefault();
+      return false;
+    }
+    const ok = confirm(
+      `Delete ${checked.length} selected system${checked.length === 1 ? '' : 's'} permanently? `
+      + 'Their checklist items, data sources, snapshots, and assessments will be removed too. This cannot be undone.'
+    );
+    if (!ok) { ev.preventDefault(); return false; }
+    return true;
+  };
+
+  // ── Per-row delete — single fetch DELETE with confirm + table refresh
+  document.addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('.cyab-system-del');
+    if (!btn) return;
+    const id = btn.dataset.systemId;
+    const name = btn.dataset.systemName || `system ${id}`;
+    if (!confirm(`Delete "${name}" permanently? This cannot be undone.`)) return;
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      const r = await fetch(`/api/cyab/studio/systems/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
+      if (!r.ok) {
+        const txt = await r.text().catch(() => '');
+        throw new Error(r.status + (txt ? ': ' + txt.slice(0, 80) : ''));
+      }
+      // Reload the table the same way the page does on filter changes.
+      if (window.htmx) {
+        const tableHost = document.querySelector('[hx-get="/cyab/systems/_table"]');
+        if (tableHost) htmx.trigger(tableHost, 'load');
+        else location.reload();
+      } else {
+        location.reload();
+      }
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'Delete';
+      alert('Delete failed: ' + e.message);
+    }
+  });
+})();
+</script>
 {% endif %}
