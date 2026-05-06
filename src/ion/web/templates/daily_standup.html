@@ -59,7 +59,6 @@
           </h2>
           <div class="flex items-center gap-3 text-[12px]">
             <span class="text-ion-coral font-semibold">Critical: <span id="kpi-critical">--</span></span>
-            <span class="text-ion-amber font-semibold">High: <span id="kpi-high">--</span></span>
           </div>
         </div>
         <div id="alerts-table-wrap" class="overflow-x-auto">
@@ -448,13 +447,13 @@ function renderCluster(es) {
 
 /* ── S2: Critical Alerts ── */
 function renderAlerts(data) {
-  // data is {critical_count, high_count, total, alerts: [...]}
+  // v0.19.5: data is {critical_count, total, alerts: [...]} — high
+  // dropped from the standup; analysts see High via /alerts.
   const alertData = data || {};
   const alerts = alertData.alerts || [];
   document.getElementById('kpi-critical').textContent = alertData.critical_count ?? 0;
-  document.getElementById('kpi-high').textContent = alertData.high_count ?? 0;
   const tbody = document.getElementById('alerts-tbody');
-  if (!alerts.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No critical/high alerts in last 24h</td></tr>'; return; }
+  if (!alerts.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No critical alerts in last 24h</td></tr>'; return; }
   const rows = alerts.slice(0, 15);
   tbody.innerHTML = rows.map(a => `<tr class="border-b border-white/5 hover:bg-white/[.02]">
     <td class="px-3 py-2 text-slate-400 font-mono">${fmtShort(a.timestamp)}</td>

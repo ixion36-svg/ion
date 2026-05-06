@@ -95,7 +95,13 @@ async def _check_cluster_health() -> Dict[str, Any]:
 
 
 async def _check_critical_alerts() -> Dict[str, Any]:
-    """Critical + high alerts in the last 24 h."""
+    """Critical alerts in the last 24 h.
+
+    v0.19.5: was Critical + High. Daily standup is meant to surface
+    "what should ops act on right now" — the High band was diluting
+    the focus. Operators can still see High via /alerts. Standup
+    stays Critical-only.
+    """
     from ion.services.elasticsearch_service import ElasticsearchService
 
     es = ElasticsearchService()
@@ -103,12 +109,9 @@ async def _check_critical_alerts() -> Dict[str, Any]:
         return {"total": 0, "alerts": []}
     try:
         alerts = await es.get_alerts(hours=24, severity="critical", limit=50)
-        high_alerts = await es.get_alerts(hours=24, severity="high", limit=50)
-        all_alerts = alerts + high_alerts
         return {
             "critical_count": len(alerts),
-            "high_count": len(high_alerts),
-            "total": len(all_alerts),
+            "total": len(alerts),
             "alerts": [
                 {
                     "id": a.id,
@@ -119,7 +122,7 @@ async def _check_critical_alerts() -> Dict[str, Any]:
                     "timestamp": a.timestamp.isoformat(),
                     "rule_name": a.rule_name,
                 }
-                for a in sorted(all_alerts, key=lambda x: x.timestamp, reverse=True)[:20]
+                for a in sorted(alerts, key=lambda x: x.timestamp, reverse=True)[:20]
             ],
         }
     except Exception as e:
@@ -764,9 +767,8 @@ def _render_standup_html(data: "StandupSaveRequest", current_user: "User") -> st
     alerts = checks.get("critical_alerts") or {}
     if alerts:
         out.append(
-            f'<h2>Critical/High Alerts (Last 24h) &mdash; '
-            f'{alerts.get("critical_count", 0)} Critical, '
-            f'{alerts.get("high_count", 0)} High</h2>'
+            f'<h2>Critical Alerts (Last 24h) &mdash; '
+            f'{alerts.get("critical_count", 0)} Critical</h2>'
         )
         alert_list = alerts.get("alerts", [])
         if alert_list:
@@ -784,7 +786,7 @@ def _render_standup_html(data: "StandupSaveRequest", current_user: "User") -> st
                 )
             out.append("</table>")
         else:
-            out.append("<p>No critical/high alerts in the last 24 hours.</p>")
+            out.append("<p>No critical alerts in the last 24 hours.</p>")
 
     # -- Open alerts (last 30 days) — v0.17.1 ---------------------------------
     a30 = checks.get("open_alerts_30d") or {}

@@ -1,5 +1,28 @@
 # Changelog
 
+## v0.19.5 — 2026-05-06
+
+### Daily SOC standup — alerts panel was dropping criticals + showed high
+
+Two issues, one commit:
+
+- **Severity filter was case-sensitive.** `ElasticsearchService.get_alerts(severity=...)`
+  used Elasticsearch `term` queries against four severity fields
+  (`event.severity`, `kibana.alert.severity`, `signal.rule.severity`,
+  `severity`). Kibana stores those lowercase, but Wazuh and various
+  custom rule producers ship them capitalised (`"Critical"`) or all-caps
+  (`"HIGH"`). The single-casing match silently dropped non-Kibana
+  criticals — the standup looked empty even on a busy day. Replaced
+  the four `term` clauses with `terms` queries that fan out the
+  caller's value into every common casing
+  (`{lower, capitalize, upper, original}`). Same inverted-index lookup
+  cost on the ES side; no schema change.
+- **Standup now shows Critical only.** Was Critical + High. The High
+  band was diluting the signal — daily standup is meant to surface
+  "what should ops act on right now," and analysts can still see High
+  via `/alerts`. Dropped the second `get_alerts` call, the
+  `high_count` field, and the `kpi-high` pill in the template.
+
 ## v0.19.4 — 2026-05-06
 
 ### CyAB Overview checklist is now actually editable
