@@ -25,6 +25,7 @@ wallboard renders an "unavailable" tile for that panel.
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -381,7 +382,16 @@ def _gather_threat_stats(session: Session) -> Dict[str, Any]:
 
 
 def _build_threat_summary_prompt(stats: Dict[str, Any]) -> str:
-    """Pack the stats into a compact analyst-grade prompt."""
+    """Pack the stats into a compact analyst-grade prompt.
+
+    v0.19.21: rewritten to discourage instruction-leakage. The previous
+    version put the persona ("You are a SOC duty manager...") at the
+    top, which qwen2.5-class models often paraphrased back into the
+    output ("As a SOC duty manager, I'm seeing..."). New shape: stats
+    block first, then a STRICT FORMAT section, then negative
+    constraints. Output is post-processed by ``_sanitize_landscape_text``
+    so any residual leakage gets stripped before the wallboard renders.
+    """
     sev = ", ".join(f"{k}={v}" for k, v in (stats.get("severity_24h") or {}).items()) or "—"
     ver = ", ".join(f"{k}={v}" for k, v in (stats.get("verdict_7d") or {}).items()) or "—"
     closures = ", ".join(
@@ -389,17 +399,74 @@ def _build_threat_summary_prompt(stats: Dict[str, Any]) -> str:
     ) or "—"
     backlog = ", ".join(f"{k}={v}" for k, v in (stats.get("open_backlog_sev") or {}).items()) or "—"
     return (
-        "You are a SOC duty manager writing a wall-display summary for analysts on shift.\n"
-        "Output 2-3 short sentences in plain English describing the current threat landscape, "
-        "followed by 2-3 single-line bullet trends prefixed with '- '.\n\n"
-        f"Last 24h alerts: {stats.get('alerts_24h_total', 0)}\n"
-        f"Severity (24h): {sev}\n"
-        f"Verdicts (7d): {ver}\n"
-        f"Top closure reasons (7d): {closures}\n"
-        f"Open case backlog by severity: {backlog}\n\n"
-        "Keep total output under 90 words. No headings, no preamble, no markdown bold/italic. "
-        "Lead with the most actionable observation."
+        "STATS\n"
+        f"alerts_24h={stats.get('alerts_24h_total', 0)}\n"
+        f"severity_24h={sev}\n"
+        f"verdict_7d={ver}\n"
+        f"top_closures_7d={closures}\n"
+        f"backlog_severity={backlog}\n\n"
+        "TASK: write a SOC threat-landscape summary for an analyst wall display.\n\n"
+        "OUTPUT EXACTLY THIS SHAPE — nothing before, nothing after:\n"
+        "<2 plain-English sentences, lead with the most actionable observation>\n"
+        "- <one short trend bullet>\n"
+        "- <one short trend bullet>\n"
+        "- <one short trend bullet>\n\n"
+        "RULES:\n"
+        "- Under 90 words total.\n"
+        "- No preamble. Do not write 'Here is', 'Sure', 'Below', 'Note:'.\n"
+        "- Do not address the reader. Do not say 'I am', 'I'll', 'we', 'as a'.\n"
+        "- Do not repeat or reference the words STATS, TASK, OUTPUT, RULES.\n"
+        "- No markdown bold/italic, no headings, no code fences.\n"
     )
+
+
+# Lines that look like prompt-instruction leakage. Matched line-by-line
+# after the model returns; matching lines are dropped before the body
+# reaches the wallboard renderer.
+_LEAKAGE_LINE_PATTERNS = [
+    re.compile(
+        r"^\s*(?:here(?:'s| is)|sure[,!\.]|below|note:|output:?|response:?|"
+        r"task:?|format:?|stats:?|rules:?|constraints?:?|summary:?|trends?:?)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:as a (?:soc )?(?:duty )?(?:manager|analyst)|wall[\s-]display|"
+        r"on shift|i (?:am|'m|'ll|will)|let me|let us|we(?:'re| are))\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"^\s*(?:```|~~~)"),  # code fences
+]
+
+
+def _sanitize_landscape_text(text: str) -> str:
+    """Strip prompt-instruction leakage, markdown emphasis, and word-cap.
+
+    Returns the cleaned body. May return an empty string if the model
+    only returned leakage — caller should treat empty as "no AI summary".
+    """
+    if not text:
+        return ""
+    # Strip markdown emphasis markers — bold then italic, both flavours.
+    text = re.sub(r"\*\*([^*\n]+)\*\*", r"\1", text)
+    text = re.sub(r"__([^_\n]+)__", r"\1", text)
+    text = re.sub(r"\*([^*\n]+)\*", r"\1", text)
+    text = re.sub(r"_([^_\n]+)_", r"\1", text)
+
+    cleaned: list[str] = []
+    for line in text.split("\n"):
+        if any(p.search(line) for p in _LEAKAGE_LINE_PATTERNS):
+            continue
+        cleaned.append(line)
+
+    out = "\n".join(cleaned).strip()
+    # Collapse triple+ blank lines.
+    out = re.sub(r"\n{3,}", "\n\n", out).strip()
+
+    # Hard word-cap as a backstop — the prompt says <90 but models drift.
+    words = out.split()
+    if len(words) > 110:
+        out = " ".join(words[:110]).rstrip(",;:.") + "…"
+    return out
 
 
 def _generate_landscape_text(prompt: str, *, timeout: float = 15.0) -> Optional[str]:
@@ -460,6 +527,11 @@ def _collect_threat_landscape(session: Session) -> Dict[str, Any]:
     stats = _gather_threat_stats(session)
     prompt = _build_threat_summary_prompt(stats)
     text = _generate_landscape_text(prompt)
+    # v0.19.21: scrub instruction leakage and markdown emphasis before
+    # the wallboard renders. If the model returned nothing but leakage,
+    # the sanitiser collapses to "" and we degrade to summary_kind=stats.
+    if text:
+        text = _sanitize_landscape_text(text) or None
     return {
         "summary":      text,
         "summary_kind": "ai" if text else "stats",

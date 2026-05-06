@@ -1,5 +1,46 @@
 # Changelog
 
+## v0.19.21 — 2026-05-06
+
+### feat(wallboard): drop ticker strip
+
+The footer ticker on `/wallboard` was visual noise — critical alerts
+already surface in the alerts panel, and the dedicated ticker
+feature still renders inside the main app shell where dismissal
+works. Removed the footer block, the `renderTicker` JS, the
+unreferenced `.wb-marquee` / `wb-scroll` CSS, and the refresh-loop
+call. The snapshot API still carries `ticker` for other consumers;
+the wallboard just doesn't render it.
+
+### fix(wallboard): tighten AI threat-landscape summary
+
+The Ollama-generated threat-landscape paragraph was leaking prompt
+fragments back to the wall display ("As a SOC duty manager, I'm
+seeing…", "Here is a summary…", echoed `Output:` headers, stray
+markdown bold). Two-pronged fix:
+
+**Prompt rewrite** (`_build_threat_summary_prompt`) — replaced the
+"You are a SOC duty manager" persona (which qwen2.5-class models
+liked to paraphrase back) with a stats block + STRICT FORMAT +
+explicit negative constraints ("Do not write 'Here is', 'Sure',
+'Below'. Do not say 'I am', 'I'll', 'we', 'as a'.").
+
+**Output sanitiser** (`_sanitize_landscape_text`) — applied after
+the model returns, before the snapshot is cached:
+- Strips markdown bold/italic markers (both `**`/`__` and `*`/`_`).
+- Drops whole lines matching leakage patterns: leading
+  `Here/Sure/Below/Note:/Output:/Task:/Format:/Stats:/Rules:/Summary:/
+  Trends:`; mid-line `as a (SOC) (duty) (manager|analyst)`,
+  `wall display`, `on shift`, `I am/'m/'ll/will`, `let me/us`,
+  `we're/are`; code fences.
+- Hard word-cap at 110 (target prompt is 90 — leaves slack for
+  occasional drift; if the model still over-produces, tail truncates
+  at the cap with an ellipsis).
+
+If the sanitiser collapses to empty (model returned only leakage),
+the wallboard degrades gracefully to `summary_kind=stats` and
+renders the deterministic stats fallback.
+
 ## v0.19.20 — 2026-05-06
 
 ### fix(standup): always show a meaningful Rule label
