@@ -399,12 +399,17 @@
     } else if (!list.length) {
       body = `<div class="deck-empty">✓ No critical alerts in the last 24 hours.</div>`;
     } else {
-      const rows = list.slice(0, 10).map(r => `<tr>
+      // v0.19.20: final fallback to alert id so the Rule cell is
+      // never blank on the slide — matches the standup page change.
+      const rows = list.slice(0, 10).map(r => {
+        const ruleLabel = r.rule_name || r.title || r.id || '(unnamed)';
+        return `<tr>
         <td class="mono">${esc(fmtTime(r.timestamp).slice(0,16))}</td>
         <td>${sevPill(r.severity)}</td>
-        <td class="truncate">${esc(r.rule_name || r.title || '')}</td>
+        <td class="truncate" title="${esc(ruleLabel)}">${esc(ruleLabel)}</td>
         <td class="mono">${esc(r.host || '')}</td>
-      </tr>`).join('');
+      </tr>`;
+      }).join('');
       body = `<table class="deck-table"><thead><tr>
         <th>Time</th><th>Severity</th><th>Rule</th><th>Host</th>
       </tr></thead><tbody>${rows}</tbody></table>`;
