@@ -1,5 +1,10 @@
 {# Overview tab — checklist grouped by category, critical first.
-   Each item links to where to fix it (other tabs). #}
+   v0.19.4: items are now editable. Each row has a status <select> that
+   PUTs to /api/cyab/studio/checklist/{id} with a JSON body. The icon
+   colour swaps inline on success without re-fetching the whole tab.
+   The "+ Add custom item" form likewise switched from HTMX form-encoded
+   (which the JSON-bodied endpoint silently 422'd on) to plain fetch().
+#}
 
 {% set critical_items = checklist | selectattr('is_critical', 'equalto', true) | list %}
 {% set non_critical = checklist | rejectattr('is_critical', 'equalto', true) | list %}
@@ -12,14 +17,23 @@
     'done': 'emerald-400', 'in_progress': 'amber-400',
     'missing': 'rose-400', 'na': 'slate-500', 'unknown': 'slate-500'
   }.get(item.status, 'slate-500') %}
-  <div class="checklist-item flex items-center gap-3 py-1.5 px-2 hover:bg-slate-800/40 rounded" data-kind="{{ item.kind }}">
-    <span class="text-{{ status_color }} text-[14px] w-4">{{ status_icon }}</span>
+  <div class="checklist-item flex items-center gap-3 py-1.5 px-2 hover:bg-slate-800/40 rounded"
+       data-kind="{{ item.kind }}" data-item-id="{{ item.id }}">
+    <span class="status-icon text-{{ status_color }} text-[14px] w-4">{{ status_icon }}</span>
     <span class="flex-1 text-[13px] text-slate-200">{{ item.label }}</span>
     <span class="text-slate-600 text-[10px] font-mono uppercase">{{ item.kind }}</span>
     {% if item.url %}
       <a href="{{ item.url }}" class="text-cyan-400 text-[11px] hover:underline" target="_blank" rel="noopener">link</a>
     {% endif %}
-    <span class="text-slate-500 text-[11px] w-20 text-right">{{ item.status }}</span>
+    <select class="checklist-status px-1.5 py-0.5 bg-slate-900 border border-slate-700 text-slate-200 text-[11px] rounded w-24"
+            data-item-id="{{ item.id }}" aria-label="Status for {{ item.label }}">
+      <option value="unknown"     {% if item.status == 'unknown' %}selected{% endif %}>Unknown</option>
+      <option value="missing"     {% if item.status == 'missing' %}selected{% endif %}>Missing</option>
+      <option value="in_progress" {% if item.status == 'in_progress' %}selected{% endif %}>In progress</option>
+      <option value="done"        {% if item.status == 'done' %}selected{% endif %}>Done</option>
+      <option value="na"          {% if item.status == 'na' %}selected{% endif %}>Not needed</option>
+    </select>
+    <span class="checklist-row-msg text-[10px] w-12 text-right text-slate-600"></span>
   </div>
 {% endmacro %}
 
@@ -48,14 +62,16 @@
   {% endif %}
 {% endfor %}
 
-{# "Add custom item" form — POSTs to existing /api/cyab/studio/systems/{id}/checklist #}
+{# "Add custom item" form — POSTs to /api/cyab/studio/systems/{id}/checklist
+   as JSON. v0.19.4: was HTMX form-encoded which the BaseModel-bound
+   endpoint silently 422'd on. #}
 <section class="mt-6 pt-4 border-t border-slate-800">
   <details>
     <summary class="text-cyan-400 text-[12px] cursor-pointer">+ Add custom checklist item</summary>
-    <form hx-post="/api/cyab/studio/systems/{{ system.id }}/checklist"
-          hx-target="#tab-content"
-          hx-swap="innerHTML"
-          class="mt-3 flex gap-2 items-center">
+    <form id="cyab-add-checklist-form"
+          data-system-id="{{ system.id }}"
+          class="mt-3 flex gap-2 items-center"
+          onsubmit="return cyabAddChecklistItem(event)">
       <input name="label" placeholder="e.g. Quarterly access review" required
              class="flex-1 px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
       <select name="category" class="px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
@@ -65,6 +81,121 @@
         <option value="compliance">Compliance</option>
       </select>
       <button type="submit" class="px-3 py-1 bg-cyan-700 text-white text-[12px] rounded">Add</button>
+      <span id="cyab-add-checklist-msg" class="text-[11px] text-slate-500"></span>
     </form>
   </details>
 </section>
+
+<script>
+(function () {
+  // ── Status icon/colour table mirrors the Jinja macro above. Kept
+  // tiny so a future status addition is one place + the macro.
+  const ICONS = {
+    done: '✓', in_progress: '◐', missing: '✗', na: '—', unknown: '○',
+  };
+  const COLOURS = {
+    done: 'text-emerald-400',
+    in_progress: 'text-amber-400',
+    missing: 'text-rose-400',
+    na: 'text-slate-500',
+    unknown: 'text-slate-500',
+  };
+  const COLOUR_CLASSES = Object.values(COLOURS);
+
+  function setRowStatus(row, status) {
+    const icon = row.querySelector('.status-icon');
+    if (!icon) return;
+    icon.textContent = ICONS[status] || '○';
+    COLOUR_CLASSES.forEach(c => icon.classList.remove(c));
+    icon.classList.add(COLOURS[status] || 'text-slate-500');
+  }
+
+  function flashMsg(el, text, isErr) {
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('text-rose-400', 'text-emerald-400', 'text-slate-600');
+    el.classList.add(isErr ? 'text-rose-400' : 'text-emerald-400');
+    setTimeout(() => {
+      el.textContent = '';
+      el.classList.remove('text-rose-400', 'text-emerald-400');
+      el.classList.add('text-slate-600');
+    }, 2000);
+  }
+
+  // Event delegation — survives partial swaps and re-renders.
+  document.addEventListener('change', async (ev) => {
+    const sel = ev.target.closest('.checklist-status');
+    if (!sel) return;
+    const itemId = sel.dataset.itemId;
+    const newStatus = sel.value;
+    const row = sel.closest('.checklist-item');
+    const msg = row && row.querySelector('.checklist-row-msg');
+    const previous = row && row.querySelector('.status-icon')?.textContent;
+    sel.disabled = true;
+    try {
+      const r = await fetch(`/api/cyab/studio/checklist/${encodeURIComponent(itemId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!r.ok) {
+        const txt = await r.text().catch(() => '');
+        throw new Error(r.status + (txt ? ': ' + txt.slice(0, 80) : ''));
+      }
+      setRowStatus(row, newStatus);
+      flashMsg(msg, 'saved', false);
+    } catch (e) {
+      flashMsg(msg, 'failed', true);
+      console.warn('checklist update failed:', e);
+      // best-effort revert: reload the tab so the select goes back
+      // to the server's truth without a manual refresh.
+      const tabBtn = document.querySelector('[data-tab="overview"]');
+      if (tabBtn && typeof tabBtn.click === 'function') tabBtn.click();
+    } finally {
+      sel.disabled = false;
+    }
+  });
+
+  // ── Add-custom-item form ────────────────────────────────────
+  window.cyabAddChecklistItem = async function (ev) {
+    ev.preventDefault();
+    const form = ev.target;
+    const sysId = form.dataset.systemId;
+    const fd = new FormData(form);
+    const label = (fd.get('label') || '').toString().trim();
+    const category = (fd.get('category') || 'design').toString();
+    const msg = document.getElementById('cyab-add-checklist-msg');
+    if (!label) { flashMsg(msg, 'label required', true); return false; }
+    // kind must be unique-ish per-system; derive from label slug.
+    const kind = 'custom_' + label.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40);
+    try {
+      const r = await fetch(`/api/cyab/studio/systems/${encodeURIComponent(sysId)}/checklist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ kind, label, category, is_critical: false, status: 'unknown' }),
+      });
+      if (!r.ok) {
+        const txt = await r.text().catch(() => '');
+        throw new Error(r.status + (txt ? ': ' + txt.slice(0, 80) : ''));
+      }
+      flashMsg(msg, 'added — refreshing…', false);
+      // Trigger an HTMX-friendly reload of the overview tab so the
+      // new row shows up. Falls through to location.reload() if the
+      // tab nav can't be found.
+      const tabBtn = document.querySelector('[data-tab="overview"]');
+      if (tabBtn && typeof tabBtn.click === 'function') {
+        tabBtn.click();
+      } else {
+        setTimeout(() => location.reload(), 400);
+      }
+    } catch (e) {
+      flashMsg(msg, 'failed', true);
+      console.warn('checklist add failed:', e);
+    }
+    return false;
+  };
+})();
+</script>
