@@ -482,13 +482,19 @@ function renderAlerts(data) {
   const tbody = document.getElementById('alerts-tbody');
   if (!alerts.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No critical alerts in last 24h</td></tr>'; return; }
   const rows = alerts.slice(0, 15);
-  tbody.innerHTML = rows.map(a => `<tr class="border-b border-white/5 hover:bg-white/[.02]">
+  // v0.19.20: fall back through rule_name → title → id so the cell is
+  // never blank — analysts complained the panel was hard to decipher
+  // when ES alerts had no rule.name (older Sigma exports, custom feeds).
+  tbody.innerHTML = rows.map(a => {
+    const ruleLabel = a.rule_name || a.title || a.id || '(unnamed)';
+    return `<tr class="border-b border-white/5 hover:bg-white/[.02]">
     <td class="px-3 py-2 text-slate-400 font-mono">${fmtShort(a.timestamp)}</td>
     <td class="px-3 py-2">${sevPill(a.severity)}</td>
-    <td class="px-3 py-2 text-white truncate max-w-[260px]">${esc(a.rule_name)}</td>
+    <td class="px-3 py-2 text-white truncate max-w-[320px]" title="${esc(ruleLabel)}">${esc(ruleLabel)}</td>
     <td class="px-3 py-2 text-slate-300">${esc(a.host)}</td>
     <td class="px-3 py-2 text-slate-400">${esc(a.status)}</td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
 }
 
 /* ── S3: Stale Cases ── */

@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.19.20 — 2026-05-06
+
+### fix(standup): always show a meaningful Rule label
+
+Critical-alerts table on `/daily-standup`, the HTML slide deck, and
+the .pptx export all rendered the Rule column from `rule_name`
+only. ES alerts that lack a populated `rule.name` (older Sigma
+exports, custom feeds, ION-local fallback rows where the underlying
+triage was never enriched) showed a blank cell — analysts had no
+way to decipher which detection fired.
+
+Same fallback chain applied in three places:
+`rule_name → title → id → "(unnamed)"`.
+
+- `templates/daily_standup.html` — page table; also widened the
+  truncation cap from 260 → 320px and added a `title=` attribute so
+  hovering a truncated row reveals the full label.
+- `templates/daily_standup_slides.html` — slides table.
+- `daily_standup_api.py::_build_standup_pptx` — pptx Rule cell.
+
+Stale-cases panel was already rendering `triggered_rules`
+(v0.19.14), so nothing changed there.
+
+### chore: docker-compose default image tag bumped to 0.19.20
+
+`docker-compose.yml` had a stale `0.19.7` baked into the image
+fallback for both `ion` and `seeder` services. Bumped both to
+`0.19.20` so a no-flag `docker compose pull` on a fresh checkout
+matches the tagged release.
+
 ## v0.19.19 — 2026-05-06
 
 ### Bob investigation — prompt-injection Pass 1

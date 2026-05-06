@@ -1264,11 +1264,16 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
     _eyebrow(s, "Section 2 · Critical Alerts (Last 24h)")
     _title(s, "Critical Alerts", color=CORAL)
     _kpi(s, 0.6, "Critical", a.get("critical_count", 0), color=CORAL, value_size=80)
+    # v0.19.20: pptx Rule column was blank for ES alerts without a
+    # rule.name — fall back to title, then id, so the slide is never
+    # mysteriously empty. Matches the standup page and HTML deck.
     rows = [
         [
             (r.get("timestamp", "") or "")[:16].replace("T", " "),
             r.get("severity", ""),
-            (r.get("rule_name", "") or "")[:60],
+            (
+                (r.get("rule_name") or r.get("title") or r.get("id") or "(unnamed)")
+            )[:60],
             r.get("host", ""),
         ]
         for r in (a.get("alerts") or [])[:8]
