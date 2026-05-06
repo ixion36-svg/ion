@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.19.12 — 2026-05-06
+
+### Bob investigations — verdict-vocabulary regression
+
+Operators on `qwen2.5:7b` reported every investigation completing with
+`verdict = inconclusive`. Diagnostic from a real `investigations.raw_response`
+showed the model was **regurgitating the input fields back** instead of
+producing the analyst envelope:
+
+```json
+{"rule_name":"...","alert_id":"...","timestamp":"...",
+ "severity_original":"medium","enrichment":{...},
+ "mitre_tags":[],"memory_context":"","extracted_iocs":{...}}
+```
+
+Those are the keys ION packs INTO the prompt (via `_build_user_prompt_body`
+emitting a `json.dumps(...)` block) — not output-envelope keys. With
+`format: "json"` constraining the model to valid JSON, mid-tier models
+(qwen2.5:7b sits right at the threshold) pattern-matched the input shape
+and mirrored it. The output contract instructions, sitting at the end
+of a 14 kB system prompt, were losing the recency contest to whatever
+JSON the model had just attended to in the user message.
+
+**Two fixes, both surgical:**
+
+- `investigation_service._build_user_prompt_body` rewrote to emit a
+  labeled-markdown block (`## Alert summary`, `- key: value` bullets)
+  instead of a JSON dump. Same data, no JSON-shaped template for the
+  model to mimic. Cluster-investigation `user_body` got the same
+  treatment — the `json.dumps(extracted_iocs)` /
+  `json.dumps(enrichment)` lines became markdown sub-sections.
+- `_OUTPUT_CONTRACT` (in `alert_prompt_service.py`) gained a "**Do NOT
+  echo input fields back**" preamble that explicitly names the
+  forbidden keys (`alert_summary`, `enrichment`, `mitre_tags`,
+  `extracted_iocs`, `memory_context`, `rule_name`, `alert_id`,
+  `timestamp`, `severity_original`, `rule_id`) — and a worked example
+  showing input-shape → output-shape transformation. Added BEFORE the
+  schema, not after, so primacy + recency both reinforce.
+
+No model swap required, no schema change. Capable models (8B+) ignore
+the redundant instructions; the threshold-class models (3-7B) get the
+explicit anchor they need.
+
 ## v0.19.11 — 2026-05-06
 
 ### Standup deck — AI Threat Summary + AOB slides
