@@ -11,9 +11,7 @@
   <link rel="stylesheet" href="/static/css/tailwind.css?v=0.9.80-lightmode">
   <style>
     html, body { height: 100%; margin: 0; padding: 0; background: #0a0e17; overflow: hidden; }
-    .wb-marquee { display: inline-flex; gap: 36px; white-space: nowrap;
-                  animation: wb-scroll 60s linear infinite; }
-    @keyframes wb-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    /* v0.19.21: marquee CSS removed with the ticker strip. */
     .wb-pulse-down { animation: wb-pulse 2s infinite; }
     @keyframes wb-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
     .wb-grid-bg {
@@ -245,18 +243,9 @@
 
     </main>
 
-    <!-- ═══════════════════ TICKER STRIP ═══════════════════ -->
-    <footer class="rounded-[16px] border border-white/5 bg-ink-900/50 h-[56px] flex items-center gap-4 px-5 overflow-hidden">
-      <div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-ion-amber/10 text-ion-amber shrink-0">
-        <svg class="w-3.5 h-3.5"><use href="#i-zap"/></svg>
-        <span class="label-tiny font-bold">Ticker</span>
-      </div>
-      <div class="flex-1 overflow-hidden">
-        <div id="wb-ticker-content" class="wb-marquee">
-          <span class="text-[13px] text-slate-500 italic">No active ticker entries</span>
-        </div>
-      </div>
-    </footer>
+    <!-- v0.19.21: ticker strip removed from the wallboard. Critical
+         alerts are already on the alerts panel; the dedicated ticker
+         feature still renders inside the main app shell. -->
 
   </div>
 
@@ -614,25 +603,9 @@ function renderThreatLandscape(t) {
   }
 }
 
-function renderTicker(t) {
-  const wrap = $('wb-ticker-content');
-  if (!t || !t.items || !t.items.length) {
-    wrap.innerHTML = '<span class="text-[13px] text-slate-500 italic">No active ticker entries</span>';
-    wrap.style.animation = 'none';
-    return;
-  }
-  const SEV_DOT = { critical: 'bg-ion-coral', high: 'bg-ion-amber', medium: 'bg-ion-cyan', info: 'bg-slate-500' };
-  const items = t.items.concat(t.items);  // duplicate for marquee loop
-  wrap.innerHTML = items.map(i => {
-    const dot = SEV_DOT[String(i.severity || 'info').toLowerCase()] || 'bg-slate-500';
-    return `<span class="inline-flex items-center gap-2 text-[13px]">
-              <span class="h-2 w-2 rounded-full ${dot} shrink-0"></span>
-              <strong class="text-white">${escHtml(i.title || '(untitled)')}</strong>
-              ${i.body ? `<span class="text-slate-400">— ${escHtml(i.body.substring(0, 140))}</span>` : ''}
-            </span>`;
-  }).join('');
-  wrap.style.animation = 'wb-scroll 60s linear infinite';
-}
+// v0.19.21: renderTicker removed with the footer strip. Snapshot still
+// carries `ticker` for the rest of the app's ticker UI; we just don't
+// render it on the wallboard.
 
 // ── Refresh loop ─────────────────────────────────────────────
 async function refresh() {
@@ -649,7 +622,6 @@ async function refresh() {
     renderBob(s.bob || {});
     renderRules(s.rules || {});
     renderThreatLandscape(s.threat_landscape || {});
-    renderTicker(s.ticker || {});
     $('wb-cache-age').textContent = 'refreshed ' + fmtAge(s.cache_age_seconds || 0);
   } catch (e) {
     console.error('refresh error', e);
