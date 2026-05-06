@@ -447,13 +447,22 @@ class ElasticsearchService:
         ]
 
         if severity:
+            # v0.19.5: was case-sensitive `term` queries on a single
+            # casing — Kibana indices store severity lowercase but
+            # other producers (Wazuh, custom rules) ship "Critical" or
+            # "CRITICAL". The single-casing match silently dropped
+            # those, leaving the daily SOC standup looking empty even
+            # when criticals existed. Fan out to all common casings via
+            # `terms`. Cheap on ES — same inverted-index lookup.
+            sev_str = str(severity)
+            sev_variants = list({sev_str.lower(), sev_str.capitalize(), sev_str.upper(), sev_str})
             must_clauses.append({
                 "bool": {
                     "should": [
-                        {"term": {"event.severity": severity}},
-                        {"term": {"kibana.alert.severity": severity}},
-                        {"term": {"signal.rule.severity": severity}},
-                        {"term": {"severity": severity}},
+                        {"terms": {"event.severity": sev_variants}},
+                        {"terms": {"kibana.alert.severity": sev_variants}},
+                        {"terms": {"signal.rule.severity": sev_variants}},
+                        {"terms": {"severity": sev_variants}},
                     ],
                     "minimum_should_match": 1
                 }
