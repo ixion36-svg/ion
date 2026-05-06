@@ -63,9 +63,14 @@ def stats_endpoint(session: Session = Depends(get_db_session)):
     return canary_service.stats(session)
 
 
-@router.get("/types")
+@router.get("/types", dependencies=[Depends(require_permission("alert:read"))])
 def types_endpoint():
-    """Static reference: enumerate canary types and statuses for the UI."""
+    """Static reference: enumerate canary types and statuses for the UI.
+
+    v0.19.17: was unauthenticated. Every other route in this file
+    requires alert:read; this one was missed. Closes pre-auth schema
+    enumeration of the CanaryType/CanaryStatus enums.
+    """
     return {
         "types": [
             {"id": t.value, "label": t.value.replace("_", " ").title()}

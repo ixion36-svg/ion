@@ -1,5 +1,66 @@
 # Changelog
 
+## v0.19.17 — 2026-05-06
+
+### Security hardening — quick-wins from v0.19.16 assessment
+
+Ten findings closed in one release; deeper items (SSRF on
+`PUT /api/admin/config/*`, upload streaming caps, PII default,
+prompt sanitisation) remain open and will land separately after
+design + testing.
+
+**AuthZ tightening:**
+- `GET /canaries/types` was unauthenticated — now requires
+  `alert:read` like every other route in the file. Closes
+  pre-auth schema enumeration.
+- `GET /health/deep` (probes ES / Kibana / OpenCTI / TIDE)
+  required no auth — now requires `get_current_user`. The
+  shallow `GET /health` for load balancers stays public.
+- `POST /comm-templates` was gated only on `alert:read`
+  (matched the GET listings); creating templates is a write
+  action, now requires `alert:triage`.
+- `POST /change-log` was on `alert:read`; the approve and
+  rollback siblings already required `system:settings`. Create
+  brought into line so a read-only analyst can't inject change
+  records that an admin later approves blindly.
+- `GET /api/wallboard/snapshot` and `POST /api/wallboard/refresh`
+  required only `get_current_user` — sessions belonging to
+  users with all roles revoked still worked. Both now require
+  `alert:read` to match the page route.
+- `GET /roles` returned the full role-to-permission graph to
+  any authenticated user. Now requires `user:read`.
+
+**Information disclosure:**
+- `_render_standup_html` save path: `HTTPException(detail=str(e))`
+  leaked SQLAlchemy table/column names. Wrapped with
+  `safe_error()` (returns the exception class name only; full
+  trace stays in app log).
+- `translator_api.py` had seven `detail=str(exc)` /
+  `f"...: {exc}"` leaks. All wrapped with `safe_error()`.
+- `course_api.py` upload error path leaked filesystem paths.
+  Same wrap.
+- OIDC callback was emitting the user's email at INFO level on
+  every successful login; under ECS log shipping this lands in
+  long-term storage. Email moved to DEBUG; INFO line keeps the
+  username only.
+
+**Secrets hygiene:**
+- `.env.deploy` shipped `ION_ADMIN_PASSWORD=admin2025`,
+  `ION_DATABASE_URL=postgresql://ion:ion2025@.../ion`, and
+  `ION_DB_PASSWORD=ion2025` as defaults. All three replaced
+  with `REPLACE_WITH_*` placeholders. `ION_COOKIE_SECURE`
+  default flipped from `false` to `true` so deployments behind
+  HTTPS get the Secure flag without operator intervention.
+
+**XSS hardening:**
+- `templates/audit_logs.html` rendered `log.action`,
+  `log.resource_type`, `log.resource_id`, and `log.ip_address`
+  via template literal `innerHTML` without escape. All four
+  wrapped with the existing `escapeHtml()` helper. The current
+  audit producers don't carry user-named resource content
+  but a future producer storing case titles or custom checklist
+  names would.
+
 ## v0.19.16 — 2026-05-06
 
 ### Code-review fixes (`v0.19.4..v0.19.15`)

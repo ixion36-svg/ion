@@ -41,7 +41,10 @@ def get_template(template_id: int, session: Session = Depends(get_db_session)):
     return result
 
 
-@router.post("", dependencies=[Depends(require_permission("alert:read"))])
+# v0.19.17: was alert:read (matched the GET listings); creating
+# templates is a write action and now requires alert:triage to match
+# the read/write split applied across the rest of the API.
+@router.post("", dependencies=[Depends(require_permission("alert:triage"))])
 def create_template(
     data: TemplateCreate,
     current_user: User = Depends(get_current_user),

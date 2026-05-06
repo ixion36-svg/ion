@@ -29,6 +29,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
+# v0.19.17: route exception details through safe_error so HTTP responses
+# don't carry raw `str(exc)` (file paths, internal libraries, partial
+# stack frames). The full trace still goes to the app log.
+from ion.core.safe_errors import safe_error
+
 from ion.auth.dependencies import require_page_permission, require_permission
 from ion.models.user import User
 from ion.services.translation_service import (
@@ -97,8 +102,11 @@ def translate(
     try:
         out = translate_long_text(body.text, target_lang=body.target, source_lang=body.source)
     except TranslationError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail=f"Translator unavailable: {safe_error(exc, 'translate')}")
     except ValueError as exc:
+        # ValueError is raised for caller-side input issues (oversize input,
+        # bad language code) — its message is part of the API contract,
+        # so it stays.
         raise HTTPException(status_code=400, detail=str(exc))
     return {
         "source": body.source,
@@ -129,7 +137,7 @@ async def translate_file(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logger.warning("Extractor failed for %s: %s", file.filename, exc)
-        raise HTTPException(status_code=400, detail=f"Extract failed: {exc}")
+        raise HTTPException(status_code=400, detail=f"Extract failed: {safe_error(exc, 'translator_extract')}")
     if not text.strip():
         return {
             "filename": file.filename,
@@ -145,8 +153,11 @@ async def translate_file(
     try:
         out = translate_long_text(text, target_lang=target, source_lang=source)
     except TranslationError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail=f"Translator unavailable: {safe_error(exc, 'translate')}")
     except ValueError as exc:
+        # ValueError is raised for caller-side input issues (oversize input,
+        # bad language code) — its message is part of the API contract,
+        # so it stays.
         raise HTTPException(status_code=400, detail=str(exc))
     return {
         "filename": file.filename,
@@ -179,7 +190,7 @@ async def extract(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logger.warning("Extractor failed for %s: %s", file.filename, exc)
-        raise HTTPException(status_code=400, detail=f"Extract failed: {exc}")
+        raise HTTPException(status_code=400, detail=f"Extract failed: {safe_error(exc, 'translator_extract')}")
     return {
         "filename": file.filename,
         "kind": kind,

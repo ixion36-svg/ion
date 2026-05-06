@@ -39,7 +39,12 @@ def get_summary(days: int = Query(30, ge=1), session: Session = Depends(get_db_s
     return get_change_summary(session, days=days)
 
 
-@router.post("", dependencies=[Depends(require_permission("alert:read"))])
+# v0.19.17: was alert:read; change-log entries feed the approve and
+# rollback workflow, so creation needs to match the system:settings
+# perm the approve/rollback siblings already require. Stops a
+# read-only analyst from injecting change records that an admin
+# subsequently approves blindly.
+@router.post("", dependencies=[Depends(require_permission("system:settings"))])
 def create_change(
     data: ChangeCreate,
     current_user: User = Depends(get_current_user),
