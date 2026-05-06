@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.19.4 — 2026-05-06
+
+### CyAB Overview checklist is now actually editable
+
+The Overview tab was shipped (v0.19.0 commit `656ddad`) as a read-only
+display: each item rendered as a static `<div>` with the status text
+beside it but no control to change it. The user could see "missing"
+or "unknown" but had no way to mark "yes we have it now" (`done`) or
+"not needed" (`na`). The backend endpoint was already there
+(`PUT /api/cyab/studio/checklist/{item_id}`) — only the UI was missing.
+
+The "+ Add custom checklist item" form was technically broken too:
+it used HTMX form-encoded POST against an endpoint declared with a
+Pydantic `BaseModel` body, which FastAPI rejects with `422` unless
+the content type is JSON.
+
+Fix:
+- Each row now has a status `<select>` (Unknown / Missing / In progress /
+  Done / Not needed) wired via `change` event delegation to a `fetch`
+  PUT with a JSON body. On success the row's icon and colour swap
+  in-place — no full tab re-render. On failure the tab reloads so the
+  select reverts to the server's truth.
+- The add-item form was rewritten as a vanilla `fetch` POST with
+  `Content-Type: application/json`, deriving `kind` as `custom_<slug>`
+  from the label so callers don't have to invent one.
+- Both calls send `credentials: 'same-origin'` so the session cookie
+  carries the `case:update` permission check.
+
 ## v0.19.3 — 2026-05-05
 
 ### Bob investigation reliability — regression from v0.18.1
