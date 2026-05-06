@@ -169,6 +169,31 @@ def reload_config() -> Config:
     return get_config()
 
 
+def _ssrf_safe_url(url: str, integration_type: str) -> str:
+    """v0.19.18: SSRF gate before persisting an integration URL.
+
+    The wizard test endpoints (admin_api.py:~1429-1703) call
+    validate_integration_url() before contacting the target. The
+    config-save handlers and the wizard /save endpoint historically
+    just rstripped the trailing slash and trusted the value. Any admin
+    could therefore set, say, ``opencti_url=http://169.254.169.254/``
+    and the next OpenCTI poll would hit the AWS metadata endpoint.
+
+    Centralised here so every PUT path validates the same way and the
+    Docker-hostname carve-out (``http://postgres/``, ``http://ollama/``)
+    behaves identically to the test path.
+    """
+    from fastapi import HTTPException
+    from ion.core.url_validator import validate_integration_url
+    ok, err = validate_integration_url(url, integration_type)
+    if not ok:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {integration_type} URL: {err}",
+        )
+    return url.rstrip("/")
+
+
 # =============================================================================
 # Configuration Endpoints
 # =============================================================================
@@ -327,7 +352,7 @@ async def update_gitlab_settings(
         config.gitlab_enabled = settings.gitlab_enabled
 
     if settings.gitlab_url is not None:
-        config.gitlab_url = settings.gitlab_url.rstrip("/")
+        config.gitlab_url = _ssrf_safe_url(settings.gitlab_url, "gitlab")
 
     if settings.gitlab_token is not None and not settings.gitlab_token.startswith("*"):
         config.gitlab_token = settings.gitlab_token
@@ -360,7 +385,7 @@ async def update_opencti_settings(
         config.opencti_enabled = settings.opencti_enabled
 
     if settings.opencti_url is not None:
-        config.opencti_url = settings.opencti_url.rstrip("/")
+        config.opencti_url = _ssrf_safe_url(settings.opencti_url, "opencti")
 
     if settings.opencti_token is not None and not settings.opencti_token.startswith("*"):
         config.opencti_token = settings.opencti_token
@@ -385,7 +410,7 @@ async def update_elasticsearch_settings(
         config.elasticsearch_enabled = settings.elasticsearch_enabled
 
     if settings.elasticsearch_url is not None:
-        config.elasticsearch_url = settings.elasticsearch_url.rstrip("/")
+        config.elasticsearch_url = _ssrf_safe_url(settings.elasticsearch_url, "elasticsearch")
 
     if settings.elasticsearch_api_key is not None and not settings.elasticsearch_api_key.startswith("*"):
         config.elasticsearch_api_key = settings.elasticsearch_api_key
@@ -476,7 +501,7 @@ async def update_kibana_settings(
         config.kibana_cases_enabled = settings.kibana_cases_enabled
 
     if settings.kibana_url is not None:
-        config.kibana_url = settings.kibana_url.rstrip("/")
+        config.kibana_url = _ssrf_safe_url(settings.kibana_url, "kibana")
 
     if settings.kibana_username is not None:
         config.kibana_username = settings.kibana_username
@@ -514,7 +539,7 @@ async def update_dfir_iris_settings(
         config.dfir_iris_enabled = settings.dfir_iris_enabled
 
     if settings.dfir_iris_url is not None:
-        config.dfir_iris_url = settings.dfir_iris_url.rstrip("/")
+        config.dfir_iris_url = _ssrf_safe_url(settings.dfir_iris_url, "dfir_iris")
 
     if settings.dfir_iris_api_key is not None and not settings.dfir_iris_api_key.startswith("*"):
         config.dfir_iris_api_key = settings.dfir_iris_api_key
@@ -542,7 +567,7 @@ async def update_tide_settings(
         config.tide_enabled = settings.tide_enabled
 
     if settings.tide_url is not None:
-        config.tide_url = settings.tide_url.rstrip("/")
+        config.tide_url = _ssrf_safe_url(settings.tide_url, "tide")
 
     if settings.tide_api_key is not None and not settings.tide_api_key.startswith("*"):
         config.tide_api_key = settings.tide_api_key
@@ -576,7 +601,7 @@ async def update_arkime_settings(
     if settings.arkime_enabled is not None:
         config.arkime_enabled = settings.arkime_enabled
     if settings.arkime_url is not None:
-        config.arkime_url = settings.arkime_url.rstrip("/")
+        config.arkime_url = _ssrf_safe_url(settings.arkime_url, "arkime")
     if settings.arkime_verify_ssl is not None:
         config.arkime_verify_ssl = settings.arkime_verify_ssl
     if settings.arkime_username is not None:
@@ -604,7 +629,7 @@ async def update_ollama_settings(
     if settings.ollama_enabled is not None:
         config.ollama_enabled = settings.ollama_enabled
     if settings.ollama_url is not None:
-        config.ollama_url = settings.ollama_url.rstrip("/")
+        config.ollama_url = _ssrf_safe_url(settings.ollama_url, "ollama")
     if settings.ollama_model is not None:
         config.ollama_model = settings.ollama_model
     if settings.ollama_timeout is not None:
@@ -1883,7 +1908,7 @@ async def save_wizard_integration(
         if config_data.enabled is not None:
             config.elasticsearch_enabled = config_data.enabled
         if config_data.url is not None:
-            config.elasticsearch_url = config_data.url.rstrip("/")
+            config.elasticsearch_url = _ssrf_safe_url(config_data.url, "elasticsearch")
         if config_data.api_key is not None and not config_data.api_key.startswith("*"):
             config.elasticsearch_api_key = config_data.api_key
         if config_data.username is not None:
@@ -1901,7 +1926,7 @@ async def save_wizard_integration(
         if config_data.enabled is not None:
             config.kibana_cases_enabled = config_data.enabled
         if config_data.url is not None:
-            config.kibana_url = config_data.url.rstrip("/")
+            config.kibana_url = _ssrf_safe_url(config_data.url, "kibana")
         if config_data.username is not None:
             config.kibana_username = config_data.username
         if config_data.password is not None and not config_data.password.startswith("*"):
@@ -1917,7 +1942,7 @@ async def save_wizard_integration(
         if config_data.enabled is not None:
             config.gitlab_enabled = config_data.enabled
         if config_data.url is not None:
-            config.gitlab_url = config_data.url.rstrip("/")
+            config.gitlab_url = _ssrf_safe_url(config_data.url, "gitlab")
         if config_data.token is not None and not config_data.token.startswith("*"):
             config.gitlab_token = config_data.token
         if config_data.project_id is not None:
@@ -1931,7 +1956,7 @@ async def save_wizard_integration(
         if config_data.enabled is not None:
             config.opencti_enabled = config_data.enabled
         if config_data.url is not None:
-            config.opencti_url = config_data.url.rstrip("/")
+            config.opencti_url = _ssrf_safe_url(config_data.url, "opencti")
         if config_data.token is not None and not config_data.token.startswith("*"):
             config.opencti_token = config_data.token
         if config_data.verify_ssl is not None:
@@ -1941,7 +1966,7 @@ async def save_wizard_integration(
         if config_data.enabled is not None:
             config.ollama_enabled = config_data.enabled
         if config_data.url is not None:
-            config.ollama_url = config_data.url.rstrip("/")
+            config.ollama_url = _ssrf_safe_url(config_data.url, "ollama")
         if config_data.model is not None:
             config.ollama_model = config_data.model
         if config_data.timeout is not None:
@@ -1965,7 +1990,7 @@ async def save_wizard_integration(
         if config_data.enabled is not None:
             config.dfir_iris_enabled = config_data.enabled
         if config_data.url is not None:
-            config.dfir_iris_url = config_data.url.rstrip("/")
+            config.dfir_iris_url = _ssrf_safe_url(config_data.url, "dfir_iris")
         if config_data.api_key is not None and not config_data.api_key.startswith("*"):
             config.dfir_iris_api_key = config_data.api_key
         if config_data.verify_ssl is not None:
@@ -2012,7 +2037,7 @@ async def save_all_wizard_integrations(
                 if config_data.enabled is not None:
                     config.elasticsearch_enabled = config_data.enabled
                 if config_data.url is not None:
-                    config.elasticsearch_url = config_data.url.rstrip("/")
+                    config.elasticsearch_url = _ssrf_safe_url(config_data.url, "elasticsearch")
                 if config_data.api_key is not None and not config_data.api_key.startswith("*"):
                     config.elasticsearch_api_key = config_data.api_key
                 if config_data.username is not None:
@@ -2031,7 +2056,7 @@ async def save_all_wizard_integrations(
                 if config_data.enabled is not None:
                     config.kibana_cases_enabled = config_data.enabled
                 if config_data.url is not None:
-                    config.kibana_url = config_data.url.rstrip("/")
+                    config.kibana_url = _ssrf_safe_url(config_data.url, "kibana")
                 if config_data.username is not None:
                     config.kibana_username = config_data.username
                 if config_data.password is not None and not config_data.password.startswith("*"):
@@ -2048,7 +2073,7 @@ async def save_all_wizard_integrations(
                 if config_data.enabled is not None:
                     config.gitlab_enabled = config_data.enabled
                 if config_data.url is not None:
-                    config.gitlab_url = config_data.url.rstrip("/")
+                    config.gitlab_url = _ssrf_safe_url(config_data.url, "gitlab")
                 if config_data.token is not None and not config_data.token.startswith("*"):
                     config.gitlab_token = config_data.token
                 if config_data.project_id is not None:
@@ -2063,7 +2088,7 @@ async def save_all_wizard_integrations(
                 if config_data.enabled is not None:
                     config.opencti_enabled = config_data.enabled
                 if config_data.url is not None:
-                    config.opencti_url = config_data.url.rstrip("/")
+                    config.opencti_url = _ssrf_safe_url(config_data.url, "opencti")
                 if config_data.token is not None and not config_data.token.startswith("*"):
                     config.opencti_token = config_data.token
                 if config_data.verify_ssl is not None:
@@ -2074,7 +2099,7 @@ async def save_all_wizard_integrations(
                 if config_data.enabled is not None:
                     config.ollama_enabled = config_data.enabled
                 if config_data.url is not None:
-                    config.ollama_url = config_data.url.rstrip("/")
+                    config.ollama_url = _ssrf_safe_url(config_data.url, "ollama")
                 if config_data.model is not None:
                     config.ollama_model = config_data.model
                 if config_data.timeout is not None:
@@ -2101,7 +2126,7 @@ async def save_all_wizard_integrations(
                 if config_data.enabled is not None:
                     config.dfir_iris_enabled = config_data.enabled
                 if config_data.url is not None:
-                    config.dfir_iris_url = config_data.url.rstrip("/")
+                    config.dfir_iris_url = _ssrf_safe_url(config_data.url, "dfir_iris")
                 if config_data.api_key is not None and not config_data.api_key.startswith("*"):
                     config.dfir_iris_api_key = config_data.api_key
                 if config_data.verify_ssl is not None:

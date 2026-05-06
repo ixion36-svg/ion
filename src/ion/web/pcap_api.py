@@ -32,10 +32,15 @@ async def analyze_pcap(
     if not ext:
         raise HTTPException(400, f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}")
 
-    # Read file content
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(400, f"File too large. Maximum size: {MAX_FILE_SIZE // (1024 * 1024)} MB")
+    # Read file content.
+    # v0.19.18: was `await file.read()` followed by a post-hoc size
+    # check, which buffered the entire upload (potentially multi-GB)
+    # into memory before the 100 MB cap was evaluated. Stream-read
+    # with a running cap so oversize uploads are rejected before the
+    # allocation completes — returns 413 instead of 400 to match
+    # standard semantics.
+    from ion.core.uploads import read_upload_capped
+    content = await read_upload_capped(file, MAX_FILE_SIZE)
     if len(content) == 0:
         raise HTTPException(400, "Empty file")
 
