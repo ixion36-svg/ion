@@ -1093,6 +1093,51 @@ def delete_custom_doc_checklist_item(
     return {"ok": True, "deleted": item_id}
 
 
+# ── System delete (v0.19.7) ──────────────────────────────────────────────
+def _delete_system_row(session: Session, sys_id: int) -> bool:
+    """Hard-delete a CyabSystem and its non-cascading children.
+
+    Two child tables (cyab_data_sources, cyab_snapshots) ship with FK
+    constraints but no ondelete=CASCADE — Postgres rejects the parent
+    delete unless we wipe those rows first. Cascading children
+    (checklist items, system assessments) clean themselves up via the
+    FK ondelete clause; SET-NULL children (wizard sessions,
+    vulnerability links) just unlink. Returns False if the system
+    doesn't exist.
+    """
+    from ion.models.cyab import CyabDataSource, CyabSnapshot
+    sys_row = session.get(CyabSystem, sys_id)
+    if sys_row is None:
+        return False
+    session.query(CyabSnapshot).filter(CyabSnapshot.system_id == sys_id).delete(
+        synchronize_session=False
+    )
+    session.query(CyabDataSource).filter(CyabDataSource.system_id == sys_id).delete(
+        synchronize_session=False
+    )
+    session.delete(sys_row)
+    session.commit()
+    return True
+
+
+@router.delete(
+    "/systems/{sys_id}",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def delete_cyab_system(
+    sys_id: int,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Hard-delete a CyAB system. Cascades to checklist + assessments
+    automatically; data sources and snapshots are wiped explicitly
+    because their FKs predate the ondelete=CASCADE convention."""
+    if not _delete_system_row(session, sys_id):
+        raise HTTPException(status_code=404, detail=f"System {sys_id} not found")
+    logger.info("CyAB system deleted: id=%s by user=%s", sys_id, current_user.id)
+    return {"ok": True, "deleted": sys_id}
+
+
 # ── Scoping pack PDF (Sub-plan C) ─────────────────────────────────────────
 
 def _render_scoping_pack_pdf_html(scores: dict, answers: dict) -> str:
