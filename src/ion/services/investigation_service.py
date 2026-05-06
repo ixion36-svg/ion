@@ -1379,27 +1379,98 @@ class InvestigationService:
     ) -> str:
         """Assemble the user-message payload for the LLM.
 
-        Deliberately emits a JSON block (pretty-printed for readability
-        in logs) followed by a short instruction tail that specifies the
-        JSON output contract.
-        """
-        body = {
-            "alert_summary": alert_summary,
-            "enrichment": enrichment,
-            "mitre_tags": mitre_tags,
-            "memory_context": memory_ctx_md,
-            "extracted_iocs": extracted_iocs,
-        }
-        try:
-            dumped = json.dumps(body, default=str, indent=2, ensure_ascii=False)
-        except (TypeError, ValueError):
-            dumped = str(body)
+        v0.19.12: was emitting a single pretty-printed JSON block with
+        keys ``alert_summary`` / ``enrichment`` / ``mitre_tags`` /
+        ``memory_context`` / ``extracted_iocs``. With ``format: "json"``
+        constraining the output to valid JSON, mid-tier models
+        (qwen2.5:7b at the threshold) pattern-matched on the input
+        shape and *echoed those exact keys back* in the response — the
+        analyst envelope (verdict / confidence / suggested_closure_reason)
+        never made it into the output, and the parser fell back to
+        ``inconclusive`` for every investigation.
 
-        tail = (
-            "\n\nRespond with ONE JSON object conforming to the Output Contract "
-            "in the system message. No markdown fences, no prose outside JSON."
+        Now emits a labeled-markdown block so there's no JSON shape to
+        mirror. Trade-off: marginally less compact in the log; far
+        higher field-completion rate from any model the size of qwen
+        2.5:7b or smaller.
+        """
+        def _fmt_kv(d: Dict[str, Any], indent: str = "- ") -> str:
+            if not d:
+                return f"{indent}(none)\n"
+            lines = []
+            for k, v in d.items():
+                if isinstance(v, (list, tuple)):
+                    if not v:
+                        continue
+                    lines.append(f"{indent}{k}: {', '.join(str(x) for x in v)}")
+                elif isinstance(v, dict):
+                    if not v:
+                        continue
+                    lines.append(f"{indent}{k}:")
+                    for k2, v2 in v.items():
+                        lines.append(f"  - {k2}: {v2}")
+                else:
+                    if v in (None, ""):
+                        continue
+                    lines.append(f"{indent}{k}: {v}")
+            return ("\n".join(lines) + "\n") if lines else f"{indent}(none)\n"
+
+        out: List[str] = ["# ALERT TO INVESTIGATE\n"]
+
+        out.append("## Alert summary")
+        out.append(_fmt_kv(alert_summary))
+
+        out.append("## Enrichment")
+        if not enrichment:
+            out.append("- (none)\n")
+        else:
+            for kind, hits in enrichment.items():
+                if not hits:
+                    continue
+                out.append(f"### {kind}")
+                if isinstance(hits, dict):
+                    for ind, ctx in hits.items():
+                        ctx_str = ctx if isinstance(ctx, str) else json.dumps(ctx, default=str)
+                        # Keep nested context compact and quoted so the
+                        # model treats it as text, not a key/value pair
+                        # to copy.
+                        out.append(f"- `{ind}` → {ctx_str}")
+                else:
+                    out.append(f"- {hits}")
+                out.append("")
+
+        out.append("## MITRE ATT&CK (auto-tagged)")
+        if mitre_tags:
+            out.append("- " + ", ".join(str(t) for t in mitre_tags) + "\n")
+        else:
+            out.append("- (none)\n")
+
+        out.append("## Extracted IOCs")
+        if not extracted_iocs:
+            out.append("- (none)\n")
+        else:
+            for ioc_type, vals in extracted_iocs.items():
+                if not vals:
+                    continue
+                out.append(f"- **{ioc_type}**: " + ", ".join(str(v) for v in vals))
+            out.append("")
+
+        if memory_ctx_md and memory_ctx_md.strip():
+            out.append("## Investigation memory")
+            out.append(memory_ctx_md.strip() + "\n")
+
+        out.append(
+            "---\n"
+            "Now PRODUCE one JSON object matching the Output Contract in the system "
+            "message. CRITICAL: do NOT echo any of the keys above (alert_summary, "
+            "enrichment, mitre_tags, extracted_iocs, memory_context, rule_name, "
+            "alert_id, timestamp, severity_original) — those are inputs. Use ONLY "
+            "the output-envelope keys: verdict, confidence, severity, summary, "
+            "analyst_explanation, technical_details, mitre, recommended_actions, "
+            "key_observations, suggested_closure_reason, tuning_recommendation, "
+            "iocs (and the optional ones). No markdown fences, no prose outside JSON."
         )
-        return dumped + tail
+        return "\n".join(out)
 
     async def _single_llm_call(
         self,
@@ -2070,20 +2141,48 @@ class InvestigationService:
             brief_lines.append(f"  {i}. [{ts}] {rule_name} id={aid[:20]}")
         if len(alerts) > 20:
             brief_lines.append(f"  … and {len(alerts) - 20} more")
+        # v0.19.12: was emitting json.dumps(extracted_iocs) and
+        # json.dumps(enrichment summary), which qwen2.5:7b mirrored back
+        # under format="json" instead of producing the analyst envelope.
+        # Render as labeled markdown so there's no JSON shape to mimic.
+        brief_lines += [""]
+
+        brief_lines.append("## Extracted IOCs across cluster")
+        if not extracted_iocs:
+            brief_lines.append("- (none)")
+        else:
+            for k, v in extracted_iocs.items():
+                if not v:
+                    continue
+                brief_lines.append(f"- **{k}**: " + ", ".join(str(x) for x in v))
+
+        brief_lines.append("")
+        brief_lines.append("## Enrichment summary")
+        if not enrichment:
+            brief_lines.append("- (none)")
+        else:
+            for k, v in enrichment.items():
+                brief_lines.append(f"- {k}: {len(v)} entries")
+
+        brief_lines.append("")
+        brief_lines.append(f"## MITRE tags (union): {', '.join(mitre_tags) or 'none'}")
+
         brief_lines += [
             "",
-            f"Extracted IOCs across cluster: {json.dumps(extracted_iocs)}",
-            f"Enrichment summary: {json.dumps({k: len(v) for k, v in enrichment.items()})}",
-            f"MITRE tags (union): {', '.join(mitre_tags) or 'none'}",
+            "## Investigation memory",
+            memory_ctx_md or "- (no prior investigations for this signature)",
             "",
-            "Memory context:",
-            memory_ctx_md or "(no prior investigations for this signature)",
-            "",
-            "Analyse the CLUSTER as a whole. Respond with ONE JSON object "
-            "conforming to the Output Contract in the system message. Scope "
-            "every field (verdict, IOCs, affected assets, blast radius, "
-            "recommended actions, tuning) to the cluster, not any single "
-            "alert. No markdown fences, no prose outside JSON.",
+            "---",
+            "Analyse the CLUSTER as a whole. PRODUCE one JSON object matching "
+            "the Output Contract in the system message. CRITICAL: do NOT echo "
+            "any of the section headings or input keys above (alert_summary, "
+            "enrichment, mitre_tags, extracted_iocs, memory_context, rule_name, "
+            "alert_id, timestamp, severity_original) — those are inputs. Use "
+            "ONLY output-envelope keys: verdict, confidence, severity, summary, "
+            "analyst_explanation, technical_details, mitre, recommended_actions, "
+            "key_observations, suggested_closure_reason, tuning_recommendation, "
+            "iocs. Scope every field to the cluster, not any single alert. No "
+            "markdown fences, no prose outside JSON.",
         ]
         user_prompt = "\n".join(brief_lines)
 

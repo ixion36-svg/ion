@@ -2872,6 +2872,45 @@ _OUTPUT_CONTRACT = """
 
 ## Output Contract — MANDATORY
 
+You are PRODUCING analyst output. The user message contains INPUT data
+about the alert. **Do NOT echo input fields back.** Specifically, your
+response must NOT contain any of these keys: ``alert_summary``,
+``enrichment``, ``mitre_tags``, ``extracted_iocs``, ``memory_context``,
+``rule_name``, ``alert_id``, ``timestamp``, ``severity_original``,
+``rule_id``. Those are *inputs you read*, not *outputs you produce*.
+
+Use ONLY the output-envelope keys listed in the schema below.
+
+### Worked example
+
+If the user message contains:
+```
+## Alert summary
+- rule.name: Suspicious PowerShell EncodedCommand
+- host.hostname: WS-12
+- process.command_line: powershell.exe -EncodedCommand JABwAGEAdABoAA==
+```
+
+Your response should be (illustrative — verdict and details depend on
+the actual alert):
+```json
+{"verdict":"true_positive","confidence":"high","severity":"high",
+ "summary":"Encoded PowerShell launched on WS-12, payload decoded to filesystem path manipulation.",
+ "analyst_explanation":"PowerShell with -EncodedCommand is a hallmark of obfuscated execution. The base64 string decoded indicates path-prep for a follow-on stager.",
+ "technical_details":"...",
+ "mitre":{"tactics":["TA0002"],"techniques":["T1059.001","T1027"]},
+ "recommended_actions":[{"priority":"p1","action":"Isolate WS-12","owner":"soc"}],
+ "key_observations":[{"field":"process.command_line","value":"powershell.exe -EncodedCommand JABwAGEAdABoAA==","significance":"obfuscated execution"}],
+ "suggested_closure_reason":"true_positive",
+ "tuning_recommendation":{"rule_needs_tuning":false,"rationale":null,"suggested_change":null},
+ "iocs":[]}
+```
+
+Note the response does NOT contain ``rule.name``, ``host.hostname``,
+``alert_summary``, etc. — only the analyst-envelope keys.
+
+---
+
 Respond with **ONE** valid JSON object. No prose, no markdown code fences,
 no commentary outside the JSON. The object MUST conform to this schema:
 
