@@ -52,48 +52,54 @@ _last_result: Optional[Dict[str, Any]] = None
 # ---------------------------------------------------------------------------
 
 
-def _alert_is_critical(es_service, alert_id: str) -> bool:
-    """Best-effort check — fail-open (treat as non-critical) on any error.
+def _critical_alert_ids_batch(es_service, alert_ids: list) -> set:
+    """Return the subset of ``alert_ids`` that ES says are critical.
 
-    The ES service's alert fetch helpers vary by version; we try the common
-    ones and fall back to False. A non-critical false is the safer default
-    (no ticker noise) — false negatives surface via manual ticker entries.
+    v0.19.6: was a per-row ``_alert_is_critical`` that fetched each
+    triage's ES doc one-by-one via ``get_alert_by_id`` — except that
+    method has never existed on ``ElasticsearchService`` (the wrapper
+    exposes ``get_alerts_by_ids`` and ``get_alerts``, and that
+    contract drift made the ticker emit zero rows on every deploy).
+    Now: one batched ``get_alerts_by_ids`` call per tick. The wrapper
+    is async, so we hop into a fresh event loop with ``asyncio.run``
+    — fine because the ticker tick is itself called from a worker
+    thread, not from inside an existing loop.
     """
-    if es_service is None:
-        return False
+    if es_service is None or not alert_ids:
+        return set()
+    fetch = getattr(es_service, "get_alerts_by_ids", None)
+    if fetch is None:
+        logger.warning(
+            "Ticker: ES service has no get_alerts_by_ids method — no critical tickers will fire"
+        )
+        return set()
     try:
-        fetch = getattr(es_service, "get_alert_by_id", None) or getattr(
-            es_service, "fetch_alert", None
-        )
-        if fetch is None:
-            # v0.19.3: was silent; now WARN once-per-tick so a missing
-            # method (rename, refactor) doesn't become an invisible
-            # zero-ticker outage.
-            logger.warning(
-                "Ticker: ES service has neither get_alert_by_id nor fetch_alert — no critical tickers will fire"
-            )
-            return False
-        alert = fetch(alert_id)
+        import asyncio
+        alerts = asyncio.run(fetch(list(alert_ids)))
     except Exception as exc:
-        logger.debug("Ticker: ES fetch for %s failed: %s", alert_id, exc)
-        return False
-    if not alert:
-        return False
+        logger.warning("Ticker: batched ES fetch failed: %s", exc)
+        return set()
 
-    # Try the common severity shapes used by ION's ES wrapper.
-    severity = (
-        alert.get("severity")
-        or (alert.get("rule") or {}).get("severity")
-        or alert.get("kibana.alert.severity")
-    )
-    if not severity and isinstance(alert.get("raw_data"), dict):
-        raw = alert["raw_data"]
-        severity = (
-            raw.get("severity")
-            or (raw.get("rule") or {}).get("severity")
-            or raw.get("kibana.alert.severity")
-        )
-    return str(severity or "").lower() == "critical"
+    critical: set = set()
+    for alert in alerts or []:
+        # ElasticsearchAlert dataclass has a flat ``severity`` field
+        # parsed from whichever raw shape the producer used. Belt-and-
+        # braces: also walk raw_data in case the parser missed it.
+        sev = getattr(alert, "severity", None)
+        if not sev:
+            raw = getattr(alert, "raw_data", None) or {}
+            if isinstance(raw, dict):
+                sev = (
+                    raw.get("severity")
+                    or (raw.get("rule") or {}).get("severity")
+                    or raw.get("kibana.alert.severity")
+                    or raw.get("event", {}).get("severity")
+                )
+        if str(sev or "").lower() == "critical":
+            aid = getattr(alert, "id", None)
+            if aid:
+                critical.add(aid)
+    return critical
 
 
 def run_ticker_once(session: Session) -> Dict[str, Any]:
@@ -135,9 +141,16 @@ def run_ticker_once(session: Session) -> Dict[str, Any]:
         len(stuck), threshold_min,
     )
 
+    # v0.19.6: classify all stuck rows in one batched ES call, not one
+    # call per row (which also relied on a method that doesn't exist).
+    critical_ids = _critical_alert_ids_batch(
+        es_service, [t.es_alert_id for t in stuck]
+    )
+    logger.info("Ticker tick: %d of %d are critical", len(critical_ids), len(stuck))
+
     created = 0
     for triage in stuck:
-        if not _alert_is_critical(es_service, triage.es_alert_id):
+        if triage.es_alert_id not in critical_ids:
             continue
         existing = (
             session.query(Ticker)

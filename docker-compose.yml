@@ -98,7 +98,7 @@ services:
     # build: .  # Uncomment to build from source instead of pulling
 
 
-    image: ixion36/ion:${ION_VERSION:-0.11.21}
+    image: ixion36/ion:${ION_VERSION:-0.19.5}
 
     container_name: ion
     restart: unless-stopped
@@ -219,8 +219,11 @@ services:
       # you run a larger chat model (llama3.1:70b ≈ 40GB) AND have RAM
       # budget for both simultaneously.
       - OLLAMA_MAX_LOADED_MODELS=${OLLAMA_MAX_LOADED_MODELS:-2}
-      # Keep model in memory longer to reduce reload times
-      - OLLAMA_KEEP_ALIVE=30m
+      # Keep model in memory longer to reduce reload times.
+      # v0.19.5: -1 means "never unload" — eliminates cold-start tax on
+      # the investigation queue (intermittent alerts can sit longer than
+      # 30m between runs and re-pay the model-load on every wake).
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:--1}
 
     # Resource limits - adjust based on available RAM
     # For 32GB system, can increase to 16-20GB
@@ -254,7 +257,7 @@ services:
   seeder:
 
 
-    image: ixion36/ion:${ION_VERSION:-0.11.21}
+    image: ixion36/ion:${ION_VERSION:-0.19.5}
 
     container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]
