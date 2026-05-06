@@ -123,16 +123,19 @@ def dismiss_ticker(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
-    """Per-user dismiss. Critical tickets cannot be dismissed — they
-    resolve automatically when the underlying condition clears."""
+    """v0.19.13: per-user dismiss for any ticker, including critical.
+
+    Was previously 403 for critical-severity rows on the theory that
+    critical events shouldn't be ignorable. In practice it left
+    analysts with no way to clear the strip when they'd already
+    triaged a known FP cluster — they had to case every alert. Since
+    dismiss is per-user and critical tickers also still auto-resolve
+    when the underlying alert is cased, peer-analyst visibility is
+    preserved.
+    """
     ticker = session.get(Ticker, ticker_id)
     if not ticker:
         raise HTTPException(status_code=404, detail="Ticker not found")
-    if ticker.severity == TickerSeverity.CRITICAL.value:
-        raise HTTPException(
-            status_code=403,
-            detail="Critical tickers cannot be dismissed — they auto-resolve",
-        )
     existing = (
         session.query(TickerDismissal)
         .filter(

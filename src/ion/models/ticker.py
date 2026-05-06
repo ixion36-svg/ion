@@ -119,8 +119,18 @@ class Ticker(Base, TimestampMixin):
 
     @property
     def is_dismissable(self) -> bool:
-        """Critical tickers can't be dismissed — they resolve automatically."""
-        return self.severity != TickerSeverity.CRITICAL
+        """v0.19.13: all tickers are per-user dismissable.
+
+        Was previously gated to non-critical only on the theory that
+        critical events shouldn't be ignorable. In practice this just
+        meant analysts couldn't clear the strip until they cased every
+        flagged alert — even when they'd already triaged a known FP
+        cluster. Per-user dismiss only hides the ticker from THIS
+        user's strip; the row stays in the DB and peer analysts still
+        see it, so the safety story holds. Critical tickers also still
+        auto-resolve once the underlying alert is cased.
+        """
+        return True
 
 
 class TickerDismissal(Base):

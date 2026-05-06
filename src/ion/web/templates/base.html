@@ -238,9 +238,10 @@
                 if (!items.length) { strip.innerHTML = ''; strip.style.display = 'none'; return; }
                 strip.innerHTML = items.map(t => {
                     const link = t.link_url ? `<a href="${esc(t.link_url)}">open</a>` : '';
-                    const dismiss = t.severity === 'critical'
-                        ? ''
-                        : `<button class="ion-ticker-dismiss" data-id="${t.id}" onclick="ionDismissTicker(${t.id})">Dismiss</button>`;
+                    // v0.19.13: critical tickers are now per-user dismissable
+                    // too. Auto-resolve still kicks in once the underlying
+                    // alert is cased, so the operational visibility stays.
+                    const dismiss = `<button class="ion-ticker-dismiss" data-id="${t.id}" onclick="ionDismissTicker(${t.id})">Dismiss</button>`;
                     const body = t.body ? `<span class="ion-ticker-body">${esc(t.body)}</span>` : '';
                     return `<div class="ion-ticker-item severity-${esc(t.severity)}">
                         <span class="ion-ticker-title">${esc(t.title)}</span>
