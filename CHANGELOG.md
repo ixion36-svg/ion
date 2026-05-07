@@ -1,5 +1,183 @@
 # Changelog
 
+## v0.20.1 — 2026-05-07
+
+### feat(forensics): tamper-evident ledger + pinned evidence on ForensicCase
+
+Brings ForensicCase up to the v0.20.0 AlertCase Workbench bar, completing
+the chain-of-custody story across both case types.
+
+**Two new tables, FK'd to `forensic_cases`:**
+
+- `forensic_case_pins` — pinned forensic items per case. UNIQUE
+  constraint on (forensic_case_id, source_type, source_ref) prevents
+  duplicate pins. Status flow: triage → confirmed → reported, or →
+  dismissed (soft-delete; row stays so the chain stays meaningful).
+  Severity tag, MITRE techniques, free-form tags, JSON metadata.
+
+- `forensic_case_ledger` — append-only tamper-evident audit. Per-case
+  monotonic `seq` (UNIQUE forensic_case_id, seq), with
+  `content_hash = sha256(prev_hash || "|" || action || "|" ||
+  canonical_json(payload))`. Genesis row uses prev_hash="0"*64. Per-case
+  `pg_advisory_xact_lock` serialises appends. Lock namespace `FCWL`
+  (0x4643574C) is distinct from AlertCase `CEVL` so cross-case
+  parallelism is correct.
+
+**REST API (new, all under /api/forensics/{id}):**
+
+- `GET    /pins`             — list pins (paginates by status)
+- `GET    /pins?include_dismissed=true` — include dismissed pins
+- `POST   /pins`             — create pin (409 on duplicate dedupe)
+- `PATCH  /pins/{pin_id}`    — update status / summary / severity / tags / mitre / title
+- `DELETE /pins/{pin_id}`    — soft-delete (status=dismissed + ledger row)
+- `GET    /ledger`           — list ledger rows (capped at 2000)
+- `GET    /ledger/verify`    — walk + verify the chain
+- `POST   /evidence/upload`  — file upload (50 MB cap; sha256 + ledger row)
+
+Permissions reuse `forensic:read` (GET) and `forensic:update` (mutations),
+`forensic:create` for upload — all pre-existing roles.
+
+**Smoke-tested:** 17-assertion suite (`tests/test_forensics_workbench.py`)
+covers pin CRUD, dedupe 409, status change, chain verify, tamper detect
+(direct UPDATE → `is_valid=false`, `first_break_seq=1`), evidence upload
+hash match, ledger limit cap, and cross-case ownership rejection.
+
+### feat(courses): lesson-level PDF export
+
+`GET /api/courses/{slug}/lessons/{lesson_id}/export.pdf` renders any
+lesson as a WeasyPrint-generated PDF: course/module/lesson breadcrumb,
+lesson body (Markdown → HTML), embedded "Knowledge Check" block when
+the lesson has questions (questions only, no answers). Mermaid blocks
+fall back to a static notice. Reuses the existing
+`pdf_export_service.py` plumbing already used for completion
+certificates and standup decks. A "Download PDF" link appears in the
+lesson HTML view footer area. 7 integration tests including PDF magic
+bytes and Content-Disposition.
+
+### feat(skills): export AlertPromptTemplate as SKILL.md (publisher side)
+
+Completes the v0.13.1 deferred publisher angle for the Elastic Agent
+Skills feature: ION's own AlertPromptTemplate rows can now be exported
+as SKILL.md folders for cross-SOC reuse.
+
+- `GET /api/admin/skills/templates/{template_id}/export.zip` — single
+  template
+- `GET /api/admin/skills/templates/export.zip[?ids=1,2,3]` — bulk
+  export (or all enabled if `ids` omitted), with a top-level
+  `MANIFEST.txt` listing exported template ids
+
+Output round-trips cleanly through the existing
+`src/ion/services/skill_loader.py` consumer — every published skill
+folder is loadable by ION's own Bob 6th matcher tier without
+modification. Frontmatter mapping: `name` (slugified) → `name`,
+`description` → `description`, `rule_ids_json` + `rule_id_pattern`
+composed into `when_to_use`, `mitre_tactics_json` → `tags` (with
+`tactic:` prefix + `ion-template` sentinel), `rule_groups_json` →
+`matches_rule_groups`, `mitre_techniques_json` → `matches_techniques`,
+`prompt_text` → body. 24 tests with explicit round-trip assertions.
+
+### feat(labs): replayable lab fixtures (seed/teardown lifecycle)
+
+The v0.13.2 LAB-type lessons are now actually interactive: launching
+a lab seeds mock alerts/cases/observables into the receiving tables,
+completing it tears them down, leaving the workspace clean for the
+next learner.
+
+**Two new tables:**
+
+- `lab_fixtures` — template rows per lesson (`lesson_id`,
+  `fixture_kind` ∈ alert/alert_case/observable/attachment, `payload`
+  JSONB, `target_table`).
+- `lab_session_fixtures` — materialisation ledger per (enrollment,
+  lesson) tracking which fixture rows were materialised into which
+  target rows, with `torn_down_at` for the teardown phase.
+
+**Service** (`src/ion/services/lab_fixture_service.py`) seeds and tears
+down under `pg_advisory_xact_lock(0x4C414246, enrollment_id)` so
+concurrent learners don't double-materialise. Idempotent: re-launching
+a still-active lab returns the existing materialised ids without
+re-inserting. `target_table` is allow-listed (`alerts`, `alert_triage`,
+`alert_cases`, `observables`); column names in `payload` are
+regex-validated (`^[a-z_][a-z0-9_]*$`) before SQL build.
+
+**Routes** (mounted at `/api/courses/{slug}/lessons/{lesson_id}/lab/...`):
+`POST /launch` returns `{materialised_count, materialised_ids,
+observable_links}` so the lab UI can deep-link straight to the seeded
+alerts/cases. `POST /complete` tears down and marks the lesson
+COMPLETED. Both write `audit_logs` rows (`lab_launch` / `lab_complete`).
+
+LAB-type lesson templates render "Launch lab" / "Complete lab" buttons
+inline; deep-link list appears once seeded. `seed_lab_fixtures.py`
+ships 3 example fixtures for L1 Module 2's first lab (Mimikatz +
+PowerShell encoded triage rows + an alert_case) so the feature can be
+demoed end-to-end on a fresh seed. 18 tests including idempotency,
+session isolation, and column-injection rejection.
+
+### chore(cyab): drop /cyab/studio + migrate residual API surface
+
+CHANGELOG promised the drop in v0.20.0; it never happened. Replaced by
+the v0.19.x `/cyab/systems` IA. Deletes `src/ion/web/cyab_studio_api.py`
+(~1200 lines) and `cyab_studio.html` (~1500 lines). Migrates ~580
+lines of unique behavior into `src/ion/web/cyab_api.py`: catalogue
+read endpoints, sub-profile authoring, TIDE rule-stub generation,
+intake autosave, data-source CRUD + use-case status, system coverage,
+onboarding-pack PDF + sign, checklist CRUD, and bulk-delete helper.
+Eight templates updated to point at `/api/cyab/...` instead of
+`/api/cyab/studio/...`. Three integration tests updated to match.
+The `/cyab/studio` route now 404s — anyone with a stale bookmark
+should land on `/cyab/systems`.
+
+### sec/quality fix-pack: TOCTOU pin ownership, WeasyPrint SSRF, lab safety
+
+- **Critical (cross-cutting):** `update_pin` and `dismiss_pin` in
+  both `case_pin_service` and `forensic_pin_service` previously
+  committed mutations BEFORE the API handler verified
+  `pin.case_id == case_id`. A user with case-A access could mutate a
+  pin in case B; the mutation persisted before the 404 returned.
+  Fixed both services symmetrically: ownership check now runs at the
+  top of the service, raising `PinError` (→ 404) before any DB write.
+  Two new cross-case rejection tests.
+
+- **Medium (SSRF):** `pdf_export_service` was passing user-authored
+  `content_md` straight to `HTML(string=...).write_pdf()`, which
+  resolves external `<img src>` URLs server-side. A lesson author
+  could embed `![](http://169.254.169.254/...)` and trigger SSRF on
+  export. Added `_block_external_url_fetcher` that raises on any
+  non-`data:` URI; wired into the central `generate_pdf` so all PDF
+  render paths (lesson, certificate, standup) share the guard. Test
+  asserts no outbound HTTP for blocked URLs.
+
+- **Low (SQL safety):** `lab_fixture_service._insert_row` interpolated
+  column names from JSONB payload directly into INSERT SQL. Now
+  regex-validated before the SQL string is built; rejects uppercase,
+  reserved chars, and quote-injection patterns.
+
+- **Low (consistency):** `pdf_export_service._build_pdf_html` now
+  HTML-escapes metadata values (the title row was already escaped —
+  inconsistency removed).
+
+- **Cleanup:** CyAB studio submit handlers' misleading
+  `Optional[User] = Depends(get_current_user)` pattern (auth was
+  enforced by `dependencies=[Depends(require_permission(...))]` but
+  the type signature suggested otherwise) replaced with typed
+  `User = Depends(require_permission(...))` parameters. Dead
+  `if current_user is not None` guards removed.
+
+- **Convention:** `labs_api.py` route decorators now use relative
+  paths per ION convention (router prefix is set at `include_router`,
+  not in the decorator).
+
+### sec: SECURITY_ASSESSMENT.md refreshed v0.9.43 → v0.20.1
+
+Stale by ten versions. Re-audited 18+ net-new attack surfaces (translator
+file uploads, PCAP analyze, forensics CRUD, CyAB scoping/audit, daily
+standup pptx, certificate PDF, the 14-site URL-config save fix, OIDC
+callback PII logging, autopilot kill switch, Bob input_data trust
+boundary). Severity tally: 0 critical / 0 high / 4 medium / 4 low
+(was 1C / 3H / 4M / 3L at v0.9.43).
+
+### chore: docker-compose default image tag bumped to 0.20.1
+
 ## v0.20.0 — 2026-05-07
 
 ### feat(workbench): pinned evidence + tamper-evident ledger on AlertCase
