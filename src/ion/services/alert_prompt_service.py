@@ -2637,6 +2637,308 @@ _DEFAULT_TEMPLATES: list[dict] = [
             "recommended_actions",
         ],
     },
+    # ---------------------------------------------------------------------------
+    # ESXi ATT&CK v17 detection pack — T1675, T1059.012, T1505.006, T1673
+    # ---------------------------------------------------------------------------
+    {
+        "name": "ESXi Administration Command",
+        "description": (
+            "Investigation guide for ESXi administration API/SDK abuse "
+            "(T1675). Adversaries use vSphere Web Services SDK calls such as "
+            "StartProgramInGuest and ListProcessesInGuest to execute commands "
+            "on guest VMs without touching the guest OS network stack."
+        ),
+        "priority": 30,
+        "severity_hint": "high",
+        "prompt_text": (
+            "ESXi hypervisors have been a primary ransomware target since "
+            "2023, with groups such as Akira, Black Basta, and Royal "
+            "deliberately staging on vCenter to achieve mass encryption of "
+            "guest VMDK files in a single operation. T1675 covers abuse of "
+            "the vSphere Web Services SDK (SOAP API) to execute guest "
+            "programs via `StartProgramInGuest` and enumerate them via "
+            "`ListProcessesInGuest` — entirely over the management plane, "
+            "bypassing guest-OS EDR agents.\n\n"
+            "**Investigation steps:**\n"
+            "1. Confirm the alert source host is an ESXi node or vCenter "
+            "appliance (`host.os.platform: linux` AND `host.hostname` "
+            "matching your hypervisor inventory).\n"
+            "2. Identify the calling account in `user.name` / "
+            "`winlog.event_data.SubjectUserName` — service accounts should "
+            "not invoke `StartProgramInGuest` outside a scheduled task "
+            "window.\n"
+            "3. Correlate with vSphere API audit logs: search for "
+            "`VirtualMachine.guest.executeInGuest` privilege records within "
+            "the same 5-minute window.\n"
+            "4. Pivot on source IP in `source.ip` — is it a known admin "
+            "jump-host or an unexpected subnet?\n"
+            "5. Check for follow-on T1486 (data encrypted) within 30 "
+            "minutes: `event.action: file_rename` on `.vmdk` or `.vmx` "
+            "paths.\n\n"
+            "**Sample EQL stub (Elastic Security):**\n"
+            "```\n"
+            "process where host.os.platform == \"linux\"\n"
+            "  and process.parent.name == \"vmware-vmx\"\n"
+            "  and process.name in (\"sh\", \"bash\", \"python3\", \"perl\")\n"
+            "```\n\n"
+            "**Sample KQL pivot (Kibana Discover):**\n"
+            "```\n"
+            "host.os.platform: linux AND process.parent.name: vmware-vmx "
+            "AND process.name: (sh OR bash OR python3)\n"
+            "```\n\n"
+            "Adversary indicators: unexpected child processes of `vmware-vmx`, "
+            "guest-exec calls originating from a non-vCenter IP, use of "
+            "`vim-cmd vmsvc/` against all registered VMs in rapid succession. "
+            "Assign verdict per Output Contract."
+        ),
+        "investigation_checklist_text": (
+            "- Is the source IP a known vCenter/admin host or an unexpected "
+            "address?\n"
+            "- Which VM guest(s) were targeted by `StartProgramInGuest`?\n"
+            "- What command/binary was invoked in the guest — encoded or "
+            "plaintext?\n"
+            "- Did `ListProcessesInGuest` precede execution (reconnaissance "
+            "pattern)?\n"
+            "- Any ESXi shell login (`esxcli` / `vim-cmd`) by the same "
+            "account in the same window?\n"
+            "- Were VMDK files renamed or written shortly after (T1486 "
+            "pivot)?\n"
+            "- Is this account's vSphere role scoped to least privilege or "
+            "full admin?"
+        ),
+        "expected_outputs": [
+            "source_account_context",
+            "guest_exec_detail",
+            "lateral_movement_indicators",
+            "ransomware_staging_risk",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Hypervisor CLI Execution",
+        "description": (
+            "Investigation guide for ESXi hypervisor CLI abuse (T1059.012). "
+            "Covers `esxcli`, `vim-cmd`, `esxcfg-*`, and direct DCUI shell "
+            "commands used by adversaries to manage VMs, disable firewall, "
+            "or drop persistence scripts."
+        ),
+        "priority": 15,
+        "severity_hint": "high",
+        "prompt_text": (
+            "ESXi ransomware operators routinely enable the ESXi Shell "
+            "(disabled by default in hardened deployments) to run `esxcli` "
+            "and `vim-cmd` bulk operations — shutting down all guest VMs "
+            "before encrypting VMDK files, or deploying backdoors via "
+            "the `/etc/rc.local.d/` startup path. T1059.012 was formalised "
+            "in ATT&CK v17 specifically to capture this TTP observed across "
+            "Royal, Akira, and ESXiArgs campaigns in 2024-2025.\n\n"
+            "**Investigation steps:**\n"
+            "1. Verify ESXi Shell is/was enabled: check syslog for "
+            "`DCUI: shell enabled` or `esxshell` service start events.\n"
+            "2. Examine `process.name` and `process.command_line` for "
+            "hypervisor management binaries:\n"
+            "   - `vim-cmd vmsvc/power.off` / `vmsvc/getallvms` (mass "
+            "power-off before encryption)\n"
+            "   - `esxcli vm process list` (VM enumeration — pairs with "
+            "T1673)\n"
+            "   - `esxcli network firewall set --enabled false` (defense "
+            "evasion)\n"
+            "   - `esxcfg-firewall -d` (legacy firewall disable)\n"
+            "3. Check parent process: legitimate ESXi management sessions "
+            "have `sshd` → `sh` → `esxcli`; anomalous paths include "
+            "web-server workers as parent.\n"
+            "4. Look for file writes to `/etc/rc.local.d/` or `/store/` "
+            "within the same session (T1505.006 pivot).\n\n"
+            "**Sample EQL stub:**\n"
+            "```\n"
+            "process where host.os.platform == \"linux\"\n"
+            "  and process.name : (\"vim-cmd\", \"esxcli\", \"esxcfg-*\",\n"
+            "                      \"esxcfg-firewall\", \"esxcfg-vmknic\")\n"
+            "  and not process.parent.name in (\"cron\", \"init\")\n"
+            "```\n\n"
+            "**Sample KQL:**\n"
+            "```\n"
+            "host.os.platform: linux AND "
+            "process.name: (vim-cmd OR esxcli OR esxcfg-*)\n"
+            "```\n\n"
+            "This template carries priority 15 so it wins tier-3 matching "
+            "over all generic T1059 templates. Assign verdict per Output "
+            "Contract; escalate immediately if `vim-cmd vmsvc/power.off` "
+            "is confirmed."
+        ),
+        "investigation_checklist_text": (
+            "- Was ESXi Shell enabled immediately before the event? Who "
+            "enabled it?\n"
+            "- Which hypervisor CLI binary was used "
+            "(`vim-cmd`/`esxcli`/`esxcfg-*`)?\n"
+            "- What exact arguments were passed — bulk power-off, firewall "
+            "disable, or file staging?\n"
+            "- Is the SSH source IP a known management host?\n"
+            "- Any writes to `/etc/rc.local.d/` or `/store/` in the same "
+            "session (VIB/backdoor staging)?\n"
+            "- Were all guest VMs powered off before this event (ransomware "
+            "pre-encryption step)?\n"
+            "- Cross-check T1673 (VM enumeration) in the 10 minutes prior."
+        ),
+        "expected_outputs": [
+            "shell_enable_timeline",
+            "cli_command_analysis",
+            "firewall_state_change",
+            "persistence_drop_risk",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "vSphere Installation Bundle (VIB)",
+        "description": (
+            "Investigation guide for malicious VIB persistence (T1505.006). "
+            "Adversaries install unsigned or community-accepted VIBs to "
+            "deploy backdoors, reverse shells, or credential harvesters that "
+            "survive ESXi reboots via startup tasks and firewall rules."
+        ),
+        "priority": 20,
+        "severity_hint": "critical",
+        "prompt_text": (
+            "VIB-based persistence was used in the UNC3886 / VMware ESXi "
+            "zero-day campaign (CVE-2023-34048) and is now a standard TTP "
+            "in post-exploitation toolkits targeting hypervisor "
+            "infrastructure. A malicious VIB can open reverse-shell "
+            "listeners, create privileged service accounts, and add firewall "
+            "rules that persist across reboots — making remediation "
+            "significantly harder than guest-OS persistence.\n\n"
+            "**Investigation steps:**\n"
+            "1. Capture the VIB name, vendor, and acceptance level from the "
+            "alert or from the host: `esxcli software vib list | grep "
+            "-v VMware`.\n"
+            "2. Check acceptance level — `CommunitySupported` or "
+            "`PartnerSupported` vibs installed outside a change window are "
+            "high-confidence malicious.\n"
+            "3. Inspect installed files: `esxcli software vib get -n "
+            "<name>` reveals payload paths. Common backdoor locations: "
+            "`/bin/`, `/sbin/`, `/etc/rc.local.d/`.\n"
+            "4. Examine the VIB's embedded firewall rules: did it open an "
+            "inbound port not present in the baseline ruleset?\n"
+            "5. Extract and hash VIB payload binaries; pivot to VirusTotal "
+            "and internal threat-intel (TIDE/OpenCTI) for known backdoor "
+            "families (vmtool backdoor, VIRTUALPITA, VIRTUALPIE).\n"
+            "6. Identify the install account and method: `esxcli software "
+            "vib install` requires root — correlate with T1059.012 ESXi "
+            "shell session.\n\n"
+            "**Sample EQL stub:**\n"
+            "```\n"
+            "process where host.os.platform == \"linux\"\n"
+            "  and process.name == \"esxcli\"\n"
+            "  and process.args : (\"software\", \"vib\", \"install\")\n"
+            "```\n\n"
+            "**Sample KQL:**\n"
+            "```\n"
+            "host.os.platform: linux AND process.name: esxcli "
+            "AND process.args: install AND process.args: vib\n"
+            "```\n\n"
+            "Adversary families: VIRTUALPITA (port 7475 listener), "
+            "VIRTUALPIE (Python reverse shell), tpnfc backdoor. Assign "
+            "verdict per Output Contract; treat any unsigned VIB installed "
+            "outside change management as true_positive pending refutation."
+        ),
+        "investigation_checklist_text": (
+            "- What is the VIB name, vendor string, and acceptance level?\n"
+            "- Was the install within an approved change window?\n"
+            "- Which account executed the `esxcli software vib install` "
+            "command?\n"
+            "- What files does the VIB payload place on the filesystem?\n"
+            "- Does the VIB add firewall rules or startup tasks?\n"
+            "- Hash the payload binaries and check VirusTotal / TIDE / "
+            "OpenCTI.\n"
+            "- Does the host have a known vulnerability "
+            "(CVE-2023-34048 / CVE-2021-21985) that enabled the install?\n"
+            "- Is the ESXi host isolated from vCenter management plane "
+            "pending forensics?"
+        ),
+        "expected_outputs": [
+            "vib_metadata",
+            "payload_file_inventory",
+            "firewall_rule_delta",
+            "threat_intel_match",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Virtual Machine Discovery",
+        "description": (
+            "Investigation guide for hypervisor VM enumeration (T1673). "
+            "Adversaries enumerate all registered VMs on an ESXi host "
+            "using `esxcli vm process list`, `vim-cmd vmsvc/getallvms`, or "
+            "vSphere API calls as a prerequisite to mass power-off and "
+            "ransomware encryption."
+        ),
+        "priority": 35,
+        "severity_hint": "medium",
+        "prompt_text": (
+            "VM discovery is a near-universal first step in ESXi-targeting "
+            "ransomware operations: the adversary must know the full VM "
+            "inventory to power off all guests before encrypting VMDK files "
+            "on the datastore (encrypted-while-running VMs corrupt the disk "
+            "image, reducing ransom payment likelihood). Campaigns including "
+            "Akira, LockBit ESXi, and BlackMatter all exhibit this pattern "
+            "within seconds of obtaining ESXi shell access.\n\n"
+            "**Investigation steps:**\n"
+            "1. Identify the enumeration command: `esxcli vm process list`, "
+            "`vim-cmd vmsvc/getallvms`, or vSphere API `RetrieveProperties` "
+            "on `VirtualMachine` objects.\n"
+            "2. Check timing: VM discovery within 60 seconds of an ESXi "
+            "shell login is a strong ransomware precursor indicator.\n"
+            "3. Correlate with T1059.012 — was `esxcli` or `vim-cmd` used "
+            "in the same shell session?\n"
+            "4. Look for immediate follow-on `vim-cmd vmsvc/power.off` or "
+            "`esxcli vm process kill` commands — these confirm ransomware "
+            "staging intent.\n"
+            "5. Enumerate affected datastores: which NFS/VMFS volumes are "
+            "accessible from this host and contain production VMDK files?\n"
+            "6. Assess blast radius: how many VMs were registered at the "
+            "time of enumeration?\n\n"
+            "**Sample EQL stub:**\n"
+            "```\n"
+            "process where host.os.platform == \"linux\"\n"
+            "  and (\n"
+            "    (process.name == \"esxcli\" and process.args : \"vm\")\n"
+            "    or (process.name == \"vim-cmd\" and\n"
+            "        process.args : \"vmsvc/getallvms\")\n"
+            "  )\n"
+            "```\n\n"
+            "**Sample KQL:**\n"
+            "```\n"
+            "host.os.platform: linux AND "
+            "(process.name: esxcli AND process.args: \"vm process list\") "
+            "OR (process.name: vim-cmd AND process.args: getallvms)\n"
+            "```\n\n"
+            "Adversary indicators: discovery immediately followed by "
+            "power-off commands, large VM counts in output (>20 suggests "
+            "production datastore), enumeration from a non-interactive "
+            "session (cron job or script). Assign verdict per Output "
+            "Contract; treat as true_positive if followed by power-off "
+            "within 2 minutes."
+        ),
+        "investigation_checklist_text": (
+            "- Which command was used for enumeration "
+            "(`esxcli vm process list` or `vim-cmd vmsvc/getallvms`)?\n"
+            "- How many VMs were present on the host at time of discovery?\n"
+            "- Was a power-off or process-kill command issued within 2 "
+            "minutes (ransomware staging)?\n"
+            "- What account ran the command — interactive SSH, cron, or "
+            "vSphere API?\n"
+            "- Did ESXi shell enable event precede this (T1059.012 chain)?\n"
+            "- Which datastores are mounted — are VMDK files at risk?\n"
+            "- Is vCenter / SRM able to recover these VMs from snapshots "
+            "or replication?"
+        ),
+        "expected_outputs": [
+            "vm_inventory_count",
+            "session_timeline",
+            "power_off_followon",
+            "datastore_blast_radius",
+            "recommended_actions",
+        ],
+    },
 ]
 
 
@@ -2856,6 +3158,23 @@ _TEMPLATE_MITRE_MAP: dict[str, dict[str, list[str]]] = {
     "Supply Chain — Malicious Package / Typosquat": {
         "techniques": ["T1195.002", "T1059", "T1552"],
         "tactics": ["TA0001", "TA0006"],
+    },
+    # ESXi ATT&CK v17 pack
+    "ESXi Administration Command": {
+        "techniques": ["T1675"],
+        "tactics": ["TA0002"],  # Execution
+    },
+    "Hypervisor CLI Execution": {
+        "techniques": ["T1059.012"],
+        "tactics": ["TA0002"],  # Execution
+    },
+    "vSphere Installation Bundle (VIB)": {
+        "techniques": ["T1505.006"],
+        "tactics": ["TA0003"],  # Persistence
+    },
+    "Virtual Machine Discovery": {
+        "techniques": ["T1673"],
+        "tactics": ["TA0007"],  # Discovery
     },
 }
 
