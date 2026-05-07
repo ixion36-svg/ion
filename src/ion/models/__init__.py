@@ -39,6 +39,15 @@ from ion.models.canary import Canary, CanaryHit, CanaryStatus, CanaryType
 # v0.10.4: case-similarity embeddings (pgvector-backed).
 from ion.models.case_embedding import CaseEmbedding  # noqa: F401
 
+# v0.20.0: Workbench — pinned evidence + tamper-evident ledger.
+from ion.models.case_evidence import (  # noqa: F401
+    CaseEvidenceLedger,
+    CaseEvidencePin,
+    FindingStatus,
+    PinSeverity,
+    PinSourceType,
+)
+
 # v0.11.2: L1/L2/L3/L4 SOC analyst training course subsystem.
 from ion.models.course import (  # noqa: F401
     Course,

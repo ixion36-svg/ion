@@ -55,6 +55,15 @@ from ion.services.kibana_sync_helpers import (
 from ion.services.observable_extractor import extract_observables_from_raw
 
 _rate_limit_enabled = _os.environ.get("ION_RATE_LIMIT_ENABLED", "true").lower() not in ("false", "0", "no")
+
+# v0.20.0: kill switch for the multi-alert pattern detector's auto-start
+# branch in /alerts/host-patterns. Defaults to OFF — analysts asked for
+# explicit "Start Playbook" clicks instead of surprise executions
+# appearing on the case timeline. Flip ION_AUTO_PLAYBOOK_ENABLED=true
+# in .env to restore the v0.19.x behaviour.
+_auto_playbook_enabled = _os.environ.get(
+    "ION_AUTO_PLAYBOOK_ENABLED", "false"
+).lower() in ("true", "1", "yes")
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["120/minute"],
@@ -8543,8 +8552,12 @@ async def get_host_patterns(
         pattern_data["execution"] = None
         pattern_data["auto_started"] = False
 
-        if playbook and pattern.auto_execute:
-            # Auto-start: pick the first matched alert as the representative
+        if playbook and pattern.auto_execute and _auto_playbook_enabled:
+            # Auto-start: pick the first matched alert as the representative.
+            # v0.20.0: gated on ION_AUTO_PLAYBOOK_ENABLED (default false).
+            # When the flag is off the matched playbook is still surfaced in
+            # `pattern_data["playbook"]` so the analyst can click Start
+            # Playbook themselves — no surprise executions on the timeline.
             representative_alert_id = pattern.matched_alerts[0].id if pattern.matched_alerts else None
             if representative_alert_id:
                 existing = repo.get_active_execution_for_alert(
