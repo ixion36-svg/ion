@@ -1,12 +1,13 @@
 {# Secondary tab strip rendered inside every CyAB page.
    Caller passes `active_tab` (string) to highlight one entry. #}
 {% set _tabs = [
-  ('overview',  'Overview',  '/cyab'),
-  ('systems',   'Systems',   '/cyab/systems'),
-  ('scoping',   'Scoping',   '/cyab/scoping'),
-  ('onboard',   'Onboard',   '/cyab/onboard'),
-  ('coverage',  'Coverage',  '/cyab/coverage'),
-  ('audit',     'Audit',     '/cyab/audit'),
+  ('overview',       'Overview',       '/cyab'),
+  ('systems',        'Systems',        '/cyab/systems'),
+  ('scoping',        'Scoping',        '/cyab/scoping'),
+  ('onboard',        'Onboard',        '/cyab/onboard'),
+  ('coverage',       'Coverage',       '/cyab/coverage'),
+  ('audit',          'Audit',          '/cyab/audit'),
+  ('attack_heatmap', 'ATT&CK Heatmap', '/cyab/attack-heatmap'),
 ] %}
 <nav class="cyab-section-nav flex gap-1 border-b border-slate-800 mb-4"
      data-active="{{ active_tab }}">

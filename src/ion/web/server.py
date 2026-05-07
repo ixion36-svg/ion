@@ -1487,6 +1487,170 @@ async def cyab_audit_page(
 
 
 # ---------------------------------------------------------------------------
+# CyAB MITRE ATT&CK Heatmap (v0.22.0)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/cyab/attack-heatmap", response_class=HTMLResponse)
+async def cyab_attack_heatmap_page(
+    request: Request,
+    rollup: str = "subtechnique",
+    tactic: str = "",
+    state: str = "",
+    system_id: str = "",
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """MITRE ATT&CK technique-coverage heatmap.
+
+    Renders a full-page grid of every technique, colour-coded by coverage
+    state. Filters (rollup, tactic, state) are ?param= GET parameters so
+    the form can GET-submit with no JS state.
+    """
+    from ion.core.config import get_config
+    from ion.services.mitre_heatmap_service import get_heatmap
+    from ion.storage.database import get_engine, get_session_factory
+
+    Session = get_session_factory(get_engine(get_config().db_path))
+    session = Session()
+    try:
+        sid: int | None = None
+        if system_id:
+            try:
+                sid = int(system_id)
+            except ValueError:
+                sid = None
+        heatmap = get_heatmap(session, system_id=sid)
+    finally:
+        session.close()
+
+    # Apply client-side filters before template render.
+    cells = heatmap["cells"]
+
+    if tactic:
+        cells = [c for c in cells if tactic in c["tactic_ids"]]
+
+    if state:
+        cells = [c for c in cells if c["cell_state"] == state]
+
+    if rollup == "parent":
+        cells = _rollup_to_parent(cells)
+
+    # Group by tactic for section headers.
+    tactic_groups = _group_by_tactic(cells)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="cyab/attack_heatmap.html",
+        context={
+            "heatmap": heatmap,
+            "cells": cells,
+            "tactic_groups": tactic_groups,
+            "summary": heatmap["summary"],
+            "user": user,
+            "active_tab": "attack_heatmap",
+            "filters": {
+                "rollup": rollup,
+                "tactic": tactic,
+                "state": state,
+                "system_id": system_id,
+            },
+        },
+    )
+
+
+def _rollup_to_parent(cells: list) -> list:
+    """Collapse sub-techniques to parent row, taking max cell_state."""
+    _state_rank = {
+        "not_covered_seen": 3,
+        "covered_exercised": 2,
+        "covered_not_exercised": 1,
+        "not_covered_not_seen": 0,
+    }
+    parent_map: dict = {}
+    standalone = []
+    for cell in cells:
+        tid = cell["technique_id"]
+        if "." in tid:
+            parent_id = tid.rsplit(".", 1)[0]
+            existing = parent_map.get(parent_id)
+            if existing is None or (
+                _state_rank.get(cell["cell_state"], 0)
+                > _state_rank.get(existing["cell_state"], 0)
+            ):
+                # Merge sub-technique counts onto parent placeholder.
+                merged = dict(cell)
+                merged["technique_id"] = parent_id
+                parent_map[parent_id] = merged
+            else:
+                # Accumulate counts onto winner.
+                existing["alert_case_count"] += cell["alert_case_count"]
+                existing["pin_count"] += cell["pin_count"]
+        else:
+            standalone.append(cell)
+
+    # Merge parent placeholders with any standalone parent cells.
+    by_id = {c["technique_id"]: c for c in standalone}
+    for parent_id, merged in parent_map.items():
+        if parent_id in by_id:
+            existing = by_id[parent_id]
+            existing["alert_case_count"] += merged["alert_case_count"]
+            existing["pin_count"] += merged["pin_count"]
+            if (
+                _state_rank.get(merged["cell_state"], 0)
+                > _state_rank.get(existing["cell_state"], 0)
+            ):
+                existing["cell_state"] = merged["cell_state"]
+        else:
+            by_id[parent_id] = merged
+
+    return sorted(by_id.values(), key=lambda c: c["technique_id"])
+
+
+def _group_by_tactic(cells: list) -> list:
+    """Return [{tactic_id, label, cells}, ...] grouped by first tactic_id."""
+    _TACTIC_LABELS = {
+        "TA0001": "Initial Access",
+        "TA0002": "Execution",
+        "TA0003": "Persistence",
+        "TA0004": "Privilege Escalation",
+        "TA0005": "Defense Evasion",
+        "TA0006": "Credential Access",
+        "TA0007": "Discovery",
+        "TA0008": "Lateral Movement",
+        "TA0009": "Collection",
+        "TA0010": "Exfiltration",
+        "TA0011": "Command and Control",
+        "TA0040": "Impact",
+        "TA0042": "Resource Development",
+        "TA0043": "Reconnaissance",
+    }
+    groups: dict = {}
+    uncategorized = []
+    for cell in cells:
+        tactic_ids = cell.get("tactic_ids") or []
+        if not tactic_ids:
+            uncategorized.append(cell)
+            continue
+        for tid in sorted(tactic_ids):
+            groups.setdefault(tid, []).append(cell)
+
+    result = []
+    for tid in sorted(groups.keys()):
+        result.append(
+            {
+                "tactic_id": tid,
+                "label": _TACTIC_LABELS.get(tid, tid),
+                "cells": groups[tid],
+            }
+        )
+    if uncategorized:
+        result.append(
+            {"tactic_id": "", "label": "Uncategorized", "cells": uncategorized}
+        )
+    return result
+
+
+# ---------------------------------------------------------------------------
 # CyAB Onboarding Wizard (Sub-plan B / Task 3)
 # ---------------------------------------------------------------------------
 

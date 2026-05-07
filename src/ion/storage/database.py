@@ -105,7 +105,7 @@ def advisory_lock(engine: Engine, lock_id: int, *, hold_until_close: bool = Fals
       module state and never closed for the worker's lifetime. Subsequent
       workers see the lock as held and skip permanently. Use this for
       single-instance background loops (TIDE bg sync, Analytics loop, etc.)
-      so we don't end up with 4× duplicate background tasks. The lock
+      so we don't end up with 4x duplicate background tasks. The lock
       auto-releases on connection drop, so a worker crash hands ownership
       to a sibling worker on the next restart cycle.
     """
@@ -997,6 +997,69 @@ def _run_migrations(engine: Engine) -> None:
                     "ALTER TABLE bob_eval_runs ADD COLUMN skipped_count INTEGER NOT NULL DEFAULT 0"
                 ))
                 logger.info("Migrated: bob_eval_runs.skipped_count")
+
+
+    # v0.22.0 Feature B: alert_case_annotations -- timestamped timeline annotations.
+    # Base.metadata.create_all() handles fresh deploys; this block upgrades
+    # existing databases idempotently.
+    if not insp.has_table('alert_case_annotations'):
+        dt = 'TIMESTAMP' if _is_postgres(engine) else 'DATETIME'
+        pk_def = 'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'
+        with engine.begin() as conn:
+            conn.execute(text(
+                f'CREATE TABLE alert_case_annotations ('
+                f'    id INTEGER PRIMARY KEY {pk_def},'
+                f'    alert_case_id INTEGER NOT NULL'
+                f'        REFERENCES alert_cases(id) ON DELETE CASCADE,'
+                f'    created_by_id INTEGER NOT NULL REFERENCES users(id),'
+                f'    timeline_ts {dt} NOT NULL,'
+                f'    body TEXT NOT NULL CHECK (length(body) > 0),'
+                f'    created_at {dt} NOT NULL DEFAULT CURRENT_TIMESTAMP,'
+                f'    updated_at {dt} NOT NULL DEFAULT CURRENT_TIMESTAMP,'
+                f'    deleted_at {dt}'
+                f')'
+            ))
+            conn.execute(text(
+                'CREATE INDEX ix_aca_case ON alert_case_annotations (alert_case_id)'
+            ))
+            conn.execute(text(
+                'CREATE INDEX ix_aca_created_by ON alert_case_annotations (created_by_id)'
+            ))
+            conn.execute(text(
+                'CREATE INDEX ix_aca_timeline_ts '
+                'ON alert_case_annotations (alert_case_id, timeline_ts)'
+            ))
+            logger.info('Migrated: CREATE TABLE alert_case_annotations')
+
+    # v0.22.0 Feature B: forensic_case_annotations -- mirror for ForensicCase.
+    if not insp.has_table('forensic_case_annotations'):
+        dt = 'TIMESTAMP' if _is_postgres(engine) else 'DATETIME'
+        pk_def = 'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'
+        with engine.begin() as conn:
+            conn.execute(text(
+                f'CREATE TABLE forensic_case_annotations ('
+                f'    id INTEGER PRIMARY KEY {pk_def},'
+                f'    forensic_case_id INTEGER NOT NULL'
+                f'        REFERENCES forensic_cases(id) ON DELETE CASCADE,'
+                f'    created_by_id INTEGER NOT NULL REFERENCES users(id),'
+                f'    timeline_ts {dt} NOT NULL,'
+                f'    body TEXT NOT NULL CHECK (length(body) > 0),'
+                f'    created_at {dt} NOT NULL DEFAULT CURRENT_TIMESTAMP,'
+                f'    updated_at {dt} NOT NULL DEFAULT CURRENT_TIMESTAMP,'
+                f'    deleted_at {dt}'
+                f')'
+            ))
+            conn.execute(text(
+                'CREATE INDEX ix_fca_case ON forensic_case_annotations (forensic_case_id)'
+            ))
+            conn.execute(text(
+                'CREATE INDEX ix_fca_created_by ON forensic_case_annotations (created_by_id)'
+            ))
+            conn.execute(text(
+                'CREATE INDEX ix_fca_timeline_ts '
+                'ON forensic_case_annotations (forensic_case_id, timeline_ts)'
+            ))
+            logger.info('Migrated: CREATE TABLE forensic_case_annotations')
 
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
