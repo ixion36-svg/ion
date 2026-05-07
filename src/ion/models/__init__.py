@@ -54,6 +54,9 @@ from ion.models.forensic_workbench import (  # noqa: F401
     ForensicCasePin,
 )
 
+# v0.21.0: Bob Prompt Evaluation Harness — per-template P/R/F1 runs.
+from ion.models.bob_eval import BobEvalRun, BobEvalRunSample  # noqa: F401
+
 # v0.11.2: L1/L2/L3/L4 SOC analyst training course subsystem.
 from ion.models.course import (  # noqa: F401
     Course,
