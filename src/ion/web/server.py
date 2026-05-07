@@ -54,6 +54,7 @@ from ion.web.change_log_api import router as change_log_router
 from ion.web.comm_template_api import router as comm_template_router
 from ion.web.compliance_api import router as compliance_router
 from ion.web.course_api import router as course_router
+from ion.web.labs_api import router as labs_router
 from ion.web.cyab_api import router as cyab_router
 from ion.web.cyab_studio_api import router as cyab_studio_router
 from ion.web.cyber_range_api import router as cyber_range_router
@@ -333,6 +334,8 @@ app.include_router(alert_prompt_router, prefix="")
 app.include_router(story_router, prefix="")
 # v0.11.2 — L1/L2/L3 SOC training course subsystem
 app.include_router(course_router, prefix="")
+# v0.21.0 — Lab fixture launch/complete lifecycle
+app.include_router(labs_router, prefix="")
 app.include_router(tuning_proposal_router, prefix="")
 app.include_router(ticker_router, prefix="")
 app.include_router(investigation_memory_router)
