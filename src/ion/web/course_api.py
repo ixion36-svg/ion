@@ -1390,10 +1390,22 @@ def course_detail_page(
 
 @router.get("/lessons/{lesson_id}", response_class=HTMLResponse)
 def lesson_page(
-    lesson_id: int, request: Request, _user: User = Depends(require_page_auth),
+    lesson_id: int,
+    request: Request,
+    _user: User = Depends(require_page_auth),
+    session: Session = Depends(get_db_session),
 ):
+    # Resolve course slug so the template can build lab launch/complete URLs.
+    course_slug = ""
+    lesson = session.get(Lesson, lesson_id)
+    if lesson and lesson.module and lesson.module.course_id:
+        course = session.get(Course, lesson.module.course_id)
+        if course:
+            course_slug = course.slug or ""
     return _templates.TemplateResponse(
-        request=request, name="lesson.html", context={"lesson_id": lesson_id},
+        request=request,
+        name="lesson.html",
+        context={"lesson_id": lesson_id, "course_slug": course_slug},
     )
 
 
