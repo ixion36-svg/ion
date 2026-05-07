@@ -820,6 +820,52 @@ def _run_migrations(engine: Engine) -> None:
                     )
                     logger.info("Migrated: investigations.%s", col_name)
 
+    # v0.21.0: lab_fixtures + lab_session_fixtures for replayable labs.
+    # lab_fixtures holds the template rows (what to seed for a lesson).
+    # lab_session_fixtures tracks which rows were materialised per-enrolment
+    # so teardown only removes the session's own data.
+    if not insp.has_table("lab_fixtures"):
+        json_type = "JSONB" if _is_postgres(engine) else "JSON"
+        with engine.begin() as conn:
+            conn.execute(text(f"""
+                CREATE TABLE lab_fixtures (
+                    id INTEGER PRIMARY KEY {'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'},
+                    lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+                    fixture_kind VARCHAR(32) NOT NULL,
+                    payload {json_type} NOT NULL,
+                    target_table TEXT NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX ix_lab_fixtures_lesson ON lab_fixtures (lesson_id)"
+            ))
+            logger.info("Migrated: CREATE TABLE lab_fixtures")
+
+    if not insp.has_table("lab_session_fixtures"):
+        with engine.begin() as conn:
+            conn.execute(text(f"""
+                CREATE TABLE lab_session_fixtures (
+                    id INTEGER PRIMARY KEY {'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'},
+                    enrollment_id INTEGER NOT NULL REFERENCES course_enrolments(id) ON DELETE CASCADE,
+                    lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+                    fixture_id INTEGER NOT NULL REFERENCES lab_fixtures(id) ON DELETE CASCADE,
+                    materialised_row_id BIGINT NOT NULL,
+                    materialised_table TEXT NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    torn_down_at TIMESTAMP
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX ix_lab_sess_fix_enroll_lesson "
+                "ON lab_session_fixtures (enrollment_id, lesson_id)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX ix_lab_sess_fix_torn_down "
+                "ON lab_session_fixtures (torn_down_at)"
+            ))
+            logger.info("Migrated: CREATE TABLE lab_session_fixtures")
+
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
 
