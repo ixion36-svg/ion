@@ -35,6 +35,7 @@ from ion.core.config import get_config as get_app_config
 from ion.core.logging import get_logger, setup_logging
 from ion.storage.database import init_db
 from ion.web.admin_api import router as admin_router
+from ion.web.skill_publisher_api import router as skill_publisher_router
 from ion.web.ai_api import router as ai_router
 from ion.web.alert_pattern_api import router as alert_pattern_router
 from ion.web.alert_prompt_api import router as alert_prompt_router
@@ -267,6 +268,7 @@ app.include_router(api_router, prefix="/api")
 app.include_router(security_router, prefix="/api/security")
 app.include_router(integration_router, prefix="/api/integrations")
 app.include_router(admin_router, prefix="/api/admin")
+app.include_router(skill_publisher_router, prefix="/api/admin")
 app.include_router(observable_router, prefix="/api")
 app.include_router(ai_router)
 app.include_router(kibana_router, prefix="/api/kibana")
