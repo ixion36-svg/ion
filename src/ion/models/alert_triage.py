@@ -286,3 +286,43 @@ class KnownFalsePositive(Base, TimestampMixin):
 # Backward compatibility aliases
 AlertComment = Note
 CaseNote = Note
+
+
+class AlertCaseAnnotation(Base):
+    """Timestamped free-text analyst annotation on an AlertCase timeline (v0.22.0).
+
+    Soft-delete via ``deleted_at``. A single ledger row is written on create
+    (action='annotation_created') but edits/deletes do NOT touch the ledger —
+    see spec §4.2 for the mutability decision.
+    """
+
+    __tablename__ = "alert_case_annotations"
+    __table_args__ = (
+        Index("ix_aca_case", "alert_case_id"),
+        Index("ix_aca_created_by", "created_by_id"),
+        Index("ix_aca_timeline_ts", "alert_case_id", "timeline_ts"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    alert_case_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("alert_cases.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    timeline_ts: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now(), nullable=False
+    )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Relationships
+    alert_case: Mapped["AlertCase"] = relationship("AlertCase")
+    created_by: Mapped["User"] = relationship("User", foreign_keys=[created_by_id])
+
+    def __repr__(self) -> str:
+        return f"<AlertCaseAnnotation(id={self.id}, case={self.alert_case_id})>"

@@ -20,7 +20,11 @@ from sqlalchemy.orm import Session
 from ion.auth.dependencies import get_current_user, require_permission
 from ion.core.safe_errors import safe_error
 from ion.models.user import User
-from ion.services import case_ledger_service, case_pin_service
+from ion.services import annotation_service, case_ledger_service, case_pin_service
+from ion.services.annotation_service import (
+    AnnotationError,
+    AnnotationForbiddenError,
+)
 from ion.services.case_pin_service import (
     CaseNotFoundError,
     DuplicatePinError,
@@ -163,6 +167,147 @@ def dismiss_pin_endpoint(
         raise HTTPException(status_code=404, detail=safe_error(exc)) from exc
     return {"pin": pin.to_dict()}
 
+
+
+
+# ---------------------------------------------------------------------------
+# Annotation schemas (v0.22.0)
+# ---------------------------------------------------------------------------
+
+
+class AnnotationCreate(BaseModel):
+    timeline_ts: str  # ISO-8601 datetime string, stored as UTC naive
+    body: str = Field(..., min_length=1, max_length=2000)
+
+
+class AnnotationUpdate(BaseModel):
+    timeline_ts: Optional[str] = None
+    body: Optional[str] = Field(None, min_length=1, max_length=2000)
+
+
+def _parse_ts(ts_str: str):
+    """Parse ISO-8601 datetime string to naive UTC datetime."""
+    from datetime import datetime
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S.%f",
+                "%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(ts_str, fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"Cannot parse datetime: {ts_str!r}")
+
+
+def _annotation_response(ann, session) -> dict:
+    """Build the API response shape (deleted_at never included)."""
+    from sqlalchemy.orm import Session
+    username = None
+    if ann.created_by:
+        username = getattr(ann.created_by, "username", None)
+    return {
+        "id": ann.id,
+        "case_id": ann.alert_case_id,
+        "timeline_ts": ann.timeline_ts.isoformat() if ann.timeline_ts else None,
+        "body": ann.body,
+        "created_by_id": ann.created_by_id,
+        "created_by_username": username,
+        "created_at": ann.created_at.isoformat() if ann.created_at else None,
+        "updated_at": ann.updated_at.isoformat() if ann.updated_at else None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Annotation endpoints (v0.22.0)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{case_id}/annotations",
+    dependencies=[Depends(require_permission("case:read"))],
+)
+def list_annotations_endpoint(
+    case_id: int,
+    session: Session = Depends(get_db_session),
+):
+    annotations = annotation_service.list_active(session, case_id)
+    return {"annotations": [_annotation_response(a, session) for a in annotations]}
+
+
+@router.post(
+    "/{case_id}/annotations",
+    status_code=201,
+)
+def create_annotation_endpoint(
+    case_id: int,
+    body: AnnotationCreate,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("case:update")),
+):
+    try:
+        ts = _parse_ts(body.timeline_ts)
+        ann = annotation_service.create(
+            session,
+            alert_case_id=case_id,
+            body=body.body,
+            timeline_ts=ts,
+            actor_id=user.id,
+        )
+    except AnnotationError as exc:
+        raise HTTPException(status_code=404, detail=safe_error(exc)) from exc
+    return _annotation_response(ann, session)
+
+
+@router.patch(
+    "/{case_id}/annotations/{ann_id}",
+)
+def update_annotation_endpoint(
+    case_id: int,
+    ann_id: int,
+    body: AnnotationUpdate,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("case:update")),
+):
+    has_close = user.has_permission("case:close")
+    try:
+        ts = _parse_ts(body.timeline_ts) if body.timeline_ts else None
+        ann = annotation_service.update(
+            session,
+            ann_id,
+            alert_case_id=case_id,
+            actor=user,
+            has_case_close=has_close,
+            body=body.body,
+            timeline_ts=ts,
+        )
+    except AnnotationForbiddenError as exc:
+        raise HTTPException(status_code=403, detail=safe_error(exc)) from exc
+    except AnnotationError as exc:
+        raise HTTPException(status_code=404, detail=safe_error(exc)) from exc
+    return _annotation_response(ann, session)
+
+
+@router.delete(
+    "/{case_id}/annotations/{ann_id}",
+)
+def delete_annotation_endpoint(
+    case_id: int,
+    ann_id: int,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("case:update")),
+):
+    has_close = user.has_permission("case:close")
+    try:
+        ann = annotation_service.soft_delete(
+            session,
+            ann_id,
+            alert_case_id=case_id,
+            actor=user,
+            has_case_close=has_close,
+        )
+    except AnnotationForbiddenError as exc:
+        raise HTTPException(status_code=403, detail=safe_error(exc)) from exc
+    except AnnotationError as exc:
+        raise HTTPException(status_code=404, detail=safe_error(exc)) from exc
+    return {"deleted": True, "id": ann.id}
 
 @router.get(
     "/{case_id}/ledger",

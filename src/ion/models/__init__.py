@@ -19,6 +19,7 @@ from ion.models.ai_preferences import (
 from ion.models.alert_prompt import AlertPromptTemplate  # noqa: F401
 from ion.models.alert_triage import (
     AlertCase,
+    AlertCaseAnnotation,  # noqa: F401
     AlertCaseStatus,
     AlertComment,  # Backward compatibility alias for Note
     AlertTriage,
@@ -84,6 +85,7 @@ from ion.models.forensics import (
     EvidenceStatus,
     EvidenceType,
     ForensicCase,
+    ForensicCaseAnnotation,  # noqa: F401
     ForensicCasePriority,
     ForensicCaseStatus,
     ForensicCaseStep,

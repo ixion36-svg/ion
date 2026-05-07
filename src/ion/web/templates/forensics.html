@@ -239,6 +239,7 @@
                 <button class="fr-tab" onclick="switchDetailTab('evidence')">Evidence</button>
                 <button class="fr-tab" onclick="switchDetailTab('timeline')">Timeline</button>
                 <button class="fr-tab" onclick="switchDetailTab('report')">Report</button>
+                <button class="fr-tab" onclick="switchDetailTab('annotations')">Annotations</button>
             </div>
             <!-- Sections Tab (fillable investigation steps) -->
             <div id="cd-tab-sections">
@@ -258,6 +259,21 @@
             </div>
             <div id="cd-tab-report" style="display:none;">
                 <div id="cd-report-content" style="white-space:pre-wrap;font-family:monospace;background:var(--bg-secondary);padding:16px;border-radius:8px;max-height:500px;overflow-y:auto;"></div>
+            </div>
+            <!-- v0.22.0 Annotations Tab — separate from ForensicTimelineEntry items (spec 4.7) -->
+            <div id="cd-tab-annotations" style="display:none;">
+                <div id="forensic-annotations-body" style="margin-bottom:8px;">
+                    <div style="color:var(--text-secondary);font-size:.8rem;">Loading annotations...</div>
+                </div>
+                <div id="forensic-ann-form" style="display:none;margin-top:8px;">
+                    <input type="datetime-local" id="forensic-ann-ts" style="width:100%;margin-bottom:6px;background:var(--bg-secondary);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:4px 8px;color:var(--text-primary);font-size:.85rem;">
+                    <textarea id="forensic-ann-body" rows="3" placeholder="Add a timeline annotation..." style="width:100%;background:var(--bg-secondary);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:6px 8px;color:var(--text-primary);font-size:.85rem;resize:vertical;box-sizing:border-box;"></textarea>
+                    <div style="display:flex;gap:6px;margin-top:6px;">
+                        <button class="btn btn-primary" style="font-size:.8rem;padding:4px 12px;" onclick="submitForensicAnnotation()">Save</button>
+                        <button class="btn btn-secondary" style="font-size:.8rem;padding:4px 12px;" onclick="toggleForensicAnnotationForm()">Cancel</button>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" style="font-size:.8rem;padding:4px 12px;" onclick="toggleForensicAnnotationForm()">+ Add annotation</button>
             </div>
         </div>
     </div>
@@ -823,7 +839,7 @@ function switchTab(tab){
     else if(tab==='reference')renderReferenceDocs();
 }
 function switchDetailTab(tab){
-    const tabs=['sections','evidence','timeline','report'];
+    const tabs=['sections','evidence','timeline','report','annotations'];
     document.querySelectorAll('#cd-body .fr-tab').forEach((b,i)=>b.classList.toggle('active',tabs[i]===tab));
     tabs.forEach(t=>{const el=document.getElementById('cd-tab-'+t);if(el)el.style.display=t===tab?'':'none'});
     if(tab==='report')loadReportTab();
@@ -979,6 +995,7 @@ function renderCaseDetail(c){
     renderTimeline(c.timeline_entries||[]);
     renderDetailEvidence(c.evidence_items||[]);
     switchDetailTab('sections');
+    loadForensicAnnotations(c.id);
 }
 
 // ======== SECTIONS (fillable steps) ========
@@ -1613,5 +1630,114 @@ function simpleMarkdown(md){
 }
 
 init();
+
+// v0.22.0 ForensicCase Timeline Annotations
+// Separate section — does NOT interleave with ForensicTimelineEntry items (spec 4.7)
+
+var _forensicAnnCaseId = null;
+
+async function loadForensicAnnotations(caseId) {
+    _forensicAnnCaseId = caseId;
+    var body = document.getElementById('forensic-annotations-body');
+    if (!body) return;
+    try {
+        var resp = await fetch('/api/forensics/cases/' + caseId + '/annotations');
+        if (!resp.ok) { body.innerHTML = '<div style="color:var(--text-secondary);font-size:.8rem;">Failed to load annotations</div>'; return; }
+        var data = await resp.json();
+        var annotations = data.annotations || [];
+        renderForensicAnnotations(annotations);
+    } catch (e) { }
+}
+
+function renderForensicAnnotations(annotations) {
+    var body = document.getElementById('forensic-annotations-body');
+    if (!body) return;
+    if (!annotations.length) {
+        body.innerHTML = '<div style="color:var(--text-secondary);font-size:.8rem;">No annotations yet.</div>';
+        return;
+    }
+    var html = annotations.map(function(a) {
+        var ts = a.timeline_ts ? new Date(a.timeline_ts).toLocaleString() : '';
+        var author = a.created_by_username || 'unknown';
+        return '<div style="border-left:3px solid #6366f1;padding:6px 6px 6px 10px;margin-bottom:8px;background:rgba(99,102,241,0.06);border-radius:0 4px 4px 0;" id="fann-' + a.id + '">'
+            + '<div style="display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--text-secondary);margin-bottom:4px;">'
+            + '<span style="color:#818cf8;font-weight:600;">' + (ts||'') + '</span>'
+            + '<span>&middot;</span><span>' + (author||'') + '</span>'
+            + '<span style="margin-left:auto;display:flex;gap:4px;">'
+            + '<button type="button" onclick="editForensicAnnotation(' + a.id + ',\'' + (a.body||'').replace(/'/g,"\\'") + '\')" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 3px;font-size:.8rem;">&#9998;</button>'
+            + '<button type="button" onclick="deleteForensicAnnotation(' + a.id + ')" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 3px;font-size:.8rem;">&times;</button>'
+            + '</span></div>'
+            + '<div style="font-size:.8rem;color:var(--text-primary);white-space:pre-wrap;">' + (a.body||'') + '</div>'
+            + '</div>';
+    }).join('');
+    body.innerHTML = html;
+}
+
+function toggleForensicAnnotationForm() {
+    var form = document.getElementById('forensic-ann-form');
+    if (!form) return;
+    form.style.display = form.style.display === 'none' ? '' : 'none';
+    if (form.style.display !== 'none') {
+        var tsEl = document.getElementById('forensic-ann-ts');
+        if (tsEl && !tsEl.value) {
+            var now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            tsEl.value = now.toISOString().slice(0, 16);
+        }
+    }
+}
+
+async function submitForensicAnnotation() {
+    var caseId = _forensicAnnCaseId;
+    if (!caseId) return;
+    var tsEl = document.getElementById('forensic-ann-ts');
+    var bodyEl = document.getElementById('forensic-ann-body');
+    if (!tsEl || !bodyEl) return;
+    var tsVal = (tsEl.value || '').trim();
+    var bodyVal = (bodyEl.value || '').trim();
+    if (!tsVal) { tsEl.focus(); return; }
+    if (!bodyVal) { bodyEl.focus(); return; }
+    var tsIso = tsVal.length === 16 ? tsVal + ':00' : tsVal;
+    try {
+        var resp = await fetch('/api/forensics/cases/' + caseId + '/annotations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timeline_ts: tsIso, body: bodyVal }),
+        });
+        if (!resp.ok) { var err = await resp.json().catch(function(){return {};}); alert('Failed: ' + (err.detail || resp.status)); return; }
+        bodyEl.value = ''; tsEl.value = '';
+        toggleForensicAnnotationForm();
+        loadForensicAnnotations(caseId);
+    } catch (e) { alert('Failed to save annotation'); }
+}
+
+async function editForensicAnnotation(annId, currentBody) {
+    var caseId = _forensicAnnCaseId;
+    if (!caseId) return;
+    var newBody = prompt('Edit annotation:', currentBody);
+    if (newBody === null || newBody === currentBody) return;
+    if (!newBody.trim()) { alert('Body cannot be empty'); return; }
+    try {
+        var resp = await fetch('/api/forensics/cases/' + caseId + '/annotations/' + annId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ body: newBody }),
+        });
+        if (!resp.ok) { var err = await resp.json().catch(function(){return {};}); alert('Failed: ' + (err.detail || resp.status)); return; }
+        loadForensicAnnotations(caseId);
+    } catch (e) { alert('Failed to update annotation'); }
+}
+
+async function deleteForensicAnnotation(annId) {
+    var caseId = _forensicAnnCaseId;
+    if (!caseId) return;
+    if (!confirm('Delete this annotation?')) return;
+    try {
+        var resp = await fetch('/api/forensics/cases/' + caseId + '/annotations/' + annId, { method: 'DELETE' });
+        if (!resp.ok) { var err = await resp.json().catch(function(){return {};}); alert('Failed: ' + (err.detail || resp.status)); return; }
+        loadForensicAnnotations(caseId);
+    } catch (e) { alert('Failed to delete annotation'); }
+}
+
 </script>
 {% endblock %}
