@@ -1,7 +1,8 @@
 # ION Security Assessment Report
 
 **Assessment Date:** 2026-05-07
-**Application Version:** 0.20.1-rc (integration/v0.20.1 branch)
+**Application Version:** 0.21.0-rc (integration/v0.21.0 branch)
+**Previous Assessment Version:** 0.20.1-rc (2026-05-06)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent
@@ -10,17 +11,17 @@
 
 ## Executive Summary
 
-ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.20.1-rc adds significant new attack surface (ForensicCase Workbench, lesson PDF export, SKILL publisher ZIP export, lab fixtures) that is largely well-implemented but carries three findings that require attention before ship.
+ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc adds the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. The net-new surface is largely well-controlled, carrying two new findings (both Low) that do not block ship.
 
-| Severity | v0.9.43 | v0.20.1-rc |
-|----------|---------|------------|
-| Critical | 0 | **0** |
-| High | 0 | **0** |
-| Medium | 2 | **3** (+1) |
-| Low | 3 | **4** (+1) |
-| **Total** | **5** | **7** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc |
+|----------|---------|------------|------------|
+| Critical | 0 | **0** | **0** |
+| High | 0 | **0** | **0** |
+| Medium | 2 | **3** | **3** (unchanged) |
+| Low | 3 | **4** | **6** (+2) |
+| **Total** | **5** | **7** | **9** |
 
-The overall posture is improved or stable on every carried-forward finding. The net increase comes from new surface, not from regression. No finding is release-blocking on its own, but **M3 (WeasyPrint SSRF via lesson PDF) and M4 (lab fixture column injection) together are recommended for immediate patching** before the v0.20.1 production push. The remaining findings carry acceptable risk for an internal authenticated deployment.
+The v0.20.1 posture is unchanged on all carried-forward findings. The two new Low findings come from new surface, not regressions. **Ship-with-followup** is the recommendation: no finding in v0.21.0-rc is release-blocking, but L5 (reasoning_text in samples serialisation) and L6 (confidence_threshold_override permission tier) should be addressed in v0.21.1.
 
 ---
 
@@ -263,6 +264,106 @@ All migrated routes confirmed to carry `require_permission` or `get_current_user
 
 ---
 
+## Net-New Surfaces in v0.21.0
+
+### Item 23: Bob Eval Harness — `POST /api/bob-eval/runs`, `GET /api/bob-eval/runs[/{run_id}[/samples]]`, `GET /bob-eval`
+
+**Files:** `src/ion/web/bob_eval_api.py`, `src/ion/services/bob_eval_service.py`, `src/ion/models/bob_eval.py`
+
+#### 23a. Permission gate on all routes
+
+`_SETTINGS_PERM = require_permission("system:settings")` is applied as `Depends(_SETTINGS_PERM)` on every route: POST runs, GET runs, GET runs/{run_id}, GET runs/{run_id}/samples, and the HTML GET /bob-eval. The `require_permission` factory chains through `get_current_user` which enforces a valid session token before the permission check. Authentication and authorisation are both enforced. **PASS.**
+
+#### 23b. `sample_size` integer validation
+
+`CreateEvalRunRequest` uses `sample_size: int = Field(50, ge=1, le=_MAX_SAMPLE_SIZE)` where `_MAX_SAMPLE_SIZE = 200`. FastAPI/Pydantic v2 enforces `ge=1, le=200` at the schema validation stage before the handler is called. A non-integer body field causes a 422; a value outside 1–200 causes a 422. Additionally, `create_eval_run` in `bob_eval_service.py` applies `sample_size = min(sample_size, _MAX_SAMPLE_SIZE)` as a belt-and-suspenders clamp before the DB write. **PASS — no gap.**
+
+#### 23c. Thread spawn before template validation (non-existent `template_id`)
+
+The handler calls `create_eval_run(...)` first, which performs `session.get(AlertPromptTemplate, template_id)` before committing the `BobEvalRun` row. If the template does not exist, `create_eval_run` raises `ValueError`, the handler converts it to HTTP 400, and `run_eval_async` is never called. There is no window where a thread is spawned against a non-existent template. **PASS — no DoS vector.**
+
+#### 23d. Duplicate-run advisory lock
+
+`_run_eval_sync` acquires two locks before executing:
+
+1. `_acquire_try_advisory_lock(session, LOCK_BOB_EVAL_BG)` — a session-scoped non-blocking lock that fails immediately if the investigation loop holds it. If two simultaneous POSTs both win this check (possible: both eval threads can hold the session lock concurrently since it is not the run-specific lock), the second check gates them:
+2. `_acquire_xact_lock(session, _BPEH_NS, eval_run_id)` — a transactional advisory lock keyed by `(0x42504548, eval_run_id)`. Since each POST creates a distinct `eval_run_id`, this lock does not prevent two simultaneous runs for the same template — it prevents the same run ID from being re-entered. If two users simultaneously POST `{template_id: 5, sample_size: 50}`, two separate `BobEvalRun` rows are created with distinct IDs, and both threads proceed concurrently.
+
+**Finding (Low — see L5 below):** Two simultaneous eval runs for the same template are not serialised. Each run independently pulls a random sample of up to 200 `ai_feedback` rows and issues up to 200 Ollama calls. With two simultaneous requests, an admin can drive 400 concurrent Ollama calls. Given `system:settings` access is restricted to administrators and Ollama already has a queue (`bypass_queue=True` is set, meaning the eval calls skip the normal investigation queue), the practical impact is resource exhaustion on Ollama, not a privilege-escalation risk. Severity: Low; not a DoS risk to unauthenticated actors.
+
+#### 23e. Pagination bounds on `/samples`
+
+`page_size: int = Query(50, ge=1, le=200)` enforces the upper bound. The `offset` is computed as `(page - 1) * page_size` from validated inputs. Total count query is bounded by the run's own `sample_size` cap (200 max). **PASS.**
+
+---
+
+### Item 24: `Investigation.reasoning_text` — `ION_BOB_STORE_REASONING=true` gate
+
+**Files:** `src/ion/services/investigation_service.py`, `src/ion/models/investigation.py`, `src/ion/web/investigation_api.py`, `src/ion/web/investigation_memory_api.py`
+
+#### 24a. Storage gating
+
+`reasoning_text` is written to the `Investigation` row only when `os.environ.get("ION_BOB_STORE_REASONING", "false").lower() in ("true", "1", "yes")`. The column always exists in the schema (populated by migration in `database.py`), but remains NULL unless the flag is set. **PASS.**
+
+#### 24b. Retention parity with alert records
+
+`Investigation` rows have no dedicated purge/deletion path in the codebase. There is no API endpoint, background task, or repository method that deletes `Investigation` rows. Consequently, `reasoning_text` has indefinite retention regardless of alert lifecycle. Alert triage rows (`alert_triage`) similarly lack a purge path; neither surface has a retention-limiting mechanism. This is a pre-existing data-retention characteristic, not a regression in v0.21.0. **ADVISORY — no new finding.** Document in RUNBOOK that `reasoning_text` persists until manual DB purge if `ION_BOB_STORE_REASONING=true` is enabled.
+
+#### 24c. Unintentional logging of reasoning_text
+
+`investigation_service.py` truncates the stored value to 8,000 characters (`[:8000]`). The stored text is not written to any log line in the service. Logger calls in `bob_eval_service.py` that could surface reasoning text are at DEBUG level (`logger.debug`) and do not include the reasoning content directly — only alert IDs and error messages appear in the error handler. No Python `%r` or f-string expands reasoning text into a log line in the audited paths. **PASS.**
+
+#### 24d. Serialisation — exposure in non-admin routes
+
+`InvestigationSummary` (both the `investigation_api.py` and `investigation_memory_api.py` versions) does not include `reasoning_text` as a field. `InvestigationDetail` in `investigation_memory_api.py` includes `prompt_snapshot` and `raw_response` but not `reasoning_text`. The `_inv_to_detail` converter does not copy `inv.reasoning_text` to the response object. Both GET endpoints that return `Investigation` objects (`/api/investigate/jobs/{inv_id}` and `/api/investigations/{inv_id}`) are gated on `alert:read`, not `system:settings`. However, since `reasoning_text` is not serialised in any response schema, the effective exposure to `alert:read` users is zero. **PASS — reasoning_text is not leaked via any API response.**
+
+Note: `BobEvalRunSample.reasoning_text` (a distinct column on the eval harness samples table) _is_ included in `BobEvalRunSample.to_dict()` and returned by `GET /api/bob-eval/runs/{run_id}/samples`. That endpoint is `system:settings`-gated. See finding L5.
+
+---
+
+### Item 25: `AlertPromptTemplate.confidence_threshold_override`
+
+**Files:** `src/ion/web/alert_prompt_api.py`, `src/ion/storage/alert_prompt_repository.py`, `src/ion/models/alert_prompt.py`
+
+#### 25a. Bounds validation
+
+`AlertPromptCreate` and `AlertPromptUpdate` both declare `confidence_threshold_override: Optional[int] = Field(default=None, ge=0, le=100)`. Pydantic v2 enforces `ge=0, le=100` at the schema level; out-of-range integers return 422. NULL (omitted) is permitted, which maps to "use global env-var default". The column is stored as `Integer` in the DB with no DB-level check constraint, but the application-layer validation is sufficient for the authenticated-user threat model. **PASS.**
+
+#### 25b. Permission gate on write routes
+
+`POST /api/alert-prompts` and `PUT /api/alert-prompts/{template_id}` both use `dependencies=[Depends(require_any_permission(_MANAGE_PERMS))]` where `_MANAGE_PERMS = ["playbook:create", "playbook:update", "playbook:delete"]`. These are content-author permissions, not analyst-level permissions.
+
+**Finding (Low — see L6 below):** The `confidence_threshold_override` field controls the AI circuit-breaker threshold per template. Setting it to `0` would cause every Bob investigation matched to that template to be flagged as low-confidence and escalated via the `bob_escalation_badge` path, effectively suppressing AI verdicts for all alerts matching the template. Setting it to `100` would cause the circuit breaker never to fire for that template's alerts, meaning every AI verdict would be written unconditionally regardless of actual model confidence. This field has operational security significance (it governs whether AI verdicts are written vs. escalated) but is writable by any user with `playbook:create` or `playbook:update` permission — which is a broader set than `system:settings`. Recommend restricting write access on `confidence_threshold_override` to `system:settings`, either by adding a separate PATCH endpoint or by splitting the `AlertPromptUpdate` schema to require elevated permission when this field is present.
+
+---
+
+### Item 26: `AlertTriage.bob_escalation_badge` — writable via user API?
+
+**Files:** `src/ion/web/api.py`, `src/ion/models/alert_triage.py`
+
+`bob_escalation_badge` is set exclusively by `investigation_service.py` when the circuit breaker fires (`triage.bob_escalation_badge = "low_confidence_triage"`). The `TriageUpdate` Pydantic schema (api.py lines 3786–3794) exposes: `status`, `assigned_to_id`, `assigned_to_name`, `priority`, `case_id`, `analyst_notes`, `observables`, `mitre_techniques`. `bob_escalation_badge` is not in the schema. The update handler (`update_alert_triage`) maps only the fields listed in `TriageUpdate` to ORM attributes — there is no `**kwargs` or dynamic field assignment that would allow injection of unlisted fields. **PASS — not user-writable.**
+
+The field is returned as a read-only value in the triage serialisation block (api.py line 6382) so the UI can render the escalation pill. This is intentional and safe.
+
+---
+
+### Item 27: AIFeedback `human_verdict="pending"` sentinel and eval harness data access
+
+**Files:** `src/ion/services/bob_eval_service.py`, `src/ion/models/bob_eval.py`
+
+The eval harness de-duplicates `ai_feedback` rows by `MAX(id)` per `(alert_id, alert_prompt_template_id)`. The `human_verdict="pending"` sentinel identifies circuit-breaker rows (where `auto_escalated=true` or verdict has not yet been set by an analyst). These rows are treated as abstentions in the eval loop (line 339: `if auto_escalated or human_verdict == "pending": abstentions += 1`) and written to `bob_eval_run_samples` with `bob_verdict=None, agreement=None, reasoning_text=None`. They do not receive a fresh Ollama call. The `human_verdict` field value `"pending"` is stored in the `BobEvalRunSample.human_verdict` column and returned in the `/samples` response, but this only exposes the verdict state — not the underlying alert content, analyst notes, or triage detail. The `/samples` endpoint is `system:settings`-gated. **PASS — no triage data leakage beyond what admins already have access to.**
+
+---
+
+**New Findings Summary (v0.21.0)**
+
+| ID | Severity | Surface | Issue |
+|----|----------|---------|-------|
+| L5 | Low | `POST /api/bob-eval/runs` | No per-template concurrency guard — two simultaneous runs for the same template both proceed, driving up to 2× Ollama load |
+| L6 | Low | `PUT /api/alert-prompts/{id}` | `confidence_threshold_override` (circuit-breaker control) writable by `playbook:create/update` users, not restricted to `system:settings` |
+
+---
+
 ## Recommendations for Production
 
 1. **Patch M3 (WeasyPrint SSRF) before v0.20.1 ship.** Apply a no-network URL fetcher to `pdf_export_service.py`. Three lines of code; unblocks the lesson PDF feature safely.
@@ -270,9 +371,12 @@ All migrated routes confirmed to carry `require_permission` or `get_current_user
 3. **Fix L4 (`StandupPptxRequest` unbounded fields).** Add `max_length` to `ai_summary` and `aob` in `StandupPptxRequest`. One-line change.
 4. **Fix Item 22 Optional-user studio submit.** Change `Optional[User]` to `User = Depends(require_permission("alert:read"))` at cyab_api.py lines 3720 and 4100.
 5. **Close M2 (SIEM webhook call-time SSRF).** Add `validate_integration_url()` call at the top of `export_to_webhook` and `export_to_splunk_hec` in `siem_export.py`.
-6. **Set `ION_COOKIE_SECURE=true`** behind any TLS terminator in production.
-7. **Set `ION_DEBUG_MODE=false`** to disable `/docs`, `/redoc`, and `/openapi.json`.
-8. **Use a non-default `ION_ADMIN_PASSWORD`.**
-9. **Migrate from `python-jose`** to `PyJWT` or `authlib` at next dependency-refresh cycle.
-10. **Add `|` and `>` to `_yaml_str` special-character set** in `skill_publisher_service.py` as a belt-and-suspenders guard on SKILL.md frontmatter.
-11. **Add `storage_location` path sanitisation** in `forensics_api.py` `EvidenceCreate` schema proactively, before any feature uses the field as a filesystem path.
+6. **Address L6 (`confidence_threshold_override` permission tier) in v0.21.1.** Either add a separate `PATCH /api/alert-prompts/{id}/threshold` endpoint gated on `system:settings`, or check for this field in `update_alert_prompt` and require elevated permission when it is present in the update payload.
+7. **Address L5 (concurrent eval runs) in v0.21.1.** Add a template-level advisory lock in `_run_eval_sync` using the same two-int form: `pg_advisory_xact_lock(_BPEH_NS, template_id or 0)`. This would serialise same-template runs without blocking cross-template parallelism.
+8. **Document `reasoning_text` retention** in RUNBOOK: when `ION_BOB_STORE_REASONING=true`, `Investigation.reasoning_text` and `BobEvalRunSample.reasoning_text` persist until manual DB purge. Add a note that this flag should be treated as a data-classification decision under the same policy as `summary_text`.
+9. **Set `ION_COOKIE_SECURE=true`** behind any TLS terminator in production.
+10. **Set `ION_DEBUG_MODE=false`** to disable `/docs`, `/redoc`, and `/openapi.json`.
+11. **Use a non-default `ION_ADMIN_PASSWORD`.**
+12. **Migrate from `python-jose`** to `PyJWT` or `authlib` at next dependency-refresh cycle.
+13. **Add `|` and `>` to `_yaml_str` special-character set** in `skill_publisher_service.py` as a belt-and-suspenders guard on SKILL.md frontmatter.
+14. **Add `storage_location` path sanitisation** in `forensics_api.py` `EvidenceCreate` schema proactively, before any feature uses the field as a filesystem path.
