@@ -26,7 +26,7 @@
 <section class="bg-slate-900/40 border border-slate-800 rounded p-3 mb-4">
   <header class="flex items-center justify-between mb-2">
     <h4 class="text-slate-300 text-[12px]">Onboarding Pack</h4>
-    <a href="/api/cyab/studio/systems/{{ system.id }}/onboarding-pack" target="_blank"
+    <a href="/api/cyab/systems/{{ system.id }}/onboarding-pack" target="_blank"
        class="text-cyan-400 text-[11.5px] hover:underline">Open PDF &rarr;</a>
   </header>
 
@@ -39,7 +39,7 @@
   </div>
   {% endif %}
 
-  <form hx-post="/api/cyab/studio/systems/{{ system.id }}/onboarding-pack/sign"
+  <form hx-post="/api/cyab/systems/{{ system.id }}/onboarding-pack/sign"
         hx-target="#tab-content" hx-swap="innerHTML"
         class="flex items-center gap-2">
     <input name="sign_soc_name" placeholder="Your name" required

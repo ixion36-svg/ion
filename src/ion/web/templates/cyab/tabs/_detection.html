@@ -1,11 +1,10 @@
-{# Detection Use Cases tab — lifted from cyab_studio.html.
+{# Detection Use Cases tab.
 
    Catalogue schema (see cyab_subprofile_catalogue.py):
      detection_use_cases: [{id, title, kind, risk, summary, description,
                             mitre_ids, logic_snippet, ...}]
-   Per-source status chips reuse the existing studio endpoint
-   /api/cyab/studio/data-sources/{ds_id}/use-case-status — the studio JS
-   loaded at the bottom cycles each chip's value (shipped/partial/gap/n/a).
+   Per-source status chips use /api/cyab/data-sources/{ds_id}/use-case-status
+   to cycle each chip's value (shipped/partial/gap/n/a).
 #}
 {% if not subprofile %}
   <p class="text-slate-500 text-[12px]">
@@ -39,7 +38,7 @@
             </button>
           {% endfor %}
           <button class="px-2 py-0.5 bg-cyan-700 text-white text-[10.5px] rounded"
-                  hx-post="/api/cyab/studio/use-cases/{{ uc.id }}/tide-stub"
+                  hx-post="/api/cyab/use-cases/{{ uc.id }}/tide-stub"
                   hx-target="closest article"
                   hx-swap="afterend">
             + TIDE
@@ -54,6 +53,5 @@
     {% endfor %}
   </div>
 
-  {# Re-use the studio's status-chip cycling JS. #}
-  <script src="/static/js/cyab_studio.js" defer></script>
+  {# status-chip cycling JS lives in app.js (cyab_studio.js dropped in v0.20.0) #}
 {% endif %}

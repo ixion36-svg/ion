@@ -1,18 +1,14 @@
-"""Integration tests: /cyab/studio is now a 301 redirect to /cyab/systems[/:id].
+"""The /cyab/studio redirect was dropped in v0.20.0.
 
-Kept for one minor version (v0.19.x). Drop in v0.20.0.
+Verify that the old URL now returns 404 (no redirect stub present).
 """
 
-import pytest
 
-
-def test_studio_without_system_redirects_to_systems_list(client):
+def test_studio_url_is_gone(client):
     r = client.get("/cyab/studio", follow_redirects=False)
-    assert r.status_code == 301
-    assert r.headers["location"] in ("/cyab/systems", "/cyab")
+    assert r.status_code == 404
 
 
-def test_studio_with_system_redirects_to_per_system_page(client):
+def test_studio_url_with_system_is_gone(client):
     r = client.get("/cyab/studio?system=123", follow_redirects=False)
-    assert r.status_code == 301
-    assert r.headers["location"] == "/cyab/systems/123"
+    assert r.status_code == 404

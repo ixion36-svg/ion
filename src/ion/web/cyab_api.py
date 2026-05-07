@@ -2799,10 +2799,42 @@ async def scoping_score(request: Request):
 
 @router.post("/scoping/pdf")
 async def scoping_pdf_proxy(request: Request):
-    """Pass-through to the studio_api implementation so the URL lives under
-    /api/cyab/scoping/pdf as the spec requires."""
-    from ion.web.cyab_studio_api import render_scoping_pack
-    return await render_scoping_pack(request)
+    """Render the scoping summary as a PDF (HTML fallback if WeasyPrint missing)."""
+    from ion.services import cyab_scoping_engine
+
+    raw = await request.form()
+    answers: dict = {}
+    for key in raw.keys():
+        vals = [v for v in raw.getlist(key) if v != ""]
+        if not vals:
+            continue
+        answers[key] = vals if len(vals) > 1 else vals[0]
+
+    scores = cyab_scoping_engine.score_answers(answers)
+    full_html = _render_scoping_pack_pdf_html(scores, answers)
+    try:
+        from weasyprint import HTML as WpHTML
+        pdf_bytes = WpHTML(string=full_html).write_pdf()
+        filename = f"scoping_pack_{date.today().isoformat()}.pdf"
+        from fastapi.responses import Response as _Resp
+        return _Resp(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+    except (ImportError, OSError):
+        from fastapi.responses import Response as _Resp
+        return _Resp(
+            content=full_html,
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -3268,7 +3300,7 @@ def _build_audit_feed(
             "snapshot_id":   snap.id,
             "snapshot_date": snap.snapshot_date.isoformat(),
             "link":          f"/cyab/systems/{snap.system_id}#snapshot={snap.id}",
-            "pdf_link":      f"/api/cyab/studio/systems/{snap.system_id}/onboarding-pack?as_of={snap.snapshot_date.isoformat()}",
+            "pdf_link":      f"/api/cyab/systems/{snap.system_id}/onboarding-pack?as_of={snap.snapshot_date.isoformat()}",
         })
 
     # 3. Checklist updates. The model exposes the user FK as
@@ -3346,3 +3378,883 @@ def _build_audit_feed(
 
     events.sort(key=lambda e: e["when"], reverse=True)
     return {"events": events[:limit], "total": len(events)}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Migrated from cyab_studio_api (dropped in v0.20.0).
+#
+#  All routes formerly under /api/cyab/studio/* now live here under
+#  /api/cyab/*.  Templates and tests were updated to match; the old
+#  /api/cyab/studio router mount and cyab_studio_api.py have been removed.
+# ═══════════════════════════════════════════════════════════════════════════
+
+import html as _html_mod
+import logging as _logging
+import re as _re
+from typing import Any, Dict
+
+from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
+from ion.services.cyab_subprofile_service import (
+    get_subprofile_full,
+    get_use_case,
+    list_pillars,
+    list_subprofiles_for_pillar,
+    patch_subprofile,
+    system_coverage,
+)
+from ion.services import cyab_doc_checklist_service as _doc_svc
+
+_studio_logger = _logging.getLogger(__name__)
+
+_STUDIO_NOTES_MARKER = "STUDIO_AUTOSAVE"
+_VALID_UC_STATUSES = {"shipped", "partial", "gap", "n/a"}
+
+
+# ---------------------------------------------------------------------------
+# Pydantic models (studio-origin)
+# ---------------------------------------------------------------------------
+
+class SubprofilePatch(BaseModel):
+    label: Optional[str] = None
+    icon: Optional[str] = None
+    description: Optional[str] = None
+    ecs_anchors: Optional[List[str]] = None
+    expected_feeds: Optional[List[str]] = None
+    catalogue: Optional[Dict[str, Any]] = None
+
+
+class TideStubRequest(BaseModel):
+    subprofile_id: str
+
+
+class SignOffRequest(BaseModel):
+    sign_dept_name: Optional[str] = None
+    sign_soc_name: Optional[str] = None
+    containment_authority: Optional[str] = None
+
+
+class AnswersPatch(BaseModel):
+    answers: Dict[str, Any]
+    subprofile_id: Optional[str] = None
+
+
+class UseCaseStatusPatch(BaseModel):
+    statuses: Dict[str, Optional[str]]
+
+
+class SubprofileCreate(BaseModel):
+    id: str
+    pillar_id: str
+    label: str
+    icon: Optional[str] = "cpu"
+    description: Optional[str] = None
+    ecs_anchors: Optional[List[str]] = None
+    expected_feeds: Optional[List[str]] = None
+
+
+class DocChecklistUpdate(BaseModel):
+    status: Optional[str] = None
+    url: Optional[str] = None
+    notes: Optional[str] = None
+    label: Optional[str] = None
+    is_critical: Optional[bool] = None
+
+
+class DocChecklistAdd(BaseModel):
+    kind: str
+    label: str
+    category: str = "design"
+    is_critical: bool = False
+    status: str = "unknown"
+    url: Optional[str] = None
+    notes: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Catalogue read — pillars + sub-profiles
+# ---------------------------------------------------------------------------
+
+@router.get("/pillars")
+def get_pillars(session: Session = Depends(get_db_session)):
+    return {"pillars": list_pillars(session)}
+
+
+@router.get("/pillars/{pillar_id}/subprofiles")
+def get_subprofiles_in_pillar(
+    pillar_id: str,
+    session: Session = Depends(get_db_session),
+):
+    pillar = session.get(CyabPillar, pillar_id)
+    if pillar is None:
+        raise HTTPException(status_code=404, detail="Unknown pillar")
+    return {
+        "pillar": {
+            "id": pillar.id,
+            "label": pillar.label,
+            "icon": pillar.icon,
+            "priority": pillar.priority,
+            "description": pillar.description,
+        },
+        "subprofiles": list_subprofiles_for_pillar(session, pillar_id),
+    }
+
+
+@router.get("/subprofiles/{sub_id}")
+def get_subprofile(sub_id: str, session: Session = Depends(get_db_session)):
+    full = get_subprofile_full(session, sub_id)
+    if full is None:
+        raise HTTPException(status_code=404, detail="Unknown sub-profile")
+    return full
+
+
+def _row_to_full_dict(row: CyabSubProfile) -> Dict[str, Any]:
+    return {
+        "id": row.id,
+        "pillar_id": row.pillar_id,
+        "label": row.label,
+        "icon": row.icon,
+        "description": row.description,
+        "ecs_anchors": json.loads(row.ecs_anchors or "[]"),
+        "expected_feeds": json.loads(row.expected_feeds or "[]"),
+        "catalogue": json.loads(row.catalogue_json or "{}"),
+        "catalogue_version": row.catalogue_version,
+        "is_custom": row.is_custom,
+    }
+
+
+@router.post(
+    "/subprofiles",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def create_subprofile_route(
+    body: SubprofileCreate,
+    session: Session = Depends(get_db_session),
+):
+    import re as _re2
+    if not _re2.fullmatch(r"[a-z0-9_]{2,64}", body.id):
+        raise HTTPException(status_code=400, detail="id must be 2–64 chars of [a-z0-9_]")
+    pillar = session.get(CyabPillar, body.pillar_id)
+    if pillar is None:
+        raise HTTPException(status_code=404, detail="Unknown pillar")
+    existing = session.get(CyabSubProfile, body.id)
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="Sub-profile id already exists")
+    row = CyabSubProfile(
+        id=body.id,
+        pillar_id=body.pillar_id,
+        label=body.label,
+        icon=body.icon or "cpu",
+        ecs_anchors=json.dumps(body.ecs_anchors or []),
+        expected_feeds=json.dumps(body.expected_feeds or []),
+        catalogue_json=json.dumps({
+            "intake_questions": [], "recommended_tasks": [],
+            "detection_use_cases": [], "audit_use_cases": [], "references": [],
+        }, sort_keys=True),
+        catalogue_version=1,
+        is_custom=True,
+        description=body.description,
+    )
+    session.add(row)
+    session.commit()
+    return _row_to_full_dict(row)
+
+
+@router.patch(
+    "/subprofiles/{sub_id}",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def patch_subprofile_route(
+    sub_id: str,
+    patch: SubprofilePatch,
+    session: Session = Depends(get_db_session),
+):
+    payload = patch.model_dump(exclude_unset=True)
+    if not payload:
+        raise HTTPException(status_code=400, detail="Empty patch")
+    updated = patch_subprofile(session, sub_id, payload)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Unknown sub-profile")
+    return updated
+
+
+@router.get("/subprofiles/{sub_id}/use-cases/{uc_id}")
+def get_use_case_route(
+    sub_id: str,
+    uc_id: str,
+    session: Session = Depends(get_db_session),
+):
+    uc = get_use_case(session, sub_id, uc_id)
+    if uc is None:
+        raise HTTPException(status_code=404, detail="Unknown use case")
+    return uc
+
+
+# ---------------------------------------------------------------------------
+# TIDE stub generation
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/use-cases/{uc_id}/tide-stub",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def generate_tide_stub(
+    uc_id: str,
+    body: TideStubRequest,
+    session: Session = Depends(get_db_session),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    uc = get_use_case(session, body.subprofile_id, uc_id)
+    if uc is None:
+        raise HTTPException(status_code=404, detail="Unknown use case")
+    try:
+        tide = get_tide_service()
+        if tide is None or not getattr(tide, "is_configured", lambda: False)():
+            raise HTTPException(status_code=503, detail="TIDE not configured")
+    except ImportError:
+        raise HTTPException(status_code=503, detail="TIDE service unavailable")
+    severity_map = {"critical": "Critical", "high": "High", "medium": "Medium", "low": "Low"}
+    rule_payload = {
+        "name": uc.get("title", uc_id),
+        "description": uc.get("description") or uc.get("summary") or "",
+        "severity": severity_map.get(uc.get("risk", "medium"), "Medium"),
+        "mitre_techniques": list(uc.get("mitre_ids") or []),
+        "language": uc.get("logic_lang", "esql"),
+        "rule_body": uc.get("logic_snippet", ""),
+        "tags": ["cyab-onboarding", f"subprofile:{body.subprofile_id}"],
+        "source": "ion.cyab.onboarding",
+    }
+    try:
+        create_fn = getattr(tide, "create_rule_stub", None) or getattr(tide, "create_rule", None)
+        if create_fn is None:
+            raise HTTPException(status_code=501, detail="TIDE client lacks create_rule support")
+        new_rule_id = create_fn(rule_payload)
+    except HTTPException:
+        raise
+    except Exception as e:
+        _studio_logger.warning("TIDE stub generation failed: %s", e)
+        raise HTTPException(status_code=502, detail=f"TIDE create failed: {e}")
+    full = get_subprofile_full(session, body.subprofile_id)
+    if full is None:
+        raise HTTPException(status_code=404, detail="Unknown sub-profile")
+    cat = full.get("catalogue") or {}
+    for kind in ("detection_use_cases", "audit_use_cases"):
+        for entry in cat.get(kind) or []:
+            if entry.get("id") == uc_id:
+                ids = list(entry.get("tide_rule_ids") or [])
+                ids.append(new_rule_id)
+                entry["tide_rule_ids"] = ids
+                break
+    patch_subprofile(session, body.subprofile_id, {"catalogue": cat})
+    return {"tide_rule_id": new_rule_id, "use_case_id": uc_id}
+
+
+# ---------------------------------------------------------------------------
+# System intake answers (autosave)
+# ---------------------------------------------------------------------------
+
+def _get_or_create_studio_assessment(
+    session: Session, sys_id: int, user_id: Optional[int],
+) -> CyabSystemAssessment:
+    from ion.services.cyab_assessment_questions import SCHEMA_VERSION
+    row = session.scalars(
+        select(CyabSystemAssessment)
+        .where(CyabSystemAssessment.system_id == sys_id)
+        .where(CyabSystemAssessment.notes == _STUDIO_NOTES_MARKER)
+        .order_by(CyabSystemAssessment.submitted_at.desc())
+        .limit(1)
+    ).first()
+    if row is not None:
+        return row
+    row = CyabSystemAssessment(
+        system_id=sys_id,
+        schema_version=SCHEMA_VERSION,
+        submitted_by=user_id,
+        responses_json="{}",
+        notes=_STUDIO_NOTES_MARKER,
+    )
+    session.add(row)
+    session.flush()
+    return row
+
+
+@router.get("/systems/{sys_id}/answers")
+def get_system_answers(sys_id: int, session: Session = Depends(get_db_session)):
+    sys = session.get(CyabSystem, sys_id)
+    if sys is None:
+        raise HTTPException(status_code=404, detail="Unknown system")
+    legacy = session.scalars(
+        select(CyabSystemAssessment)
+        .where(CyabSystemAssessment.system_id == sys_id)
+        .where(CyabSystemAssessment.notes != _STUDIO_NOTES_MARKER)
+        .order_by(CyabSystemAssessment.submitted_at.desc())
+        .limit(1)
+    ).first()
+    studio = session.scalars(
+        select(CyabSystemAssessment)
+        .where(CyabSystemAssessment.system_id == sys_id)
+        .where(CyabSystemAssessment.notes == _STUDIO_NOTES_MARKER)
+        .limit(1)
+    ).first()
+    merged: Dict[str, Any] = {}
+    for src in (legacy, studio):
+        if src and src.responses_json:
+            try:
+                merged.update(json.loads(src.responses_json) or {})
+            except json.JSONDecodeError:
+                pass
+    return {
+        "system_id": sys_id,
+        "answers": merged,
+        "studio_assessment_id": studio.id if studio else None,
+    }
+
+
+@router.post(
+    "/systems/{sys_id}/answers",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def patch_system_answers(
+    sys_id: int,
+    body: AnswersPatch,
+    session: Session = Depends(get_db_session),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    sys = session.get(CyabSystem, sys_id)
+    if sys is None:
+        raise HTTPException(status_code=404, detail="Unknown system")
+    row = _get_or_create_studio_assessment(
+        session, sys_id, current_user.id if current_user else None,
+    )
+    try:
+        existing = json.loads(row.responses_json or "{}")
+    except json.JSONDecodeError:
+        existing = {}
+    for k, v in (body.answers or {}).items():
+        if v is None:
+            existing.pop(k, None)
+        else:
+            existing[k] = v
+    row.responses_json = json.dumps(existing, default=str, sort_keys=True)
+    row.submitted_at = datetime.utcnow()
+    if current_user is not None:
+        row.submitted_by = current_user.id
+    session.commit()
+    return {
+        "system_id": sys_id,
+        "studio_assessment_id": row.id,
+        "answer_count": len(existing),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Data-source use-case status
+# ---------------------------------------------------------------------------
+
+@router.get("/systems/{sys_id}/data-sources")
+def list_data_sources_for_system(
+    sys_id: int,
+    subprofile_id: Optional[str] = None,
+    session: Session = Depends(get_db_session),
+):
+    sys = session.get(CyabSystem, sys_id)
+    if sys is None:
+        raise HTTPException(status_code=404, detail="Unknown system")
+    q = select(CyabDataSource).where(CyabDataSource.system_id == sys_id)
+    if subprofile_id:
+        q = q.where(CyabDataSource.subprofile_id == subprofile_id)
+    q = q.order_by(CyabDataSource.name.asc())
+    rows = session.scalars(q).all()
+    return {
+        "system_id": sys_id,
+        "subprofile_id": subprofile_id,
+        "data_sources": [
+            {
+                "id": r.id,
+                "name": r.name,
+                "data_source_type": r.data_source_type,
+                "subprofile_id": r.subprofile_id,
+                "data_namespace": r.data_namespace,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/data-sources/{ds_id}/use-case-status")
+def get_data_source_uc_status(ds_id: int, session: Session = Depends(get_db_session)):
+    ds = session.get(CyabDataSource, ds_id)
+    if ds is None:
+        raise HTTPException(status_code=404, detail="Unknown data source")
+    raw = ds.use_case_status
+    parsed: Dict[str, str] = {}
+    legacy: Optional[str] = None
+    if raw:
+        try:
+            obj = json.loads(raw)
+            if isinstance(obj, dict):
+                parsed = {k: v for k, v in obj.items() if v in _VALID_UC_STATUSES}
+            else:
+                legacy = raw
+        except json.JSONDecodeError:
+            legacy = raw
+    return {
+        "data_source_id": ds_id,
+        "subprofile_id": ds.subprofile_id,
+        "statuses": parsed,
+        "legacy_text": legacy,
+    }
+
+
+@router.post(
+    "/data-sources/{ds_id}/use-case-status",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def patch_data_source_uc_status(
+    ds_id: int,
+    body: UseCaseStatusPatch,
+    session: Session = Depends(get_db_session),
+):
+    ds = session.get(CyabDataSource, ds_id)
+    if ds is None:
+        raise HTTPException(status_code=404, detail="Unknown data source")
+    raw = ds.use_case_status
+    existing: Dict[str, str] = {}
+    if raw:
+        try:
+            obj = json.loads(raw)
+            if isinstance(obj, dict):
+                existing = {k: v for k, v in obj.items() if v in _VALID_UC_STATUSES}
+        except json.JSONDecodeError:
+            pass
+    for k, v in (body.statuses or {}).items():
+        if v is None:
+            existing.pop(k, None)
+            continue
+        if v not in _VALID_UC_STATUSES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status '{v}' for {k}; must be one of {sorted(_VALID_UC_STATUSES)}",
+            )
+        existing[k] = v
+    ds.use_case_status = json.dumps(existing, sort_keys=True)
+    session.commit()
+    return {"data_source_id": ds_id, "statuses": existing, "count": len(existing)}
+
+
+# ---------------------------------------------------------------------------
+# Per-system sub-profile coverage
+# ---------------------------------------------------------------------------
+
+@router.get("/systems/{sys_id}/coverage")
+def get_system_coverage(sys_id: int, session: Session = Depends(get_db_session)):
+    sys = session.get(CyabSystem, sys_id)
+    if sys is None:
+        raise HTTPException(status_code=404, detail="Unknown system")
+    return system_coverage(session, sys_id)
+
+
+# ---------------------------------------------------------------------------
+# Onboarding Pack PDF
+# ---------------------------------------------------------------------------
+
+def _h(v: Any) -> str:
+    return _html_mod.escape("" if v is None else str(v), quote=True)
+
+
+def _render_onboarding_pack_html(session: Session, sys: CyabSystem) -> str:
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    org_asmt = session.scalars(
+        select(CyabAssessment).order_by(CyabAssessment.submitted_at.desc()).limit(1)
+    ).first()
+    sys_asmt = session.scalars(
+        select(CyabSystemAssessment)
+        .where(CyabSystemAssessment.system_id == sys.id)
+        .order_by(CyabSystemAssessment.submitted_at.desc()).limit(1)
+    ).first()
+    sources = session.scalars(
+        select(CyabDataSource).where(CyabDataSource.system_id == sys.id)
+    ).all()
+    coverage = system_coverage(session, sys.id)
+    cover = (
+        f"<h1 style='border:none;margin:0;padding:0;'>CyAB Onboarding Pack</h1>"
+        f"<p class='pdf-subtitle'>{_h(sys.name)} &bull; {_h(sys.department)} &bull; {now} &bull; ION</p>"
+        f"<table class='pdf-meta'>"
+        f"<tr><td>System</td><td><strong>{_h(sys.name)}</strong></td></tr>"
+        f"<tr><td>Department</td><td>{_h(sys.department)}</td></tr>"
+        f"<tr><td>Status</td><td>{_h(sys.status)}</td></tr>"
+        f"<tr><td>Readiness score</td><td>{_h(sys.readiness_score)}%</td></tr>"
+        f"</table>"
+    )
+    context = "<h2>Strategic context</h2>"
+    if org_asmt and org_asmt.computed_profile_json:
+        try:
+            profile = json.loads(org_asmt.computed_profile_json)
+        except json.JSONDecodeError:
+            profile = {}
+        rows_html = "".join(
+            f"<tr><td>{_h(k)}</td><td>{_h(v)}</td></tr>" for k, v in profile.items()
+        )
+        context += f"<table class='pdf-meta'>{rows_html}</table>"
+    else:
+        context += "<p><em>No org-wide assessment captured yet.</em></p>"
+    scope = (
+        "<h2>System scope &mdash; data sources</h2><table>"
+        "<thead><tr><th>Name</th><th>Type</th><th>Sub-profile</th>"
+        "<th>SAL</th><th>Retention</th><th>P1 SLA</th><th>Namespace</th></tr></thead><tbody>"
+    )
+    for ds in sources:
+        scope += (
+            f"<tr><td>{_h(ds.name)}</td><td>{_h(ds.data_source_type)}</td>"
+            f"<td>{_h(ds.subprofile_id) or '<em>not set</em>'}</td>"
+            f"<td>{_h(ds.sal_tier)}</td><td>{_h(ds.retention)}</td>"
+            f"<td>{_h(ds.p1_sla)}</td><td>{_h(ds.data_namespace)}</td></tr>"
+        )
+    scope += "</tbody></table>"
+    readiness_html = "<h2>Per-sub-profile readiness</h2>"
+    answers: Dict[str, Any] = {}
+    if sys_asmt and sys_asmt.responses_json:
+        try:
+            answers = json.loads(sys_asmt.responses_json)
+        except json.JSONDecodeError:
+            answers = {}
+    if not coverage["subprofiles"]:
+        readiness_html += "<p><em>No sub-profiles assigned to data sources yet.</em></p>"
+    else:
+        for sp in coverage["subprofiles"]:
+            sub_full = get_subprofile_full(session, sp["subprofile_id"]) or {}
+            cat = sub_full.get("catalogue") or {}
+            readiness_html += (
+                f"<h3>{_h(sp['label'])}</h3>"
+                f"<p class='pdf-meta'>Intake: {_h(sp['intake']['answered'])}/{_h(sp['intake']['total'])} "
+                f"({_h(sp['intake']['pct'])}%) &bull; "
+                f"Detection: {_h(sp['detection']['shipped'])}/{_h(sp['detection']['total'])} "
+                f"({_h(sp['detection']['pct'])}%) &bull; "
+                f"Audit: {_h(sp['audit']['shipped'])}/{_h(sp['audit']['total'])} "
+                f"({_h(sp['audit']['pct'])}%)</p>"
+            )
+            qs = cat.get("intake_questions") or []
+            if qs:
+                readiness_html += (
+                    "<table><thead><tr><th>Question</th><th>Answer</th></tr></thead><tbody>"
+                )
+                for q in qs:
+                    ans = answers.get(q["key"], "<em>not answered</em>")
+                    readiness_html += f"<tr><td>{_h(q['text'])}</td><td>{_h(ans)}</td></tr>"
+                readiness_html += "</tbody></table>"
+            dets = cat.get("detection_use_cases") or []
+            if dets:
+                readiness_html += (
+                    "<h4>Detection coverage</h4>"
+                    "<table><thead><tr><th>Use case</th><th>MITRE</th><th>Risk</th></tr></thead><tbody>"
+                )
+                for d in dets:
+                    readiness_html += (
+                        f"<tr><td>{_h(d.get('title'))}</td>"
+                        f"<td>{_h(', '.join(d.get('mitre_ids') or []))}</td>"
+                        f"<td>{_h(d.get('risk'))}</td></tr>"
+                    )
+                readiness_html += "</tbody></table>"
+            auds = cat.get("audit_use_cases") or []
+            if auds:
+                readiness_html += (
+                    "<h4>Audit / compliance coverage</h4>"
+                    "<table><thead><tr><th>Use case</th><th>Compliance</th><th>Risk</th></tr></thead><tbody>"
+                )
+                for a in auds:
+                    readiness_html += (
+                        f"<tr><td>{_h(a.get('title'))}</td>"
+                        f"<td>{_h(', '.join(a.get('compliance_frames') or []))}</td>"
+                        f"<td>{_h(a.get('risk'))}</td></tr>"
+                    )
+                readiness_html += "</tbody></table>"
+    containment = (
+        f"<h2>Containment authority</h2><p>{_h(sys.containment_authority)}</p>"
+        if sys.containment_authority else
+        "<h2>Containment authority</h2><p><em>Not yet captured.</em></p>"
+    )
+    try:
+        doc_items = _doc_svc.list_for_system(session, sys.id)
+        doc_cov = _doc_svc.coverage_summary(session, sys.id)
+    except Exception:
+        doc_items, doc_cov = [], None
+    if doc_items:
+        by_cat: Dict[str, list] = {}
+        for it in doc_items:
+            by_cat.setdefault(it.get("category", "design"), []).append(it)
+        cat_labels = {
+            "design": "Architecture & Design", "operational": "Operational",
+            "security": "Security & Risk", "compliance": "Compliance",
+        }
+        STATUS_LABEL = {
+            "done": "Done", "in_progress": "In progress",
+            "missing": "Missing", "na": "N/A", "unknown": "Unknown",
+        }
+        doc_rows = []
+        for cat in ["design", "operational", "security", "compliance"]:
+            if cat not in by_cat:
+                continue
+            doc_rows.append(f"<h3>{_h(cat_labels.get(cat, cat.title()))}</h3>")
+            doc_rows.append(
+                "<table><tr><th>Item</th><th>Status</th><th>Link</th><th>Notes</th></tr>"
+            )
+            for it in by_cat[cat]:
+                star = " ★" if it.get("is_critical") else ""
+                status_lbl = STATUS_LABEL.get(it.get("status", "unknown"), it.get("status", ""))
+                url = it.get("url") or ""
+                url_cell = f'<a href="{_h(url)}">{_h(url)[:60]}</a>' if url else ""
+                doc_rows.append(
+                    f"<tr><td>{_h(it.get('label', ''))}{star}</td>"
+                    f"<td>{_h(status_lbl)}</td><td>{url_cell}</td>"
+                    f"<td>{_h((it.get('notes') or '')[:160])}</td></tr>"
+                )
+            doc_rows.append("</table>")
+        critical_block = ""
+        if doc_cov and doc_cov.get("critical_missing"):
+            missing = ", ".join(doc_cov["critical_missing"])
+            critical_block = (
+                f'<p style="color:#a40000;"><strong>Critical documents missing:</strong> '
+                f'{_h(missing)}</p>'
+            )
+        doc_section = (
+            "<h2>Documentation checklist</h2>"
+            f'<p>★ marks critical items. Coverage: '
+            f'<strong>{(doc_cov or {}).get("done", 0)}/{(doc_cov or {}).get("total", 0)}</strong> '
+            f'done · {(doc_cov or {}).get("completion_pct", 0)}%.</p>'
+            f"{critical_block}" + "".join(doc_rows)
+        )
+    else:
+        doc_section = ""
+    signoff = (
+        "<h2>Sign-off</h2><table class='pdf-meta'>"
+        f"<tr><td>Department lead</td><td>{_h(sys.sign_dept_name) or '<em>pending</em>'}</td>"
+        f"<td>{_h(sys.sign_dept_date) or ''}</td></tr>"
+        f"<tr><td>SOC lead</td><td>{_h(sys.sign_soc_name) or '<em>pending</em>'}</td>"
+        f"<td>{_h(sys.sign_soc_date) or ''}</td></tr></table>"
+    )
+    style = (
+        "<style>"
+        "@page { size: A4; margin: 18mm; }"
+        "body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; font-size: 11pt; }"
+        "h1 { font-size: 24pt; color: #0b3d91; }"
+        "h2 { color: #0b3d91; border-bottom: 2px solid #0b3d91; padding-bottom: 4px; margin-top: 28px; }"
+        "h3 { color: #1a4ea3; margin-top: 18px; }"
+        "h4 { color: #444; margin-top: 12px; }"
+        "table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10pt; }"
+        "th, td { border: 1px solid #d0d7de; padding: 6px 8px; text-align: left; vertical-align: top; }"
+        "th { background: #f6f8fa; }"
+        "table.pdf-meta { width: auto; }"
+        "table.pdf-meta td { border: none; padding: 3px 12px 3px 0; }"
+        ".pdf-subtitle { color: #555; font-size: 10pt; margin-top: 0; }"
+        "</style>"
+    )
+    return (
+        f"<!DOCTYPE html><html><head>{style}</head>"
+        f"<body>{cover}{context}{scope}{readiness_html}{containment}{doc_section}{signoff}</body></html>"
+    )
+
+
+from fastapi.responses import Response as _Response
+
+
+@router.get(
+    "/systems/{sys_id}/onboarding-pack",
+    dependencies=[Depends(require_permission("case:read"))],
+)
+def render_onboarding_pack(sys_id: int, session: Session = Depends(get_db_session)):
+    sys = session.get(CyabSystem, sys_id)
+    if sys is None:
+        raise HTTPException(status_code=404, detail="Unknown system")
+    full_html = _render_onboarding_pack_html(session, sys)
+    try:
+        from weasyprint import HTML as WpHTML
+        pdf_bytes = WpHTML(string=full_html).write_pdf()
+        slug = _re.sub(r"[^A-Za-z0-9._-]+", "_", sys.name or "system").strip("_")[:60] or "system"
+        filename = f"onboarding_pack_{slug}_{date.today().isoformat()}.pdf"
+        return _Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+    except (ImportError, OSError):
+        return _Response(
+            content=full_html,
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+
+@router.post(
+    "/systems/{sys_id}/onboarding-pack/sign",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def sign_onboarding_pack(
+    sys_id: int,
+    body: SignOffRequest,
+    session: Session = Depends(get_db_session),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    sys = session.get(CyabSystem, sys_id)
+    if sys is None:
+        raise HTTPException(status_code=404, detail="Unknown system")
+    today = date.today()
+    if body.sign_dept_name is not None:
+        sys.sign_dept_name = body.sign_dept_name
+        sys.sign_dept_date = today
+    if body.sign_soc_name is not None:
+        sys.sign_soc_name = body.sign_soc_name
+        sys.sign_soc_date = today
+    if body.containment_authority is not None:
+        sys.containment_authority = body.containment_authority
+    if sys.sign_dept_name and sys.sign_soc_name:
+        sys.status = "ACTIVE"
+    session.commit()
+    session.refresh(sys)
+    try:
+        coverage = _doc_svc.coverage_summary(session, sys.id)
+    except Exception:
+        coverage = None
+    return {
+        "system_id": sys.id,
+        "status": sys.status,
+        "sign_dept_name": sys.sign_dept_name,
+        "sign_dept_date": sys.sign_dept_date.isoformat() if sys.sign_dept_date else None,
+        "sign_soc_name": sys.sign_soc_name,
+        "sign_soc_date": sys.sign_soc_date.isoformat() if sys.sign_soc_date else None,
+        "containment_authority": sys.containment_authority,
+        "doc_checklist_coverage": coverage,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Documentation checklist
+# ---------------------------------------------------------------------------
+
+@router.get("/systems/{sys_id}/checklist")
+def get_doc_checklist(
+    sys_id: int,
+    session: Session = Depends(get_db_session),
+    _user: User = Depends(get_current_user),
+):
+    sys_row = session.get(CyabSystem, sys_id)
+    if not sys_row:
+        raise HTTPException(status_code=404, detail=f"System {sys_id} not found")
+    return {
+        "system_id": sys_id,
+        "items": _doc_svc.list_for_system(session, sys_id),
+        "coverage": _doc_svc.coverage_summary(session, sys_id),
+    }
+
+
+@router.put(
+    "/checklist/{item_id}",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def update_doc_checklist_item(
+    item_id: int,
+    body: DocChecklistUpdate,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        out = _doc_svc.update_item(
+            session, item_id,
+            status=body.status, url=body.url, notes=body.notes,
+            label=body.label, is_critical=body.is_critical,
+            user_id=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if out is None:
+        raise HTTPException(status_code=404, detail=f"Checklist item {item_id} not found")
+    return out
+
+
+@router.post(
+    "/systems/{sys_id}/checklist",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def add_custom_doc_checklist_item(
+    sys_id: int,
+    body: DocChecklistAdd,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    sys_row = session.get(CyabSystem, sys_id)
+    if not sys_row:
+        raise HTTPException(status_code=404, detail=f"System {sys_id} not found")
+    try:
+        out = _doc_svc.add_custom_item(
+            session, sys_id,
+            kind=body.kind, label=body.label, category=body.category,
+            is_critical=body.is_critical, status=body.status,
+            url=body.url, notes=body.notes,
+            user_id=current_user.id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return out
+
+
+@router.delete(
+    "/checklist/{item_id}",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def delete_custom_doc_checklist_item(
+    item_id: int,
+    session: Session = Depends(get_db_session),
+    _user: User = Depends(get_current_user),
+):
+    ok = _doc_svc.delete_custom_item(session, item_id)
+    if not ok:
+        raise HTTPException(
+            status_code=400,
+            detail="Item not found, or it is a default-catalogue row (cannot be deleted).",
+        )
+    return {"ok": True, "deleted": item_id}
+
+
+# ---------------------------------------------------------------------------
+# System hard-delete (migrated from studio; used by both per-row UI and bulk)
+# ---------------------------------------------------------------------------
+
+def _delete_system_row(session: Session, sys_id: int) -> bool:
+    """Hard-delete a CyabSystem and its non-cascading children."""
+    from ion.models.cyab import CyabDataSource, CyabSnapshot
+    sys_row = session.get(CyabSystem, sys_id)
+    if sys_row is None:
+        return False
+    session.query(CyabSnapshot).filter(CyabSnapshot.system_id == sys_id).delete(
+        synchronize_session=False
+    )
+    session.query(CyabDataSource).filter(CyabDataSource.system_id == sys_id).delete(
+        synchronize_session=False
+    )
+    session.delete(sys_row)
+    session.commit()
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Scoping pack PDF (inlined — no longer proxied from studio)
+# ---------------------------------------------------------------------------
+
+def _render_scoping_pack_pdf_html(scores: dict, answers: dict) -> str:
+    from datetime import datetime as _dt
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+    template_dir = Path(__file__).parent / "templates"
+    env = Environment(
+        loader=FileSystemLoader(str(template_dir)),
+        autoescape=select_autoescape(["html"]),
+    )
+    tmpl = env.get_template("cyab/_scoping_pack_pdf.html")
+    return tmpl.render(
+        scores=scores,
+        answers=answers,
+        generated_at=_dt.now().strftime("%Y-%m-%d %H:%M"),
+    )

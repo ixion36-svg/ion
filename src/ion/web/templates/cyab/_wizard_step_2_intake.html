@@ -1,5 +1,5 @@
 {# Step 2: Intake — sub-profile-driven questions. Reuses
-   /api/cyab/studio/systems/{sys_id}/answers for autosave so the SAME
+   /api/cyab/systems/{sys_id}/answers for autosave so the SAME
    intake form is used here and on the per-system Intake tab.
 
    The "live recommendation counter" (use cases / threat-actor matches /
@@ -50,7 +50,7 @@
             <span class="text-slate-300">{{ q.text }}</span>
             <input type="text" name="answers[{{ q.id }}]" value="{{ state.intake.get(q.id, '') }}"
                    class="w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded"
-                   hx-post="/api/cyab/studio/systems/{{ state.system_id }}/answers"
+                   hx-post="/api/cyab/systems/{{ state.system_id }}/answers"
                    hx-trigger="change delay:600ms"
                    hx-vals='js:{ answers: { "{{ q.id }}": this.value } }'
                    hx-swap="none">

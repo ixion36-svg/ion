@@ -57,7 +57,6 @@ from ion.web.compliance_api import router as compliance_router
 from ion.web.course_api import router as course_router
 from ion.web.labs_api import router as labs_router
 from ion.web.cyab_api import router as cyab_router
-from ion.web.cyab_studio_api import router as cyab_studio_router
 from ion.web.cyber_range_api import router as cyber_range_router
 from ion.web.d3fend_api import router as d3fend_router
 from ion.web.daily_standup_api import router as daily_standup_router
@@ -286,7 +285,6 @@ app.include_router(social_router, prefix="/api/social")
 app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(engineering_analytics_router, prefix="/api/engineering/analytics")
 app.include_router(cyab_router, prefix="/api/cyab")
-app.include_router(cyab_studio_router, prefix="/api/cyab/studio")
 app.include_router(wallboard_router, prefix="")
 # v0.17.0: translator — page route + /api/translator/* routes share the
 # same router so it owns its own prefixes internally.
@@ -1168,14 +1166,15 @@ async def cyab_systems_bulk(
             )
 
         # v0.19.7: bulk delete. Reuses _delete_system_row from
-        # cyab_studio_api so the manual data_sources / snapshots
-        # cascade is identical to the single-row endpoint.
+        # cyab_api (migrated from cyab_studio_api in v0.20.0) so the
+        # data_sources / snapshots cascade is identical to the
+        # single-row endpoint.
         # v0.19.16: privilege gate. The enclosing endpoint is
         # require_page_permission("alert:read") because the read-ish
         # actions (mark-reviewed/export-csv/rerun-health) are fine for
         # any analyst. delete-selected is destructive and must match
-        # the case:update gate the per-row DELETE /api/cyab/studio/
-        # systems/{id} endpoint already enforces.
+        # the case:update gate the per-row DELETE /api/cyab/systems/{id}
+        # endpoint already enforces.
         # v0.19.16: also catches IntegrityError per-row so a single
         # FK-violation doesn't poison the shared session for the rest
         # of the user's selection.
@@ -1186,7 +1185,7 @@ async def cyab_systems_bulk(
                     detail="case:update permission required for bulk delete",
                 )
             from sqlalchemy.exc import IntegrityError
-            from ion.web.cyab_studio_api import _delete_system_row
+            from ion.web.cyab_api import _delete_system_row
             deleted = 0
             failed: list[int] = []
             for s in rows:
@@ -1210,15 +1209,6 @@ async def cyab_systems_bulk(
     finally:
         session.close()
 
-
-@app.get("/cyab/studio")
-async def cyab_studio_redirect(system: int | None = None):
-    """301 redirect — /cyab/studio is replaced by /cyab/systems/{id}.
-
-    Kept for one minor version (v0.19.x). Drop in v0.20.0.
-    """
-    target = f"/cyab/systems/{system}" if system else "/cyab/systems"
-    return RedirectResponse(url=target, status_code=301)
 
 
 @app.get("/cyab/systems/{system_id}", response_class=HTMLResponse)
@@ -1351,7 +1341,7 @@ async def cyab_system_tab(
             ctx["progress"] = cyab_doc_checklist_service.coverage_summary(session, system_id)
             # Existing sign-off history lives on CyabSystem itself
             # (sign_dept_*/sign_soc_* — populated by the existing
-            # POST /api/cyab/studio/systems/{id}/onboarding-pack/sign
+            # POST /api/cyab/systems/{id}/onboarding-pack/sign
             # endpoint). The CyabSnapshot model has no ``kind`` or
             # ``signed_by`` columns, so the de-duped history is read
             # directly from the canonical fields on the system row.

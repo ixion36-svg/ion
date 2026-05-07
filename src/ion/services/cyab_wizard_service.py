@@ -109,7 +109,7 @@ def save_identity(session: Session, wizard_id: str, identity: Dict[str, Any]) ->
 
 def save_intake(session: Session, wizard_id: str, answers: Dict[str, Any]) -> Dict[str, Any]:
     """Persist Step 2 answers in the wizard blob (real autosave goes via
-    /api/cyab/studio/systems/{sys_id}/answers -- this just records the
+    /api/cyab/systems/{sys_id}/answers -- this just records the
     snapshot for resume). Advances step -> 3."""
     row = _load(session, wizard_id)
     state = _state(row)
