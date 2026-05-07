@@ -241,9 +241,10 @@ def _build_pdf_html(
 
     meta_rows = ""
     if metadata:
+        import html as _html_esc
         for key, val in metadata.items():
             if val:
-                meta_rows += f"<tr><td>{key}</td><td>{val}</td></tr>\n"
+                meta_rows += f"<tr><td>{key}</td><td>{_html_esc.escape(str(val))}</td></tr>\n"
 
     meta_table = ""
     if meta_rows:
@@ -274,6 +275,13 @@ def _build_pdf_html(
 </html>"""
 
 
+def _block_external_url_fetcher(url: str):
+    if url.startswith("data:"):
+        from weasyprint import default_url_fetcher
+        return default_url_fetcher(url)
+    raise ValueError(f"External resource blocked in PDF export: {url}")
+
+
 def generate_pdf(
     html_content: str,
     title: str = "Document",
@@ -301,7 +309,7 @@ def generate_pdf(
         ) from exc
 
     full_html = _build_pdf_html(html_content, title, metadata)
-    return HTML(string=full_html).write_pdf()
+    return HTML(string=full_html, url_fetcher=_block_external_url_fetcher).write_pdf()
 
 
 def render_lesson_pdf(lesson, course) -> bytes:

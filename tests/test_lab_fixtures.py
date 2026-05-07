@@ -416,6 +416,39 @@ class TestTeardownLab:
             assert gone is None
 
 
+class TestInsertRowColumnSafety:
+    def test_malicious_column_name_raises_value_error(
+        self, db: Session, lab_lesson: Lesson, enrolment: UserEnrolment
+    ):
+        """A fixture row with an unsafe column name must raise ValueError
+        before any SQL is executed.
+        """
+        from ion.services.lab_fixture_service import _insert_row
+
+        bad_payload = {
+            "id) RETURNING pg_sleep(5)--": "injected",
+            "status": "open",
+        }
+        with pytest.raises(ValueError, match="Unsafe column name"):
+            _insert_row(db, target_table="alert_triage", payload=bad_payload)
+
+    def test_valid_column_names_are_accepted(
+        self, db: Session
+    ):
+        """Well-formed snake_case column names pass the safety check."""
+        from ion.services.lab_fixture_service import _SAFE_COLUMN_RE
+
+        valid = ["id", "es_alert_id", "status", "created_at", "source_system"]
+        for col in valid:
+            assert _SAFE_COLUMN_RE.match(col), f"Expected {col!r} to be valid"
+
+    def test_upper_case_column_rejected(self, db: Session):
+        from ion.services.lab_fixture_service import _insert_row
+
+        with pytest.raises(ValueError, match="Unsafe column name"):
+            _insert_row(db, target_table="alert_triage", payload={"Status": "open"})
+
+
 class TestGetLiveSessionFixtures:
     def test_returns_active_rows(
         self, db: Session, lab_lesson: Lesson, enrolment: UserEnrolment
