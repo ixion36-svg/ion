@@ -88,7 +88,6 @@ from ion.web.playbook_action_api import router as playbook_action_router
 from ion.web.playbook_analytics_api import router as playbook_analytics_router
 from ion.web.report_scheduler_api import router as report_scheduler_router
 from ion.web.role_skills_api import router as role_skills_router
-from ion.web.saved_search_api import router as saved_search_router
 from ion.web.scheduler_api import router as scheduler_router
 from ion.web.security_api import router as security_router
 from ion.web.security_middleware import RateLimitSecurityMiddleware, SecurityMonitoringMiddleware
@@ -321,7 +320,6 @@ app.include_router(incident_cost_router, prefix="/api")
 app.include_router(compliance_router, prefix="/api")
 app.include_router(comm_template_router, prefix="/api")
 app.include_router(change_log_router, prefix="/api")
-app.include_router(saved_search_router, prefix="/api")
 app.include_router(sla_router, prefix="/api")
 app.include_router(network_map_router, prefix="/api")
 app.include_router(bulk_ops_router, prefix="/api")
@@ -765,18 +763,6 @@ async def startup_event():
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request, user: User = Depends(require_page_auth)):
     """Render the main dashboard (Tailwind refresh)."""
-    return templates.TemplateResponse(request=request, name="dashboard_v2.html")
-
-
-@app.get("/dashboard-legacy", response_class=HTMLResponse)
-async def dashboard_legacy(request: Request, user: User = Depends(require_page_auth)):
-    """Legacy role-based dashboard — kept as a rollback path during the Tailwind migration."""
-    return templates.TemplateResponse(request=request, name="index.html")
-
-
-@app.get("/dashboard-v2", response_class=HTMLResponse)
-async def dashboard_v2(request: Request, user: User = Depends(require_page_auth)):
-    """Alias for /. Kept so existing bookmarks still resolve during the rollout."""
     return templates.TemplateResponse(request=request, name="dashboard_v2.html")
 
 
