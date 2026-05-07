@@ -6375,6 +6375,11 @@ async def get_alert_triage(
             "observables": triage.observables,
             "mitre_techniques": triage.mitre_techniques,
             "source_system": triage.source_system,
+            # v0.21.0: Bob confidence scoring + circuit breaker
+            "suggested_verdict": getattr(triage, "suggested_verdict", None),
+            "suggested_verdict_confidence": getattr(triage, "suggested_verdict_confidence", None),
+            "suggested_verdict_confidence_int": getattr(triage, "suggested_verdict_confidence_int", None),
+            "bob_escalation_badge": getattr(triage, "bob_escalation_badge", None),
         }
 
     # ------------------------------------------------------------------

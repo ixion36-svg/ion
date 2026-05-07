@@ -57,6 +57,7 @@ class AlertPromptRepository:
         severity_hint: Optional[str] = None,
         expected_outputs: Optional[List[str]] = None,
         created_by_id: Optional[int] = None,
+        confidence_threshold_override: Optional[int] = None,
     ) -> AlertPromptTemplate:
         tmpl = AlertPromptTemplate(
             name=name,
@@ -73,6 +74,7 @@ class AlertPromptRepository:
             severity_hint=severity_hint,
             expected_outputs_json=_dumps(expected_outputs),
             created_by_id=created_by_id,
+            confidence_threshold_override=confidence_threshold_override,
         )
         self.session.add(tmpl)
         self.session.flush()

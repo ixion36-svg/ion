@@ -59,6 +59,13 @@ class AlertPromptTemplate(Base, TimestampMixin):
     severity_hint: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     expected_outputs_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # v0.21.0: per-template circuit-breaker threshold override. When set,
+    # overrides ION_BOB_CONFIDENCE_THRESHOLD for alerts matched by this
+    # template. NULL = use the global env-var default.
+    confidence_threshold_override: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True
+    )
+
     # Audit trail
     created_by_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
@@ -106,6 +113,7 @@ class AlertPromptTemplate(Base, TimestampMixin):
             "created_by_username": (
                 self.created_by.username if self.created_by else None
             ),
+            "confidence_threshold_override": self.confidence_threshold_override,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

@@ -141,6 +141,13 @@
                             <textarea id="prompt-outputs" class="form-control" rows="3" placeholder="verdict&#10;recommended_actions&#10;ioc_confidence"></textarea>
                         </div>
                     </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1;">
+                            <label for="prompt-confidence-threshold">Confidence Threshold Override (0-100)</label>
+                            <input type="number" id="prompt-confidence-threshold" class="form-control" min="0" max="100" placeholder="e.g. 70 — leave blank to use global default">
+                            <p class="form-help">When set, Bob must reach this confidence score to write a verdict for alerts matched by this template. Overrides ION_BOB_CONFIDENCE_THRESHOLD (default 60).</p>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
@@ -349,6 +356,7 @@ function resetForm() {
     document.getElementById('prompt-checklist').value = '';
     document.getElementById('prompt-severity').value = '';
     document.getElementById('prompt-outputs').value = '';
+    document.getElementById('prompt-confidence-threshold').value = '';
 }
 
 function showCreateModal() {
@@ -380,6 +388,9 @@ function editTemplate(id) {
     document.getElementById('prompt-checklist').value = t.investigation_checklist_text || '';
     document.getElementById('prompt-severity').value = t.severity_hint || '';
     document.getElementById('prompt-outputs').value = arrayToLines(t.expected_outputs);
+    document.getElementById('prompt-confidence-threshold').value =
+        (t.confidence_threshold_override !== null && t.confidence_threshold_override !== undefined)
+            ? t.confidence_threshold_override : '';
     document.getElementById('prompt-modal').style.display = 'flex';
 }
 
@@ -399,6 +410,12 @@ async function saveTemplate() {
         investigation_checklist_text: document.getElementById('prompt-checklist').value || null,
         severity_hint: document.getElementById('prompt-severity').value || null,
         expected_outputs: linesToArray(document.getElementById('prompt-outputs').value),
+        confidence_threshold_override: (() => {
+            const v = document.getElementById('prompt-confidence-threshold').value.trim();
+            if (v === '' || v === null) return null;
+            const n = parseInt(v, 10);
+            return isNaN(n) ? null : Math.min(100, Math.max(0, n));
+        })(),
     };
 
     if (!payload.name) { alert('Name is required'); return; }

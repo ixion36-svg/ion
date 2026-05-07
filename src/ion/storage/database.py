@@ -866,6 +866,62 @@ def _run_migrations(engine: Engine) -> None:
             ))
             logger.info("Migrated: CREATE TABLE lab_session_fixtures")
 
+    # v0.21.0: Bob confidence scoring + circuit breakers.
+    # Adds numeric confidence columns and circuit-breaker fields.
+    if insp.has_table("investigations"):
+        existing = {col["name"] for col in insp.get_columns("investigations")}
+        for col_name, col_type in {
+            "confidence_int": "INTEGER",
+            "reasoning_text": "TEXT",
+        }.items():
+            if col_name not in existing:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(f"ALTER TABLE investigations ADD COLUMN {col_name} {col_type}")
+                    )
+                    logger.info("Migrated: investigations.%s", col_name)
+
+    if insp.has_table("alert_triage"):
+        existing = {col["name"] for col in insp.get_columns("alert_triage")}
+        for col_name, col_type in {
+            "suggested_verdict_confidence_int": "INTEGER",
+            "bob_escalation_badge": "VARCHAR(30)",
+        }.items():
+            if col_name not in existing:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(f"ALTER TABLE alert_triage ADD COLUMN {col_name} {col_type}")
+                    )
+                    logger.info("Migrated: alert_triage.%s", col_name)
+
+    if insp.has_table("ai_feedback"):
+        existing = {col["name"] for col in insp.get_columns("ai_feedback")}
+        if "bob_confidence_int" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE ai_feedback ADD COLUMN bob_confidence_int INTEGER")
+                )
+                logger.info("Migrated: ai_feedback.bob_confidence_int")
+        if "auto_escalated" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE ai_feedback ADD COLUMN auto_escalated BOOLEAN NOT NULL DEFAULT FALSE"
+                        if _is_postgres(engine)
+                        else "ALTER TABLE ai_feedback ADD COLUMN auto_escalated BOOLEAN NOT NULL DEFAULT 0"
+                    )
+                )
+                logger.info("Migrated: ai_feedback.auto_escalated")
+
+    if insp.has_table("alert_prompt_templates"):
+        existing = {col["name"] for col in insp.get_columns("alert_prompt_templates")}
+        if "confidence_threshold_override" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE alert_prompt_templates ADD COLUMN confidence_threshold_override INTEGER")
+                )
+                logger.info("Migrated: alert_prompt_templates.confidence_threshold_override")
+
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
 

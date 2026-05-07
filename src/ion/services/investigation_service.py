@@ -81,6 +81,50 @@ _BOB_IOC_TYPE_MAP = {
 }
 
 
+_DEFAULT_BOB_CONFIDENCE_THRESHOLD = 60
+_DEFAULT_BOB_STORE_REASONING = False
+
+
+def _compute_confidence(parsed: Dict[str, Any]) -> int:
+    """Compute a 0-100 confidence score from the LLM parsed envelope.
+
+    Starts from the raw LLM confidence value and applies deductions:
+    - Invalid verdict: -20
+    - Closure reason / verdict mismatch: -15
+    - No key_observations: -10
+
+    Result is clamped to [0, 100].
+    """
+    from ion.models.alert_triage import CaseClosureReason
+    raw = max(0, min(100, int(parsed.get("confidence") or 0)))
+    verdict = parsed.get("verdict") or ""
+    valid = {r.value for r in CaseClosureReason}
+    if verdict not in valid:
+        raw -= 20
+    closure = parsed.get("suggested_closure_reason") or ""
+    if closure and verdict and closure != verdict:
+        raw -= 15
+    if not parsed.get("key_observations"):
+        raw -= 10
+    return max(0, min(100, raw))
+
+
+def _get_bob_confidence_threshold(template=None) -> int:
+    """Resolve circuit-breaker threshold: template override > env var > default."""
+    if template is not None:
+        override = getattr(template, "confidence_threshold_override", None)
+        if override is not None:
+            try:
+                return int(override)
+            except (TypeError, ValueError):
+                pass
+    try:
+        return int(os.environ.get("ION_BOB_CONFIDENCE_THRESHOLD",
+                                  str(_DEFAULT_BOB_CONFIDENCE_THRESHOLD)))
+    except (TypeError, ValueError):
+        return _DEFAULT_BOB_CONFIDENCE_THRESHOLD
+
+
 def _render_bob_alert_note(parsed: Dict[str, Any]) -> str:
     """Render a markdown Note body from the JSON envelope.
 
@@ -171,21 +215,28 @@ def _write_bob_outputs(
     alert_id: str,
     investigation_id: int,
     parsed: Dict[str, Any],
+    template=None,
 ) -> None:
-    """Write Bob's three post-investigation artefacts in one transaction.
+    """Write Bob's post-investigation artefacts in one transaction.
 
     Runs inside the caller's transaction (does not commit). Best-effort —
     callers wrap this in try/except because a post-hook failure must not
     mark the investigation itself as failed.
 
     1. Alert Note (entity_type=ALERT, entity_id=alert_id) authored by Bob.
-    2. AlertTriage.suggested_verdict / suggested_verdict_confidence.
+    2. AlertTriage.suggested_verdict / suggested_verdict_confidence (gated by
+       circuit breaker — see _compute_confidence / _get_bob_confidence_threshold).
     3. Observable rows for high-confidence IOCs, tagged source:bob.
     4. TuningProposal on FP verdict with a concrete suggested_change.
+    5. Persist confidence_int (and optionally reasoning_text) on Investigation.
+    6. Write AIFeedback row at fire time for circuit-breaker telemetry.
 
     v0.10.5: short-circuits when the alert's triage is already CLOSED or
     its case is CLOSED — prevents Bob from polluting closed-case timelines
     when an investigation is re-run (force=True, manual retrigger, etc.).
+
+    v0.21.0: circuit breaker — if confidence_int < threshold, suppress
+    suggested_verdict on triage and write an auto_escalated AIFeedback row.
     """
     from ion.models.alert_triage import (
         AlertCase,
@@ -234,6 +285,24 @@ def _write_bob_outputs(
         )
         return
 
+    # v0.21.0: compute numeric confidence + resolve circuit-breaker threshold.
+    confidence_int = _compute_confidence(parsed)
+    threshold = _get_bob_confidence_threshold(template)
+    above_threshold = confidence_int >= threshold
+
+    # Persist confidence_int (and optionally reasoning_text) on Investigation.
+    from ion.models.investigation import Investigation as _Investigation
+    inv_row = db.get(_Investigation, investigation_id)
+    if inv_row is not None:
+        inv_row.confidence_int = confidence_int
+        store_reasoning = os.environ.get(
+            "ION_BOB_STORE_REASONING", "false"
+        ).lower() in ("true", "1", "yes")
+        if store_reasoning:
+            inv_row.reasoning_text = (
+                parsed.get("analyst_explanation") or ""
+            )[:8000] or None
+
     # 1) Alert Note ---------------------------------------------------------
     note_body = _render_bob_alert_note(parsed)
     if note_body:
@@ -245,7 +314,7 @@ def _write_bob_outputs(
         )
         db.add(note)
 
-    # 2) AlertTriage.suggested_verdict -------------------------------------
+    # 2) AlertTriage.suggested_verdict (circuit-breaker gated) -------------
     triage = (
         db.query(AlertTriage)
         .filter(AlertTriage.es_alert_id == alert_id)
@@ -253,14 +322,49 @@ def _write_bob_outputs(
     )
     verdict = parsed.get("verdict")
     conf = parsed.get("confidence_level") or "low"
-    if triage is not None and verdict and verdict != "inconclusive":
-        # Only write non-inconclusive verdicts with medium+ confidence so
-        # the hint badge doesn't shout at analysts on weak signals.
-        if conf in ("medium", "high"):
-            # suggested_verdict uses CaseClosureReason naming — the
-            # LLM contract already emits those exact values.
-            triage.suggested_verdict = verdict
-            triage.suggested_verdict_confidence = conf
+
+    if triage is not None:
+        if above_threshold:
+            # Happy path: write verdict when non-inconclusive + medium+ confidence.
+            if verdict and verdict != "inconclusive" and conf in ("medium", "high"):
+                triage.suggested_verdict = verdict
+                triage.suggested_verdict_confidence = conf
+                triage.suggested_verdict_confidence_int = confidence_int
+        else:
+            # Circuit breaker fired — do NOT write suggested_verdict.
+            triage.bob_escalation_badge = "low_confidence_triage"
+            triage.suggested_verdict_confidence_int = confidence_int
+            logger.info(
+                "Bob circuit breaker fired for alert %s: confidence %d < threshold %d",
+                alert_id, confidence_int, threshold,
+            )
+
+    # v0.21.0: write AIFeedback row at fire time so circuit-breaker events
+    # are captured independently of case-close (which may never happen for
+    # escalated alerts). This is a SECOND write point; record_case_close_feedback
+    # remains the primary path for normal case-close events.
+    from ion.models.ai_feedback import AIFeedback
+    # Resolve the template id for this investigation
+    _apt_id: Optional[int] = None
+    if template is not None:
+        _apt_id = getattr(template, "id", None)
+    elif inv_row is not None:
+        _apt_id = getattr(inv_row, "prompt_template_id", None)
+    fb = AIFeedback(
+        investigation_id=investigation_id,
+        case_id=None,
+        alert_id=str(alert_id),
+        alert_prompt_template_id=_apt_id,
+        bob_suggested_verdict=verdict if above_threshold else None,
+        bob_confidence=conf if above_threshold else None,
+        bob_confidence_int=confidence_int,
+        # human_verdict is required NOT NULL — use sentinel while unresolved.
+        human_verdict="pending",
+        human_closed_by_id=None,
+        agreement=None,
+        auto_escalated=not above_threshold,
+    )
+    db.add(fb)
 
     # 3) TuningProposal when Bob flagged FP with a concrete change ---------
     tuning = parsed.get("tuning_recommendation") or {}
@@ -2015,6 +2119,7 @@ class InvestigationService:
                         alert_id=alert_id,
                         investigation_id=inv_id,
                         parsed=parsed,
+                        template=template,
                     )
                 except Exception as exc:
                     logger.warning(
