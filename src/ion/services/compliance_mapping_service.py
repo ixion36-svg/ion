@@ -13,7 +13,6 @@ Public API:
     list_frameworks() -> list[dict]                 # framework metadata
     get_framework(id) -> dict | None                # all controls for one framework
     get_compliance_posture(tide, fid='nist_csf')    # compute coverage scorecard
-    get_compliance_posture_legacy(tide)             # NIST CSF for backwards compat
 """
 
 import logging
@@ -373,31 +372,3 @@ def get_all_postures(tide_service) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Backwards-compatibility shim
-# ---------------------------------------------------------------------------
-
-def get_compliance_posture_legacy(tide_service) -> dict:
-    """Legacy entry point — original NIST CSF scoring with the old response shape.
-
-    Kept so existing callers (and the original /api/compliance/nist-posture
-    endpoint) keep working while new callers move to get_compliance_posture().
-    """
-    posture = get_compliance_posture(tide_service, "nist_csf")
-    if "error" in posture:
-        return posture
-    # Original shape returned "framework" as a string and didn't include
-    # framework_id / version / url / state. Keep parity for old callers.
-    return {
-        "framework": posture["framework"],
-        "overall_score": posture["overall_score"],
-        "controls": [
-            {k: v for k, v in c.items() if k not in ("state", "description")}
-            for c in posture["controls"]
-        ],
-        "summary": {
-            "fully_covered": posture["summary"]["fully_covered"],
-            "partial": posture["summary"]["partial"],
-            "no_coverage": posture["summary"]["no_coverage"],
-        },
-    }
