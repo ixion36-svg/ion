@@ -70,24 +70,28 @@ def seed_knowledge_base() -> None:
         from ion.data.kb_offensive_access import COLLECTIONS as KB_OFF_ACCESS
         from ion.data.kb_offensive_advanced import COLLECTIONS as KB_OFF_ADVANCED
 
+        # Registry: (label, COLLECTIONS).  article_source in each COLLECTIONS
+        # entry may be a callable returning [(title, tags, content), ...] or a
+        # plain list of {"title", "tags", "content"} dicts — detected at load
+        # time via callable() so new modules need no flag.
         all_modules = [
-            ("Main KB", KB_MAIN, True),         # COLLECTIONS entries use functions
-            ("Blue Team", KB_BLUETEAM, True),
-            ("Foundations", KB_FOUNDATIONS, True),
-            ("Fundamentals", KB_FUNDAMENTALS, False),  # Uses lists of dicts
-            ("Offensive — Access & Escalation", KB_OFF_ACCESS, False),
-            ("Offensive — C2, Web & Evasion", KB_OFF_ADVANCED, False),
-            ("Foundations Extended", KB_FOUNDATIONS_EXT, False),
-            ("Networking — Protocols & Infra", KB_NET_PROTO, False),
-            ("Networking — Defense & Analysis", KB_NET_DEF, False),
-            ("Forensics — Analysis", KB_FORENSICS, False),
-            ("Forensics — Advanced", KB_FORENSICS_ADV, False),
-            ("Forensics — IR & Logs", KB_FORENSICS_IR, False),
-            ("Cloud, SIEM & Governance", KB_CLOUD_SIEM, False),
+            ("Main KB", KB_MAIN),
+            ("Blue Team", KB_BLUETEAM),
+            ("Foundations", KB_FOUNDATIONS),
+            ("Fundamentals", KB_FUNDAMENTALS),
+            ("Offensive — Access & Escalation", KB_OFF_ACCESS),
+            ("Offensive — C2, Web & Evasion", KB_OFF_ADVANCED),
+            ("Foundations Extended", KB_FOUNDATIONS_EXT),
+            ("Networking — Protocols & Infra", KB_NET_PROTO),
+            ("Networking — Defense & Analysis", KB_NET_DEF),
+            ("Forensics — Analysis", KB_FORENSICS),
+            ("Forensics — Advanced", KB_FORENSICS_ADV),
+            ("Forensics — IR & Logs", KB_FORENSICS_IR),
+            ("Cloud, SIEM & Governance", KB_CLOUD_SIEM),
         ]
 
         total = 0
-        for module_name, collections, uses_functions in all_modules:
+        for module_name, collections in all_modules:
             for col_name, col_desc, article_source in collections:
                 # Get or create child collection
                 child = collection_repo.get_by_name_and_parent(col_name, parent_id)
@@ -99,11 +103,10 @@ def seed_knowledge_base() -> None:
                     )
                     session.flush()
 
-                # Get articles (function call or direct list)
-                if uses_functions:
-                    articles = article_source()
-                    # Format: [(title, [tags], content), ...]
-                    for title, tags, content in articles:
+                # Normalise: callable → [(title, tags, content)]; list → same via dict access
+                if callable(article_source):
+                    articles_iter = article_source()
+                    for title, tags, content in articles_iter:
                         existing_doc = doc_repo.get_by_name(title)
                         if existing_doc:
                             continue
