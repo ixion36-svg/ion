@@ -63,6 +63,7 @@
 <script>
 const LESSON_ID = {{ lesson_id | tojson }};
 let _lesson = null;
+let _courseSlug = '';    // resolved in loadLesson; used by the PDF download link
 let _answers = {};       // {question_id: value}
 let _resultMap = null;   // {question_id: {is_correct, points_earned, points_max, correct_answer, explanation_md}}
 
@@ -77,8 +78,8 @@ async function loadLesson() {
     const r = await fetch('/api/lessons/' + LESSON_ID);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     _lesson = await r.json();
-    document.getElementById('ln-back').href = _lesson.course_id
-      ? `/courses/${await slugForCourse(_lesson.course_id)}` : '/courses';
+    _courseSlug = _lesson.course_id ? await slugForCourse(_lesson.course_id) : '';
+    document.getElementById('ln-back').href = _courseSlug ? `/courses/${_courseSlug}` : '/courses';
     render();
   } catch (e) {
     document.getElementById('ln-root').innerHTML =
@@ -117,6 +118,10 @@ function render() {
        </button>`
     : `<button id="ln-submit-btn" class="ln-btn-primary" onclick="submitQuiz()">Submit answers</button>`;
 
+  const pdfLink = _courseSlug
+    ? `<a class="ln-btn-secondary" href="/api/courses/${_courseSlug}/lessons/${l.id}/export.pdf" download style="font-size:0.78rem;padding:0.55rem 1rem;">Download PDF</a>`
+    : '';
+
   document.getElementById('ln-root').innerHTML = `
     <div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">${escHtml(l.lesson_type)}</div>
     <h1 class="text-[26px] font-bold text-white tracking-tight mb-2">${escHtml(l.title)}</h1>
@@ -129,7 +134,7 @@ function render() {
     <div id="ln-content" class="ln-content">${md(l.content_md || '')}</div>
     <div id="ln-questions">${questionsHtml}</div>
     <div id="ln-banner-slot"></div>
-    <div class="ln-actions">${completeBtn}</div>
+    <div class="ln-actions">${completeBtn}${pdfLink}</div>
   `;
 
   // Wire option clicks
