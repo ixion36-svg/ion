@@ -406,3 +406,103 @@ class TestForensicWorkbench:
         entries = r.json()["entries"]
         assert len(entries) == 1
         assert entries[0]["seq"] == 1
+
+    def test_16_cross_case_patch_rejected(self, app_client: TestClient):
+        """PATCH a pin using a different case's id in the URL returns 404.
+
+        The mutation must not be committed: the pin's title is unchanged.
+        """
+        # Create case-A and case-B
+        r_a = app_client.post(
+            "/api/forensics/cases",
+            json={
+                "title": "TOCTOU Case A",
+                "investigation_type": "malware_analysis",
+                "description": "",
+                "priority": "low",
+            },
+        )
+        assert r_a.status_code == 200, r_a.text
+        case_a_id = r_a.json()["id"]
+
+        r_b = app_client.post(
+            "/api/forensics/cases",
+            json={
+                "title": "TOCTOU Case B",
+                "investigation_type": "malware_analysis",
+                "description": "",
+                "priority": "low",
+            },
+        )
+        assert r_b.status_code == 200, r_b.text
+        case_b_id = r_b.json()["id"]
+
+        # Create a pin on case-A
+        r_pin = app_client.post(
+            f"/api/forensics/cases/{case_a_id}/pins",
+            json={"source_type": "note", "source_ref": "", "title": "Original Title"},
+        )
+        assert r_pin.status_code == 200, r_pin.text
+        pin_id = r_pin.json()["pin"]["id"]
+
+        # Attempt to PATCH using case-B's id in the URL
+        r_bad = app_client.patch(
+            f"/api/forensics/cases/{case_b_id}/pins/{pin_id}",
+            json={"title": "Mutated by B"},
+        )
+        assert r_bad.status_code == 404
+
+        # The pin must be unchanged
+        pins = app_client.get(
+            f"/api/forensics/cases/{case_a_id}/pins"
+        ).json()["pins"]
+        pin = next(p for p in pins if p["id"] == pin_id)
+        assert pin["title"] == "Original Title"
+
+    def test_17_cross_case_dismiss_rejected(self, app_client: TestClient):
+        """DELETE a pin using a different case's id in the URL returns 404.
+
+        The pin must remain non-dismissed (mutation not committed).
+        """
+        r_a = app_client.post(
+            "/api/forensics/cases",
+            json={
+                "title": "TOCTOU Dismiss A",
+                "investigation_type": "malware_analysis",
+                "description": "",
+                "priority": "low",
+            },
+        )
+        case_a_id = r_a.json()["id"]
+
+        r_b = app_client.post(
+            "/api/forensics/cases",
+            json={
+                "title": "TOCTOU Dismiss B",
+                "investigation_type": "malware_analysis",
+                "description": "",
+                "priority": "low",
+            },
+        )
+        case_b_id = r_b.json()["id"]
+
+        r_pin = app_client.post(
+            f"/api/forensics/cases/{case_a_id}/pins",
+            json={"source_type": "note", "source_ref": "", "title": "Must Survive"},
+        )
+        pin_id = r_pin.json()["pin"]["id"]
+
+        import json as _json
+        r_bad = app_client.request(
+            "DELETE",
+            f"/api/forensics/cases/{case_b_id}/pins/{pin_id}",
+            content=_json.dumps({"reason": "cross-case attack"}),
+            headers={"Content-Type": "application/json"},
+        )
+        assert r_bad.status_code == 404
+
+        pins = app_client.get(
+            f"/api/forensics/cases/{case_a_id}/pins"
+        ).json()["pins"]
+        pin = next(p for p in pins if p["id"] == pin_id)
+        assert pin["finding_status"] != "dismissed"

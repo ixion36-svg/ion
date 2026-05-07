@@ -131,6 +131,7 @@ def update_pin_endpoint(
         pin = forensic_pin_service.update_pin(
             session,
             pin_id,
+            forensic_case_id=case_id,
             actor_id=user.id,
             finding_status=body.finding_status,
             summary=body.summary,
@@ -140,9 +141,7 @@ def update_pin_endpoint(
             title=body.title,
         )
     except PinError as exc:
-        raise HTTPException(status_code=400, detail=safe_error(exc)) from exc
-    if pin.forensic_case_id != case_id:
-        raise HTTPException(status_code=404, detail="pin not in this case")
+        raise HTTPException(status_code=404, detail=safe_error(exc)) from exc
     return {"pin": pin.to_dict()}
 
 
@@ -156,12 +155,10 @@ def dismiss_pin_endpoint(
 ):
     try:
         pin = forensic_pin_service.dismiss_pin(
-            session, pin_id, actor_id=user.id, reason=body.reason
+            session, pin_id, forensic_case_id=case_id, actor_id=user.id, reason=body.reason
         )
     except PinError as exc:
-        raise HTTPException(status_code=400, detail=safe_error(exc)) from exc
-    if pin.forensic_case_id != case_id:
-        raise HTTPException(status_code=404, detail="pin not in this case")
+        raise HTTPException(status_code=404, detail=safe_error(exc)) from exc
     return {"pin": pin.to_dict()}
 
 

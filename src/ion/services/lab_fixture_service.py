@@ -196,6 +196,10 @@ def teardown_lab(
     return torn_down
 
 
+import re as _re
+_SAFE_COLUMN_RE = _re.compile(r"^[a-z_][a-z0-9_]*$")
+
+
 def _insert_row(
     session: Session, *, target_table: str, payload: dict[str, Any]
 ) -> int:
@@ -209,6 +213,9 @@ def _insert_row(
         raise ValueError("payload must not be empty")
 
     columns = list(payload.keys())
+    for col in columns:
+        if not _SAFE_COLUMN_RE.match(col):
+            raise ValueError(f"Unsafe column name rejected: {col!r}")
     placeholders = [f":{col}" for col in columns]
     col_list = ", ".join(columns)
     ph_list = ", ".join(placeholders)

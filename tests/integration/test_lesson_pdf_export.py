@@ -62,9 +62,20 @@ def seeded_client(temp_db, monkeypatch):
     )
 
     from ion.auth.dependencies import get_current_user
+    from ion.web.api import get_db_session
     from ion.web.server import app
 
+    seeded_session_factory = sessionmaker(bind=temp_db)
+
+    def _override_session():
+        sess = seeded_session_factory()
+        try:
+            yield sess
+        finally:
+            sess.close()
+
     app.dependency_overrides[get_current_user] = lambda: fake_admin
+    app.dependency_overrides[get_db_session] = _override_session
 
     client = TestClient(app)
     yield client, course_slug, lesson_id
@@ -147,3 +158,115 @@ def test_lesson_pdf_404_lesson_wrong_course(seeded_client, temp_db):
 
     r = client.get(f"/api/courses/{slug}/lessons/{other_lesson_id}/export.pdf")
     assert r.status_code == 404
+
+
+@pytest.fixture
+def ssrf_client(temp_db, monkeypatch):
+    """TestClient with a lesson whose content_md embeds an external image URL."""
+    monkeypatch.setattr("ion.storage.database.get_engine", lambda *_a, **_k: temp_db)
+    from ion.storage.database import reset_engine
+    reset_engine()
+
+    from ion.models.base import Base
+    from ion.models.course import Course, CourseModule, Lesson
+    from ion.models.user import User
+
+    Base.metadata.create_all(temp_db)
+
+    from sqlalchemy.orm import sessionmaker as _SM
+    s = _SM(bind=temp_db)()
+
+    course = Course(
+        title="SSRF Test Course", slug="ssrf-test-course-2", level="L1",
+        description_md="", estimated_hours=1, pass_threshold=70, published=True,
+    )
+    s.add(course)
+    s.flush()
+    module = CourseModule(
+        course_id=course.id, order=1, title="M1", estimated_minutes=10,
+    )
+    s.add(module)
+    s.flush()
+    lesson = Lesson(
+        module_id=module.id, order=1, title="SSRF Lesson",
+        lesson_type="reading",
+        content_md="## Test\n\n![external](http://example.com/x.png)\n\n![imds](http://169.254.169.254/latest/meta-data/)\n",
+        duration_min=5,
+    )
+    s.add(lesson)
+    s.commit()
+    lesson_id = lesson.id
+    slug = course.slug
+    s.close()
+
+    fake_admin = User(
+        id=999, username="ssrf_admin", email="ssrf_admin@localhost",
+        password_hash="x", display_name="SSRF Admin", is_active=True,
+    )
+
+    from ion.auth.dependencies import get_current_user
+    from ion.web.api import get_db_session
+    from ion.web.server import app
+
+    ssrf_session_factory = _SM(bind=temp_db)
+
+    def _override_session():
+        sess = ssrf_session_factory()
+        try:
+            yield sess
+        finally:
+            sess.close()
+
+    app.dependency_overrides[get_current_user] = lambda: fake_admin
+    app.dependency_overrides[get_db_session] = _override_session
+
+    from fastapi.testclient import TestClient
+    client = TestClient(app)
+    yield client, slug, lesson_id
+
+    app.dependency_overrides.clear()
+    reset_engine()
+
+
+def test_lesson_pdf_blocks_external_images(ssrf_client, monkeypatch):
+    """External image URLs in content_md must not trigger outbound HTTP.
+
+    The PDF route must return 200 with a non-empty body even when the
+    lesson embeds http:// image references; WeasyPrint's url_fetcher raises
+    ValueError for those URLs so rendering continues without the images.
+    """
+    import urllib.request as _urllib_req
+
+    fetched_urls: list[str] = []
+
+    real_urlopen = _urllib_req.urlopen
+
+    def _spy_urlopen(url, *args, **kwargs):
+        fetched_urls.append(str(url))
+        return real_urlopen(url, *args, **kwargs)
+
+    monkeypatch.setattr(_urllib_req, "urlopen", _spy_urlopen)
+
+    from ion.services import pdf_export_service
+
+    blocked: list[str] = []
+    real_fetcher = pdf_export_service._block_external_url_fetcher
+
+    def _tracking_fetcher(url: str):
+        try:
+            return real_fetcher(url)
+        except ValueError:
+            blocked.append(url)
+            raise
+
+    monkeypatch.setattr(pdf_export_service, "_block_external_url_fetcher", _tracking_fetcher)
+
+    client, slug, lesson_id = ssrf_client
+    r = client.get(f"/api/courses/{slug}/lessons/{lesson_id}/export.pdf")
+
+    assert r.status_code == 200
+    assert len(r.content) > 0
+
+    # No outbound HTTP via urllib should have been attempted for the external URLs.
+    external_fetched = [u for u in fetched_urls if "169.254" in u or "example.com" in u]
+    assert external_fetched == [], f"SSRF: outbound HTTP attempted for {external_fetched}"

@@ -160,6 +160,7 @@ def update_pin(
     session: Session,
     pin_id: int,
     *,
+    alert_case_id: int,
     actor_id: int,
     finding_status: Optional[str] = None,
     summary: Optional[str] = None,
@@ -173,6 +174,8 @@ def update_pin(
     pin = session.get(CaseEvidencePin, pin_id)
     if pin is None:
         raise PinError(f"pin {pin_id} not found")
+    if pin.alert_case_id != alert_case_id:
+        raise PinError(f"pin {pin_id} not in this case")
 
     _validate_inputs(
         source_type=pin.source_type,
@@ -255,6 +258,7 @@ def dismiss_pin(
     session: Session,
     pin_id: int,
     *,
+    alert_case_id: int,
     actor_id: int,
     reason: Optional[str] = None,
 ) -> CaseEvidencePin:
@@ -262,6 +266,8 @@ def dismiss_pin(
     pin = session.get(CaseEvidencePin, pin_id)
     if pin is None:
         raise PinError(f"pin {pin_id} not found")
+    if pin.alert_case_id != alert_case_id:
+        raise PinError(f"pin {pin_id} not in this case")
 
     if pin.finding_status == FindingStatus.DISMISSED.value:
         return pin  # idempotent

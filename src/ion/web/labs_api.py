@@ -98,7 +98,7 @@ def _build_observable_links(live_rows: list[dict]) -> List[Optional[str]]:
 # ── Routes ────────────────────────────────────────────────────────────────
 
 
-@router.post("/api/courses/{slug}/lessons/{lesson_id}/lab/launch")
+@router.post("/courses/{slug}/lessons/{lesson_id}/lab/launch")
 def launch_lab(
     slug: str,
     lesson_id: int,
@@ -138,7 +138,7 @@ def launch_lab(
     }
 
 
-@router.post("/api/courses/{slug}/lessons/{lesson_id}/lab/complete")
+@router.post("/courses/{slug}/lessons/{lesson_id}/lab/complete")
 def complete_lab(
     slug: str,
     lesson_id: int,

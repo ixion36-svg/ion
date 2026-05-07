@@ -3593,15 +3593,12 @@ def get_use_case_route(
 # TIDE stub generation
 # ---------------------------------------------------------------------------
 
-@router.post(
-    "/use-cases/{uc_id}/tide-stub",
-    dependencies=[Depends(require_permission("case:update"))],
-)
+@router.post("/use-cases/{uc_id}/tide-stub")
 def generate_tide_stub(
     uc_id: str,
     body: TideStubRequest,
     session: Session = Depends(get_db_session),
-    current_user: Optional[User] = Depends(get_current_user),
+    _user: User = Depends(require_permission("case:update")),
 ):
     uc = get_use_case(session, body.subprofile_id, uc_id)
     if uc is None:
@@ -3709,22 +3706,17 @@ def get_system_answers(sys_id: int, session: Session = Depends(get_db_session)):
     }
 
 
-@router.post(
-    "/systems/{sys_id}/answers",
-    dependencies=[Depends(require_permission("case:update"))],
-)
+@router.post("/systems/{sys_id}/answers")
 def patch_system_answers(
     sys_id: int,
     body: AnswersPatch,
     session: Session = Depends(get_db_session),
-    current_user: Optional[User] = Depends(get_current_user),
+    current_user: User = Depends(require_permission("case:update")),
 ):
     sys = session.get(CyabSystem, sys_id)
     if sys is None:
         raise HTTPException(status_code=404, detail="Unknown system")
-    row = _get_or_create_studio_assessment(
-        session, sys_id, current_user.id if current_user else None,
-    )
+    row = _get_or_create_studio_assessment(session, sys_id, current_user.id)
     try:
         existing = json.loads(row.responses_json or "{}")
     except json.JSONDecodeError:
@@ -3736,8 +3728,7 @@ def patch_system_answers(
             existing[k] = v
     row.responses_json = json.dumps(existing, default=str, sort_keys=True)
     row.submitted_at = datetime.utcnow()
-    if current_user is not None:
-        row.submitted_by = current_user.id
+    row.submitted_by = current_user.id
     session.commit()
     return {
         "system_id": sys_id,
@@ -4089,15 +4080,12 @@ def render_onboarding_pack(sys_id: int, session: Session = Depends(get_db_sessio
         )
 
 
-@router.post(
-    "/systems/{sys_id}/onboarding-pack/sign",
-    dependencies=[Depends(require_permission("case:update"))],
-)
+@router.post("/systems/{sys_id}/onboarding-pack/sign")
 def sign_onboarding_pack(
     sys_id: int,
     body: SignOffRequest,
     session: Session = Depends(get_db_session),
-    current_user: Optional[User] = Depends(get_current_user),
+    current_user: User = Depends(require_permission("case:update")),
 ):
     sys = session.get(CyabSystem, sys_id)
     if sys is None:
