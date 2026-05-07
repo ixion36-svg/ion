@@ -200,11 +200,12 @@ def _collect_bob(session: Session) -> Dict[str, Any]:
         .where(AIFeedback.created_at >= cutoff_7d)
     ) or 0)
 
-    # Agreement = analyst_verdict matches bob_verdict (or both null).
+    # Fix 5: use correct column names — analyst_verdict→human_verdict,
+    # bob_verdict→bob_suggested_verdict (pre-existing latent bug).
     agreement_count = 0
     if feedback_7d_total > 0:
         rows = session.execute(
-            select(AIFeedback.analyst_verdict, AIFeedback.bob_verdict)
+            select(AIFeedback.human_verdict, AIFeedback.bob_suggested_verdict)
             .where(AIFeedback.created_at >= cutoff_7d)
         ).all()
         agreement_count = sum(1 for av, bv in rows if av is not None and bv is not None and av == bv)

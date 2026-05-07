@@ -143,16 +143,30 @@ def get_all_scorecards(
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
 
-    rows = (
-        session.query(
-            AIFeedback.alert_prompt_template_id,
-            AIFeedback.agreement,
-            AIFeedback.human_verdict,
-        )
-        .filter(AIFeedback.created_at >= cutoff)
-        .filter(AIFeedback.alert_prompt_template_id.isnot(None))
-        .all()
+    # Fix 3: dedup by (alert_id, template_id) keeping max(id) per pair —
+    # mirrors the same dedup applied in bob_eval_service._fetch_deduped_feedback.
+    # Without this, a pending (circuit-breaker) row and a later resolved row for
+    # the same alert inflate sample_size but the pending row has agreement=NULL,
+    # silently skewing the agreement_pct denominator.
+    from sqlalchemy import text as _text
+    is_pg = (
+        session.bind is not None and
+        session.bind.dialect.name == "postgresql"
     )
+    dedup_sql = _text("""
+        SELECT alert_prompt_template_id, agreement, human_verdict
+        FROM ai_feedback
+        WHERE id IN (
+            SELECT MAX(id)
+            FROM ai_feedback
+            WHERE alert_prompt_template_id IS NOT NULL
+              AND created_at >= :cutoff
+            GROUP BY alert_id, alert_prompt_template_id
+        )
+        AND alert_prompt_template_id IS NOT NULL
+    """)
+    raw_rows = session.execute(dedup_sql, {"cutoff": cutoff}).fetchall()
+    rows = [(r[0], r[1], r[2]) for r in raw_rows]
 
     # Aggregate in Python — the sample size per template is bounded by
     # analyst throughput (order of hundreds/month), so this is fine.
@@ -213,6 +227,25 @@ def get_alert_prompt(
     return tmpl.to_dict()
 
 
+def _check_confidence_threshold_permission(user: User, value: Optional[int]) -> None:
+    """Fix 6: confidence_threshold_override requires system:settings permission.
+
+    Raises 403 if the value is explicitly set and the user lacks system:settings.
+    """
+    if value is None:
+        return
+    has_perm = any(
+        p.name == "system:settings"
+        for role in (user.roles or [])
+        for p in (role.permissions or [])
+    )
+    if not has_perm:
+        raise HTTPException(
+            status_code=403,
+            detail="system:settings required to set confidence_threshold_override",
+        )
+
+
 @router.post(
     "/api/alert-prompts",
     dependencies=[Depends(require_any_permission(_MANAGE_PERMS))],
@@ -222,6 +255,7 @@ def create_alert_prompt(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
+    _check_confidence_threshold_permission(current_user, data.confidence_threshold_override)
     repo = AlertPromptRepository(session)
     existing = repo.get_by_name(data.name)
     if existing:
@@ -248,6 +282,8 @@ def create_alert_prompt(
             confidence_threshold_override=data.confidence_threshold_override,
         )
         session.commit()
+    except HTTPException:
+        raise
     except Exception:
         session.rollback()
         logger.exception("Failed to create alert prompt template")
@@ -262,8 +298,12 @@ def create_alert_prompt(
 def update_alert_prompt(
     template_id: int,
     data: AlertPromptUpdate,
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
+    # Fix 6: confidence_threshold_override is a system-level field.
+    _check_confidence_threshold_permission(current_user, data.confidence_threshold_override)
+
     repo = AlertPromptRepository(session)
     tmpl = repo.get_by_id(template_id)
     if not tmpl:
@@ -281,6 +321,8 @@ def update_alert_prompt(
     try:
         repo.update(tmpl, **data.model_dump(exclude_unset=True))
         session.commit()
+    except HTTPException:
+        raise
     except Exception:
         session.rollback()
         logger.exception("Failed to update alert prompt template")

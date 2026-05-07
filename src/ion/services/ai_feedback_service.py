@@ -25,6 +25,7 @@ def record_case_close_feedback(
     human_closed_by_id: Optional[int],
     delta_reason: Optional[str],
     session: Session,
+    bob_confidence_int: Optional[int] = None,
 ) -> int:
     """Write AIFeedback rows for every triage entry in the case.
 
@@ -48,6 +49,12 @@ def record_case_close_feedback(
             alert_id = triage.es_alert_id
             bob_verdict = triage.suggested_verdict
             bob_confidence = triage.suggested_verdict_confidence
+            # Fix 4: persist numeric confidence from the triage row.
+            # Caller may override via the kwarg; fall back to triage column.
+            triage_confidence_int = getattr(triage, "suggested_verdict_confidence_int", None)
+            effective_confidence_int = (
+                bob_confidence_int if bob_confidence_int is not None else triage_confidence_int
+            )
 
             # Find the most recent Investigation for this alert, if any,
             # to link up investigation_id + template_id.
@@ -73,6 +80,7 @@ def record_case_close_feedback(
                 ),
                 bob_suggested_verdict=bob_verdict,
                 bob_confidence=bob_confidence,
+                bob_confidence_int=effective_confidence_int,
                 human_verdict=human_verdict,
                 human_closed_by_id=human_closed_by_id,
                 agreement=agreement,

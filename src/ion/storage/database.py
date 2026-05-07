@@ -988,6 +988,16 @@ def _run_migrations(engine: Engine) -> None:
             ))
             logger.info("Migrated: CREATE TABLE bob_eval_run_samples")
 
+    # v0.21.0 Fix 2: add skipped_count to bob_eval_runs for missing-alert tracking.
+    if insp.has_table("bob_eval_runs"):
+        existing = {col["name"] for col in insp.get_columns("bob_eval_runs")}
+        if "skipped_count" not in existing:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE bob_eval_runs ADD COLUMN skipped_count INTEGER NOT NULL DEFAULT 0"
+                ))
+                logger.info("Migrated: bob_eval_runs.skipped_count")
+
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
 

@@ -93,6 +93,23 @@ The alert-to-PCAP workflow uses `ArkimeService.download_pcap_by_community_id(nod
 
 For dev environments with limited RAM, use `qwen2.5:0.5b`. The admin wizard at `/settings` also lets you change URL/model/timeout at runtime.
 
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `ION_BOB_STORE_REASONING` | Store LLM reasoning text in Investigation.reasoning_text and BobEvalRunSample.reasoning_text | `false` |
+
+### PII and Data Retention Advisory
+
+`ION_BOB_STORE_REASONING=true` increases the PII footprint of ION. The LLM reasoning chain may include hostnames, usernames, IP addresses, and other alert-payload values extracted from the original security event. These values are stored verbatim in:
+
+- `investigations.reasoning_text` — one row per investigation run
+- `bob_eval_run_samples.reasoning_text` — one row per eval harness sample
+
+Neither column has an automatic purge policy. Operators are responsible for defining and enforcing a retention policy that complies with their local privacy obligations (GDPR Art. 5(1)(e), HIPAA minimum necessary, etc.). Recommended approach:
+
+1. Leave `ION_BOB_STORE_REASONING=false` (default) unless you need the reasoning chain for debugging or training data collection.
+2. If enabled, add a scheduled job or a DB-level TTL policy to null-out or delete `reasoning_text` columns after your retention window (e.g. 90 days).
+3. Ensure your Postgres backup and WAL configuration handles the column appropriately — reasoning text from investigations is not subject to alert-level access controls.
+
 ---
 
 ## 3. Daily SOC Lead Checklist
