@@ -48,6 +48,12 @@ from ion.models.case_evidence import (  # noqa: F401
     PinSourceType,
 )
 
+# v0.20.1: ForensicCase Workbench — parallel ledger + pins for forensic cases.
+from ion.models.forensic_workbench import (  # noqa: F401
+    ForensicCaseLedger,
+    ForensicCasePin,
+)
+
 # v0.11.2: L1/L2/L3/L4 SOC analyst training course subsystem.
 from ion.models.course import (  # noqa: F401
     Course,
@@ -298,6 +304,9 @@ __all__ = [
     "ForensicPlaybookStep",
     "ForensicCaseStep",
     "ForensicTimelineEntry",
+    # v0.20.1: ForensicCase Workbench
+    "ForensicCasePin",
+    "ForensicCaseLedger",
     # CyAB models
     "CyabSystem",
     "CyabDataSource",
