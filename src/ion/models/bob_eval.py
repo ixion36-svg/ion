@@ -72,6 +72,9 @@ class BobEvalRun(Base, TimestampMixin):
     # does not match the emitted verdict.
     hallucination_proxy: Mapped[Optional[float]] = mapped_column(Numeric(5, 4), nullable=True)
 
+    # v0.21.0 Fix 2: rows skipped because the linked alert/investigation was deleted.
+    skipped_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
@@ -95,6 +98,7 @@ class BobEvalRun(Base, TimestampMixin):
             "tn_count": self.tn_count,
             "abstention_count": self.abstention_count,
             "hallucination_proxy": float(self.hallucination_proxy) if self.hallucination_proxy is not None else None,
+            "skipped_count": self.skipped_count,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

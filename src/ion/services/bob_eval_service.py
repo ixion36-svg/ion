@@ -251,6 +251,17 @@ def _acquire_xact_lock(session: Session, ns: int, key: int) -> None:
     )
 
 
+def _release_advisory_lock(session: Session, lock_id: int) -> None:
+    """Release a session-scoped advisory lock. No-op on SQLite."""
+    if session.bind is None:
+        return
+    if session.bind.dialect.name != "postgresql":
+        return
+    session.execute(
+        text("SELECT pg_advisory_unlock(:id)"), {"id": lock_id}
+    )
+
+
 def _run_eval_sync(eval_run_id: int) -> None:
     """Core evaluation loop. Runs in a background thread."""
     engine = get_engine()
@@ -263,15 +274,27 @@ def _run_eval_sync(eval_run_id: int) -> None:
             logger.error("BobEvalRun %d not found", eval_run_id)
             return
 
-        # --- Singleton guard: block if investigation loop holds the BG lock ---
-        inv_lock_held = _acquire_try_advisory_lock(session, LOCK_BOB_EVAL_BG)
-        if not inv_lock_held:
+        # --- Fix 1: guard against investigation loop holding its own lock ---
+        # Attempt to acquire LOCK_INVESTIGATION_BG (non-blocking). If the
+        # investigation loop already holds it, fail fast rather than running
+        # Ollama calls that compete with live triage work.
+        inv_lock_acquired = _acquire_try_advisory_lock(session, LOCK_INVESTIGATION_BG)
+        if not inv_lock_acquired:
             run.status = "failed"
             run.error_message = "investigation loop active — try again later"
             session.commit()
             return
+        # Release immediately — we only needed to know the loop wasn't running.
+        _release_advisory_lock(session, LOCK_INVESTIGATION_BG)
 
-        # --- Per-run transactional lock to prevent re-entry ---
+        # --- Fix 7: per-template concurrency lock — serialise same-template runs ---
+        # Use template_id (or 0 for "all templates") as the lock key so two
+        # simultaneous POST runs for the same template wait rather than both
+        # spawning up to 200 Ollama calls concurrently.
+        template_lock_key = run.template_id if run.template_id is not None else 0
+        _acquire_xact_lock(session, _BPEH_NS, template_lock_key)
+
+        # --- Per-run transactional lock to prevent re-entry of the same run ---
         _acquire_xact_lock(session, _BPEH_NS, eval_run_id)
 
         _execute_eval(run, session)
@@ -328,7 +351,7 @@ def _execute_eval(run: BobEvalRun, session: Session) -> None:
     # --- Evaluate each sample -----------------------------------------------
     svc = get_ollama_service()
     sample_records: List[Dict[str, Any]] = []
-    tp = fp = fn = tn = abstentions = 0
+    tp = fp = fn = tn = abstentions = skipped = 0
 
     for fb_row in feedback_rows:
         fb_id = fb_row["id"]
@@ -354,12 +377,18 @@ def _execute_eval(run: BobEvalRun, session: Session) -> None:
             })
             continue
 
-        # Call Ollama with deterministic params.
-        fresh_verdict, confidence_int, reasoning_text = _call_ollama_for_sample(
+        # Fix 2: call Ollama using the live prompt-builder path.
+        # Returns skipped=True when the investigation/alert was deleted.
+        fresh_verdict, confidence_int, reasoning_text, was_skipped = _call_ollama_for_sample(
             svc=svc,
             fb_row=fb_row,
             run_id=run.id,
+            session=session,
         )
+
+        if was_skipped:
+            skipped += 1
+            continue
 
         # Classify sample.
         agreement: Optional[bool] = None
@@ -401,6 +430,7 @@ def _execute_eval(run: BobEvalRun, session: Session) -> None:
     run.fn_count = fn
     run.tn_count = tn
     run.abstention_count = abstentions
+    run.skipped_count = skipped
     run.precision_score = round(precision, 4) if precision is not None else None
     run.recall_score = round(recall, 4) if recall is not None else None
     run.f1_score = round(f1, 4) if f1 is not None else None
@@ -409,9 +439,9 @@ def _execute_eval(run: BobEvalRun, session: Session) -> None:
     run.completed_at = datetime.now(timezone.utc).isoformat()
     session.commit()
     logger.info(
-        "BobEvalRun %d completed: tp=%d fp=%d fn=%d tn=%d abs=%d "
+        "BobEvalRun %d completed: tp=%d fp=%d fn=%d tn=%d abs=%d skipped=%d "
         "P=%.4f R=%.4f F1=%.4f",
-        run.id, tp, fp, fn, tn, abstentions,
+        run.id, tp, fp, fn, tn, abstentions, skipped,
         precision or 0.0, recall or 0.0, f1 or 0.0,
     )
 
@@ -439,7 +469,7 @@ def _fetch_deduped_feedback(
             sql = text("""
                 SELECT id, alert_id, alert_prompt_template_id,
                        bob_suggested_verdict, human_verdict, agreement,
-                       bob_confidence_int, auto_escalated
+                       bob_confidence_int, auto_escalated, investigation_id
                 FROM ai_feedback
                 WHERE id IN (
                     SELECT MAX(id)
@@ -454,7 +484,7 @@ def _fetch_deduped_feedback(
             sql = text("""
                 SELECT id, alert_id, alert_prompt_template_id,
                        bob_suggested_verdict, human_verdict, agreement,
-                       bob_confidence_int, auto_escalated
+                       bob_confidence_int, auto_escalated, investigation_id
                 FROM ai_feedback
                 WHERE id IN (
                     SELECT MAX(id)
@@ -471,7 +501,7 @@ def _fetch_deduped_feedback(
             sql = text("""
                 SELECT id, alert_id, alert_prompt_template_id,
                        bob_suggested_verdict, human_verdict, agreement,
-                       bob_confidence_int, auto_escalated
+                       bob_confidence_int, auto_escalated, investigation_id
                 FROM ai_feedback
                 WHERE id IN (
                     SELECT MAX(id)
@@ -485,7 +515,7 @@ def _fetch_deduped_feedback(
             sql = text("""
                 SELECT id, alert_id, alert_prompt_template_id,
                        bob_suggested_verdict, human_verdict, agreement,
-                       bob_confidence_int, auto_escalated
+                       bob_confidence_int, auto_escalated, investigation_id
                 FROM ai_feedback
                 WHERE id IN (
                     SELECT MAX(id)
@@ -500,41 +530,92 @@ def _fetch_deduped_feedback(
     return [dict(r._mapping) for r in rows]
 
 
+def _load_prompt_snapshot_for_sample(
+    fb_row: Dict[str, Any],
+    session: Session,
+) -> Optional[Tuple[str, str]]:
+    """Load (system_prompt, user_body) for a feedback row from its linked Investigation.
+
+    Strategy (Fix 2):
+    - Look up the Investigation linked to fb_row via investigation_id.
+    - Use inv.prompt_snapshot as the user body (exact input Bob saw during live triage).
+    - Render the system prompt from the current template (fb_row["alert_prompt_template_id"]).
+
+    Returns (system_prompt, user_body) or None if the investigation has been deleted
+    or has no prompt snapshot (retention drop / old row pre-v0.10.11).
+    """
+    from ion.models.investigation import Investigation
+
+    inv_id = fb_row.get("investigation_id")
+    if not inv_id:
+        return None
+
+    inv = session.get(Investigation, inv_id)
+    if inv is None or not inv.prompt_snapshot:
+        return None
+
+    # Build system prompt from the template that was matched at investigation time.
+    template_id = fb_row.get("alert_prompt_template_id")
+    system_prompt = ""
+    if template_id is not None:
+        try:
+            from ion.models.alert_prompt import AlertPromptTemplate
+            from ion.services.alert_prompt_service import render_system_prompt
+            tmpl = session.get(AlertPromptTemplate, template_id)
+            system_prompt = render_system_prompt(tmpl, alert=None, session=session)
+        except Exception as exc:
+            logger.debug("Could not render system prompt for template %s: %s", template_id, exc)
+
+    if not system_prompt:
+        # Fall back to the generic security system prompt.
+        try:
+            from ion.services.ollama_service import SYSTEM_PROMPTS
+            system_prompt = SYSTEM_PROMPTS.get("security", "")
+        except Exception:
+            system_prompt = ""
+
+    return system_prompt, inv.prompt_snapshot
+
+
 def _call_ollama_for_sample(
     svc: Any,
     fb_row: Dict[str, Any],
     run_id: int,
-) -> Tuple[Optional[str], Optional[int], Optional[str]]:
-    """Call Ollama for one sample and return (verdict, confidence_int, reasoning).
+    session: Session,
+) -> Tuple[Optional[str], Optional[int], Optional[str], bool]:
+    """Call Ollama for one sample and return (verdict, confidence_int, reasoning, skipped).
 
-    Uses deterministic params: temperature=0, top_p=0.1, top_k=1, seed=run_id.
-    Runs Ollama via asyncio.run (background thread pattern, same as sweep loop).
-    Returns (None, None, None) on any error.
+    Fix 2: builds the same prompt the live investigation loop builds by reusing the
+    stored prompt_snapshot from the linked Investigation row. Compares the FRESH
+    verdict against ai_feedback.human_verdict (ground truth) — NOT against Bob's
+    prior output — so the harness measures template accuracy, not consistency.
+
+    Returns skipped=True when the Investigation or its prompt_snapshot is missing
+    (retention drop / alert deleted). The caller increments skipped_count and skips
+    the sample without failing the whole run.
+
+    Uses the same sampling params as the live loop: temperature=0.2, seed=run_id.
     """
     if svc is None or not getattr(svc, "enabled", False):
-        return None, None, None
+        return None, None, None, False
+
+    prompt_pair = _load_prompt_snapshot_for_sample(fb_row, session)
+    if prompt_pair is None:
+        # Missing investigation or no snapshot — skip gracefully.
+        return None, None, None, True
+
+    system_prompt, user_body = prompt_pair
 
     try:
-        # Construct a minimal prompt replaying the original investigation context.
-        alert_id = fb_row.get("alert_id") or "unknown"
-        bob_verdict_original = fb_row.get("bob_suggested_verdict") or "unknown"
-        prompt_content = (
-            f"Re-evaluate alert id: {alert_id}. "
-            f"Bob's original verdict: {bob_verdict_original}. "
-            "Provide your verdict as JSON with keys: "
-            "{\"verdict\": \"<verdict>\", \"confidence\": <0-100>, "
-            "\"analyst_explanation\": \"<explanation>\"}"
-        )
-
         result = asyncio.run(
             svc.chat(
-                messages=[{"role": "user", "content": prompt_content}],
-                temperature=0.0,
-                top_p=0.1,
-                top_k=1,
+                messages=[{"role": "user", "content": user_body}],
+                system_prompt=system_prompt,
+                context_type="security",
+                temperature=0.2,
+                max_tokens=4096,
                 seed=run_id,
                 bypass_queue=True,
-                response_format="json",
                 user_id=0,
             )
         )
@@ -543,11 +624,11 @@ def _call_ollama_for_sample(
         verdict = parsed.get("verdict")
         confidence_int = _safe_int(parsed.get("confidence"))
         reasoning = (parsed.get("analyst_explanation") or "")[:2000] or None
-        return verdict, confidence_int, reasoning
+        return verdict, confidence_int, reasoning, False
 
     except Exception as exc:
         logger.debug("Ollama call failed for sample alert=%s: %s", fb_row.get("alert_id"), exc)
-        return None, None, None
+        return None, None, None, False
 
 
 def _parse_eval_response(content: str) -> Dict[str, Any]:
