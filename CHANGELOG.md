@@ -1,5 +1,141 @@
 # Changelog
 
+## v0.21.0 — 2026-05-07
+
+### feat(bob): confidence scoring + circuit breakers
+
+Bob's LLM JSON envelope already emitted a `confidence` integer (0–100)
+for every triage; v0.21.0 finally **persists it**, applies a validation
+penalty, and gates verdict-write on a configurable threshold.
+
+**Confidence calculation (hybrid):** the LLM's self-rated confidence is
+the starting point; deterministic post-processing applies penalties
+when the parsed envelope is internally inconsistent — invalid
+`CaseClosureReason` (-20), `verdict ≠ suggested_closure_reason` (-15),
+empty `key_observations` (-10). Result clamped to [0, 100].
+
+**Circuit breaker:** if `confidence_int < ION_BOB_CONFIDENCE_THRESHOLD`
+(default 60), Bob does NOT emit a closure recommendation — the alert
+is auto-escalated to human review with a `low_confidence_triage`
+badge. AIFeedback ledger records `auto_escalated=True` at fire time
+for harness visibility (the case-close path supersedes via MAX(id)
+dedup, so escalated-only alerts surface as abstentions, not errors).
+Per-template `confidence_threshold_override` is editable from the
+Alert Prompts admin UI by users with `system:settings`.
+
+**Schema:** seven new columns —
+`investigations.{confidence_int, reasoning_text}`,
+`alert_triage.{suggested_verdict_confidence_int, bob_escalation_badge}`,
+`ai_feedback.{bob_confidence_int, auto_escalated}`,
+`alert_prompt_templates.confidence_threshold_override`.
+
+**UI:** alert card renders a confidence badge — green (≥80), amber
+(60–79), red (<60); auto-escalated rows surface a distinct amber pill.
+
+**`reasoning_text` storage** is gated on `ION_BOB_STORE_REASONING`
+(default false). Enabling it stores the LLM's full `analyst_explanation`
+on `Investigation` for chain-of-thought audit. PII implication: alert
+content is the source of the reasoning text — operators in privacy-
+sensitive deployments should leave it off. No automatic purge; see
+RUNBOOK.md "PII and Data Retention Advisory".
+
+### feat(bob): prompt evaluation harness — per-template precision/recall/F1
+
+A reproducible offline runner that, given the existing AIFeedback
+labels, replays the live investigation prompt against each historical
+alert and scores every `AlertPromptTemplate` for precision, recall,
+F1, and a hallucination proxy.
+
+**Two new tables, admin-only:** `bob_eval_runs` (one row per run with
+template snapshot — name + sha256 of `prompt_text` at run start, model
+name + version, sample size, P/R/F1, TP/FP/FN/TN/abstention/skipped
+counts, hallucination proxy, status); `bob_eval_run_samples`
+(one row per evaluated AIFeedback row, capturing fresh verdict +
+human verdict + agreement + confidence + reasoning).
+
+**Real Ollama replay, not mocked.** Eval calls use deterministic
+parameters (temperature=0, top_p=0.1, top_k=1, fixed seed) and
+`bypass_queue=True`, exactly as the live investigation loop. The
+harness rebuilds the original investigation prompt via
+`AlertPromptService.render_system_prompt` + `Investigation.prompt_snapshot`
+(the exact user body from the live triage), so it measures **template
+accuracy against ground truth**, not consistency with Bob's prior
+output. Missing investigations (retention drop, deleted) increment
+`skipped_count` and don't fail the run.
+
+**Concurrency:** per-template `pg_advisory_xact_lock(BPEH_NS, template_id)`
+prevents two simultaneous runs against the same template (avoiding
+400 concurrent Ollama calls from two POSTs). Runs hard-block if the
+live investigation loop holds `LOCK_INVESTIGATION_BG` — eval doesn't
+race with production triage.
+
+**API/UI:** `POST /api/bob-eval/runs` (sample_size capped at 200),
+`GET /api/bob-eval/runs[/{id}[/samples]]`, admin-only `/bob-eval` page
+with runs table + Run-Eval modal + per-run drilldown. All routes
+require `system:settings`.
+
+**AIFeedback dedup pattern:** Feature B writes a fire-time row with
+`human_verdict="pending"` (column is NOT NULL); the case-close write
+path persists a second row. Both the eval harness and the per-template
+scorecard now dedup via MAX(id) per `(alert_id, alert_prompt_template_id)`
+— the case-close row supersedes pending when both exist; alerts that
+never close stay as pending and count as abstentions.
+
+### feat(detections): ESXi ATT&CK v17 detection pack
+
+Four new `AlertPromptTemplate` rows for the ESXi platform additions
+in MITRE ATT&CK v17 (April 2025): T1675 (ESXi Administration Command),
+T1059.012 (Hypervisor CLI Execution), T1505.006 (vSphere Installation
+Bundle / VIB), T1673 (Virtual Machine Discovery). Priorities tuned —
+T1059.012 at 15 to beat existing T1059* templates at priority 20+;
+T1505.006 at 20 to beat T1505.003 sibling at 25; T1675 and T1673 at
+30/35 (technique IDs are unique). Each prompt body covers context,
+investigation steps, sample EQL/KQL stubs against vSphere/ESXi log
+indices, and expected adversary indicators.
+
+### sec/quality: review + audit fix-pack
+
+Eight findings landed during code review and security delta:
+
+- **(blocking)** Lock inversion in `_run_eval_sync` — was acquiring
+  the eval harness's own singleton lock instead of `LOCK_INVESTIGATION_BG`.
+  Now correctly try-acquires the investigation lock and fails if held.
+- **(blocking)** Eval prompt was sending `"Re-evaluate alert id: N.
+  Bob's original verdict: ..."` — measured consistency with Bob's
+  prior output, not template accuracy. Now reuses the live
+  prompt-builder + persisted prompt snapshot so verdicts are compared
+  against `human_verdict` (true ground truth).
+- Per-template scorecard `get_all_scorecards` now dedups by MAX(id)
+  per `(alert_id, alert_prompt_template_id)` — was double-counting
+  fire-time rows alongside resolved rows, deflating `agreement_pct`.
+- `record_case_close_feedback` now persists `bob_confidence_int`
+  from the triage row — was leaving it NULL on closed-case rows so
+  confidence-stratified analysis only saw fire-time data.
+- Pre-existing `wallboard_service._collect_bob` AttributeError (it
+  referenced non-existent `AIFeedback.analyst_verdict` and
+  `.bob_verdict` — real names: `human_verdict`, `bob_suggested_verdict`).
+  Was latent until v0.21.0 increased AIFeedback write volume.
+- `confidence_threshold_override` writability now gated on
+  `system:settings` (was editable by `playbook:create/update` users).
+- Per-template eval concurrency lock — second simultaneous POST for
+  the same template now serialises behind the first instead of
+  spawning a parallel run.
+- RUNBOOK.md and `.env.example` document `ION_BOB_STORE_REASONING`'s
+  PII implication and the lack of auto-purge for `reasoning_text`.
+
+### sec: SECURITY_ASSESSMENT.md updated for v0.21.0 surfaces
+
+Delta update covering `/api/bob-eval/*` (admin-only, sample_size
+capped server-side, `template_id` bound-parameter, no thread-spawn
+DoS path), `Investigation.reasoning_text` storage and PII boundary,
+`AlertPromptTemplate.confidence_threshold_override` input validation
+(server-side `Field(ge=0, le=100)`), AIFeedback `pending` sentinel
+not leaked outside admin routes. Net new: 0 critical / 0 high / 0
+medium / 2 low (both fixed in this release). Running totals: 0C / 0H
+/ 3M / 6L.
+
+### chore: docker-compose default image tag bumped to 0.21.0
+
 ## v0.20.1 — 2026-05-07
 
 ### feat(forensics): tamper-evident ledger + pinned evidence on ForensicCase
