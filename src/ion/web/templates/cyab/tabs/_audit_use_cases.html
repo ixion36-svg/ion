@@ -1,12 +1,11 @@
-{# Audit Use Cases tab — same shape as Detection (Task 9), different
+{# Audit Use Cases tab — same shape as Detection, different
    catalogue key + heading.
 
    Catalogue schema (see cyab_subprofile_catalogue.py):
      audit_use_cases: [{id, title, kind, risk, summary, description,
                        compliance_frames, logic_snippet, ...}]
-   Per-source status chips reuse the existing studio endpoint
-   /api/cyab/studio/data-sources/{ds_id}/use-case-status — the studio JS
-   loaded at the bottom cycles each chip's value (shipped/partial/gap/n/a).
+   Per-source status chips use /api/cyab/data-sources/{ds_id}/use-case-status
+   to cycle each chip's value (shipped/partial/gap/n/a).
 #}
 {# Marker so generic tab smoke tests (which look for the slug substring) can
    identify the tab even in empty states. #}
@@ -52,6 +51,5 @@
     {% endfor %}
   </div>
 
-  {# Re-use the studio's status-chip cycling JS. #}
-  <script src="/static/js/cyab_studio.js" defer></script>
+  {# status-chip cycling JS lives in app.js (cyab_studio.js dropped in v0.20.0) #}
 {% endif %}

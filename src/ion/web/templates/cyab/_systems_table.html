@@ -1,6 +1,6 @@
 {# v0.19.7: per-row + bulk system delete. Bulk goes through the
    existing /api/cyab/systems/bulk action=delete-selected path; the
-   per-row trash button uses DELETE /api/cyab/studio/systems/{id}. #}
+   per-row trash button uses DELETE /api/cyab/systems/{id}. #}
 {% if not rows %}
   <p class="text-slate-500 text-[12px] py-8 text-center">
     No systems match these filters.
@@ -118,7 +118,7 @@
     btn.disabled = true;
     btn.textContent = '…';
     try {
-      const r = await fetch(`/api/cyab/studio/systems/${encodeURIComponent(id)}`, {
+      const r = await fetch(`/api/cyab/systems/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         credentials: 'same-origin',
       });
