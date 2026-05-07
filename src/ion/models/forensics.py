@@ -587,3 +587,44 @@ class ForensicTimelineEntry(Base):
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             "metadata": self.metadata_json,
         }
+
+
+class ForensicCaseAnnotation(Base):
+    """Timestamped free-text analyst annotation on a ForensicCase timeline (v0.22.0).
+
+    Mirrors AlertCaseAnnotation exactly but references forensic_cases.
+    Soft-delete via ``deleted_at``. A single ledger row is written on create
+    (action='annotation_created') via the FCWL ledger; edits/deletes do NOT
+    touch the ledger — see spec §4.2.
+    """
+
+    __tablename__ = "forensic_case_annotations"
+    __table_args__ = (
+        Index("ix_fca_case", "forensic_case_id"),
+        Index("ix_fca_created_by", "created_by_id"),
+        Index("ix_fca_timeline_ts", "forensic_case_id", "timeline_ts"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    forensic_case_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("forensic_cases.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    timeline_ts: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now(), nullable=False
+    )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Relationships
+    forensic_case: Mapped["ForensicCase"] = relationship("ForensicCase")
+    created_by: Mapped["User"] = relationship("User", foreign_keys=[created_by_id])
+
+    def __repr__(self) -> str:
+        return f"<ForensicCaseAnnotation(id={self.id}, case={self.forensic_case_id})>"

@@ -506,3 +506,290 @@ class TestForensicWorkbench:
         ).json()["pins"]
         pin = next(p for p in pins if p["id"] == pin_id)
         assert pin["finding_status"] != "dismissed"
+
+
+
+
+# =============================================================================
+# v0.22.0 ForensicCase Annotation Tests (spec §6.2 mirrored to forensic)
+# =============================================================================
+
+
+class TestForensicCaseAnnotations:
+    """11 annotation smoke tests mirroring spec §6.2 for ForensicCase."""
+
+    @pytest.fixture(scope="class")
+    def ann_case_id(self, app_client: TestClient) -> int:
+        """Create a dedicated ForensicCase for annotation tests."""
+        r = app_client.post(
+            "/api/forensics/cases",
+            json={
+                "title": "Annotation Forensic Smoke Case",
+                "investigation_type": "malware_analysis",
+                "description": "Annotation tests",
+                "priority": "medium",
+            },
+        )
+        assert r.status_code == 200, r.text
+        return r.json()["id"]
+
+    def test_ann_01_create_annotation(self, app_client: TestClient, ann_case_id: int):
+        """POST annotation with valid body and timeline_ts returns 201 with id."""
+        r = app_client.post(
+            f"/api/forensics/cases/{ann_case_id}/annotations",
+            json={"timeline_ts": "2026-05-07T14:35:00", "body": "C2 beacon observed post-containment."},
+        )
+        assert r.status_code == 201, r.text
+        data = r.json()
+        assert "id" in data
+        assert data["body"] == "C2 beacon observed post-containment."
+        assert data["case_id"] == ann_case_id
+        assert "deleted_at" not in data
+
+    def test_ann_02_list_annotations(self, app_client: TestClient, ann_case_id: int):
+        """GET annotations list returns created annotation; deleted_at absent."""
+        r = app_client.get(f"/api/forensics/cases/{ann_case_id}/annotations")
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert "annotations" in data
+        assert len(data["annotations"]) >= 1
+        ann = data["annotations"][0]
+        assert "deleted_at" not in ann
+        assert ann["body"] == "C2 beacon observed post-containment."
+
+    def test_ann_03_update_annotation(self, app_client: TestClient, ann_case_id: int):
+        """PATCH annotation body returns 200 with updated content."""
+        anns = app_client.get(
+            f"/api/forensics/cases/{ann_case_id}/annotations"
+        ).json()["annotations"]
+        ann_id = anns[0]["id"]
+
+        r = app_client.patch(
+            f"/api/forensics/cases/{ann_case_id}/annotations/{ann_id}",
+            json={"body": "Updated: lateral movement confirmed after containment."},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["body"] == "Updated: lateral movement confirmed after containment."
+
+    def test_ann_04_delete_annotation(self, app_client: TestClient, ann_case_id: int):
+        """DELETE annotation; subsequent GET list does not include it."""
+        r = app_client.post(
+            f"/api/forensics/cases/{ann_case_id}/annotations",
+            json={"timeline_ts": "2026-05-07T15:00:00", "body": "To be deleted."},
+        )
+        assert r.status_code == 201
+        ann_id = r.json()["id"]
+
+        del_r = app_client.delete(
+            f"/api/forensics/cases/{ann_case_id}/annotations/{ann_id}"
+        )
+        assert del_r.status_code == 200, del_r.text
+
+        anns = app_client.get(
+            f"/api/forensics/cases/{ann_case_id}/annotations"
+        ).json()["annotations"]
+        ids = [a["id"] for a in anns]
+        assert ann_id not in ids
+
+    def test_ann_05_create_writes_ledger_row(self, app_client: TestClient, ann_case_id: int):
+        """POST annotation writes a ledger row with action='annotation_created'."""
+        r = app_client.post(
+            f"/api/forensics/cases/{ann_case_id}/annotations",
+            json={"timeline_ts": "2026-05-07T16:00:00", "body": "Ledger check annotation."},
+        )
+        assert r.status_code == 201
+        ann_id = r.json()["id"]
+
+        ledger = app_client.get(
+            f"/api/forensics/cases/{ann_case_id}/ledger"
+        ).json()
+        entries = ledger["entries"]
+        ann_entries = [e for e in entries if e.get("action") == "annotation_created"]
+        assert len(ann_entries) >= 1, "Expected at least one annotation_created ledger entry"
+        payloads = [e["payload"] for e in ann_entries]
+        assert any(p.get("annotation_id") == ann_id for p in payloads)
+
+    def test_ann_06_cross_case_patch_rejected(self, app_client: TestClient, ann_case_id: int):
+        """Cross-case PATCH returns 404; annotation unchanged."""
+        r_b = app_client.post(
+            "/api/forensics/cases",
+            json={"title": "Cross B", "investigation_type": "malware_analysis",
+                  "description": "", "priority": "low"},
+        )
+        assert r_b.status_code == 200
+        case_b_id = r_b.json()["id"]
+
+        r_ann = app_client.post(
+            f"/api/forensics/cases/{ann_case_id}/annotations",
+            json={"timeline_ts": "2026-05-07T17:00:00", "body": "Original forensic body."},
+        )
+        assert r_ann.status_code == 201
+        ann_id = r_ann.json()["id"]
+
+        r_bad = app_client.patch(
+            f"/api/forensics/cases/{case_b_id}/annotations/{ann_id}",
+            json={"body": "Mutated by B"},
+        )
+        assert r_bad.status_code == 404, f"Expected 404, got {r_bad.status_code}"
+
+        anns = app_client.get(
+            f"/api/forensics/cases/{ann_case_id}/annotations"
+        ).json()["annotations"]
+        ann = next((a for a in anns if a["id"] == ann_id), None)
+        assert ann is not None
+        assert ann["body"] == "Original forensic body."
+
+    def test_ann_07_cross_case_delete_rejected(self, app_client: TestClient, ann_case_id: int):
+        """Cross-case DELETE returns 404; annotation not soft-deleted."""
+        r_c = app_client.post(
+            "/api/forensics/cases",
+            json={"title": "Cross C", "investigation_type": "malware_analysis",
+                  "description": "", "priority": "low"},
+        )
+        assert r_c.status_code == 200
+        case_c_id = r_c.json()["id"]
+
+        r_ann = app_client.post(
+            f"/api/forensics/cases/{ann_case_id}/annotations",
+            json={"timeline_ts": "2026-05-07T18:00:00", "body": "Must survive cross-case delete."},
+        )
+        assert r_ann.status_code == 201
+        ann_id = r_ann.json()["id"]
+
+        r_bad = app_client.delete(
+            f"/api/forensics/cases/{case_c_id}/annotations/{ann_id}"
+        )
+        assert r_bad.status_code == 404, f"Expected 404, got {r_bad.status_code}"
+
+        anns = app_client.get(
+            f"/api/forensics/cases/{ann_case_id}/annotations"
+        ).json()["annotations"]
+        ids = [a["id"] for a in anns]
+        assert ann_id in ids
+
+    def test_ann_08_empty_body_rejected(self, app_client: TestClient, ann_case_id: int):
+        """POST annotation with empty body returns 422."""
+        r = app_client.post(
+            f"/api/forensics/cases/{ann_case_id}/annotations",
+            json={"timeline_ts": "2026-05-07T19:00:00", "body": ""},
+        )
+        assert r.status_code == 422, r.text
+
+    def test_ann_09_body_too_long_rejected(self, app_client: TestClient, ann_case_id: int):
+        """POST annotation with body > 2000 chars returns 422."""
+        r = app_client.post(
+            f"/api/forensics/cases/{ann_case_id}/annotations",
+            json={"timeline_ts": "2026-05-07T19:30:00", "body": "y" * 2001},
+        )
+        assert r.status_code == 422, r.text
+
+    def test_ann_10_edit_other_user_annotation_without_close(
+        self, db_engine, admin_user: User, ann_case_id: int
+    ):
+        """Edit another user's annotation without forensic:close returns 403.
+
+        We create a plain user who has forensic:update (passes the API gate)
+        but is NOT the annotation author and does NOT have forensic:close.
+        The annotation service should raise AnnotationForbiddenError -> 403.
+        """
+        from ion.web.server import app
+        from ion.auth.dependencies import get_current_user as _gcu, get_db_session as _gds
+        from sqlalchemy import select as _sel
+
+        factory = sessionmaker(bind=db_engine, expire_on_commit=False)
+        saved_overrides = dict(app.dependency_overrides)
+
+        def _session():
+            s = factory()
+            try:
+                yield s
+            finally:
+                s.close()
+
+        # Build plain user with forensic:update but NOT forensic:close
+        plain_session = factory()
+        plain_perm_names = ["forensic:read", "forensic:update"]
+        plain_perms = []
+        for pname in plain_perm_names:
+            resource, action = pname.split(":", 1)
+            existing = plain_session.execute(
+                _sel(Permission).where(Permission.name == pname)
+            ).scalar_one_or_none()
+            if existing:
+                p = existing
+            else:
+                p = Permission(name=pname, resource=resource, action=action)
+                plain_session.add(p)
+                plain_session.flush()
+            plain_perms.append(p)
+        plain_role = Role(name="fann_plain_role")
+        plain_session.add(plain_role)
+        plain_session.flush()
+        for p in plain_perms:
+            plain_session.execute(
+                role_permissions.insert().values(role_id=plain_role.id, permission_id=p.id)
+            )
+        plain_user = User(
+            username="fann_plain",
+            email="fann_plain@test.local",
+            password_hash="x",
+            display_name="fann_plain",
+            is_active=True,
+        )
+        plain_session.add(plain_user)
+        plain_session.flush()
+        plain_session.execute(
+            user_roles.insert().values(user_id=plain_user.id, role_id=plain_role.id)
+        )
+        plain_session.commit()
+        plain_session.close()
+
+        # Create annotation as admin_user (different user id)
+        def _as_admin():
+            return admin_user
+
+        app.dependency_overrides[_gds] = _session
+        app.dependency_overrides[_gcu] = _as_admin
+        with TestClient(app, raise_server_exceptions=True) as admin_c:
+            r_ann = admin_c.post(
+                f"/api/forensics/cases/{ann_case_id}/annotations",
+                json={"timeline_ts": "2026-05-07T20:00:00", "body": "Admin forensic annotation."},
+            )
+            assert r_ann.status_code == 201, r_ann.text
+            ann_id = r_ann.json()["id"]
+
+        # Keep a long-lived session open so the plain_user object
+        # can lazy-load roles/permissions when has_permission is called.
+        plain_holder_session = factory()
+        plain_user_loaded = plain_holder_session.get(User, plain_user.id)
+        # Eagerly touch the relationship chain so it is loaded into memory
+        _ = [p.name for r in plain_user_loaded.roles for p in r.permissions]
+
+        # Try to edit as plain_user — not author, no forensic:close
+        def _as_plain():
+            return plain_user_loaded
+
+        app.dependency_overrides[_gcu] = _as_plain
+        with TestClient(app, raise_server_exceptions=True) as plain_c:
+            r_bad = plain_c.patch(
+                f"/api/forensics/cases/{ann_case_id}/annotations/{ann_id}",
+                json={"body": "Unauthorized edit"},
+            )
+            assert r_bad.status_code == 403, f"Expected 403, got {r_bad.status_code}: {r_bad.text}"
+
+        plain_holder_session.close()
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(saved_overrides)
+
+    def test_ann_11_ledger_chain_valid_after_annotation(
+        self, app_client: TestClient, ann_case_id: int
+    ):
+        """GET /ledger/verify returns is_valid=true after annotation creates."""
+        app_client.post(
+            f"/api/forensics/cases/{ann_case_id}/annotations",
+            json={"timeline_ts": "2026-05-07T21:00:00", "body": "Chain check annotation."},
+        )
+        r = app_client.get(f"/api/forensics/cases/{ann_case_id}/ledger/verify")
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data.get("is_valid") is True, f"Ledger chain broken: {data}"

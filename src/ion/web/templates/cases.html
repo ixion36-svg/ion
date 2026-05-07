@@ -2383,6 +2383,8 @@ async function openCaseDetail(caseId) {
         loadSimilarObservables(c.id);
         // v0.20.0: Workbench — pinned evidence + ledger verify
         loadWorkbench(c.id);
+        // v0.22.0: Timeline annotations
+        loadAnnotations(c.id);
     } catch (e) {
         body.innerHTML = '<p style="color:#ef4444;text-align:center;padding:2rem;">Failed to load case details</p>';
     }
@@ -2719,6 +2721,20 @@ function renderPanelContent(c) {
         +   '<div id="workbench-kanban-' + c.id + '" class="workbench-kanban">'
         +     '<div class="cpanel-empty-hint" style="grid-column:1/-1;">Loading workbench…</div>'
         +   '</div>'
+        + '</div>';
+
+    // -- v0.22.0 Timeline Annotations --
+    // Indigo left-border accent distinguishes narrative from evidence pins.
+    // Loaded async via loadAnnotations() after panel paint.
+    html += '<div class="cpanel-section" id="annotations-section-' + c.id + '">'
+        + '<div class="cpanel-section-title" style="display:flex;align-items:center;gap:0.5rem;">'
+        + '<i class="icon-clock"></i> Timeline Annotations'
+        + '<span class="cpanel-section-badge" id="annotations-count-' + c.id + '">'
+        + '</span>'
+        + '</div>'
+        + '<div id="annotations-body-' + c.id + '">'
+        + '<div class="cpanel-empty-hint">Loading annotations…</div>'
+        + '</div>'
         + '</div>';
 
     // Action buttons
@@ -3851,6 +3867,121 @@ async function dismissWorkbenchPin(caseId, pinId) {
     } catch (e) {
         alert('Dismiss failed');
     }
+}
+
+
+// =============================================================================
+// v0.22.0 Timeline Annotations
+// =============================================================================
+
+async function loadAnnotations(caseId) {
+    var body = document.getElementById('annotations-body-' + caseId);
+    var countEl = document.getElementById('annotations-count-' + caseId);
+    if (!body) return;
+    try {
+        var resp = await fetch('/api/alert-cases/' + caseId + '/annotations');
+        if (!resp.ok) { body.innerHTML = '<div class="cpanel-empty-hint">Failed to load annotations</div>'; return; }
+        var data = await resp.json();
+        var annotations = data.annotations || [];
+        if (countEl) countEl.textContent = String(annotations.length);
+        renderAnnotations(caseId, annotations);
+    } catch (e) { body.innerHTML = '<div class="cpanel-empty-hint">Failed to load annotations</div>'; }
+}
+
+function renderAnnotations(caseId, annotations) {
+    var body = document.getElementById('annotations-body-' + caseId);
+    if (!body) return;
+    var html = annotations.map(function(a) { return renderAnnotationCard(caseId, a); }).join('');
+    html += '<div style="margin-top:0.5rem;"><button type="button" class="btn btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.65rem;" onclick="toggleAnnotationForm(' + caseId + ')">+ Add annotation</button></div>';
+    html += renderAnnotationFormHtml(caseId);
+    body.innerHTML = html;
+}
+
+function renderAnnotationFormHtml(caseId) {
+    return '<div id="annotation-form-' + caseId + '" style="display:none;margin-top:0.6rem;">'
+        + '<input type="datetime-local" id="ann-ts-' + caseId + '" style="width:100%;margin-bottom:0.4rem;background:var(--bg-secondary);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:0.3rem 0.5rem;color:var(--text-primary);font-size:0.8rem;">'
+        + '<textarea id="ann-body-' + caseId + '" rows="3" placeholder="Add a timeline annotation..." style="width:100%;background:var(--bg-secondary);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:0.4rem 0.6rem;color:var(--text-primary);font-size:0.8rem;resize:vertical;box-sizing:border-box;"></textarea>'
+        + '<div style="display:flex;gap:0.4rem;margin-top:0.35rem;">'
+        + '<button type="button" class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="submitAnnotation(' + caseId + ')">Save</button>'
+        + '<button type="button" class="btn" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="toggleAnnotationForm(' + caseId + ')">Cancel</button>'
+        + '</div></div>';
+}
+
+function renderAnnotationCard(caseId, a) {
+    var ts = a.timeline_ts ? new Date(a.timeline_ts).toLocaleString() : '';
+    var author = a.created_by_username || 'unknown';
+    return '<div class="cpanel-ann-card" style="border-left:3px solid #6366f1;padding:0.5rem 0.5rem 0.5rem 0.75rem;margin-bottom:0.5rem;background:rgba(99,102,241,0.06);border-radius:0 4px 4px 0;" id="ann-card-' + caseId + '-' + a.id + '">'
+        + '<div style="display:flex;align-items:center;gap:0.5rem;font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.25rem;">'
+        + '<span style="color:#818cf8;font-weight:600;">' + esc(ts) + '</span>'
+        + '<span>&middot;</span><span>' + esc(author) + '</span>'
+        + '<span style="margin-left:auto;display:flex;gap:0.35rem;">'
+        + '<button type="button" title="Edit" onclick="editAnnotation(' + caseId + ',' + a.id + ')" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 0.2rem;font-size:0.8rem;">&#9998;</button>'
+        + '<button type="button" title="Delete" onclick="deleteAnnotation(' + caseId + ',' + a.id + ')" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 0.2rem;font-size:0.8rem;">&times;</button>'
+        + '</span></div>'
+        + '<div style="font-size:0.8rem;color:var(--text-primary);white-space:pre-wrap;">' + esc(a.body) + '</div>'
+        + '</div>';
+}
+
+function toggleAnnotationForm(caseId) {
+    var form = document.getElementById('annotation-form-' + caseId);
+    if (!form) return;
+    form.style.display = form.style.display === 'none' ? '' : 'none';
+    if (form.style.display !== 'none') {
+        var tsEl = document.getElementById('ann-ts-' + caseId);
+        if (tsEl && !tsEl.value) {
+            var now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            tsEl.value = now.toISOString().slice(0, 16);
+        }
+    }
+}
+
+async function submitAnnotation(caseId) {
+    var tsEl = document.getElementById('ann-ts-' + caseId);
+    var bodyEl = document.getElementById('ann-body-' + caseId);
+    if (!tsEl || !bodyEl) return;
+    var tsVal = (tsEl.value || '').trim();
+    var bodyVal = (bodyEl.value || '').trim();
+    if (!tsVal) { tsEl.focus(); return; }
+    if (!bodyVal) { bodyEl.focus(); return; }
+    var tsIso = tsVal.length === 16 ? tsVal + ':00' : tsVal;
+    try {
+        var resp = await fetch('/api/alert-cases/' + caseId + '/annotations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timeline_ts: tsIso, body: bodyVal }),
+        });
+        if (!resp.ok) { var err = await resp.json().catch(function(){return {};}); alert('Failed: ' + (err.detail || resp.status)); return; }
+        bodyEl.value = ''; tsEl.value = '';
+        loadAnnotations(caseId);
+    } catch (e) { alert('Failed to save annotation'); }
+}
+
+async function editAnnotation(caseId, annId) {
+    var card = document.getElementById('ann-card-' + caseId + '-' + annId);
+    var bodyDiv = card ? card.querySelectorAll('div')[1] : null;
+    var currentBody = bodyDiv ? bodyDiv.textContent : '';
+    var newBody = prompt('Edit annotation:', currentBody);
+    if (newBody === null || newBody === currentBody) return;
+    if (!newBody.trim()) { alert('Body cannot be empty'); return; }
+    try {
+        var resp = await fetch('/api/alert-cases/' + caseId + '/annotations/' + annId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ body: newBody }),
+        });
+        if (!resp.ok) { var err = await resp.json().catch(function(){return {};}); alert('Failed: ' + (err.detail || resp.status)); return; }
+        loadAnnotations(caseId);
+    } catch (e) { alert('Failed to update annotation'); }
+}
+
+async function deleteAnnotation(caseId, annId) {
+    if (!confirm('Delete this annotation?')) return;
+    try {
+        var resp = await fetch('/api/alert-cases/' + caseId + '/annotations/' + annId, { method: 'DELETE' });
+        if (!resp.ok) { var err = await resp.json().catch(function(){return {};}); alert('Failed: ' + (err.detail || resp.status)); return; }
+        loadAnnotations(caseId);
+    } catch (e) { alert('Failed to delete annotation'); }
 }
 
 // =============================================================================
