@@ -178,6 +178,15 @@ class AlertTriage(Base, TimestampMixin):
     suggested_verdict_confidence: Mapped[Optional[str]] = mapped_column(
         String(20), nullable=True
     )  # low | medium | high
+    # v0.21.0: numeric parallel to the string tier above (0-100)
+    suggested_verdict_confidence_int: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True
+    )
+    # Set to "low_confidence_triage" when the circuit breaker fires — signals
+    # the UI to show the "auto-escalated" pill and suppress the verdict badge.
+    bob_escalation_badge: Mapped[Optional[str]] = mapped_column(
+        String(30), nullable=True
+    )
     # Snapshot of the originating system at first triage touch. Lives here
     # (not just on the live ES doc) so attribution survives ES retention
     # rotation. Sourced from data_stream.namespace when the triage is

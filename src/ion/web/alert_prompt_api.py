@@ -63,6 +63,10 @@ class AlertPromptCreate(BaseModel):
     investigation_checklist_text: Optional[str] = None
     severity_hint: Optional[str] = None
     expected_outputs: Optional[List[str]] = None
+    # v0.21.0: per-template circuit-breaker threshold (0-100, NULL = use global)
+    confidence_threshold_override: Optional[int] = Field(
+        default=None, ge=0, le=100
+    )
 
 
 class AlertPromptUpdate(BaseModel):
@@ -79,6 +83,10 @@ class AlertPromptUpdate(BaseModel):
     investigation_checklist_text: Optional[str] = None
     severity_hint: Optional[str] = None
     expected_outputs: Optional[List[str]] = None
+    # v0.21.0: per-template circuit-breaker threshold (0-100, NULL = use global)
+    confidence_threshold_override: Optional[int] = Field(
+        default=None, ge=0, le=100
+    )
 
 
 class ResolveRequest(BaseModel):
@@ -237,6 +245,7 @@ def create_alert_prompt(
             severity_hint=data.severity_hint,
             expected_outputs=data.expected_outputs,
             created_by_id=current_user.id,
+            confidence_threshold_override=data.confidence_threshold_override,
         )
         session.commit()
     except Exception:

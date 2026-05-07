@@ -60,6 +60,14 @@ class AIFeedback(Base, TimestampMixin):
     # Optional free-text delta reason supplied by the closer
     delta_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # v0.21.0: numeric confidence score (0-100) alongside the legacy string tier
+    bob_confidence_int: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # True when circuit breaker fired — Bob's confidence was below threshold so
+    # no verdict was written to triage; a human must resolve this alert manually.
+    auto_escalated: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
+
     human_closed_by = relationship("User", foreign_keys=[human_closed_by_id])
 
     def to_dict(self) -> dict:
@@ -78,5 +86,7 @@ class AIFeedback(Base, TimestampMixin):
             ),
             "agreement": self.agreement,
             "delta_reason": self.delta_reason,
+            "bob_confidence_int": self.bob_confidence_int,
+            "auto_escalated": self.auto_escalated,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
