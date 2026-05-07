@@ -51,6 +51,7 @@ from ion.web.canary_api import router as canary_router
 from ion.web.case_grouper_api import router as case_grouper_router
 from ion.web.case_similarity_api import router as case_similarity_router
 from ion.web.workbench_api import router as workbench_router
+from ion.web.bob_eval_api import router as bob_eval_router
 from ion.web.change_log_api import router as change_log_router
 from ion.web.comm_template_api import router as comm_template_router
 from ion.web.compliance_api import router as compliance_router
@@ -347,6 +348,8 @@ app.include_router(investigation_router, prefix="")
 app.include_router(case_grouper_router, prefix="")
 app.include_router(webhook_router, prefix="/api")
 app.include_router(daily_standup_router, prefix="/api")
+# v0.21.0: Bob Prompt Evaluation Harness — /api/bob-eval/* + /bob-eval page
+app.include_router(bob_eval_router, prefix="")
 
 
 def _validate_startup_config():
