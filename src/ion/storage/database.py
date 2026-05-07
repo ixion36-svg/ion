@@ -476,6 +476,44 @@ def _run_migrations(engine: Engine) -> None:
                     )
                     logger.info("Migrated: forensic_cases.%s", col_name)
 
+    # v0.20.1: ForensicCase Workbench tables (pins + tamper-evident ledger).
+    # Base.metadata.create_all() (called in init_db) creates these tables on
+    # fresh databases with correct per-dialect DDL. The blocks below add
+    # idempotent indexes for upgrade scenarios where the tables are newly
+    # introduced on an existing deployment (create_all skips pre-existing
+    # tables but does NOT add indexes to them).
+    if insp.has_table("forensic_case_pins"):
+        existing_idx = {idx["name"] for idx in insp.get_indexes("forensic_case_pins")}
+        with engine.begin() as conn:
+            if "ix_forensic_case_pins_case" not in existing_idx:
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_forensic_case_pins_case "
+                    "ON forensic_case_pins (forensic_case_id)"
+                ))
+                logger.info("Migrated: ix_forensic_case_pins_case")
+            if "ix_forensic_case_pins_status" not in existing_idx:
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_forensic_case_pins_status "
+                    "ON forensic_case_pins (forensic_case_id, finding_status)"
+                ))
+                logger.info("Migrated: ix_forensic_case_pins_status")
+
+    if insp.has_table("forensic_case_ledger"):
+        existing_idx = {idx["name"] for idx in insp.get_indexes("forensic_case_ledger")}
+        with engine.begin() as conn:
+            if "ix_forensic_case_ledger_case" not in existing_idx:
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_forensic_case_ledger_case "
+                    "ON forensic_case_ledger (forensic_case_id)"
+                ))
+                logger.info("Migrated: ix_forensic_case_ledger_case")
+            if "ix_forensic_case_ledger_timestamp" not in existing_idx:
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_forensic_case_ledger_timestamp "
+                    "ON forensic_case_ledger (timestamp)"
+                ))
+                logger.info("Migrated: ix_forensic_case_ledger_timestamp")
+
     # Migrations for forensic_playbook_steps — structured fields
     if insp.has_table("forensic_playbook_steps"):
         existing = {col["name"] for col in insp.get_columns("forensic_playbook_steps")}
