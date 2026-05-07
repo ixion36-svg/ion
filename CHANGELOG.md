@@ -1,5 +1,81 @@
 # Changelog
 
+## v0.20.0 — 2026-05-07
+
+### feat(workbench): pinned evidence + tamper-evident ledger on AlertCase
+
+The headline v0.20.0 feature, inspired by Heimdall-DFIR's Workbench
+concept. Turns AlertCase from "ticket with comments" into "forensic
+record with chain-of-custody".
+
+**Two new tables, both attached to AlertCase, no edits to existing tables:**
+
+- `case_evidence_pins` — lightweight pinned forensic items per case.
+  Pin an alert as key evidence, an observable, an ES timeline event,
+  or a free-form analyst observation. UNIQUE constraint on
+  (alert_case_id, source_type, source_ref) prevents duplicate pins.
+  Status flow: triage → confirmed → reported, or → dismissed
+  (soft-delete; the row stays so the chain stays meaningful).
+  Severity tag, MITRE techniques, free-form tags, JSON metadata.
+
+- `case_evidence_ledger` — append-only tamper-evident audit. Per-case
+  monotonic `seq` (UNIQUE alert_case_id, seq), with
+  `content_hash = sha256(prev_hash || "|" || action || "|" ||
+  canonical_json(payload))`. Genesis row uses prev_hash="0"*64. Every
+  workbench mutation (pin, status_change, summary_edit, severity_change,
+  tags_change, mitre_change, title_change, dismiss) writes a ledger row.
+  Per-case `pg_advisory_xact_lock` serialises appends so two concurrent
+  pins can't both compute prev_hash off the same row.
+
+**Verification:** `GET /api/alert-cases/{id}/ledger/verify` walks the
+chain in seq order, recomputing each hash and reporting the first
+break with `{is_valid, seq_count, first_break_seq, error}`. The
+Workbench UI banner reads this on every panel load and turns red if
+the chain is broken (any tamper, gap, or duplicate seq).
+
+**REST API (new, all under /api/alert-cases/{id}):**
+
+- `GET    /pins`             — list pins (paginates by status)
+- `GET    /pins?include_dismissed=true` — include dismissed pins
+- `POST   /pins`             — create pin (409 on duplicate dedupe)
+- `PATCH  /pins/{pin_id}`    — update status / summary / severity / tags / mitre / title
+- `DELETE /pins/{pin_id}`    — soft-delete (status=dismissed + ledger row)
+- `GET    /ledger`           — list ledger rows (capped at 2000)
+- `GET    /ledger/verify`    — walk + verify the chain
+
+Permissions reuse `case:read` (GET) and `case:update` (mutations).
+
+**UI (additive — zero edits to existing case-panel sections):**
+
+A new Workbench section appended below Investigation Notes on the
+case panel. Header carries a verify banner (green "chain ok · N
+entries", red "chain BROKEN at seq X") plus pin count, plus an
+Add-observation inline form. Three-column Kanban (Triage, Confirmed,
+Reported) with native HTML5 drag-and-drop — drag a card to PATCH its
+finding_status (and emit a status_change ledger row). "Pin as
+evidence" button on every linked alert card. ✕ on each card to
+dismiss with confirmation.
+
+**Smoke-tested end-to-end against the live container:** 10 HTTP API
+assertions (login, baseline, pin alert, dedup→409, pin note,
+status_change, verify, ledger inspection, dismiss, include_dismissed)
+plus a tamper test (psql UPDATE seq=2 payload → verify reports
+`is_valid=false, first_break_seq=2, content_hash mismatch at seq 2`).
+All green before tagging.
+
+### feat(autopilot): kill switch for auto-playbook execution
+
+`/alerts/host-patterns` was auto-starting playbook executions when a
+multi-alert pattern matched a `Playbook` flagged `auto_execute=true`.
+Analysts asked for explicit "Start Playbook" clicks instead of
+surprise executions on the case timeline. Added `ION_AUTO_PLAYBOOK_ENABLED`
+env flag, default **false**. Pattern detection still runs and the
+matched playbook still surfaces in the response (so the UI can offer
+a button), but no execution is created until the analyst clicks. Set
+`ION_AUTO_PLAYBOOK_ENABLED=true` in .env to restore v0.19.x behaviour.
+
+### chore: docker-compose default image tag bumped to 0.20.0
+
 ## v0.19.21 — 2026-05-06
 
 ### feat(wallboard): drop ticker strip
