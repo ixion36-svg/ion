@@ -3470,36 +3470,6 @@ async def get_es_config_status(
     }
 
 
-@router.post("/elasticsearch/config", dependencies=[Depends(require_admin)])
-async def update_es_config(
-    request: Request,
-    current_user: User = Depends(get_current_user),
-):
-    """Update Elasticsearch configuration (admin only)."""
-    data = await request.json()
-
-    config = get_config()
-    config_path = Path.cwd() / ".ion" / "config.json"
-
-    # Update config fields
-    if "enabled" in data:
-        config.elasticsearch_enabled = data["enabled"]
-    if "url" in data:
-        config.elasticsearch_url = data["url"]
-    if "api_key" in data:
-        config.elasticsearch_api_key = data["api_key"]
-    if "username" in data:
-        config.elasticsearch_username = data["username"]
-    if "password" in data:
-        config.elasticsearch_password = data["password"]
-    if "alert_index" in data:
-        config.elasticsearch_alert_index = data["alert_index"]
-    if "verify_ssl" in data:
-        config.elasticsearch_verify_ssl = data["verify_ssl"]
-
-    config.to_file(config_path)
-
-    return {"message": "Elasticsearch configuration updated"}
 
 
 @router.get("/elasticsearch/test")
