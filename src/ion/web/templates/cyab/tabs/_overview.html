@@ -1,6 +1,6 @@
 {# Overview tab — checklist grouped by category, critical first.
    v0.19.4: items are now editable. Each row has a status <select> that
-   PUTs to /api/cyab/studio/checklist/{id} with a JSON body. The icon
+   PUTs to /api/cyab/checklist/{id} with a JSON body. The icon
    colour swaps inline on success without re-fetching the whole tab.
    The "+ Add custom item" form likewise switched from HTMX form-encoded
    (which the JSON-bodied endpoint silently 422'd on) to plain fetch().
@@ -62,7 +62,7 @@
   {% endif %}
 {% endfor %}
 
-{# "Add custom item" form — POSTs to /api/cyab/studio/systems/{id}/checklist
+{# "Add custom item" form — POSTs to /api/cyab/systems/{id}/checklist
    as JSON. v0.19.4: was HTMX form-encoded which the BaseModel-bound
    endpoint silently 422'd on. #}
 <section class="mt-6 pt-4 border-t border-slate-800">
@@ -133,7 +133,7 @@
     const previous = row && row.querySelector('.status-icon')?.textContent;
     sel.disabled = true;
     try {
-      const r = await fetch(`/api/cyab/studio/checklist/${encodeURIComponent(itemId)}`, {
+      const r = await fetch(`/api/cyab/checklist/${encodeURIComponent(itemId)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -171,7 +171,7 @@
     const kind = 'custom_' + label.toLowerCase()
       .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40);
     try {
-      const r = await fetch(`/api/cyab/studio/systems/${encodeURIComponent(sysId)}/checklist`, {
+      const r = await fetch(`/api/cyab/systems/${encodeURIComponent(sysId)}/checklist`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
