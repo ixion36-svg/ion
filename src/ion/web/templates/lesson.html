@@ -62,9 +62,11 @@
 
 <script>
 const LESSON_ID = {{ lesson_id | tojson }};
+const COURSE_SLUG = {{ course_slug | default('') | tojson }};
 let _lesson = null;
 let _answers = {};       // {question_id: value}
 let _resultMap = null;   // {question_id: {is_correct, points_earned, points_max, correct_answer, explanation_md}}
+let _labState = null;    // {materialised_count, materialised_ids, observable_links}
 
 function escHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
 function md(s) {
@@ -101,9 +103,27 @@ function render() {
   const isQuizLike = (l.lesson_type === 'quiz' || l.lesson_type === 'lab');
   const labLink = (l.lesson_type === 'lab' && l.lab_target_url)
     ? `<div class="ln-banner" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;">
-         <strong>🛠 Hands-on lab.</strong> Open <a class="underline" href="${escHtml(l.lab_target_url)}" target="_blank">${escHtml(l.lab_target_url)}</a>
+         <strong>Hands-on lab.</strong> Open <a class="underline" href="${escHtml(l.lab_target_url)}" target="_blank">${escHtml(l.lab_target_url)}</a>
          in another tab and complete the task before answering the verification questions.
        </div>` : '';
+
+  const labFixturesSection = (l.lesson_type === 'lab')
+    ? `<div id="ln-lab-fixtures" class="ln-banner" style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;margin-bottom:0.75rem;">
+         <div style="font-weight:700;margin-bottom:0.5rem;">Lab environment</div>
+         <div id="ln-lab-status" style="font-size:0.82rem;color:var(--text-secondary);">
+           Click <em>Launch lab</em> to seed practice alerts/cases into ION for this exercise.
+         </div>
+         <div style="margin-top:0.6rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+           <button id="ln-lab-launch-btn" class="ln-btn-primary" onclick="launchLab()" style="font-size:0.8rem;padding:0.45rem 1rem;">
+             Launch lab
+           </button>
+           <button id="ln-lab-complete-btn" class="ln-btn-secondary" onclick="completeLab()" style="font-size:0.8rem;padding:0.45rem 1rem;">
+             Complete lab
+           </button>
+         </div>
+         <div id="ln-lab-links" style="margin-top:0.5rem;font-size:0.78rem;"></div>
+       </div>`
+    : '';
 
   let questionsHtml = '';
   if (isQuizLike && (l.questions || []).length) {
@@ -121,10 +141,11 @@ function render() {
     <div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">${escHtml(l.lesson_type)}</div>
     <h1 class="text-[26px] font-bold text-white tracking-tight mb-2">${escHtml(l.title)}</h1>
     <div class="flex gap-3 text-[12px] text-slate-400 mb-5">
-      <span>⏱ ~${l.duration_min}m</span>
+      <span>~${l.duration_min}m</span>
       ${l.user_score != null ? `<span>Last score: <strong>${l.user_score}%</strong></span>` : ''}
       ${l.user_attempts > 0 ? `<span>${l.user_attempts} attempt${l.user_attempts !== 1 ? 's' : ''}</span>` : ''}
     </div>
+    ${labFixturesSection}
     ${labLink}
     <div id="ln-content" class="ln-content">${md(l.content_md || '')}</div>
     <div id="ln-questions">${questionsHtml}</div>
@@ -256,6 +277,58 @@ function renderResults(d) {
     <button class="ln-btn-secondary" onclick="loadLesson()">Re-attempt</button>
     <a class="ln-btn-primary" href="javascript:history.back()">Back to course →</a>
   `;
+}
+
+async function launchLab() {
+  const btn = document.getElementById('ln-lab-launch-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Launching…'; }
+  try {
+    const slug = COURSE_SLUG || await _getCourseSlug();
+    const r = await fetch(`/api/courses/${encodeURIComponent(slug)}/lessons/${LESSON_ID}/lab/launch`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+    _labState = d;
+    _renderLabLinks(d);
+    const st = document.getElementById('ln-lab-status');
+    if (st) st.textContent = `Lab seeded — ${d.materialised_count} fixture row(s) inserted.`;
+    showToast('Lab launched', 'success');
+  } catch (e) { showToast('Launch failed: ' + e.message, 'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Launch lab'; } }
+}
+window.launchLab = launchLab;
+
+async function completeLab() {
+  const btn = document.getElementById('ln-lab-complete-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Completing…'; }
+  try {
+    const slug = COURSE_SLUG || await _getCourseSlug();
+    const r = await fetch(`/api/courses/${encodeURIComponent(slug)}/lessons/${LESSON_ID}/lab/complete`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+    const st = document.getElementById('ln-lab-status');
+    if (st) st.textContent = `Lab complete — ${d.torn_down_count} row(s) removed.`;
+    const linksEl = document.getElementById('ln-lab-links');
+    if (linksEl) linksEl.innerHTML = '';
+    showToast('Lab completed', 'success');
+    setTimeout(loadLesson, 600);
+  } catch (e) { showToast('Complete failed: ' + e.message, 'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Complete lab'; } }
+}
+window.completeLab = completeLab;
+
+function _renderLabLinks(d) {
+  const el = document.getElementById('ln-lab-links');
+  if (!el) return;
+  const links = (d.observable_links || []).filter(Boolean);
+  if (!links.length) return;
+  el.innerHTML = 'Seeded: ' + links.map(l =>
+    `<a href="${escHtml(l)}" target="_blank" class="underline" style="color:#a5b4fc;margin-right:0.5rem;">${escHtml(l)}</a>`
+  ).join('');
+}
+
+async function _getCourseSlug() {
+  if (_lesson && _lesson.course_id) return slugForCourse(_lesson.course_id);
+  return '';
 }
 
 document.addEventListener('DOMContentLoaded', loadLesson);
