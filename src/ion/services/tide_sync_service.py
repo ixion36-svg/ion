@@ -44,7 +44,17 @@ _SYNC_TARGETS = [
 ]
 
 # Sync interval in seconds (default 5 minutes, configurable via env).
-SYNC_INTERVAL = int(os.environ.get("ION_TIDE_SYNC_INTERVAL", "300"))
+# v0.22.0: canonical name is ION_TIDE_SYNC_INTERVAL_S; old name accepted with
+# a deprecation warning for one release cycle.
+_raw_interval = os.environ.get("ION_TIDE_SYNC_INTERVAL_S")
+if _raw_interval is None:
+    _raw_interval = os.environ.get("ION_TIDE_SYNC_INTERVAL")
+    if _raw_interval is not None:
+        import logging as _log
+        _log.getLogger(__name__).warning(
+            "ION_TIDE_SYNC_INTERVAL is deprecated; rename to ION_TIDE_SYNC_INTERVAL_S"
+        )
+SYNC_INTERVAL = int(_raw_interval or "300")
 
 
 # ---------------------------------------------------------------------------
