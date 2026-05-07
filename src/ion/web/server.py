@@ -66,6 +66,7 @@ from ion.web.enrichment_api import router as enrichment_router
 from ion.web.entity_timeline_api import router as entity_timeline_router
 from ion.web.executive_report_api import router as executive_report_router
 from ion.web.forensics_api import router as forensics_router
+from ion.web.forensic_workbench_api import router as forensic_workbench_router
 from ion.web.incident_cost_api import router as incident_cost_router
 from ion.web.integration_api import router as integration_router
 from ion.web.investigation_api import router as investigation_router
@@ -276,6 +277,8 @@ app.include_router(notes_router, prefix="/api/notes")
 app.include_router(pcap_router, prefix="/api/pcap")
 app.include_router(arkime_router)  # router already has prefix="/api"
 app.include_router(forensics_router, prefix="/api/forensics")
+# v0.20.1: ForensicCase Workbench — pinned evidence + tamper-evident ledger
+app.include_router(forensic_workbench_router, prefix="/api/forensics")
 app.include_router(social_router, prefix="/api/social")
 app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(engineering_analytics_router, prefix="/api/engineering/analytics")
