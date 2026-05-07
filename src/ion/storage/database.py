@@ -81,6 +81,7 @@ LOCK_TICKER_BG              = 1018
 LOCK_CASE_EMBEDDING_BG      = 1019
 LOCK_KB_EMBEDDING_BG        = 1020
 LOCK_SEED_CYAB_SUBPROFILES  = 1021  # v0.12.0 — Onboarding Studio catalogue seeder
+LOCK_BOB_EVAL_BG            = 1022  # v0.21.0 — Bob Prompt Eval Harness singleton guard
 
 
 @contextmanager
@@ -921,6 +922,71 @@ def _run_migrations(engine: Engine) -> None:
                     text("ALTER TABLE alert_prompt_templates ADD COLUMN confidence_threshold_override INTEGER")
                 )
                 logger.info("Migrated: alert_prompt_templates.confidence_threshold_override")
+
+    # v0.21.0: Bob Prompt Evaluation Harness — eval run + sample tables.
+    # Base.metadata.create_all creates these on fresh deployments. The blocks
+    # below add them idempotently on upgrades and ensure indexes exist.
+    if not insp.has_table("bob_eval_runs"):
+        ts_type = "TIMESTAMPTZ" if _is_postgres(engine) else "DATETIME"
+        with engine.begin() as conn:
+            conn.execute(text(f"""
+                CREATE TABLE bob_eval_runs (
+                    id INTEGER PRIMARY KEY {'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'},
+                    template_id INTEGER REFERENCES alert_prompt_templates(id) ON DELETE SET NULL,
+                    template_name VARCHAR(255),
+                    prompt_body_hash VARCHAR(64) NOT NULL,
+                    model_name VARCHAR(128) NOT NULL,
+                    model_version VARCHAR(128),
+                    sample_size INTEGER NOT NULL,
+                    started_at {ts_type},
+                    completed_at {ts_type},
+                    status VARCHAR(20) NOT NULL DEFAULT 'running',
+                    error_message TEXT,
+                    triggered_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    precision_score NUMERIC(5,4),
+                    recall_score NUMERIC(5,4),
+                    f1_score NUMERIC(5,4),
+                    tp_count INTEGER NOT NULL DEFAULT 0,
+                    fp_count INTEGER NOT NULL DEFAULT 0,
+                    fn_count INTEGER NOT NULL DEFAULT 0,
+                    tn_count INTEGER NOT NULL DEFAULT 0,
+                    abstention_count INTEGER NOT NULL DEFAULT 0,
+                    hallucination_proxy NUMERIC(5,4),
+                    created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX ix_bob_eval_runs_template_id ON bob_eval_runs (template_id)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX ix_bob_eval_runs_started_at ON bob_eval_runs (started_at)"
+            ))
+            conn.execute(text(
+                "CREATE INDEX ix_bob_eval_runs_status ON bob_eval_runs (status)"
+            ))
+            logger.info("Migrated: CREATE TABLE bob_eval_runs")
+
+    if not insp.has_table("bob_eval_run_samples"):
+        with engine.begin() as conn:
+            conn.execute(text(f"""
+                CREATE TABLE bob_eval_run_samples (
+                    id INTEGER PRIMARY KEY {'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'},
+                    eval_run_id INTEGER NOT NULL REFERENCES bob_eval_runs(id) ON DELETE CASCADE,
+                    ai_feedback_id INTEGER NOT NULL REFERENCES ai_feedback(id) ON DELETE CASCADE,
+                    bob_verdict VARCHAR(50),
+                    human_verdict VARCHAR(50) NOT NULL,
+                    agreement BOOLEAN,
+                    confidence_int INTEGER,
+                    reasoning_text TEXT,
+                    UNIQUE (eval_run_id, ai_feedback_id)
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX ix_bob_eval_run_samples_run_id "
+                "ON bob_eval_run_samples (eval_run_id)"
+            ))
+            logger.info("Migrated: CREATE TABLE bob_eval_run_samples")
 
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
