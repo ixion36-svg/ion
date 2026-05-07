@@ -54,13 +54,3 @@ def get_framework_endpoint(framework_id: str):
     return fw
 
 
-# ---------------------------------------------------------------------------
-# Legacy endpoint kept for backwards compatibility with the original code
-# (was the only compliance endpoint, returning NIST CSF only).
-# ---------------------------------------------------------------------------
-
-@router.get("/nist", dependencies=[Depends(require_permission("alert:read"))])
-def legacy_nist_endpoint():
-    """Deprecated: use /compliance/nist_csf/posture."""
-    from ion.services.compliance_mapping_service import get_compliance_posture_legacy
-    return get_compliance_posture_legacy(get_tide_service())
