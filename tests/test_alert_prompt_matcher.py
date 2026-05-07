@@ -265,3 +265,105 @@ class TestExtractors:
         alert = {"mitre_techniques": ["TA0002", "T1059"]}
         techs = AlertPromptRepository._extract_mitre_techniques(alert)
         assert techs == ["T1059"]
+
+
+# ---------------------------------------------------------------------------
+# ESXi ATT&CK v17 detection pack tests (T1675, T1059.012, T1505.006, T1673)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def esxi_session(tmp_path):
+    """Isolated SQLite session for ESXi pack tests."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'esxi_pack.db'}")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    s = Session()
+    yield s
+    s.close()
+
+
+class TestESXiV17Templates:
+    """Integration tests for the ESXi ATT&CK v17 detection pack seed."""
+
+    def test_seed_inserts_four_esxi_templates(self, esxi_session):
+        """seed_default_templates inserts all 4 ESXi pack templates."""
+        from ion.services.alert_prompt_service import seed_default_templates
+
+        inserted = seed_default_templates(db=esxi_session)
+        repo = AlertPromptRepository(esxi_session)
+        all_templates = repo.list_all()
+        esxi_names = {
+            "ESXi Administration Command",
+            "Hypervisor CLI Execution",
+            "vSphere Installation Bundle (VIB)",
+            "Virtual Machine Discovery",
+        }
+        seeded_names = {t.name for t in all_templates}
+        assert esxi_names.issubset(seeded_names)
+        assert inserted >= 4
+
+    def test_seed_is_idempotent(self, esxi_session):
+        """Running seed twice produces no duplicate rows."""
+        from ion.services.alert_prompt_service import seed_default_templates
+
+        seed_default_templates(db=esxi_session)
+        seed_default_templates(db=esxi_session)
+        repo = AlertPromptRepository(esxi_session)
+        all_templates = repo.list_all()
+        names = [t.name for t in all_templates]
+        assert len(names) == len(set(names)), "Duplicate template names after double seed"
+
+    def test_t1675_matches_esxi_administration_command(self, esxi_session):
+        """T1675 alert matches ESXi Administration Command template."""
+        from ion.services.alert_prompt_service import seed_default_templates
+
+        seed_default_templates(db=esxi_session)
+        repo = AlertPromptRepository(esxi_session)
+        alert = {"rule": {"mitre": {"id": ["T1675"], "tactic": ["TA0002"]}}}
+        match = repo.find_matching(alert)
+        assert match is not None
+        assert match.name == "ESXi Administration Command"
+
+    def test_t1059_012_matches_hypervisor_cli_not_generic_t1059(self, esxi_session):
+        """T1059.012 alert matches Hypervisor CLI Execution (priority 25), not generic T1059 (priority 35)."""
+        from ion.services.alert_prompt_service import seed_default_templates
+
+        seed_default_templates(db=esxi_session)
+        repo = AlertPromptRepository(esxi_session)
+        # Seed a generic T1059 template with priority 35 to ensure the
+        # sub-technique-specific template (priority 25) wins the tiebreak.
+        _make(
+            repo,
+            name="Generic T1059",
+            mitre_techniques=["T1059"],
+            priority=35,
+        )
+        esxi_session.flush()
+        alert = {"rule": {"mitre": {"id": ["T1059.012"], "tactic": ["TA0002"]}}}
+        match = repo.find_matching(alert)
+        assert match is not None
+        assert match.name == "Hypervisor CLI Execution"
+        assert match.priority == 15
+
+    def test_t1505_006_matches_vib_template(self, esxi_session):
+        """T1505.006 alert matches vSphere Installation Bundle (VIB) template."""
+        from ion.services.alert_prompt_service import seed_default_templates
+
+        seed_default_templates(db=esxi_session)
+        repo = AlertPromptRepository(esxi_session)
+        alert = {"rule": {"mitre": {"id": ["T1505.006"], "tactic": ["TA0003"]}}}
+        match = repo.find_matching(alert)
+        assert match is not None
+        assert match.name == "vSphere Installation Bundle (VIB)"
+
+    def test_t1673_matches_virtual_machine_discovery(self, esxi_session):
+        """T1673 alert matches Virtual Machine Discovery template."""
+        from ion.services.alert_prompt_service import seed_default_templates
+
+        seed_default_templates(db=esxi_session)
+        repo = AlertPromptRepository(esxi_session)
+        alert = {"rule": {"mitre": {"id": ["T1673"], "tactic": ["TA0007"]}}}
+        match = repo.find_matching(alert)
+        assert match is not None
+        assert match.name == "Virtual Machine Discovery"
