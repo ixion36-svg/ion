@@ -534,6 +534,71 @@ def get_course_certificate(
         )
 
 
+# ── Lesson PDF export (v0.20.1) ──────────────────────────────────────────
+
+
+@router.get("/api/courses/{slug}/lessons/{lesson_id}/export.pdf")
+def export_lesson_pdf(
+    slug: str,
+    lesson_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Return a WeasyPrint-rendered PDF of a single lesson.
+
+    Auth mirrors ``GET /api/lessons/{id}``: any authenticated user may fetch a
+    lesson; no enrolment gate because analysts revisit PDFs offline after
+    course completion.  Returns 404 if the course or lesson does not exist, or
+    if the lesson does not belong to this course slug.
+    """
+    from fastapi.responses import Response
+
+    course = session.query(Course).filter(Course.slug == slug).one_or_none()
+    if course is None:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    lesson = session.get(Lesson, lesson_id)
+    if lesson is None:
+        raise HTTPException(status_code=404, detail="Lesson not found")
+
+    module = lesson.module
+    if module is None or module.course_id != course.id:
+        raise HTTPException(status_code=404, detail="Lesson not found in this course")
+
+    from ion.services.pdf_export_service import render_lesson_pdf
+
+    slug_safe = re.sub(r"[^A-Za-z0-9._-]+", "_", slug).strip("_")[:50] or "course"
+    module_order = str(module.order) if module else "0"
+    lesson_slug = re.sub(r"[^A-Za-z0-9._-]+", "_", lesson.title or "").strip("_")[:40] or f"lesson{lesson_id}"
+    filename = f"{slug_safe}-m{module_order}-{lesson_slug}.pdf"
+
+    try:
+        from weasyprint import HTML as _WpHTML  # noqa: F401 — availability check
+        pdf_bytes = render_lesson_pdf(lesson, course)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+    except (ImportError, OSError):
+        # WeasyPrint missing in this environment — return HTML fallback.
+        from ion.services.pdf_export_service import _content_to_html, _build_pdf_html
+        import html as _html_mod
+        body_html = _content_to_html(lesson.content_md or "", "markdown")
+        full_html = _build_pdf_html(body_html, lesson.title or "Lesson")
+        return Response(
+            content=full_html,
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+
 # ── Lesson endpoints ─────────────────────────────────────────────────────
 
 
