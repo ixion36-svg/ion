@@ -85,6 +85,11 @@ class Investigation(Base):
     recommended_actions_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ioc_snapshot_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # v0.21.0: numeric confidence score (0-100) from _compute_confidence.
+    confidence_int: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Analyst explanation text — stored when ION_BOB_STORE_REASONING=true.
+    reasoning_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # v0.10.11: training-loop foundation. Every investigation persists the
     # rendered user prompt + the model's raw output + the grounded evidence
     # bullets. Without these, AIFeedback disagreements are uncountable but

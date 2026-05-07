@@ -5142,6 +5142,10 @@ function renderTriageBar(alertId, triage) {
     const analystNotes = triage ? (triage.analyst_notes || '') : '';
     const observables = triage ? (triage.observables || []) : [];
     const mitreTechniques = triage ? (triage.mitre_techniques || []) : [];
+    // v0.21.0: Bob confidence badge + auto-escalated pill
+    const bobConfidenceInt = triage ? triage.suggested_verdict_confidence_int : null;
+    const bobEscalationBadge = triage ? triage.bob_escalation_badge : null;
+    const bobSuggestedVerdict = triage ? triage.suggested_verdict : null;
 
     // Merge auto-detected MITRE from alert with saved techniques
     const alert = currentDetailAlert;
@@ -5215,6 +5219,26 @@ function renderTriageBar(alertId, triage) {
             <button class="alert-closure-btn escalated" onclick="showAlertClosureModal('${escapeHtml(alertId)}', 'escalated')">&#9650; Escalated</button>
             <button class="alert-closure-btn false-positive" onclick="showAlertClosureModal('${escapeHtml(alertId)}', 'false_positive')">&#10007; False Positive</button>
         </div>
+        ${(() => {
+            if (bobConfidenceInt === null && bobConfidenceInt === undefined && !bobEscalationBadge) return '';
+            const parts = [];
+            if (bobConfidenceInt !== null && bobConfidenceInt !== undefined) {
+                let color, label;
+                if (bobConfidenceInt >= 80) {
+                    color = '#22c55e'; label = 'High';
+                } else if (bobConfidenceInt >= 60) {
+                    color = '#f59e0b'; label = 'Medium';
+                } else {
+                    color = '#ef4444'; label = 'Low';
+                }
+                const verdictStr = bobSuggestedVerdict ? ` &middot; ${escapeHtml(bobSuggestedVerdict.replace('_', ' '))}` : '';
+                parts.push(`<span title="Bob confidence score" style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.15rem 0.5rem;border-radius:9999px;font-size:0.72rem;font-weight:600;background:${color}22;color:${color};border:1px solid ${color}55;">&#129302; Bob ${label} ${bobConfidenceInt}%${verdictStr}</span>`);
+            }
+            if (bobEscalationBadge === 'low_confidence_triage') {
+                parts.push(`<span title="Bob could not produce a confident verdict — human review required" style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.15rem 0.5rem;border-radius:9999px;font-size:0.72rem;font-weight:600;background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b55;">&#9650; Auto-escalated</span>`);
+            }
+            return parts.length ? `<div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.4rem;">${parts.join('')}</div>` : '';
+        })()}
         <div class="triage-notes-row" style="margin-top:0.5rem;">
             <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.25rem;">Analyst Notes</label>
             <div style="display:flex;gap:0.5rem;">
