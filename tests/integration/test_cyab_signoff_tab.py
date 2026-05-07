@@ -26,7 +26,7 @@ def test_signoff_tab_includes_containment_authority(client, make_system):
 def test_signoff_tab_links_onboarding_pack_pdf(client, make_system):
     sys_id = make_system(name="signoff-pdf", containment_authority="SOC Lead")
     r = client.get(f"/cyab/systems/{sys_id}/tab/signoff")
-    assert f"/api/cyab/studio/systems/{sys_id}/onboarding-pack" in r.text
+    assert f"/api/cyab/systems/{sys_id}/onboarding-pack" in r.text
 
 
 def test_signoff_tab_includes_governance_section(client, make_system):
@@ -40,7 +40,7 @@ def test_signoff_tab_includes_governance_section(client, make_system):
 def test_signoff_tab_has_sign_form(client, make_system):
     sys_id = make_system(name="signoff-form", containment_authority="SOC Lead")
     r = client.get(f"/cyab/systems/{sys_id}/tab/signoff")
-    assert f"/api/cyab/studio/systems/{sys_id}/onboarding-pack/sign" in r.text
+    assert f"/api/cyab/systems/{sys_id}/onboarding-pack/sign" in r.text
 
 
 def test_signoff_tab_empty_history(client, make_system):
@@ -52,8 +52,8 @@ def test_signoff_tab_empty_history(client, make_system):
 
 def test_signoff_tab_shows_prior_signoffs(client, make_system, temp_db):
     """Prior sign-offs are read from CyabSystem.sign_dept_* / sign_soc_*
-    fields (the actual sign-off persistence used by the existing
-    POST /api/cyab/studio/systems/{id}/onboarding-pack/sign endpoint).
+    fields (the actual sign-off persistence used by the
+    POST /api/cyab/systems/{id}/onboarding-pack/sign endpoint).
 
     The plan note about CyabSnapshot rows tagged 'signoff' doesn't match
     the actual model — CyabSnapshot has no ``kind`` or ``signed_by``

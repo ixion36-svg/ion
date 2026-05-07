@@ -1,4 +1,4 @@
-{# Intake tab — sub-profile-driven questions, lifted from cyab_studio.html.
+{# Intake tab — sub-profile-driven questions.
 
    The catalogue schema (see cyab_subprofile_catalogue.py) uses:
      - q.key          (stable string id; matches answers dict keys)
@@ -6,10 +6,9 @@
      - q.answer_type  ('yesno' | 'single' | 'multi')
      - q.options      (list of {value,label} for single/multi)
 
-   Existing answers are persisted by /api/cyab/studio/systems/{id}/answers
-   (POST). We render a plain HTML form here; HTMX wiring matches the
-   studio's auto-save endpoint so submitted edits go back to the same
-   CyabSystemAssessment row.
+   Existing answers are persisted by /api/cyab/systems/{id}/answers
+   (POST). We render a plain HTML form here; HTMX wiring auto-saves
+   edits back to the same CyabSystemAssessment row.
 #}
 {% if not subprofile %}
   <div class="py-6 text-slate-400">
@@ -40,7 +39,7 @@
     <span class="text-cyan-300 text-[12px]">{{ answered }} / {{ total }} answered</span>
   </header>
 
-  <form hx-post="/api/cyab/studio/systems/{{ system.id }}/answers"
+  <form hx-post="/api/cyab/systems/{{ system.id }}/answers"
         hx-target="#tab-content" hx-swap="innerHTML"
         hx-ext="json-enc"
         class="space-y-4">

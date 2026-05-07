@@ -4,7 +4,7 @@ A row exists for the lifetime of an in-progress onboarding. When the user
 hits "Finish" on step 4 the row stays (audit trail) but is_complete=True.
 The actual CyabSystem and CyabDataSource rows are created mid-wizard
 (end of Step 1 and Step 3 respectively) so on-page autosaves can write
-real intake answers via the existing /api/cyab/studio endpoints.
+real intake answers via the existing /api/cyab endpoints.
 """
 
 from datetime import datetime
