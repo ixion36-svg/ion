@@ -259,3 +259,56 @@ The Investigation Queue (`/investigate`) prioritizes cases for analyst attention
 - External tools can send alerts to `POST /api/webhooks/alert` with a JSON body.
 - Set `ION_WEBHOOK_SECRET` env var and pass it as `X-Webhook-Secret` header for authentication.
 - Health check: `GET /api/webhooks/health`.
+
+---
+
+## Release Ritual — Version Bump
+
+Past releases rotted version strings in less-obvious files. v0.22.0 cleaned up 13-release rot in `src/ion/__init__.py` (was `0.19.19`), README badge (was `0.9.98`), Dockerfile OCI label (was `0.11.6`), and `.env.deploy` (was `0.11.21`). To prevent regression, every release must bump the **eight canonical files** below in a single `chore(release): vX.Y.Z` commit applied at the end of the release ritual.
+
+### Eight files that must bump every release
+
+| # | File | What to change |
+|---|------|----------------|
+| 1 | `src/ion/__init__.py` | `__version__ = "X.Y.Z"` — **load-bearing** for `{{ ion_version }}` in every Jinja template. **Verify before assuming any other file is authoritative.** |
+| 2 | `pyproject.toml` | `version = "X.Y.Z"` |
+| 3 | `docker-compose.yml` | TWO `${ION_VERSION:-X.Y.Z}` fallback defaults (currently lines 101, 260; verify before bump) |
+| 4 | `Dockerfile` | `org.opencontainers.image.version="X.Y.Z"` OCI label |
+| 5 | `README.md` | Version badge `version-X.Y.Z-blue` |
+| 6 | `.env.deploy` | `ION_VERSION=X.Y.Z` AND the human-readable comment on the line above it |
+| 7 | `CHANGELOG.md` | New top entry `## vX.Y.Z — YYYY-MM-DD` |
+| 8 | `SECURITY_ASSESSMENT.md` | Bump "Application Version" header, add new column to severity-trend table, add "Net-New Surfaces in vX.Y.Z" section (and "Net-Removed Surface" if applicable) |
+
+### Two sanity-check greps (must return empty before tagging)
+
+Run both immediately after the bump commit. Both expected output: empty.
+
+```bash
+# A — historical-rot values must be gone:
+grep -RnE "0\.19\.19|0\.11\.6|0\.9\.98|0\.11\.21" \
+  ~/ixion/ \
+  --exclude-dir=.git \
+  --exclude-dir=__pycache__ \
+  --exclude=CHANGELOG.md \
+  --exclude=SECURITY_ASSESSMENT.md \
+  --exclude=RUNBOOK.md \
+  --exclude='_spec_v0_*.md' \
+  --exclude='_research_*.md' \
+  --exclude='seed_courses.py'
+
+# B — previous-released version must NOT remain in canonical-version files:
+# (substitute PREV_VERSION with the version you're shipping over)
+grep -nE 'version *= *"PREV_VERSION"|ION_VERSION:-PREV_VERSION|__version__ *= *"PREV_VERSION"|version-PREV_VERSION|=PREV_VERSION\b' \
+  ~/ixion/pyproject.toml \
+  ~/ixion/docker-compose.yml \
+  ~/ixion/src/ion/__init__.py \
+  ~/ixion/Dockerfile \
+  ~/ixion/README.md \
+  ~/ixion/.env.deploy
+```
+
+If either grep returns hits, fix and re-run before tagging.
+
+### Why this ritual matters
+
+`src/ion/__init__.py:__version__` is exposed as `{{ ion_version }}` to every Jinja template in the app. From v0.19.19 through v0.21.0 — across thirteen releases — the UI footer displayed the wrong version because this file was never updated alongside `pyproject.toml`. README badge, Dockerfile OCI label, and `.env.deploy` rotted to similar degrees. v0.22.0 reset the baseline; this section keeps it from drifting again.

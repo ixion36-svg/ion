@@ -1,5 +1,197 @@
 # Changelog
 
+## v0.22.0 — 2026-05-09
+
+### feat(cyab/heatmap): MITRE ATT&CK technique-coverage heatmap (Feature A)
+
+A read-only page that diffs **CyAB catalogue declared coverage** against
+**actual technique occurrence in real cases** — alert triage records
+plus AlertCase + ForensicCase Workbench pins. Surfaces three signals
+the CyAB studio could not previously visualise:
+
+- `covered_exercised` (green) — catalogued AND seen in cases. Healthy.
+- `covered_not_exercised` (amber) — catalogued but ZERO observations.
+  Primary risk signal: declared coverage that has never fired in real
+  alerts. Either threats aren't materialising as expected or the
+  detection isn't actually firing.
+- `not_covered_seen` (red) — appears in real cases but absent from
+  catalogue. Undetected-pattern signal — the catalogue has a gap that
+  real activity is exposing.
+- `not_covered_not_seen` (gray) — neither declared nor observed.
+
+**Air-gap-safe.** Technique metadata is bundled — `src/ion/data/attack_techniques.json`
+holds 637 ATT&CK Enterprise v15.1 techniques. No live STIX fetch at
+runtime. Refresh script `scripts/generate_attack_techniques_json.py`
+runs at every minor-version bump as part of release ritual (same
+pattern as KEV bundled-snapshot).
+
+**Service:** `mitre_heatmap_service.get_heatmap(session, system_id=None)`.
+Postgres path uses `LATERAL json_array_elements_text` against
+`alert_triage.mitre_techniques`, `case_evidence_pins.mitre_techniques`,
+and `forensic_case_pins.mitre_techniques`. SQLite fallback unnests in
+Python. Technique IDs normalised at read time (uppercase `T`-prefixed)
+so historical data with inconsistent format isn't backfilled. Reuses
+`_aggregate_uc_status()` from `cyab_subprofile_service` for catalogue
+state.
+
+**API:** `GET /api/cyab/attack-heatmap` — gated `alert:read`,
+`Cache-Control: no-cache`, optional `?system_id=N` parameter (accepted
+but unused in the v0.22.0 template; future per-system drilldown).
+
+**Page:** `/cyab/attack-heatmap` — server-rendered Jinja, CSS-grid
+layout, tactic-grouped sections, four cell-state colours.
+`<form method="get">` filters for rollup (sub-technique vs parent),
+tactic, and cell-state. No SPA. New nav entry alongside Coverage /
+Audit Feed / Systems.
+
+**Smoke tests:** 8 in `tests/test_mitre_heatmap.py` — empty DB, four
+cell-state combinations, dismissed-pin exclusion, sub-technique
+rollup, ForensicCase pin participation.
+
+### feat(workbench): timeline annotations on AlertCase + ForensicCase (Feature B)
+
+Free-text time-anchored notes attached to specific points on a case
+timeline — distinct from general case notes (unanchored) and from
+Workbench pins (evidence items, not narrative). Mirrors AlertCase and
+ForensicCase symmetrically.
+
+**Mutability decision (sealed):** annotations are a freestanding
+mutable surface, NOT written to the tamper-evident hash chain.
+Justification: ledger integrity is load-bearing only for evidence;
+analytical narrative needs to be correctable as an investigation
+unfolds without polluting the chain with typo-fix churn. Soft-delete
+only (`deleted_at`); hard-delete forbidden. A single
+`annotation_created` ledger row IS written on creation, recording
+existence + actor (no body content) — lightweight audit without
+encoding mutable text into the hash. Edit and delete events do NOT
+write additional ledger rows. No edit-history table in this version
+(deferred until a compliance ask requires it).
+
+**Schema:** `alert_case_annotations` + `forensic_case_annotations` —
+`(id, case_id FK CASCADE, created_by_id FK users, timeline_ts,
+body NOT NULL CHECK length>0, created_at, updated_at, deleted_at)`.
+Three indexes per table (case, created_by, case+timeline_ts).
+Migrations follow the established `database.py::_run_migrations()`
+pattern; no Alembic.
+
+**Services:** `annotation_service.py` (AlertCase) and
+`forensic_annotation_service.py` (ForensicCase). Methods `create`,
+`list_active`, `update`, `soft_delete`. **TOCTOU rule satisfied** —
+ownership and authorisation checks happen INSIDE each service before
+any mutation, mirroring the v0.20.1 pin-service fix pattern.
+Cross-case PATCH/DELETE returns 404 (mismatch detected in
+`_get_annotation_or_raise`); edit-without-ownership returns 403
+(detected in `_check_edit_permission`). The route layer never
+mutates — it delegates entirely to the service.
+
+**API:** four endpoints per case type — `GET/POST/PATCH/DELETE`
+under `/api/alert-cases/{id}/annotations` and
+`/api/forensics/cases/{id}/annotations`. Pydantic body capped at 2000
+chars, empty body rejected (422). `deleted_at` never returned to the
+caller. `timeline_ts` stored UTC naive (matches
+`CaseEvidenceLedger.timestamp` convention).
+
+**Permissions** (no new gates — reuses existing): list = `case:read`;
+create/edit-own = `case:update`; edit-any = `case:close`. ForensicCase
+mirrors with `forensic:*`.
+
+**UI:** dedicated annotations section in the AlertCase Workbench
+panel (`cases.html`) and the ForensicCase Workbench panel
+(`forensics.html`). Indigo left-border accent visually separates
+narrative from evidence. Inline form (not modal) for create/edit
+with `<input type="datetime-local">` + textarea. Edit/delete icons
+visible only to author or `case:close` users. Per spec §4.7 sealed
+decision, annotations render in the Workbench panel ONLY — no
+unified case-timeline view in v0.22.0.
+
+**Smoke tests:** 22 total — 11 in new `tests/test_alert_case_annotations.py`
+plus 11 mirrored cases in `TestForensicCaseAnnotations` appended to
+`tests/test_forensics_workbench.py` (which now totals 28 — 17 existing
++ 11 new). All pass.
+
+### chore(cleanup): drop dedup + legacy surface
+
+Read-only audit pass identified ~10 high-confidence dedup / drop
+candidates. Five landed in v0.22.0; the rest are deferred or out of
+scope.
+
+- **Dropped `POST /api/elasticsearch/config`** — older write path
+  that bypassed `_ssrf_safe_url()`, skipped Pydantic validation, and
+  didn't invalidate the assignment cache. Replacement at
+  `PUT /api/admin/config/elasticsearch` (admin_api.py:401) is fully
+  validated. Caller-check confirmed `topology.html:734` only used
+  the path for a GET. **Latent SSRF + unvalidated-write surface
+  removed.**
+- **Dropped `/api/compliance/nist`** legacy alias — replacement at
+  `/api/compliance/nist_csf/posture` is live; `get_compliance_posture_legacy()`
+  helper deleted alongside.
+- **Dropped 2 dead placeholder templates** —
+  `cyab/audit_placeholder.html` and `cyab/coverage_placeholder.html`,
+  both superseded by real `cyab/audit.html` + `cyab/coverage.html`
+  pages and unreferenced by any route.
+- **Dropped `/dashboard-legacy` and `/dashboard-v2`** route handlers
+  — Tailwind-rollout fences from v0.19. Tailwind has been stable
+  long enough that the rollback path and migration alias are pure
+  dead weight.
+- **Consolidated saved-search endpoints** — the older `saved_search_api.py`
+  was shadowed by `api.py:7514+` for 3 of its 5 endpoints; the unique
+  `/pin` and `/use` routes were either migrated into `api.py` or
+  dropped if unused, and the entire `saved_search_api.py` file was
+  deleted (with its `server.py` import + include).
+- **Standardised `kb_seed_service.py` registry** — the
+  `uses_functions` boolean flag distinguishing two registry-format
+  variants was replaced with a `callable()` duck-type check. Both
+  formats continue to work; new `kb_*.py` modules need no annotation.
+  Avoids touching ~100k lines of KB content.
+- **Renamed `ION_TIDE_SYNC_INTERVAL` → `ION_TIDE_SYNC_INTERVAL_S`** —
+  matches the `_S` convention every other interval var uses.
+  Old name read with deprecation log warning for one release cycle.
+
+Net LOC reclaimed across the cleanup pass: ~150 lines.
+
+### chore(release): full version-bump everywhere — fix 13-release rot
+
+Prior releases rotted version strings in eight files. The user
+flagged this and requested every future release follow a documented
+checklist. v0.22.0's release commit cleans up the rot AND establishes
+the pattern.
+
+**Cleaned rot:**
+- `src/ion/__init__.py:__version__` was `0.19.19` (rotted by 13
+  releases). This is **load-bearing** — feeds `{{ ion_version }}`
+  into every Jinja template, so the UI footer was lying about the
+  ION version since v0.19.19 shipped.
+- `README.md` version badge was `0.9.98` (rotted by ~12 versions).
+- `Dockerfile` OCI label was `0.11.6` (rotted by ~10 versions).
+- `.env.deploy` `ION_VERSION` was `0.11.21` (rotted by ~10 versions).
+
+**Bump-everywhere checklist** (now canonicalised in
+`_spec_v0_22.md` §5.4 and added to `RUNBOOK.md` "Release ritual"
+section): `src/ion/__init__.py`, `pyproject.toml`, `docker-compose.yml`
+(two fallback defaults), `Dockerfile` OCI label, `README.md` badge,
+`.env.deploy` (comment + `ION_VERSION`), `CHANGELOG.md`, and
+`SECURITY_ASSESSMENT.md`. Two sanity-check greps run at the end of
+every release ritual to verify no rot reappears.
+
+### sec: SECURITY_ASSESSMENT.md delta for v0.22.0
+
+Net-new surfaces gated and reviewed:
+`/api/cyab/attack-heatmap` (alert:read, no PII, technique counts only),
+`/api/alert-cases/{id}/annotations` and
+`/api/forensics/cases/{id}/annotations` (per-case auth, body cap 2000
+chars, soft-delete only), and the bundled
+`src/ion/data/attack_techniques.json` (read-only data, no runtime
+mutation).
+
+**Net-removed surface:** `POST /api/elasticsearch/config` — eliminates
+a latent SSRF + unvalidated-write path. Findings-quality improvement,
+not a new finding.
+
+Net new in v0.22.0: 0C / 0H / 0M / 0L. Running totals unchanged from
+v0.21.0.
+
+### chore: docker-compose default image tag bumped to 0.22.0
+
 ## v0.21.0 — 2026-05-07
 
 ### feat(bob): confidence scoring + circuit breakers
