@@ -1,8 +1,8 @@
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-05-07
-**Application Version:** 0.21.0-rc (integration/v0.21.0 branch)
-**Previous Assessment Version:** 0.20.1-rc (2026-05-06)
+**Assessment Date:** 2026-05-09
+**Application Version:** 0.22.0-rc (integration/v0.22.0 branch)
+**Previous Assessment Version:** 0.21.0-rc (2026-05-07)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent
@@ -11,17 +11,17 @@
 
 ## Executive Summary
 
-ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc adds the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. The net-new surface is largely well-controlled, carrying two new findings (both Low) that do not block ship.
+ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
-| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc |
-|----------|---------|------------|------------|
-| Critical | 0 | **0** | **0** |
-| High | 0 | **0** | **0** |
-| Medium | 2 | **3** | **3** (unchanged) |
-| Low | 3 | **4** | **6** (+2) |
-| **Total** | **5** | **7** | **9** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc |
+|----------|---------|------------|------------|------------|
+| Critical | 0 | **0** | **0** | **0** |
+| High | 0 | **0** | **0** | **0** |
+| Medium | 2 | **3** | **3** | **3** (unchanged) |
+| Low | 3 | **4** | **6** | **6** (unchanged) |
+| **Total** | **5** | **7** | **9** | **9** |
 
-The v0.20.1 posture is unchanged on all carried-forward findings. The two new Low findings come from new surface, not regressions. **Ship-with-followup** is the recommendation: no finding in v0.21.0-rc is release-blocking, but L5 (reasoning_text in samples serialisation) and L6 (confidence_threshold_override permission tier) should be addressed in v0.21.1.
+The v0.21.0 posture is unchanged on all carried-forward findings. **Ship-with-followup** remains the recommendation: no finding in v0.22.0-rc is release-blocking. L5 (reasoning_text in samples serialisation) and L6 (confidence_threshold_override permission tier) carry over from v0.21.0 — should still be addressed in v0.22.1.
 
 ---
 
@@ -261,6 +261,82 @@ All migrated routes confirmed to carry `require_permission` or `get_current_user
 | PII logging | OIDC callback logs username only at INFO; email at DEBUG only |
 | Auto-playbook kill switch | `ION_AUTO_PLAYBOOK_ENABLED=false` default (v0.20.0) |
 | Tamper-evident ledger | sha256 chain on ForensicCase (v0.20.1) and AlertCase (v0.20.0); advisory-lock serialised appends |
+
+---
+
+## Net-New Surfaces in v0.22.0
+
+### Item 26: MITRE ATT&CK technique-coverage heatmap — `GET /api/cyab/attack-heatmap`, `GET /cyab/attack-heatmap`
+
+**Files:** `src/ion/services/mitre_heatmap_service.py`, `src/ion/web/cyab_api.py`, `src/ion/web/server.py` (page route), `src/ion/web/templates/cyab/attack_heatmap.html`, `src/ion/data/attack_techniques.json`
+
+**Auth gate:** `Depends(require_permission("alert:read"))` on the API; the page route inherits the standard CyAB section gate.
+
+**Threat model & mitigations:**
+- *Information disclosure of alert activity volume.* The response exposes per-technique alert-case counts and pin counts. Counts could let a low-privilege internal user infer "this organisation has been getting hit by T1558 lately." Mitigation: gated behind `alert:read`, the same permission that already exposes the underlying triage rows. No additional surface.
+- *Bundled snapshot integrity.* `src/ion/data/attack_techniques.json` is read-only at runtime. Any tampering requires repository write access; covered by the existing supply-chain controls (signed commits, CI image build).
+- *No live STIX fetch.* Air-gap rule preserved; the heatmap never reaches MITRE's servers at runtime. The refresh script is dev-time only.
+- *Cache header.* Response sets `Cache-Control: no-cache` so a stale browser cache cannot serve stale technique observation counts during a deployment window.
+- *No PII.* Response payload contains only technique IDs, technique labels (from the bundled snapshot), tactic IDs, integer counts, and a string state enum.
+
+### Item 27: Timeline annotations — `*/annotations` endpoints on AlertCase + ForensicCase
+
+**Files:** `src/ion/services/annotation_service.py`, `src/ion/services/forensic_annotation_service.py`, `src/ion/models/alert_triage.py` (`AlertCaseAnnotation`), `src/ion/models/forensics.py` (`ForensicCaseAnnotation`), `src/ion/web/workbench_api.py`, `src/ion/web/forensic_workbench_api.py`, `src/ion/storage/database.py` (table creation in `_run_migrations()`).
+
+**Endpoints:**
+- `GET /api/alert-cases/{case_id}/annotations` — list active annotations
+- `POST /api/alert-cases/{case_id}/annotations` — create
+- `PATCH /api/alert-cases/{case_id}/annotations/{ann_id}` — edit body and/or `timeline_ts`
+- `DELETE /api/alert-cases/{case_id}/annotations/{ann_id}` — soft-delete
+- ForensicCase mirror under `/api/forensics/cases/{case_id}/annotations`
+
+**Auth gates:** list = `case:read` (forensic: `forensic:read`); create + edit-own = `case:update`; edit-any = `case:close`. Author check: `annotation.created_by_id == current_user.id`. Service-level check, NOT route-level — TOCTOU rule from v0.20.1 pin-service fix is satisfied (verified by reviewer; check happens inside `_check_edit_permission` before any `session.add()` or attribute mutation).
+
+**Threat model & mitigations:**
+- *Cross-case PATCH/DELETE.* `_get_annotation_or_raise` verifies `annotation.alert_case_id == url_case_id` before any mutation. Mismatch raises 404 (not 403) so a low-privilege user cannot enumerate which case-IDs hold which annotation-IDs.
+- *Stored XSS in body.* Body is rendered via Jinja's autoescape (existing `SandboxedEnvironment`). Inline JS in the Workbench template uses `textContent` not `innerHTML` for body display.
+- *Body size.* Pydantic schema enforces `max_length=2000`. DB CHECK constraint enforces `length(body) > 0`. Three-layer defence (route → DB → CHECK).
+- *Hard-delete.* Disallowed. Soft-delete via `deleted_at` only; `deleted_at IS NOT NULL` filters from list query. Hard-delete would require database-direct access.
+- *Ledger integrity NOT compromised.* Annotations are NOT written to the tamper-evident hash chain. A single `annotation_created` ledger row IS appended on creation (records `annotation_id`, `timeline_ts`, actor — NOT body content), so the chain still proves that an annotation existed at a point in time. Subsequent edits do not append to the chain. This is a deliberate design call to keep the chain's invariant load-bearing only for evidence pins.
+- *Permission escalation.* `case:close` (supervisor-level) is required to edit another user's annotation. A user with only `case:update` can edit only their own. Verified by smoke test (test #10 in `test_alert_case_annotations.py`).
+- *Timezone.* `timeline_ts` stored UTC naive, matching `CaseEvidenceLedger.timestamp` convention. No timezone-confusion attack surface.
+
+### Item 28: Bundled `attack_techniques.json`
+
+**Files:** `src/ion/data/attack_techniques.json`, `scripts/generate_attack_techniques_json.py`
+
+**Type:** read-only static data file shipped in the Docker image. 637 ATT&CK Enterprise v15.1 technique records (`id`, `name`, `tactic_ids`, `is_subtechnique`, `parent_id`).
+
+**Threat model:**
+- *Path traversal.* File is loaded once at service initialisation via a hardcoded relative path; user input does not influence the load path.
+- *Schema drift.* Generator script validates STIX structure during refresh; runtime loader fails closed if the file is malformed (heatmap returns empty cells with a warning log).
+- *Secrets.* None. Public ATT&CK data only.
+
+---
+
+## Net-Removed Surface in v0.22.0
+
+### Item R1: `POST /api/elasticsearch/config` — REMOVED
+
+**Was at:** `src/ion/web/api.py` (lines 3473–3502, deleted in commit `e345e53`).
+
+**Why removed:** Older write path that bypassed `_ssrf_safe_url()`, skipped Pydantic validation (writes raw `request.json()`), did not call `reload_config()`, and did not invalidate the assignment cache. The properly-gated replacement at `PUT /api/admin/config/elasticsearch` (`admin_api.py:401`) has been live for several releases.
+
+**Caller-check before removal:** `topology.html:734` only used the URL for a GET against the read endpoint at `api.py:3459`. No POST callers in templates, static JS, or tests.
+
+**Findings-quality impact:** removes a latent SSRF + unvalidated-write surface. Not a counted closure (the write path was undocumented and ungated improperly, never raised as a formal finding); reported here for traceability.
+
+### Item R2: `/api/compliance/nist` legacy endpoint — REMOVED
+
+**Was at:** `src/ion/web/compliance_api.py:62` plus `get_compliance_posture_legacy()` in `compliance_mapping_service.py`. Replaced by `/api/compliance/nist_csf/posture`. No callers found.
+
+### Item R3: `/dashboard-legacy` and `/dashboard-v2` — REMOVED
+
+**Was at:** `src/ion/web/server.py:771` and `:777`. Tailwind-rollout fences from v0.19; rollback path no longer needed.
+
+### Item R4: `saved_search_api.py` — REMOVED (file)
+
+**Was at:** `src/ion/web/saved_search_api.py`. Endpoints shadowed by `api.py:7514+` for the common-case routes; unique `/pin` and `/use` routes either consolidated into `api.py` or removed if unused.
 
 ---
 

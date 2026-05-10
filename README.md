@@ -1,6 +1,6 @@
 # ION - Intelligent Operating Network
 
-![Version](https://img.shields.io/badge/version-0.9.98-blue)
+![Version](https://img.shields.io/badge/version-0.22.0-blue)
 ![Python](https://img.shields.io/badge/python-3.14-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ixion36%2Fion-blue)
@@ -317,7 +317,7 @@ docker compose --profile ai up -d
 ```bash
 docker pull ixion36/ion:latest
 # or a specific version
-docker pull ixion36/ion:0.9.98
+docker pull ixion36/ion:0.22.0
 ```
 
 ---
