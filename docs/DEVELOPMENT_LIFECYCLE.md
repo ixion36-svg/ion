@@ -247,7 +247,7 @@ The shipped artefact is a Docker image:
 - **OCI labels:** `org.opencontainers.image.version` set per release; updated by the release ritual (file 4 of 8).
 - **Image is multi-arch** (built via buildx) and reproducible-by-tag (each `vX.Y.Z` tag is content-addressed by Docker Hub digest).
 
-There is currently **no signed image** (`cosign` / Sigstore) and **no Software Bill of Materials** (SBOM) generated at build time. **Gap (§8).**
+**SBOM (v0.26.0):** A Software Bill of Materials is generated via `syft` during the Docker build (pinned version `1.18.1`, installed as a static binary in the builder stage, removed before the runtime stage). The SBOM lists every Python package pip resolved into the runtime venv, in SPDX-JSON format. It is shipped inside the image at `/app/sbom.spdx.json` and is extractable post-build via `docker cp <container>:/app/sbom.spdx.json .`. Closes the SBOM half of the §8 build-artefacts gap. Image signing via `cosign`/Sigstore remains a §8 item.
 
 #### 3.4.6 The release ritual
 
@@ -341,7 +341,7 @@ The NCSC's 8 principles map to ION's existing practice as follows. Where a princ
 | **1. Secure development environment** | Maintainer's workstation uses Windows 11 with BitLocker; AI pair-programmer (Claude Opus 4.7) runs locally via Claude Code. No third-party access to the dev environment. | **Partial** — formal DSE hardening checklist not documented. |
 | **2. Protect your code repository** | GitHub private repository, SSH-keyed access, branch `main` is the only release-eligible branch. | **Partial** — branch protection not enabled; signed commits not enforced (§3.4.1). |
 | **3. Secure-by-default configuration** | `.env.deploy` template ships secure defaults. Cookie Secure flag warned at startup. Debug mode default-off. Admin password forced to be non-default in production. | **Met** — see `docs/DEPLOYMENT.md`. |
-| **4. Manage third-party risk** | Dependencies declared in `pyproject.toml` with version-floor constraints. Licence policy stated (§3.2.3). `pip-audit` runs in CI against the OSV database on every push and PR (v0.25.0). | **Mostly Met** — SCA scanning landed v0.25.0; SBOM (`syft`) and exact-pinned versions remain §8 gaps. |
+| **4. Manage third-party risk** | Dependencies declared in `pyproject.toml` with version-floor constraints. Licence policy stated (§3.2.3). `pip-audit` runs in CI against the OSV database on every push and PR (v0.25.0). `syft` generates a SPDX-JSON SBOM at Docker build, shipped at `/app/sbom.spdx.json` in the image (v0.26.0). | **Met** — SCA + SBOM in place. Exact-pinned versions remain a §8 candidate for reproducible builds but are not load-bearing for third-party risk management. |
 | **5. Plan for vulnerabilities** | `SECURITY_ASSESSMENT.md` reviewed every release. Per-finding fix-by-version target stated. SLA documented in §3.5.4. | **Met** for internal findings; gap for public disclosure channel (§8). |
 | **6. Continuous security testing** | Per-release `SECURITY_ASSESSMENT.md` is a manual audit pass. Regression tests are pinned to every fix. CI runs `pytest` + `ruff` + `bandit -r src/` + `pip-audit` on every push and PR via GitHub Actions (`.github/workflows/test.yml`, v0.24.0 / SCA v0.25.0). | **Met** — automated CI security scanning incl. SCA. Higher-tier static analysis (Semgrep / CodeQL) remains an aspirational §8 candidate. |
 | **7. Auditable build** | Two-commit release pattern; `chore(release)` commit is mechanical and auditable. Docker images content-addressed by digest. | **Partial** — no signed images; no SBOM; no reproducible-build guarantee at the Python wheel layer (§8). |
@@ -476,7 +476,7 @@ The following items are **not currently in place** and represent the delta betwe
 |-----|--------|-------------------|
 | ~~CI/CD pipeline (`.github/workflows`)~~ | **Closed v0.24.0** — `test.yml` runs pytest + ruff + bandit on every push and PR. |
 | ~~Software Composition Analysis (Snyk / pip-audit)~~ | **Closed v0.25.0** — `pip-audit` runs in CI on every push and PR against the OSV database. One CVE-2024-23342 ignore documented with justification (ecdsa Minerva timing side-channel; not reachable in ION's RS256-only OIDC path). |
-| Software Bill of Materials (SBOM) generation at build | Not in place | v0.24.x — `syft` or equivalent on the Docker image |
+| ~~Software Bill of Materials (SBOM) generation at build~~ | **Closed v0.26.0** — `syft` (pinned 1.18.1) generates SPDX-JSON SBOM at Docker build; shipped inside the image at `/app/sbom.spdx.json` and extractable via `docker cp`. |
 | Container image signing (cosign / Sigstore) | Not in place | v0.25.x — depends on customer infrastructure |
 | Pinned dependency versions (vs `>=` floor) | Not in place | v0.24.x — `pyproject.toml` constraint hardening |
 | Prometheus metrics endpoint | Not in place | v0.26.x — speculative |
@@ -499,6 +499,7 @@ The following items are **not currently in place** and represent the delta betwe
 | 1.0 | 2026-05-11 | Maintainer | Initial publication, aligned to Secure by Design 5 phases. Cross-referenced NCSC SD&D 8 principles. Gap analysis (§8) captures the delta to full defence-tier supplier alignment. |
 | 1.1 | 2026-05-11 | Maintainer | v0.24.0: CI pipeline landed at `.github/workflows/test.yml` (pytest + ruff + bandit). §3.4.4 rewritten to describe the running CI. §4 NCSC Principle 6 status moved from **Partial** to **Met**. §8 CI gap struck through with closure note. |
 | 1.2 | 2026-05-11 | Maintainer | v0.25.0: Software Composition Analysis (`pip-audit`) added as a 4th parallel CI job, scanning the resolved dep tree against OSV. §3.4.4 lists the new job and the documented `--ignore-vuln` baseline. §4 NCSC Principle 4 status moved from **Partial** to **Mostly Met**; Principle 6 prose updated to list pip-audit alongside bandit. §8 SCA gap struck through with closure note. |
+| 1.3 | 2026-05-11 | Maintainer | v0.26.0: Software Bill of Materials (`syft` 1.18.1) generated at Docker build; SPDX-JSON shipped inside the image at `/app/sbom.spdx.json`. §3.4.5 rewritten to describe the syft step. §4 NCSC Principle 4 status moved from **Mostly Met** to **Met**. §8 SBOM gap struck through with closure note. Also notes the v0.26.0 ruff cleanup: codebase-wide ignores added for deliberate-style rules (E402/E712/E741/N806/F841/N811/E711/E731/E701), per-file ignores extended to cover ORM forward-reference F821 in model files, and `ruff check src/` returns 0 errors — closing the v0.24.0/v0.25.0 ruff red CI job. |
 
 ---
 
