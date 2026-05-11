@@ -793,3 +793,51 @@ class TestThreeCriterionPartialCredit:
         assert "viewed_alert" in matched_kinds
         assert "observable_created" in matched_kinds
         assert "case_closed_with_reason" not in matched_kinds
+
+
+# ── v0.26.0: pass-threshold enforcement (pick_lab_lesson_status) ─────────
+
+
+class TestPickLabLessonStatus:
+    """v0.26.0: the helper that decides completed vs failed on lab completion.
+
+    The function lives in ion.web.labs_api so it can be re-used by both
+    the endpoint and (in a follow-up) a real-time grading ticker that
+    grades open sessions in the background. Threshold defaults to 70
+    via Course.pass_threshold but the helper is threshold-agnostic.
+    """
+
+    def test_score_none_stays_completed(self):
+        """Legacy lessons without rubrics return score=None; they shouldn't
+        be penalised — keep the v0.23.0 "always completed" semantics in
+        that case."""
+        from ion.web.labs_api import pick_lab_lesson_status
+        assert pick_lab_lesson_status(None, 70) == "completed"
+
+    def test_score_below_threshold_fails(self):
+        from ion.web.labs_api import pick_lab_lesson_status
+        assert pick_lab_lesson_status(50, 70) == "failed"
+
+    def test_score_at_threshold_passes(self):
+        """Boundary is inclusive — score == threshold is a pass."""
+        from ion.web.labs_api import pick_lab_lesson_status
+        assert pick_lab_lesson_status(70, 70) == "completed"
+
+    def test_score_above_threshold_passes(self):
+        from ion.web.labs_api import pick_lab_lesson_status
+        assert pick_lab_lesson_status(95, 70) == "completed"
+
+    def test_zero_score_fails(self):
+        from ion.web.labs_api import pick_lab_lesson_status
+        assert pick_lab_lesson_status(0, 70) == "failed"
+
+    def test_perfect_score_passes(self):
+        from ion.web.labs_api import pick_lab_lesson_status
+        assert pick_lab_lesson_status(100, 70) == "completed"
+
+    def test_custom_threshold_respected(self):
+        """A course with a stricter pass_threshold (e.g. L3 set to 80)
+        should fail learners scoring between 70-79."""
+        from ion.web.labs_api import pick_lab_lesson_status
+        assert pick_lab_lesson_status(75, 80) == "failed"
+        assert pick_lab_lesson_status(80, 80) == "completed"

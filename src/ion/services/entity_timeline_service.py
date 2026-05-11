@@ -159,7 +159,7 @@ def _search_cases(session: Session, entity: str, cutoff: datetime) -> list[dict]
                 "title": f"Case {c.case_number}: {c.title}",
                 "severity": c.severity or "unknown",
                 "status": c.status,
-                "detail": f"Entity found in affected hosts/users",
+                "detail": "Entity found in affected hosts/users",
                 "meta": {"case_number": c.case_number},
             })
 

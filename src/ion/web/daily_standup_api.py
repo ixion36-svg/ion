@@ -471,7 +471,7 @@ async def _check_log_source_health(
         return {
             "label": label,
             "status": "not_configured",
-            "error": f"No host patterns configured (set ION_STANDUP_DCS_HOSTS / ION_STANDUP_WEF_HOSTS)",
+            "error": "No host patterns configured (set ION_STANDUP_DCS_HOSTS / ION_STANDUP_WEF_HOSTS)",
             "diag": diag,
         }
 
@@ -1150,10 +1150,10 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
     light backgrounds to print legibly).
     """
     from io import BytesIO
+
     from pptx import Presentation
-    from pptx.util import Inches, Pt
     from pptx.dml.color import RGBColor
-    from pptx.enum.text import PP_ALIGN
+    from pptx.util import Inches, Pt
 
     prs = Presentation()
     prs.slide_width = Inches(13.333)

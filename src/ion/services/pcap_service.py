@@ -1627,8 +1627,8 @@ def _detect_isakmp_issues(sessions: dict) -> list[Finding]:
                 category="ISAKMP/IKE",
                 severity="medium",
                 title=f"IKE: {len(delete_sessions)}/{total} sessions torn down ({pct}%)",
-                detail=f"High proportion of IKE sessions explicitly deleted. May indicate "
-                       f"unstable VPN tunnels or DPD failures.",
+                detail="High proportion of IKE sessions explicitly deleted. May indicate "
+                       "unstable VPN tunnels or DPD failures.",
             ))
 
     # Summary: all internal and healthy
@@ -1639,8 +1639,8 @@ def _detect_isakmp_issues(sessions: dict) -> list[Finding]:
             category="ISAKMP/IKE",
             severity="low",
             title=f"IKE: {int_established}/{total} internal session(s) established normally",
-            detail=f"All IKE/IPsec negotiations are between internal IPs and completed successfully. "
-                   f"No unauthorized external tunnels detected.",
+            detail="All IKE/IPsec negotiations are between internal IPs and completed successfully. "
+                   "No unauthorized external tunnels detected.",
         ))
 
     return findings
@@ -1837,7 +1837,7 @@ def _detect_dns_tunneling(dns_counter: collections.Counter) -> list[Finding]:
                 category="DNS Tunneling",
                 severity="high",
                 title=f"High subdomain diversity for {base} ({len(subs)} unique)",
-                detail=f"Excessive unique subdomains under a single domain is a strong DNS tunneling indicator.",
+                detail="Excessive unique subdomains under a single domain is a strong DNS tunneling indicator.",
             ))
         elif len(subs) > 15:
             findings.append(Finding(
@@ -1851,7 +1851,7 @@ def _detect_dns_tunneling(dns_counter: collections.Counter) -> list[Finding]:
                 category="DNS Anomaly",
                 severity="medium",
                 title=f"Repetitive DNS queries to {base} ({total_hits} queries, {len(subs)} subdomains)",
-                detail=f"High query volume to a single domain with multiple subdomains may indicate C2 beaconing over DNS.",
+                detail="High query volume to a single domain with multiple subdomains may indicate C2 beaconing over DNS.",
             ))
 
     return findings

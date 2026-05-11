@@ -35,7 +35,6 @@ from ion.core.config import get_config as get_app_config
 from ion.core.logging import get_logger, setup_logging
 from ion.storage.database import init_db
 from ion.web.admin_api import router as admin_router
-from ion.web.skill_publisher_api import router as skill_publisher_router
 from ion.web.ai_api import router as ai_router
 from ion.web.alert_pattern_api import router as alert_pattern_router
 from ion.web.alert_prompt_api import router as alert_prompt_router
@@ -45,18 +44,17 @@ from ion.web.api import limiter
 from ion.web.api import router as api_router
 from ion.web.arkime_api import router as arkime_router
 from ion.web.attack_story_api import router as attack_story_router
+from ion.web.bob_analysis_api import router as bob_analysis_router
+from ion.web.bob_eval_api import router as bob_eval_router
 from ion.web.briefing_api import router as briefing_router
 from ion.web.bulk_ops_api import router as bulk_ops_router
 from ion.web.canary_api import router as canary_router
 from ion.web.case_grouper_api import router as case_grouper_router
 from ion.web.case_similarity_api import router as case_similarity_router
-from ion.web.workbench_api import router as workbench_router
-from ion.web.bob_eval_api import router as bob_eval_router
 from ion.web.change_log_api import router as change_log_router
 from ion.web.comm_template_api import router as comm_template_router
 from ion.web.compliance_api import router as compliance_router
 from ion.web.course_api import router as course_router
-from ion.web.labs_api import router as labs_router
 from ion.web.cyab_api import router as cyab_router
 from ion.web.cyber_range_api import router as cyber_range_router
 from ion.web.d3fend_api import router as d3fend_router
@@ -67,16 +65,16 @@ from ion.web.engineering_analytics_api import router as engineering_analytics_ro
 from ion.web.enrichment_api import router as enrichment_router
 from ion.web.entity_timeline_api import router as entity_timeline_router
 from ion.web.executive_report_api import router as executive_report_router
-from ion.web.forensics_api import router as forensics_router
 from ion.web.forensic_workbench_api import router as forensic_workbench_router
+from ion.web.forensics_api import router as forensics_router
 from ion.web.incident_cost_api import router as incident_cost_router
 from ion.web.integration_api import router as integration_router
-from ion.web.bob_analysis_api import router as bob_analysis_router
 from ion.web.investigation_api import router as investigation_router
 from ion.web.investigation_memory_api import router as investigation_memory_router
 from ion.web.ioc_staleness_api import router as ioc_staleness_router
 from ion.web.kibana_api import router as kibana_router
 from ion.web.knowledge_graph_api import router as knowledge_graph_router
+from ion.web.labs_api import router as labs_router
 from ion.web.log_source_api import router as log_source_router
 from ion.web.logging_middleware import RequestLoggingMiddleware
 from ion.web.maturity_api import router as maturity_router
@@ -94,6 +92,7 @@ from ion.web.security_api import router as security_router
 from ion.web.security_middleware import RateLimitSecurityMiddleware, SecurityMonitoringMiddleware
 from ion.web.service_account_api import router as service_account_router
 from ion.web.shift_handover_api import router as shift_handover_router
+from ion.web.skill_publisher_api import router as skill_publisher_router
 from ion.web.skills_api import router as skills_router
 from ion.web.sla_api import router as sla_router
 from ion.web.smtp_api import router as smtp_router
@@ -112,6 +111,7 @@ from ion.web.tuning_proposal_api import router as tuning_proposal_router
 from ion.web.vulnerability_api import router as vulnerability_router
 from ion.web.wallboard_api import router as wallboard_router
 from ion.web.webhook_api import router as webhook_router
+from ion.web.workbench_api import router as workbench_router
 
 es_config = get_elasticsearch_config()
 if es_config.get("url"):
@@ -936,12 +936,13 @@ async def cyab_overview_page(
     content moved to /cyab/systems/{id} (Sub-plan A); fleet table moved
     to /cyab/systems (next task).
     """
+    from sqlalchemy import select
+
+    from ion.core.config import get_config
     from ion.models.cyab import CyabSystem
     from ion.services import cyab_doc_checklist_service
     from ion.storage.database import get_engine, get_session_factory
-    from ion.core.config import get_config
     from ion.web.cyab_api import dashboard_metrics
-    from sqlalchemy import select
 
     config = get_config()
     Session = get_session_factory(get_engine(config.db_path))
@@ -1177,6 +1178,7 @@ async def cyab_systems_bulk(
                     detail="case:update permission required for bulk delete",
                 )
             from sqlalchemy.exc import IntegrityError
+
             from ion.web.cyab_api import _delete_system_row
             deleted = 0
             failed: list[int] = []
@@ -1210,10 +1212,10 @@ async def cyab_system_detail_page(
     user: User = Depends(require_page_permission("alert:read")),
 ):
     """Per-system CyAB page (replaces /cyab/studio for a given system)."""
+    from ion.core.config import get_config
     from ion.models.cyab import CyabSystem
     from ion.services import cyab_doc_checklist_service
     from ion.storage.database import get_engine, get_session_factory
-    from ion.core.config import get_config
 
     config = get_config()
     engine = get_engine(config.db_path)
@@ -1261,9 +1263,9 @@ async def cyab_system_tab(
 
     label, template_name = _CYAB_TABS[tab_name]
 
+    from ion.core.config import get_config
     from ion.models.cyab import CyabSystem
     from ion.storage.database import get_engine, get_session_factory
-    from ion.core.config import get_config
 
     config = get_config()
     engine = get_engine(config.db_path)
@@ -1282,11 +1284,11 @@ async def cyab_system_tab(
             ctx["checklist"] = cyab_doc_checklist_service.list_for_system(session, system_id)
             ctx["progress"] = cyab_doc_checklist_service.coverage_summary(session, system_id)
         elif tab_name == "intake":
+            from ion.services.cyab_assessment_service import load_answers
             from ion.services.cyab_subprofile_service import (
                 get_subprofile_full,
                 system_coverage,
             )
-            from ion.services.cyab_assessment_service import load_answers
             # The sub-profile tag lives on data sources (see
             # CyabDataSource.subprofile_id). For the per-system intake
             # view, pick the first tagged source's sub-profile as the
@@ -1302,7 +1304,9 @@ async def cyab_system_tab(
             ctx["answers"] = load_answers(session, system_id) or {}
         elif tab_name == "sources":
             import json as _json
+
             from sqlalchemy import select
+
             from ion.models.cyab import CyabDataSource
             sources = session.execute(
                 select(CyabDataSource)
@@ -1370,6 +1374,7 @@ async def cyab_system_tab(
             # Per-source status (existing studio JS cycles via the existing
             # use-case-status endpoint, keyed by source id + uc id).
             from sqlalchemy import select
+
             from ion.models.cyab import CyabDataSource
             ctx["sources"] = session.execute(
                 select(CyabDataSource).where(CyabDataSource.system_id == system_id)
@@ -1658,13 +1663,13 @@ async def cyab_onboard_page(
     /api/cyab/onboard/{wid}/step/{n} advances state and returns an
     HTMX-replaceable partial.
     """
+    from ion.core.config import get_config
     from ion.services import cyab_wizard_service
     from ion.services.cyab_subprofile_service import (
         list_pillars,
         list_subprofiles_for_pillar,
     )
     from ion.storage.database import get_engine, get_session_factory
-    from ion.core.config import get_config
 
     config = get_config()
     Session = get_session_factory(get_engine(config.db_path))
@@ -1745,9 +1750,9 @@ async def cyab_onboard_step_1(
     CyabSystem row via ``cyab_wizard_service.save_identity``. Returns
     the Step 2 partial for HTMX clients, or a 303 redirect for plain
     browsers."""
+    from ion.core.config import get_config
     from ion.services import cyab_wizard_service
     from ion.storage.database import get_engine, get_session_factory
-    from ion.core.config import get_config
 
     config = get_config()
     Session = get_session_factory(get_engine(config.db_path))
@@ -1799,13 +1804,13 @@ async def cyab_onboard_step_2(
     """Step 2 — Intake. Persists the snapshot of answers in the wizard
     blob (real autosave goes via the Studio answers endpoint). Returns
     Step 3 partial for HTMX or 303 redirects to the Step 3 URL."""
+    from ion.core.config import get_config
     from ion.services import cyab_wizard_service
     from ion.services.cyab_subprofile_service import (
         list_pillars,
         list_subprofiles_for_pillar,
     )
     from ion.storage.database import get_engine, get_session_factory
-    from ion.core.config import get_config
 
     form = await request.form()
     answers = {
@@ -1854,9 +1859,9 @@ async def cyab_onboard_step_3(
     """Step 3 — First data source. Persists a CyabDataSource on the
     backing system, lazy-seeds the doc checklist so Step 4 has rows to
     render, and either returns the Step 4 partial (HTMX) or redirects."""
-    from ion.services import cyab_wizard_service, cyab_doc_checklist_service
-    from ion.storage.database import get_engine, get_session_factory
     from ion.core.config import get_config
+    from ion.services import cyab_doc_checklist_service, cyab_wizard_service
+    from ion.storage.database import get_engine, get_session_factory
 
     Session = get_session_factory(get_engine(get_config().db_path))
     session = Session()
@@ -1902,9 +1907,9 @@ async def cyab_onboard_finish(
 ):
     """Apply doc-placeholder overrides, mark wizard complete, redirect to
     the per-system page."""
+    from ion.core.config import get_config
     from ion.services import cyab_wizard_service
     from ion.storage.database import get_engine, get_session_factory
-    from ion.core.config import get_config
 
     form = await request.form()
     # Parse docs[<kind>][<field>] = value

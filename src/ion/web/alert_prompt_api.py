@@ -137,7 +137,7 @@ def get_all_scorecards(
 
 
     try:
-        from ion.models.ai_feedback import AIFeedback
+        pass
     except Exception:
         return {"window_days": window_days, "scorecards": {}}
 

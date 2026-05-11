@@ -35,6 +35,9 @@ from ion.models.analytics import (
     AnalyticsSnapshot,
 )
 from ion.models.base import Base
+
+# v0.21.0: Bob Prompt Evaluation Harness — per-template P/R/F1 runs.
+from ion.models.bob_eval import BobEvalRun, BobEvalRunSample  # noqa: F401
 from ion.models.canary import Canary, CanaryHit, CanaryStatus, CanaryType
 
 # v0.10.4: case-similarity embeddings (pgvector-backed).
@@ -48,15 +51,6 @@ from ion.models.case_evidence import (  # noqa: F401
     PinSeverity,
     PinSourceType,
 )
-
-# v0.20.1: ForensicCase Workbench — parallel ledger + pins for forensic cases.
-from ion.models.forensic_workbench import (  # noqa: F401
-    ForensicCaseLedger,
-    ForensicCasePin,
-)
-
-# v0.21.0: Bob Prompt Evaluation Harness — per-template P/R/F1 runs.
-from ion.models.bob_eval import BobEvalRun, BobEvalRunSample  # noqa: F401
 
 # v0.11.2: L1/L2/L3/L4 SOC analyst training course subsystem.
 from ion.models.course import (  # noqa: F401
@@ -78,6 +72,12 @@ from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
 from ion.models.cyab_wizard import CyabWizardSession  # noqa: F401
 from ion.models.document import Document, DocumentVersion
 from ion.models.emulation import EmulationPlan, EmulationPlanStatus, EmulationStep, StepResult
+
+# v0.20.1: ForensicCase Workbench — parallel ledger + pins for forensic cases.
+from ion.models.forensic_workbench import (  # noqa: F401
+    ForensicCaseLedger,
+    ForensicCasePin,
+)
 from ion.models.forensics import (
     CustodyAction,
     CustodyLogEntry,

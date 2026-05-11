@@ -27,7 +27,6 @@ from sqlalchemy.orm import Session
 from ion.models.cyab import CyabDataSource, CyabSystem
 from ion.models.cyab_wizard import CyabWizardSession
 
-
 _EMPTY_STATE: Dict[str, Any] = {
     "step": 1,
     "identity": {},

@@ -799,7 +799,7 @@ async def save_generated_document(
 
     for db in get_db_session():
         doc_repo = DocumentRepository(db)
-        doc_name = payload.document_name or f"AI Generated Document"
+        doc_name = payload.document_name or "AI Generated Document"
         document = doc_repo.create(
             name=doc_name,
             rendered_content=payload.content,

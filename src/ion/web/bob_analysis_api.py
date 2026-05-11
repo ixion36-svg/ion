@@ -28,12 +28,11 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import desc, select, text
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
@@ -189,7 +188,7 @@ def _build_user_prompt(
     """Construct the markdown context block the analyst expects Bob to use."""
     parts: list[str] = []
 
-    parts.append(f"## Case under review")
+    parts.append("## Case under review")
     parts.append(f"- **Case number:** `{case.case_number}`")
     parts.append(f"- **Title:** {case.title or '(no title)'}")
     parts.append(f"- **Severity:** {case.severity or 'unknown'}")

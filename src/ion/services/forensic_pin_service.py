@@ -16,9 +16,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ion.models.forensics import ForensicCase
 from ion.models.case_evidence import FindingStatus, PinSeverity, PinSourceType
 from ion.models.forensic_workbench import ForensicCasePin
+from ion.models.forensics import ForensicCase
 from ion.services import forensic_ledger_service
 
 logger = logging.getLogger(__name__)

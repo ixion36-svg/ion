@@ -170,7 +170,6 @@ def _alert_observations_postgres(session: Session) -> Dict[str, int]:
 
 def _alert_observations_sqlite(session: Session) -> Dict[str, int]:
     """SQLite fallback: fetch rows with mitre_techniques and unnest in Python."""
-    from sqlalchemy import select, text as sa_text
     sql = text(
         "SELECT mitre_techniques, case_id FROM alert_triage "
         "WHERE case_id IS NOT NULL AND mitre_techniques IS NOT NULL"

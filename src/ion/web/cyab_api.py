@@ -3235,7 +3235,7 @@ def _build_audit_feed(
     """Inner builder kept separate so the endpoint stays small. Pure helper
     that takes a live session and returns the feed payload — no I/O setup.
     """
-    from ion.models.cyab import CyabSystem, CyabSnapshot
+    from ion.models.cyab import CyabSnapshot, CyabSystem
     from ion.models.cyab_doc_checklist import CyabDocChecklistItem
 
     events: list = []
@@ -3394,6 +3394,7 @@ import re as _re
 from typing import Any, Dict
 
 from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
+from ion.services import cyab_doc_checklist_service as _doc_svc
 from ion.services.cyab_subprofile_service import (
     get_subprofile_full,
     get_use_case,
@@ -3402,7 +3403,6 @@ from ion.services.cyab_subprofile_service import (
     patch_subprofile,
     system_coverage,
 )
-from ion.services import cyab_doc_checklist_service as _doc_svc
 
 _studio_logger = _logging.getLogger(__name__)
 
@@ -3850,6 +3850,7 @@ def get_attack_heatmap(
     Response is always fresh (Cache-Control: no-cache).
     """
     from fastapi.responses import JSONResponse as _JSONResponse
+
     from ion.services.mitre_heatmap_service import get_heatmap
 
     data = get_heatmap(session, system_id=system_id)
@@ -4261,6 +4262,7 @@ def _delete_system_row(session: Session, sys_id: int) -> bool:
 
 def _render_scoping_pack_pdf_html(scores: dict, answers: dict) -> str:
     from datetime import datetime as _dt
+
     from jinja2 import Environment, FileSystemLoader, select_autoescape
     template_dir = Path(__file__).parent / "templates"
     env = Environment(

@@ -38,8 +38,8 @@ async def receive_alert_webhook(
     Previously the check was bypassed when the env var was empty, allowing
     unauthenticated alert injection.
     """
-    import os
     import hmac
+    import os
     expected_secret = os.environ.get("ION_WEBHOOK_SECRET", "")
     if not expected_secret:
         raise HTTPException(

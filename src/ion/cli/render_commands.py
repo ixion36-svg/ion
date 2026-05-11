@@ -328,7 +328,7 @@ def batch_render(
             session.commit()
 
         # Show results
-        console.print(f"\n[bold]Results:[/bold]")
+        console.print("\n[bold]Results:[/bold]")
         console.print(f"  Total: {summary.total}")
         console.print(f"  [green]Successful: {summary.successful}[/green]")
         if summary.failed > 0:
@@ -337,7 +337,7 @@ def batch_render(
         # Show details for failed items
         failed_results = [r for r in summary.results if not r.success]
         if failed_results:
-            console.print(f"\n[red]Failed items:[/red]")
+            console.print("\n[red]Failed items:[/red]")
             for r in failed_results[:10]:  # Show first 10 failures
                 console.print(f"  [{r.index}] {r.error}")
             if len(failed_results) > 10:
@@ -347,7 +347,7 @@ def batch_render(
         if not no_save:
             created_docs = [r for r in summary.results if r.document_id]
             if created_docs:
-                console.print(f"\n[green]Created documents:[/green]")
+                console.print("\n[green]Created documents:[/green]")
                 for r in created_docs[:10]:
                     console.print(f"  [{r.document_id}] {r.document_name}")
                 if len(created_docs) > 10:
