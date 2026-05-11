@@ -275,6 +275,47 @@ Memory: `feedback_release_version_bump.md` — the eight-file checklist is load-
 
 If a sanity-check grep fires during the release ritual, or a routine lint / encoding / type-check issue surfaces, it is **fixed silently and the release proceeds**. Only true feature regressions are surfaced. Memory: `feedback_fix_silently.md`. Rationale: closeout-pass issues are noise; surfacing them every release inflates the SECURITY_ASSESSMENT delta and dilutes attention from real findings.
 
+#### 3.4.8 Release acceptance testing (post-tag, pre-announce)
+
+After the tag is pushed and the Docker image lands at `ixion36/ion:vX.Y.Z`, the maintainer runs a **release-acceptance walk-through** against the actual built image (not the dev tree) before the release is considered "shippable" to a customer. The walk-through is **smoke-level** — it verifies the image boots and the headline feature of the release works through the UI — not full regression. Full regression is what the CI suite + per-feature integration tests cover; this step is the human-in-the-loop confirmation that the artefact a customer will deploy actually does what the CHANGELOG promises.
+
+**Steps (canonical):**
+
+1. **Spin up against the tagged image.**
+   ```
+   cd ~/ixion
+   # Edit .env: ION_VERSION=X.Y.Z   (the tag, not "latest")
+   docker compose up -d ion postgres
+   ```
+2. **Health probe.**
+   ```
+   until curl -fs http://localhost:8000/api/health; do sleep 5; done
+   ```
+   Confirm the response carries the expected version: `{"status":"ok","database":"postgresql","version":"X.Y.Z"}`. A mismatch means the image was built from a different commit than the tag and the release is **not shippable** — investigate and re-build.
+3. **SBOM extract** (v0.26.0+):
+   ```
+   cid=$(docker ps -qf name=^ion$)
+   docker cp "$cid":/app/sbom.spdx.json ./sbom-vX.Y.Z.json
+   head -c 400 sbom-vX.Y.Z.json
+   ```
+   First 400 bytes should be valid SPDX-2.3 JSON with `"creators":["Organization: Anchore, Inc","Tool: syft-…"]`.
+4. **Headline-feature walk** through the UI at `http://localhost:8000`:
+   - Log in as the seeded admin (credentials from `.env`).
+   - Walk the release's "what shipped" paragraph in the CHANGELOG, exercising each new surface end-to-end through the browser. Examples: a new endpoint via its consuming UI; a new audit event by triggering the action and checking `/admin/audit`; a new lab-grading criterion by running a lab session and reading the breakdown subpanel.
+   - Pay specific attention to any UI introduced in the release — the Jinja templates aren't covered by unit tests and only show up at this stage.
+5. **Spot-check the release artefacts.**
+   - `CHANGELOG.md` top entry matches the tagged commit's deltas.
+   - `SECURITY_ASSESSMENT.md` v X.Y.Z paragraph + severity-trend column are present.
+   - `docs/DEVELOPMENT_LIFECYCLE.md` §9 carries a revision row if any §3 phase practice or §8 gap status changed.
+6. **Tear down.**
+   ```
+   docker compose down
+   ```
+
+**Outcome.** If every step passes, the release is announceable to the operator / customer. If any step fails, the version is held back: a v.X.Y.(Z+1) patch is cut with the specific fix, and the testing walk re-runs against the new tag.
+
+This step is **not automated** — it deliberately keeps a human in the loop for the per-release UI / artefact verification that CI can't easily replicate (no Selenium-style browser tests in the suite, by design — the no-SPA constraint makes server-rendered-Jinja regressions visually obvious to a human in seconds where a brittle DOM-assertion test would take longer to maintain than to write). Test plans for each release are added to the CHANGELOG entry as part of the spec writing in §3.2.
+
 ---
 
 ### 3.5 Operate
@@ -499,7 +540,7 @@ The following items are **not currently in place** and represent the delta betwe
 | 1.0 | 2026-05-11 | Maintainer | Initial publication, aligned to Secure by Design 5 phases. Cross-referenced NCSC SD&D 8 principles. Gap analysis (§8) captures the delta to full defence-tier supplier alignment. |
 | 1.1 | 2026-05-11 | Maintainer | v0.24.0: CI pipeline landed at `.github/workflows/test.yml` (pytest + ruff + bandit). §3.4.4 rewritten to describe the running CI. §4 NCSC Principle 6 status moved from **Partial** to **Met**. §8 CI gap struck through with closure note. |
 | 1.2 | 2026-05-11 | Maintainer | v0.25.0: Software Composition Analysis (`pip-audit`) added as a 4th parallel CI job, scanning the resolved dep tree against OSV. §3.4.4 lists the new job and the documented `--ignore-vuln` baseline. §4 NCSC Principle 4 status moved from **Partial** to **Mostly Met**; Principle 6 prose updated to list pip-audit alongside bandit. §8 SCA gap struck through with closure note. |
-| 1.3 | 2026-05-11 | Maintainer | v0.26.0: Software Bill of Materials (`syft` 1.18.1) generated at Docker build; SPDX-JSON shipped inside the image at `/app/sbom.spdx.json`. §3.4.5 rewritten to describe the syft step. §4 NCSC Principle 4 status moved from **Mostly Met** to **Met**. §8 SBOM gap struck through with closure note. Also notes the v0.26.0 ruff cleanup: codebase-wide ignores added for deliberate-style rules (E402/E712/E741/N806/F841/N811/E711/E731/E701), per-file ignores extended to cover ORM forward-reference F821 in model files, and `ruff check src/` returns 0 errors — closing the v0.24.0/v0.25.0 ruff red CI job. |
+| 1.3 | 2026-05-11 | Maintainer | v0.26.0: Software Bill of Materials (`syft` 1.18.1) generated at Docker build; SPDX-JSON shipped inside the image at `/app/sbom.spdx.json`. §3.4.5 rewritten to describe the syft step. §4 NCSC Principle 4 status moved from **Mostly Met** to **Met**. §8 SBOM gap struck through with closure note. Also notes the v0.26.0 ruff cleanup: codebase-wide ignores added for deliberate-style rules (E402/E712/E741/N806/F841/N811/E711/E731/E701), per-file ignores extended to cover ORM forward-reference F821 in model files, and `ruff check src/` returns 0 errors — closing the v0.24.0/v0.25.0 ruff red CI job. **New §3.4.8 Release acceptance testing** section formalises the post-tag UI / artefact verification walk-through (health probe → SBOM extract → headline-feature walk → spot-check release files → tear down). Replaces ad-hoc per-release walk with a canonical checklist. |
 
 ---
 
