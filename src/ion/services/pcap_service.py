@@ -551,7 +551,8 @@ def _extract_files_from_streams(streams: dict) -> list[ExtractedFile]:
                     offset = pos + 1
                     continue
 
-                md5 = hashlib.md5(carved).hexdigest()
+                # MD5 used as a content fingerprint for dedup, never for security.
+                md5 = hashlib.md5(carved, usedforsecurity=False).hexdigest()
                 if md5 in seen_hashes:
                     offset = pos + len(magic)
                     continue
@@ -740,7 +741,9 @@ def _parse_client_hello_ja3(data: bytes) -> tuple[str, str]:
         "-".join(elliptic_curves),
         "-".join(ec_point_formats),
     ])
-    ja3_hash = hashlib.md5(ja3_str.encode()).hexdigest()
+    # JA3 fingerprint is canonically an MD5 hash of the TLS-handshake string;
+    # the algorithm is interoperability-defined, not a security boundary.
+    ja3_hash = hashlib.md5(ja3_str.encode(), usedforsecurity=False).hexdigest()
 
     return ja3_str, ja3_hash
 
@@ -2219,7 +2222,8 @@ def _parse_server_hello_ja3s(data: bytes) -> tuple[str, str]:
             offset += 4 + ext_data_len
 
     ja3s_str = f"{tls_version},{cipher},{'-'.join(extensions)}"
-    ja3s_hash = hashlib.md5(ja3s_str.encode()).hexdigest()
+    # JA3S fingerprint MD5 is interoperability-defined (same as JA3 above).
+    ja3s_hash = hashlib.md5(ja3s_str.encode(), usedforsecurity=False).hexdigest()
     return ja3s_str, ja3s_hash
 
 
@@ -2308,7 +2312,8 @@ def _parse_ssh_kexinit(data: bytes) -> tuple[str, str]:
 
     # HASSH (client): kex[0], enc_c2s[2], mac_c2s[4], comp_c2s[6]
     hassh_str = ";".join([all_lists[0], all_lists[2], all_lists[4], all_lists[6]])
-    hassh_hash = hashlib.md5(hassh_str.encode()).hexdigest()
+    # HASSH fingerprint MD5 is interoperability-defined like JA3/JA3S.
+    hassh_hash = hashlib.md5(hassh_str.encode(), usedforsecurity=False).hexdigest()
     return hassh_str, hassh_hash
 
 
@@ -2470,7 +2475,8 @@ def _extract_http_files(streams: dict) -> list[dict]:
             )
             if content_type and any(content_type.startswith(t) for t in interesting_types):
                 body = data[body_start:body_start + min(content_length, 5 * 1024 * 1024)] if content_length else b""
-                md5 = hashlib.md5(body).hexdigest() if body else ""
+                # MD5 is used as a content fingerprint for body dedup, not for security.
+                md5 = hashlib.md5(body, usedforsecurity=False).hexdigest() if body else ""
                 if md5 and md5 not in seen:
                     seen.add(md5)
                     ext = content_type.split("/")[-1].split(";")[0][:10]
@@ -2536,7 +2542,8 @@ def _detect_base64_payloads(streams: dict) -> list[dict]:
                 continue
 
             preview = decoded[:80].decode("ascii", errors="replace")
-            key = hashlib.md5(candidate[:100]).hexdigest()
+            # MD5 used as a fingerprint to dedup base64 candidates, not for security.
+            key = hashlib.md5(candidate[:100], usedforsecurity=False).hexdigest()
             if key in seen:
                 continue
             seen.add(key)
