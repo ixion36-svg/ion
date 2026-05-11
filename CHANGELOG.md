@@ -1,5 +1,123 @@
 # Changelog
 
+## v0.23.0 — 2026-05-11
+
+Adaptive lab grading. The deferred-since-v0.20.1 curriculum-infra
+headline lands as a design-pass + minimum-viable end-to-end. Lab
+sessions are promoted from implicit-via-torn_down_at to a first-class
+`lab_sessions` parent row carrying score + attempt metadata; per-lesson
+`lab_rubrics` define deterministic criteria evaluated against the
+`audit_logs` table; per-(session, criterion) results live in
+`lab_criterion_results` so re-grading is idempotent and the score is
+auditable. Session 1 ships **one criterion kind** (`viewed_alert`) and
+**one seeded rubric** (L1 Module 2 "Read your first alert in /alerts"
+worth 100 points). Future kinds (linked_to_case, observable_created,
+case_closed_with_reason, …) layer on without schema change. v0.24.0
+covers multi-criterion rubrics, backfilled rubrics for all lab lessons,
+pass-threshold enforcement, score history view, and the real-time
+grading ticker.
+
+### feat(labs): three-table grading schema
+
+- `lab_sessions` — one row per (enrollment, lesson, attempt) with
+  `started_at`, `completed_at`, `score`, `points_earned`, `points_max`.
+  Unique on `(enrollment_id, lesson_id, attempt_number)`. Replaces the
+  implicit-via-torn_down_at state machine and lets the grader scope
+  audit-log lookups to a single attempt window.
+- `lab_rubrics` — per-lesson criteria. Columns: `lesson_id`,
+  `criterion_kind` (VARCHAR(48), e.g. `viewed_alert`), `criterion_config`
+  (JSONB, kind-specific), `points`, `sort_order`, `description`.
+- `lab_criterion_results` — per-(session, rubric) audit trail.
+  `points_earned`, `matched`, `matched_audit_log_id`, `evaluated_at`,
+  `notes`. Unique on `(session_id, rubric_id)` so re-grading upserts
+  rather than appending.
+- `lab_session_fixtures.session_id` — new FK column linking materialised
+  data to its parent session. Permits the grader to back-correlate
+  audit rows (which carry resource_id only) to the lab that owns them.
+
+Files: `src/ion/storage/database.py` (idempotent PG + SQLite migrations,
+session_id included in the fresh `lab_session_fixtures` CREATE so new
+deploys avoid an inspector-cache staleness footgun on the ALTER path).
+
+### feat(labs): LabSessionService — session lifecycle
+
+`start_or_resume(enrollment_id, lesson_id)` returns the active session
+id, advisory-locked on a fresh namespace (`LABS` = 0x4C414253, disjoint
+from `LABF`). `link_fixtures(session_id, materialised_ids)` attaches
+seeded rows. `complete(session_id, score, points_earned, points_max)`
+finalises. `current_for(enrollment_id, lesson_id)` returns the active
+session id or None. The fixture seeder remains untouched — the new
+service slots in before/after it in the API.
+
+Files: `src/ion/services/lab_session_service.py`.
+
+### feat(labs): LabGradingService — audit-log-driven evaluation
+
+`grade_session(session_id)` walks the lesson's rubric criteria,
+dispatches to the registered evaluator per `criterion_kind`, persists
+results, and rolls up to a percent score. The `viewed_alert` evaluator
+selects `audit_logs` rows where
+`action='alert_view' AND resource_type='alert_triage' AND resource_id IN
+(<session's materialised alert_triage ids>) AND user_id=<session owner>
+AND timestamp >= session.started_at`. Unknown criterion kinds persist
+a diagnostic note and award zero points without raising. Re-grading is
+idempotent via the `uq_criterion_result` unique constraint.
+
+Files: `src/ion/services/lab_grading_service.py`.
+
+### feat(api): emit alert_view audit event on triage read
+
+`GET /elasticsearch/alerts/{alert_id}/triage` now writes an `alert_view`
+audit row keyed on the triage PK (matching `lab_session_fixtures.
+materialised_row_id` for alert fixtures) when the triage row exists.
+Write failure is logged and swallowed — audit must never break the
+read path.
+
+Files: `src/ion/web/api.py`.
+
+### feat(labs): launch creates a session, complete grades
+
+`POST /api/courses/{slug}/lessons/{lesson_id}/lab/launch` now opens or
+resumes a `lab_sessions` row and links freshly-materialised fixtures
+to it before returning. `POST .../lab/complete` runs the grader
+**before** teardown (so the criterion evaluators can still read the
+fixture-to-resource map), persists the score to both `lab_sessions`
+and `course_lesson_progress.score`, then tears down. Response shape
+grows: `session_id`, `score`, `points_earned`, `points_max`, `criteria`
+(per-criterion breakdown). Old fields (`torn_down_count`,
+`lesson_status`) unchanged.
+
+Files: `src/ion/web/labs_api.py`.
+
+### feat(curriculum): seed one rubric for the L1 Module 2 lab
+
+`seed_courses.py` gains a `_add_lab_rubric` helper and an inline call
+on the "Read your first alert in /alerts" lab — single `viewed_alert`
+criterion worth 100 points. Idempotent reseed. Demonstrates the
+end-to-end grading path on an existing lab without rubric churn.
+
+Files: `seed_courses.py`.
+
+### feat(ui): render rubric breakdown in lesson.html
+
+After `/lab/complete` returns, the lab status panel now shows the score
+percent, points earned vs. max, and a per-criterion ✓/✗ list with the
+points awarded per criterion. Minimal styling consistent with the
+existing lab banner.
+
+Files: `src/ion/web/templates/lesson.html`.
+
+### test(labs): 11 grading cases + e2e cycle
+
+`tests/test_lab_grading.py` covers: session start/resume idempotence,
+attempt bump after completion, empty-rubric handling, viewed_alert
+match + non-match, audit row scoped to wrong alert / wrong action,
+re-grade idempotence, unknown criterion kind graceful failure, and a
+launch → audit → complete end-to-end cycle. 25/25 passing across the
+existing fixture suite plus the new grading suite.
+
+---
+
 ## v0.22.1 — 2026-05-11
 
 Security patch. Closes the two carry-over Lows that the v0.22.0-rc
