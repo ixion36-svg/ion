@@ -1,5 +1,70 @@
 # Changelog
 
+## v0.22.1 — 2026-05-11
+
+Security patch. Closes the two carry-over Lows that the v0.22.0-rc
+SECURITY_ASSESSMENT recommended addressing in a follow-up, and resolves
+the three open questions from `_spec_v0_22.md` §7.
+
+### security(bob-eval): L5 — gate `reasoning_text` at samples API response layer
+
+`GET /api/bob-eval/runs/{run_id}/samples` now reads `ION_BOB_STORE_REASONING`
+at request time and strips `reasoning_text` from each sample dict when
+the flag is false. Rows persisted while the flag was true stop leaking
+via the API immediately on flag disable, with no DB back-fill required.
+`BobEvalRunSample.reasoning_text` is the only `reasoning_text` field
+exposed through any `to_dict()` path; `Investigation.reasoning_text` is
+not serialised by any endpoint and needs no further mitigation.
+
+Files: `src/ion/web/bob_eval_api.py`.
+Regression: `tests/integration/test_bob_eval.py::TestReasoningTextResponseGate`.
+
+### security(alert-prompts): L6 — close `confidence_threshold_override` null bypass
+
+The v0.21.1 permission check only fired when the incoming value was
+non-null. The Alert Prompts edit UI always emitted the field in PUT
+payloads, so a user with only `playbook:update` could send
+`{"confidence_threshold_override": null, …}` to clear a system-tier
+strict threshold, reverting it to the env-default.
+
+`_check_confidence_threshold_permission` now takes the Pydantic update
+model and the current stored value, uses `model_fields_set` to
+distinguish field-omitted from explicit-null, and treats any change —
+including explicit-null-clearing-non-null — as requiring
+`system:settings`. The UI additionally hides the threshold form-row for
+users lacking the permission (via `/api/auth/me`) and omits the field
+from the payload entirely as defence-in-depth.
+
+Files: `src/ion/web/alert_prompt_api.py`,
+`src/ion/web/templates/alert_prompt_templates.html`.
+Regression: `tests/integration/test_v021_fixes.py::TestConfidenceThresholdPermission`
+(7 cases including a regression test for the explicit-null bypass).
+
+### test(heatmap): OQ5 — Postgres-path smoke test parametrization
+
+`tests/test_mitre_heatmap.py` previously hard-coded SQLite, leaving the
+Postgres LATERAL-join service path untested by the smoke suite. The
+`db_engine` fixture now honours `ION_TEST_DATABASE_URL` when set,
+falling back to ephemeral SQLite otherwise. Operators with a Postgres
+instance can exercise the LATERAL path locally:
+
+```
+ION_TEST_DATABASE_URL=postgresql://user:pass@host/dbname \
+  pytest tests/test_mitre_heatmap.py
+```
+
+CI default remains SQLite (Python-side unnesting path). No CI changes.
+
+### docs(security): SECURITY_ASSESSMENT.md v0.22.1 delta section
+
+New section documents L5/L6 closure and resolves OQ4 (`alert:read` is
+the correct gate for `/api/cyab/attack-heatmap` — heatmap is an
+aggregate of data those users already see) and OQ6 (`timeline_ts` is
+UTC-naive matching `CaseEvidenceLedger.timestamp` project convention).
+Severity-trend table extended with the v0.22.1 column.
+
+---
+
 ## v0.22.0 — 2026-05-09
 
 ### feat(cyab/heatmap): MITRE ATT&CK technique-coverage heatmap (Feature A)

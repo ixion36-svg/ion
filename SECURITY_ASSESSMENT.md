@@ -1,8 +1,8 @@
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-05-09
-**Application Version:** 0.22.0-rc (integration/v0.22.0 branch)
-**Previous Assessment Version:** 0.21.0-rc (2026-05-07)
+**Assessment Date:** 2026-05-11 (v0.22.1 delta) / 2026-05-09 (v0.22.0-rc body below)
+**Application Version:** 0.22.1 (security patch on main)
+**Previous Assessment Version:** 0.22.0-rc (2026-05-09)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent
@@ -13,15 +13,43 @@
 
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
-| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc |
-|----------|---------|------------|------------|------------|
-| Critical | 0 | **0** | **0** | **0** |
-| High | 0 | **0** | **0** | **0** |
-| Medium | 2 | **3** | **3** | **3** (unchanged) |
-| Low | 3 | **4** | **6** | **6** (unchanged) |
-| **Total** | **5** | **7** | **9** | **9** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 |
+|----------|---------|------------|------------|------------|---------|
+| Critical | 0 | **0** | **0** | **0** | **0** |
+| High | 0 | **0** | **0** | **0** | **0** |
+| Medium | 2 | **3** | **3** | **3** | **3** |
+| Low | 3 | **4** | **6** | **6** | **4** (L5+L6 closed) |
+| **Total** | **5** | **7** | **9** | **9** | **7** |
 
-The v0.21.0 posture is unchanged on all carried-forward findings. **Ship-with-followup** remains the recommendation: no finding in v0.22.0-rc is release-blocking. L5 (reasoning_text in samples serialisation) and L6 (confidence_threshold_override permission tier) carry over from v0.21.0 — should still be addressed in v0.22.1.
+v0.22.1 closes the two Lows that the v0.22.0-rc assessment recommended addressing in a patch (L5 reasoning_text serialisation, L6 confidence_threshold_override permission tier) and resolves the three open questions (OQ4/5/6) from `_spec_v0_22.md` §7. See the v0.22.1 Delta section below for details.
+
+---
+
+## v0.22.1 Delta (2026-05-11)
+
+**Net change vs v0.22.0-rc:** −2 Low (L5, L6 closed). Three open questions (OQ4, OQ5, OQ6) resolved with rationale below.
+
+### CLOSED: L5 — `reasoning_text` in samples serialisation
+**File:** `src/ion/web/bob_eval_api.py`
+`get_run_samples` now reads `ION_BOB_STORE_REASONING` at request time and strips `reasoning_text` from each sample dict when the flag is false. Rows that were persisted while the flag was true stop leaking via the samples API immediately on flag disable; no DB back-fill required. `BobEvalRunSample.reasoning_text` is the only `reasoning_text` field exposed through any `to_dict()` path — `Investigation.reasoning_text` is not serialised by any endpoint. Regression tests: `tests/integration/test_bob_eval.py::TestReasoningTextResponseGate` (3 cases).
+
+### CLOSED: L6 — `confidence_threshold_override` permission-tier bypass
+**File:** `src/ion/web/alert_prompt_api.py`
+The v0.21.1 gate only fired when the incoming value was non-null. The Alert Prompts edit UI always emitted the field in PUT payloads (always-on `confidence_threshold_override` key in the JSON body), so a user with only `playbook:update` could send `{"confidence_threshold_override": null, …}` to clear a system-tier strict threshold (reverting it to the env-default). `_check_confidence_threshold_permission` now takes the Pydantic update model and the current stored value, uses `model_fields_set` to distinguish field-omitted from explicit-null, and treats any change — including explicit-null-clearing-non-null — as requiring `system:settings`. The UI hides the threshold form-row for users without `system:settings` (via `/api/auth/me` permissions check) and omits the field from the payload entirely; backend gate is the defence-in-depth authority. Regression tests: `tests/integration/test_v021_fixes.py::TestConfidenceThresholdPermission` (7 cases).
+
+### RESOLVED: OQ4 — `alert:read` is the correct gate for `/api/cyab/attack-heatmap`
+The heatmap exposes per-technique alert-case and pin counts aggregated from `AlertCase`, `AlertTriage`, `CaseEvidencePin`, and `ForensicCasePin` rows. Users with `alert:read` already have access to all of those rows directly via the alert list, triage view, and case views — the heatmap is a per-technique aggregation of data they are already authorised to see. No privilege escalation. `alert:read` is confirmed as the right minimum gate.
+
+### RESOLVED: OQ5 — heatmap smoke-test backend coverage
+**File:** `tests/test_mitre_heatmap.py`
+The smoke suite previously hard-coded SQLite, leaving the Postgres LATERAL-join service path untested. The `db_engine` fixture now honours `ION_TEST_DATABASE_URL` when set, falling back to ephemeral SQLite. Operators with a Postgres instance can exercise the LATERAL path locally with:
+```
+ION_TEST_DATABASE_URL=postgresql://user:pass@host/dbname pytest tests/test_mitre_heatmap.py
+```
+CI default remains SQLite (Python-side unnesting path); the Postgres path is exercised at deploy/integration time and now also reproducible locally.
+
+### RESOLVED: OQ6 — `timeline_ts` timezone convention
+`alert_case_annotations.timeline_ts` and `forensic_case_annotations.timeline_ts` are stored as UTC-naive `DateTime`, matching the `CaseEvidenceLedger.timestamp` convention used across the project. The Workbench JS treats these as UTC for display, consistent with all other timestamp surfaces. Cross-region deployments do not currently require tz-aware storage; if that changes, the migration would span both annotation tables AND the ledger to keep ordering deterministic.
 
 ---
 
