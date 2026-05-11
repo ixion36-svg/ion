@@ -1151,6 +1151,24 @@ def _run_migrations(engine: Engine) -> None:
             ))
             logger.info("Migrated: CREATE TABLE lab_criterion_results")
 
+    # v0.23.1: system_runtime_flags — small key/value bag for runtime
+    # toggles that must be visible across all workers (e.g. the leader
+    # worker that owns the investigation sweep loop AND the request-
+    # handling worker that toggles a pause flag from the UI). In-process
+    # state on a singleton would not satisfy the multi-worker uvicorn
+    # deployment.
+    if not insp.has_table("system_runtime_flags"):
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE TABLE system_runtime_flags (
+                    key VARCHAR(64) PRIMARY KEY,
+                    value VARCHAR(255) NOT NULL,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_by_id INTEGER REFERENCES users(id)
+                )
+            """))
+            logger.info("Migrated: CREATE TABLE system_runtime_flags")
+
     # v0.23.0: link existing lab_session_fixtures rows to their parent session.
     # NULL is permitted for legacy rows persisted before this version.
     if insp.has_table("lab_session_fixtures"):

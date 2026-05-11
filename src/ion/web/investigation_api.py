@@ -27,9 +27,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_page_auth, require_permission
 from ion.models.user import User
+from ion.services import system_flags
 from ion.services.investigation_memory_service import (
     get_investigation_memory_service,
 )
@@ -37,6 +40,7 @@ from ion.services.investigation_service import (
     InvestigationError,
     get_investigation_service,
 )
+from ion.web.api import get_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -280,6 +284,145 @@ async def get_job(
     if inv is None:
         raise HTTPException(status_code=404, detail="Investigation not found")
     return _inv_to_summary(inv)
+
+
+# ---------------------------------------------------------------------------
+# Queue control (v0.23.1) — pause/resume + cancel-pending + per-row cancel
+# ---------------------------------------------------------------------------
+
+
+class LoopStatusResponse(BaseModel):
+    paused: bool
+    updated_at: Optional[str] = None
+    updated_by_id: Optional[int] = None
+
+
+class CancelResponse(BaseModel):
+    cancelled_count: int
+
+
+@router.get("/api/investigate/loop/status", response_model=LoopStatusResponse)
+async def get_loop_status(
+    user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+) -> LoopStatusResponse:
+    """Return whether the investigation sweep loop is currently paused."""
+    meta = system_flags.get_flag_metadata(
+        session, system_flags.INVESTIGATION_LOOP_PAUSED
+    )
+    return LoopStatusResponse(
+        paused=system_flags.is_truthy(meta.get("value")),
+        updated_at=meta.get("updated_at"),
+        updated_by_id=meta.get("updated_by_id"),
+    )
+
+
+@router.post("/api/investigate/loop/pause", response_model=LoopStatusResponse)
+async def pause_loop(
+    user: User = Depends(require_permission("alert:triage")),
+    session: Session = Depends(get_db_session),
+) -> LoopStatusResponse:
+    """Pause the sweep loop — next iteration returns without fetching alerts.
+
+    Pending investigations already in the database remain; bulk-cancel
+    them via ``POST /api/investigate/jobs/cancel-pending`` if needed.
+    """
+    system_flags.set_flag(
+        session, system_flags.INVESTIGATION_LOOP_PAUSED, "true",
+        user_id=user.id,
+    )
+    session.commit()
+    meta = system_flags.get_flag_metadata(
+        session, system_flags.INVESTIGATION_LOOP_PAUSED
+    )
+    logger.info("Investigation sweep loop paused by user_id=%s", user.id)
+    return LoopStatusResponse(
+        paused=True,
+        updated_at=meta.get("updated_at"),
+        updated_by_id=meta.get("updated_by_id"),
+    )
+
+
+@router.post("/api/investigate/loop/resume", response_model=LoopStatusResponse)
+async def resume_loop(
+    user: User = Depends(require_permission("alert:triage")),
+    session: Session = Depends(get_db_session),
+) -> LoopStatusResponse:
+    """Resume the sweep loop — clear the pause flag."""
+    system_flags.clear_flag(session, system_flags.INVESTIGATION_LOOP_PAUSED)
+    session.commit()
+    logger.info("Investigation sweep loop resumed by user_id=%s", user.id)
+    return LoopStatusResponse(paused=False)
+
+
+@router.post(
+    "/api/investigate/jobs/cancel-pending",
+    response_model=CancelResponse,
+)
+async def cancel_all_pending(
+    user: User = Depends(require_permission("alert:triage")),
+    session: Session = Depends(get_db_session),
+) -> CancelResponse:
+    """Bulk-cancel every pending investigation (sweep will skip them next pass).
+
+    Idempotent: a second call cancels zero rows. Running investigations are
+    left alone — they will complete or fail on their own; cancel them
+    individually via the per-row endpoint if needed.
+    """
+    result = session.execute(
+        text(
+            "UPDATE investigations SET status = 'cancelled', "
+            "completed_at = CURRENT_TIMESTAMP "
+            "WHERE status = 'pending'"
+        ),
+    )
+    session.commit()
+    count = result.rowcount or 0
+    logger.info(
+        "Bulk-cancelled %d pending investigation(s) by user_id=%s",
+        count, user.id,
+    )
+    return CancelResponse(cancelled_count=count)
+
+
+@router.post(
+    "/api/investigate/jobs/{inv_id}/cancel",
+    response_model=CancelResponse,
+)
+async def cancel_one(
+    inv_id: int,
+    user: User = Depends(require_permission("alert:triage")),
+    session: Session = Depends(get_db_session),
+) -> CancelResponse:
+    """Cancel a single pending or running investigation.
+
+    Returns ``{cancelled_count: 1}`` on success, ``{cancelled_count: 0}`` if
+    the row was already terminal (completed/failed/cancelled). 404 if the
+    investigation id does not exist.
+    """
+    existing = session.execute(
+        text("SELECT id, status FROM investigations WHERE id = :id"),
+        {"id": inv_id},
+    ).fetchone()
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+
+    result = session.execute(
+        text(
+            "UPDATE investigations SET status = 'cancelled', "
+            "completed_at = CURRENT_TIMESTAMP "
+            "WHERE id = :id AND status IN ('pending', 'running')"
+        ),
+        {"id": inv_id},
+    )
+    session.commit()
+    count = result.rowcount or 0
+    if count:
+        logger.info(
+            "Cancelled investigation id=%d (was %s) by user_id=%s",
+            inv_id, existing[1], user.id,
+        )
+    return CancelResponse(cancelled_count=count)
 
 
 # ---------------------------------------------------------------------------

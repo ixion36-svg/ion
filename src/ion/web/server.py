@@ -71,6 +71,7 @@ from ion.web.forensics_api import router as forensics_router
 from ion.web.forensic_workbench_api import router as forensic_workbench_router
 from ion.web.incident_cost_api import router as incident_cost_router
 from ion.web.integration_api import router as integration_router
+from ion.web.bob_analysis_api import router as bob_analysis_router
 from ion.web.investigation_api import router as investigation_router
 from ion.web.investigation_memory_api import router as investigation_memory_router
 from ion.web.ioc_staleness_api import router as ioc_staleness_router
@@ -343,6 +344,8 @@ app.include_router(ticker_router, prefix="")
 app.include_router(investigation_memory_router)
 app.include_router(scheduler_router, prefix="")
 app.include_router(investigation_router, prefix="")
+# v0.23.1 — on-demand Bob case analysis (replaces auto-comment)
+app.include_router(bob_analysis_router, prefix="/api")
 app.include_router(case_grouper_router, prefix="")
 app.include_router(webhook_router, prefix="/api")
 app.include_router(daily_standup_router, prefix="/api")

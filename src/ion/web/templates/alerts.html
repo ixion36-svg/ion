@@ -9536,10 +9536,15 @@ function showCreateCaseFromSelected() {
     // Get selected alerts data
     const selectedAlerts = allAlerts.filter(a => selectedAlertIds.has(a.id));
 
-    // Auto-populate from multiple alerts
+    // Auto-populate from multiple alerts.
+    // v0.23.1: multi-alert title now carries the lead alert's rule name so
+    // the case is recognisable at a glance from the cases list, rather than
+    // a generic "N related alerts" placeholder.
+    const _leadName = (selectedAlerts[0] && (selectedAlerts[0].rule_name || selectedAlerts[0].title))
+        || 'Multi-Alert Investigation';
     const prefillTitle = selectedAlerts.length === 1
         ? selectedAlerts[0].title
-        : `Investigation: ${selectedAlerts.length} related alerts`;
+        : `Investigation: ${selectedAlerts.length} - ${_leadName}`;
 
     // Collect hosts, users, rules from all selected alerts
     const hosts = [...new Set(selectedAlerts.map(a => a.host).filter(Boolean))];
