@@ -17,6 +17,12 @@
       <p class="mt-3 text-[13px] text-slate-400 max-w-2xl">Live view of the autonomous investigation pipeline. Running jobs, recently completed verdicts, and on-demand controls.</p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
+      <button id="iq-pause-btn" onclick="iqTogglePause()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+        <span id="iq-pause-label">Pause loop</span>
+      </button>
+      <button onclick="iqCancelAllPending()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-red-500/10 hover:border-red-500/30 border border-white/10 text-[12px] font-semibold transition">
+        Cancel all pending
+      </button>
       <button onclick="iqRefresh()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
         <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Refresh
       </button>
@@ -25,6 +31,11 @@
       </button>
     </div>
   </section>
+
+  <!-- v0.23.1: loop pause banner -->
+  <div id="iq-pause-banner" class="rounded-[12px] border border-amber-500/30 bg-amber-500/10 p-3 mb-4 text-amber-300 text-[12px]" style="display:none;">
+    Sweep loop is <strong>paused</strong>. New investigations will not be auto-queued until you resume. Existing pending rows remain — click <em>Cancel all pending</em> if you want to clear the backlog.
+  </div>
 
   <!-- Manual-trigger card -->
   <section class="rounded-[12px] border border-white/5 bg-ink-900/50 p-5 mb-6">
@@ -228,6 +239,10 @@
   }
 
   function iqRenderRow_active(inv) {
+    // v0.23.1: per-row cancel for pending/running investigations.
+    const cancelBtn = (inv.status === 'pending' || inv.status === 'running')
+      ? `<button onclick="iqCancelOne(${inv.id})" class="text-[11px] text-red-300 hover:text-red-200 hover:underline">Cancel</button>`
+      : '';
     return `
       <tr>
         <td>${iqStatusPill(inv.status)}</td>
@@ -236,7 +251,10 @@
         <td>${iqEscape(inv.host || "—")}</td>
         <td>${iqEscape(inv.user_name || "—")}</td>
         <td class="iq-mono">${iqEscape((inv.alert_id_ref||"").slice(0,16))}</td>
-        <td><a class="text-ion-cyan hover:underline text-[12px]" href="/investigations?focus=${inv.id}">Open</a></td>
+        <td>
+          <a class="text-ion-cyan hover:underline text-[12px]" href="/investigations?focus=${inv.id}">Open</a>
+          ${cancelBtn ? '<span class="text-slate-600 mx-2">·</span>' + cancelBtn : ''}
+        </td>
       </tr>`;
   }
   function iqRenderRow_completed(inv) {
@@ -345,16 +363,93 @@
     }
   }
 
-  function iqRefresh() { iqLoad(); }
+  function iqRefresh() { iqLoad(); iqLoadLoopStatus(); }
+
+  // v0.23.1 — queue control: pause/resume + bulk-cancel + per-row cancel.
+
+  async function iqLoadLoopStatus() {
+    try {
+      const res = await fetch('/api/investigate/loop/status', {
+        credentials: 'same-origin',
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const label = document.getElementById('iq-pause-label');
+      const banner = document.getElementById('iq-pause-banner');
+      if (data.paused) {
+        if (label) label.textContent = 'Resume loop';
+        if (banner) banner.style.display = '';
+      } else {
+        if (label) label.textContent = 'Pause loop';
+        if (banner) banner.style.display = 'none';
+      }
+    } catch (e) {
+      console.warn('Loop status load failed:', e);
+    }
+  }
+
+  async function iqTogglePause() {
+    // Read current state, then flip via the matching endpoint.
+    try {
+      const cur = await fetch('/api/investigate/loop/status', {
+        credentials: 'same-origin',
+      });
+      const data = await cur.json();
+      const target = data.paused ? 'resume' : 'pause';
+      const res = await fetch('/api/investigate/loop/' + target, {
+        method: 'POST', credentials: 'same-origin',
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      await iqLoadLoopStatus();
+    } catch (e) {
+      console.warn('Loop toggle failed:', e);
+      alert('Loop toggle failed: ' + e.message);
+    }
+  }
+
+  async function iqCancelAllPending() {
+    if (!confirm('Cancel ALL pending investigations? Running rows are left alone.')) return;
+    try {
+      const res = await fetch('/api/investigate/jobs/cancel-pending', {
+        method: 'POST', credentials: 'same-origin',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
+      alert(`Cancelled ${data.cancelled_count} pending investigation(s).`);
+      await iqLoad();
+    } catch (e) {
+      console.warn('Bulk cancel failed:', e);
+      alert('Bulk cancel failed: ' + e.message);
+    }
+  }
+
+  async function iqCancelOne(invId) {
+    if (!confirm('Cancel investigation #' + invId + '?')) return;
+    try {
+      const res = await fetch('/api/investigate/jobs/' + invId + '/cancel', {
+        method: 'POST', credentials: 'same-origin',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
+      await iqLoad();
+    } catch (e) {
+      console.warn('Cancel failed:', e);
+      alert('Cancel failed: ' + e.message);
+    }
+  }
 
   window.iqLoad = iqLoad;
   window.iqRefresh = iqRefresh;
   window.iqRunSweep = iqRunSweep;
   window.iqManualSubmit = iqManualSubmit;
+  window.iqTogglePause = iqTogglePause;
+  window.iqCancelAllPending = iqCancelAllPending;
+  window.iqCancelOne = iqCancelOne;
 
   document.addEventListener('DOMContentLoaded', function() {
     iqLoad();
-    refreshTimer = setInterval(iqLoad, refreshMs);
+    iqLoadLoopStatus();
+    refreshTimer = setInterval(function() { iqLoad(); iqLoadLoopStatus(); }, refreshMs);
   });
 })();
 </script>

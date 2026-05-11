@@ -2737,6 +2737,27 @@ function renderPanelContent(c) {
         + '</div>'
         + '</div>';
 
+    // v0.23.1 — On-demand Bob analysis panel (rendered into when analyst clicks
+    // "Get Bob's Analysis"). Empty until then.
+    html += '<div id="bob-analysis-panel-' + c.id + '" class="cpanel-section" style="display:none;">'
+        +   '<div class="cpanel-section-title" style="display:flex;align-items:center;gap:0.5rem;">'
+        +     '<i class="icon-sparkles"></i> Bob\'s analysis'
+        +     '<span id="bob-analysis-meta-' + c.id + '" style="margin-left:auto;font-size:0.7rem;color:#94a3b8;font-weight:400;"></span>'
+        +   '</div>'
+        +   '<div id="bob-analysis-body-' + c.id + '" '
+        +        'style="white-space:pre-wrap;font-size:0.85rem;line-height:1.5;color:#cbd5e1;'
+        +        'padding:0.75rem;background:rgba(0,0,0,0.2);border-left:3px solid #6de4ff;border-radius:4px;">'
+        +   '</div>'
+        +   '<div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap;">'
+        +     '<button class="btn" onclick="saveBobAnalysisAsNote(' + c.id + ')" '
+        +              'style="font-size:0.75rem;padding:0.35rem 0.75rem;">Save as note</button>'
+        +     '<button class="btn" onclick="getBobAnalysis(' + c.id + ')" '
+        +              'style="font-size:0.75rem;padding:0.35rem 0.75rem;">Re-run</button>'
+        +     '<button class="btn" onclick="hideBobAnalysis(' + c.id + ')" '
+        +              'style="font-size:0.75rem;padding:0.35rem 0.75rem;background:none;">Dismiss</button>'
+        +   '</div>'
+        + '</div>';
+
     // Action buttons
     html += '<div class="cpanel-actions">';
     if (c.dfir_iris_case_id) {
@@ -2747,6 +2768,9 @@ function renderPanelContent(c) {
     if (c.kibana_url) {
         html += '<a class="btn" href="' + esc(c.kibana_url) + '" target="_blank" rel="noopener">View in Kibana</a>';
     }
+    html += '<button class="btn btn-primary" onclick="getBobAnalysis(' + c.id + ')" '
+        +       'title="Generate Bob\'s analysis based on investigations, observables, raw alert, and similar cases">'
+        +       'Get Bob\'s analysis</button>';
     html += '<button class="btn" onclick="toggleCasePlaybookBrowser(' + c.id + ')">Start Playbook</button>';
     html += '<a class="btn" href="/api/elasticsearch/alerts/cases/' + c.id + '/pdf" target="_blank" rel="noopener" title="Export case as PDF">Export PDF</a>';
     html += '</div>';
@@ -3102,6 +3126,77 @@ async function addPanelNote(caseId) {
     } catch (e) {
         showToast('Failed to add note: ' + e.message, 'error');
     }
+}
+
+// =============================================================================
+// v0.23.1 — On-demand Bob case analysis (replaces v0.22.x auto-comment)
+// =============================================================================
+// `_bobAnalysisCache` keeps the most recent generation per case so "Save as
+// note" can post the exact text the analyst saw without re-running the LLM.
+const _bobAnalysisCache = {};
+
+async function getBobAnalysis(caseId) {
+    const panel = document.getElementById('bob-analysis-panel-' + caseId);
+    const body = document.getElementById('bob-analysis-body-' + caseId);
+    const meta = document.getElementById('bob-analysis-meta-' + caseId);
+    if (panel) panel.style.display = '';
+    if (body) body.textContent = 'Generating analysis… (this can take 15–60s)';
+    if (meta) meta.textContent = '';
+    try {
+        const resp = await fetch(
+            '/api/elasticsearch/alerts/cases/' + caseId + '/bob-analysis',
+            { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+        );
+        const data = await resp.json();
+        if (!resp.ok) {
+            throw new Error(data.detail || ('HTTP ' + resp.status));
+        }
+        _bobAnalysisCache[caseId] = data.analysis;
+        if (body) body.textContent = data.analysis;
+        if (meta) {
+            const s = data.sources || {};
+            meta.textContent =
+                'model: ' + (data.model || 'unknown') +
+                ' · alerts: ' + (s.alerts_count || 0) +
+                ' · investigations: ' + (s.investigations_count || 0) +
+                ' · observables: ' + (s.observables_count || 0) +
+                ' · similar: ' + (s.similar_cases_count || 0);
+        }
+        showToast("Bob's analysis ready", 'success');
+    } catch (e) {
+        if (body) body.textContent = 'Failed: ' + e.message;
+        showToast("Bob analysis failed: " + e.message, 'error');
+    }
+}
+
+async function saveBobAnalysisAsNote(caseId) {
+    const text = _bobAnalysisCache[caseId];
+    if (!text) {
+        showToast("No analysis to save — run 'Get Bob's analysis' first.", 'warning');
+        return;
+    }
+    if (!confirm("Save this Bob analysis as a note on the case?")) return;
+    try {
+        const resp = await fetch(
+            '/api/elasticsearch/alerts/cases/' + caseId + '/notes',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: text }),
+            }
+        );
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        showToast('Saved as note', 'success');
+        delete _bobAnalysisCache[caseId];
+        openCaseDetail(caseId);
+    } catch (e) {
+        showToast("Save failed: " + e.message, 'error');
+    }
+}
+
+function hideBobAnalysis(caseId) {
+    const panel = document.getElementById('bob-analysis-panel-' + caseId);
+    if (panel) panel.style.display = 'none';
 }
 
 // =============================================================================
