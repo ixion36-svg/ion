@@ -2295,6 +2295,10 @@ function onDrop(e, targetStatus) {
 // Case Status Updates
 // =============================================================================
 async function updateCaseStatus(caseId, status, closureReason, closureNotes) {
+    // v0.23.2: returns true on success, false on failure so callers can
+    // decide whether to close the panel / clear pendingClosure. Previously
+    // the function swallowed the result, which made it impossible to keep
+    // the closure modal open when the PATCH failed.
     try {
         const body = { status: status };
         if (closureReason) body.closure_reason = closureReason;
@@ -2314,20 +2318,39 @@ async function updateCaseStatus(caseId, status, closureReason, closureNotes) {
         showToast('Case status updated', 'success');
         await loadAllCases();
 
-        // Refresh panel if open for this case
-        if (document.getElementById('case-panel').classList.contains('open')) {
-            const numEl = document.getElementById('panel-case-number');
-            const openCase = allCases.find(c => c.id === caseId);
-            if (openCase && numEl && numEl.textContent === openCase.case_number) {
-                openCaseDetail(caseId);
+        // v0.23.2 (panel-close bug): the v0.23.x conditional gated the
+        // panel refresh on `openCase` being present in allCases. allCases
+        // could be momentarily empty (network race or list-endpoint
+        // failure), which made the gate silently fail and leave the panel
+        // showing pre-close state — the bug the user reported as "closing
+        // via the dropdown sometimes seems not to close the case".
+        //
+        // Fix: read the case id straight off `panel.dataset.caseId`, set
+        // by openCaseDetail. No allCases dependency. For the close path
+        // on the panel's own case, auto-close the panel (mirroring the
+        // kanban experience). For other status changes on that case,
+        // refresh the panel directly. Status changes targeting a
+        // different case (kanban drag while a different case's panel is
+        // open) do not touch the panel.
+        const panel = document.getElementById('case-panel');
+        if (panel && panel.classList.contains('open')) {
+            const panelCaseId = parseInt(panel.dataset.caseId || '0', 10);
+            if (panelCaseId === caseId) {
+                if (status === 'closed') {
+                    closeCasePanel();
+                } else {
+                    openCaseDetail(caseId);
+                }
             }
         }
+        return true;
     } catch (e) {
         showToast('Failed to update case: ' + e.message, 'error');
+        return false;
     }
 }
 
-function confirmClosure() {
+async function confirmClosure() {
     if (!pendingClosure) return;
 
     const reason = document.getElementById('closure-reason').value;
@@ -2337,13 +2360,45 @@ function confirmClosure() {
     }
 
     const notes = document.getElementById('closure-notes').value.trim();
+    const caseId = pendingClosure.caseId;
+    const targetStatus = pendingClosure.targetStatus;
 
-    document.getElementById('closure-modal-overlay').style.display = 'none';
-    updateCaseStatus(pendingClosure.caseId, pendingClosure.targetStatus, reason, notes);
-    pendingClosure = null;
+    // v0.23.2: await the PATCH and only hide the modal + clear pendingClosure
+    // when it succeeds. If the PATCH errors (e.g., server returns 400 on a
+    // bad closure_reason, or a 5xx), the modal stays open so the analyst
+    // can fix the issue and retry, instead of silently losing the close
+    // intent and leaving the dropdown stuck on "closed" with no real close
+    // on the server.
+    const ok = await updateCaseStatus(caseId, targetStatus, reason, notes);
+    if (ok) {
+        document.getElementById('closure-modal-overlay').style.display = 'none';
+        pendingClosure = null;
+    }
 }
 
 function cancelClosure() {
+    // v0.23.2: reset the panel's status <select> back to the case's actual
+    // status. Without this, the select stays stuck on "closed" after
+    // cancel, and a subsequent re-pick of "closed" does NOT fire onchange
+    // (same-value transitions don't dispatch). That bug presented as
+    // "closing via dropdown sometimes does nothing" — the user thought
+    // they were starting a new close, but the browser ignored the click.
+    if (pendingClosure) {
+        const caseObj = allCases.find(c => c.id === pendingClosure.caseId);
+        if (caseObj) {
+            // The panel has multiple selects (status, severity, assigned_to_id).
+            // Pick the one whose onchange attribute references the 'status'
+            // field for this case_id — that's the dropdown the user just
+            // changed and now wants to roll back.
+            const needle = "panelUpdateField(" + pendingClosure.caseId + ",'status'";
+            document.querySelectorAll('.cpanel-meta-grid select').forEach(sel => {
+                const handler = sel.getAttribute('onchange') || '';
+                if (handler.indexOf(needle) !== -1) {
+                    sel.value = caseObj.status;
+                }
+            });
+        }
+    }
     document.getElementById('closure-modal-overlay').style.display = 'none';
     pendingClosure = null;
 }
@@ -2368,6 +2423,11 @@ async function openCaseDetail(caseId) {
 
         document.getElementById('panel-case-number').textContent = c.case_number || '';
         document.getElementById('panel-case-title').textContent = c.title || '';
+        // v0.23.2: stash the open case id on the panel itself so subsequent
+        // status changes can identify "this is the case the panel is on"
+        // without round-tripping through allCases (which may be momentarily
+        // empty during loadAllCases / load failures).
+        panel.dataset.caseId = String(c.id);
 
         body.innerHTML = renderPanelContent(c);
 
@@ -3021,8 +3081,13 @@ async function loadKibanaComments(kibanaId) {
 }
 
 function closeCasePanel() {
-    document.getElementById('case-panel').classList.remove('open');
+    const panel = document.getElementById('case-panel');
+    panel.classList.remove('open');
     document.getElementById('case-panel-overlay').classList.remove('open');
+    // v0.23.2: clear the tracked case id so a subsequent updateCaseStatus
+    // for a different case doesn't mistakenly think the panel is showing
+    // it (panel is closed, dataset would be stale).
+    delete panel.dataset.caseId;
 }
 
 // =============================================================================
