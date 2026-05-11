@@ -410,40 +410,110 @@ class TestWallboardBobCollect:
 
 
 class TestConfidenceThresholdPermission:
-    """Only users with system:settings may set confidence_threshold_override."""
+    """v0.22.1: confidence_threshold_override gate is incoming-vs-stored.
 
-    def test_user_without_system_settings_raises_403(self, session, admin_user, template):
-        from ion.web.alert_prompt_api import _check_confidence_threshold_permission
+    The v0.21.x check only fired when the incoming value was non-null, which
+    let a non-system:settings user clear an existing override by sending an
+    explicit `confidence_threshold_override: null` (the UI always emitted
+    the field). The v0.22.1 fix compares incoming to the stored value and
+    treats any difference as a change requiring system:settings.
+    """
 
-        _, analyst = admin_user  # analyst only has playbook:update
+    def test_user_without_system_settings_setting_non_null_raises_403(
+        self, session, admin_user, template
+    ):
+        from ion.web.alert_prompt_api import (
+            _check_confidence_threshold_permission,
+            AlertPromptUpdate,
+        )
+
+        _, analyst = admin_user
+        data = AlertPromptUpdate(confidence_threshold_override=80)
 
         with pytest.raises(HTTPException) as exc_info:
-            _check_confidence_threshold_permission(analyst, 80)
+            _check_confidence_threshold_permission(analyst, data, current_value=None)
         assert exc_info.value.status_code == 403
         assert "system:settings" in str(exc_info.value.detail).lower()
 
-    def test_user_with_system_settings_does_not_raise(self, session, admin_user, template):
-        from ion.web.alert_prompt_api import _check_confidence_threshold_permission
+    def test_user_with_system_settings_does_not_raise(
+        self, session, admin_user, template
+    ):
+        from ion.web.alert_prompt_api import (
+            _check_confidence_threshold_permission,
+            AlertPromptUpdate,
+        )
 
-        admin, _ = admin_user  # admin has system:settings
+        admin, _ = admin_user
+        data = AlertPromptUpdate(confidence_threshold_override=80)
+        _check_confidence_threshold_permission(admin, data, current_value=None)
 
-        # Must not raise.
-        _check_confidence_threshold_permission(admin, 80)
-
-    def test_none_value_does_not_raise_for_any_user(self, session, admin_user, template):
-        from ion.web.alert_prompt_api import _check_confidence_threshold_permission
+    def test_field_omitted_does_not_raise_for_any_user(
+        self, session, admin_user, template
+    ):
+        from ion.web.alert_prompt_api import (
+            _check_confidence_threshold_permission,
+            AlertPromptUpdate,
+        )
 
         _, analyst = admin_user
+        # Field omitted entirely (model_fields_set excludes it).
+        data = AlertPromptUpdate(name="rename-only")
+        _check_confidence_threshold_permission(analyst, data, current_value=70)
 
-        # value=None means "not changing" — no permission check needed.
-        _check_confidence_threshold_permission(analyst, None)
-
-    def test_zero_value_still_requires_permission(self, session, admin_user, template):
-        from ion.web.alert_prompt_api import _check_confidence_threshold_permission
+    def test_zero_value_still_requires_permission(
+        self, session, admin_user, template
+    ):
+        from ion.web.alert_prompt_api import (
+            _check_confidence_threshold_permission,
+            AlertPromptUpdate,
+        )
 
         _, analyst = admin_user
-
-        # 0 is a valid explicit value (disables circuit breaker) — needs perm.
+        data = AlertPromptUpdate(confidence_threshold_override=0)
         with pytest.raises(HTTPException) as exc_info:
-            _check_confidence_threshold_permission(analyst, 0)
+            _check_confidence_threshold_permission(analyst, data, current_value=None)
         assert exc_info.value.status_code == 403
+
+    def test_explicit_null_clearing_existing_override_raises_403(
+        self, session, admin_user, template
+    ):
+        """v0.22.1 (L6) regression: clearing a non-null override via explicit null."""
+        from ion.web.alert_prompt_api import (
+            _check_confidence_threshold_permission,
+            AlertPromptUpdate,
+        )
+
+        _, analyst = admin_user
+        # Mimic the UI payload from a non-system:settings user: explicit null
+        # plus other fields. model_fields_set DOES include the field.
+        data = AlertPromptUpdate(confidence_threshold_override=None)
+        assert "confidence_threshold_override" in data.model_fields_set
+        with pytest.raises(HTTPException) as exc_info:
+            _check_confidence_threshold_permission(analyst, data, current_value=80)
+        assert exc_info.value.status_code == 403
+
+    def test_explicit_null_when_already_null_is_noop(
+        self, session, admin_user, template
+    ):
+        """No actual change — incoming None equals stored None — must not raise."""
+        from ion.web.alert_prompt_api import (
+            _check_confidence_threshold_permission,
+            AlertPromptUpdate,
+        )
+
+        _, analyst = admin_user
+        data = AlertPromptUpdate(confidence_threshold_override=None)
+        _check_confidence_threshold_permission(analyst, data, current_value=None)
+
+    def test_same_value_resubmit_is_noop(
+        self, session, admin_user, template
+    ):
+        """Saving the same value back must not require system:settings."""
+        from ion.web.alert_prompt_api import (
+            _check_confidence_threshold_permission,
+            AlertPromptUpdate,
+        )
+
+        _, analyst = admin_user
+        data = AlertPromptUpdate(confidence_threshold_override=75)
+        _check_confidence_threshold_permission(analyst, data, current_value=75)

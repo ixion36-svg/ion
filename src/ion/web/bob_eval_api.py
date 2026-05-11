@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 from pathlib import Path
 from typing import List, Optional
 
@@ -152,13 +153,27 @@ def get_run_samples(
         BobEvalRunSample.eval_run_id == run_id
     ).scalar() or 0
 
+    # L5 (v0.22.1): reasoning_text is only emitted when ION_BOB_STORE_REASONING
+    # is true at request time. Rows persisted while the flag was enabled stay
+    # in the DB if it is later disabled; gating at the response layer ensures
+    # those rows stop leaking without requiring a back-fill purge.
+    store_reasoning = os.environ.get(
+        "ION_BOB_STORE_REASONING", "false"
+    ).lower() in ("true", "1", "yes")
+    sample_dicts = []
+    for s in samples:
+        d = s.to_dict()
+        if not store_reasoning:
+            d.pop("reasoning_text", None)
+        sample_dicts.append(d)
+
     return {
         "run_id": run_id,
         "page": page,
         "page_size": page_size,
         "total": total,
         "total_pages": max(1, math.ceil(total / page_size)),
-        "samples": [s.to_dict() for s in samples],
+        "samples": sample_dicts,
     }
 
 
