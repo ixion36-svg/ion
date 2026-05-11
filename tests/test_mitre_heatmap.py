@@ -1,7 +1,15 @@
 """Smoke test suite for MITRE ATT&CK coverage heatmap (Feature A, v0.22.0).
 
-Eight cases per spec §6.1. Runs against SQLite (dev-local) or Postgres
-(CI). DB dialect switches the LATERAL-join path vs. Python-side unnesting.
+Eight cases per spec §6.1. By default runs against an ephemeral SQLite
+DB (Python-side unnesting path). If ION_TEST_DATABASE_URL is set in the
+environment, the suite runs against that DSN instead — typically a
+Postgres instance, which exercises the LATERAL-join service path.
+
+v0.22.1 (OQ5): the previous version of this fixture was hard-coded to
+SQLite, so the Postgres LATERAL path went untested in CI. Operators
+with a Postgres handy can now run:
+    ION_TEST_DATABASE_URL=postgresql://... pytest tests/test_mitre_heatmap.py
+to exercise the dialect-specific service path.
 
 Test layout:
   1. GET /api/cyab/attack-heatmap unauthenticated  → 401
@@ -17,6 +25,7 @@ Test layout:
 from __future__ import annotations
 
 import json
+import os
 from typing import Generator
 
 import pytest
@@ -42,14 +51,28 @@ _api_get_db_session = _web_api.get_db_session
 
 @pytest.fixture(scope="module")
 def db_engine(tmp_path_factory):
-    """Module-scoped SQLite engine with all ION tables."""
-    db_path = tmp_path_factory.mktemp("hm") / "test_heatmap.db"
-    engine = create_engine(
-        f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
-    )
+    """Module-scoped engine — Postgres if ION_TEST_DATABASE_URL is set, else SQLite.
+
+    v0.22.1 (OQ5): honour an opt-in env var so the Postgres LATERAL service
+    path is exercisable without restructuring the whole suite. When pointed
+    at Postgres, schema setup uses create_all on a clean DB; the test is
+    self-contained and drops nothing it didn't create, so use a throwaway DB.
+    """
+    dsn = os.environ.get("ION_TEST_DATABASE_URL")
+    if dsn:
+        engine = create_engine(dsn, future=True)
+    else:
+        db_path = tmp_path_factory.mktemp("hm") / "test_heatmap.db"
+        engine = create_engine(
+            f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
+        )
     import ion.models  # noqa: F401 — side-effect import registers all models
     Base.metadata.create_all(engine)
     yield engine
+    if dsn:
+        # Leave the throwaway DB schema in place — operators run pytest against
+        # disposable instances. Cleaning up would risk dropping shared data.
+        Base.metadata.drop_all(engine)
     engine.dispose()
 
 

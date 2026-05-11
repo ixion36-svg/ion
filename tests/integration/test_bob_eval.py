@@ -754,6 +754,91 @@ class TestMissingAlertSkip:
 # ---------------------------------------------------------------------------
 
 
+class TestReasoningTextResponseGate:
+    """v0.22.1 (L5): reasoning_text is gated at the samples API response layer.
+
+    The v0.21.x behaviour gated only at write time — rows persisted while
+    ION_BOB_STORE_REASONING=true continued leaking via the samples API after
+    the flag was disabled. The fix filters reasoning_text from response
+    payloads when the flag is false at request time, regardless of when the
+    row was written.
+    """
+
+    def _seed_run_with_sample(self, db_session, template, admin_user):
+        run = BobEvalRun(
+            template_id=template.id,
+            template_name=template.name,
+            prompt_body_hash="deadbeef" * 8,
+            model_name="test-model",
+            sample_size=1,
+            status="completed",
+            triggered_by_id=admin_user.id,
+        )
+        db_session.add(run)
+        db_session.flush()
+        fb = _seed_feedback(
+            db_session, template.id, "leak-test-alert",
+            agreement=True, human_verdict="true_positive",
+            with_investigation=False,
+        )
+        sample = BobEvalRunSample(
+            eval_run_id=run.id,
+            ai_feedback_id=fb.id,
+            human_verdict="true_positive",
+            bob_verdict="true_positive",
+            agreement=True,
+            confidence_int=90,
+            reasoning_text="LEAKY: chain-of-thought stored when flag was on",
+        )
+        db_session.add(sample)
+        db_session.commit()
+        return run
+
+    def test_reasoning_text_stripped_when_flag_false(
+        self, db_session, admin_user, template, monkeypatch
+    ):
+        from ion.web.bob_eval_api import get_run_samples
+
+        run = self._seed_run_with_sample(db_session, template, admin_user)
+        monkeypatch.delenv("ION_BOB_STORE_REASONING", raising=False)
+
+        resp = get_run_samples(
+            run_id=run.id, page=1, page_size=50,
+            current_user=admin_user, session=db_session,
+        )
+        assert resp["total"] == 1
+        assert len(resp["samples"]) == 1
+        assert "reasoning_text" not in resp["samples"][0]
+
+    def test_reasoning_text_stripped_when_flag_explicitly_false(
+        self, db_session, admin_user, template, monkeypatch
+    ):
+        from ion.web.bob_eval_api import get_run_samples
+
+        run = self._seed_run_with_sample(db_session, template, admin_user)
+        monkeypatch.setenv("ION_BOB_STORE_REASONING", "false")
+
+        resp = get_run_samples(
+            run_id=run.id, page=1, page_size=50,
+            current_user=admin_user, session=db_session,
+        )
+        assert "reasoning_text" not in resp["samples"][0]
+
+    def test_reasoning_text_emitted_when_flag_true(
+        self, db_session, admin_user, template, monkeypatch
+    ):
+        from ion.web.bob_eval_api import get_run_samples
+
+        run = self._seed_run_with_sample(db_session, template, admin_user)
+        monkeypatch.setenv("ION_BOB_STORE_REASONING", "true")
+
+        resp = get_run_samples(
+            run_id=run.id, page=1, page_size=50,
+            current_user=admin_user, session=db_session,
+        )
+        assert resp["samples"][0]["reasoning_text"].startswith("LEAKY:")
+
+
 class TestPerTemplateConcurrencyLock:
     """On SQLite the pg_advisory_xact_lock is a no-op, so both runs complete.
 

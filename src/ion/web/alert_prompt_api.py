@@ -227,12 +227,25 @@ def get_alert_prompt(
     return tmpl.to_dict()
 
 
-def _check_confidence_threshold_permission(user: User, value: Optional[int]) -> None:
-    """Fix 6: confidence_threshold_override requires system:settings permission.
+def _check_confidence_threshold_permission(
+    user: User,
+    data: "BaseModel",
+    *,
+    current_value: Optional[int] = None,
+) -> None:
+    """v0.22.1 (L6): confidence_threshold_override changes require system:settings.
 
-    Raises 403 if the value is explicitly set and the user lacks system:settings.
+    Distinguishes "field omitted" from "explicit null" via Pydantic's
+    model_fields_set. Any change to the resulting stored value — including
+    clearing a non-null override to NULL by sending an explicit null payload —
+    requires system:settings. Closes the v0.21.x bypass where a user with only
+    playbook:create/update could revert a system-tier strict threshold to the
+    env-default by sending `confidence_threshold_override: null`.
     """
-    if value is None:
+    if "confidence_threshold_override" not in data.model_fields_set:
+        return
+    incoming = data.confidence_threshold_override
+    if incoming == current_value:
         return
     has_perm = any(
         p.name == "system:settings"
@@ -242,7 +255,7 @@ def _check_confidence_threshold_permission(user: User, value: Optional[int]) -> 
     if not has_perm:
         raise HTTPException(
             status_code=403,
-            detail="system:settings required to set confidence_threshold_override",
+            detail="system:settings required to change confidence_threshold_override",
         )
 
 
@@ -255,7 +268,7 @@ def create_alert_prompt(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
-    _check_confidence_threshold_permission(current_user, data.confidence_threshold_override)
+    _check_confidence_threshold_permission(current_user, data, current_value=None)
     repo = AlertPromptRepository(session)
     existing = repo.get_by_name(data.name)
     if existing:
@@ -301,13 +314,17 @@ def update_alert_prompt(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
-    # Fix 6: confidence_threshold_override is a system-level field.
-    _check_confidence_threshold_permission(current_user, data.confidence_threshold_override)
-
     repo = AlertPromptRepository(session)
     tmpl = repo.get_by_id(template_id)
     if not tmpl:
         raise HTTPException(status_code=404, detail="Alert prompt template not found")
+
+    # v0.22.1 (L6): gate is now incoming-vs-stored, so an explicit null that
+    # would clear a non-null override is treated as a change and requires
+    # system:settings. Must run AFTER tmpl is loaded so current_value is known.
+    _check_confidence_threshold_permission(
+        current_user, data, current_value=tmpl.confidence_threshold_override
+    )
 
     # Name uniqueness on rename
     if data.name and data.name != tmpl.name:
