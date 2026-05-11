@@ -6352,6 +6352,23 @@ async def get_alert_triage(
             "bob_escalation_badge": getattr(triage, "bob_escalation_badge", None),
         }
 
+        # v0.23.0: emit an alert_view audit event keyed on the triage PK so
+        # the adaptive lab grader can back-correlate via lab_session_fixtures
+        # (which stores materialised_row_id = AlertTriage.id). Cheap insert;
+        # the existing (user_id, action) index covers the grader's lookup.
+        try:
+            AuditLogRepository(session).create(
+                action="alert_view",
+                user_id=current_user.id,
+                resource_type="alert_triage",
+                resource_id=triage.id,
+                details=f"es_alert_id={alert_id}",
+            )
+            session.commit()
+        except Exception:
+            logger.exception("alert_view audit log write failed (non-fatal)")
+            session.rollback()
+
     # ------------------------------------------------------------------
     # Investigation memory enrichment
     # ------------------------------------------------------------------

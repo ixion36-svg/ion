@@ -90,6 +90,56 @@ def _add_q(session: Session, lesson: Lesson, *, order: int, kind: str,
     return q
 
 
+def _add_lab_rubric(
+    session: Session,
+    lesson: Lesson,
+    *,
+    criterion_kind: str,
+    config: dict | None = None,
+    points: int = 10,
+    sort_order: int = 0,
+    description: str = "",
+) -> None:
+    """Insert a lab_rubrics row for a LAB lesson (v0.23.0).
+
+    Idempotent reseed: if a row with the same (lesson_id, criterion_kind,
+    sort_order) already exists, this is a no-op. Otherwise inserts a new
+    criterion the lab grader will evaluate when the learner completes the
+    lab. JSON config carries kind-specific knobs; for v0.23.0's single
+    ``viewed_alert`` kind it is intentionally empty.
+    """
+    from sqlalchemy import text as _text
+
+    existing = session.execute(
+        _text(
+            "SELECT id FROM lab_rubrics "
+            "WHERE lesson_id = :lid AND criterion_kind = :ck "
+            "  AND sort_order = :so"
+        ),
+        {"lid": lesson.id, "ck": criterion_kind, "so": sort_order},
+    ).fetchone()
+    if existing is not None:
+        return
+
+    session.execute(
+        _text(
+            "INSERT INTO lab_rubrics "
+            "(lesson_id, criterion_kind, criterion_config, points, "
+            " sort_order, description) "
+            "VALUES (:lid, :ck, :cfg, :pts, :so, :desc)"
+        ),
+        {
+            "lid": lesson.id,
+            "ck": criterion_kind,
+            "cfg": json.dumps(config or {}),
+            "pts": int(points),
+            "so": sort_order,
+            "desc": description or None,
+        },
+    )
+    session.flush()
+
+
 # ── Cleanup ──────────────────────────────────────────────────────────────
 
 
@@ -1519,6 +1569,18 @@ Answer the 4 questions below based on the alert you reviewed.
         ],
         explanation_md="**`severity`** (rule.severity / alert.severity / case.severity — the same value flows through). The on-call paging rota is keyed on severity in most SOAR / paging configurations: Critical pages immediately; High pages OOH; Medium queues for next-business-day; Low batches for review. Wrong severity → wrong on-call routing. The L1's reflex on escalation is to confirm severity matches the case's actual impact before triggering the L2 / IR engagement; setting severity too high wakes people unnecessarily, too low delays response on real incidents.",
         points=2,
+    )
+
+    # v0.23.0: adaptive lab grading rubric. The lab's load-bearing analyst
+    # action is *opening one of the seeded alerts*, so the criterion is a
+    # single "viewed_alert" worth 100 points. Future criteria (link to
+    # case, choose a closure reason, etc.) layer on without schema change.
+    _add_lab_rubric(
+        session, m2_lab,
+        criterion_kind="viewed_alert",
+        points=100,
+        sort_order=0,
+        description="Opened the seeded alert's detail panel at least once during the session.",
     )
 
     # ── Module 3 — Windows Event Logs (v0.11.6) ──────────────────────────
