@@ -1,5 +1,128 @@
 # Changelog
 
+## v0.25.0 — 2026-05-11
+
+Mixed plate matching the v0.22/0.23.0/0.24.0 shape: one feature, one SDLC
+gap closure, one cleanup.
+
+### feat(labs): adaptive lab grading session 3 — observable_created + case_closed_with_reason
+
+Extends the grader with two new criterion kinds and backfills rubrics on
+four LAB lessons that previously had no grading attached.
+
+**New criterion kind: `observable_created`** awards points the first time
+the session user accumulates ≥`min_count` audit rows with
+`action='observable_linked'` during the session window. Optional `types`
+config filters by `details["observable_type"]` so a rubric author can
+require e.g. ≥1 IP observable specifically. Unlike `viewed_alert` /
+`linked_to_case`, this kind does NOT scope by `lab_session_fixtures` —
+the L1 M5 / L2 hunt labs grade "did the learner extract any observables
+during the session", not "did they extract observables tied to a specific
+seeded alert".
+
+**New criterion kind: `case_closed_with_reason`** awards points the first
+time the session user accumulates ≥`min_count` audit rows with
+`action='case_closed'` during the session window where
+`details["closure_reason"]` is in `required_reasons`. The L1 M7 escalation
+lab uses this to grade "did the learner close a case as `true_positive`"
+— the load-bearing outcome of a runbook-driven escalation.
+
+**New audit event: `observable_linked`** fires whenever a new
+`ObservableLink` row is created via an analyst action:
+
+- `POST /api/observables/extract-from-alert/{alert_triage_id}` and
+  `POST /api/observables/extract-from-case/{case_id}` — both endpoints
+  now snapshot `max(ObservableLink.id)` before the service call and
+  audit each new link row after.
+- The case-create observable extraction in `api.py:create_case` —
+  same snapshot pattern, one audit row per new link the
+  `enrich_and_link_observables_for_case` + fallback extract pair
+  produces.
+
+`resource_type='observable'`, `resource_id=link.observable_id`,
+`details={"observable_id", "observable_type", "link_type", "entity_id",
+"context"}`. Pre-existing links (re-extracting an alert with already-linked
+observables) produce zero audit rows. All writes wrapped in try/except
+(non-fatal).
+
+**New audit event: `case_closed`** fires at the OPEN→CLOSED transition in
+`api.py:update_case`. Inserts after `case.closed_at = datetime.utcnow()`
+and before the AIFeedback capture — guarded by the existing
+`new_status == "closed" and old_status != "closed"` check so no-op
+re-PATCH of a closed case does not fire a second audit row.
+`resource_type='alert_case'`, `resource_id=case.id`,
+`details={"case_id", "case_number", "closure_reason", "closure_notes"}`.
+
+**Rubric backfill** on the four LAB lessons that the v0.25.0 surface map
+identified as gradable with the new fixture-independent kinds:
+
+- **L1 M5 Lab** (Tag and triage an observable) — 100pt `observable_created`
+  `min_count=1`.
+- **L1 M7 Lab** (Escalate a case via the runbook) — 100pt
+  `case_closed_with_reason` `["true_positive"]`.
+- **L2 M2 Lab** (Hunt with KQL / EQL / ES|QL) — 100pt `observable_created`
+  `min_count=1`.
+- **L2 M5 Lab** (Hunt a beacon with ES|QL CoV) — 60pt `observable_created`
+  `min_count=2` + 40pt `case_closed_with_reason` `["true_positive"]`. The
+  second multi-criterion rubric in the catalogue (alongside L1 M2's
+  `viewed_alert` + `linked_to_case`).
+
+The remaining three LAB lessons (L2 M8 TIDE-rule conversion, L3 M3 Caldera
+operation, L3 M6 FIN6 chain) are explicitly deferred — they grade actions
+that require criterion kinds tied to TIDE rule creation and Caldera
+operation telemetry, neither of which is exposed in the audit surfaces
+ION currently writes. Tracked in `_backlog_v0_25.md` under "Fixture/rubric
+support for L2 M8, L3 M3, L3 M6".
+
+Tests: 10 new cases in `tests/test_lab_grading.py` covering both new
+evaluators (no-match / single-count / min-count / type filter / wrong
+reason / multi-reason match) plus a 3-criterion partial-credit
+integration test. 29/29 lab grading tests pass. New
+`tests/test_v025_audit_events.py` (3 cases) pins the `case_closed` audit
+contract end-to-end through the FastAPI `TestClient`.
+
+Files: `src/ion/services/lab_grading_service.py`, `src/ion/web/api.py`,
+`src/ion/web/observable_api.py`, `seed_courses.py`,
+`tests/test_lab_grading.py`, `tests/test_v025_audit_events.py`.
+
+### ci: pip-audit added as 4th parallel CI job (SDLC §8 SCA closure)
+
+`.github/workflows/test.yml` gains a `sca` job that runs `pip-audit
+--vulnerability-service osv --strict` against the resolved dependency
+tree of `pip install -e .`. Any vulnerability finding fails the build.
+
+A single `--ignore-vuln CVE-2024-23342` is documented inline with
+justification: the CVE is a timing side-channel against pure-Python ECDSA
+signing in the `ecdsa` package (transitive via `python-jose[cryptography]`).
+ION's only JWT validation path is at `src/ion/auth/oidc.py:186` which pins
+`algorithms=["RS256"]` (RSA, never ECDSA), so the vulnerable code is not
+reachable. The upstream `ecdsa` maintainer states the fix is to use a
+different library — replacing `python-jose` with `PyJWT` removes the
+ignore entirely and is tracked in `_backlog_v0_25.md` as a v0.26.0+ item.
+
+SDLC doc updates:
+- `docs/DEVELOPMENT_LIFECYCLE.md` §3.4.4 — 4-job CI description.
+- §4 — NCSC Principle 4 (Manage third-party risk) moves from Partial to
+  **Mostly Met**; Principle 6 (Continuous security testing) prose updated.
+- §8 — SCA gap struck through with closure note.
+- §9 — v1.2 revision row.
+
+### cleanup: rename `_backlog_v0_23.md` → `_backlog_v0_25.md`
+
+The rolling backlog file's name lagged the actual cycle. Renamed and
+refreshed to reflect v0.24.0 closures, v0.25.0 closures, and the v0.26.0
+candidate set (lab grading session 4 items, SBOM via syft, pinned deps,
+SECURITY.md, threat-model doc, coverage reporting, python-jose → PyJWT
+migration).
+
+### Stack alignment
+
+No external dependency or behaviour change beyond the SCA gate. The
+`--ignore-vuln` documentation is the only allowlist; future findings go
+through the workflow file's inline justification process.
+
+---
+
 ## v0.24.0 — 2026-05-11
 
 Mixed plate per the v0.23.2 handoff recommendation: one feature, one
