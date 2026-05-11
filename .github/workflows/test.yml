@@ -1,0 +1,98 @@
+# ION CI pipeline (v0.24.0)
+#
+# Runs on every push to main and every pull request. Closes the SDLC §8
+# gap "CI/CD pipeline (.github/workflows)" — see docs/DEVELOPMENT_LIFECYCLE.md
+# §3.4.4 and §4 Principle 6.
+#
+# Jobs:
+#   - test : pytest on Python 3.11 against the full tests/ suite. SQLite
+#            in-process, no DB service needed.
+#   - lint : ruff check on src/ (config in pyproject.toml [tool.ruff]).
+#   - sec  : bandit -r src/ with the skip set documented in this file's
+#            comment for `bandit-skip`. Treats high-severity findings as
+#            fatal; medium and below as warnings.
+#
+# Each job is independent — a ruff failure doesn't gate pytest, and vice
+# versa, so a single review surface shows everything that's wrong at once.
+
+name: test
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run pytest
+        run: pytest tests/ -q --tb=short
+
+  lint:
+    name: ruff
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install ruff
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Run ruff check
+        run: ruff check src/
+
+  sec:
+    name: bandit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install "bandit[toml]"
+
+      # Skips are documented per ION's threat model:
+      #   B602 — shell=True in subprocess (KB seed scripts intentionally
+      #          call external CLIs like vol.py / tcpdump in restricted
+      #          paths with no untrusted input)
+      #   B608 — SQL string construction (SQLAlchemy ORM elsewhere; the
+      #          flagged raw queries are inside _run_migrations and the
+      #          lab fixture inserter where column names are allow-listed)
+      #   B101 — assert statements (test code, and some defensive asserts
+      #          in services that are not used for security checks)
+      # High-severity findings fail the job; medium and below are warnings.
+      - name: Run bandit
+        run: bandit -r src/ --skip B602,B608,B101 -lll

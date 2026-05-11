@@ -14,14 +14,24 @@ criterion of the form "viewed alert X" matches an ``audit_logs`` row where
 materialised alert_triage ids AND the audit row's ``timestamp`` lies
 inside the session window.
 
-Criterion kinds (v0.23.0)
--------------------------
-``viewed_alert`` — config: ``{}``. Awards full points the first time any
-audit row with action='alert_view' lands on any of the session's
-materialised alert_triage rows.
+Criterion kinds
+---------------
+``viewed_alert`` (v0.23.0) — config: ``{}``. Awards full points the
+first time any audit row with action='alert_view' lands on any of the
+session's materialised alert_triage rows.
 
-The kind registry below is deliberately extensible: v0.24.0 adds
-linked_to_case, observable_created, case_closed_with_reason, etc.
+``linked_to_case`` (v0.24.0) — config: ``{"min_alerts": int = 2}``.
+Awards full points the first time at least ``min_alerts`` of the
+session's materialised alert_triage rows are observed as linked to the
+SAME case via the ``alert_linked`` audit event. The audit event was
+introduced in v0.24.0 at the two case-link write sites in
+``ion.web.api`` (case-create loop and PUT triage); its ``details``
+column carries the target ``case_id`` as JSON, which the evaluator
+groups by to ensure the alerts converge on a single case rather than
+being scattered across multiple.
+
+Future kinds: ``observable_created``, ``case_closed_with_reason``,
+``regex_in_analyst_notes``, ``mitre_technique_tagged``.
 """
 
 from __future__ import annotations
@@ -101,10 +111,93 @@ def _evaluate_viewed_alert(
     return True, int(row[0])
 
 
+def _evaluate_linked_to_case(
+    session: Session,
+    *,
+    session_id: int,
+    user_id: int,
+    started_at,
+    config: dict[str, Any],
+) -> tuple[bool, Optional[int]]:
+    """Return (matched, audit_log_id_of_earliest_matching_row).
+
+    Match when ``min_alerts`` (default 2) of the session's materialised
+    alert_triage rows are linked to the same case during the session
+    window. The audit rows we read here are emitted by ION's two
+    case-link write sites (case-create loop and PUT triage) since
+    v0.24.0; each row's ``details`` column carries the target ``case_id``
+    as JSON so we can group by it and require convergence on one case
+    rather than crediting the learner for scattering alerts.
+    """
+    min_alerts = int(config.get("min_alerts", 2))
+
+    triage_ids = _materialised_ids_for_session(
+        session, session_id=session_id, target_table="alert_triage"
+    )
+    if len(triage_ids) < min_alerts:
+        return False, None
+
+    placeholders = ", ".join(f":id_{i}" for i in range(len(triage_ids)))
+    params = {
+        "uid": user_id,
+        "since": started_at,
+    }
+    for i, tid in enumerate(triage_ids):
+        params[f"id_{i}"] = tid
+
+    rows = session.execute(
+        text(
+            "SELECT id, resource_id, details FROM audit_logs "
+            "WHERE action = 'alert_linked' "
+            "  AND resource_type = 'alert_triage' "
+            f"  AND resource_id IN ({placeholders}) "
+            "  AND user_id = :uid "
+            "  AND timestamp >= :since "
+            "ORDER BY id ASC"
+        ),
+        params,
+    ).fetchall()
+    if not rows:
+        return False, None
+
+    # Group by the target case_id parsed out of details JSON. The first
+    # case_id that accumulates ``min_alerts`` distinct materialised
+    # alert_triage ids wins, and the matched audit_log id is the earliest
+    # row that contributed to that group.
+    per_case_alerts: dict[int, set[int]] = {}
+    per_case_earliest_audit: dict[int, int] = {}
+    for audit_id, resource_id, details_raw in rows:
+        if details_raw is None:
+            continue
+        try:
+            details = (
+                details_raw
+                if isinstance(details_raw, dict)
+                else json.loads(details_raw)
+            )
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        case_id = details.get("case_id")
+        if case_id is None:
+            continue
+        try:
+            case_id = int(case_id)
+        except (TypeError, ValueError):
+            continue
+        bucket = per_case_alerts.setdefault(case_id, set())
+        bucket.add(int(resource_id))
+        per_case_earliest_audit.setdefault(case_id, int(audit_id))
+        if len(bucket) >= min_alerts:
+            return True, per_case_earliest_audit[case_id]
+
+    return False, None
+
+
 # Registry: criterion_kind → evaluator callable
 # Each evaluator returns (matched: bool, matched_audit_log_id: Optional[int]).
 _EVALUATORS = {
     "viewed_alert": _evaluate_viewed_alert,
+    "linked_to_case": _evaluate_linked_to_case,
 }
 
 
