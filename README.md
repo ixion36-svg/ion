@@ -342,6 +342,21 @@ ion/
 
 ---
 
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture, components, data flow, schema |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Deployment topology, container orchestration, `.env.deploy` reference |
+| [`docs/RUNBOOK.md`](docs/RUNBOOK.md) | Operational duties (SOC lead daily activities, integration config, troubleshooting, release ritual) |
+| [`docs/DEVELOPMENT_LIFECYCLE.md`](docs/DEVELOPMENT_LIFECYCLE.md) | Development lifecycle aligned to Secure by Design (5 phases); cross-references NCSC Secure Development and Deployment |
+| [`CHANGELOG.md`](CHANGELOG.md) | Per-release change record |
+| [`SECURITY_ASSESSMENT.md`](SECURITY_ASSESSMENT.md) | Per-release security audit with severity-trend table |
+| [`SETUP.md`](SETUP.md) | Local dev setup |
+| [`STACK.md`](STACK.md) | Tech-stack reference |
+
+---
+
 ## License
 
 MIT
