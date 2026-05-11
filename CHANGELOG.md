@@ -1,5 +1,74 @@
 # Changelog
 
+## v0.23.2 — 2026-05-11
+
+Bug-fix patch — the case-close panel-dropdown silent no-op operator
+reported. Closing a case via the kanban drag-and-drop worked every time;
+closing via the panel's status dropdown sometimes appeared to do
+everything but not actually close the case. Four UI fixes converge to
+make the panel path mirror the kanban path exactly.
+
+### fix(cases): panel-refresh gate no longer depends on allCases
+
+The v0.23.x post-PATCH refresh logic gated the panel re-render on
+`allCases.find(c => c.id === caseId)` returning a row AND the panel's
+header text matching. If `loadAllCases` was momentarily empty (network
+race, list-endpoint error swallowed in the catch) the gate silently
+failed — the PATCH had committed, but the panel kept showing the
+pre-close state and the user concluded the close didn't happen.
+
+The panel now stashes its open case id on `panel.dataset.caseId` when
+`openCaseDetail` runs. `updateCaseStatus` reads that directly, no
+allCases dependency, no fragile case_number text comparison.
+`closeCasePanel` clears the dataset so a subsequent status change for
+a different case doesn't mistake a closed panel for an open one.
+
+### fix(cases): auto-close panel when closing its own case
+
+The kanban path naturally moves the card to the closed column, giving
+clear visual feedback that the close worked. The panel path left the
+panel open showing the now-closed case, which fed the "did it actually
+close?" confusion. Closing a case through the panel dropdown now
+auto-closes the panel — the user sees the panel slide away and the
+kanban card visibly move, identical UX to the kanban drag path. Other
+status changes (open ↔ acknowledged) refresh the panel in place as
+before.
+
+### fix(cases): cancelClosure resets the stale select value
+
+Picking "closed" from the panel dropdown opened the modal but left the
+`<select>` element's DOM value at "closed". If the user cancelled the
+modal, re-picking "closed" did NOT fire `onchange` again (same-value
+transitions don't dispatch in the browser), so a subsequent close
+attempt was silently swallowed by the JS event model. `cancelClosure`
+now walks the panel's status `<select>` and rolls it back to the case's
+actual current status, so a subsequent re-pick fires `onchange`
+normally and reopens the modal.
+
+### fix(cases): confirmClosure awaits the PATCH
+
+The v0.23.x `confirmClosure` hid the modal and cleared `pendingClosure`
+synchronously before the async PATCH resolved. If the PATCH returned
+400 (bad closure_reason) or 5xx (Kibana sync hiccup), the modal was
+already gone and the analyst lost the close intent without an obvious
+retry path. The modal now stays open if `updateCaseStatus` returns
+false, lets the analyst fix the issue, and only dismisses on success.
+
+### test: backend regression on the PATCH close contract
+
+`tests/test_v023_2_case_close.py` (4 cases) pins the server-side half:
+PATCH with valid `closure_reason` persists status=CLOSED + closed_at +
+closed_by_id; missing `closure_reason` returns 400 with no transition;
+invalid `closure_reason` returns 400; round-trip GET returns
+`status='closed'` as the frontend expects. There's no JS test harness
+in the suite, so the comment block in `cases.html` documents the four
+JS fixes inline next to the affected functions.
+
+Files: `src/ion/web/templates/cases.html`,
+`tests/test_v023_2_case_close.py`.
+
+---
+
 ## v0.23.1 — 2026-05-11
 
 Bug-fix patch on top of v0.23.0. Three operator-reported issues addressed:
