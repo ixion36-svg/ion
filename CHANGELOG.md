@@ -1,5 +1,93 @@
 # Changelog
 
+## v0.23.1 — 2026-05-11
+
+Bug-fix patch on top of v0.23.0. Three operator-reported issues addressed:
+
+### feat(investigate): queue control — pause toggle + bulk cancel + per-row cancel
+
+The investigation sweep loop processes pending alert investigations on a
+60s ticker. Operators reported ~30 pending investigations queueing up
+with no UI mechanism to halt or trim the backlog. Three new endpoints +
+UI controls land in v0.23.1:
+
+- `GET /api/investigate/loop/status` — returns `{paused, updated_at, updated_by_id}`
+- `POST /api/investigate/loop/pause` — sets the runtime flag
+- `POST /api/investigate/loop/resume` — clears the flag
+- `POST /api/investigate/jobs/cancel-pending` — bulk-cancel all pending
+  rows (running rows left alone, terminal rows unaffected)
+- `POST /api/investigate/jobs/{inv_id}/cancel` — per-row cancel; 404 on
+  missing id, returns `{cancelled_count: 0|1}`
+
+The sweep checks the pause flag at the top of every iteration and
+short-circuits with `{paused: true, scanned: 0}` when set. The
+`_find_recent_investigation` dedup query now treats `cancelled` rows as
+"existing" so the sweep does not re-queue an alert whose previous
+investigation was deliberately cancelled.
+
+New table `system_runtime_flags` (key/value/updated_at/updated_by_id)
+backs the pause flag. The leader-worker model means in-process state is
+not visible to other workers — the DB-backed flag is the only correct
+shape for the multi-worker uvicorn deployment.
+
+UI: `investigation_queue.html` gains a Pause/Resume toggle, a "Cancel
+all pending" button, a banner shown when paused, and a per-row Cancel
+action on each pending/running row.
+
+Files: `src/ion/storage/database.py`,
+`src/ion/services/system_flags.py` (new),
+`src/ion/services/investigation_service.py`,
+`src/ion/web/investigation_api.py`,
+`src/ion/web/templates/investigation_queue.html`.
+Regression: `tests/test_v023_1_queue_control.py` (14 cases).
+
+### feat(bob): on-demand case analysis — auto-comment removed
+
+The v0.22.x behaviour auto-wrote a Note on the case (and a matching
+Kibana Cases comment) after every investigation completion. Operators
+asked for analyst-triggered analysis instead, gathering the inputs
+explicitly named by the user request: investigations, the rule,
+observables, raw alert data, similar cases.
+
+`investigation_service._post_to_case` no longer writes a Note or posts
+a Kibana comment. The non-comment side-effects remain (IOC merge into
+`case.observables`, AlertTriage/AlertCase OPEN→ACKNOWLEDGED, ES
+workflow status push) since they help the SOC workflow without being
+intrusive.
+
+New endpoint `POST /api/elasticsearch/alerts/cases/{case_id}/bob-analysis`
+gathers five inputs (linked triages, prior investigations, observables,
+raw ES alert for the lead alert, top-N similar closed cases via
+pgvector) and calls Ollama with a focused case-analysis system prompt.
+Returns `{analysis, model, sources, generated_at}` — does NOT persist
+anything. Permission: `case:read`.
+
+Case detail panel gains a "Get Bob's analysis" button. The analysis
+renders in a collapsible panel with three actions: **Save as note**
+(posts the analysis text to the existing
+`POST /api/elasticsearch/alerts/cases/{id}/notes` endpoint, authored
+by the analyst), **Re-run**, and **Dismiss**.
+
+Files: `src/ion/web/bob_analysis_api.py` (new),
+`src/ion/web/server.py` (router mount),
+`src/ion/services/investigation_service.py` (auto-comment removal),
+`src/ion/web/templates/cases.html` (button + result panel).
+Regression: `tests/test_bob_analysis.py` (4 cases — endpoint contract +
+no-Note guarantee + `_post_to_case` no-longer-writes-Note guard).
+
+### fix(alerts): multi-alert case title carries lead alert name
+
+`alerts.html` line 9542 generated multi-alert case titles as
+`Investigation: ${N} related alerts` — recognisable only from the
+case-detail body, not from the cases list. Changed to
+`Investigation: ${N} - ${rule_name || title || 'Multi-Alert Investigation'}`
+so analysts can identify the case by glance. Single-alert path
+unchanged (still uses `[0].title`).
+
+Files: `src/ion/web/templates/alerts.html`.
+
+---
+
 ## v0.23.0 — 2026-05-11
 
 Adaptive lab grading. The deferred-since-v0.20.1 curriculum-infra
