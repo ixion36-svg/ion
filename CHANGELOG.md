@@ -1,5 +1,72 @@
 # Changelog
 
+## v0.25.1 — 2026-05-11
+
+Bug-fix patch on top of v0.25.0. Closes three issues in the v0.16.0 PCAP
+auto-analysis wiring that combined to make the feature never fire on
+multi-alert case creation:
+
+### fix(pcap): multi-alert PCAP auto-analysis + ES fallback
+
+**Issue 1 — multi-select case-create never triggered PCAP analysis.** The
+alerts list endpoint sends `include_raw=False` to cut payload size, so
+`a.raw_data` is empty for every alert on the list. When the analyst
+multi-selects alerts and clicks "Create case", the resulting
+`alert_contexts` carries empty `raw_data` per alert — and the v0.16.0
+PCAP code only looked at `ctx.raw_data` to extract `network.community_id`.
+Result: 0 flows queued, no PCAP analysis ever ran for multi-alert cases.
+
+Fix: new `_build_pcap_flows` helper in `api.py:create_case` walks every
+`alert_id` in `data.alert_ids`. For each, it reads `raw_data` from the
+matching `alert_context` if present, OR calls
+`ElasticsearchService.get_alerts_by_ids` to fetch the full `_source`
+document from ES (one batch call, not per-alert). ES failures are
+non-fatal — partial flows still get queued.
+
+**Issue 2 — node-hint operator-precedence bug.** The original v0.16.0
+expression was:
+
+```python
+node_hint = (
+    rd.get("arkime_node")
+    or rd.get("arkime", {}).get("node") if isinstance(rd.get("arkime"), dict) else None
+)
+```
+
+Python's ternary has lower precedence than `or`, so this evaluates as
+`(arkime_node or arkime.node) if isinstance(arkime, dict) else None`.
+When `rd["arkime"]` wasn't a dict, the WHOLE expression returned None —
+including the top-level `arkime_node` value, which was lost. Many
+deployments put `arkime_node` at the top level without a nested
+`arkime` dict, so this dropped the node hint on every alert from those
+deployments.
+
+Fix: rewrote as an explicit two-step lookup — top-level `arkime_node`
+first, nested `arkime.node` as a fallback. Pinned by a regression test
+in `tests/test_v025_pcap_auto_analysis.py`.
+
+**Issue 3 — one global node hint for all flows.** The v0.16.0 service
+took a single `alert_node_hint` for all community_ids in a case. In
+multi-alert cases where different alerts were captured on different
+Arkime nodes, the wrong node hint was passed to the second-and-later
+flows.
+
+Fix: changed `enqueue_pcap_analysis_for_case` to take a `flows: List[Dict]`
+parameter where each entry is
+`{"community_id", "node_hint", "alert_id"}`. The runner iterates flows
+sequentially with each flow's own node hint. Legacy callers passing
+`community_ids` + `alert_node_hint` are accepted via a back-compat
+shim that translates the kwargs into the flow shape.
+
+Tests: 15 new cases in `tests/test_v025_pcap_auto_analysis.py` covering
+`_extract_community_and_node` (7), `_build_pcap_flows` (5), and the
+service's dedup + back-compat behaviour (3). All 15 pass.
+
+Files: `src/ion/services/pcap_analysis_service.py`, `src/ion/web/api.py`,
+`tests/test_v025_pcap_auto_analysis.py`.
+
+---
+
 ## v0.25.0 — 2026-05-11
 
 Mixed plate matching the v0.22/0.23.0/0.24.0 shape: one feature, one SDLC
