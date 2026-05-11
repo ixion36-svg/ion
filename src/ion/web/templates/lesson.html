@@ -311,7 +311,14 @@ async function completeLab() {
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
     const st = document.getElementById('ln-lab-status');
-    if (st) st.textContent = `Lab complete — ${d.torn_down_count} row(s) removed.`;
+    if (st) {
+      let msg = `Lab complete — ${d.torn_down_count} row(s) removed.`;
+      if (typeof d.score === 'number') {
+        msg = `Lab graded: ${d.score}% (${d.points_earned}/${d.points_max}). ${d.torn_down_count} row(s) removed.`;
+      }
+      st.textContent = msg;
+    }
+    _renderLabCriteria(d);
     const linksEl = document.getElementById('ln-lab-links');
     if (linksEl) linksEl.innerHTML = '';
     showToast('Lab completed', 'success');
@@ -320,6 +327,29 @@ async function completeLab() {
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Complete lab'; } }
 }
 window.completeLab = completeLab;
+
+function _renderLabCriteria(d) {
+  // v0.23.0: render per-criterion grading results inside the lab panel.
+  const host = document.getElementById('ln-lab-links');
+  if (!host) return;
+  const criteria = d.criteria || [];
+  if (!criteria.length) return;
+  const rows = criteria.map(c => {
+    const mark = c.matched ? '✓' : '✗';
+    const colour = c.matched ? '#34d399' : '#f87171';
+    const label = escHtml(c.kind);
+    return `<div style="display:flex;justify-content:space-between;gap:0.5rem;padding:0.2rem 0;">
+              <span style="color:${colour};">${mark}</span>
+              <span style="flex:1;color:var(--text-secondary);">${label}</span>
+              <span style="color:var(--text-secondary);">${c.points_earned}/${c.points_max}</span>
+            </div>`;
+  }).join('');
+  host.innerHTML =
+    '<div style="margin-top:0.4rem;padding:0.4rem 0.6rem;border:1px solid rgba(255,255,255,0.08);border-radius:0.4rem;background:rgba(0,0,0,0.2);">'
+    + '<div style="font-weight:600;color:var(--text-primary);margin-bottom:0.25rem;font-size:0.78rem;">Rubric</div>'
+    + rows
+    + '</div>';
+}
 
 function _renderLabLinks(d) {
   const el = document.getElementById('ln-lab-links');

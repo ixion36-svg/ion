@@ -1,14 +1,20 @@
-"""Lab fixture API — launch / complete lifecycle for LAB-type lessons (v0.21.0).
+"""Lab fixture API — launch / complete lifecycle for LAB-type lessons.
 
 Routes (all relative — server.py mounts this router with prefix=""):
 
     POST /api/courses/{slug}/lessons/{lesson_id}/lab/launch
-        Seed mock data for the learner's lab session.
-        Returns {materialised_count, observable_links}.
+        Start or resume a lab session, seed mock data for it.
+        Returns {session_id, materialised_count, observable_links}.
 
     POST /api/courses/{slug}/lessons/{lesson_id}/lab/complete
-        Tear down materialised data and mark the lesson completed.
-        Returns {torn_down_count}.
+        Grade the current lab session against its lesson rubric, tear down
+        materialised data, and mark the lesson completed.
+        Returns {session_id, score, points_earned, points_max, criteria,
+        torn_down_count}.
+
+v0.23.0 (adaptive lab grading): launch creates/resumes a lab_sessions row;
+complete grades via LabGradingService before teardown. The session id flows
+through to the UI so the score panel can render per-criterion results.
 
 Auth: requires an active course enrolment for the requesting user.
 """
@@ -25,6 +31,7 @@ from sqlalchemy.orm import Session
 from ion.auth.dependencies import get_current_user
 from ion.models.course import Course, Lesson, LessonProgressStatus, LessonType, UserEnrolment
 from ion.models.user import AuditLog, User
+from ion.services import lab_grading_service, lab_session_service
 from ion.services.lab_fixture_service import (
     _observable_link,
     get_live_session_fixtures,
@@ -116,7 +123,16 @@ def launch_lab(
 
     enr = _require_enrollment(session, current_user.id, lesson.module.course_id)
 
+    # v0.23.0: open or resume a lab session before seeding fixtures so the
+    # materialised rows can be back-correlated by the grader.
+    sess_id = lab_session_service.start_or_resume(
+        session, enrollment_id=enr.id, lesson_id=lesson_id
+    )
+
     mat_ids = seed_lab(session, enrollment_id=enr.id, lesson_id=lesson_id)
+    lab_session_service.link_fixtures(
+        session, session_id=sess_id, materialised_ids=mat_ids
+    )
 
     live = get_live_session_fixtures(session, enrollment_id=enr.id, lesson_id=lesson_id)
     links = _build_observable_links(live)
@@ -132,6 +148,7 @@ def launch_lab(
     session.commit()
 
     return {
+        "session_id": sess_id,
         "materialised_count": len(mat_ids),
         "materialised_ids": mat_ids,
         "observable_links": [lnk for lnk in links if lnk],
@@ -156,9 +173,26 @@ def complete_lab(
 
     enr = _require_enrollment(session, current_user.id, lesson.module.course_id)
 
+    # v0.23.0: grade BEFORE teardown so the grader can read the
+    # lab_session_fixtures rows that still point at the materialised data.
+    sess_id = lab_session_service.current_for(
+        session, enrollment_id=enr.id, lesson_id=lesson_id
+    )
+    grade_summary: dict = {}
+    if sess_id is not None:
+        grade_summary = lab_grading_service.grade_session(session, session_id=sess_id)
+        lab_session_service.complete(
+            session,
+            session_id=sess_id,
+            score=grade_summary.get("score"),
+            points_earned=grade_summary.get("points_earned", 0),
+            points_max=grade_summary.get("points_max", 0),
+        )
+
     torn_down = teardown_lab(session, enrollment_id=enr.id, lesson_id=lesson_id)
 
-    # Mark lesson progress completed.
+    # Mark lesson progress completed and persist the cached score.
+    score = grade_summary.get("score") if sess_id is not None else None
     prog_row = session.execute(
         text(
             "SELECT id, status FROM course_lesson_progress "
@@ -171,18 +205,21 @@ def complete_lab(
         session.execute(
             text(
                 "INSERT INTO course_lesson_progress "
-                "(user_id, lesson_id, status, completed_at, last_accessed_at, attempts) "
-                "VALUES (:uid, :lid, 'completed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)"
+                "(user_id, lesson_id, status, score, completed_at, "
+                " last_accessed_at, attempts) "
+                "VALUES (:uid, :lid, 'completed', :score, CURRENT_TIMESTAMP, "
+                "        CURRENT_TIMESTAMP, 1)"
             ),
-            {"uid": current_user.id, "lid": lesson_id},
+            {"uid": current_user.id, "lid": lesson_id, "score": score},
         )
     else:
         session.execute(
             text(
                 "UPDATE course_lesson_progress SET status = 'completed', "
-                "completed_at = CURRENT_TIMESTAMP WHERE id = :id"
+                "score = :score, completed_at = CURRENT_TIMESTAMP "
+                "WHERE id = :id"
             ),
-            {"id": prog_row[0]},
+            {"id": prog_row[0], "score": score},
         )
 
     _audit(
@@ -191,11 +228,19 @@ def complete_lab(
         user_id=current_user.id,
         lesson_id=lesson_id,
         enrollment_id=enr.id,
-        detail=f"Completed lab for lesson {lesson_id}; torn_down {torn_down} rows",
+        detail=(
+            f"Completed lab for lesson {lesson_id}; torn_down {torn_down} rows; "
+            f"score={score}"
+        ),
     )
     session.commit()
 
     return {
+        "session_id": sess_id,
+        "score": score,
+        "points_earned": grade_summary.get("points_earned", 0),
+        "points_max": grade_summary.get("points_max", 0),
+        "criteria": grade_summary.get("criteria", []),
         "torn_down_count": torn_down,
         "lesson_status": LessonProgressStatus.COMPLETED,
     }
