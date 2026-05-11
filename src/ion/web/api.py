@@ -4402,6 +4402,23 @@ async def create_case(
                     triage.rule_name = rule_name_by_alert[alert_id]
             triage.case_id = new_case.id
             linked += 1
+            # v0.24.0: emit alert_linked audit row keyed on the triage PK so
+            # the adaptive lab grader's linked_to_case evaluator can match
+            # via lab_session_fixtures (which stores materialised_row_id =
+            # AlertTriage.id). Best-effort — failure logs and proceeds, the
+            # case link itself has already been set above.
+            try:
+                AuditLogRepository(session).create(
+                    action="alert_linked",
+                    user_id=current_user.id,
+                    resource_type="alert_triage",
+                    resource_id=triage.id,
+                    details={"case_id": new_case.id, "es_alert_id": alert_id},
+                )
+            except Exception:
+                logger.exception(
+                    "alert_linked audit write failed (case-create path, non-fatal)"
+                )
 
     # v0.15.3: harvest observables from EVERY linked AlertTriage rather
     # than only those the client supplied alert_contexts for. The earlier
@@ -6537,7 +6554,26 @@ async def update_alert_triage(
     if data.priority is not None:
         triage.priority = data.priority
     if data.case_id is not None:
+        # v0.24.0: track whether the case link actually changed so the audit
+        # row only fires on a real transition (not a no-op re-PATCH).
+        _case_id_changed = triage.case_id != data.case_id
         triage.case_id = data.case_id
+        if _case_id_changed:
+            try:
+                AuditLogRepository(session).create(
+                    action="alert_linked",
+                    user_id=current_user.id,
+                    resource_type="alert_triage",
+                    resource_id=triage.id,
+                    details={
+                        "case_id": data.case_id,
+                        "es_alert_id": alert_id,
+                    },
+                )
+            except Exception:
+                logger.exception(
+                    "alert_linked audit write failed (PUT triage path, non-fatal)"
+                )
     if data.analyst_notes is not None:
         triage.analyst_notes = data.analyst_notes
     if data.observables is not None:

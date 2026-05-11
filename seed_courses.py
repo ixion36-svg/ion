@@ -100,43 +100,63 @@ def _add_lab_rubric(
     sort_order: int = 0,
     description: str = "",
 ) -> None:
-    """Insert a lab_rubrics row for a LAB lesson (v0.23.0).
+    """Upsert a lab_rubrics row for a LAB lesson (v0.23.0; upsert in v0.24.0).
 
-    Idempotent reseed: if a row with the same (lesson_id, criterion_kind,
-    sort_order) already exists, this is a no-op. Otherwise inserts a new
-    criterion the lab grader will evaluate when the learner completes the
-    lab. JSON config carries kind-specific knobs; for v0.23.0's single
-    ``viewed_alert`` kind it is intentionally empty.
+    Keyed on ``(lesson_id, sort_order)`` — that's the "slot" the rubric
+    occupies. If a row already exists in that slot, all other fields
+    (criterion_kind, points, config, description) are refreshed. This
+    lets a reseed retune a lab's grading without dropping the table.
+    A reseed that swaps the criterion_kind at a given sort_order also
+    works (e.g., the v0.24.0 L1 M2 rubric replaced a single 100-pt
+    viewed_alert at sort_order=0 with a 40-pt viewed_alert + a new
+    60-pt linked_to_case at sort_order=1 — the existing row's points
+    needed to drop from 100 to 40, so the upsert semantic is required).
     """
     from sqlalchemy import text as _text
 
     existing = session.execute(
         _text(
             "SELECT id FROM lab_rubrics "
-            "WHERE lesson_id = :lid AND criterion_kind = :ck "
-            "  AND sort_order = :so"
+            "WHERE lesson_id = :lid AND sort_order = :so"
         ),
-        {"lid": lesson.id, "ck": criterion_kind, "so": sort_order},
+        {"lid": lesson.id, "so": sort_order},
     ).fetchone()
-    if existing is not None:
-        return
-
-    session.execute(
-        _text(
-            "INSERT INTO lab_rubrics "
-            "(lesson_id, criterion_kind, criterion_config, points, "
-            " sort_order, description) "
-            "VALUES (:lid, :ck, :cfg, :pts, :so, :desc)"
-        ),
-        {
-            "lid": lesson.id,
-            "ck": criterion_kind,
-            "cfg": json.dumps(config or {}),
-            "pts": int(points),
-            "so": sort_order,
-            "desc": description or None,
-        },
-    )
+    cfg_json = json.dumps(config or {})
+    if existing is None:
+        session.execute(
+            _text(
+                "INSERT INTO lab_rubrics "
+                "(lesson_id, criterion_kind, criterion_config, points, "
+                " sort_order, description) "
+                "VALUES (:lid, :ck, :cfg, :pts, :so, :desc)"
+            ),
+            {
+                "lid": lesson.id,
+                "ck": criterion_kind,
+                "cfg": cfg_json,
+                "pts": int(points),
+                "so": sort_order,
+                "desc": description or None,
+            },
+        )
+    else:
+        session.execute(
+            _text(
+                "UPDATE lab_rubrics SET "
+                "  criterion_kind = :ck, "
+                "  criterion_config = :cfg, "
+                "  points = :pts, "
+                "  description = :desc "
+                "WHERE id = :id"
+            ),
+            {
+                "id": existing[0],
+                "ck": criterion_kind,
+                "cfg": cfg_json,
+                "pts": int(points),
+                "desc": description or None,
+            },
+        )
     session.flush()
 
 
@@ -1485,21 +1505,22 @@ This comment carries forward the timeline, the verbatim pivots, the IOCs, and th
 
 ## Task
 
-The L1 SOC analyst's day starts at the alerts queue. This lab walks you through the first-mile actions on **one open alert** of your choice.
+The L1 SOC analyst's day starts at the alerts queue. This lab walks you through the first-mile actions on **two open alerts** that look like they could be part of the same incident.
 
 1. Open `/alerts` in a new tab.
-2. Pick any alert in **Open** status; if none exist, ask the L1 lead to seed one or move to the SmokeTest data.
-3. Click the alert to open the detail page. Spend 2-3 minutes reading the rule's metadata, the matched events, and the affected entities.
-4. Identify the following fields on the detail page:
+2. Find the two lab-seeded alerts (rule names containing `(Lab fixture)`). One is the Mimikatz LSASS dump, the other is the Base64-encoded PowerShell.
+3. Click each alert in turn to open the detail page. Spend 2-3 minutes per alert reading the rule's metadata, the matched events, and the affected entities.
+4. Identify the following fields on each detail page:
    - `rule.name` — the detection rule that fired.
    - `rule.severity` — the severity classification.
    - `host.name` — the host the alert is about.
    - `user.name` — the user account involved (if any).
    - `event.action` / `event.category` — the ECS event class.
-5. Read the alert's MITRE technique mapping (if present).
-6. Decide whether you'd close the alert as **true_positive**, **false_positive**, **benign_true_positive**, or **inconclusive** based on the evidence.
+5. Read the alert's MITRE technique mapping (if present). Notice that the two alerts map to different ATT&CK techniques (T1003.001 and T1059.001) but share host context — that's the correlation signal.
+6. **Link both alerts to a single case.** Either create a new case from one of the alerts and add the other, or pick the pre-seeded `LAB-CASE-0001` ("Lab fixture case — Credential access chain") and link both alerts to it. The point is to make ION recognise them as parts of the same incident.
+7. Decide whether you'd close the case as **true_positive**, **false_positive**, **benign_true_positive**, or **inconclusive** based on the combined evidence.
 
-The point of the exercise is to *practice navigating the alert UI* — not to make a perfect call. Your goal is fluency with the panel layout.
+The point of the exercise is to *practice navigating the alert UI AND correlating alerts into a case* — not to make a perfect call. Your goal is fluency with the panel layout plus the reflex to link related alerts together.
 
 ## What to expect
 
@@ -1571,16 +1592,30 @@ Answer the 4 questions below based on the alert you reviewed.
         points=2,
     )
 
-    # v0.23.0: adaptive lab grading rubric. The lab's load-bearing analyst
-    # action is *opening one of the seeded alerts*, so the criterion is a
-    # single "viewed_alert" worth 100 points. Future criteria (link to
-    # case, choose a closure reason, etc.) layer on without schema change.
+    # v0.23.0: adaptive lab grading rubric (revised in v0.24.0 to cover
+    # the multi-criterion + correlation extension of the lab).
+    #
+    # The lab grades two analyst reflexes:
+    #   1. Reading at least one of the seeded alerts (40 points).
+    #   2. Linking BOTH seeded alerts to the same case (60 points) —
+    #      the correlation muscle the L1 needs on every multi-alert
+    #      incident. linked_to_case (v0.24.0) reads the alert_linked
+    #      audit events written by api.py's case-create + PUT-triage
+    #      endpoints and requires convergence on a single case_id.
     _add_lab_rubric(
         session, m2_lab,
         criterion_kind="viewed_alert",
-        points=100,
+        points=40,
         sort_order=0,
-        description="Opened the seeded alert's detail panel at least once during the session.",
+        description="Opened at least one of the seeded alerts' detail panels during the session.",
+    )
+    _add_lab_rubric(
+        session, m2_lab,
+        criterion_kind="linked_to_case",
+        config={"min_alerts": 2},
+        points=60,
+        sort_order=1,
+        description="Linked both seeded alerts to the same case during the session.",
     )
 
     # ── Module 3 — Windows Event Logs (v0.11.6) ──────────────────────────

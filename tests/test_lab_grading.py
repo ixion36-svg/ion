@@ -423,3 +423,184 @@ class TestEndToEnd:
         ).fetchone()
         assert completed.score == 100
         assert completed.completed_at is not None
+
+
+# ── v0.24.0: linked_to_case criterion + multi-criterion grading ──────────
+
+
+def _add_alert_triage_fixture_n(db: Session, lesson_id: int, n: int) -> list[str]:
+    """Add N alert_triage fixtures to a lesson; return the es_alert_ids."""
+    ids = []
+    for i in range(n):
+        es_id = f"lab-alert-multi-{i:03d}"
+        _add_alert_triage_fixture(db, lesson_id, es_id)
+        ids.append(es_id)
+    return ids
+
+
+def _add_link_audit(
+    db: Session, user_id: int, triage_id: int, case_id: int
+) -> int:
+    """Insert an alert_linked audit row pointing at a triage + case pair."""
+    import json as _json
+    row = AuditLog(
+        user_id=user_id,
+        action="alert_linked",
+        resource_type="alert_triage",
+        resource_id=triage_id,
+        details=_json.dumps({"case_id": case_id, "es_alert_id": f"es-{triage_id}"}),
+    )
+    db.add(row)
+    db.flush()
+    return row.id
+
+
+class TestLinkedToCaseEvaluator:
+    """v0.24.0: linked_to_case fires when N materialised alerts converge on a case."""
+
+    def test_no_match_without_audit_rows(self, db, enrolment, lab_lesson):
+        _add_alert_triage_fixture_n(db, lab_lesson.id, 2)
+        _add_rubric(db, lab_lesson.id, kind="linked_to_case", points=60,
+                    config={"min_alerts": 2})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        mat_ids = seed_lab(db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id)
+        lab_session_service.link_fixtures(
+            db, session_id=sid, materialised_ids=mat_ids
+        )
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is False
+        assert result["score"] == 0
+
+    def test_match_when_two_alerts_link_to_same_case(
+        self, db, enrolment, lab_lesson, user
+    ):
+        _add_alert_triage_fixture_n(db, lab_lesson.id, 2)
+        _add_rubric(db, lab_lesson.id, kind="linked_to_case", points=60,
+                    config={"min_alerts": 2})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        mat_ids = seed_lab(db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id)
+        lab_session_service.link_fixtures(
+            db, session_id=sid, materialised_ids=mat_ids
+        )
+        # Both alerts linked to case_id=42.
+        _add_link_audit(db, user.id, mat_ids[0], 42)
+        _add_link_audit(db, user.id, mat_ids[1], 42)
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is True
+        assert result["score"] == 100
+
+    def test_no_match_when_alerts_link_to_different_cases(
+        self, db, enrolment, lab_lesson, user
+    ):
+        _add_alert_triage_fixture_n(db, lab_lesson.id, 2)
+        _add_rubric(db, lab_lesson.id, kind="linked_to_case", points=60,
+                    config={"min_alerts": 2})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        mat_ids = seed_lab(db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id)
+        lab_session_service.link_fixtures(
+            db, session_id=sid, materialised_ids=mat_ids
+        )
+        # Alerts linked to DIFFERENT cases — no convergence.
+        _add_link_audit(db, user.id, mat_ids[0], 42)
+        _add_link_audit(db, user.id, mat_ids[1], 99)
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is False
+        assert result["score"] == 0
+
+    def test_no_match_with_only_one_alert_linked(
+        self, db, enrolment, lab_lesson, user
+    ):
+        _add_alert_triage_fixture_n(db, lab_lesson.id, 2)
+        _add_rubric(db, lab_lesson.id, kind="linked_to_case", points=60,
+                    config={"min_alerts": 2})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        mat_ids = seed_lab(db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id)
+        lab_session_service.link_fixtures(
+            db, session_id=sid, materialised_ids=mat_ids
+        )
+        # Only one alert linked.
+        _add_link_audit(db, user.id, mat_ids[0], 42)
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is False
+
+
+class TestMultiCriterionRubric:
+    """v0.24.0: a rubric with viewed_alert (40) + linked_to_case (60) scores partial."""
+
+    def _setup_multi_rubric(self, db, lab_lesson):
+        _add_alert_triage_fixture_n(db, lab_lesson.id, 2)
+        _add_rubric(db, lab_lesson.id, kind="viewed_alert", points=40, sort_order=0)
+        _add_rubric(db, lab_lesson.id, kind="linked_to_case", points=60,
+                    sort_order=1, config={"min_alerts": 2})
+
+    def test_only_viewed_scores_40(self, db, enrolment, lab_lesson, user):
+        self._setup_multi_rubric(db, lab_lesson)
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        mat_ids = seed_lab(db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id)
+        lab_session_service.link_fixtures(
+            db, session_id=sid, materialised_ids=mat_ids
+        )
+        _add_audit(db, user_id=user.id, action="alert_view",
+                   resource_type="alert_triage", resource_id=mat_ids[0])
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["points_earned"] == 40
+        assert result["points_max"] == 100
+        assert result["score"] == 40
+
+    def test_only_linked_scores_60(self, db, enrolment, lab_lesson, user):
+        self._setup_multi_rubric(db, lab_lesson)
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        mat_ids = seed_lab(db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id)
+        lab_session_service.link_fixtures(
+            db, session_id=sid, materialised_ids=mat_ids
+        )
+        _add_link_audit(db, user.id, mat_ids[0], 42)
+        _add_link_audit(db, user.id, mat_ids[1], 42)
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["points_earned"] == 60
+        assert result["score"] == 60
+
+    def test_both_score_100(self, db, enrolment, lab_lesson, user):
+        self._setup_multi_rubric(db, lab_lesson)
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        mat_ids = seed_lab(db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id)
+        lab_session_service.link_fixtures(
+            db, session_id=sid, materialised_ids=mat_ids
+        )
+        _add_audit(db, user_id=user.id, action="alert_view",
+                   resource_type="alert_triage", resource_id=mat_ids[0])
+        _add_link_audit(db, user.id, mat_ids[0], 42)
+        _add_link_audit(db, user.id, mat_ids[1], 42)
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["points_earned"] == 100
+        assert result["score"] == 100
+        # Both rubric rows individually matched.
+        assert all(c["matched"] for c in result["criteria"])
+
+    def test_neither_scores_0(self, db, enrolment, lab_lesson):
+        self._setup_multi_rubric(db, lab_lesson)
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        mat_ids = seed_lab(db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id)
+        lab_session_service.link_fixtures(
+            db, session_id=sid, materialised_ids=mat_ids
+        )
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["points_earned"] == 0
+        assert result["score"] == 0
+        assert not any(c["matched"] for c in result["criteria"])

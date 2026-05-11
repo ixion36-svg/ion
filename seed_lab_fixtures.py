@@ -67,13 +67,25 @@ _FIXTURES = [
             "updated_at": "2026-01-01 00:00:00",
         },
     },
+    # v0.24.0: the L1 M2 lab now grades the learner on linking the two
+    # seeded alerts into a single case via the linked_to_case rubric
+    # criterion. The pre-seeded case description used to assert the
+    # alerts were already linked to it (they weren't — neither alert
+    # fixture's payload sets case_id) which was misleading. We keep the
+    # case as a pre-seeded TARGET the learner can pick when linking,
+    # rather than removing it (creating-from-scratch adds friction that
+    # isn't the point of THIS lab). Description updated to reflect the
+    # new task.
     {
         "fixture_kind": "alert_case",
         "target_table": "alert_cases",
         "payload": {
             "case_number": "LAB-CASE-0001",
             "title": "Lab fixture case — Credential access chain",
-            "description": "Auto-seeded for L1 Module 2 lab exercise. Investigate the two open alerts linked to this case.",
+            "description": (
+                "Auto-seeded for L1 Module 2 lab exercise. "
+                "Link the two open alerts to this case as part of the lab task."
+            ),
             "status": "open",
             "severity": "high",
             "created_by_id": 1,
