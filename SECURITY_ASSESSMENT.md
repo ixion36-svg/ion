@@ -1,8 +1,8 @@
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-05-11 (v0.22.1 delta) / 2026-05-09 (v0.22.0-rc body below)
-**Application Version:** 0.22.1 (security patch on main)
-**Previous Assessment Version:** 0.22.0-rc (2026-05-09)
+**Assessment Date:** 2026-05-11 (v0.23.0 delta + v0.22.1 delta) / 2026-05-09 (v0.22.0-rc body below)
+**Application Version:** 0.23.0 (adaptive lab grading feature ship on main)
+**Previous Assessment Version:** 0.22.1 (2026-05-11)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent
@@ -13,15 +13,63 @@
 
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
-| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 |
-|----------|---------|------------|------------|------------|---------|
-| Critical | 0 | **0** | **0** | **0** | **0** |
-| High | 0 | **0** | **0** | **0** | **0** |
-| Medium | 2 | **3** | **3** | **3** | **3** |
-| Low | 3 | **4** | **6** | **6** | **4** (L5+L6 closed) |
-| **Total** | **5** | **7** | **9** | **9** | **7** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 |
+|----------|---------|------------|------------|------------|---------|---------|
+| Critical | 0 | **0** | **0** | **0** | **0** | **0** |
+| High | 0 | **0** | **0** | **0** | **0** | **0** |
+| Medium | 2 | **3** | **3** | **3** | **3** | **3** (unchanged) |
+| Low | 3 | **4** | **6** | **6** | **4** | **4** (unchanged) |
+| **Total** | **5** | **7** | **9** | **9** | **7** | **7** |
 
-v0.22.1 closes the two Lows that the v0.22.0-rc assessment recommended addressing in a patch (L5 reasoning_text serialisation, L6 confidence_threshold_override permission tier) and resolves the three open questions (OQ4/5/6) from `_spec_v0_22.md` §7. See the v0.22.1 Delta section below for details.
+v0.23.0 adds the adaptive lab grading feature — three new tables, one new audit-event surface, and one new evaluator service. Net new findings: 0C / 0H / 0M / 0L. v0.22.1 closes the two Lows that the v0.22.0-rc assessment recommended addressing in a patch (L5 reasoning_text serialisation, L6 confidence_threshold_override permission tier) and resolves the three open questions (OQ4/5/6) from `_spec_v0_22.md` §7. See the deltas below.
+
+---
+
+## v0.23.0 Delta (2026-05-11)
+
+**Net change vs v0.22.1:** +0 findings. One new feature surface (adaptive lab grading) with three new tables, one new audit event, and refactored launch/complete endpoints.
+
+### New Surface 1: `lab_sessions` / `lab_rubrics` / `lab_criterion_results` tables
+
+**Files:** `src/ion/storage/database.py` (migrations), `src/ion/services/lab_session_service.py`, `src/ion/services/lab_grading_service.py`.
+
+Three tables comprise the grading data model. `lab_sessions` is a parent row per (enrollment, lesson, attempt); `lab_rubrics` carries per-lesson criteria with a kind-string discriminator and a JSONB config; `lab_criterion_results` is the per-(session, rubric) audit trail. All three use `ON DELETE CASCADE` on FKs so user/course/lesson deletion cleans up grading data correctly. The `uq_criterion_result` unique constraint on `(session_id, rubric_id)` enforces idempotent re-grading at the schema layer. **PASS — no untrusted input written to any of these tables; criterion_config is operator-authored at seed time and read by the dispatch table only.**
+
+### New Surface 2: `alert_view` audit event on GET /elasticsearch/alerts/{id}/triage
+
+**File:** `src/ion/web/api.py`.
+
+The triage-read endpoint now writes one `audit_logs` row per call with `action='alert_view'`, `resource_type='alert_triage'`, and `resource_id = triage.id` when the triage row exists. The write is in a try/except — failure is logged and swallowed so audit writes never break the read path. Audit-log throughput already absorbs higher-volume events (every triage update, every alert close, etc.); the additive read event is bounded by analyst-hours and well within the existing capacity envelope. **PASS — no PII expansion (the existing audit log already carries user_id + resource_id; the new row adds nothing not already auditable).**
+
+### New Surface 3: LabGradingService — audit-log-driven evaluator
+
+**File:** `src/ion/services/lab_grading_service.py`.
+
+The grader's `viewed_alert` evaluator runs the following parameterised query against `audit_logs`:
+```
+SELECT id FROM audit_logs
+WHERE action = 'alert_view'
+  AND resource_type = 'alert_triage'
+  AND resource_id IN (<session's materialised alert_triage ids>)
+  AND user_id = :uid
+  AND timestamp >= :since
+ORDER BY id ASC LIMIT 1
+```
+The IN clause uses dynamic parameter placeholders (`:id_0, :id_1, …`) bound from `lab_session_fixtures` rows scoped to the session, not from user input. The `user_id` and `since` bind values come from the session's enrollment row and `lab_sessions.started_at`, both server-controlled. **PASS — no SQL injection vector; cross-learner snooping is blocked by the `user_id = :uid` AND `resource_id IN (session's own materialised ids)` double-filter (a learner's audit_logs row matches only on their own seeded fixtures because each enrollment seeds distinct rows).**
+
+### New Surface 4: `/api/courses/{slug}/lessons/{lesson_id}/lab/{launch,complete}` response shape
+
+**File:** `src/ion/web/labs_api.py`.
+
+Both endpoints gain new response fields (`session_id` on both; `score`, `points_earned`, `points_max`, `criteria` on complete). The criteria list contains rubric metadata (kind, matched, points) — operator-authored content, no PII. Existing fields preserved. **PASS — additive response shape; downstream consumers (lesson.html, tests) gracefully tolerate missing fields.**
+
+### Known non-finding: grade-snipe by direct API call
+
+The `alert_view` audit event fires whenever a learner GETs the triage endpoint, regardless of whether they used the UI. A learner with `alert:read` could call the endpoint directly to trigger the audit row without actually reading the rendered detail panel. This is by design — the criterion is "viewed the alert" defined as "issued an alert-read request", which a CLI/curl invocation satisfies. Pedagogically this is acceptable because the rubric measures access, not comprehension; comprehension is measured by the lab's verification questions (the existing quiz machinery on the same lesson). Documented here to make the threat-model boundary explicit rather than fixed.
+
+### Known non-finding: unbounded attempt count
+
+`lab_sessions.attempt_number` increments without cap. A learner can launch/complete-and-fail/launch repeatedly until the rubric matches. This is a pedagogy choice (re-attempts are encouraged for skill drill), not a security boundary. Future versions may add per-course attempt limits if instructors request them; the schema already supports it via the `attempt_number` column.
 
 ---
 
