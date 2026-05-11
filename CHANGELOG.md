@@ -1,5 +1,103 @@
 # Changelog
 
+## v0.24.0 — 2026-05-11
+
+Mixed plate per the v0.23.2 handoff recommendation: one feature, one
+SDLC gap closure, one cleanup.
+
+### feat(labs): adaptive lab grading session 2 — multi-criterion rubrics + linked_to_case kind
+
+The v0.23.0 session-1 ship had one criterion kind (`viewed_alert`) on
+one seeded rubric (L1 Module 2, 100 points). Session 2 extends the
+grader to support multiple criteria per lab and adds the
+`linked_to_case` kind that grades alert-correlation behaviour — the
+load-bearing L1 reflex on multi-alert incidents.
+
+**New criterion kind: `linked_to_case`** evaluates whether the learner
+linked at least N (default 2) of the session's materialised
+alert_triage rows to the SAME case during the session window.
+Convergence on a single case is the test, not scattered linkages
+across multiple cases. The evaluator reads ``audit_logs`` rows with
+``action='alert_linked'`` and groups by the target ``case_id`` from
+the row's ``details`` JSON.
+
+**New audit event: `alert_linked`** fires at the two case-link write
+sites in `ion.web.api`:
+
+- The case-create loop at ``POST /elasticsearch/alerts/cases`` (one
+  audit row per linked alert when a new case is created from the
+  alerts page).
+- The PUT triage path at ``PUT /elasticsearch/alerts/{alert_id}/triage``
+  when ``case_id`` is set or changed (one row per real transition;
+  no-op re-PATCH does not fire).
+
+Both writes are best-effort: the audit row is wrapped in a try/except
+so a logging failure can never break the case-link operation itself.
+``resource_type='alert_triage'``, ``resource_id=triage.id``,
+``details={"case_id": <int>, "es_alert_id": "<es-id>"}``.
+
+**L1 Module 2 lab content updated** to reflect the correlation focus:
+the lab now grades reading at least one of the seeded alerts (40
+points) plus linking BOTH to the same case (60 points). The two
+seeded alert fixtures were already un-linked at the fixture-payload
+level (no ``case_id`` set); the pre-seeded ``LAB-CASE-0001`` is kept
+as a ready-made target case the learner can pick when linking. Lab
+description updated to remove the (incorrect) claim that the alerts
+were pre-linked to the case.
+
+**Rubric helper now upserts.** ``_add_lab_rubric`` in ``seed_courses.py``
+previously skipped when ``(lesson_id, criterion_kind, sort_order)`` matched
+an existing row; now it keys on ``(lesson_id, sort_order)`` and updates
+all other fields on a hit. The v0.24.0 rubric retune (100→40+60)
+required the upsert semantic — without it, an existing 100-pt
+viewed_alert row would have stayed at 100 on reseed.
+
+Tests: 8 new cases in ``tests/test_lab_grading.py`` covering
+linked_to_case match/no-match/wrong-case/single-alert scenarios and a
+TestMultiCriterionRubric class proving partial-credit grading
+(0/40/60/100). 19/19 lab grading tests pass.
+
+Files: ``src/ion/web/api.py``, ``src/ion/services/lab_grading_service.py``,
+``seed_courses.py``, ``seed_lab_fixtures.py``,
+``tests/test_lab_grading.py``.
+
+### feat(ci): GitHub Actions pipeline — closes SDLC §8 CI gap
+
+`.github/workflows/test.yml` runs three parallel jobs on every push to
+`main`/`dev` and every PR to `main`:
+
+- **pytest** — full `tests/` suite on Python 3.11 / Ubuntu / SQLite
+  in-process. 15-minute timeout.
+- **ruff** — lint via `ruff check src/` using the existing
+  `pyproject.toml [tool.ruff]` config (target py311, line length 120,
+  data/ per-file ignores).
+- **bandit** — `bandit -r src/ --skip B602,B608,B101 -lll` (high-
+  severity only). Skips documented in-workflow per ION's threat model
+  (B602 covers KB seed scripts' allow-listed CLI invocations, B608
+  covers the raw migration SQL with allow-listed column names, B101
+  covers test asserts).
+
+Each job runs independently so a single review surface shows every
+category of failure at once. The SDLC doc was updated to reflect the
+running CI: §3.4.4 rewritten, §4 NCSC Principle 6 moved from
+**Partial** to **Met**, §8 CI gap struck through with closure note,
+§9 Revision History gains a v1.1 row.
+
+Files: ``.github/workflows/test.yml`` (new), ``docs/DEVELOPMENT_LIFECYCLE.md``.
+
+### chore(tide): drop ION_TIDE_SYNC_INTERVAL deprecation fallback
+
+The v0.22.0 rename `ION_TIDE_SYNC_INTERVAL` → `ION_TIDE_SYNC_INTERVAL_S`
+shipped with a one-release-cycle fallback that logged a deprecation
+warning. v0.24.0 removes the fallback per the v0.22.0 carry-over plan.
+Operators still using the old name must rename their env var; the
+deprecation warning has been live since v0.22.0 so the renaming window
+was three minor versions long.
+
+Files: ``src/ion/services/tide_sync_service.py``.
+
+---
+
 ## v0.23.2 — 2026-05-11
 
 Bug-fix patch — the case-close panel-dropdown silent no-op operator

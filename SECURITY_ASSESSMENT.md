@@ -1,8 +1,8 @@
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-05-11 (v0.23.2 + v0.23.1 + v0.23.0 + v0.22.1 deltas) / 2026-05-09 (v0.22.0-rc body below)
-**Application Version:** 0.23.2 (UI bug-fix patch on main)
-**Previous Assessment Version:** 0.23.1 (2026-05-11)
+**Assessment Date:** 2026-05-11 (v0.24.0 + v0.23.2 + v0.23.1 + v0.23.0 + v0.22.1 deltas) / 2026-05-09 (v0.22.0-rc body below)
+**Application Version:** 0.24.0 (feature ship on main)
+**Previous Assessment Version:** 0.23.2 (2026-05-11)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent
@@ -13,15 +13,47 @@
 
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
-| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 |
-|----------|---------|------------|------------|------------|---------|---------|---------|---------|
-| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
-| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** |
-| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 |
+|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|
+| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
+| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** |
+| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** |
 
-v0.23.2 is a UI bug-fix patch — case-close via the panel dropdown silently no-op'd when the post-PATCH `allCases.find(...)` gate failed. Pure frontend fix; no server-side changes; no new endpoints; no new tables. Net new findings: 0C / 0H / 0M / 0L. v0.23.1 is a bug-fix patch — investigation queue control surface, Bob auto-comment removal in favour of an on-demand endpoint, multi-alert case title format. The auto-comment removal also closes a **minor information-flow concern**: prior behaviour wrote Bob's verdict + summary text to a Note row authored by the system user on EVERY investigation completion, including cases that may have been opened by a different user. The new model only emits Bob output when an analyst explicitly clicks "Get Bob's analysis", which is a clear consent boundary.
+v0.24.0 is a mixed-plate ship: adaptive lab grading session 2 (new `alert_linked` audit event surface, new `linked_to_case` grader criterion kind), a CI pipeline that closes the largest SDLC §8 gap (continuous security testing via bandit + pytest + ruff on every push), and the v0.22.0 carry-over TIDE env-var fallback cleanup. Net new findings: 0C / 0H / 0M / 0L. The new audit event closes a tiny pre-existing trail gap (alert-case linkages were not audited before v0.24.0 — see v0.24.0 Delta below). v0.23.2 is a UI bug-fix patch — case-close via the panel dropdown silently no-op'd when the post-PATCH `allCases.find(...)` gate failed. Pure frontend fix; no server-side changes; no new endpoints; no new tables. v0.23.1 is a bug-fix patch — investigation queue control surface, Bob auto-comment removal in favour of an on-demand endpoint, multi-alert case title format. The auto-comment removal also closes a **minor information-flow concern**: prior behaviour wrote Bob's verdict + summary text to a Note row authored by the system user on EVERY investigation completion, including cases that may have been opened by a different user. The new model only emits Bob output when an analyst explicitly clicks "Get Bob's analysis", which is a clear consent boundary.
+
+---
+
+## v0.24.0 Delta (2026-05-11)
+
+**Net change vs v0.23.2:** +0 findings. One new audit-event surface (`alert_linked`), one new grader criterion kind (`linked_to_case`), one new CI pipeline closing the largest SDLC §8 gap, one cleanup. The new audit event also closes a tiny pre-existing audit-trail gap: prior to v0.24.0, linking an alert to a case (via either the case-create loop or PUT-triage path) was a mutation with **no audit_logs row**. That's now fixed, which materially improves the case-ownership audit trail without introducing a new attack surface.
+
+### New Surface 1: `alert_linked` audit event
+
+**Files:** `src/ion/web/api.py` at the case-create loop (~line 4404) and the PUT triage path (~line 6539).
+
+The event fires on every real `AlertTriage.case_id` transition, with `action='alert_linked'`, `resource_type='alert_triage'`, `resource_id=triage.id`, and `details={"case_id": <int>, "es_alert_id": "<es-id>"}` as JSON. Both write sites wrap the audit row in a try/except so an audit failure cannot break the case-link operation itself. The PUT triage path also guards against no-op re-PATCHes (the `case_id` value is compared to the existing one before the audit row fires) so re-saving an already-linked triage doesn't generate audit noise.
+
+**Information-flow:** the event reveals nothing the calling user did not already know — they just made the link. No new data is exposed to anyone reading the audit log who did not already have access to the underlying alert and case.
+
+### New Surface 2: `linked_to_case` grader criterion kind
+
+**File:** `src/ion/services/lab_grading_service.py`.
+
+The evaluator reads `audit_logs` rows for the session's materialised alert_triage ids, scoped by `user_id` and `started_at` (the same scope as the v0.23.0 `viewed_alert` evaluator), and groups by the target `case_id` parsed out of the JSON `details` column. Match when `min_alerts` (default 2) distinct materialised alerts converge on a single case. The IN clause uses dynamic parameter placeholders bound from `lab_session_fixtures` rows — no untrusted data flows into the query.
+
+### New Surface 3: GitHub Actions CI pipeline
+
+**File:** `.github/workflows/test.yml`.
+
+Three parallel jobs (pytest, ruff, bandit) on every push to `main`/`dev` and every PR to `main`. Bandit skips are documented in the workflow file and reflect ION's existing threat model (allow-listed CLI invocations, allow-listed raw migration SQL, test asserts). No secrets are exposed by the workflow; no third-party actions outside `actions/checkout` and `actions/setup-python` are used. The workflow itself is auditable in git history; modifying it requires a push to `main` like any other change.
+
+### Removed Surface: `ION_TIDE_SYNC_INTERVAL` deprecation fallback
+
+**File:** `src/ion/services/tide_sync_service.py`.
+
+The v0.22.0→v0.23.x one-cycle deprecation fallback that logged a warning and accepted the old env-var name was removed in v0.24.0. Operators still using the old name must rename to `ION_TIDE_SYNC_INTERVAL_S`. The deprecation warning has been live since v0.22.0 across three minor versions, so the renaming window was generous.
 
 ---
 
