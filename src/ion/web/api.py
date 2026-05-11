@@ -4470,6 +4470,15 @@ async def create_case(
     from ion.services.observable_service import get_observable_service
     obs_service = get_observable_service(session)
 
+    # v0.25.0: snapshot ObservableLink.id BEFORE the extract calls so the
+    # audit pass below knows which links are genuinely new. Feeds the
+    # adaptive lab-grading observable_created evaluator.
+    from sqlalchemy import func as _func
+    from ion.models.observable import ObservableLink as _ObservableLink
+    _max_link_id_before = (
+        session.query(_func.coalesce(_func.max(_ObservableLink.id), 0)).scalar() or 0
+    )
+
     # Primary path — pre-extracted observables from every linked triage.
     enriched_observables = await obs_service.enrich_and_link_observables_for_case(
         case_id=new_case.id,
@@ -4498,6 +4507,50 @@ async def create_case(
     if case_observables:
         new_case.observables = case_observables
         session.commit()
+
+    # v0.25.0: emit observable_linked audit rows for new ObservableLink rows
+    # created by the extract calls above. Best-effort; never blocks the
+    # response. Feeds the adaptive lab-grading observable_created evaluator.
+    try:
+        from sqlalchemy.orm import joinedload as _joinedload
+        new_links = (
+            session.query(_ObservableLink)
+            .options(_joinedload(_ObservableLink.observable))
+            .filter(_ObservableLink.id > int(_max_link_id_before))
+            .all()
+        )
+        for link in new_links:
+            obs = link.observable
+            obs_type = (
+                obs.type.value if obs and hasattr(obs.type, "value")
+                else str(getattr(obs, "type", "")) if obs else ""
+            )
+            try:
+                AuditLogRepository(session).create(
+                    action="observable_linked",
+                    user_id=current_user.id,
+                    resource_type="observable",
+                    resource_id=link.observable_id,
+                    details={
+                        "observable_id": link.observable_id,
+                        "observable_type": obs_type,
+                        "link_type": (
+                            link.link_type.value
+                            if hasattr(link.link_type, "value")
+                            else str(link.link_type)
+                        ),
+                        "entity_id": link.entity_id,
+                        "context": link.context,
+                    },
+                )
+            except Exception:
+                logger.exception(
+                    "observable_linked audit write failed in create_case (non-fatal)"
+                )
+    except Exception:
+        logger.exception(
+            "observable_linked audit batch failed in create_case (non-fatal)"
+        )
 
     # ── v0.16.0: PCAP auto-analysis ─────────────────────────────────────
     #
@@ -5282,6 +5335,29 @@ async def update_case(
             case.closure_notes = data.closure_notes
             case.closed_by_id = current_user.id
             case.closed_at = datetime.utcnow()
+
+            # v0.25.0: audit the transition for the adaptive lab-grading
+            # case_closed_with_reason evaluator. Best-effort; never blocks
+            # the close. The guard at line 5269 ensures we only fire on a
+            # real OPEN→CLOSED transition (not re-PATCHing closure_notes
+            # on an already-closed case).
+            try:
+                AuditLogRepository(session).create(
+                    action="case_closed",
+                    user_id=current_user.id,
+                    resource_type="alert_case",
+                    resource_id=case.id,
+                    details={
+                        "case_id": case.id,
+                        "case_number": case.case_number,
+                        "closure_reason": data.closure_reason,
+                        "closure_notes": data.closure_notes,
+                    },
+                )
+            except Exception:
+                logger.exception(
+                    "case_closed audit write failed (non-fatal)"
+                )
 
             # Capture AIFeedback ledger rows — per-template agreement metrics
             # feed the detection-engineering scorecard. Best-effort; never
