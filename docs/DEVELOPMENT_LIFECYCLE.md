@@ -228,11 +228,12 @@ Test categories in use:
 
 There is **no current quantitative coverage target**. Coverage is gated by reviewer judgement: every new endpoint requires at least one happy-path + one error-path test; every fix requires a regression test that fails on the pre-fix code and passes on the fix.
 
-A **CI pipeline** runs on every push to `main` and every pull request via GitHub Actions (`.github/workflows/test.yml`, landed in v0.24.0). Three jobs run in parallel:
+A **CI pipeline** runs on every push to `main` / `dev` and every pull request to `main` via GitHub Actions (`.github/workflows/test.yml`, landed in v0.24.0; SCA added v0.25.0). Four jobs run in parallel:
 
 - **pytest** — full `tests/` suite on Python 3.11 / Ubuntu / SQLite in-process. Timeout 15 minutes. Must pass for the workflow to be green.
 - **ruff** — lint via `ruff check src/` with configuration in `pyproject.toml [tool.ruff]` (target Python 3.11, line length 120, per-file ignores for `data/` modules).
 - **bandit** — security lint via `bandit -r src/` with documented skip set `B602,B608,B101` (rationale in the workflow file). High-severity findings fail the job; medium and below are warnings.
+- **pip-audit** — Software Composition Analysis (v0.25.0) via `pip-audit --vulnerability-service osv --strict`. Scans the project's resolved dependency tree against the OSV vulnerability database. Any finding fails the job; specific CVEs may be allowlisted via `--ignore-vuln <id>` with a justification block in the workflow file. The v0.25.0 baseline ignores CVE-2024-23342 (ecdsa Minerva timing side-channel; not reachable in ION's RS256-only OIDC path — see the workflow file for the full justification).
 
 Each job is independent, so a single review surface shows every category of failure at once rather than serialising on the first failure. CI failures **block tag/release** — the release ritual now requires a green CI run on the commit being tagged.
 
@@ -340,9 +341,9 @@ The NCSC's 8 principles map to ION's existing practice as follows. Where a princ
 | **1. Secure development environment** | Maintainer's workstation uses Windows 11 with BitLocker; AI pair-programmer (Claude Opus 4.7) runs locally via Claude Code. No third-party access to the dev environment. | **Partial** — formal DSE hardening checklist not documented. |
 | **2. Protect your code repository** | GitHub private repository, SSH-keyed access, branch `main` is the only release-eligible branch. | **Partial** — branch protection not enabled; signed commits not enforced (§3.4.1). |
 | **3. Secure-by-default configuration** | `.env.deploy` template ships secure defaults. Cookie Secure flag warned at startup. Debug mode default-off. Admin password forced to be non-default in production. | **Met** — see `docs/DEPLOYMENT.md`. |
-| **4. Manage third-party risk** | Dependencies declared in `pyproject.toml` with version-floor constraints. Licence policy stated (§3.2.3). | **Partial** — no SCA scanning; no SBOM; versions floor-constrained but not pinned exact (§8). |
+| **4. Manage third-party risk** | Dependencies declared in `pyproject.toml` with version-floor constraints. Licence policy stated (§3.2.3). `pip-audit` runs in CI against the OSV database on every push and PR (v0.25.0). | **Mostly Met** — SCA scanning landed v0.25.0; SBOM (`syft`) and exact-pinned versions remain §8 gaps. |
 | **5. Plan for vulnerabilities** | `SECURITY_ASSESSMENT.md` reviewed every release. Per-finding fix-by-version target stated. SLA documented in §3.5.4. | **Met** for internal findings; gap for public disclosure channel (§8). |
-| **6. Continuous security testing** | Per-release `SECURITY_ASSESSMENT.md` is a manual audit pass. Regression tests are pinned to every fix. CI runs `pytest` + `ruff` + `bandit -r src/` on every push and PR via GitHub Actions (`.github/workflows/test.yml`, v0.24.0). | **Met** — automated CI security scanning landed v0.24.0. Higher-tier SCA (Snyk / Semgrep) remains a §8 gap. |
+| **6. Continuous security testing** | Per-release `SECURITY_ASSESSMENT.md` is a manual audit pass. Regression tests are pinned to every fix. CI runs `pytest` + `ruff` + `bandit -r src/` + `pip-audit` on every push and PR via GitHub Actions (`.github/workflows/test.yml`, v0.24.0 / SCA v0.25.0). | **Met** — automated CI security scanning incl. SCA. Higher-tier static analysis (Semgrep / CodeQL) remains an aspirational §8 candidate. |
 | **7. Auditable build** | Two-commit release pattern; `chore(release)` commit is mechanical and auditable. Docker images content-addressed by digest. | **Partial** — no signed images; no SBOM; no reproducible-build guarantee at the Python wheel layer (§8). |
 | **8. Operational telemetry** | ECS-compliant structured logs; audit_log table; status banners on degraded integrations. | **Partial** — no metrics endpoint; no formal log-shipping spec (§8). |
 
@@ -474,7 +475,7 @@ The following items are **not currently in place** and represent the delta betwe
 | Gap | Status | Indicative target |
 |-----|--------|-------------------|
 | ~~CI/CD pipeline (`.github/workflows`)~~ | **Closed v0.24.0** — `test.yml` runs pytest + ruff + bandit on every push and PR. |
-| Software Composition Analysis (Snyk / pip-audit) | Not in place | v0.24.x — integrate into CI |
+| ~~Software Composition Analysis (Snyk / pip-audit)~~ | **Closed v0.25.0** — `pip-audit` runs in CI on every push and PR against the OSV database. One CVE-2024-23342 ignore documented with justification (ecdsa Minerva timing side-channel; not reachable in ION's RS256-only OIDC path). |
 | Software Bill of Materials (SBOM) generation at build | Not in place | v0.24.x — `syft` or equivalent on the Docker image |
 | Container image signing (cosign / Sigstore) | Not in place | v0.25.x — depends on customer infrastructure |
 | Pinned dependency versions (vs `>=` floor) | Not in place | v0.24.x — `pyproject.toml` constraint hardening |
@@ -497,6 +498,7 @@ The following items are **not currently in place** and represent the delta betwe
 |---------|------|--------|--------|
 | 1.0 | 2026-05-11 | Maintainer | Initial publication, aligned to Secure by Design 5 phases. Cross-referenced NCSC SD&D 8 principles. Gap analysis (§8) captures the delta to full defence-tier supplier alignment. |
 | 1.1 | 2026-05-11 | Maintainer | v0.24.0: CI pipeline landed at `.github/workflows/test.yml` (pytest + ruff + bandit). §3.4.4 rewritten to describe the running CI. §4 NCSC Principle 6 status moved from **Partial** to **Met**. §8 CI gap struck through with closure note. |
+| 1.2 | 2026-05-11 | Maintainer | v0.25.0: Software Composition Analysis (`pip-audit`) added as a 4th parallel CI job, scanning the resolved dep tree against OSV. §3.4.4 lists the new job and the documented `--ignore-vuln` baseline. §4 NCSC Principle 4 status moved from **Partial** to **Mostly Met**; Principle 6 prose updated to list pip-audit alongside bandit. §8 SCA gap struck through with closure note. |
 
 ---
 

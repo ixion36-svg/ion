@@ -1,8 +1,8 @@
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-05-11 (v0.24.0 + v0.23.2 + v0.23.1 + v0.23.0 + v0.22.1 deltas) / 2026-05-09 (v0.22.0-rc body below)
-**Application Version:** 0.24.0 (feature ship on main)
-**Previous Assessment Version:** 0.23.2 (2026-05-11)
+**Assessment Date:** 2026-05-11 (v0.25.0 + v0.24.0 + v0.23.2 + v0.23.1 + v0.23.0 + v0.22.1 deltas) / 2026-05-09 (v0.22.0-rc body below)
+**Application Version:** 0.25.0 (feature ship on main)
+**Previous Assessment Version:** 0.24.0 (2026-05-11)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent
@@ -13,15 +13,49 @@
 
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
-| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 |
-|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|
-| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
-| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** |
-| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 |
+|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|---------|
+| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
+| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** |
+| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** | **7** |
 
-v0.24.0 is a mixed-plate ship: adaptive lab grading session 2 (new `alert_linked` audit event surface, new `linked_to_case` grader criterion kind), a CI pipeline that closes the largest SDLC §8 gap (continuous security testing via bandit + pytest + ruff on every push), and the v0.22.0 carry-over TIDE env-var fallback cleanup. Net new findings: 0C / 0H / 0M / 0L. The new audit event closes a tiny pre-existing trail gap (alert-case linkages were not audited before v0.24.0 — see v0.24.0 Delta below). v0.23.2 is a UI bug-fix patch — case-close via the panel dropdown silently no-op'd when the post-PATCH `allCases.find(...)` gate failed. Pure frontend fix; no server-side changes; no new endpoints; no new tables. v0.23.1 is a bug-fix patch — investigation queue control surface, Bob auto-comment removal in favour of an on-demand endpoint, multi-alert case title format. The auto-comment removal also closes a **minor information-flow concern**: prior behaviour wrote Bob's verdict + summary text to a Note row authored by the system user on EVERY investigation completion, including cases that may have been opened by a different user. The new model only emits Bob output when an analyst explicitly clicks "Get Bob's analysis", which is a clear consent boundary.
+v0.25.0 is a mixed-plate ship: adaptive lab grading session 3 (two new audit-event surfaces `observable_linked` and `case_closed`, two new grader criterion kinds `observable_created` and `case_closed_with_reason`, four lab rubric backfills), Software Composition Analysis added to CI via pip-audit (closes SDLC §8 SCA gap), and the backlog file rename cleanup. Net new findings: 0C / 0H / 0M / 0L. The two new audit events close two more pre-existing audit-trail gaps (observable creation/linking and case closure were not in `audit_logs` before — see v0.25.0 Delta below). The pip-audit job documents one explicit `--ignore-vuln` (CVE-2024-23342, ECDSA timing side-channel in transitive `ecdsa` package; not reachable in ION's RS256-only OIDC path). v0.24.0 was the previous mixed-plate ship: adaptive lab grading session 2 (`alert_linked` audit, `linked_to_case` kind), a CI pipeline that closes the largest SDLC §8 gap (continuous security testing via bandit + pytest + ruff), and the v0.22.0 carry-over TIDE env-var fallback cleanup.
+
+---
+
+## v0.25.0 Delta (2026-05-11)
+
+**Net change vs v0.24.0:** +0 findings. Two new audit-event surfaces (`observable_linked`, `case_closed`), two new grader criterion kinds, one new CI gate (`pip-audit`), and one explicit per-CVE allowlist. The two new audit events also close two pre-existing audit-trail gaps: prior to v0.25.0, both observable-link creation (via the extract endpoints or the case-create extraction path) AND case closures (the `OPEN→CLOSED` transition through PATCH `update_case`) were mutations with **no `audit_logs` row**. That's now fixed, materially improving the case-lifecycle audit trail without introducing new attack surface.
+
+### New Surface 1: `observable_linked` audit event
+
+**Files:** `src/ion/web/observable_api.py` at `extract_from_alert` (line 926) and `extract_from_case` (line 947); `src/ion/web/api.py` in `create_case` immediately after the `enrich_and_link_observables_for_case` + fallback extract pair.
+
+Each call site snapshots `max(ObservableLink.id)` before the service call, then emits one audit row per new `ObservableLink.id > snapshot` after. `resource_type='observable'`, `resource_id=link.observable_id`, `details={"observable_id", "observable_type", "link_type", "entity_id", "context"}`. Pre-existing links (re-extracting an alert that already has its observables linked) produce zero audit rows because the snapshot filter excludes them. All writes wrapped in try/except (best-effort; an audit failure cannot block the API response).
+
+**Information-flow:** the event reveals nothing the calling user did not already know — they just created the link by calling the API. No new data is exposed to anyone reading the audit log who did not already have access to the underlying observable and entity.
+
+### New Surface 2: `case_closed` audit event
+
+**File:** `src/ion/web/api.py` at `update_case` immediately after `case.closed_at = datetime.utcnow()` (line 5285+) and before the AIFeedback capture.
+
+Fires on every real `OPEN→CLOSED` transition. The guard at the top of the close block (`new_status == "closed" and old_status != "closed"`) ensures no-op re-PATCH of an already-closed case does not write a second audit row — pinned by `tests/test_v025_audit_events.py::test_subsequent_non_close_patch_does_not_write_extra_audit`. `resource_type='alert_case'`, `resource_id=case.id`, `details={"case_id", "case_number", "closure_reason", "closure_notes"}`.
+
+### New Surface 3: `observable_created` + `case_closed_with_reason` grader criterion kinds
+
+**File:** `src/ion/services/lab_grading_service.py`.
+
+Both evaluators read `audit_logs` rows scoped by `user_id` and `started_at`. Neither evaluator scopes by `lab_session_fixtures` (unlike `viewed_alert` and `linked_to_case`) — they grade "did the learner perform action X during the session window", not "did they perform action X tied to a specific seeded fixture". The IN-clause patterns from the prior kinds aren't needed here; instead the queries use a single `action=...` predicate and stream the matching rows, parsing `details` JSON in Python for fine-grained filtering (`types` filter for `observable_created`; `required_reasons` set membership for `case_closed_with_reason`). No untrusted input flows into either query.
+
+### New Surface 4: `pip-audit` CI gate
+
+**File:** `.github/workflows/test.yml`.
+
+The 4th parallel job runs `pip-audit --vulnerability-service osv --strict --ignore-vuln CVE-2024-23342` against the project's resolved dependency tree. The `--strict` flag fails the build on any vulnerability finding not explicitly allowlisted; the one allowlisted CVE has a detailed justification block in the workflow file referencing `src/ion/auth/oidc.py:186` (which pins `algorithms=["RS256"]`, so the ECDSA-side-channel vuln is not reachable). Future findings go through: (a) attempt dependency bump in `pyproject.toml`, (b) if infeasible, add `--ignore-vuln` with justification, (c) escalate to security review for HIGH/CRITICAL that can neither be fixed nor reasonably ignored.
+
+The audit-trail gap closures here (one for observable lifecycle, one for case lifecycle) bring ION's `audit_logs` table to symmetric coverage of the alert / case / observable mutations that matter for SOC compliance. The next equivalent gap is annotation edits (deferred from v0.22.0 — `annotation_edits` history table is in `_backlog_v0_25.md`).
 
 ---
 
